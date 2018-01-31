@@ -1,5 +1,7 @@
 #version 150 core // version 3.2
 
+$include "common.vert"
+
 in		vec3	pos_chunk;
 in		vec4	uvzw_atlas;
 in		vec4	dbg_tint;
@@ -19,4 +21,6 @@ void main () {
 	vs_pos_cam =		pos_cam;
 	vs_uvzw_atlas =		uvzw_atlas;
 	vs_dbg_tint =		dbg_tint;
+	
+	WIREFRAME_MACRO;
 }

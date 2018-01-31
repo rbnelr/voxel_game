@@ -11,9 +11,6 @@
 typedef s32v2	iv2;
 typedef s32v3	iv3;
 typedef s32v4	iv4;
-typedef u32v2	uv2;
-typedef u32v3	uv3;
-typedef u32v4	uv4;
 typedef fv2		v2;
 typedef fv3		v3;
 typedef fv4		v4;
@@ -22,11 +19,19 @@ typedef fm3		m3;
 typedef fm4		m4;
 typedef fhm		hm;
 
+typedef u8v3	lrgb8;
+typedef u8v4	lrgba8;
+
+static lrgb8 to_lrgb8 (v3 lrgbf) {
+	lrgbf = lrgbf * 255.0f +0.5f;
+	return lrgb8((u8)lrgbf.x, (u8)lrgbf.y, (u8)lrgbf.z);
+}
+
 struct Interpolator_Key {
 	f32	range_begin;
 	v3	col;
 };
-v3 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
+lrgb8 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
 	dbg_assert(keys_count >= 1);
 	
 	s32 i=0;
@@ -34,17 +39,21 @@ v3 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
 		if (val < keys[i].range_begin) break;
 	}
 	
+	v3 col;
 	if (i == 0) { // val is lower than the entire range
-		return keys[0].col;
+		col = keys[0].col;
 	} else if (i == keys_count) { // val is higher than the entire range
-		return keys[i -1].col;
+		col = keys[i -1].col;
+	} else {
+		
+		dbg_assert(keys_count >= 2 && i < keys_count);
+		
+		auto& a = keys[i -1];
+		auto& b = keys[i];
+		
+		col = lerp(a.col, b.col, map(val, a.range_begin, b.range_begin));
 	}
-	
-	dbg_assert(keys_count >= 2 && i < keys_count);
-	
-	auto& a = keys[i -1];
-	auto& b = keys[i];
-	return lerp(a.col, b.col, map(val, a.range_begin, b.range_begin));
+	return to_lrgb8(col);
 }
 
 static Interpolator_Key _incandescent_gradient_keys[] = {
@@ -53,7 +62,7 @@ static Interpolator_Key _incandescent_gradient_keys[] = {
 	{ 0.6667f,	srgb(255,255,0)	},
 	{ 1,		srgb(255)		},
 };
-static v3 incandescent_gradient (f32 val) {
+static lrgb8 incandescent_gradient (f32 val) {
 	return interpolate(val, _incandescent_gradient_keys, ARRLEN(_incandescent_gradient_keys));
 }
 static Interpolator_Key _spectrum_gradient_keys[] = {
@@ -63,7 +72,7 @@ static Interpolator_Key _spectrum_gradient_keys[] = {
 	{ 0.75f,	srgb(255,255,0)	},
 	{ 1,		srgb(255,0,0)	},
 };
-static v3 spectrum_gradient (f32 val) {
+static lrgb8 spectrum_gradient (f32 val) {
 	return interpolate(val, _spectrum_gradient_keys, ARRLEN(_spectrum_gradient_keys));
 }
 
@@ -73,6 +82,10 @@ static v3 spectrum_gradient (f32 val) {
 
 #include "platform.hpp"
 
+#include "Mmsystem.h"
+static void dbg_play_sound () {
+	PlaySound(TEXT("recycle.wav"), NULL, SND_FILENAME|SND_ASYNC);
+}
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_STATIC
@@ -117,6 +130,14 @@ static void logf_warning (cstr format, ...) {
 	va_end(vl);
 	
 	printf(ANSI_COLOUR_CODE_YELLOW "%s\n" ANSI_COLOUR_CODE_NC, str.c_str());
+}
+
+namespace random {
+	
+	f32 range (f32 l, f32 h) {
+		return (f32)rand() / (f32)RAND_MAX;
+	}
+	
 }
 
 //
@@ -210,15 +231,15 @@ static Shader* new_shader (strcr v, strcr f, std::initializer_list<Uniform> u, s
 //
 // TODO: document
 struct Mesh_Vertex {
-	v3	pos_chunk;
-	v4	uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
-	v4	dbg_tint;
+	v3		pos_chunk;
+	v4		uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
+	lrgba8	dbg_tint;
 };
 
 static Vertex_Layout mesh_vert_layout = {
-	{ "pos_chunk",	T_V3, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, pos_chunk) },
-	{ "uvzw_atlas",	T_V4, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, uvzw_atlas) },
-	{ "dbg_tint",	T_V4, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, dbg_tint) },
+	{ "pos_chunk",	T_V3,	sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, pos_chunk) },
+	{ "uvzw_atlas",	T_V4,	sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, uvzw_atlas) },
+	{ "dbg_tint",	T_U8V4,	sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, dbg_tint) },
 };
 
 static s32 texture_res = 16;
@@ -254,20 +275,152 @@ static constexpr f32 BLOCK_FULL_HP = 100;
 struct Block {
 	block_type	type;
 	f32			hp;
-	v4			dbg_tint;
+	lrgba8		dbg_tint;
 };
 
 #include "noise.hpp"
 
-static constexpr iv3 CHUNK_DIM = iv3(32,32,16);
+typedef s64v3 bpos;
+typedef s64v2 chunk_pos_t;
 
-struct Chunk {
-	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
+struct s64v2_hashmap {
+	chunk_pos_t v;
 	
-	Block& get_block (iv3 pos) {
-		return data[pos.z][pos.y][pos.x];
+	bool operator== (s64v2_hashmap const& r) const { // for hash map
+		return v.x == r.v.x && v.y == r.v.y;
 	}
 };
+
+static_assert(sizeof(size_t) == 8, "");
+
+namespace std {
+	template<> struct hash<s64v2_hashmap> { // for hash map
+		size_t operator() (s64v2_hashmap const& v) const {
+			return (v.v.y & 0xffffffff) << 32 | (v.v.x & 0xffffffff);
+		}
+	};
+}
+
+static constexpr bpos CHUNK_DIM = bpos(32,32,64);
+
+struct Chunk {
+	chunk_pos_t pos;
+	
+	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
+	
+	Vbo		vbo;
+	
+	void init_gl () {
+		vbo.init(&mesh_vert_layout);
+	}
+	
+	Block* get_block (bpos pos) {
+		return &data[pos.z][pos.y][pos.x];
+	}
+	
+	void generate_blocks_mesh () {
+		
+		bpos chunk_origin = bpos(pos * CHUNK_DIM.xy(), 0);
+		
+		vbo.vertecies.clear();
+		
+		auto cube = [&] (bpos const& pos_world, bpos const& pos_chunk, Block const* b) {
+			
+			f32 XL = (f32)pos_world.x;
+			f32 YL = (f32)pos_world.y;
+			f32 ZL = (f32)pos_world.z;
+			f32 XH = (f32)(pos_world.x +1);
+			f32 YH = (f32)(pos_world.y +1);
+			f32 ZH = (f32)(pos_world.z +1);
+			
+			f32 w = get_block_texture_index_from_block_type(b->type);
+			
+			if (pos_chunk.x == CHUNK_DIM.x-1	|| get_block(pos_chunk +bpos(+1,0,0))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+			}
+			if (pos_chunk.x == 0				|| get_block(pos_chunk +bpos(-1,0,0))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+			}
+			if (pos_chunk.y == CHUNK_DIM.y-1	|| get_block(pos_chunk +bpos(0,+1,0))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+			}
+			if (pos_chunk.y == 0				|| get_block(pos_chunk +bpos(0,-1,0))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->dbg_tint };
+			}
+			if (pos_chunk.z == CHUNK_DIM.z-1	|| get_block(pos_chunk +bpos(0,0,+1))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b->dbg_tint };
+			}
+			if (pos_chunk.z == 0				|| get_block(pos_chunk +bpos(0,0,-1))->type == BT_AIR) {
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b->dbg_tint };
+			}
+		};
+		
+		{
+			bpos i;
+			for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
+				for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
+					for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
+						auto* block = get_block(i);
+						
+						if (block->type != BT_AIR) {
+							
+							cube(i +chunk_origin, i, block);
+							
+						}
+					}
+				}
+			}
+		}
+		
+		vbo.upload();
+	}
+	
+};
+
+#include <unordered_map>
+std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
 f32 heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
@@ -287,23 +440,21 @@ f32 heightmap_perlin2d (v2 v) {
 	
 	//printf(">>>>>>>>> %.3f %.3f\n", fre, amp);
 	
-	return tot +3;
+	return tot +32;
 }
 
-Chunk chunk = {};
-
-f32 heightmap[CHUNK_DIM.y][CHUNK_DIM.x];
-
-void gen_chunks () {
-	iv3 i;
+void gen_chunk (Chunk* chunk) {
+	bpos i; // position in chunk
 	for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
 		for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 			for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
-				auto& b = chunk.get_block(i);
+				auto* b = chunk->get_block(i);
 				
-				b.type = BT_AIR;
-				b.hp = BLOCK_FULL_HP;
-				b.dbg_tint = 1;
+				b->type = BT_AIR;
+				b->hp = BLOCK_FULL_HP;
+				b->dbg_tint = 255;
+				
+				//if (i.z == CHUNK_DIM.z-1) b->type = BT_EARTH;
 			}
 		}
 	}
@@ -311,20 +462,70 @@ void gen_chunks () {
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
-			f32 height = heightmap[i.y][i.x];
+			f32 height = heightmap_perlin2d((v2)i.xy() +chunk->pos*CHUNK_DIM.xy());
 			s32 highest_block = (s32)floor(height +0.5f);
 			
-			for (i.z=0; i.z <= min(highest_block, 16); ++i.z) {
-				auto& b = chunk.get_block(i);
+			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
+				auto* b = chunk->get_block(i);
 				if (i.z != highest_block) {
-					b.type = BT_EARTH;
+					b->type = BT_EARTH;
 				} else {
-					b.type = BT_GRASS;
+					b->type = BT_GRASS;
 				}
-				b.dbg_tint = v4(spectrum_gradient((height +0.5f) / 5), 1);
+				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 20, 32)), 255);
 			}
 		}
 	}
+}
+
+Chunk* new_chunk (v3 cam_pos_world) {
+	dbg_assert(chunks.size() > 0);
+	
+	Chunk* c = new Chunk;
+	c->init_gl();
+	
+	f32			nearest_free_spot_dist = +INF;
+	chunk_pos_t	nearest_free_spot;
+	
+	for (auto& hash_pair : chunks) {
+		auto& c = hash_pair.second;
+		
+		auto check_chunk_spot = [&] (chunk_pos_t pos) {
+			if (chunks.count({pos}) != 0) return;
+			// free spot found
+			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
+			
+			f32 dist = length(cam_pos_world.xy() - chunk_center);
+			if (dist < nearest_free_spot_dist && all(pos >= 0)) {
+				nearest_free_spot_dist = dist;
+				nearest_free_spot = pos;
+			}
+		};
+		
+		check_chunk_spot(c->pos +chunk_pos_t(+1, 0));
+		check_chunk_spot(c->pos +chunk_pos_t( 0,+1));
+		check_chunk_spot(c->pos +chunk_pos_t(-1, 0));
+		check_chunk_spot(c->pos +chunk_pos_t( 0,-1));
+		
+	}
+	
+	dbg_assert(nearest_free_spot_dist != +INF);
+	
+	c->pos = nearest_free_spot;
+	
+	chunks.insert({{c->pos}, c});
+	gen_chunk(c);
+	return c;
+}
+Chunk* inital_chunk () {
+	Chunk* c = new Chunk;
+	c->init_gl();
+	
+	c->pos = 0;
+	
+	chunks.insert({{c->pos}, c});
+	gen_chunk(c);
+	return c;
 }
 
 //
@@ -403,6 +604,10 @@ static void save_game () {
 	}
 }
 
+static void reset_chunks () {
+	for (auto& c : chunks) gen_chunk(c.second);
+}
+
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
 	
@@ -431,6 +636,8 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				case GLFW_KEY_SPACE:		inp.move_dir.y += went_down ? +1 : -1;		break;
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
+				
+				case GLFW_KEY_R:			if (went_down) reset_chunks();					break;
 			}
 		} else {
 			switch (key) {
@@ -631,6 +838,7 @@ int main (int argc, char** argv) {
 		tex_block_atlas.upload();
 	}
 	
+	#if 0
 	Texture2D noise_test;
 	auto gen_noise_test = [&] () {
 		iv2 size = CHUNK_DIM.xy();
@@ -663,14 +871,24 @@ int main (int argc, char** argv) {
 		
 		gen_chunks();
 	};
+	#endif
 	
-	Vbo chunk_vbo;
-	chunk_vbo.init(&mesh_vert_layout);
+	inital_chunk();
+	while (chunks.size() < 6) new_chunk(cam.pos_world);
 	
 	// 
 	f64 prev_t = glfwGetTime();
 	f32 avg_dt = 1.0f / 60;
 	f32 avg_dt_alpha = 0.025f;
+	
+	/*
+	auto explosion_random_period = [] () {
+		f32 tmp = random::range(0,1);
+		return lerp(0.1f, 4.0f, tmp*tmp);
+	};
+	
+	f64 next_explosion = prev_t +explosion_random_period();
+	*/
 	
 	for (u32 frame_i=0;; ++frame_i) {
 		
@@ -682,7 +900,7 @@ int main (int argc, char** argv) {
 			f32 avdt_ms = avg_dt * 1000;
 			
 			//printf("frame #%5d %6.1f fps %6.2f ms  avg: %6.1f fps %6.2f ms\n", frame_i, fps, dt_ms, avg_fps, avdt_ms);
-			glfwSetWindowTitle(wnd, prints("%s %6d  %6.1f fps avg %6.2f ms avg", app_name, frame_i, avg_fps, avdt_ms).c_str());
+			glfwSetWindowTitle(wnd, prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms).c_str());
 		}
 		
 		inp.mouse_look_diff = 0;
@@ -761,8 +979,22 @@ int main (int argc, char** argv) {
 			}
 		}
 		
-		gen_noise_test();
+		//// Gameplay
+		if (0 && frame_i % 60 == 0 && frame_i != 0) {
+			new_chunk(cam.pos_world);
+			printf(">> %d chunks\n", (s32)chunks.size());
+		}
 		
+		/* if (0 && prev_t >= next_explosion) {
+			
+			random::range()
+			
+			dbg_play_sound();
+			
+			next_explosion = prev_t +explosion_random_period();
+		} */
+		
+		//// Draw
 		glViewport(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
 		
 		if (shad_sky->valid()) { // draw skybox
@@ -831,86 +1063,10 @@ int main (int argc, char** argv) {
 		}
 		#endif
 		
-		{
-			chunk_vbo.vertecies.clear();
+		for (auto& chunk_hash_pair : chunks) {
+			auto& chunk = chunk_hash_pair.second;
 			
-			auto cube = [&] (iv3 block_pos, Block const& b) {
-				
-				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&chunk_vbo.vertecies, sizeof(Mesh_Vertex)*6*6);
-				
-				f32 XL = (f32)block_pos.x;
-				f32 YL = (f32)block_pos.y;
-				f32 ZL = (f32)block_pos.z;
-				f32 XH = (f32)(block_pos.x +1);
-				f32 YH = (f32)(block_pos.y +1);
-				f32 ZH = (f32)(block_pos.z +1);
-				
-				f32 w = get_block_texture_index_from_block_type(b.type);
-				
-				// Sides
-				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				
-				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				
-				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
-				
-				// Top
-				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
-				// Bottom
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
-				
-			};
-			
-			{
-				iv3 i;
-				for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
-					for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
-						for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
-							auto block = chunk.get_block(i);
-							
-							if (block.type != BT_AIR) {
-								
-								cube(i, block);
-								
-							}
-						}
-					}
-				}
-			}
-			
-			chunk_vbo.upload();
+			chunk->generate_blocks_mesh();
 			
 			if (shad_main->valid()) {
 				bind_texture_unit(0, &tex_block_atlas);
@@ -923,7 +1079,7 @@ int main (int argc, char** argv) {
 				shad_main->set_unif("texture_res", texture_res);
 				shad_main->set_unif("atlas_textures_count", atlas_textures_count);
 				
-				chunk_vbo.draw_entire(shad_main);
+				chunk->vbo.draw_entire(shad_main);
 			}
 		}
 		
@@ -994,7 +1150,7 @@ int main (int argc, char** argv) {
 			
 			if (1 && shad_overlay_tex->valid()) {
 				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
-				draw_overlay_tex2d(&noise_test, LL, 8);
+				//draw_overlay_tex2d(&noise_test, LL, 8);
 			}
 			#if 0
 			if (0 && shad_overlay_cubemap->valid()) {

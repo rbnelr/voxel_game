@@ -931,6 +931,8 @@ enum data_type {
 	T_IV3		,
 	T_IV4		,
 	
+	T_U8V4		,
+	
 	T_M3		,
 	T_M4		,
 };
@@ -1334,6 +1336,9 @@ struct Vertex_Layout {
 				GLint comps = 1;
 				GLenum type = GL_FLOAT;
 				u32 size = sizeof(f32);
+				
+				bool int_format = false;
+				
 				switch (a.type) {
 					case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(f32);	break;
 					case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(f32);	break;
@@ -1345,12 +1350,14 @@ struct Vertex_Layout {
 					case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(s32);	break;
 					case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(s32);	break;
 					
+					case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(u8);	break;
+					
 					default: dbg_assert(false);
 				}
 				
-				vertex_size += size;
+				vertex_size += size * comps;
 				
-				glVertexAttribPointer(loc, comps, type, GL_FALSE, a.stride, (void*)a.offs);
+				glVertexAttribPointer(loc, comps, type, int_format ? GL_TRUE : GL_FALSE, a.stride, (void*)a.offs);
 				
 			}
 		}
@@ -1423,7 +1430,7 @@ struct Vbo {
 				glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, NULL);
 		} else {
 			if (vertecies.size() > 0) {
-				dbg_assert(vertecies.size() % vertex_size == 0);
+				dbg_assert(vertecies.size() % vertex_size == 0, "%d %d", (s32)vertecies.size(), vertex_size);
 				glDrawArrays(GL_TRIANGLES, 0, vertecies.size() / vertex_size);
 			}
 		}

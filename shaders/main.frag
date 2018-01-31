@@ -1,6 +1,8 @@
 #version 150 core // version 3.2
 
-$include "common.glsl"
+#define WIREFRAME 0
+
+$include "common.frag"
 
 in		vec3	vs_pos_cam;
 in		vec4	vs_uvzw_atlas;
@@ -68,6 +70,7 @@ void main () {
 	uv.y /= atlas_textures_count;
 	uv.y += vs_uvzw_atlas.w / atlas_textures_count;
 	
-	FRAG_COL( texture(atlas, uv).rgba * mix(vec4(1), vs_dbg_tint, 0.7) );
+	FRAG_COL( texture(atlas, uv).rgba );
+	//FRAG_COL( texture(atlas, uv).rgba * mix(vec4(1), vs_dbg_tint, 0.7) );
 	//FRAG_COL( vs_dbg_tint );
 }
