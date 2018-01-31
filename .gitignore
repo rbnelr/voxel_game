@@ -2,6 +2,7 @@ deps/*
 !deps/glad/
 !deps/stb/
 !deps/glfw-3.3/
+!deps/noise/
 
 assets_src/
 
