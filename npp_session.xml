@@ -1,0 +1,93 @@
+<NotepadPlus>
+    <Session activeView="0">
+        <mainView activeIndex="1">
+            <File firstVisibleLine="21" xOffset="0" scrollWidth="2100" startPos="196" endPos="196" selMode="0" lang="Batch" encoding="-1" filename="D:\Cproj\lib_engine\build.bat" backupFilePath="" originalFileLastModifTimestamp="1511764192" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="-1" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="2100" startPos="442" endPos="442" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\todo.txt" backupFilePath="" originalFileLastModifTimestamp="1511829516" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="0" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1211" startPos="0" endPos="0" selMode="0" lang="Normal Text" encoding="-1" filename="D:\Cproj\lib_engine\notes.txt" backupFilePath="" originalFileLastModifTimestamp="1511473056" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="6660560" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1211" startPos="0" endPos="0" selMode="0" lang="Normal Text" encoding="-1" filename="D:\Cproj\lib_engine\README.md" backupFilePath="" originalFileLastModifTimestamp="1511452094" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="7864439" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1428" startPos="4052" endPos="4052" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\platform.hpp" backupFilePath="" originalFileLastModifTimestamp="1511787020" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="1397903696" mapWrapIndentMode="-1" mapIsWrap="no">
+                <Fold line="10" />
+                <Fold line="13" />
+                <Fold line="19" />
+                <Fold line="24" />
+                <Fold line="29" />
+                <Fold line="41" />
+                <Fold line="46" />
+                <Fold line="58" />
+                <Fold line="74" />
+                <Fold line="78" />
+            </File>
+            <File firstVisibleLine="145" xOffset="0" scrollWidth="1428" startPos="5033" endPos="5003" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\gl.hpp" backupFilePath="" originalFileLastModifTimestamp="1511830206" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="0" mapWrapIndentMode="-1" mapIsWrap="no">
+                <Fold line="1" />
+                <Fold line="25" />
+                <Fold line="50" />
+                <Fold line="90" />
+                <Fold line="134" />
+                <Fold line="329" />
+            </File>
+            <File firstVisibleLine="14" xOffset="0" scrollWidth="1428" startPos="1610" endPos="1610" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\font.hpp" backupFilePath="" originalFileLastModifTimestamp="1511812243" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="16777217" mapWrapIndentMode="-1" mapIsWrap="no" />
+        </mainView>
+        <subView activeIndex="0">
+            <File firstVisibleLine="206" xOffset="0" scrollWidth="1057" startPos="6798" endPos="6798" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\engine.cpp" backupFilePath="" originalFileLastModifTimestamp="1511830226" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="1360" mapWrapIndentMode="-1" mapIsWrap="no">
+                <Fold line="37" />
+                <Fold line="69" />
+                <Fold line="84" />
+                <Fold line="91" />
+                <Fold line="124" />
+                <Fold line="150" />
+                <Fold line="229" />
+                <Fold line="257" />
+                <Fold line="286" />
+                <Fold line="292" />
+                <Fold line="299" />
+                <Fold line="306" />
+                <Fold line="313" />
+                <Fold line="324" />
+                <Fold line="332" />
+                <Fold line="341" />
+                <Fold line="351" />
+                <Fold line="353" />
+                <Fold line="360" />
+                <Fold line="362" />
+                <Fold line="369" />
+                <Fold line="379" />
+                <Fold line="410" />
+                <Fold line="411" />
+                <Fold line="421" />
+                <Fold line="422" />
+                <Fold line="432" />
+                <Fold line="449" />
+                <Fold line="522" />
+                <Fold line="530" />
+                <Fold line="546" />
+            </File>
+            <File firstVisibleLine="141" xOffset="0" scrollWidth="1057" startPos="6415" endPos="6429" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\shapes.hpp" backupFilePath="" originalFileLastModifTimestamp="1511826960" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="1139212288" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="391" xOffset="0" scrollWidth="1057" startPos="8699" endPos="8711" selMode="0" lang="C++" encoding="-1" filename="D:\Cproj\lib_engine\src\mesh_loader.hpp" backupFilePath="" originalFileLastModifTimestamp="1511822279" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="1869898079" mapWrapIndentMode="-1" mapIsWrap="no">
+                <Fold line="28" />
+                <Fold line="101" />
+                <Fold line="108" />
+                <Fold line="119" />
+                <Fold line="129" />
+                <Fold line="141" />
+                <Fold line="153" />
+                <Fold line="163" />
+                <Fold line="175" />
+                <Fold line="186" />
+                <Fold line="236" />
+                <Fold line="241" />
+                <Fold line="255" />
+                <Fold line="264" />
+                <Fold line="269" />
+                <Fold line="274" />
+                <Fold line="490" />
+                <Fold line="501" />
+            </File>
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\normals.frag" backupFilePath="" originalFileLastModifTimestamp="1511603364" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="512" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\diffuse.frag" backupFilePath="" originalFileLastModifTimestamp="1511811673" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="-2130706303" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\skybox.vert" backupFilePath="" originalFileLastModifTimestamp="1511692806" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="512" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\skybox.frag" backupFilePath="" originalFileLastModifTimestamp="1511792682" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="512" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\overlay_tex.vert" backupFilePath="" originalFileLastModifTimestamp="1511810674" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="1139212288" mapWrapIndentMode="-1" mapIsWrap="no" />
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="1057" startPos="0" endPos="0" selMode="0" lang="GLSL_fixed" encoding="-1" filename="D:\Cproj\lib_engine\shaders\overlay_tex.frag" backupFilePath="" originalFileLastModifTimestamp="1511792768" mapFirstVisibleDisplayLine="-1" mapFirstVisibleDocLine="-1" mapLastVisibleDocLine="-1" mapNbLine="-1" mapHigherPos="-1" mapWidth="-1" mapHeight="-1" mapKByteInDoc="6619254" mapWrapIndentMode="-1" mapIsWrap="no" />
+        </subView>
+    </Session>
+</NotepadPlus>
