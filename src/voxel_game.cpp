@@ -22,6 +22,51 @@ typedef fm3		m3;
 typedef fm4		m4;
 typedef fhm		hm;
 
+struct Interpolator_Key {
+	f32	range_begin;
+	v3	col;
+};
+v3 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
+	dbg_assert(keys_count >= 1);
+	
+	s32 i=0;
+	for (; i<keys_count; ++i) {
+		if (val < keys[i].range_begin) break;
+	}
+	
+	if (i == 0) { // val is lower than the entire range
+		return keys[0].col;
+	} else if (i == keys_count) { // val is higher than the entire range
+		return keys[i -1].col;
+	}
+	
+	dbg_assert(keys_count >= 2 && i < keys_count);
+	
+	auto& a = keys[i -1];
+	auto& b = keys[i];
+	return lerp(a.col, b.col, map(val, a.range_begin, b.range_begin));
+}
+
+static Interpolator_Key _incandescent_gradient_keys[] = {
+	{ 0,		srgb(0)			},
+	{ 0.3333f,	srgb(138,0,0)	},
+	{ 0.6667f,	srgb(255,255,0)	},
+	{ 1,		srgb(255)		},
+};
+static v3 incandescent_gradient (f32 val) {
+	return interpolate(val, _incandescent_gradient_keys, ARRLEN(_incandescent_gradient_keys));
+}
+static Interpolator_Key _spectrum_gradient_keys[] = {
+	{ 0,		srgb(0,0,127)	},
+	{ 0.25f,	srgb(0,0,248)	},
+	{ 0.5f,		srgb(0,127,0)	},
+	{ 0.75f,	srgb(255,255,0)	},
+	{ 1,		srgb(255,0,0)	},
+};
+static v3 spectrum_gradient (f32 val) {
+	return interpolate(val, _spectrum_gradient_keys, ARRLEN(_spectrum_gradient_keys));
+}
+
 #define _USING_V110_SDK71_ 1
 #include "glad.c"
 #include "GLFW/glfw3.h"
@@ -167,11 +212,13 @@ static Shader* new_shader (strcr v, strcr f, std::initializer_list<Uniform> u, s
 struct Mesh_Vertex {
 	v3	pos_chunk;
 	v4	uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
+	v4	dbg_tint;
 };
 
 static Vertex_Layout mesh_vert_layout = {
 	{ "pos_chunk",	T_V3, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, pos_chunk) },
 	{ "uvzw_atlas",	T_V4, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, uvzw_atlas) },
+	{ "dbg_tint",	T_V4, sizeof(Mesh_Vertex), offsetof(Mesh_Vertex, dbg_tint) },
 };
 
 static s32 texture_res = 16;
@@ -207,9 +254,12 @@ static constexpr f32 BLOCK_FULL_HP = 100;
 struct Block {
 	block_type	type;
 	f32			hp;
+	v4			dbg_tint;
 };
 
-static constexpr iv3 CHUNK_DIM = iv3(16,16,16);
+#include "noise.hpp"
+
+static constexpr iv3 CHUNK_DIM = iv3(32,32,16);
 
 struct Chunk {
 	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
@@ -219,8 +269,68 @@ struct Chunk {
 	}
 };
 
+f32 heightmap_perlin2d (v2 v) {
+	using namespace perlin_noise_n;
+	
+	//v += v2(1,-1)*mouse * 20;
+	
+	//f32 fre = lerp(0.33f, 3.0f, mouse.x);
+	//f32 amp = lerp(0.33f, 3.0f, mouse.y);
+	
+	f32 tot = 0;
+	
+	tot += perlin_octave(v, 0.053f) * 6.2f;
+	tot += perlin_octave(v, 0.175f) * 4;
+	tot += perlin_octave(v, 0.597f) * 0.79f;
+	
+	tot *= 1.5f;
+	
+	//printf(">>>>>>>>> %.3f %.3f\n", fre, amp);
+	
+	return tot +3;
+}
+
+Chunk chunk = {};
+
+f32 heightmap[CHUNK_DIM.y][CHUNK_DIM.x];
+
+void gen_chunks () {
+	iv3 i;
+	for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
+		for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
+			for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
+				auto& b = chunk.get_block(i);
+				
+				b.type = BT_AIR;
+				b.hp = BLOCK_FULL_HP;
+				b.dbg_tint = 1;
+			}
+		}
+	}
+	
+	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
+		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
+			
+			f32 height = heightmap[i.y][i.x];
+			s32 highest_block = (s32)floor(height +0.5f);
+			
+			for (i.z=0; i.z <= min(highest_block, 16); ++i.z) {
+				auto& b = chunk.get_block(i);
+				if (i.z != highest_block) {
+					b.type = BT_EARTH;
+				} else {
+					b.type = BT_GRASS;
+				}
+				b.dbg_tint = v4(spectrum_gradient((height +0.5f) / 5), 1);
+			}
+		}
+	}
+}
+
 //
 static f32			dt = 0;
+
+static v2			mouse; // for quick debugging
 
 struct Input {
 	iv2		wnd_dim;
@@ -245,6 +355,8 @@ struct Input {
 			f64 x, y;
 			glfwGetCursorPos(wnd, &x, &y);
 			mcursor_pos_px = iv2((int)x, (int)y);
+			
+			mouse = v2(x,y) / (v2)wnd_dim;
 		}
 	}
 	
@@ -420,7 +532,18 @@ int main (int argc, char** argv) {
 	
 	//
 	
-	auto* shad_overlay_tex =		new_shader("overlay_tex.vert",	"overlay_tex.frag",		{UCOM, UV2("pos_clip"), UV2("size_clip")}, {{0,"tex0"}});
+	static GLint OVERLAY_TEXTURE_UNIT = 7;
+	
+	GLuint tex_sampler_nearest;
+	{
+		glGenSamplers(1, &tex_sampler_nearest);
+		glBindSampler(OVERLAY_TEXTURE_UNIT, tex_sampler_nearest);
+		
+		glSamplerParameteri(tex_sampler_nearest, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glSamplerParameteri(tex_sampler_nearest, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+	
+	auto* shad_overlay_tex =		new_shader("overlay_tex.vert",	"overlay_tex.frag",		{UCOM, UV2("pos_clip"), UV2("size_clip")}, {{OVERLAY_TEXTURE_UNIT,"tex0"}});
 	//auto* shad_overlay_cubemap =	new_shader("overlay_tex.vert",	"overlay_cubemap.frag",	{UCOM, UV2("pos_clip"), UV2("size_clip")}, {{0,"tex0"}});
 	
 	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
@@ -508,31 +631,38 @@ int main (int argc, char** argv) {
 		tex_block_atlas.upload();
 	}
 	
-	Chunk chunk = {};
-	
-	{
-		iv3 i;
-		for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
-					auto& b = chunk.get_block(i);
-					
-					b.type = BT_AIR;
-					b.hp = BLOCK_FULL_HP;
-					
-					if (i.z == 0) {
-						b.type = BT_EARTH;
-					} else if (i.z == 1) {
-						b.type = BT_GRASS;
-					} else {
-						
-						
-						
-					}
-				}
+	Texture2D noise_test;
+	auto gen_noise_test = [&] () {
+		iv2 size = CHUNK_DIM.xy();
+		
+		noise_test.alloc_cpu_single_mip(PT_LRGB8, size);
+		
+		dbg_assert(noise_test.get_pixel_size() == 3);
+		u8* dst_pixels = (u8*)noise_test.data.data;
+		auto dst = [&] (s32 x, s32 y) -> u8* {
+			return &dst_pixels[y*size.x*3 + x*3];
+		};
+		
+		iv2 pos;
+		for (pos.y=0; pos.y<size.y; ++pos.y) {
+			for (pos.x=0; pos.x<size.x; ++pos.x) {
+				
+				f32 val = heightmap_perlin2d((v2)pos);
+				heightmap[pos.y][pos.x] = val;
+				
+				val = (val +0.5f) / 8;
+				
+				u32 tmp = (u32)(clamp(val, 0.0f,1.0f) * 255.0f);
+				dst(pos.x,pos.y)[0] = tmp;
+				dst(pos.x,pos.y)[1] = tmp;
+				dst(pos.x,pos.y)[2] = tmp;
 			}
 		}
-	}
+		
+		noise_test.upload();
+		
+		gen_chunks();
+	};
 	
 	Vbo chunk_vbo;
 	chunk_vbo.init(&mesh_vert_layout);
@@ -560,6 +690,8 @@ int main (int argc, char** argv) {
 		glfwPollEvents();
 		
 		inp.get_non_callback_input();
+		
+		//printf(">>> mouse: %.2f %.2f\n", mouse.x,mouse.y);
 		
 		if (glfwWindowShouldClose(wnd)) break;
 		
@@ -628,6 +760,8 @@ int main (int argc, char** argv) {
 				s->set_unif("mcursor_pos", inp.bottom_up_mcursor_pos());
 			}
 		}
+		
+		gen_noise_test();
 		
 		glViewport(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
 		
@@ -700,7 +834,7 @@ int main (int argc, char** argv) {
 		{
 			chunk_vbo.vertecies.clear();
 			
-			auto cube = [&] (iv3 block_pos, block_type bt) {
+			auto cube = [&] (iv3 block_pos, Block const& b) {
 				
 				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&chunk_vbo.vertecies, sizeof(Mesh_Vertex)*6*6);
 				
@@ -711,51 +845,51 @@ int main (int argc, char** argv) {
 				f32 YH = (f32)(block_pos.y +1);
 				f32 ZH = (f32)(block_pos.z +1);
 				
-				f32 w = get_block_texture_index_from_block_type(bt);
+				f32 w = get_block_texture_index_from_block_type(b.type);
 				
 				// Sides
-				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w) };
+				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
 				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w) };
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
 				
-				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w) };
+				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
 				
-				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w) };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w) };
+				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b.dbg_tint };
 				
 				// Top
-				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w) };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w) };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w) };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w) };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w) };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w) };
+				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b.dbg_tint };
 				// Bottom
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w) };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w) };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w) };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w) };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w) };
-				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w) };
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b.dbg_tint };
 				
 			};
 			
@@ -768,7 +902,7 @@ int main (int argc, char** argv) {
 							
 							if (block.type != BT_AIR) {
 								
-								cube(i, block.type);
+								cube(i, block);
 								
 							}
 						}
@@ -799,7 +933,7 @@ int main (int argc, char** argv) {
 			v2 UL = v2(0,1);
 			v2 UR = v2(1,1);
 			
-			auto draw_overlay_tex2d = [&] (Texture2D* tex, v2 pos01, v2 size_multiplier=10) {
+			auto draw_overlay_tex2d = [&] (Texture2D* tex, v2 pos01, v2 size_multiplier=1) {
 				if (!shad_overlay_tex->valid()) {
 					dbg_assert(false);
 					return;
@@ -820,7 +954,7 @@ int main (int argc, char** argv) {
 				shad_overlay_tex->bind();
 				shad_overlay_tex->set_unif("pos_clip", pos_clip);
 				shad_overlay_tex->set_unif("size_clip", size_clip);
-				bind_texture_unit(0, tex);
+				bind_texture_unit(OVERLAY_TEXTURE_UNIT, tex);
 				glDrawArrays(GL_TRIANGLES, 0, 6);
 				
 				glEnable(GL_CULL_FACE);
@@ -859,9 +993,8 @@ int main (int argc, char** argv) {
 			#endif
 			
 			if (1 && shad_overlay_tex->valid()) {
-				//draw_overlay_tex2d(tex_test, LL);
-				//draw_overlay_tex2d(tex_haha, UL);
-				//draw_overlay_tex2d(&tex_block_atlas, LR);
+				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
+				draw_overlay_tex2d(&noise_test, LL, 8);
 			}
 			#if 0
 			if (0 && shad_overlay_cubemap->valid()) {

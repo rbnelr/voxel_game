@@ -4,6 +4,7 @@ $include "common.glsl"
 
 in		vec3	vs_pos_cam;
 in		vec4	vs_uvzw_atlas;
+in		vec4	vs_dbg_tint;
 
 uniform	sampler2D	atlas;
 
@@ -67,5 +68,6 @@ void main () {
 	uv.y /= atlas_textures_count;
 	uv.y += vs_uvzw_atlas.w / atlas_textures_count;
 	
-	FRAG_COL( texture(atlas, uv).rgb );
+	FRAG_COL( texture(atlas, uv).rgba * mix(vec4(1), vs_dbg_tint, 0.7) );
+	//FRAG_COL( vs_dbg_tint );
 }

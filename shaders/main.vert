@@ -2,9 +2,11 @@
 
 in		vec3	pos_chunk;
 in		vec4	uvzw_atlas;
+in		vec4	dbg_tint;
 
 out		vec3	vs_pos_cam;
 out		vec4	vs_uvzw_atlas;
+out		vec4	vs_dbg_tint;
 
 uniform	mat4	world_to_cam;
 uniform	mat4	cam_to_clip;
@@ -16,4 +18,5 @@ void main () {
 	
 	vs_pos_cam =		pos_cam;
 	vs_uvzw_atlas =		uvzw_atlas;
+	vs_dbg_tint =		dbg_tint;
 }
