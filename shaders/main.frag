@@ -70,7 +70,7 @@ void main () {
 	uv.y /= atlas_textures_count;
 	uv.y += vs_uvzw_atlas.w / atlas_textures_count;
 	
-	FRAG_COL( texture(atlas, uv).rgba );
-	//FRAG_COL( texture(atlas, uv).rgba * mix(vec4(1), vs_dbg_tint, 0.7) );
+	//FRAG_COL( texture(atlas, uv).rgba );
+	FRAG_COL( mix(texture(atlas, uv).rgba, vec4(1), 0.4) * mix(vec4(1), vs_dbg_tint, 1) );
 	//FRAG_COL( vs_dbg_tint );
 }

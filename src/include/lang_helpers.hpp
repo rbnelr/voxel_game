@@ -382,3 +382,26 @@ static std::basic_string<utf32> utf8_to_utf32 (std::string utf8_str) {
 	
 	return ret;
 }
+
+namespace parse_n {
+	static bool whitespace_c (char c) {	return c == ' ' || c == '\t'; }
+	
+	static bool whitespace (char** pcur) {
+		char* cur = *pcur;
+		if (!whitespace_c(*cur)) return false;
+		
+		do {
+			++cur;
+		} while (whitespace_c(*cur));
+		
+		*pcur = cur;
+		return true;
+	}
+	
+	static bool char_ (char** pcur, char c) {
+		if (**pcur != c) return false;
+		(*pcur)++;
+		return true;
+	}
+	
+}

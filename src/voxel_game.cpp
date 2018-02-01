@@ -140,6 +140,8 @@ namespace random {
 	
 }
 
+static v2			mouse; // for quick debugging
+
 //
 struct Source_File {
 	str			filepath;
@@ -209,8 +211,134 @@ static cstr textures_base_path =	"assets_src";
 #include "gl.hpp"
 #include "font.hpp"
 
-static font::Font* console_font;
+static font::Font*	overlay_font;
+static f32			overlay_font_line_y;
 
+static Shader*		shad_font;
+static Vbo			vbo_overlay_font;
+
+static void begin_overlay_text () {
+	vbo_overlay_font.clear();
+	
+	overlay_font_line_y = overlay_font->ascent_plus_gap;
+}
+static void overlay_line (strcr s, v3 col=srgb(255,40,0)*0.01f, s32 cursor_pos=-1) {
+	overlay_font->emit_line(&vbo_overlay_font.vertecies, &overlay_font_line_y, shad_font, utf8_to_utf32(s), v4(col, 1), cursor_pos);
+}
+
+//
+static v3 option_col =			srgb(255,40,0)*0.01f;
+static v3 option_highl_col =	srgb(255,255,80)*0.4f;
+static v3 option_edit_col =		srgb(255,255,80)*0.8f;
+
+static enum { OPT_NOT_EDITING=0, OPT_SELECTING, OPT_EDITING } opt_mode = OPT_SELECTING;
+static bool opt_value_edit_flag = false;
+static bool opt_toggle_open = false;
+
+static s32 selected_option = 0;
+static s32 cur_option;
+
+static str opt_val_str;
+static s32 opt_cur_char = 0;
+
+static void begin_options () {
+	cur_option = 0;
+}
+
+static bool parse_s32 (strcr str, s32* val) {
+	char* end = nullptr;
+	*val = strtol(str.c_str(), &end, 10);
+	return end;
+}
+static bool parse_f32 (strcr str, f32* val) {
+	char* end = nullptr;
+	*val = strtof(str.c_str(), &end);
+	return end;
+}
+static bool parse_v2 (strcr str, v2* val) {
+	using namespace parse_n;
+	
+	char* cur = (char*)str.c_str();
+	
+	whitespace(&cur);
+	
+	val->x = strtof(cur, &cur);
+	if (!cur) return false;
+	
+	whitespace(&cur);
+	char_(&cur, ',');
+	
+	whitespace(&cur);
+	
+	val->y = strtof(cur, &cur);
+	if (!cur) return false;
+	
+	return true;
+}
+
+static bool _option (strcr name, str& opt_str, bool* open) {
+	bool option_highl = opt_mode && cur_option++ == selected_option;
+	bool option_edit = option_highl && opt_mode == OPT_EDITING;
+	if (option_highl && opt_toggle_open) {
+		opt_toggle_open = false;
+		if (open) *open = !(*open);
+	}
+	
+	if (option_edit && opt_value_edit_flag) { // started editing
+		opt_value_edit_flag = false;
+		opt_val_str = opt_str;
+	}
+	
+	if (option_edit) {
+		opt_str = opt_val_str;
+	}
+	
+	v3 col = option_col;
+	if (option_highl) {
+		col = option_edit ? option_edit_col : option_highl_col;
+	}
+	
+	overlay_line(prints("%s: %s%s", name.c_str(), opt_str.c_str(), open && !(*open) ? " {...}":""), col, option_edit ? name.size() +2 +opt_cur_char : -1);
+	
+	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
+		opt_value_edit_flag = false;
+		return true;
+	}
+	return false;
+}
+
+static bool option (strcr name, s32 (*get)(), void (*set)(s32)=nullptr, bool* open=nullptr) {
+	str opt_str = prints("%4d", get());
+	s32 tmp;
+	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp) && set) {
+		set(tmp);
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option (strcr name, s32* val, bool* open=nullptr) {
+	str opt_str = prints("%4d", *val);
+	s32 tmp;
+	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
+		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option (strcr name, v2* val, bool* open=nullptr) {
+	str opt_str = prints("%8.7g, %8.7g", val->x,val->y);
+	v2 tmp;
+	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
+		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+
+//
 #define USI(name)	Uniform(T_INT, name)
 #define UIV2(name)	Uniform(T_IV2, name)
 #define UV2(name)	Uniform(T_V2, name)
@@ -306,10 +434,15 @@ static constexpr bpos CHUNK_DIM = bpos(32,32,64);
 struct Chunk {
 	chunk_pos_t pos;
 	
+	bool		vbo_needs_update = false;
+	
 	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
 	
 	Vbo		vbo;
 	
+	void init () {
+		
+	}
 	void init_gl () {
 		vbo.init(&mesh_vert_layout);
 	}
@@ -319,6 +452,8 @@ struct Chunk {
 	}
 	
 	void generate_blocks_mesh () {
+		if (!vbo_needs_update) return;
+		vbo_needs_update = false;
 		
 		bpos chunk_origin = bpos(pos * CHUNK_DIM.xy(), 0);
 		
@@ -422,6 +557,20 @@ struct Chunk {
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
+struct Perlin_Octave {
+	f32	freq;
+	f32	amp;
+};
+std::vector<Perlin_Octave> heightmap_perlin2d_octaves = {
+	{ 0.03f,	30		},
+	{ 0.1f,		10		},
+	{ 0.4f,		3		},
+	{ 2.0f,		0.1f	},
+};
+static s32 get_heightmap_perlin2d_octaves_count () {			return (s32)heightmap_perlin2d_octaves.size(); }
+static void set_heightmap_perlin2d_octaves_count (s32 count) {	heightmap_perlin2d_octaves.resize(count); }
+static bool heightmap_perlin2d_octaves_open = true;
+
 f32 heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
 	
@@ -432,9 +581,9 @@ f32 heightmap_perlin2d (v2 v) {
 	
 	f32 tot = 0;
 	
-	tot += perlin_octave(v, 0.053f) * 6.2f;
-	tot += perlin_octave(v, 0.175f) * 4;
-	tot += perlin_octave(v, 0.597f) * 0.79f;
+	for (auto& o : heightmap_perlin2d_octaves) {
+		tot += perlin_octave(v, o.freq) * o.amp;
+	}
 	
 	tot *= 1.5f;
 	
@@ -472,16 +621,19 @@ void gen_chunk (Chunk* chunk) {
 				} else {
 					b->type = BT_GRASS;
 				}
-				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 20, 32)), 255);
+				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 10, 48)), 255);
 			}
 		}
 	}
+	
+	chunk->vbo_needs_update = true;
 }
 
 Chunk* new_chunk (v3 cam_pos_world) {
 	dbg_assert(chunks.size() > 0);
 	
 	Chunk* c = new Chunk;
+	c->init();
 	c->init_gl();
 	
 	f32			nearest_free_spot_dist = +INF;
@@ -496,7 +648,9 @@ Chunk* new_chunk (v3 cam_pos_world) {
 			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
 			
 			f32 dist = length(cam_pos_world.xy() - chunk_center);
-			if (dist < nearest_free_spot_dist && all(pos >= 0)) {
+			if (dist < nearest_free_spot_dist
+					&& all(pos >= 0)
+					) {
 				nearest_free_spot_dist = dist;
 				nearest_free_spot = pos;
 			}
@@ -519,6 +673,7 @@ Chunk* new_chunk (v3 cam_pos_world) {
 }
 Chunk* inital_chunk () {
 	Chunk* c = new Chunk;
+	c->init();
 	c->init_gl();
 	
 	c->pos = 0;
@@ -530,8 +685,6 @@ Chunk* inital_chunk () {
 
 //
 static f32			dt = 0;
-
-static v2			mouse; // for quick debugging
 
 struct Input {
 	iv2		wnd_dim;
@@ -604,7 +757,7 @@ static void save_game () {
 	}
 }
 
-static void reset_chunks () {
+static void regen_chunks () {
 	for (auto& c : chunks) gen_chunk(c.second);
 }
 
@@ -623,8 +776,67 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	} else {
 		if (!alt) {
 			switch (key) {
-				case GLFW_KEY_F11:			if (went_down) {		toggle_fullscreen(); }	break;
-				
+				case GLFW_KEY_F11:			if (went_down) {	toggle_fullscreen(); }		return;
+			}
+		} else {
+			switch (key) {
+				case GLFW_KEY_ENTER:		if (alt && went_down) {	toggle_fullscreen(); }	return;
+			}
+		}
+	}
+	
+	if (opt_mode == OPT_SELECTING) { 
+		switch (key) {
+			case GLFW_KEY_F1:		if (went_down)	opt_mode = OPT_NOT_EDITING;		return;
+			case GLFW_KEY_ENTER:	if (went_down) {
+					opt_value_edit_flag = true;
+					opt_mode = OPT_EDITING;
+				}
+				return;
+			
+			case GLFW_KEY_UP:		if (went_down || repeated)	selected_option = max(selected_option -1, 0);				return;
+			case GLFW_KEY_DOWN:		if (went_down || repeated)	selected_option = min(selected_option +1, cur_option);		return;
+			
+			case GLFW_KEY_E:		if (went_down)	opt_toggle_open = true;		return;
+			
+		}
+	} else if (opt_mode == OPT_EDITING) { 
+		switch (key) {
+			case GLFW_KEY_F1:			if (went_down)	opt_mode = OPT_NOT_EDITING;		return;
+			case GLFW_KEY_ENTER:		if (went_down) {
+					opt_value_edit_flag = true;
+					opt_mode = OPT_SELECTING;
+				}
+				return;
+			case GLFW_KEY_ESCAPE:		if (went_down) {
+					opt_mode = OPT_SELECTING;
+				}
+				return;
+			
+			case GLFW_KEY_LEFT:			if (went_down || repeated)	opt_cur_char = max(opt_cur_char -1, 0);							return;
+			case GLFW_KEY_RIGHT:		if (went_down || repeated)	opt_cur_char = min(opt_cur_char +1, (s32)opt_val_str.size());	return;
+			
+			case GLFW_KEY_BACKSPACE:	if (went_down || repeated) {
+					if (opt_cur_char > 0) {
+						opt_val_str.erase(opt_val_str.begin() +opt_cur_char -1);
+						--opt_cur_char;
+					}
+				}
+				return;
+			case GLFW_KEY_DELETE:		if (went_down || repeated) {
+					if (opt_cur_char < (s32)opt_val_str.size()) {
+						opt_val_str.erase(opt_val_str.begin() +opt_cur_char);
+					}
+				}
+				return;
+		}
+	}
+	
+	if (repeated) {
+		
+	} else {
+		if (!alt) {
+			switch (key) {
 				//
 				case GLFW_KEY_A:			inp.move_dir.x -= went_down ? +1 : -1;		break;
 				case GLFW_KEY_D:			inp.move_dir.x += went_down ? +1 : -1;		break;
@@ -637,18 +849,22 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
 				
-				case GLFW_KEY_R:			if (went_down) reset_chunks();					break;
+				case GLFW_KEY_R:			if (went_down) regen_chunks();				break;
+				
+				case GLFW_KEY_F1:			if (went_down) opt_mode = OPT_SELECTING;	break;
 			}
 		} else {
 			switch (key) {
-				
-				case GLFW_KEY_ENTER:		if (alt && went_down) {	toggle_fullscreen(); }	break;
-				
 				//
 				case GLFW_KEY_S:			if (alt && went_down) {	save_game(); }			break;
 				case GLFW_KEY_L:			if (alt && went_down) {	load_game(); }			break;
 			}
 		}
+	}
+}
+static void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
+	if (opt_mode == OPT_EDITING) {
+		opt_val_str.insert(opt_val_str.begin() +opt_cur_char++, (char)codepoint);
 	}
 }
 static void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
@@ -677,9 +893,6 @@ static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy)
 	v2 diff = v2((f32)dx,(f32)dy);
 	inp.mouse_look_diff += diff;
 }
-
-static Vbo		vbo_console_font;
-static Shader*	shad_font;
 
 int main (int argc, char** argv) {
 	
@@ -720,7 +933,7 @@ int main (int argc, char** argv) {
 	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
 	
 	{ // init game console overlay
-		f32 sz =	16; // 14 16 24
+		f32 sz =	18; // 14 16 24
 		f32 jpsz =	floor(sz * 1.75f);
 		
 		std::initializer_list<font::Glyph_Range> ranges = {
@@ -731,9 +944,9 @@ int main (int argc, char** argv) {
 			{ "meiryo.ttc",		jpsz,	{ U'　',U'、',U'。',U'”',U'「',U'」' } }, // some jp puncuation
 		};
 		
-		console_font = new font::Font(sz, ranges);
+		overlay_font = new font::Font(sz, ranges);
 		
-		vbo_console_font.init(&font::mesh_vert_layout);
+		vbo_overlay_font.init(&font::mesh_vert_layout);
 		shad_font = new_shader("font.vert", "font.frag", {UCOM}, {{0,"glyphs"}});
 	}
 	
@@ -874,7 +1087,7 @@ int main (int argc, char** argv) {
 	#endif
 	
 	inital_chunk();
-	while (chunks.size() < 6) new_chunk(cam.pos_world);
+	while (chunks.size() < 64) new_chunk(cam.pos_world);
 	
 	// 
 	f64 prev_t = glfwGetTime();
@@ -890,7 +1103,9 @@ int main (int argc, char** argv) {
 	f64 next_explosion = prev_t +explosion_random_period();
 	*/
 	
-	for (u32 frame_i=0;; ++frame_i) {
+	for (s32 frame_i=0;; ++frame_i) {
+		
+		begin_overlay_text();
 		
 		{ //
 			f32 fps = 1.0f / dt;
@@ -901,6 +1116,8 @@ int main (int argc, char** argv) {
 			
 			//printf("frame #%5d %6.1f fps %6.2f ms  avg: %6.1f fps %6.2f ms\n", frame_i, fps, dt_ms, avg_fps, avdt_ms);
 			glfwSetWindowTitle(wnd, prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms).c_str());
+			
+			overlay_line(prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms), srgb(255,40,0)*0.3f);
 		}
 		
 		inp.mouse_look_diff = 0;
@@ -909,7 +1126,9 @@ int main (int argc, char** argv) {
 		
 		inp.get_non_callback_input();
 		
-		//printf(">>> mouse: %.2f %.2f\n", mouse.x,mouse.y);
+		begin_options();
+		
+		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
 		if (glfwWindowShouldClose(wnd)) break;
 		
@@ -980,10 +1199,28 @@ int main (int argc, char** argv) {
 		}
 		
 		//// Gameplay
+		bool do_regen_chunks = false;
+		
+		option("heightmap_perlin2d_octaves", get_heightmap_perlin2d_octaves_count, set_heightmap_perlin2d_octaves_count, &heightmap_perlin2d_octaves_open);
+		if (heightmap_perlin2d_octaves_open) {
+			for (s32 i=0; i<(s32)heightmap_perlin2d_octaves.size(); ++i) {
+				auto& o = heightmap_perlin2d_octaves[i];
+				
+				v2 tmp = v2(o.freq, o.amp);
+				
+				if (option(prints("  [%2d]", i), &tmp)) do_regen_chunks = true;
+				
+				o.freq = tmp.x;	o.amp = tmp.y;
+			}
+		}
+		
+		if (do_regen_chunks) regen_chunks();
+		
 		if (0 && frame_i % 60 == 0 && frame_i != 0) {
 			new_chunk(cam.pos_world);
 			printf(">> %d chunks\n", (s32)chunks.size());
 		}
+		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
 		/* if (0 && prev_t >= next_explosion) {
 			
@@ -1161,7 +1398,6 @@ int main (int argc, char** argv) {
 			
 		}
 		
-		#if 0
 		if (shad_font->valid()) {
 			glEnable(GL_BLEND);
 			glDisable(GL_DEPTH_TEST);
@@ -1169,16 +1405,15 @@ int main (int argc, char** argv) {
 			
 			shad_font->bind();
 			shad_font->set_unif("screen_dim", (v2)inp.wnd_dim);
-			bind_texture_unit(0, &console_font->tex);
+			bind_texture_unit(0, &overlay_font->tex);
 			
-			vbo_console_font.upload();
-			vbo_console_font.draw_entire(shad_font);
+			vbo_overlay_font.upload();
+			vbo_overlay_font.draw_entire(shad_font);
 			
 			glEnable(GL_CULL_FACE);
 			glEnable(GL_DEPTH_TEST);
 			glDisable(GL_BLEND);
 		}
-		#endif
 		
 		glfwSwapBuffers(wnd);
 		
