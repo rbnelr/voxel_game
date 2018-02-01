@@ -99,17 +99,6 @@ template<> constexpr bool _safe_cast<s32, u64> (u64 x) { return x <= 0x7fffffffu
 
 #define BOOL_XOR(a, b)	(((a) != 0) == ((b) != 0))
 
-static u32 round_up_to_pot (u32 i) {
-	--i;
-	i |= i >> 1;
-	i |= i >> 2;
-	i |= i >> 4;
-	i |= i >> 8;
-	i |= i >> 16;
-	++i;
-	return i;
-}
-
 static u32 strlen (utf32 const* str) {
 	u32 ret = 0;
 	while (*str++) ++ret;

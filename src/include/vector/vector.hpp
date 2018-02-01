@@ -1,6 +1,16 @@
 
 #define INL FORCEINLINE
 
+union u8v2;
+union u8v3;
+union u8v4;
+union s32v2;
+union s32v3;
+union s32v4;
+union s64v2;
+union s64v3;
+union s64v4;
+
 //
 #define T	bool
 #define V2	bv2
@@ -24,6 +34,8 @@
 #define BV4	bv4
 
 //
+#define FLTVEC 1
+
 #define T	f32
 #define V2	fv2
 #define V3	fv3
@@ -53,12 +65,15 @@
 #undef V3
 #undef V4
 
+#undef FLTVEC
+
 //
+#define INTVEC	1
+
 #define T	s32
 #define V2	s32v2
 #define V3	s32v3
 #define V4	s32v4
-#define I_TO_F_CONV	1
 	
 	#include "vector_tv2.hpp"
 	#include "vector_tv3.hpp"
@@ -73,7 +88,6 @@
 #define V2	s64v2
 #define V3	s64v3
 #define V4	s64v4
-#define I_TO_F_CONV	1
 	
 	#include "vector_tv2.hpp"
 	#include "vector_tv3.hpp"
@@ -88,7 +102,6 @@
 #define V2	u8v2
 #define V3	u8v3
 #define V4	u8v4
-#define I_TO_F_CONV	1
 	
 	#include "vector_tv2.hpp"
 	#include "vector_tv3.hpp"
@@ -99,7 +112,7 @@
 #undef V3
 #undef V4
 
-#undef I_TO_F_CONV
+#undef INTVEC
 
 //
 #define T	f32

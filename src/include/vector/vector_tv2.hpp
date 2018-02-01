@@ -18,8 +18,8 @@ union V2 {
 	V2& operator*= (V2 r) {					return *this = V2(x * r.x, y * r.y); }
 	V2& operator/= (V2 r) {					return *this = V2(x / r.x, y / r.y); }
 	
-	#if I_TO_F_CONV
-	operator fv2() {						return fv2((f32)x, (f32)y); }
+	#if INTVEC
+	operator fv2() const {					return fv2((f32)x, (f32)y); }
 	#endif
 #endif
 };
@@ -44,6 +44,8 @@ union V2 {
 		return V2(	c.x ? l.x : r.x,	c.y ? l.y : r.y );
 	}
 	
+	static constexpr bool equal (V2 l, V2 r) {		return l.x == r.x && l.y == r.y; }
+	
 	static constexpr V2 operator+ (V2 v) {			return v; }
 	static constexpr V2 operator- (V2 v) {			return V2(-v.x, -v.y); }
 	
@@ -51,6 +53,9 @@ union V2 {
 	static constexpr V2 operator- (V2 l, V2 r) {	return V2(l.x -r.x, l.y -r.y); }
 	static constexpr V2 operator* (V2 l, V2 r) {	return V2(l.x * r.x, l.y * r.y); }
 	static constexpr V2 operator/ (V2 l, V2 r) {	return V2(l.x / r.x, l.y / r.y); }
+#if INTVEC
+	static constexpr V2 operator% (V2 l, V2 r) {	return V2(l.x % r.x, l.y % r.y); }
+#endif
 	
 	static constexpr V2 lerp (V2 a, V2 b, T t) {	return (a * V2(T(1) -t)) +(b * V2(t)); }
 	static constexpr V2 lerp (V2 a, V2 b, V2 t) {	return (a * (V2(1) -t)) +(b * t); }
@@ -59,6 +64,7 @@ union V2 {
 	static constexpr T dot (V2 l, V2 r) {			return l.x*r.x +l.y*r.y; }
 	
 	T length (V2 v) {								return sqrt(v.x*v.x +v.y*v.y); }
+	T length_sqr (V2 v) {							return v.x*v.x +v.y*v.y; }
 	V2 normalize (V2 v) {							return v / V2(length(v)); }
 	V2 normalize_or_zero (V2 v) { // TODO: epsilon?
 		T len = length(v);
@@ -72,9 +78,14 @@ union V2 {
 	static constexpr V2 min (V2 l, V2 r) {			return V2( min(l.x, r.x), min(l.y, r.y) ); }
 	static constexpr V2 max (V2 l, V2 r) {			return V2( max(l.x, r.x), max(l.y, r.y) ); }
 	#endif
+	static constexpr V2 to_deg (V2 v) {				return v * RAD_TO_DEG; }
+	static constexpr V2 to_rad (V2 v) {				return v * DEG_TO_RAD; }
 	
 	static constexpr V2 clamp (V2 val, V2 l, V2 h) {return min( max(val,l), h ); }
 	static V2 mymod (V2 val, V2 range) {
 		return V2(	mymod(val.x, range.x),	mymod(val.y, range.y) );
 	}
+	
+	static V2 floor (V2 v) {						return V2(floor(v.x),	floor(v.y)); }
+	static V2 ceil (V2 v) {							return V2(ceil(v.x),	ceil(v.y)); }
 #endif

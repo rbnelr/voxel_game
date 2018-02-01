@@ -6,6 +6,7 @@
 #include "types.hpp"
 #include "lang_helpers.hpp"
 #include "math.hpp"
+#include "bit_twiddling.hpp"
 #include "vector/vector.hpp"
 
 typedef s32v2	iv2;
@@ -275,6 +276,60 @@ static bool parse_v2 (strcr str, v2* val) {
 	
 	return true;
 }
+static bool parse_v3 (strcr str, v3* val) {
+	using namespace parse_n;
+	
+	char* cur = (char*)str.c_str();
+	
+	whitespace(&cur);
+	
+	val->x = strtof(cur, &cur);
+	if (!cur) return false;
+	
+	whitespace(&cur);
+	char_(&cur, ',');
+	
+	whitespace(&cur);
+	
+	val->y = strtof(cur, &cur);
+	if (!cur) return false;
+	
+	whitespace(&cur);
+	char_(&cur, ',');
+	
+	whitespace(&cur);
+	
+	val->z = strtof(cur, &cur);
+	if (!cur) return false;
+	
+	return true;
+}
+
+static bool option_group (strcr name, bool* open=nullptr) {
+	bool option_highl = opt_mode && cur_option++ == selected_option;
+	bool option_edit = option_highl && opt_mode == OPT_EDITING;
+	if (option_highl && opt_toggle_open) {
+		opt_toggle_open = false;
+		if (open) *open = !(*open);
+	}
+	
+	if (option_edit && opt_value_edit_flag) { // started editing
+		opt_value_edit_flag = false;
+	}
+	
+	v3 col = option_col;
+	if (option_highl) {
+		col = option_edit ? option_edit_col : option_highl_col;
+	}
+	
+	overlay_line(prints("%s:%s", name.c_str(), open && !(*open) ? " {...}":""), col, option_edit ? name.size() +2 +opt_cur_char : -1);
+	
+	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
+		opt_value_edit_flag = false;
+		return true;
+	}
+	return false;
+}
 
 static bool _option (strcr name, str& opt_str, bool* open) {
 	bool option_highl = opt_mode && cur_option++ == selected_option;
@@ -307,6 +362,16 @@ static bool _option (strcr name, str& opt_str, bool* open) {
 	return false;
 }
 
+static bool option (strcr name, bool* val, bool* open=nullptr) {
+	str opt_str = prints("%1d", *val ? 1 : 0);
+	s32 tmp;
+	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
+		*val = tmp != 0;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
 static bool option (strcr name, s32 (*get)(), void (*set)(s32)=nullptr, bool* open=nullptr) {
 	str opt_str = prints("%4d", get());
 	s32 tmp;
@@ -327,11 +392,52 @@ static bool option (strcr name, s32* val, bool* open=nullptr) {
 	}
 	return false;
 }
+static bool option (strcr name, f32* val, bool* open=nullptr) {
+	str opt_str = prints("%8.7g", *val);
+	f32 tmp;
+	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
+		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
 static bool option (strcr name, v2* val, bool* open=nullptr) {
 	str opt_str = prints("%8.7g, %8.7g", val->x,val->y);
 	v2 tmp;
 	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
 		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option (strcr name, v3* val, bool* open=nullptr) {
+	str opt_str = prints("%8.7g, %8.7g, %8.7g", val->x,val->y,val->z);
+	v3 tmp;
+	if (_option(name, opt_str, open))	if (parse_v3(opt_val_str, &tmp)) {
+		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+
+static bool option_deg (strcr name, f32* val, bool* open=nullptr) {
+	str opt_str = prints("%8.7g", to_deg(*val));
+	f32 tmp;
+	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
+		*val = to_rad(tmp);
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option_deg (strcr name, v2* val, bool* open=nullptr) {
+	str opt_str = prints("%8.7g, %8.7g", to_deg(val->x),to_deg(val->y));
+	v2 tmp;
+	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
+		*val = to_rad(tmp);
 		opt_str = opt_val_str;
 		return true;
 	}
@@ -383,14 +489,19 @@ enum block_type : s32 {
 	BT_EARTH	,
 	BT_GRASS	,
 	
+	BT_OUT_OF_BOUNDS	=0xfe,
+	BT_NO_CHUNK			=0xff,
+	
 	BLOCK_TYPES_COUNT
 };
+static bool bt_is_pervious (block_type t) { return t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK; }
 
 static cstr block_texture_name[BLOCK_TYPES_COUNT] = {
 	/* BT_AIR	*/	"missing.png",
 	/* BT_EARTH	*/	"earth.png",
 	/* BT_GRASS	*/	"grass.png",
 };
+static s32 BLOCK_TEXTURE_INDEX_MISSING = 0;
 
 static s32 atlas_textures_count = 3;
 
@@ -406,15 +517,21 @@ struct Block {
 	lrgba8		dbg_tint;
 };
 
+static constexpr Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, 0, 255 };
+static constexpr Block B_NO_CHUNK = { BT_NO_CHUNK, 0, 255 };
+
 #include "noise.hpp"
 
-typedef s64v3 bpos;
-typedef s64v2 chunk_pos_t;
+typedef s64		bpos_t;
+typedef s64v2	bpos2;
+typedef s64v3	bpos;
+
+typedef s64v2	chunk_pos_t;
 
 struct s64v2_hashmap {
 	chunk_pos_t v;
 	
-	bool operator== (s64v2_hashmap const& r) const { // for hash map
+	NOINLINE bool operator== (s64v2_hashmap const& r) const { // for hash map
 		return v.x == r.v.x && v.y == r.v.y;
 	}
 };
@@ -423,8 +540,8 @@ static_assert(sizeof(size_t) == 8, "");
 
 namespace std {
 	template<> struct hash<s64v2_hashmap> { // for hash map
-		size_t operator() (s64v2_hashmap const& v) const {
-			return (v.v.y & 0xffffffff) << 32 | (v.v.x & 0xffffffff);
+		NOINLINE size_t operator() (s64v2_hashmap const& v) const {
+			return 53 * (hash<s64>()(v.v.x) + 53) + hash<s64>()(v.v.y);
 		}
 	};
 }
@@ -554,8 +671,44 @@ struct Chunk {
 	
 };
 
+static chunk_pos_t int_div_by_pot_floor (bpos pos_world, bpos* bpos_in_chunk) {
+	
+	chunk_pos_t chunk_pos;
+	chunk_pos.x = pos_world.x >> GET_CONST_POT(CHUNK_DIM.x); // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
+	chunk_pos.y = pos_world.y >> GET_CONST_POT(CHUNK_DIM.y);
+	
+	*bpos_in_chunk = pos_world;
+	bpos_in_chunk->x = pos_world.x & ((1 << GET_CONST_POT(CHUNK_DIM.x)) -1);
+	bpos_in_chunk->y = pos_world.y & ((1 << GET_CONST_POT(CHUNK_DIM.y)) -1);
+	
+	return chunk_pos;
+}
+
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
+
+static Chunk* _prev_query_block_chunk = nullptr; // to avoid hash map lookup most of the time, since most query_block's are going to end up in the same chunk
+
+static Block* query_block (bpos p) {
+	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
+	
+	bpos rel_p;
+	chunk_pos_t chunk_p = int_div_by_pot_floor(p, &rel_p);
+	
+	Chunk* chunk;
+	if (_prev_query_block_chunk && equal(_prev_query_block_chunk->pos, chunk_p)) {
+		chunk = _prev_query_block_chunk;
+	} else {
+		
+		auto k = chunks.find({chunk_p});
+		if (k == chunks.end()) return (Block*)&B_NO_CHUNK;
+		
+		chunk = k->second;
+		
+		_prev_query_block_chunk = chunk;
+	}
+	return chunk->get_block(rel_p);
+}
 
 struct Perlin_Octave {
 	f32	freq;
@@ -643,7 +796,7 @@ Chunk* new_chunk (v3 cam_pos_world) {
 		auto& c = hash_pair.second;
 		
 		auto check_chunk_spot = [&] (chunk_pos_t pos) {
-			if (chunks.count({pos}) != 0) return;
+			if (chunks.find({pos}) != chunks.end()) return;
 			// free spot found
 			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
 			
@@ -727,17 +880,35 @@ struct Camera {
 	f32	fly_vel;
 	f32	fly_vel_fast_mul;
 	f32	vfov;
+	
+	bool	opt_open;
+	
+	void options () {
+		option_group("camera", &opt_open);
+		if (opt_open) {
+			option(		"  pos_world",			&pos_world);
+			option_deg(	"  ori_ae",				&ori_ae);
+			option(		"  fly_vel",			&fly_vel);
+			option(		"  fly_vel_fast_mul",	&fly_vel_fast_mul);
+			option_deg(	"  vfov",				&vfov);
+		}
+	}
 };
 
 static Camera default_camera = {	v3(0, -5, 1),
 									v2(deg(0), deg(+80)),
 									4,
 									4,
-									deg(70) };
+									deg(70), true };
 
 static Camera		cam;
 
 #define SAVE_FILE	"saves/camera_view.bin"
+
+struct Player {
+	//v3	pos_world = v3((v2)CHUNK_DIM.xy() / 2, );
+	
+};
 
 static void load_game () {
 	bool loaded = read_entire_file(SAVE_FILE, &cam, sizeof(cam));
@@ -1087,7 +1258,14 @@ int main (int argc, char** argv) {
 	#endif
 	
 	inital_chunk();
-	while (chunks.size() < 64) new_chunk(cam.pos_world);
+	while (chunks.size() < 256) new_chunk(cam.pos_world);
+	
+	bool one_chunk_every_frame = false;
+	bool one_chunk_every_frame_open = false;
+	s32 one_chunk_every_frame_period = 60;
+	
+	Vbo test_vbo;
+	test_vbo.init(&mesh_vert_layout);
 	
 	// 
 	f64 prev_t = glfwGetTime();
@@ -1199,6 +1377,8 @@ int main (int argc, char** argv) {
 		}
 		
 		//// Gameplay
+		cam.options();
+		
 		bool do_regen_chunks = false;
 		
 		option("heightmap_perlin2d_octaves", get_heightmap_perlin2d_octaves_count, set_heightmap_perlin2d_octaves_count, &heightmap_perlin2d_octaves_open);
@@ -1216,10 +1396,11 @@ int main (int argc, char** argv) {
 		
 		if (do_regen_chunks) regen_chunks();
 		
-		if (0 && frame_i % 60 == 0 && frame_i != 0) {
-			new_chunk(cam.pos_world);
-			printf(">> %d chunks\n", (s32)chunks.size());
-		}
+		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
+		if (one_chunk_every_frame_open) option("  period", &one_chunk_every_frame_period);
+		
+		if (one_chunk_every_frame && frame_i % one_chunk_every_frame_period == 0 && frame_i != 0) new_chunk(cam.pos_world);
+		
 		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
 		/* if (0 && prev_t >= next_explosion) {
@@ -1318,6 +1499,110 @@ int main (int argc, char** argv) {
 				
 				chunk->vbo.draw_entire(shad_main);
 			}
+		}
+		
+		
+		if (shad_main->valid()) {
+			glDisable(GL_CULL_FACE);
+			
+			shad_main->bind();
+			// uniforms still bound
+			
+			test_vbo.clear();
+			
+			f32 r = 0.4f;
+			f32 h = 1.7f;
+			
+			v3 pos_world = (cam_to_world * v3(0,0,-3)) -v3(0,0,1);
+			
+			auto test_collision = [&] (v3 pos_world, f32 r, f32 h) {
+				
+				bool any_colliding = false;
+				
+				bpos start =	(bpos)floor(pos_world -v3(r,r,0));
+				bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
+				
+				f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+				
+				bpos i;
+				for (i.z=start.z; i.z<end.z; ++i.z) {
+					for (i.y=start.y; i.y<end.y; ++i.y) {
+						for (i.x=start.x; i.x<end.x; ++i.x) {
+							
+							v2 p = pos_world.xy() -(v2)i.xy(); // circle position relative to block
+							
+							v2 closest_p = clamp(p, 0,1); // closest point on block
+							
+							bool could_collide = length_sqr(closest_p -p) <= r*r;
+							
+							lrgba8 col = 255;
+							
+							if (!could_collide) {
+								col = lrgba8(40,40,40,255);
+							} else {
+								
+								auto* b = query_block(i);
+								bool colliding = !bt_is_pervious(b->type);
+								
+								if (colliding) col = lrgba8(255,0,0,255);
+								
+								any_colliding = any_colliding || colliding;
+							}
+							Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
+							
+							*out++ = { (v3)i +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)i +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
+						}
+					}
+				}
+				return any_colliding;
+			};
+			bool colliding = test_collision(pos_world, r, h);
+			
+			{
+				s32 cylinder_sides = 32;
+				
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*(3+6+3)*cylinder_sides);
+				
+				f32 w = BLOCK_TEXTURE_INDEX_MISSING;
+				
+				lrgba8 col = 255;
+				if (colliding) col = lrgba8(255,0,0,255);
+				
+				v2 rv = v2(r,0);
+				
+				for (s32 i=0; i<cylinder_sides; ++i) {
+					f32 rot_a = (f32)(i +0) / (f32)cylinder_sides * deg(360);
+					f32 rot_b = (f32)(i +1) / (f32)cylinder_sides * deg(360);
+					
+					m2 ma = rotate2(rot_a);
+					m2 mb = rotate2(rot_b);
+					
+					*out++ = { pos_world +v3(0,0,     h), v4(v2(0.5f),					UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(ma * rv, h), v4(ma * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(mb * rv, h), v4(mb * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					
+					*out++ = { pos_world +v3(mb * rv, 0), v4(mb * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(mb * rv, h), v4(mb * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(ma * rv, 0), v4(ma * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(ma * rv, 0), v4(ma * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(mb * rv, h), v4(mb * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(ma * rv, h), v4(ma * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					
+					*out++ = { pos_world +v3(0,0,     0), v4(v2(0.5f),					UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(mb * rv, 0), v4(mb * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+					*out++ = { pos_world +v3(ma * rv, 0), v4(ma * v2(+0.5f,0) +0.5f,	UVZW_BLOCK_FACE_TOP,w), col };
+				}
+			}
+			
+			test_vbo.upload();
+			test_vbo.draw_entire(shad_main);
+			
+			glEnable(GL_CULL_FACE);
 		}
 		
 		{

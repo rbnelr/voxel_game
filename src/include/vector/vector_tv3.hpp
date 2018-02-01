@@ -21,11 +21,20 @@ union V3 {
 	V3& operator*= (V3 r) {					return *this = V3(x * r.x, y * r.y, z * r.z); }
 	V3& operator/= (V3 r) {					return *this = V3(x / r.x, y / r.y, z / r.z); }
 
-	#if I_TO_F_CONV
-	operator fv3() {						return fv3((f32)x, (f32)y, (f32)z); }
+	#if FLTVEC
+	operator u8v3() const;
+	operator s64v3() const;
+	operator s32v3() const;
+	#endif
+	#if INTVEC
+	operator fv3() const {					return fv3((f32)x, (f32)y, (f32)z); }
 	#endif
 #endif
 };
+
+#if INTVEC
+fv3::operator V3() const {					return V3((T)x, (T)y, (T)z); }
+#endif
 
 #if BOOLVEC
 	static constexpr bool all (V3 b) {				return b.x && b.y && b.z; }
@@ -47,6 +56,8 @@ union V3 {
 		return V3(	c.x ? l.x : r.x,	c.y ? l.y : r.y,	c.z ? l.z : r.z );
 	}
 	
+	static constexpr bool equal (V3 l, V3 r) {		return l.x == r.x && l.y == r.y && l.z == r.z; }
+	
 	static constexpr V3 operator+ (V3 v) {			return v; }
 	static constexpr V3 operator- (V3 v) {			return V3(-v.x, -v.y, -v.z); }
 
@@ -54,7 +65,10 @@ union V3 {
 	static constexpr V3 operator- (V3 l, V3 r) {	return V3(l.x -r.x, l.y -r.y, l.z -r.z); }
 	static constexpr V3 operator* (V3 l, V3 r) {	return V3(l.x * r.x, l.y * r.y, l.z * r.z); }
 	static constexpr V3 operator/ (V3 l, V3 r) {	return V3(l.x / r.x, l.y / r.y, l.z / r.z); }
-
+#if INTVEC
+	static constexpr V3 operator% (V3 l, V3 r) {	return V3(l.x % r.x, l.y % r.y, l.z % r.z); }
+#endif
+	
 	static constexpr V3 lerp (V3 a, V3 b, T t) {	return (a * V3(T(1) -t)) +(b * V3(t)); }
 	static constexpr V3 lerp (V3 a, V3 b, V3 t) {	return (a * (V3(1) -t)) +(b * t); }
 	static constexpr V3 map (V3 x, V3 a, V3 b) {	return (x -a)/(b -a); }
@@ -66,6 +80,7 @@ union V3 {
 	}
 	
 	T length (V3 v) {								return sqrt(v.x*v.x +v.y*v.y +v.z*v.z); }
+	T length_sqr (V3 v) {							return v.x*v.x +v.y*v.y +v.z*v.z; }
 	V3 normalize (V3 v) {							return v / V3(length(v)); }
 	V3 normalize_or_zero (V3 v) { // TODO: epsilon?
 		T len = length(v);
@@ -79,6 +94,8 @@ union V3 {
 	static constexpr V3 min (V3 l, V3 r) {			return V3( min(l.x, r.x), min(l.y, r.y), min(l.z, r.z) ); }
 	static constexpr V3 max (V3 l, V3 r) {			return V3( max(l.x, r.x), max(l.y, r.y), max(l.z, r.z) ); }
 	#endif
+	static constexpr V3 to_deg (V3 v) {				return v * RAD_TO_DEG; }
+	static constexpr V3 to_rad (V3 v) {				return v * DEG_TO_RAD; }
 
 	static constexpr V3 clamp (V3 val, V3 l, V3 h) {return min( max(val,l), h ); }
 	static V3 mymod (V3 val, V3 range) {
@@ -86,4 +103,7 @@ union V3 {
 					mymod(val.y, range.y),
 					mymod(val.z, range.z) );
 	}
+	
+	static V3 floor (V3 v) {						return V3(floor(v.x),	floor(v.y),	floor(v.z)); }
+	static V3 ceil (V3 v) {							return V3(ceil(v.x),	ceil(v.y),	ceil(v.z)); }
 #endif
