@@ -142,6 +142,7 @@ public:
 	static constexpr M2 row (		T a, T b,
 									T e, T f ) {				return M2{V2(a,e),V2(b,f)}; }
 	static constexpr M2 ident () {								return row(1,0, 0,1); }
+	static constexpr M2 nan () {								return row(QNAN,QNAN, QNAN,QNAN); }
 	
 	M2& operator*= (M2 r);
 };
@@ -159,6 +160,7 @@ public:
 									T e, T f, T g,
 									T i, T j, T k ) {			return M3{V3(a,e,i),V3(b,f,j),V3(c,g,k)}; }
 	static constexpr M3 ident () {								return row(1,0,0, 0,1,0, 0,0,1); }
+	static constexpr M3 nan () {								return row(QNAN,QNAN,QNAN, QNAN,QNAN,QNAN, QNAN,QNAN,QNAN); }
 	constexpr M3 (M2 m): arr{V3(m.arr[0], 0), V3(m.arr[1], 0), V3(0,0,1)} {}
 	
 	M2 m2 () const {											return M2::column( arr[0].xy(), arr[1].xy() ); }
@@ -180,6 +182,7 @@ public:
 									T i, T j, T k, T l,
 									T m, T n, T o, T p ) {		return M4{V4(a,e,i,m),V4(b,f,j,n),V4(c,g,k,o),V4(d,h,l,p)}; }
 	static constexpr M4 ident () {								return row(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1); }
+	static constexpr M4 nan () {								return row(QNAN,QNAN,QNAN,QNAN, QNAN,QNAN,QNAN,QNAN, QNAN,QNAN,QNAN,QNAN, QNAN,QNAN,QNAN,QNAN); }
 	constexpr M4 (M2 m): arr{V4(m.arr[0], 0,0), V4(m.arr[1], 0,0), V4(0,0,1,0), V4(0,0,0,1)} {}
 	constexpr M4 (M3 m): arr{V4(m.arr[0], 0), V4(m.arr[1], 0), V4(m.arr[2], 0), V4(0,0,0,1)} {}
 	
@@ -202,6 +205,7 @@ public:
 									T e, T f, T g, T h,
 									T i, T j, T k, T l ) {		return HM{V3(a,e,i),V3(b,f,j),V3(c,g,k),V3(d,h,l)}; }
 	static constexpr HM ident () {								return row(1,0,0,0, 0,1,0,0, 0,0,1,0); }
+	static constexpr HM nan () {								return row(QNAN,QNAN,QNAN,QNAN, QNAN,QNAN,QNAN,QNAN, QNAN,QNAN,QNAN,QNAN); }
 	constexpr HM (M2 m): arr{V3(m.arr[0], 0), V3(m.arr[1], 0), V3(0,0,1), V3(0,0,0)} {}
 	constexpr HM (M3 m): arr{m.arr[0], m.arr[1], m.arr[2], V3(0,0,0)} {}
 	

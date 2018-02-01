@@ -836,8 +836,84 @@ Chunk* inital_chunk () {
 	return c;
 }
 
+bool test_cylinder_collision (v3 pos_world, f32 r, f32 h) {
+	
+	bool any_colliding = false;
+	
+	bpos start =	(bpos)floor(pos_world -v3(r,r,0));
+	bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
+	
+	bpos i;
+	for (i.z=start.z; i.z<end.z; ++i.z) {
+		for (i.y=start.y; i.y<end.y; ++i.y) {
+			for (i.x=start.x; i.x<end.x; ++i.x) {
+				
+				v2 p = pos_world.xy() -(v2)i.xy(); // circle position relative to block
+				
+				v2 closest_p = clamp(p, 0,1); // closest point on block
+				
+				bool could_collide = length_sqr(closest_p -p) <= r*r;
+				
+				if (!could_collide) continue;
+				
+				auto* b = query_block(i);
+				bool colliding = !bt_is_pervious(b->type);
+				
+				any_colliding = any_colliding || colliding;
+			}
+		}
+	}
+	return any_colliding;
+}
+bool test_cylinder_collision (v3 pos_world, f32 r, f32 h, Vbo* vbo) {
+	
+	bool any_colliding = false;
+	
+	bpos start =	(bpos)floor(pos_world -v3(r,r,0));
+	bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
+	
+	f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+	
+	bpos i;
+	for (i.z=start.z; i.z<end.z; ++i.z) {
+		for (i.y=start.y; i.y<end.y; ++i.y) {
+			for (i.x=start.x; i.x<end.x; ++i.x) {
+				
+				v2 p = pos_world.xy() -(v2)i.xy(); // circle position relative to block
+				
+				v2 closest_p = clamp(p, 0,1); // closest point on block
+				
+				bool could_collide = length_sqr(closest_p -p) <= r*r;
+				
+				lrgba8 col = 255;
+				
+				if (!could_collide) {
+					col = lrgba8(40,40,40,255);
+				} else {
+					
+					auto* b = query_block(i);
+					bool colliding = !bt_is_pervious(b->type);
+					
+					if (colliding) col = lrgba8(255,0,0,255);
+					
+					any_colliding = any_colliding || colliding;
+				}
+				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo->vertecies, sizeof(Mesh_Vertex)*6);
+				
+				*out++ = { (v3)i +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
+				*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+				*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+				*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+				*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+				*out++ = { (v3)i +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
+			}
+		}
+	}
+	return any_colliding;
+}
+
 //
-static f32			dt = 0;
+static f32			dt;
 
 struct Input {
 	iv2		wnd_dim;
@@ -903,12 +979,32 @@ static Camera default_camera = {	v3(0, -5, 1),
 
 static Camera		cam;
 
+static hm world_to_cam;
+static hm cam_to_world;
+static m4 cam_to_clip;
+static m4 skybox_to_clip;
+
 #define SAVE_FILE	"saves/camera_view.bin"
 
+static v3 GRAV_ACCEL = v3(0,0,-10);
+
 struct Player {
-	//v3	pos_world = v3((v2)CHUNK_DIM.xy() / 2, );
+	v3	pos_world = v3(0,0,CHUNK_DIM.z+2);
+	v3	vel_world = 0;
 	
+	f32 collision_r = 0.4f;
+	f32 collision_h = 1.7f;
 };
+
+static Player player;
+
+static bool trigger_respawn_player = true;
+static void respawn_player () {
+	trigger_respawn_player = false;
+	
+	player.pos_world = (cam_to_world * v3(0,0,-6)) +v3(0,0,3);
+	player.vel_world = 0;
+}
 
 static void load_game () {
 	bool loaded = read_entire_file(SAVE_FILE, &cam, sizeof(cam));
@@ -928,7 +1024,9 @@ static void save_game () {
 	}
 }
 
+static bool trigger_regen_chunks = false;
 static void regen_chunks () {
+	trigger_regen_chunks = false;
 	for (auto& c : chunks) gen_chunk(c.second);
 }
 
@@ -1020,7 +1118,8 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
 				
-				case GLFW_KEY_R:			if (went_down) regen_chunks();				break;
+				case GLFW_KEY_R:			if (went_down) trigger_regen_chunks = true;		break;
+				case GLFW_KEY_Q:			if (went_down) trigger_respawn_player = true;	break;
 				
 				case GLFW_KEY_F1:			if (went_down) opt_mode = OPT_SELECTING;	break;
 			}
@@ -1066,13 +1165,14 @@ static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy)
 }
 
 int main (int argc, char** argv) {
+	world_to_cam = hm::nan();
+	cam_to_world = hm::nan();
+	cam_to_clip = m4::nan();
+	skybox_to_clip = m4::nan();
 	
 	cstr app_name = "Voxel Game";
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
-	
-	//
-	load_game();
 	
 	//
 	set_vsync(1);
@@ -1257,8 +1357,11 @@ int main (int argc, char** argv) {
 	};
 	#endif
 	
+	//
+	load_game();
+	
 	inital_chunk();
-	while (chunks.size() < 256) new_chunk(cam.pos_world);
+	while (chunks.size() < 32) new_chunk(cam.pos_world);
 	
 	bool one_chunk_every_frame = false;
 	bool one_chunk_every_frame_open = false;
@@ -1271,17 +1374,15 @@ int main (int argc, char** argv) {
 	f64 prev_t = glfwGetTime();
 	f32 avg_dt = 1.0f / 60;
 	f32 avg_dt_alpha = 0.025f;
-	
-	/*
-	auto explosion_random_period = [] () {
-		f32 tmp = random::range(0,1);
-		return lerp(0.1f, 4.0f, tmp*tmp);
-	};
-	
-	f64 next_explosion = prev_t +explosion_random_period();
-	*/
+	dt = 0;
 	
 	for (s32 frame_i=0;; ++frame_i) {
+		world_to_cam = hm::nan();
+		cam_to_world = hm::nan();
+		cam_to_clip = m4::nan();
+		skybox_to_clip = m4::nan();
+		
+		dt = min(dt, 1.0f / 20);
 		
 		begin_overlay_text();
 		
@@ -1312,10 +1413,6 @@ int main (int argc, char** argv) {
 		
 		for (auto* s : shaders)			s->reload_if_needed();
 		
-		hm world_to_cam;
-		hm cam_to_world;
-		m4 cam_to_clip;
-		m4 skybox_to_clip;
 		{
 			{
 				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (cam.vfov / deg(70));
@@ -1379,7 +1476,7 @@ int main (int argc, char** argv) {
 		//// Gameplay
 		cam.options();
 		
-		bool do_regen_chunks = false;
+		if (trigger_respawn_player) respawn_player();
 		
 		option("heightmap_perlin2d_octaves", get_heightmap_perlin2d_octaves_count, set_heightmap_perlin2d_octaves_count, &heightmap_perlin2d_octaves_open);
 		if (heightmap_perlin2d_octaves_open) {
@@ -1388,13 +1485,13 @@ int main (int argc, char** argv) {
 				
 				v2 tmp = v2(o.freq, o.amp);
 				
-				if (option(prints("  [%2d]", i), &tmp)) do_regen_chunks = true;
+				if (option(prints("  [%2d]", i), &tmp)) trigger_regen_chunks = true;
 				
 				o.freq = tmp.x;	o.amp = tmp.y;
 			}
 		}
 		
-		if (do_regen_chunks) regen_chunks();
+		if (trigger_regen_chunks) regen_chunks();
 		
 		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
 		if (one_chunk_every_frame_open) option("  period", &one_chunk_every_frame_period);
@@ -1403,14 +1500,23 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
-		/* if (0 && prev_t >= next_explosion) {
+		{
+			v3 a = v3( rotate2(lerp(0, deg(360), (f32)rand() / (f32)RAND_MAX)) * v2(1,0), 0);
 			
-			random::range()
+			player.vel_world += (GRAV_ACCEL +a) * dt;
 			
-			dbg_play_sound();
+			v3 pos = player.pos_world +player.vel_world * dt;
 			
-			next_explosion = prev_t +explosion_random_period();
-		} */
+			if (test_cylinder_collision(player.pos_world, player.collision_r, player.collision_h)) {
+				player.vel_world.z = 0;
+			}
+			
+			player.pos_world = player.pos_world +player.vel_world * dt;
+		}
+		
+		player.pos_world = (cam_to_world * v3(0,0,-4)) +v3(0,0,-0.5f);;
+		
+		//cam.pos_world = player.pos_world;
 		
 		//// Draw
 		glViewport(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
@@ -1426,8 +1532,6 @@ int main (int argc, char** argv) {
 			glEnable(GL_DEPTH_TEST);
 		}
 		glClear(GL_DEPTH_BUFFER_BIT);
-		
-		glEnable(GL_BLEND);
 		
 		#if 0
 		for (auto* m : meshes_opaque) {
@@ -1501,7 +1605,6 @@ int main (int argc, char** argv) {
 			}
 		}
 		
-		
 		if (shad_main->valid()) {
 			glDisable(GL_CULL_FACE);
 			
@@ -1510,58 +1613,11 @@ int main (int argc, char** argv) {
 			
 			test_vbo.clear();
 			
-			f32 r = 0.4f;
-			f32 h = 1.7f;
+			v3 pos_world = player.pos_world;
+			f32 r = player.collision_r;
+			f32 h = player.collision_h;
 			
-			v3 pos_world = (cam_to_world * v3(0,0,-3)) -v3(0,0,1);
-			
-			auto test_collision = [&] (v3 pos_world, f32 r, f32 h) {
-				
-				bool any_colliding = false;
-				
-				bpos start =	(bpos)floor(pos_world -v3(r,r,0));
-				bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
-				
-				f32 w = get_block_texture_index_from_block_type(BT_EARTH);
-				
-				bpos i;
-				for (i.z=start.z; i.z<end.z; ++i.z) {
-					for (i.y=start.y; i.y<end.y; ++i.y) {
-						for (i.x=start.x; i.x<end.x; ++i.x) {
-							
-							v2 p = pos_world.xy() -(v2)i.xy(); // circle position relative to block
-							
-							v2 closest_p = clamp(p, 0,1); // closest point on block
-							
-							bool could_collide = length_sqr(closest_p -p) <= r*r;
-							
-							lrgba8 col = 255;
-							
-							if (!could_collide) {
-								col = lrgba8(40,40,40,255);
-							} else {
-								
-								auto* b = query_block(i);
-								bool colliding = !bt_is_pervious(b->type);
-								
-								if (colliding) col = lrgba8(255,0,0,255);
-								
-								any_colliding = any_colliding || colliding;
-							}
-							Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
-							
-							*out++ = { (v3)i +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
-							*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
-							*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
-							*out++ = { (v3)i +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
-							*out++ = { (v3)i +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
-							*out++ = { (v3)i +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
-						}
-					}
-				}
-				return any_colliding;
-			};
-			bool colliding = test_collision(pos_world, r, h);
+			bool colliding = test_cylinder_collision(pos_world, r, h, &test_vbo);
 			
 			{
 				s32 cylinder_sides = 32;
