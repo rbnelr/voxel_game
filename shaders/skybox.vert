@@ -6,7 +6,8 @@ uniform	mat4	world_to_clip;
 uniform	vec2	mcursor_pos;
 uniform	vec2	screen_dim;
 
-uniform	mat4	skybox_to_clip;
+uniform	mat4	world_to_cam;
+uniform	mat4	cam_to_clip;
 
 #define LLL	vec3(-1,-1,-1)
 #define HLL	vec3(+1,-1,-1)
@@ -55,6 +56,6 @@ const vec3 arr[6*6] = vec3[] (
 void main () {
 	float r = mix(1, 0.2, mcursor_pos.x / screen_dim.x);
 	
-	gl_Position =		skybox_to_clip * vec4(arr[gl_VertexID], 1);
+	gl_Position =		cam_to_clip * vec4(mat3(world_to_cam) * arr[gl_VertexID], 1);
 	vs_pos_world_dir =	arr[gl_VertexID];
 }

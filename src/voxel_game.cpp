@@ -209,6 +209,40 @@ static cstr shaders_base_path =		"shaders/";
 //static cstr meshes_base_path =		"assets";
 static cstr textures_base_path =	"assets_src";
 
+static cstr save_files =			"saves/%s.bin";
+
+static bool load_data (strcr name, void* data, uptr size) {
+	str file = prints(save_files, name.c_str());
+	
+	bool loaded = read_entire_file(file.c_str(), data, size);
+	if (loaded) {
+		logf(prints("%s loaded from \"%s\".", name, file.c_str()).c_str());
+	} else {
+		logf_warning(prints("%s could not be loaded from \"%s\".", name, file.c_str()).c_str());
+	}
+	
+	return loaded;
+};
+static bool save_data (strcr name, void const* data, uptr size) {
+	str file = prints(save_files, name.c_str());
+	
+	bool saved = overwrite_file(file.c_str(), data, size);
+	if (saved) {
+		logf(prints("%s saved to \"%s\".", name, file.c_str()).c_str());
+	} else {
+		logf_warning(prints("could not write \"%s\", %s wont be loaded on next launch.", file.c_str(), name).c_str());
+	}
+	
+	return saved;
+}
+
+template <typename T> static bool load_struct (strcr name, T* data) {
+	return load_data(name, data, sizeof(*data));
+}
+template <typename T> static bool save_struct (strcr name, T const& data) {
+	return save_data(name, &data, sizeof(data));
+}
+
 #include "gl.hpp"
 #include "font.hpp"
 
@@ -949,86 +983,25 @@ struct Input {
 };
 static Input		inp;
 
-struct Camera {
-	v3	pos_world;
-	v2	ori_ae; // azimuth elevation
-	
-	f32	fly_vel;
-	f32	fly_vel_fast_mul;
-	f32	vfov;
-	
-	bool	opt_open;
-	
-	void options () {
-		option_group("camera", &opt_open);
-		if (opt_open) {
-			option(		"  pos_world",			&pos_world);
-			option_deg(	"  ori_ae",				&ori_ae);
-			option(		"  fly_vel",			&fly_vel);
-			option(		"  fly_vel_fast_mul",	&fly_vel_fast_mul);
-			option_deg(	"  vfov",				&vfov);
-		}
-	}
-};
-
-static Camera default_camera = {	v3(0, -5, 1),
-									v2(deg(0), deg(+80)),
-									4,
-									4,
-									deg(70), true };
-
-static Camera		cam;
-
-static hm world_to_cam;
-static hm cam_to_world;
-static m4 cam_to_clip;
-static m4 skybox_to_clip;
-
-#define SAVE_FILE	"saves/camera_view.bin"
-
 static v3 GRAV_ACCEL = v3(0,0,-10);
 
-struct Player {
-	v3	pos_world = v3(0,0,CHUNK_DIM.z+2);
-	v3	vel_world = 0;
+static bool viewing_flycam =		true;
+
+struct Flycam {
+	v3	pos_world =			v3(0, -5, 1);
+	v2	ori_ae =			v2(deg(0), deg(+80)); // azimuth elevation
 	
-	f32 collision_r = 0.4f;
-	f32 collision_h = 1.7f;
+	f32	vfov =				deg(70);
+	
+	f32	speed =				4;
+	f32	speed_fast_mul =	4;
 };
+static Flycam flycam;
 
-static Player player;
-
-static bool trigger_respawn_player = true;
-static void respawn_player () {
-	trigger_respawn_player = false;
-	
-	player.pos_world = (cam_to_world * v3(0,0,-6)) +v3(0,0,3);
-	player.vel_world = 0;
-}
-
-static void load_game () {
-	bool loaded = read_entire_file(SAVE_FILE, &cam, sizeof(cam));
-	if (loaded) {
-		logf("camera_view loaded from \"" SAVE_FILE "\".");
-	} else {
-		cam = default_camera;
-		logf_warning("camera_view could not be loaded from \"" SAVE_FILE "\", using defaults.");
-	}
-}
-static void save_game () {
-	bool saved = overwrite_file(SAVE_FILE, &cam, sizeof(cam));
-	if (saved) {
-		logf("camera_view saved to \"" SAVE_FILE "\".");
-	} else {
-		logf_warning("could not write \"" SAVE_FILE "\", camera_view wont be loaded on next launch.");
-	}
-}
-
-static bool trigger_regen_chunks = false;
-static void regen_chunks () {
-	trigger_regen_chunks = false;
-	for (auto& c : chunks) gen_chunk(c.second);
-}
+static bool trigger_respawn_player =	true;
+static bool trigger_regen_chunks =		false;
+static bool trigger_save_game =			false;
+static bool trigger_load_game =			false;
 
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
@@ -1040,33 +1013,29 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	
 	bool alt =			(mods & GLFW_MOD_ALT) != 0;
 	
-	if (repeated) {
-		
+	if (alt) {
+		switch (key) {
+			case GLFW_KEY_ENTER:		if (went_down) toggle_fullscreen();	return;
+		}
 	} else {
-		if (!alt) {
-			switch (key) {
-				case GLFW_KEY_F11:			if (went_down) {	toggle_fullscreen(); }		return;
-			}
-		} else {
-			switch (key) {
-				case GLFW_KEY_ENTER:		if (alt && went_down) {	toggle_fullscreen(); }	return;
-			}
+		switch (key) {
+			case GLFW_KEY_F11:			if (went_down) toggle_fullscreen();	return;
 		}
 	}
 	
 	if (opt_mode == OPT_SELECTING) { 
 		switch (key) {
-			case GLFW_KEY_F1:		if (went_down)	opt_mode = OPT_NOT_EDITING;		return;
-			case GLFW_KEY_ENTER:	if (went_down) {
+			case GLFW_KEY_F1:			if (went_down)	opt_mode = OPT_NOT_EDITING;		return;
+			case GLFW_KEY_ENTER:		if (went_down) {
 					opt_value_edit_flag = true;
 					opt_mode = OPT_EDITING;
 				}
 				return;
 			
-			case GLFW_KEY_UP:		if (went_down || repeated)	selected_option = max(selected_option -1, 0);				return;
-			case GLFW_KEY_DOWN:		if (went_down || repeated)	selected_option = min(selected_option +1, cur_option);		return;
+			case GLFW_KEY_UP:			if (went_down || repeated)	selected_option = max(selected_option -1, 0);				return;
+			case GLFW_KEY_DOWN:			if (went_down || repeated)	selected_option = min(selected_option +1, cur_option);		return;
 			
-			case GLFW_KEY_E:		if (went_down)	opt_toggle_open = true;		return;
+			case GLFW_KEY_E:			if (went_down)	opt_toggle_open = true;		return;
 			
 		}
 	} else if (opt_mode == OPT_EDITING) { 
@@ -1101,10 +1070,14 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 		}
 	}
 	
-	if (repeated) {
-		
-	} else {
-		if (!alt) {
+	if (!repeated) {
+		if (alt) {
+			switch (key) {
+				//
+				case GLFW_KEY_S:			if (went_down) trigger_save_game = true;	break;
+				case GLFW_KEY_L:			if (went_down) trigger_load_game = true;	break;
+			}
+		} else {
 			switch (key) {
 				//
 				case GLFW_KEY_A:			inp.move_dir.x -= went_down ? +1 : -1;		break;
@@ -1122,12 +1095,6 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				case GLFW_KEY_Q:			if (went_down) trigger_respawn_player = true;	break;
 				
 				case GLFW_KEY_F1:			if (went_down) opt_mode = OPT_SELECTING;	break;
-			}
-		} else {
-			switch (key) {
-				//
-				case GLFW_KEY_S:			if (alt && went_down) {	save_game(); }			break;
-				case GLFW_KEY_L:			if (alt && went_down) {	load_game(); }			break;
 			}
 		}
 	}
@@ -1149,14 +1116,16 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 	}
 }
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
-	if (!inp.move_fast) {
-		f32 delta_log = 0.1f * (f32)yoffset;
-		cam.fly_vel = pow( 2, log2(cam.fly_vel) +delta_log );
-		logf(">>> fly_vel: %f", cam.fly_vel);
-	} else {
-		f32 delta_log = -0.1f * (f32)yoffset;
-		f32 vfov = pow( 2, log2(cam.vfov) +delta_log );
-		if (vfov >= deg(1.0f/10) && vfov <= deg(170)) cam.vfov = vfov;
+	if (viewing_flycam) {
+		if (!inp.move_fast) {
+			f32 delta_log = 0.1f * (f32)yoffset;
+			flycam.speed = pow( 2, log2(flycam.speed) +delta_log );
+			logf(">>> fly_vel: %f", flycam.speed);
+		} else {
+			f32 delta_log = -0.1f * (f32)yoffset;
+			f32 vfov = pow( 2, log2(flycam.vfov) +delta_log );
+			if (vfov >= deg(1.0f/10) && vfov <= deg(170)) flycam.vfov = vfov;
+		}
 	}
 }
 static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy) {
@@ -1165,11 +1134,6 @@ static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy)
 }
 
 int main (int argc, char** argv) {
-	world_to_cam = hm::nan();
-	cam_to_world = hm::nan();
-	cam_to_clip = m4::nan();
-	skybox_to_clip = m4::nan();
-	
 	cstr app_name = "Voxel Game";
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
@@ -1199,7 +1163,7 @@ int main (int argc, char** argv) {
 	}
 	
 	#define UCOM UV2("screen_dim"), UV2("mcursor_pos") // common uniforms
-	#define UMAT UM4("world_to_cam"), UM4("cam_to_clip"), UM4("cam_to_world") // transformation uniforms
+	#define UMAT UM4("world_to_cam"), UM4("cam_to_world"), UM4("cam_to_clip") // transformation uniforms
 	
 	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
 	
@@ -1250,8 +1214,8 @@ int main (int argc, char** argv) {
 	};
 	*/
 	
-	auto* shad_sky = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UM4("skybox_to_clip")});
-	auto* shad_main = new_shader("main.vert",	"main.frag",	{UCOM, USI("texture_res"), USI("atlas_textures_count"), UMAT}, {{0,"atlas"}});
+	auto* shad_sky = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
+	auto* shad_main = new_shader("main.vert",	"main.frag",	{UCOM, UMAT, USI("texture_res"), USI("atlas_textures_count")}, {{0,"atlas"}});
 	
 	Texture2D tex_block_atlas;
 	{
@@ -1358,10 +1322,74 @@ int main (int argc, char** argv) {
 	#endif
 	
 	//
+	struct Camera_View {
+		v3	pos_world;
+		v2	ori_ae;
+		
+		f32	vfov;
+		f32	hfov;
+		
+		f32 clip_near =		1.0f/256;
+		f32 clip_far =		512;
+		
+		v2 frust_scale;
+		
+		hm	world_to_cam;
+		hm	cam_to_world;
+		m4	cam_to_clip;
+		
+		void calc_final_matricies (m3 world_to_cam_rot, m3 cam_to_world_rot) {
+			world_to_cam = world_to_cam_rot * translateH(-pos_world);
+			cam_to_world = translateH(pos_world) * cam_to_world_rot;
+			
+			{
+				frust_scale.y = tan(vfov / 2);
+				frust_scale.x = frust_scale.y * inp.wnd_dim_aspect.x;
+				
+				hfov = atan(frust_scale.x) * 2;
+				
+				v2 frust_scale_inv = 1.0f / frust_scale;
+				
+				f32 x = frust_scale_inv.x;
+				f32 y = frust_scale_inv.y;
+				f32 a = (clip_far +clip_near) / (clip_near -clip_far);
+				f32 b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
+				
+				cam_to_clip = m4::row(
+								x, 0, 0, 0,
+								0, y, 0, 0,
+								0, 0, a, b,
+								0, 0, -1, 0 );
+			}
+		}
+	};
+	
+	struct Player {
+		v3	pos_world =		v3(4,32,CHUNK_DIM.z+2);
+		v3	vel_world =		0;
+		
+		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
+		f32	vfov =			deg(80);
+		
+		v3	camera_offset_cam = v3(0,0,3);
+		
+		f32 collision_r =	0.4f;
+		f32 collision_h =	1.7f;
+	} player;
+	
+	auto load_game = [&] () {
+		trigger_load_game = false;
+		load_struct("flycam", &flycam);
+	};
+	auto save_game = [&] () {
+		trigger_save_game = false;
+		save_struct("flycam", flycam);
+	};
+	
 	load_game();
 	
 	inital_chunk();
-	while (chunks.size() < 32) new_chunk(cam.pos_world);
+	while (chunks.size() < 32) new_chunk(player.pos_world);
 	
 	bool one_chunk_every_frame = false;
 	bool one_chunk_every_frame_open = false;
@@ -1377,10 +1405,6 @@ int main (int argc, char** argv) {
 	dt = 0;
 	
 	for (s32 frame_i=0;; ++frame_i) {
-		world_to_cam = hm::nan();
-		cam_to_world = hm::nan();
-		cam_to_clip = m4::nan();
-		skybox_to_clip = m4::nan();
 		
 		dt = min(dt, 1.0f / 20);
 		
@@ -1409,74 +1433,47 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
+		option("viewing_flycam", &viewing_flycam);
+		
 		if (glfwWindowShouldClose(wnd)) break;
 		
 		for (auto* s : shaders)			s->reload_if_needed();
 		
-		{
-			{
-				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (cam.vfov / deg(70));
-				cam.ori_ae -= inp.mouse_look_diff * mouse_look_sens;
-				cam.ori_ae.x = mymod(cam.ori_ae.x, deg(360));
-				cam.ori_ae.y = clamp(cam.ori_ae.y, deg(2), deg(180.0f -2));
+		if (trigger_save_game) save_game();
+		if (trigger_load_game) load_game();
+		
+		Camera_View view;
+		#if RZ_DBG
+		memset(&view, 0xcc, sizeof(view)); // to catch me trying to use not yet calculated data
+		#endif
+		
+		m3 world_to_cam_rot;
+		m3 cam_to_world_rot;
+		{ // view/player rotation
+			auto clamped_cam_ae = [] (v2 cam_ae, v2 mouse_look_sens) -> v2 {
+				cam_ae -= inp.mouse_look_diff * mouse_look_sens;
+				cam_ae.x = mymod(cam_ae.x, deg(360));
+				cam_ae.y = clamp(cam_ae.y, deg(2), deg(180.0f -2));
 				
-				//printf(">>> %f %f\n", to_deg(camera_ae.x), to_deg(camera_ae.y));
-			}
-			m3 world_to_cam_rot = rotate3_X(-cam.ori_ae.y) * rotate3_Z(-cam.ori_ae.x);
-			m3 cam_to_world_rot = rotate3_Z(cam.ori_ae.x) * rotate3_X(cam.ori_ae.y);
+				return cam_ae;
+			};
 			
-			{
-				f32 cam_vel_forw = cam.fly_vel;
-				if (inp.move_fast) cam_vel_forw *= cam.fly_vel_fast_mul;
+			if (viewing_flycam) {
 				
-				v3 cam_vel = cam_vel_forw * v3(1,2.0f/3,1);
+				view.vfov = flycam.vfov;
+				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (view.vfov / deg(70));
 				
-				v3 cam_vel_cam = normalize_or_zero( (v3)inp.move_dir ) * cam_vel;
-				cam.pos_world += (cam_to_world_rot * cam_vel_cam) * dt;
+				view.ori_ae = flycam.ori_ae = clamped_cam_ae(flycam.ori_ae, mouse_look_sens);
+			} else {
 				
-				//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
+				view.vfov = player.vfov;
+				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (view.vfov / deg(70));
+				
+				view.ori_ae = player.ori_ae = clamped_cam_ae(player.ori_ae, mouse_look_sens);
 			}
-			world_to_cam = world_to_cam_rot * translateH(-cam.pos_world);
-			cam_to_world =translateH(cam.pos_world) * cam_to_world_rot;
-			
-			{
-				f32 vfov =			cam.vfov;
-				f32 clip_near =		1.0f/256;
-				f32 clip_far =		512;
-				
-				v2 frust_scale;
-				frust_scale.y = tan(vfov / 2);
-				frust_scale.x = frust_scale.y * inp.wnd_dim_aspect.x;
-				
-				v2 frust_scale_inv = 1.0f / frust_scale;
-				
-				f32 x = frust_scale_inv.x;
-				f32 y = frust_scale_inv.y;
-				f32 a = (clip_far +clip_near) / (clip_near -clip_far);
-				f32 b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
-				
-				cam_to_clip = m4::row(
-								x, 0, 0, 0,
-								0, y, 0, 0,
-								0, 0, a, b,
-								0, 0, -1, 0 );
-			}
-			
-			skybox_to_clip = cam_to_clip * world_to_cam_rot;
+			world_to_cam_rot = rotate3_X(-view.ori_ae.y) * rotate3_Z(-view.ori_ae.x);
+			cam_to_world_rot = rotate3_Z(view.ori_ae.x) * rotate3_X(view.ori_ae.y);
 		}
-		
-		for (auto* s : shaders) {
-			if (s->valid()) {
-				s->bind();
-				s->set_unif("screen_dim", (v2)inp.wnd_dim);
-				s->set_unif("mcursor_pos", inp.bottom_up_mcursor_pos());
-			}
-		}
-		
-		//// Gameplay
-		cam.options();
-		
-		if (trigger_respawn_player) respawn_player();
 		
 		option("heightmap_perlin2d_octaves", get_heightmap_perlin2d_octaves_count, set_heightmap_perlin2d_octaves_count, &heightmap_perlin2d_octaves_open);
 		if (heightmap_perlin2d_octaves_open) {
@@ -1491,19 +1488,22 @@ int main (int argc, char** argv) {
 			}
 		}
 		
-		if (trigger_regen_chunks) regen_chunks();
+		if (trigger_regen_chunks) {
+			trigger_regen_chunks = false;
+			for (auto& c : chunks) gen_chunk(c.second);
+		}
 		
 		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
 		if (one_chunk_every_frame_open) option("  period", &one_chunk_every_frame_period);
 		
-		if (one_chunk_every_frame && frame_i % one_chunk_every_frame_period == 0 && frame_i != 0) new_chunk(cam.pos_world);
+		if (one_chunk_every_frame && frame_i % one_chunk_every_frame_period == 0 && frame_i != 0) new_chunk(player.pos_world);
 		
 		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
 		{
-			v3 a = v3( rotate2(lerp(0, deg(360), (f32)rand() / (f32)RAND_MAX)) * v2(1,0), 0);
+			v3 accel = v3( rotate2(lerp(0, deg(360), (f32)rand() / (f32)RAND_MAX)) * v2(1,0), 0);
 			
-			player.vel_world += (GRAV_ACCEL +a) * dt;
+			player.vel_world += (GRAV_ACCEL +accel) * dt;
 			
 			v3 pos = player.pos_world +player.vel_world * dt;
 			
@@ -1514,18 +1514,42 @@ int main (int argc, char** argv) {
 			player.pos_world = player.pos_world +player.vel_world * dt;
 		}
 		
-		player.pos_world = (cam_to_world * v3(0,0,-4)) +v3(0,0,-0.5f);;
+		if (viewing_flycam) {
+			f32 cam_speed_forw = flycam.speed;
+			if (inp.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
+			
+			v3 cam_vel = cam_speed_forw * v3(1,2.0f/3,1);
+			
+			v3 cam_vel_cam = normalize_or_zero( (v3)inp.move_dir ) * cam_vel;
+			flycam.pos_world += (cam_to_world_rot * cam_vel_cam) * dt;
+			
+			//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
+			
+			view.pos_world = flycam.pos_world;
+		} else {
+			view.pos_world = player.pos_world +(view.cam_to_world * player.camera_offset_cam);
+		}
 		
-		//cam.pos_world = player.pos_world;
+		view.calc_final_matricies(world_to_cam_rot, cam_to_world_rot);
 		
 		//// Draw
+		for (auto* s : shaders) { // set common uniforms
+			if (s->valid()) {
+				s->bind();
+				s->set_unif("screen_dim", (v2)inp.wnd_dim);
+				s->set_unif("mcursor_pos", inp.bottom_up_mcursor_pos());
+			}
+		}
+		
 		glViewport(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
 		
 		if (shad_sky->valid()) { // draw skybox
 			glDisable(GL_DEPTH_TEST);
 			
 			shad_sky->bind();
-			shad_sky->set_unif("skybox_to_clip", skybox_to_clip);
+			shad_sky->set_unif("world_to_cam",	view.world_to_cam.m4());
+			shad_sky->set_unif("cam_to_world",	view.cam_to_world.m4());
+			shad_sky->set_unif("cam_to_clip",	view.cam_to_clip);
 			
 			glDrawArrays(GL_TRIANGLES, 0, 6*6);
 			
@@ -1585,21 +1609,21 @@ int main (int argc, char** argv) {
 		}
 		#endif
 		
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
+		if (shad_main->valid()) {
+			bind_texture_unit(0, &tex_block_atlas);
 			
-			chunk->generate_blocks_mesh();
+			shad_main->bind();
+			shad_main->set_unif("world_to_cam",	view.world_to_cam.m4());
+			shad_main->set_unif("cam_to_world",	view.cam_to_world.m4());
+			shad_main->set_unif("cam_to_clip",	view.cam_to_clip);
 			
-			if (shad_main->valid()) {
-				bind_texture_unit(0, &tex_block_atlas);
+			shad_main->set_unif("texture_res", texture_res);
+			shad_main->set_unif("atlas_textures_count", atlas_textures_count);
+			
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
 				
-				shad_main->bind();
-				shad_main->set_unif("world_to_cam",	world_to_cam.m4());
-				shad_main->set_unif("cam_to_clip",	cam_to_clip);
-				shad_main->set_unif("cam_to_world",	cam_to_world.m4());
-				
-				shad_main->set_unif("texture_res", texture_res);
-				shad_main->set_unif("atlas_textures_count", atlas_textures_count);
+				chunk->generate_blocks_mesh();
 				
 				chunk->vbo.draw_entire(shad_main);
 			}
