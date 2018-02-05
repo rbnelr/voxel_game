@@ -257,14 +257,14 @@ static void begin_overlay_text () {
 	
 	overlay_font_line_y = overlay_font->ascent_plus_gap;
 }
-static void overlay_line (strcr s, v3 col=srgb(255,40,0)*0.01f, s32 cursor_pos=-1) {
-	overlay_font->emit_line(&vbo_overlay_font.vertecies, &overlay_font_line_y, shad_font, utf8_to_utf32(s), v4(col, 1), cursor_pos);
+static void overlay_line (strcr s, v3 col=srgb(255,220,120)*0.8f, v3 outline_col=0, s32 cursor_pos=-1) {
+	overlay_font->emit_line(&vbo_overlay_font.vertecies, &overlay_font_line_y, shad_font, utf8_to_utf32(s), v4(col,1), v4(outline_col,1), cursor_pos);
 }
 
 //
-static v3 option_col =			srgb(255,40,0)*0.01f;
-static v3 option_highl_col =	srgb(255,255,80)*0.4f;
-static v3 option_edit_col =		srgb(255,255,80)*0.8f;
+static v3 option_col =			255;
+static v3 option_highl_col =	srgb(255,240,90)*0.95f;
+static v3 option_edit_col =		srgb(255,255,90)*1.0f;
 
 static enum { OPT_NOT_EDITING=0, OPT_SELECTING, OPT_EDITING } opt_mode = OPT_SELECTING;
 static bool opt_value_edit_flag = false;
@@ -356,7 +356,7 @@ static bool option_group (strcr name, bool* open=nullptr) {
 		col = option_edit ? option_edit_col : option_highl_col;
 	}
 	
-	overlay_line(prints("%s:%s", name.c_str(), open && !(*open) ? " {...}":""), col, option_edit ? name.size() +2 +opt_cur_char : -1);
+	overlay_line(prints("%s:%s", name.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? name.size() +2 +opt_cur_char : -1);
 	
 	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
 		opt_value_edit_flag = false;
@@ -387,7 +387,7 @@ static bool _option (strcr name, str& opt_str, bool* open) {
 		col = option_edit ? option_edit_col : option_highl_col;
 	}
 	
-	overlay_line(prints("%s: %s%s", name.c_str(), opt_str.c_str(), open && !(*open) ? " {...}":""), col, option_edit ? name.size() +2 +opt_cur_char : -1);
+	overlay_line(prints("%s: %s%s", name.c_str(), opt_str.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? name.size() +2 +opt_cur_char : -1);
 	
 	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
 		opt_value_edit_flag = false;
@@ -758,9 +758,13 @@ static s32 get_heightmap_perlin2d_octaves_count () {			return (s32)heightmap_per
 static void set_heightmap_perlin2d_octaves_count (s32 count) {	heightmap_perlin2d_octaves.resize(count); }
 static bool heightmap_perlin2d_octaves_open = true;
 
+#define _2D_TEST 1
+
 f32 heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
-	
+	#if _2D_TEST
+	return perlin_octave(v, 0.2f) > 0 ? 2 : 1;
+	#else
 	//v += v2(1,-1)*mouse * 20;
 	
 	//f32 fre = lerp(0.33f, 3.0f, mouse.x);
@@ -777,6 +781,7 @@ f32 heightmap_perlin2d (v2 v) {
 	//printf(">>>>>>>>> %.3f %.3f\n", fre, amp);
 	
 	return tot +32;
+	#endif
 }
 
 void gen_chunk (Chunk* chunk) {
@@ -799,7 +804,7 @@ void gen_chunk (Chunk* chunk) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
 			f32 height = heightmap_perlin2d((v2)i.xy() +chunk->pos*CHUNK_DIM.xy());
-			s32 highest_block = (s32)floor(height +0.5f);
+			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
 				auto* b = chunk->get_block(i);
@@ -808,7 +813,11 @@ void gen_chunk (Chunk* chunk) {
 				} else {
 					b->type = BT_GRASS;
 				}
-				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 10, 48)), 255);
+				#if _2D_TEST
+				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 3)), 255);
+				#else
+				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 50)), 255);
+				#endif
 			}
 		}
 	}
@@ -985,7 +994,7 @@ static Input		inp;
 
 static v3 GRAV_ACCEL = v3(0,0,-10);
 
-static bool viewing_flycam =		true;
+static bool viewing_flycam =		false;
 
 struct Flycam {
 	v3	pos_world =			v3(0, -5, 1);
@@ -995,6 +1004,19 @@ struct Flycam {
 	
 	f32	speed =				4;
 	f32	speed_fast_mul =	4;
+	
+	
+	bool opt_open = true;
+	void options () {
+		option_group("flycam", &opt_open);
+		if (opt_open) {
+			option(		"  pos_world",		&pos_world);
+			option_deg(	"  ori_ae",			&ori_ae);
+			option_deg(	"  vfov",			&vfov);
+			option(		"  speed",			&speed);
+			option(		"  speed_fast_mul",	&speed_fast_mul);
+		}
+	}
 };
 static Flycam flycam;
 
@@ -1068,6 +1090,7 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				}
 				return;
 		}
+		return; // do not process input when editing options
 	}
 	
 	if (!repeated) {
@@ -1168,7 +1191,7 @@ int main (int argc, char** argv) {
 	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
 	
 	{ // init game console overlay
-		f32 sz =	18; // 14 16 24
+		f32 sz =	0 ? 24 : 18; // 14 16 24
 		f32 jpsz =	floor(sz * 1.75f);
 		
 		std::initializer_list<font::Glyph_Range> ranges = {
@@ -1365,17 +1388,38 @@ int main (int argc, char** argv) {
 	};
 	
 	struct Player {
-		v3	pos_world =		v3(4,32,CHUNK_DIM.z+2);
+		#if _2D_TEST
+		//v3	pos_world =		v3(4,32,3);
+		v3	pos_world =		v3(12,32,3);
+		#else
+		v3	pos_world =		v3(4,32,43);
+		#endif
 		v3	vel_world =		0;
 		
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
 		f32	vfov =			deg(80);
 		
-		v3	camera_offset_cam = v3(0,0,3);
+		v3	camera_offset_cam = v3(0,0.6f,3);
 		
 		f32 collision_r =	0.4f;
 		f32 collision_h =	1.7f;
-	} player;
+		
+		
+		bool opt_open = true;
+		void options () {
+			option_group("player", &opt_open);
+			if (opt_open) {
+				option(		"  pos_world",			&pos_world);
+				option(		"  vel_world",			&vel_world);
+				option_deg(	"  ori_ae",				&ori_ae);
+				option_deg(	"  vfov",				&vfov);
+				option(		"  camera_offset_cam",	&camera_offset_cam);
+				option(		"  collision_r",		&collision_r);
+				option(		"  collision_h",		&collision_h);
+			}
+		}
+	};
+	Player player;
 	
 	auto load_game = [&] () {
 		trigger_load_game = false;
@@ -1420,7 +1464,7 @@ int main (int argc, char** argv) {
 			//printf("frame #%5d %6.1f fps %6.2f ms  avg: %6.1f fps %6.2f ms\n", frame_i, fps, dt_ms, avg_fps, avdt_ms);
 			glfwSetWindowTitle(wnd, prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms).c_str());
 			
-			overlay_line(prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms), srgb(255,40,0)*0.3f);
+			overlay_line(prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms), srgb(255,40,0)*0.85f);
 		}
 		
 		inp.mouse_look_diff = 0;
@@ -1434,6 +1478,8 @@ int main (int argc, char** argv) {
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
 		option("viewing_flycam", &viewing_flycam);
+		flycam.options();
+		player.options();
 		
 		if (glfwWindowShouldClose(wnd)) break;
 		
@@ -1443,9 +1489,6 @@ int main (int argc, char** argv) {
 		if (trigger_load_game) load_game();
 		
 		Camera_View view;
-		#if RZ_DBG
-		memset(&view, 0xcc, sizeof(view)); // to catch me trying to use not yet calculated data
-		#endif
 		
 		m3 world_to_cam_rot;
 		m3 cam_to_world_rot;
@@ -1500,25 +1543,11 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
-		{
-			v3 accel = v3( rotate2(lerp(0, deg(360), (f32)rand() / (f32)RAND_MAX)) * v2(1,0), 0);
-			
-			player.vel_world += (GRAV_ACCEL +accel) * dt;
-			
-			v3 pos = player.pos_world +player.vel_world * dt;
-			
-			if (test_cylinder_collision(player.pos_world, player.collision_r, player.collision_h)) {
-				player.vel_world.z = 0;
-			}
-			
-			player.pos_world = player.pos_world +player.vel_world * dt;
-		}
-		
-		if (viewing_flycam) {
+		if (viewing_flycam) { // view/player position
 			f32 cam_speed_forw = flycam.speed;
 			if (inp.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
 			
-			v3 cam_vel = cam_speed_forw * v3(1,2.0f/3,1);
+			v3 cam_vel = cam_speed_forw * v3(1,1,1);
 			
 			v3 cam_vel_cam = normalize_or_zero( (v3)inp.move_dir ) * cam_vel;
 			flycam.pos_world += (cam_to_world_rot * cam_vel_cam) * dt;
@@ -1527,7 +1556,91 @@ int main (int argc, char** argv) {
 			
 			view.pos_world = flycam.pos_world;
 		} else {
-			view.pos_world = player.pos_world +(view.cam_to_world * player.camera_offset_cam);
+			#if _2D_TEST
+			v3 pos_world = player.pos_world;
+			v3 vel_world = player.vel_world;
+			
+			pos_world.z = 1;
+			
+			// 
+			v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
+			
+			v2 walk_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)iv2(inp.move_dir.x, -inp.move_dir.z) ) * player_walk_speed);
+			
+			pos_world += v3(walk_vel_world, 0) * dt;
+			
+			{
+				f32 r = player.collision_r;
+				f32 h = player.collision_h;
+				
+				bpos start =	(bpos)floor(pos_world -v3(r,r,0));
+				bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
+				
+				bpos i;
+				for (i.z=start.z; i.z<end.z; ++i.z) {
+					for (i.y=start.y; i.y<end.y; ++i.y) {
+						for (i.x=start.x; i.x<end.x; ++i.x) {
+							
+							v2 p = pos_world.xy() -(v2)i.xy(); // circle position relative to block
+							
+							v2 closest_p = clamp(p, 0,1); // closest point on block
+							
+							v2 pen = closest_p -p; // potential penetration vector
+							bool could_collide = length_sqr(pen) <= r*r;
+							
+							if (!could_collide) continue;
+							
+							auto* b = query_block(i);
+							bool colliding = !bt_is_pervious(b->type);
+							
+							if (colliding) {
+								if (abs(pen.x) >= abs(pen.y)) {
+									vel_world.x = 0;
+									pos_world.x = i.x +closest_p.x +(pen.x < 0 ? +r : -r);
+								} else {
+									vel_world.y = 0;
+									pos_world.y = i.y +closest_p.y +(pen.y < 0 ? +r : -r);
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			player.vel_world = vel_world;
+			player.pos_world = pos_world;
+			
+			view.pos_world = player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
+			#else
+			v3 pos_world = player.pos_world;
+			v3 vel_world = player.vel_world;
+			
+			// 
+			bool grounded = false;
+			if (test_cylinder_collision(pos_world, player.collision_r, player.collision_h)) {
+				vel_world.z = 0;
+				grounded = true;
+			}
+			
+			v3 accel_world = 0;
+			if (!grounded) accel_world += GRAV_ACCEL;
+			
+			//
+			v2 walk_vel_world = 0;
+			if (grounded) {
+				
+				v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
+				
+				walk_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)iv2(inp.move_dir.x, -inp.move_dir.z) ) * player_walk_speed);
+			}
+			
+			vel_world += accel_world * dt;
+			pos_world += (vel_world +v3(walk_vel_world, 0)) * dt;
+			
+			player.vel_world = vel_world;
+			player.pos_world = pos_world;
+			view.pos_world = player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
+			#endif
 		}
 		
 		view.calc_final_matricies(world_to_cam_rot, cam_to_world_rot);

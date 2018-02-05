@@ -154,24 +154,40 @@ namespace font {
 			return 0; // missing glyph
 		}
 		
-		f32 emit_glyph (std::vector<byte>* vbo_buf, f32 pos_x_px, f32 pos_y_px, utf32 c, v4 col) {
+		f32 emit_glyph (std::vector<byte>* vbo_buf, f32 pos_x_px, f32 pos_y_px, utf32 c, v4 col, v4 outline_col) {
 			
 			stbtt_aligned_quad quad;
 			
 			stbtt_GetPackedQuad(glyphs_packed_chars.data(), tex.dim.x,tex.dim.y, search_glyph(c),
 					&pos_x_px,&pos_y_px, &quad, 1);
 			
+			auto offsets = {
+				v2(-1,-1),
+				v2(+1,-1),
+				v2(-1,+1),
+				v2(+1,+1),
+			};
+			for (auto& o : offsets) {
+				for (v2 quad_vert : QUAD_VERTS) {
+					*(Glyph_Vertex*)&*vector_append(vbo_buf, sizeof(Glyph_Vertex)) = {
+						/*pos_screen*/	lerp(v2(quad.x0,quad.y0), v2(quad.x1,quad.y1), quad_vert) +o,
+						/*uv*/			lerp(v2(quad.s0,-quad.t0), v2(quad.s1,-quad.t1), quad_vert),
+						/*col*/			outline_col };
+				}
+			}
+			
 			for (v2 quad_vert : QUAD_VERTS) {
 				*(Glyph_Vertex*)&*vector_append(vbo_buf, sizeof(Glyph_Vertex)) = {
 					/*pos_screen*/	lerp(v2(quad.x0,quad.y0), v2(quad.x1,quad.y1), quad_vert),
 					/*uv*/			lerp(v2(quad.s0,-quad.t0), v2(quad.s1,-quad.t1), quad_vert),
 					/*col*/			col };
+				
 			}
 			
 			return pos_x_px;
 		};
 		
-		void emit_line (std::vector<byte>* vbo_buf, f32* pos_y_px, Shader* shad, std::basic_string<utf32> const& text, v4 col, s32 cursor_pos=-1) {
+		void emit_line (std::vector<byte>* vbo_buf, f32* pos_y_px, Shader* shad, std::basic_string<utf32> const& text, v4 col, v4 outline_col, s32 cursor_pos=-1) {
 			
 			u32 tab_spaces = 4;
 			
@@ -179,23 +195,24 @@ namespace font {
 			
 			f32 pos_x_px = 0;
 			
-			for (size_t i=0;; ++i) {
+			auto emit_glyph_ = [&] (utf32 c) {
+				auto old_pos_x_px = pos_x_px;
+				pos_x_px = emit_glyph(vbo_buf, pos_x_px, *pos_y_px, c, col, outline_col);
 				
-				if (char_i == cursor_pos) {
-					f32 x = pos_x_px -4; // hardcoded HACK
-					emit_glyph(vbo_buf, x, *pos_y_px, U'|', v4(0,0,0,1));
+				if (char_i++ == cursor_pos) {
+					f32 x = old_pos_x_px -4; // hardcoded HACK
+					emit_glyph(vbo_buf, x, *pos_y_px, U'|', v4(0,1,0,1), v4(0,0,0,1));
 				}
-				
-				if (i == text.size()) break;
-				auto c = text[i];
+			};
+			
+			for (auto c : text) {
 				
 				switch (c) {
 					case U'\t': {
 						u32 spaces_needed = tab_spaces -(char_i % tab_spaces);
 						
 						for (u32 j=0; j<spaces_needed; ++j) {
-							pos_x_px = emit_glyph(vbo_buf, pos_x_px, *pos_y_px, U' ', col);
-							++char_i;
+							emit_glyph_( U' ');
 						}
 						
 					} break;
@@ -206,10 +223,14 @@ namespace font {
 					} break;
 					
 					default: {
-						pos_x_px = emit_glyph(vbo_buf, pos_x_px, *pos_y_px, c, col);
-						++char_i;
+						emit_glyph_(c);
 					} break;
 				}
+			}
+			
+			if (char_i == cursor_pos) {
+				f32 x = pos_x_px -4; // hardcoded HACK
+				emit_glyph(vbo_buf, x, *pos_y_px, U'|', v4(0,1,0,1), v4(0,0,0,1));
 			}
 			
 			*pos_y_px += line_height;
