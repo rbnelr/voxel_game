@@ -48,8 +48,8 @@ static constexpr f64 max (f64 l, f64 r) { return l >= r ? l : r; }
 
 static constexpr s32 clamp (s32 val, s32 l, s32 h) {	return min( max(val,l), h ); }
 static constexpr u32 clamp (u32 val, u32 l, u32 h) {	return min( max(val,l), h ); }
-static constexpr s32 clamp (s64 val, s64 l, s64 h) {	return min( max(val,l), h ); }
-static constexpr u32 clamp (u64 val, u64 l, u64 h) {	return min( max(val,l), h ); }
+static constexpr s64 clamp (s64 val, s64 l, s64 h) {	return min( max(val,l), h ); }
+static constexpr u64 clamp (u64 val, u64 l, u64 h) {	return min( max(val,l), h ); }
 
 static constexpr f32 clamp (f32 val, f32 l, f32 h) {	return min( max(val,l), h ); }
 static constexpr f64 clamp (f64 val, f64 l, f64 h) {	return min( max(val,l), h ); }

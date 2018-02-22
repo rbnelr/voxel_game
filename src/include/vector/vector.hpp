@@ -129,6 +129,18 @@ union s64v4;
 #undef BV3
 #undef BV4
 
+// length and normalization for "1 dimensional vectors" ie. scalars
+static f32 length (f32 x) {	return abs(x); }
+static s32 length (s32 x) {	return abs(x); }
+
+static f32 normalize (f32 x) {	return x / length(x); }
+static s32 normalize (s32 x) {	return x / length(x); }
+
+
+fv2::operator s64v2() const {	return s64v2((s64)x, (s64)y); }
+fv3::operator s64v3() const {	return s64v3((s64)x, (s64)y, (s64)z); }
+fv4::operator s64v4() const {	return s64v4((s64)x, (s64)y, (s64)z, (s64)w); }
+
 struct M2 {
 	V2 arr[2];
 	
@@ -424,6 +436,16 @@ static M2 rotate2 (T ang) {
 	auto sc = sin_cos(ang);
 	return M2::row(	+sc.c,	-sc.s,
 					+sc.s,	+sc.c );
+}
+
+static fv2 rotate2_90 (fv2 v) {
+	return V2(-v.y, v.x);
+}
+static fv2 rotate2_180 (fv2 v) {
+	return -v;
+}
+static fv2 rotate2_270 (fv2 v) {
+	return V2(v.y, -v.x);
 }
 
 static M3 scale3 (V3 v) {

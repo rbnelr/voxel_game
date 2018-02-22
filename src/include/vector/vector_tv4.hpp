@@ -23,6 +23,11 @@ union V4 {
 	V4& operator*= (V4 r) {					return *this = V4(x * r.x, y * r.y, z * r.z, w * r.w); }
 	V4& operator/= (V4 r) {					return *this = V4(x / r.x, y / r.y, z / r.z, w / r.w); }
 	
+	#if FLTVEC
+	operator u8v4() const;
+	operator s64v4() const;
+	operator s32v4() const;
+	#endif
 	#if INTVEC
 	operator fv4() const {					return fv4((f32)x, (f32)y, (f32)z, (f32)w); }
 	#endif
@@ -58,20 +63,27 @@ union V4 {
 	static constexpr V4 operator- (V4 l, V4 r) {	return V4(l.x -r.x, l.y -r.y, l.z -r.z, l.w -r.w); }
 	static constexpr V4 operator* (V4 l, V4 r) {	return V4(l.x * r.x, l.y * r.y, l.z * r.z, l.w	* r.w); }
 	static constexpr V4 operator/ (V4 l, V4 r) {	return V4(l.x / r.x, l.y / r.y, l.z / r.z, l.w / r.w); }
-#if INTVEC
+	#if INTVEC
 	static constexpr V4 operator% (V4 l, V4 r) {	return V4(l.x % r.x, l.y % r.y, l.z % r.z, l.w % r.w); }
-#endif
+	#endif
 
+	static constexpr T dot(V4 l, V4 r) { return l.x*r.x + l.y*r.y + l.z*r.z + l.w*r.w; }
+
+	static V4 abs(V4 v) { return V4(abs(v.x), abs(v.y), abs(v.z), abs(v.w)); }
+	static T max_component(V4 v) { return max(max(v.x, v.y), max(v.z, v.w)); }
+
+	static constexpr V4 min(V4 l, V4 r) { return V4(min(l.x, r.x), min(l.y, r.y), min(l.z, r.z), min(l.w, r.w)); }
+	static constexpr V4 max(V4 l, V4 r) { return V4(max(l.x, r.x), max(l.y, r.y), max(l.z, r.z), max(l.w, r.w)); }
+
+	#if FLTVEC
 	static constexpr V4 lerp (V4 a, V4 b, T t) {	return (a * V4(T(1) -t)) +(b * V4(t)); }
 	static constexpr V4 lerp (V4 a, V4 b, V4 t) {	return (a * (V4(1) -t)) +(b * t); }
 	static constexpr V4 map (V4 x, V4 a, V4 b) {	return (x -a)/(b -a); }
 
-	static constexpr T dot (V4 l, V4 r) {			return l.x*r.x +l.y*r.y +l.z*r.z +l.w*r.w; }
-
-	T length (V4 v) {								return sqrt(v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w); }
-	T length_sqr (V4 v) {							return v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w; }
-	V4 normalize (V4 v) {							return v / V4(length(v)); }
-	V4 normalize_or_zero (V4 v) { // TODO: epsilon?
+	static T length (V4 v) {						return sqrt(v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w); }
+	static T length_sqr (V4 v) {					return v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w; }
+	static V4 normalize (V4 v) {					return v / V4(length(v)); }
+	static V4 normalize_or_zero (V4 v) { // TODO: epsilon?
 		T len = length(v);
 		if (len != 0) {
 			 v /= len;
@@ -79,10 +91,6 @@ union V4 {
 		return v;
 	}
 	
-	#if 1
-	static constexpr V4 min (V4 l, V4 r) {			return V4( min(l.x, r.x), min(l.y, r.y), min(l.z, r.z), min(l.w, r.w) ); }
-	static constexpr V4 max (V4 l, V4 r) {			return V4( max(l.x, r.x), max(l.y, r.y), max(l.z, r.z), max(l.w, r.w) ); }
-	#endif
 	static constexpr V4 to_deg (V4 v) {				return v * RAD_TO_DEG; }
 	static constexpr V4 to_rad (V4 v) {				return v * DEG_TO_RAD; }
 
@@ -96,4 +104,5 @@ union V4 {
 	
 	static V4 floor (V4 v) {						return V4(floor(v.x),	floor(v.y),	floor(v.z),	floor(v.w)); }
 	static V4 ceil (V4 v) {							return V4(ceil(v.x),	ceil(v.y),	ceil(v.z),	ceil(v.w)); }
+	#endif
 #endif

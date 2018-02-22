@@ -1,4 +1,6 @@
 
+#define IS_DEBUGGER_PRESENT()			false
+
 #if RZ_PLATF == RZ_PLATF_GENERIC_WIN && RZ_DBG
 	
 	#if 0
@@ -23,7 +25,9 @@
 		Sleep( (DWORD)(sec * 1000.0f) );
 	}
 	
+	#undef IS_DEBUGGER_PRESENT
 	#define IS_DEBUGGER_PRESENT()			IsDebuggerPresent()
+	
 	#define DBGBREAK_IF_DEBUGGER_PRESENT	if (IS_DEBUGGER_PRESENT()) { DBGBREAK; }
 	#define BREAK_IF_DEBUGGING_ELSE_STALL	if (IS_DEBUGGER_PRESENT()) { DBGBREAK; } else { dbg_sleep(0.1f); }
 	

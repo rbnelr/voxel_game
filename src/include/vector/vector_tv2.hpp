@@ -18,6 +18,11 @@ union V2 {
 	V2& operator*= (V2 r) {					return *this = V2(x * r.x, y * r.y); }
 	V2& operator/= (V2 r) {					return *this = V2(x / r.x, y / r.y); }
 	
+	#if FLTVEC
+	operator u8v2() const;
+	operator s64v2() const;
+	operator s32v2() const;
+	#endif
 	#if INTVEC
 	operator fv2() const {					return fv2((f32)x, (f32)y); }
 	#endif
@@ -53,20 +58,27 @@ union V2 {
 	static constexpr V2 operator- (V2 l, V2 r) {	return V2(l.x -r.x, l.y -r.y); }
 	static constexpr V2 operator* (V2 l, V2 r) {	return V2(l.x * r.x, l.y * r.y); }
 	static constexpr V2 operator/ (V2 l, V2 r) {	return V2(l.x / r.x, l.y / r.y); }
-#if INTVEC
+	#if INTVEC
 	static constexpr V2 operator% (V2 l, V2 r) {	return V2(l.x % r.x, l.y % r.y); }
-#endif
+	#endif
 	
+	static constexpr T dot(V2 l, V2 r) { return l.x*r.x + l.y*r.y; }
+
+	static V2 abs(V2 v) { return V2(abs(v.x), abs(v.y)); }
+	static T max_component(V2 v) { return max(v.x, v.y); }
+
+	static constexpr V2 min(V2 l, V2 r) { return V2(min(l.x, r.x), min(l.y, r.y)); }
+	static constexpr V2 max(V2 l, V2 r) { return V2(max(l.x, r.x), max(l.y, r.y)); }
+
+	#if FLTVEC
 	static constexpr V2 lerp (V2 a, V2 b, T t) {	return (a * V2(T(1) -t)) +(b * V2(t)); }
 	static constexpr V2 lerp (V2 a, V2 b, V2 t) {	return (a * (V2(1) -t)) +(b * t); }
 	static constexpr V2 map (V2 x, V2 a, V2 b) {	return (x -a)/(b -a); }
 	
-	static constexpr T dot (V2 l, V2 r) {			return l.x*r.x +l.y*r.y; }
-	
-	T length (V2 v) {								return sqrt(v.x*v.x +v.y*v.y); }
-	T length_sqr (V2 v) {							return v.x*v.x +v.y*v.y; }
-	V2 normalize (V2 v) {							return v / V2(length(v)); }
-	V2 normalize_or_zero (V2 v) { // TODO: epsilon?
+	static T length (V2 v) {						return sqrt(v.x*v.x +v.y*v.y); }
+	static T length_sqr (V2 v) {					return v.x*v.x +v.y*v.y; }
+	static V2 normalize (V2 v) {					return v / V2(length(v)); }
+	static V2 normalize_or_zero (V2 v) { // TODO: epsilon?
 		T len = length(v);
 		if (len != 0) {
 			 v /= len;
@@ -74,10 +86,6 @@ union V2 {
 		return v;
 	}
 	
-	#if 1
-	static constexpr V2 min (V2 l, V2 r) {			return V2( min(l.x, r.x), min(l.y, r.y) ); }
-	static constexpr V2 max (V2 l, V2 r) {			return V2( max(l.x, r.x), max(l.y, r.y) ); }
-	#endif
 	static constexpr V2 to_deg (V2 v) {				return v * RAD_TO_DEG; }
 	static constexpr V2 to_rad (V2 v) {				return v * DEG_TO_RAD; }
 	
@@ -85,7 +93,8 @@ union V2 {
 	static V2 mymod (V2 val, V2 range) {
 		return V2(	mymod(val.x, range.x),	mymod(val.y, range.y) );
 	}
-	
+
 	static V2 floor (V2 v) {						return V2(floor(v.x),	floor(v.y)); }
 	static V2 ceil (V2 v) {							return V2(ceil(v.x),	ceil(v.y)); }
+	#endif
 #endif

@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS 1
+
 #include <cstdio>
 #include <array>
 #include <vector>
@@ -216,9 +218,9 @@ static bool load_data (strcr name, void* data, uptr size) {
 	
 	bool loaded = read_entire_file(file.c_str(), data, size);
 	if (loaded) {
-		logf(prints("%s loaded from \"%s\".", name, file.c_str()).c_str());
+		logf(prints("%s loaded from \"%s\".", name.c_str(), file.c_str()).c_str());
 	} else {
-		logf_warning(prints("%s could not be loaded from \"%s\".", name, file.c_str()).c_str());
+		logf_warning(prints("%s could not be loaded from \"%s\".", name.c_str(), file.c_str()).c_str());
 	}
 	
 	return loaded;
@@ -228,9 +230,9 @@ static bool save_data (strcr name, void const* data, uptr size) {
 	
 	bool saved = overwrite_file(file.c_str(), data, size);
 	if (saved) {
-		logf(prints("%s saved to \"%s\".", name, file.c_str()).c_str());
+		logf(prints("%s saved to \"%s\".", name.c_str(), file.c_str()).c_str());
 	} else {
-		logf_warning(prints("could not write \"%s\", %s wont be loaded on next launch.", file.c_str(), name).c_str());
+		logf_warning(prints("could not write \"%s\", %s wont be loaded on next launch.", file.c_str(), name.c_str()).c_str());
 	}
 	
 	return saved;
@@ -803,7 +805,7 @@ void gen_chunk (Chunk* chunk) {
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
-			f32 height = heightmap_perlin2d((v2)i.xy() +chunk->pos*CHUNK_DIM.xy());
+			f32 height = heightmap_perlin2d((v2)(i.xy() +chunk->pos*CHUNK_DIM.xy()));
 			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
@@ -909,6 +911,7 @@ bool test_cylinder_collision (v3 pos_world, f32 r, f32 h) {
 	return any_colliding;
 }
 bool test_cylinder_collision (v3 pos_world, f32 r, f32 h, Vbo* vbo) {
+	return false;
 	
 	bool any_colliding = false;
 	
@@ -957,6 +960,7 @@ bool test_cylinder_collision (v3 pos_world, f32 r, f32 h, Vbo* vbo) {
 
 //
 static f32			dt;
+static s32			frame_i; // should only be used for debugging
 
 struct Input {
 	iv2		wnd_dim;
@@ -994,7 +998,7 @@ static Input		inp;
 
 static v3 GRAV_ACCEL = v3(0,0,-10);
 
-static bool viewing_flycam =		false;
+static bool controling_flycam =		false;
 
 struct Flycam {
 	v3	pos_world =			v3(0, -5, 1);
@@ -1106,11 +1110,11 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				case GLFW_KEY_A:			inp.move_dir.x -= went_down ? +1 : -1;		break;
 				case GLFW_KEY_D:			inp.move_dir.x += went_down ? +1 : -1;		break;
 				
-				case GLFW_KEY_S:			inp.move_dir.z += went_down ? +1 : -1;		break;
-				case GLFW_KEY_W:			inp.move_dir.z -= went_down ? +1 : -1;		break;
+				case GLFW_KEY_S:			inp.move_dir.y -= went_down ? +1 : -1;		break;
+				case GLFW_KEY_W:			inp.move_dir.y += went_down ? +1 : -1;		break;
 				
-				case GLFW_KEY_LEFT_CONTROL:	inp.move_dir.y -= went_down ? +1 : -1;		break;
-				case GLFW_KEY_SPACE:		inp.move_dir.y += went_down ? +1 : -1;		break;
+				case GLFW_KEY_LEFT_CONTROL:	inp.move_dir.z -= went_down ? +1 : -1;		break;
+				case GLFW_KEY_SPACE:		inp.move_dir.z += went_down ? +1 : -1;		break;
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
 				
@@ -1139,7 +1143,7 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 	}
 }
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
-	if (viewing_flycam) {
+	if (controling_flycam) {
 		if (!inp.move_fast) {
 			f32 delta_log = 0.1f * (f32)yoffset;
 			flycam.speed = pow( 2, log2(flycam.speed) +delta_log );
@@ -1345,6 +1349,8 @@ int main (int argc, char** argv) {
 	#endif
 	
 	//
+	static bool viewing_flycam =		false;
+	
 	struct Camera_View {
 		v3	pos_world;
 		v2	ori_ae;
@@ -1390,11 +1396,25 @@ int main (int argc, char** argv) {
 	struct Player {
 		#if _2D_TEST
 		//v3	pos_world =		v3(4,32,3);
-		v3	pos_world =		v3(12,32,3);
+		//v3	pos_world =		v3(12,32,3);
+		//v3	pos_world =		v3(5,32,3);
+		
+		// case that triggered nan because of normalize() bug in collision response
+		//v3	pos_world =		v3(4,2,3);
+		//v3	vel_world =		v3(-10,+10,0);
+		
+		// case that triggered undetected collision because we were not raycasting against two blocks i missed when designing the algo
+		//v3	pos_world =		v3(v2(3, 3) +normalize(v2(3.283f, 2.718f) -v2(3, 3)) * (0.4f +0.000001f), 3);
+		//v3	vel_world =		v3(-0.231f, -0.191f, 0);
+		
+		v3	pos_world =		v3(2.4001f, 2.599f, 3);
+		v3	vel_world =		v3(-0.1f, 0.1f, 0);
+		
+		//v3	vel_world =		0;
 		#else
 		v3	pos_world =		v3(4,32,43);
-		#endif
 		v3	vel_world =		0;
+		#endif
 		
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
 		f32	vfov =			deg(80);
@@ -1448,9 +1468,21 @@ int main (int argc, char** argv) {
 	f32 avg_dt_alpha = 0.025f;
 	dt = 0;
 	
-	for (s32 frame_i=0;; ++frame_i) {
+	bool fixed_dt = IS_DEBUGGER_PRESENT(); 
+	f32 max_variable_dt = 1.0f / 20; 
+	f32 fixed_dt_dt = 1.0f / 60; 
+	
+	for (frame_i=0;; ++frame_i) {
 		
-		dt = min(dt, 1.0f / 20);
+		if (frame_i == 0) { // Timestep
+			dbg_assert(dt == 0);
+		} else {
+			if (fixed_dt) {
+				dt = fixed_dt_dt;
+			} else {
+				dt = min(dt, max_variable_dt);
+			}
+		}
 		
 		begin_overlay_text();
 		
@@ -1477,7 +1509,12 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
+		option("fixed_dt",			&fixed_dt);
+		option("max_variable_dt",	&max_variable_dt);
+		option("fixed_dt_dt",		&fixed_dt_dt);
+		
 		option("viewing_flycam", &viewing_flycam);
+		option("controling_flycam", &controling_flycam);
 		flycam.options();
 		player.options();
 		
@@ -1501,19 +1538,24 @@ int main (int argc, char** argv) {
 				return cam_ae;
 			};
 			
-			if (viewing_flycam) {
+			if (controling_flycam) {
+				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (flycam.vfov / deg(70));
 				
-				view.vfov = flycam.vfov;
-				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (view.vfov / deg(70));
-				
-				view.ori_ae = flycam.ori_ae = clamped_cam_ae(flycam.ori_ae, mouse_look_sens);
+				flycam.ori_ae = clamped_cam_ae(flycam.ori_ae, mouse_look_sens);
 			} else {
+				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (player.vfov / deg(70));
 				
-				view.vfov = player.vfov;
-				v2 mouse_look_sens = v2(deg(1.0f / 8)) * (view.vfov / deg(70));
-				
-				view.ori_ae = player.ori_ae = clamped_cam_ae(player.ori_ae, mouse_look_sens);
+				player.ori_ae = clamped_cam_ae(player.ori_ae, mouse_look_sens);
 			}
+			
+			if (viewing_flycam) {
+				view.vfov = flycam.vfov;
+				view.ori_ae = flycam.ori_ae;
+			} else {
+				view.vfov = player.vfov;
+				view.ori_ae = player.ori_ae;
+			}
+			
 			world_to_cam_rot = rotate3_X(-view.ori_ae.y) * rotate3_Z(-view.ori_ae.x);
 			cam_to_world_rot = rotate3_Z(view.ori_ae.x) * rotate3_X(view.ori_ae.y);
 		}
@@ -1535,6 +1577,10 @@ int main (int argc, char** argv) {
 			trigger_regen_chunks = false;
 			for (auto& c : chunks) gen_chunk(c.second);
 		}
+		if (trigger_respawn_player) {
+			trigger_respawn_player = false;
+			player.pos_world = Player().pos_world;
+		}
 		
 		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
 		if (one_chunk_every_frame_open) option("  period", &one_chunk_every_frame_period);
@@ -1543,20 +1589,21 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
 		
-		if (viewing_flycam) { // view/player position
+		test_vbo.clear();
+		
+		if (controling_flycam) { // view/player position
 			f32 cam_speed_forw = flycam.speed;
 			if (inp.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
 			
 			v3 cam_vel = cam_speed_forw * v3(1,1,1);
 			
-			v3 cam_vel_cam = normalize_or_zero( (v3)inp.move_dir ) * cam_vel;
+			v3 cam_vel_cam = normalize_or_zero( (v3)iv3(inp.move_dir.x, inp.move_dir.z, -inp.move_dir.y) ) * cam_vel;
 			flycam.pos_world += (cam_to_world_rot * cam_vel_cam) * dt;
 			
 			//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
-			
-			view.pos_world = flycam.pos_world;
 		} else {
-			#if _2D_TEST
+		#if _2D_TEST
+			#if 0
 			v3 pos_world = player.pos_world;
 			v3 vel_world = player.vel_world;
 			
@@ -1565,7 +1612,7 @@ int main (int argc, char** argv) {
 			// 
 			v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
 			
-			v2 walk_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)iv2(inp.move_dir.x, -inp.move_dir.z) ) * player_walk_speed);
+			v2 walk_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
 			
 			pos_world += v3(walk_vel_world, 0) * dt;
 			
@@ -1610,8 +1657,237 @@ int main (int argc, char** argv) {
 			player.vel_world = vel_world;
 			player.pos_world = pos_world;
 			
-			view.pos_world = player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
+			player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
 			#else
+			
+			v3 pos_world = player.pos_world;
+			v3 vel_world = player.vel_world;
+			
+			pos_world.z = 1;
+			
+			// 
+			v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
+			
+			//v2 walk_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
+			//vel_world = v3(walk_vel_world, 0);
+			
+			v2 feet_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
+			//v2 feet_vel_world = v2(-1,3);
+			
+			vel_world = v3( lerp(vel_world.xy(), feet_vel_world, 0.1f), 0 );
+			if (length(vel_world) < 0.01f) vel_world = 0;
+			
+			auto collision_algo = [&] () {
+				f32 r = player.collision_r;
+				f32 h = player.collision_h;
+				
+				bpos start =	(bpos)floor(pos_world -v3(r,r,0));
+				bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
+				
+				bpos bp;
+				bp.z = floor(pos_world.z);
+				
+				bool any_colliding = false;
+				
+				for (bp.y=start.y; bp.y<end.y; ++bp.y) {
+					for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+						
+						v2 p = pos_world.xy() -(v2)bp.xy(); // circle position relative to block
+						
+						v2 closest_p = clamp(p, 0,1); // closest point on block
+						
+						v2 pen = closest_p -p; // potential penetration vector
+						bool could_collide = length_sqr(pen) <= r*r;
+						
+						if (!could_collide) continue;
+						
+						auto* b = query_block(bp);
+						bool colliding = !bt_is_pervious(b->type);
+						
+						lrgba8 col = 255;
+						
+						if (colliding) col = lrgba8(255,40,40,255);
+						
+						if (1) {
+							Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
+							
+							f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+							
+							*out++ = { (v3)bp +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+							*out++ = { (v3)bp +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
+						}
+						
+						any_colliding = any_colliding || colliding;
+					}
+				}
+				
+				if (any_colliding) { // player somehow ended up inside a block
+					vel_world = 0;
+					return;
+				}
+				
+				f32 t_remain = dt;
+				
+				while (t_remain > 0) {
+					
+					struct {
+						f32 dist = +INF;
+						v2 hit_pos;
+						v2 normal;
+					} earliest_collision;
+					
+					auto find_earliest_collision_with_block_by_raycast = [&] (bpos bp) {
+						auto* b = query_block(bp);
+						if (bt_is_pervious(b->type)) return;
+						
+						v2 local_origin = (v2)bp.xy();
+						
+						v2 pos_local = pos_world.xy() -local_origin;
+						v2 vel = vel_world.xy();
+						
+						if (0) { // player cannot be inside these blocks
+							v2 closest_p = clamp(pos_local, 0,1); // closest point on block
+							
+							dbg_assert(length_sqr(closest_p -pos_local) > r*r);
+						}
+						
+						auto hit_found = [&] (v2 hit_pos_local, v2 normal_world) {
+							v2 hit_pos_world = hit_pos_local +local_origin;
+							
+							f32 hit_dist = length(pos_world.xy() -hit_pos_world);
+							
+							if (hit_dist < earliest_collision.dist) {
+								earliest_collision.dist =		hit_dist;
+								earliest_collision.hit_pos =	hit_pos_world;
+								earliest_collision.normal =		normal_world;
+							}
+						};
+						
+						auto raycast_x_line_segment = [&] (v2 ray_pos, v2 ray_dir, f32 line_y, f32 line_a_x, f32 line_b_x) { // line parallel to x axis
+							if (ray_dir.y == 0) return;
+							
+							f32 hit_pos_x = ray_pos.x +(line_y -ray_pos.y) / ray_dir.y * ray_dir.x;
+							
+							f32 t = map(hit_pos_x, line_a_x, line_b_x);
+							if (t > 0 && t < 1) { // ray cast hit
+								hit_found(v2(hit_pos_x, line_y), v2(0, normalize(line_y)));
+							}
+						};
+						auto raycast_y_line_segment = [&] (v2 ray_pos, v2 ray_dir, f32 line_x, f32 line_a_y, f32 line_b_y) { // line parallel to y axis
+							if (ray_dir.x == 0) return;
+							
+							f32 hit_pos_y = ray_pos.y +(line_x -ray_pos.x) / ray_dir.x * ray_dir.y;
+							
+							f32 t = map(hit_pos_y, line_a_y, line_b_y);
+							if (t > 0 && t < 1) { // ray cast hit
+								hit_found(v2(line_x, hit_pos_y), v2(normalize(line_x), 0));
+							}
+						};
+						
+						auto raycast_circle = [&] (v2 ray_pos, v2 ray_dir, v2 circle_pos, f32 circle_r) {
+							v2 unit_ray_dir = normalize(ray_dir);
+							
+							v2 circ_rel_p = circle_pos -ray_pos;
+							
+							f32 closest_p_dist = dot(unit_ray_dir, circ_rel_p);
+							v2 closest_p = unit_ray_dir * closest_p_dist;
+							
+							v2 circ_to_closest = closest_p -circ_rel_p;
+							
+							f32 r_sqr = circle_r*circle_r;
+							f32 dist_sqr = length_sqr(circ_to_closest);
+							
+							if (dist_sqr >= r_sqr) return; // line does not cross circle
+							
+							f32 chord_half_length = sqrt( r_sqr -dist_sqr );
+							f32 closest_hit_dist = closest_p_dist -chord_half_length;
+							f32 furthest_hit_dist = closest_p_dist +chord_half_length;
+							
+							f32 hit_dist;
+							if (closest_hit_dist >= 0)			hit_dist = closest_hit_dist;
+							else if (furthest_hit_dist >= 0)	hit_dist = furthest_hit_dist;
+							else								return; // circle hit is on backwards direction of ray, ie. no hit
+							
+							v2 rel_hit_p = hit_dist * unit_ray_dir;
+							hit_found(ray_pos +rel_hit_p, normalize(rel_hit_p -circ_rel_p));
+						};
+						
+						// this represents a minowski sum of the square of the block and our players circle
+						raycast_x_line_segment(	pos_local, vel, 0.0f -r, 0,1 );
+						raycast_x_line_segment(	pos_local, vel, 1.0f +r, 0,1 );
+						raycast_y_line_segment(	pos_local, vel, 0.0f -r, 0,1 );
+						raycast_y_line_segment(	pos_local, vel, 1.0f +r, 0,1 );
+						
+						raycast_circle(			pos_local, vel, v2( 0, 0), r );
+						raycast_circle(			pos_local, vel, v2( 0,+1), r );
+						raycast_circle(			pos_local, vel, v2(+1, 0), r );
+						raycast_circle(			pos_local, vel, v2(+1,+1), r );
+					};
+					
+					if (length(vel_world) != 0) {
+						find_earliest_collision_with_block_by_raycast( (bpos)floor(pos_world) +bpos( vel_world.x < 0 ? -1:1, vel_world.y < 0 ? -1:1, 0 ) );
+						find_earliest_collision_with_block_by_raycast( (bpos)floor(pos_world) +bpos( vel_world.x < 0 ? -1:1,                      0, 0 ) );
+						find_earliest_collision_with_block_by_raycast( (bpos)floor(pos_world) +bpos(                      0, vel_world.y < 0 ? -1:1, 0 ) );
+						find_earliest_collision_with_block_by_raycast( (bpos)floor(pos_world) +bpos( vel_world.x < 0 ? -1:1, vel_world.y < 0 ? 1:-1, 0 ) );
+						find_earliest_collision_with_block_by_raycast( (bpos)floor(pos_world) +bpos( vel_world.x < 0 ? 1:-1, vel_world.y < 0 ? -1:1, 0 ) );
+					}
+					
+					f32 max_dt = min(t_remain, 1.0f / max_component(abs(vel_world))); // if we are moving so fast that we would move by more than one block on any one axis we will do sub steps of exactly one block
+					
+					f32 earliest_collision_t = earliest_collision.dist / length(vel_world); // inf if there is no collision
+					
+					if (earliest_collision_t >= max_dt) {
+						pos_world += vel_world * max_dt;
+						t_remain -= max_dt;
+					} else {
+						//printf(">>> frame %d collision\n", frame_i);
+						
+						f32 bounciness = 0;
+						f32 kinetic_friction_coeff = 0.2f;
+						
+						// handle block collision
+						v2 normal = earliest_collision.normal;
+						v2 tangent = rotate2_90(earliest_collision.normal);
+						
+						f32 norm_vel = dot(vel_world.xy(), normal); // normal points out of the wall
+						f32 tang_vel = dot(vel_world.xy(), tangent);
+						
+						if (length(tang_vel) != 0) {
+							f32 friction_dv = kinetic_friction_coeff * max(-norm_vel, 0.0f); // change in speed due to kinetic friction (unbounded ie. can be larger than our actual velocity)
+							tang_vel += -normalize(tang_vel) * min(friction_dv, length(tang_vel));
+						}
+						
+						norm_vel = bounciness * -norm_vel;
+						
+						vel_world = v3(tangent * tang_vel + normal * norm_vel, 0);
+						
+						pos_world.x = earliest_collision.hit_pos.x;
+						pos_world.y = earliest_collision.hit_pos.y;
+						
+						pos_world += v3(earliest_collision.normal * 0.000001f, 0); // move player a epsilon distance away from the wall to prevent problems
+						
+						t_remain -= earliest_collision_t;
+					}
+				}
+			};
+			
+			collision_algo();
+			
+			printf(">>> frame %d pos_world: %.3f %.3f vel_world: %.3f %.3f\n", frame_i, pos_world.x,pos_world.y, vel_world.x,vel_world.y);
+			
+			//vel_world = 0;
+			
+			player.vel_world = vel_world;
+			player.pos_world = pos_world;
+			
+			player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
+			
+			#endif
+		#else
 			v3 pos_world = player.pos_world;
 			v3 vel_world = player.vel_world;
 			
@@ -1639,8 +1915,13 @@ int main (int argc, char** argv) {
 			
 			player.vel_world = vel_world;
 			player.pos_world = pos_world;
+		#endif
+		}
+		
+		if (viewing_flycam) {
+			view.pos_world = flycam.pos_world;
+		} else {
 			view.pos_world = player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
-			#endif
 		}
 		
 		view.calc_final_matricies(world_to_cam_rot, cam_to_world_rot);
@@ -1747,8 +2028,6 @@ int main (int argc, char** argv) {
 			
 			shad_main->bind();
 			// uniforms still bound
-			
-			test_vbo.clear();
 			
 			v3 pos_world = player.pos_world;
 			f32 r = player.collision_r;
