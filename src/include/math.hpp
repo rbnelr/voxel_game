@@ -88,3 +88,32 @@ static Sin_Cos sin_cos (f32 ang) {
 static bool equal_epsilon (f32 l, f32 r, f32 epsilon) {
 	return abs(l -r) <= epsilon;
 }
+
+#if 1
+union FI32_u {
+	f32		f;
+	u32		i;
+	FI32_u(f32 f): f{f} {}
+	FI32_u(u32 i): i{i} {}
+};
+union FI64_u {
+	f64		f;
+	u64		i;
+	FI64_u(f64 f): f{f} {}
+	FI64_u(u64 i): i{i} {}
+};
+
+static f32 int_bits_as_flt (u32 i) {
+	return FI32_u(i).f;
+}
+static f64 int_bits_as_flt (u64 i) {
+	return FI64_u(i).f;
+}
+static u32 flt_bits_as_int (f32 f) {
+	return FI32_u(f).i;
+}
+static u64 flt_bits_as_int (f64 f) {
+	return FI64_u(f).i;
+}
+#endif
+

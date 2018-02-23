@@ -3,6 +3,8 @@
 	cls
 	color 07
 	
+	rem "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64"
+	
 	rem MSVC should be always in path
 	set LLVM=D:/Cproj/_llvm/LLVM/bin/
 	if [!GCC!] == [] set GCC=D:/pt_proj/tdm_gcc/bin/

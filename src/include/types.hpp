@@ -39,33 +39,3 @@ typedef double				f64;
 typedef char const*			cstr;
 typedef char				utf8;
 typedef char32_t			utf32;
-
-////
-
-#if 0
-union FI32_u {
-	f32		f;
-	u32		i;
-	constexpr FI32_u(f32 f): f{f} {}
-	constexpr FI32_u(u32 i): i{i} {}
-};
-union FI64_u {
-	f64		f;
-	u64		i;
-	constexpr FI64_u(f64 f): f{f} {}
-	constexpr FI64_u(u64 i): i{i} {}
-};
-
-static constexpr f32 reint_int_as_flt (u32 i) {
-	return FI32_u(i).f;
-}
-static constexpr f64 reint_int_as_flt (u64 i) {
-	return FI64_u(i).f;
-}
-static constexpr u32 reint_flt_as_int (f32 f) {
-	return FI32_u(f).i;
-}
-static constexpr u64 reint_flt_as_int (f64 f) {
-	return FI64_u(f).i;
-}
-#endif

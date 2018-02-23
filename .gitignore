@@ -4,8 +4,6 @@ deps/*
 !deps/glfw-3.3/
 !deps/noise/
 
-assets_src/
-
 *.asm
 
 *.obj

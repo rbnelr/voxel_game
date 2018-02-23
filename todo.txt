@@ -1,9 +1,14 @@
 DONE:
  
+ collision not working properly on corners
+ -> fixed, was a normalization of zero vector that caused nan
+ -> 2nd. bug: needed to do raycasting on minowski sum of 5 blocks not 3
+ 
 TODO
 -FEATURES:
  
+ implement collision in 3d
+ 
 -BUGS:
  
- collision not working properly on corners
  
