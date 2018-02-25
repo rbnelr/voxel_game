@@ -9,7 +9,7 @@ union V3 {
 	constexpr T operator[] (u32 i) const {	return arr[i]; }
 	
 	INL V3 () {}
-	INL constexpr V3 (T val):				x{val},	y{val},	z{val} {}
+	INL constexpr V3 (T all):				x{all},	y{all},	z{all} {}
 	INL constexpr V3 (T x, T y, T z):		x{x},	y{y},	z{z} {}
 	INL constexpr V3 (V2 v, T z):			x{v.x},	y{v.y},	z{z} {}
 	

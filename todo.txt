@@ -4,11 +4,12 @@ DONE:
  -> fixed, was a normalization of zero vector that caused nan
  -> 2nd. bug: needed to do raycasting on minowski sum of 5 blocks not 3
  
+ implement collision in 3d
+ implemented jumping
+ 
 TODO
 -FEATURES:
  
- implement collision in 3d
- 
 -BUGS:
- 
+ somtimes can still get stuck on the border of blocks when jumping
  

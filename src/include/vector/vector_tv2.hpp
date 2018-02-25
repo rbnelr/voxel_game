@@ -9,7 +9,7 @@ union V2 {
 	constexpr T operator[] (u32 i) const {	return arr[i]; }
 	
 	INL V2 () {}
-	INL constexpr V2 (T val):				x{val},	y{val} {}
+	INL constexpr V2 (T all):				x{all},	y{all} {}
 	INL constexpr V2 (T x, T y):			x{x},	y{y} {}
 	
 #if !BOOLVEC

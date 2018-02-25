@@ -9,7 +9,7 @@ union V4 {
 	constexpr T operator[] (u32 i) const {	return arr[i]; }
 	
 	INL V4 () {}
-	INL constexpr V4 (T val):				x{val},	y{val},	z{val},	w{val} {}
+	INL constexpr V4 (T all):				x{all},	y{all},	z{all},	w{all} {}
 	INL constexpr V4 (T x, T y, T z, T w):	x{x},	y{y},	z{z},	w{w} {}
 	INL constexpr V4 (V2 v, T z, T w):		x{v.x},	y{v.y},	z{z},	w{w} {}
 	INL constexpr V4 (V3 v, T w):			x{v.x},	y{v.y},	z{v.z},	w{w} {}

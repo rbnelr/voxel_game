@@ -760,7 +760,7 @@ static s32 get_heightmap_perlin2d_octaves_count () {			return (s32)heightmap_per
 static void set_heightmap_perlin2d_octaves_count (s32 count) {	heightmap_perlin2d_octaves.resize(count); }
 static bool heightmap_perlin2d_octaves_open = true;
 
-#define _2D_TEST 1
+#define _2D_TEST 0
 
 f32 heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
@@ -919,8 +919,6 @@ struct Input {
 };
 static Input		inp;
 
-static v3 GRAV_ACCEL = v3(0,0,-10);
-
 static bool controling_flycam =		false;
 
 struct Flycam {
@@ -947,10 +945,20 @@ struct Flycam {
 };
 static Flycam flycam;
 
+static f32 grav_accel_down = 20;
+
+static f32 jump_height_from_jump_impulse (f32 jump_impulse_up, f32 grav_accel_down) {
+	return jump_impulse_up*jump_impulse_up / grav_accel_down * 0.5f;
+}
+static f32 jump_impulse_from_jump_height (f32 jump_height, f32 grav_accel_down) {
+	return sqrt( 2.0f * jump_height * grav_accel_down );
+}
+
 static bool trigger_respawn_player =	true;
 static bool trigger_regen_chunks =		false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
+static bool trigger_jump =				false;
 
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
@@ -1037,7 +1045,8 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				case GLFW_KEY_W:			inp.move_dir.y += went_down ? +1 : -1;		break;
 				
 				case GLFW_KEY_LEFT_CONTROL:	inp.move_dir.z -= went_down ? +1 : -1;		break;
-				case GLFW_KEY_SPACE:		inp.move_dir.z += went_down ? +1 : -1;		break;
+				case GLFW_KEY_SPACE:		inp.move_dir.z += went_down ? +1 : -1;
+											if (went_down) trigger_jump = true;			break;
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
 				
@@ -1350,9 +1359,17 @@ int main (int argc, char** argv) {
 		f32 collision_r =	0.4f;
 		f32 collision_h =	1.7f;
 		
-		f32 walking_friction_alpha = 0.15f;
-		f32 collision_bounciness = 0;
-		f32 collision_friction = 0.2f;
+		f32 walking_friction_alpha =	0.15f;
+		
+		f32 falling_ground_friction =	0.0f;
+		f32 falling_bounciness =		0.25f;
+		f32 falling_min_bounce_speed =	6;
+		
+		f32 wall_friction =				0.2f;
+		f32 wall_bounciness =			0.55f;
+		f32 wall_min_bounce_speed =		8;
+		
+		f32	jumping_up_impulse = jump_impulse_from_jump_height(1.3f, grav_accel_down);
 		
 		bool opt_open = true;
 		void options () {
@@ -1368,12 +1385,22 @@ int main (int argc, char** argv) {
 				option(		"  collision_h",			&collision_h);
 				
 				option(		"  walking_friction_alpha",	&walking_friction_alpha);
-				option(		"  collision_bounciness",	&collision_bounciness);
-				option(		"  collision_friction",		&collision_friction);
+				
+				option(		"  falling_ground_friction",&falling_ground_friction);
+				option(		"  falling_bounciness",		&falling_bounciness);
+				option(		"  falling_min_bounce_speed",	&falling_min_bounce_speed);
+				
+				option(		"  wall_bounciness",		&wall_bounciness);
+				option(		"  wall_friction",			&wall_friction);
+				option(		"  wall_min_bounce_speed",	&wall_min_bounce_speed);
+				
+				option(		"  jumping_up_impulse",		&jumping_up_impulse);
 			}
 		}
 	};
 	Player player;
+	
+	bool draw_debug_overlay = false;
 	
 	auto load_game = [&] () {
 		trigger_load_game = false;
@@ -1434,6 +1461,7 @@ int main (int argc, char** argv) {
 		}
 		
 		inp.mouse_look_diff = 0;
+		trigger_jump = false;
 		
 		glfwPollEvents();
 		
@@ -1536,23 +1564,144 @@ int main (int argc, char** argv) {
 			
 			//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
 		} else {
+			constexpr f32 COLLISION_SEPERATION_EPSILON = 0.001f;
+			
 			v3 pos_world = player.pos_world;
 			v3 vel_world = player.vel_world;
 			
 			// 
-			#if 1
-			v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
+			bool player_stuck_in_solid_block;
+			bool player_on_ground;
 			
-			v2 feet_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
+			auto check_blocks_around_player = [&] () {
+				auto circle_square_intersect = [] (v2 circ_origin, f32 circ_radius) { // intersection test between circle and square of edge length 1
+					// square goes from 0-1 on each axis (circ_origin pos is relative to cube)
+					
+					v2 nearest_pos_on_square = clamp( circ_origin, 0,1 );
+					
+					return length_sqr(nearest_pos_on_square -circ_origin) < circ_radius*circ_radius;
+				};
+				auto cylinder_cube_intersect = [&] (v3 cyl_origin, f32 cyl_radius, f32 cyl_height) { // intersection test between cylinder and cube of edge length 1
+					// cube goes from 0-1 on each axis (cyl_origin pos is relative to cube)
+					// cylinder origin is at the center of the circle at the base of the cylinder (-z circle)
+					
+					if (cyl_origin.z >= 1) return false; // cylinder above cube
+					if (cyl_origin.z <= -cyl_height) return false; // cylinder below cube
+					
+					return circle_square_intersect(cyl_origin.xy(), cyl_radius);
+				};
+				
+				f32 player_r = player.collision_r;
+				f32 player_h = player.collision_h;
+				
+				{ // for all blocks we could be touching
+					bpos start =	(bpos)floor(pos_world -v3(player_r,player_r,0));
+					bpos end =		(bpos)ceil(pos_world +v3(player_r,player_r,player_h));
+					
+					bool any_intersecting = false;
+					
+					bpos bp;
+					for (bp.z=start.z; bp.z<end.z; ++bp.z) {
+						for (bp.y=start.y; bp.y<end.y; ++bp.y) {
+							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+								
+								auto* b = query_block(bp);
+								bool block_solid = bt_is_solid(b->type);
+								
+								bool intersecting = false;
+								
+								if (block_solid) {
+									intersecting = cylinder_cube_intersect(pos_world -(v3)bp, player_r,player_h);
+								}
+								
+								if (0) {
+									lrgba8 col;
+									
+									if (!block_solid) {
+										col = lrgba8(40,40,40,100);
+									} else {
+										col = intersecting ? lrgba8(255,40,40,200) : lrgba8(255,255,255,150);
+									}
+									
+									Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
+									
+									f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+									
+									*out++ = { (v3)bp +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
+									*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+									*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+									*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
+									*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
+									*out++ = { (v3)bp +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
+								}
+								
+								any_intersecting = any_intersecting || intersecting;
+							}
+						}
+					}
+					
+					player_stuck_in_solid_block = any_intersecting; // player somehow ended up inside a block
+				}
+				
+				{ // for all blocks we could be standing on
+					
+					bpos_t pos_z = floor(pos_world.z);
+					
+					player_on_ground = false;
+					
+					if ((pos_world.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && vel_world.z == 0) {
+						
+						bpos2 start =	(bpos2)floor(pos_world.xy() -v2(player_r,player_r));
+						bpos2 end =		(bpos2)ceil(pos_world.xy() +v2(player_r,player_r));
+						
+						bpos bp;
+						bp.z = pos_z -1;
+						
+						for (bp.y=start.y; bp.y<end.y; ++bp.y) {
+							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+								
+								auto* b = query_block(bp);
+								bool block_solid = bt_is_solid(b->type);
+								
+								if (block_solid && circle_square_intersect(pos_world.xy() -(v2)bp.xy(), player_r)) player_on_ground = true;
+							}
+						}
+					}
+				}
+				
+			};
+			check_blocks_around_player();
 			
-			vel_world = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z ); // really bad way of doing this
-			if (length(vel_world) < 0.01f) vel_world = 0;
-			#endif
+			if (player_stuck_in_solid_block) {
+				vel_world = 0;
+			} else {
+				
+				overlay_line(prints(">>> player_on_ground: %d\n", player_on_ground));
+				
+				{ // player walking dynamics
+					v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
+					
+					v2 feet_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
+					
+					// need some proper way of doing walking dynamics
+					
+					if (player_on_ground) {
+						vel_world = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
+					} else {
+						v3 tmp = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
+						
+						if (length(vel_world.xy()) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
+					}
+					
+					if (length(vel_world) < 0.01f) vel_world = 0;
+				}
+				
+				if (trigger_jump && player_on_ground) vel_world += v3(0,0, player.jumping_up_impulse);
+				
+				vel_world += v3(0,0, -grav_accel_down) * dt;
+			}
 			
-			vel_world += GRAV_ACCEL * dt;
-			
-			pos_world.z = 1;
-			vel_world.z = 0;
+			option("draw_debug_overlay", &draw_debug_overlay);
 			
 			#if 0
 			// case 1:
@@ -1573,87 +1722,20 @@ int main (int argc, char** argv) {
 				flt_bits_as_int(vel_world.z) );
 			#endif
 			
-			auto collision_algo = [&] () {
-				auto cube_cylinder_intersect = [] (v3 cyl_origin, f32 cyl_radius, f32 cyl_height) { // intersection test between cube of edge length 1 and cylinder
-					// cube goes from 0-1 on each axis (cyl_origin pos is relative to cube)
-					// cylinder origin is at the center of the circle at the base of the cylinder (-z circle)
-					
-					if (cyl_origin.z >= 1) return false; // cylinder above cube
-					if (cyl_origin.z <= -cyl_height) return false; // cylinder below cube
-					
-					v2 nearest_2d_pos_on_cube = clamp( cyl_origin.xy(), 0,1 );
-					
-					if (length_sqr(nearest_2d_pos_on_cube -cyl_origin.xy()) >= cyl_radius*cyl_radius) return false; // 2d circle of cylinder not touching 2d square of cube
-					
-					return true;
-				};
-				
-				f32 r = player.collision_r;
-				f32 h = player.collision_h;
-				
-				{
-					// for all blocks we could be touching
-					bpos start =	(bpos)floor(pos_world -v3(r,r,0));
-					bpos end =		(bpos)ceil(pos_world +v3(r,r,h));
-					
-					bool any_intersecting = false;
-					
-					bpos bp;
-					for (bp.z=start.z; bp.z<end.z; ++bp.z) {
-						for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-								
-								auto* b = query_block(bp);
-								bool block_solid = bt_is_solid(b->type);
-								
-								bool intersecting = false;
-								
-								if (block_solid) {
-									intersecting = cube_cylinder_intersect(pos_world -(v3)bp, r,h);
-								}
-								
-								lrgba8 col;
-								
-								if (!block_solid) {
-									col = lrgba8(40,40,40,100);
-								} else {
-									col = intersecting ? lrgba8(255,40,40,200) : lrgba8(255,255,255,150);
-								}
-								
-								if (0) {
-									Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
-									
-									f32 w = get_block_texture_index_from_block_type(BT_EARTH);
-									
-									*out++ = { (v3)bp +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
-									*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
-									*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
-									*out++ = { (v3)bp +v3( 0, 0,+1.01f), v4(0,0, UVZW_BLOCK_FACE_TOP,w), col };
-									*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
-									*out++ = { (v3)bp +v3( 0,+1,+1.01f), v4(0,1, UVZW_BLOCK_FACE_TOP,w), col };
-								}
-								
-								any_intersecting = any_intersecting || intersecting;
-							}
-						}
-					}
-					
-					if (any_intersecting) { // player somehow ended up inside a block
-						//printf(">>>>>>>>> stuck!\n");
-						//Sleep(1000);
-						vel_world = 0;
-						return;
-					}
-				}
+			auto trace_player_collision_path = [&] () {
+				f32 player_r = player.collision_r;
+				f32 player_h = player.collision_h;
 				
 				f32 t_remain = dt;
 				
+				bool draw_dbg = draw_debug_overlay; // so that i only draw the debug block overlay once
+
 				while (t_remain > 0) {
 					
 					struct {
 						f32 dist = +INF;
-						v2 hit_pos;
-						v2 normal;
+						v3 hit_pos;
+						v3 normal; // normal of surface/edge we collided with, the player always collides with the outside of the block since we assume the player can never be inside a block if we're doing this raycast
 					} earliest_collision;
 					
 					auto find_earliest_collision_with_block_by_raycast_minkowski_sum = [&] (bpos bp) {
@@ -1664,20 +1746,14 @@ int main (int argc, char** argv) {
 						
 						if (block_solid) {
 							
-							v2 local_origin = (v2)bp.xy();
+							v3 local_origin = (v3)bp;
 							
-							v2 pos_local = pos_world.xy() -local_origin;
-							v2 vel = vel_world.xy();
+							v3 pos_local = pos_world -local_origin;
+							v3 vel = vel_world;
 							
-							if (0) { // player cannot be inside these blocks
-								v2 closest_p = clamp(pos_local, 0,1); // closest point on block
-								
-								dbg_assert(length_sqr(closest_p -pos_local) > r*r);
-							}
-							
-							auto hit_found = [&] (f32 hit_dist, v2 hit_pos_local, v2 normal_world) {
+							auto collision_found = [&] (f32 hit_dist, v3 hit_pos_local, v3 normal_world) {
 								if (hit_dist < earliest_collision.dist) {
-									v2 hit_pos_world = hit_pos_local +local_origin;
+									v3 hit_pos_world = hit_pos_local +local_origin;
 									
 									earliest_collision.dist =		hit_dist;
 									earliest_collision.hit_pos =	hit_pos_world;
@@ -1685,78 +1761,112 @@ int main (int argc, char** argv) {
 								}
 							};
 							
-							auto raycast_x_line_segment = [&] (v2 ray_pos, v2 ray_dir, f32 line_y, f32 line_a_x, f32 line_b_x) { // line parallel to x axis
-								if (ray_dir.y == 0 || (ray_dir.y * (line_y -ray_pos.y)) < 0) return false; // if ray parallel or ray points away from line
+							// this geometry we are reycasting our player position onto represents the minowski sum of the block and our players cylinder
+							
+							auto raycast_x_side = [&] (v3 ray_pos, v3 ray_dir, f32 plane_x, f32 normal_x) { // side forming yz plane
+								if (ray_dir.x == 0 || (ray_dir.x * (plane_x -ray_pos.x)) < 0) return false; // ray parallel to plane or ray points away from plane
 								
-								// delta of triangle formed by ray_pos, hit_pos and ray_pos projected onto line
-								f32 delta_y = line_y -ray_pos.y;
-								f32 delta_x = delta_y * (ray_dir.x / ray_dir.y);
+								f32 delta_x = plane_x -ray_pos.x;
+								v2 delta_yz = delta_x * (v2(ray_dir.y,ray_dir.z) / ray_dir.x);
+
+								v2 hit_pos_yz = v2(ray_pos.y,ray_pos.z) + delta_yz;
+
+								f32 hit_dist = length(v3(delta_x, delta_yz[0], delta_yz[1]));
+								if (!all(hit_pos_yz > v2(0,-player_h) && hit_pos_yz < 1)) return false;
 								
-								f32 hit_pos_x = ray_pos.x +delta_x;
-								
-								f32 t = map(hit_pos_x, line_a_x, line_b_x);
-								f32 hit_dist = length(v2(delta_x, delta_y));
-								if (t <= 0 || t >= 1) return false;
-								
-								hit_found(hit_dist, v2(hit_pos_x, line_y), v2(0, normalize(line_y)));
+								collision_found(hit_dist, v3(plane_x, hit_pos_yz[0], hit_pos_yz[1]), v3(normal_x,0,0));
 								return true;
 							};
-							auto raycast_y_line_segment = [&] (v2 ray_pos, v2 ray_dir, f32 line_x, f32 line_a_y, f32 line_b_y) { // line parallel to y axis
-								if (ray_dir.x == 0 || (ray_dir.x * (line_x -ray_pos.x)) < 0) return false; // if ray parallel or ray points away from line
+							auto raycast_y_side = [&] (v3 ray_pos, v3 ray_dir, f32 plane_y, f32 normal_y) { // side forming xz plane
+								if (ray_dir.y == 0 || (ray_dir.y * (plane_y -ray_pos.y)) < 0) return false; // ray parallel to plane or ray points away from plane
 								
-								// delta of triangle formed by ray_pos, hit_pos and ray_pos projected onto line
-								f32 delta_x = line_x -ray_pos.x;
-								f32 delta_y = delta_x * (ray_dir.y / ray_dir.x);
-
-								f32 hit_pos_y = ray_pos.y + delta_y;
-
-								f32 t = map(hit_pos_y, line_a_y, line_b_y);
-								f32 hit_dist = length(v2(delta_x, delta_y));
-								if (t <= 0 || t >= 1) return false;
+								f32 delta_y = plane_y -ray_pos.y;
+								v2 delta_xz = delta_y * (v2(ray_dir.x,ray_dir.z) / ray_dir.y);
 								
-								hit_found(hit_dist, v2(line_x, hit_pos_y), v2(normalize(line_x), 0));
+								v2 hit_pos_xz = v2(ray_pos.x,ray_pos.z) +delta_xz;
+								
+								f32 hit_dist = length(v3(delta_xz[0], delta_y, delta_xz[1]));
+								if (!all(hit_pos_xz > v2(0,-player_h) && hit_pos_xz < 1)) return false;
+								
+								collision_found(hit_dist, v3(hit_pos_xz[0], plane_y, hit_pos_xz[1]), v3(0,normal_y,0));
 								return true;
 							};
 							
-							auto raycast_circle = [&] (v2 ray_pos, v2 ray_dir, v2 circle_pos, f32 circle_r) {
-								v2 unit_ray_dir = normalize(ray_dir);
+							auto raycast_sides_edge = [&] (v3 ray_pos, v3 ray_dir, v2 cyl_pos2d, f32 cyl_r, f32 cyl_z_l,f32 cyl_z_h) { // edge between block sides which are cylinders in our minowski sum
+								// do 2d circle raycase using on xy plane
+								f32 ray_dir2d_len = length(ray_dir.xy());
+								if (ray_dir2d_len == 0) return false; // ray parallel to cylinder
+								v2 unit_ray_dir2d = ray_dir.xy() / ray_dir2d_len;
 								
-								v2 circ_rel_p = circle_pos -ray_pos;
+								v2 circ_rel_p = cyl_pos2d -ray_pos.xy();
 								
-								f32 closest_p_dist = dot(unit_ray_dir, circ_rel_p);
-								v2 closest_p = unit_ray_dir * closest_p_dist;
+								f32 closest_p_dist = dot(unit_ray_dir2d, circ_rel_p);
+								v2 closest_p = unit_ray_dir2d * closest_p_dist;
 								
 								v2 circ_to_closest = closest_p -circ_rel_p;
 								
-								f32 r_sqr = circle_r*circle_r;
+								f32 r_sqr = cyl_r*cyl_r;
 								f32 dist_sqr = length_sqr(circ_to_closest);
 								
-								if (dist_sqr >= r_sqr) return false; // line does not cross circle
+								if (dist_sqr >= r_sqr) return false; // ray does not cross cylinder
 								
 								f32 chord_half_length = sqrt( r_sqr -dist_sqr );
-								f32 closest_hit_dist = closest_p_dist -chord_half_length;
-								f32 furthest_hit_dist = closest_p_dist +chord_half_length;
+								f32 closest_hit_dist2d = closest_p_dist -chord_half_length;
+								f32 furthest_hit_dist2d = closest_p_dist +chord_half_length;
 								
-								f32 hit_dist;
-								if (closest_hit_dist >= 0)			hit_dist = closest_hit_dist;
-								else if (furthest_hit_dist >= 0)	hit_dist = furthest_hit_dist;
+								f32 hit_dist2d;
+								if (closest_hit_dist2d >= 0)		hit_dist2d = closest_hit_dist2d;
+								else if (furthest_hit_dist2d >= 0)	hit_dist2d = furthest_hit_dist2d;
 								else								return false; // circle hit is on backwards direction of ray, ie. no hit
 								
-								v2 rel_hit_p = hit_dist * unit_ray_dir;
-								hit_found(hit_dist, ray_pos +rel_hit_p, normalize(rel_hit_p -circ_rel_p));
+								v2 rel_hit_xy = hit_dist2d * unit_ray_dir2d;
+								
+								// calc hit z
+								f32 rel_hit_z = length(rel_hit_xy) * (ray_dir.z / ray_dir2d_len);
+								
+								v3 rel_hit_pos = v3(rel_hit_xy, rel_hit_z);
+								v3 hit_pos = ray_pos +rel_hit_pos;
+								
+								if (!(hit_pos.z > cyl_z_l && hit_pos.z < cyl_z_h)) return false;
+								
+								collision_found(length(rel_hit_pos), hit_pos, v3(normalize(rel_hit_xy -circ_rel_p), 0));
 								return true;
 							};
 							
-							// this represents a minowski sum of the square of the block and our players circle
-							hit = raycast_x_line_segment(	pos_local, vel, 0.0f -r, 0,1 ) || hit;
-							hit = raycast_x_line_segment(	pos_local, vel, 1.0f +r, 0,1 ) || hit;
-							hit = raycast_y_line_segment(	pos_local, vel, 0.0f -r, 0,1 ) || hit;
-							hit = raycast_y_line_segment(	pos_local, vel, 1.0f +r, 0,1 ) || hit;
+							auto raycast_cap = [&] (v3 ray_pos, v3 ray_dir, f32 plane_z, f32 normal_z) {
+								// normal axis aligned plane raycast
+								f32 delta_z = plane_z -ray_pos.z;
+								
+								if (ray_dir.z == 0 || (ray_dir.z * delta_z) < 0) return false; // if ray parallel to plane or ray points away from plane
+								
+								v2 delta_xy = delta_z * (ray_dir.xy() / ray_dir.z);
+								
+								v2 plane_hit_xy = ray_pos.xy() +delta_xy;
+								
+								// check if cylinder base/top circle cap intersects with block top/bottom square
+								v2 closest_p = clamp(plane_hit_xy, 0,1);
+								
+								f32 dist_sqr = length_sqr(closest_p -ray_pos.xy());
+								if (dist_sqr >= player_r*player_r) return false; // hit outside
+								
+								f32 hit_dist = length(v3(delta_xy, delta_z));
+								collision_found(hit_dist, v3(plane_hit_xy, plane_z), v3(0,0, normal_z));
+								return true;
+							};
 							
-							hit = raycast_circle(			pos_local, vel, v2( 0, 0), r ) || hit;
-							hit = raycast_circle(			pos_local, vel, v2( 0,+1), r ) || hit;
-							hit = raycast_circle(			pos_local, vel, v2(+1, 0), r ) || hit;
-							hit = raycast_circle(			pos_local, vel, v2(+1,+1), r ) || hit;
+							hit = raycast_cap(			pos_local, vel, 1,			+1) || hit; // block top
+							hit = raycast_cap(			pos_local, vel, -player_h,	-1) || hit; // block bottom
+							
+							hit = raycast_x_side(		pos_local, vel, 0 -player_r, -1 ) || hit;
+							hit = raycast_x_side(		pos_local, vel, 1 +player_r, +1 ) || hit;
+							hit = raycast_y_side(		pos_local, vel, 0 -player_r, -1 ) || hit;
+							hit = raycast_y_side(		pos_local, vel, 1 +player_r, +1 ) || hit;
+							
+							hit = raycast_sides_edge(	pos_local, vel, v2( 0, 0), player_r, -player_h, 1 ) || hit;
+							hit = raycast_sides_edge(	pos_local, vel, v2( 0,+1), player_r, -player_h, 1 ) || hit;
+							hit = raycast_sides_edge(	pos_local, vel, v2(+1, 0), player_r, -player_h, 1 ) || hit;
+							hit = raycast_sides_edge(	pos_local, vel, v2(+1,+1), player_r, -player_h, 1 ) || hit;
+							
 						}
 						
 						lrgba8 col;
@@ -1767,7 +1877,7 @@ int main (int argc, char** argv) {
 							col = hit ? lrgba8(255,40,40,200) : lrgba8(255,255,255,150);
 						}
 						
-						if (1) {
+						if (draw_dbg) {
 							Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
 							
 							f32 w = get_block_texture_index_from_block_type(BT_EARTH);
@@ -1781,21 +1891,19 @@ int main (int argc, char** argv) {
 						}
 					};
 					
-					{
+					if (length_sqr(vel_world) != 0) {
 						// for all blocks we could be touching during movement by at most one block on each axis
-						bpos start =	(bpos)floor(pos_world -v3(r,r,0)) -1;
-						bpos end =		(bpos)ceil(pos_world +v3(r,r,h)) +1;
+						bpos start =	(bpos)floor(pos_world -v3(player_r,player_r,0)) -1;
+						bpos end =		(bpos)ceil(pos_world +v3(player_r,player_r,player_h)) +1;
 						
 						bpos bp;
-						bp.z = 1;
-						//for (bp.z=start.z; bp.z<end.z; ++bp.z)
-						//{
+						for (bp.z=start.z; bp.z<end.z; ++bp.z) {
 							for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 								for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 									find_earliest_collision_with_block_by_raycast_minkowski_sum(bp);
 								}
 							}
-						//}
+						}
 					}
 					
 					//printf(">>> %f %f,%f %f,%f\n", earliest_collision.dist, pos_world.x,pos_world.y, earliest_collision.hit_pos.x,earliest_collision.hit_pos.y);
@@ -1807,43 +1915,59 @@ int main (int argc, char** argv) {
 					if (earliest_collision_t >= max_dt) {
 						pos_world += vel_world * max_dt;
 						t_remain -= max_dt;
-						//printf("%.12f\n", length(pos_world.xy() -v2(8,29)));
 					} else {
-						//printf(">>> frame %d collision\n", frame_i);
 						
 						// handle block collision
-						v2 normal = earliest_collision.normal;
-						v2 tangent = rotate2_90(earliest_collision.normal);
+						f32 friction;
+						f32 bounciness;
+						f32 min_bounce_speed;
 						
-						f32 norm_vel = dot(vel_world.xy(), normal); // normal points out of the wall
-						f32 tang_vel = dot(vel_world.xy(), tangent);
-						
-						if (length(tang_vel) != 0) {
-							f32 friction_dv = player.collision_friction * max(-norm_vel, 0.0f); // change in speed due to kinetic friction (unbounded ie. can be larger than our actual velocity)
-							tang_vel += -normalize(tang_vel) * min(friction_dv, length(tang_vel));
+						if (earliest_collision.normal.z == +1) {
+							// hit top of block ie. ground
+							friction = player.falling_ground_friction;
+							bounciness = player.falling_bounciness;
+							min_bounce_speed = player.falling_min_bounce_speed;
+						} else {
+							// hit side of block or bottom of block ie. wall or ceiling
+							friction = player.wall_friction;
+							bounciness = player.wall_bounciness;
+							min_bounce_speed = player.wall_min_bounce_speed;
 						}
 						
-						norm_vel = player.collision_bounciness * -norm_vel;
+						v3 normal = earliest_collision.normal;
+						f32 norm_speed = dot(normal, vel_world); // normal points out of the wall
+						v3 norm_vel = normal * norm_speed;
 						
-						vel_world = v3(tangent * tang_vel + normal * norm_vel, 0);
+						v3 frict_vel = vel_world -norm_vel;
+						frict_vel.z = 0; // do not apply friction on vertical movement
+						f32 frict_speed = length(frict_vel);
 						
-						pos_world.x = earliest_collision.hit_pos.x;
-						pos_world.y = earliest_collision.hit_pos.y;
+						v3 remain_vel = vel_world -norm_vel -frict_vel;
 						
-						// 0.000001f
-						pos_world += v3(earliest_collision.normal * 0.001f, 0); // move player a epsilon distance away from the wall to prevent problems
+						if (frict_speed != 0) {
+							v3 frict_dir = frict_vel / frict_speed;
+							
+							f32 friction_dv = friction * max(-norm_speed, 0.0f); // change in speed due to kinetic friction (unbounded ie. can be larger than our actual velocity)
+							frict_vel -= frict_dir * min(friction_dv, frict_speed);
+						}
 						
-						//printf("%.12f\n", length(pos_world.xy() -v2(8,29)));
-						//printf("%.12f\n", dot(vel_world.xy(), normalize(pos_world.xy() - v2(8, 29))));
+						norm_vel = bounciness * -norm_vel;
+						
+						if (length(norm_vel) <= min_bounce_speed) norm_vel = 0;
+						
+						vel_world = v3(norm_vel +frict_vel +remain_vel);
+						
+						pos_world = earliest_collision.hit_pos;
+						
+						pos_world += v3(earliest_collision.normal * COLLISION_SEPERATION_EPSILON); // move player a epsilon distance away from the wall to prevent problems, having this value be 1/1000 instead of sothing very samll prevents small intersection problems that i don't want to debug now
 						
 						t_remain -= earliest_collision_t;
 					}
+
+					draw_dbg = false;
 				}
 			};
-			
-			collision_algo();
-			
-			//printf(">>> frame %d pos_world: %.3f %.3f vel_world: %.3f %.3f\n", frame_i, pos_world.x,pos_world.y, vel_world.x,vel_world.y);
+			trace_player_collision_path();
 			
 			player.vel_world = vel_world;
 			player.pos_world = pos_world;
