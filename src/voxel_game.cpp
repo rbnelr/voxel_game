@@ -1351,10 +1351,10 @@ int main (int argc, char** argv) {
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
 		f32	vfov =			deg(80);
 		
-		v3	camera_offset_world =	v3(0,0,1.2f);
-		v3	camera_offset_cam =		v3(0,0,3);
-		//v3	camera_offset_world =	v3(0,0,1.6f);
-		//v3	camera_offset_cam =		v3(0,0,0);
+		bool third_person = true;
+		
+		f32	eye_height =	1.65f;
+		v3	third_person_camera_offset_cam =		v3(0.5f, -0.4f, 3);
 		
 		f32 collision_r =	0.4f;
 		f32 collision_h =	1.7f;
@@ -1379,8 +1379,12 @@ int main (int argc, char** argv) {
 				option(		"  vel_world",				&vel_world);
 				option_deg(	"  ori_ae",					&ori_ae);
 				option_deg(	"  vfov",					&vfov);
-				option(		"  camera_offset_world",	&camera_offset_world);
-				option(		"  camera_offset_cam",		&camera_offset_cam);
+				
+				option(		"  third_person",			&third_person);
+				
+				option(		"  eye_height",				&eye_height);
+				option(		"  third_person_camera_offset_cam",		&third_person_camera_offset_cam);
+				
 				option(		"  collision_r",			&collision_r);
 				option(		"  collision_h",			&collision_h);
 				
@@ -1971,14 +1975,13 @@ int main (int argc, char** argv) {
 			
 			player.vel_world = vel_world;
 			player.pos_world = pos_world;
-			
-			player.pos_world +(cam_to_world_rot * player.camera_offset_cam);
 		}
 		
 		if (viewing_flycam) {
 			view.pos_world = flycam.pos_world;
 		} else {
-			view.pos_world = player.pos_world +player.camera_offset_world +(cam_to_world_rot * player.camera_offset_cam);
+			view.pos_world = player.pos_world +v3(0,0,player.eye_height);
+			if (player.third_person) view.pos_world += cam_to_world_rot * player.third_person_camera_offset_cam;
 		}
 		
 		view.calc_final_matricies(world_to_cam_rot, cam_to_world_rot);
