@@ -622,7 +622,8 @@ enum block_type : s32 {
 	
 	BLOCK_TYPES_COUNT
 };
-static bool bt_is_solid (block_type t) { return !(t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
+static bool bt_is_traversable (block_type t) {	return !(t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
+static bool is_breakable (block_type t) {		return !(t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
 
 static cstr block_texture_name[BLOCK_TYPES_COUNT] = {
 	/* BT_AIR	*/	"missing.png",
@@ -1702,7 +1703,7 @@ int main (int argc, char** argv) {
 							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 								
 								auto* b = query_block(bp);
-								bool block_solid = bt_is_solid(b->type);
+								bool block_solid = bt_is_traversable(b->type);
 								
 								bool intersecting = false;
 								
@@ -1757,7 +1758,7 @@ int main (int argc, char** argv) {
 							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 								
 								auto* b = query_block(bp);
-								bool block_solid = bt_is_solid(b->type);
+								bool block_solid = bt_is_traversable(b->type);
 								
 								if (block_solid && circle_square_intersect(pos_world.xy() -(v2)bp.xy(), player_r)) player_on_ground = true;
 							}
@@ -1838,7 +1839,7 @@ int main (int argc, char** argv) {
 						bool hit = false;
 						
 						auto* b = query_block(bp);
-						bool block_solid = bt_is_solid(b->type);
+						bool block_solid = bt_is_traversable(b->type);
 						
 						if (block_solid) {
 							
@@ -2131,22 +2132,17 @@ int main (int argc, char** argv) {
 			{
 				test_vbo.clear();
 				
-				bool checker_board = false;
-				
 				auto highlight_block = [&] (bpos block) {
 					Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*ARRLEN(cube_faces));
 					
 					flt w = BLOCK_TEXTURE_INDEX_MISSING;
 					
-					u8 c = checker_board ? 255 : 0;
-					checker_board = !checker_board;
-					
 					for (v3 v : cube_faces) {
-						*out++ = { (v3)block +(v +1) / 2, v4(v2(0.5f),		UVZW_BLOCK_FACE_TOP,w), lrgba8(c,c,c,128) };
+						*out++ = { (v3)block +(v +1) / 2, v4(v2(0.5f),		UVZW_BLOCK_FACE_TOP,w), lrgba8(255,255,255,64) };
 					}
 				};
 				
-				auto ray_cast_block = [&] (v3 ray_pos, v3 ray_dir, flt max_dist) {
+				auto ray_cast_block = [&] (v3 ray_pos, v3 ray_dir, flt max_dist, bpos* hit_block_pos) -> Block* {
 					
 					bpos delta_block = bpos(	(bpos_t)normalize(ray_dir.x),
 												(bpos_t)normalize(ray_dir.y),
@@ -2166,10 +2162,11 @@ int main (int argc, char** argv) {
 					
 					for (;;) {
 						
-						highlight_block(cur_block);
-						
-						//auto* b = query_block(cur_block);
-						//if ( is_breakable(b->type) ) return b;
+						auto* b = query_block(cur_block);
+						if ( is_breakable(b->type) ) {
+							*hit_block_pos = cur_block;
+							return b;
+						}
 						
 						int axis; // find axis on which we will cross into a different block first
 						if (		next.x < next.y && next.x < next.z )	axis = 0;
@@ -2187,7 +2184,8 @@ int main (int argc, char** argv) {
 				
 				v3 dir = rotate3_Z(player.ori_ae.x) * rotate3_X(player.ori_ae.y) * v3(0,0,-1);
 				
-				ray_cast_block(player.pos_world +v3(0,0,player.eye_height), dir, 30);
+				bpos pos;
+				if (ray_cast_block(player.pos_world +v3(0,0,player.eye_height), dir, 3, &pos)) highlight_block(pos);
 				
 				glDisable(GL_CULL_FACE);
 				glEnable(GL_BLEND);
