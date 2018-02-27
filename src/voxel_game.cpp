@@ -11,6 +11,8 @@
 #include "bit_twiddling.hpp"
 #include "vector/vector.hpp"
 
+typedef f32		flt;
+
 typedef s32v2	iv2;
 typedef s32v3	iv3;
 typedef s32v4	iv4;
@@ -31,10 +33,10 @@ static lrgb8 to_lrgb8 (v3 lrgbf) {
 }
 
 struct Interpolator_Key {
-	f32	range_begin;
+	flt	range_begin;
 	v3	col;
 };
-lrgb8 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
+lrgb8 interpolate (flt val, Interpolator_Key* keys, s32 keys_count) {
 	dbg_assert(keys_count >= 1);
 	
 	s32 i=0;
@@ -65,7 +67,7 @@ static Interpolator_Key _incandescent_gradient_keys[] = {
 	{ 0.6667f,	srgb(255,255,0)	},
 	{ 1,		srgb(255)		},
 };
-static lrgb8 incandescent_gradient (f32 val) {
+static lrgb8 incandescent_gradient (flt val) {
 	return interpolate(val, _incandescent_gradient_keys, ARRLEN(_incandescent_gradient_keys));
 }
 static Interpolator_Key _spectrum_gradient_keys[] = {
@@ -75,9 +77,99 @@ static Interpolator_Key _spectrum_gradient_keys[] = {
 	{ 0.75f,	srgb(255,255,0)	},
 	{ 1,		srgb(255,0,0)	},
 };
-static lrgb8 spectrum_gradient (f32 val) {
+static lrgb8 spectrum_gradient (flt val) {
 	return interpolate(val, _spectrum_gradient_keys, ARRLEN(_spectrum_gradient_keys));
 }
+
+
+#define LLL	v3(-1,-1,-1)
+#define HLL	v3(+1,-1,-1)
+#define LHL	v3(-1,+1,-1)
+#define HHL	v3(+1,+1,-1)
+#define LLH	v3(-1,-1,+1)
+#define HLH	v3(+1,-1,+1)
+#define LHH	v3(-1,+1,+1)
+#define HHH	v3(+1,+1,+1)
+
+#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
+
+const v3 cube_faces[6*6] = {
+	QUAD(	LHL,
+			LLL,
+			LLH,
+			LHH ),
+	
+	QUAD(	HLL,
+			HHL,
+			HHH,
+			HLH ),
+	
+	QUAD(	LLL,
+			HLL,
+			HLH,
+			LLH ),
+	
+	QUAD(	HHL,
+			LHL,
+			LHH,
+			HHH ),
+	
+	QUAD(	HLL,
+			LLL,
+			LHL,
+			HHL ),
+	
+	QUAD(	LLH,
+			HLH,
+			HHH,
+			LHH )
+};
+
+#undef QUAD
+#define QUAD(a,b,c,d) a,d,b, b,d,c // facing inward
+
+const v3 cube_faces_inward[6*6] = {
+	QUAD(	LHL,
+			LLL,
+			LLH,
+			LHH ),
+	
+	QUAD(	HLL,
+			HHL,
+			HHH,
+			HLH ),
+	
+	QUAD(	LLL,
+			HLL,
+			HLH,
+			LLH ),
+	
+	QUAD(	HHL,
+			LHL,
+			LHH,
+			HHH ),
+	
+	QUAD(	HLL,
+			LLL,
+			LHL,
+			HHL ),
+	
+	QUAD(	LLH,
+			HLH,
+			HHH,
+			LHH )
+};
+
+#undef LLL
+#undef HLL
+#undef LHL
+#undef HHL
+#undef LLH
+#undef HLH
+#undef LHH
+#undef HHH
+
+#undef QUAD
 
 #define _USING_V110_SDK71_ 1
 #include "glad.c"
@@ -137,8 +229,8 @@ static void logf_warning (cstr format, ...) {
 
 namespace random {
 	
-	f32 range (f32 l, f32 h) {
-		return (f32)rand() / (f32)RAND_MAX;
+	flt range (flt l, flt h) {
+		return (flt)rand() / (flt)RAND_MAX;
 	}
 	
 }
@@ -249,7 +341,7 @@ template <typename T> static bool save_struct (strcr name, T const& data) {
 #include "font.hpp"
 
 static font::Font*	overlay_font;
-static f32			overlay_font_line_y;
+static flt			overlay_font_line_y;
 
 static Shader*		shad_font;
 static Vbo			vbo_overlay_font;
@@ -287,7 +379,7 @@ static bool parse_s32 (strcr str, s32* val) {
 	*val = strtol(str.c_str(), &end, 10);
 	return end;
 }
-static bool parse_f32 (strcr str, f32* val) {
+static bool parse_f32 (strcr str, flt* val) {
 	char* end = nullptr;
 	*val = strtof(str.c_str(), &end);
 	return end;
@@ -428,9 +520,9 @@ static bool option (strcr name, s32* val, bool* open=nullptr) {
 	}
 	return false;
 }
-static bool option (strcr name, f32* val, bool* open=nullptr) {
+static bool option (strcr name, flt* val, bool* open=nullptr) {
 	str opt_str = prints("%8.7g", *val);
-	f32 tmp;
+	flt tmp;
 	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
 		*val = tmp;
 		opt_str = opt_val_str;
@@ -459,9 +551,9 @@ static bool option (strcr name, v3* val, bool* open=nullptr) {
 	return false;
 }
 
-static bool option_deg (strcr name, f32* val, bool* open=nullptr) {
+static bool option_deg (strcr name, flt* val, bool* open=nullptr) {
 	str opt_str = prints("%8.7g", to_deg(*val));
-	f32 tmp;
+	flt tmp;
 	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
 		*val = to_rad(tmp);
 		opt_str = opt_val_str;
@@ -545,11 +637,11 @@ static s32 get_block_texture_index_from_block_type (block_type bt) {
 	return bt;
 }
 
-static constexpr f32 BLOCK_FULL_HP = 100;
+static constexpr flt BLOCK_FULL_HP = 100;
 
 struct Block {
 	block_type	type;
-	f32			hp;
+	flt			hp;
 	lrgba8		dbg_tint;
 };
 
@@ -614,14 +706,14 @@ struct Chunk {
 		
 		auto cube = [&] (bpos const& pos_world, bpos const& pos_chunk, Block const* b) {
 			
-			f32 XL = (f32)pos_world.x;
-			f32 YL = (f32)pos_world.y;
-			f32 ZL = (f32)pos_world.z;
-			f32 XH = (f32)(pos_world.x +1);
-			f32 YH = (f32)(pos_world.y +1);
-			f32 ZH = (f32)(pos_world.z +1);
+			flt XL = (flt)pos_world.x;
+			flt YL = (flt)pos_world.y;
+			flt ZL = (flt)pos_world.z;
+			flt XH = (flt)(pos_world.x +1);
+			flt YH = (flt)(pos_world.y +1);
+			flt ZH = (flt)(pos_world.z +1);
 			
-			f32 w = get_block_texture_index_from_block_type(b->type);
+			flt w = get_block_texture_index_from_block_type(b->type);
 			
 			if (pos_chunk.x == CHUNK_DIM.x-1	|| get_block(pos_chunk +bpos(+1,0,0))->type == BT_AIR) {
 				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Mesh_Vertex)*6);
@@ -747,8 +839,8 @@ static Block* query_block (bpos p) {
 }
 
 struct Perlin_Octave {
-	f32	freq;
-	f32	amp;
+	flt	freq;
+	flt	amp;
 };
 std::vector<Perlin_Octave> heightmap_perlin2d_octaves = {
 	{ 0.03f,	30		},
@@ -762,17 +854,17 @@ static bool heightmap_perlin2d_octaves_open = true;
 
 #define _2D_TEST 0
 
-f32 heightmap_perlin2d (v2 v) {
+flt heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
 	#if _2D_TEST
 	return perlin_octave(v, 0.2f) > 0 ? 2 : 1;
 	#else
 	//v += v2(1,-1)*mouse * 20;
 	
-	//f32 fre = lerp(0.33f, 3.0f, mouse.x);
-	//f32 amp = lerp(0.33f, 3.0f, mouse.y);
+	//flt fre = lerp(0.33f, 3.0f, mouse.x);
+	//flt amp = lerp(0.33f, 3.0f, mouse.y);
 	
-	f32 tot = 0;
+	flt tot = 0;
 	
 	for (auto& o : heightmap_perlin2d_octaves) {
 		tot += perlin_octave(v, o.freq) * o.amp;
@@ -805,7 +897,7 @@ void gen_chunk (Chunk* chunk) {
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
-			f32 height = heightmap_perlin2d((v2)(i.xy() +chunk->pos*CHUNK_DIM.xy()));
+			flt height = heightmap_perlin2d((v2)(i.xy() +chunk->pos*CHUNK_DIM.xy()));
 			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
@@ -834,7 +926,7 @@ Chunk* new_chunk (v3 cam_pos_world) {
 	c->init();
 	c->init_gl();
 	
-	f32			nearest_free_spot_dist = +INF;
+	flt			nearest_free_spot_dist = +INF;
 	chunk_pos_t	nearest_free_spot;
 	
 	for (auto& hash_pair : chunks) {
@@ -845,7 +937,7 @@ Chunk* new_chunk (v3 cam_pos_world) {
 			// free spot found
 			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
 			
-			f32 dist = length(cam_pos_world.xy() - chunk_center);
+			flt dist = length(cam_pos_world.xy() - chunk_center);
 			if (dist < nearest_free_spot_dist
 					&& all(pos >= 0)
 					) {
@@ -882,7 +974,7 @@ Chunk* inital_chunk () {
 }
 
 //
-static f32			dt;
+static flt			dt;
 static s32			frame_i; // should only be used for debugging
 
 struct Input {
@@ -925,10 +1017,10 @@ struct Flycam {
 	v3	pos_world =			v3(0, -5, 1);
 	v2	ori_ae =			v2(deg(0), deg(+80)); // azimuth elevation
 	
-	f32	vfov =				deg(70);
+	flt	vfov =				deg(70);
 	
-	f32	speed =				4;
-	f32	speed_fast_mul =	4;
+	flt	speed =				4;
+	flt	speed_fast_mul =	4;
 	
 	
 	bool opt_open = true;
@@ -945,12 +1037,12 @@ struct Flycam {
 };
 static Flycam flycam;
 
-static f32 grav_accel_down = 20;
+static flt grav_accel_down = 20;
 
-static f32 jump_height_from_jump_impulse (f32 jump_impulse_up, f32 grav_accel_down) {
+static flt jump_height_from_jump_impulse (flt jump_impulse_up, flt grav_accel_down) {
 	return jump_impulse_up*jump_impulse_up / grav_accel_down * 0.5f;
 }
-static f32 jump_impulse_from_jump_height (f32 jump_height, f32 grav_accel_down) {
+static flt jump_impulse_from_jump_height (flt jump_height, flt grav_accel_down) {
 	return sqrt( 2.0f * jump_height * grav_accel_down );
 }
 
@@ -1077,18 +1169,18 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
 	if (controling_flycam) {
 		if (!inp.move_fast) {
-			f32 delta_log = 0.1f * (f32)yoffset;
+			flt delta_log = 0.1f * (flt)yoffset;
 			flycam.speed = pow( 2, log2(flycam.speed) +delta_log );
 			logf(">>> fly_vel: %f", flycam.speed);
 		} else {
-			f32 delta_log = -0.1f * (f32)yoffset;
-			f32 vfov = pow( 2, log2(flycam.vfov) +delta_log );
+			flt delta_log = -0.1f * (flt)yoffset;
+			flt vfov = pow( 2, log2(flycam.vfov) +delta_log );
 			if (vfov >= deg(1.0f/10) && vfov <= deg(170)) flycam.vfov = vfov;
 		}
 	}
 }
 static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy) {
-	v2 diff = v2((f32)dx,(f32)dy);
+	v2 diff = v2((flt)dx,(flt)dy);
 	inp.mouse_look_diff += diff;
 }
 
@@ -1127,8 +1219,8 @@ int main (int argc, char** argv) {
 	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
 	
 	{ // init game console overlay
-		f32 sz =	0 ? 24 : 18; // 14 16 24
-		f32 jpsz =	floor(sz * 1.75f);
+		flt sz =	0 ? 24 : 18; // 14 16 24
+		flt jpsz =	floor(sz * 1.75f);
 		
 		std::initializer_list<font::Glyph_Range> ranges = {
 			{ "consola.ttf",	sz,		  U'\xfffd' }, // missing glyph placeholder, must be the zeroeth glyph
@@ -1262,7 +1354,7 @@ int main (int argc, char** argv) {
 		for (pos.y=0; pos.y<size.y; ++pos.y) {
 			for (pos.x=0; pos.x<size.x; ++pos.x) {
 				
-				f32 val = heightmap_perlin2d((v2)pos);
+				flt val = heightmap_perlin2d((v2)pos);
 				heightmap[pos.y][pos.x] = val;
 				
 				val = (val +0.5f) / 8;
@@ -1287,11 +1379,11 @@ int main (int argc, char** argv) {
 		v3	pos_world;
 		v2	ori_ae;
 		
-		f32	vfov;
-		f32	hfov;
+		flt	vfov;
+		flt	hfov;
 		
-		f32 clip_near =		1.0f/256;
-		f32 clip_far =		512;
+		flt clip_near =		1.0f/256;
+		flt clip_far =		512;
 		
 		v2 frust_scale;
 		
@@ -1311,10 +1403,10 @@ int main (int argc, char** argv) {
 				
 				v2 frust_scale_inv = 1.0f / frust_scale;
 				
-				f32 x = frust_scale_inv.x;
-				f32 y = frust_scale_inv.y;
-				f32 a = (clip_far +clip_near) / (clip_near -clip_far);
-				f32 b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
+				flt x = frust_scale_inv.x;
+				flt y = frust_scale_inv.y;
+				flt a = (clip_far +clip_near) / (clip_near -clip_far);
+				flt b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
 				
 				cam_to_clip = m4::row(
 								x, 0, 0, 0,
@@ -1349,27 +1441,27 @@ int main (int argc, char** argv) {
 		#endif
 		
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
-		f32	vfov =			deg(80);
+		flt	vfov =			deg(80);
 		
 		bool third_person = true;
 		
-		f32	eye_height =	1.65f;
+		flt	eye_height =	1.65f;
 		v3	third_person_camera_offset_cam =		v3(0.5f, -0.4f, 3);
 		
-		f32 collision_r =	0.4f;
-		f32 collision_h =	1.7f;
+		flt collision_r =	0.4f;
+		flt collision_h =	1.7f;
 		
-		f32 walking_friction_alpha =	0.15f;
+		flt walking_friction_alpha =	0.15f;
 		
-		f32 falling_ground_friction =	0.0f;
-		f32 falling_bounciness =		0.25f;
-		f32 falling_min_bounce_speed =	6;
+		flt falling_ground_friction =	0.0f;
+		flt falling_bounciness =		0.25f;
+		flt falling_min_bounce_speed =	6;
 		
-		f32 wall_friction =				0.2f;
-		f32 wall_bounciness =			0.55f;
-		f32 wall_min_bounce_speed =		8;
+		flt wall_friction =				0.2f;
+		flt wall_bounciness =			0.55f;
+		flt wall_min_bounce_speed =		8;
 		
-		f32	jumping_up_impulse = jump_impulse_from_jump_height(1.3f, grav_accel_down);
+		flt	jumping_up_impulse = jump_impulse_from_jump_height(1.3f, grav_accel_down);
 		
 		bool opt_open = true;
 		void options () {
@@ -1429,13 +1521,13 @@ int main (int argc, char** argv) {
 	
 	// 
 	f64 prev_t = glfwGetTime();
-	f32 avg_dt = 1.0f / 60;
-	f32 avg_dt_alpha = 0.025f;
+	flt avg_dt = 1.0f / 60;
+	flt avg_dt_alpha = 0.025f;
 	dt = 0;
 	
 	bool fixed_dt = 1 || IS_DEBUGGER_PRESENT(); 
-	f32 max_variable_dt = 1.0f / 20; 
-	f32 fixed_dt_dt = 1.0f / 60; 
+	flt max_variable_dt = 1.0f / 20; 
+	flt fixed_dt_dt = 1.0f / 60; 
 	
 	for (frame_i=0;; ++frame_i) {
 		
@@ -1452,11 +1544,11 @@ int main (int argc, char** argv) {
 		begin_overlay_text();
 		
 		{ //
-			f32 fps = 1.0f / dt;
-			f32 dt_ms = dt * 1000;
+			flt fps = 1.0f / dt;
+			flt dt_ms = dt * 1000;
 			
-			f32 avg_fps = 1.0f / avg_dt;
-			f32 avdt_ms = avg_dt * 1000;
+			flt avg_fps = 1.0f / avg_dt;
+			flt avdt_ms = avg_dt * 1000;
 			
 			//printf("frame #%5d %6.1f fps %6.2f ms  avg: %6.1f fps %6.2f ms\n", frame_i, fps, dt_ms, avg_fps, avdt_ms);
 			glfwSetWindowTitle(wnd, prints("%s %6d  %6.1f fps avg %6.2f ms avg  %6.2f ms", app_name, frame_i, avg_fps, avdt_ms, dt_ms).c_str());
@@ -1558,7 +1650,7 @@ int main (int argc, char** argv) {
 		test_vbo.clear();
 		
 		if (controling_flycam) { // view/player position
-			f32 cam_speed_forw = flycam.speed;
+			flt cam_speed_forw = flycam.speed;
 			if (inp.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
 			
 			v3 cam_vel = cam_speed_forw * v3(1,1,1);
@@ -1568,7 +1660,7 @@ int main (int argc, char** argv) {
 			
 			//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
 		} else {
-			constexpr f32 COLLISION_SEPERATION_EPSILON = 0.001f;
+			constexpr flt COLLISION_SEPERATION_EPSILON = 0.001f;
 			
 			v3 pos_world = player.pos_world;
 			v3 vel_world = player.vel_world;
@@ -1578,14 +1670,14 @@ int main (int argc, char** argv) {
 			bool player_on_ground;
 			
 			auto check_blocks_around_player = [&] () {
-				auto circle_square_intersect = [] (v2 circ_origin, f32 circ_radius) { // intersection test between circle and square of edge length 1
+				auto circle_square_intersect = [] (v2 circ_origin, flt circ_radius) { // intersection test between circle and square of edge length 1
 					// square goes from 0-1 on each axis (circ_origin pos is relative to cube)
 					
 					v2 nearest_pos_on_square = clamp( circ_origin, 0,1 );
 					
 					return length_sqr(nearest_pos_on_square -circ_origin) < circ_radius*circ_radius;
 				};
-				auto cylinder_cube_intersect = [&] (v3 cyl_origin, f32 cyl_radius, f32 cyl_height) { // intersection test between cylinder and cube of edge length 1
+				auto cylinder_cube_intersect = [&] (v3 cyl_origin, flt cyl_radius, flt cyl_height) { // intersection test between cylinder and cube of edge length 1
 					// cube goes from 0-1 on each axis (cyl_origin pos is relative to cube)
 					// cylinder origin is at the center of the circle at the base of the cylinder (-z circle)
 					
@@ -1595,8 +1687,8 @@ int main (int argc, char** argv) {
 					return circle_square_intersect(cyl_origin.xy(), cyl_radius);
 				};
 				
-				f32 player_r = player.collision_r;
-				f32 player_h = player.collision_h;
+				flt player_r = player.collision_r;
+				flt player_h = player.collision_h;
 				
 				{ // for all blocks we could be touching
 					bpos start =	(bpos)floor(pos_world -v3(player_r,player_r,0));
@@ -1629,7 +1721,7 @@ int main (int argc, char** argv) {
 									
 									Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
 									
-									f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+									flt w = get_block_texture_index_from_block_type(BT_EARTH);
 									
 									*out++ = { (v3)bp +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
 									*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
@@ -1727,17 +1819,17 @@ int main (int argc, char** argv) {
 			#endif
 			
 			auto trace_player_collision_path = [&] () {
-				f32 player_r = player.collision_r;
-				f32 player_h = player.collision_h;
+				flt player_r = player.collision_r;
+				flt player_h = player.collision_h;
 				
-				f32 t_remain = dt;
+				flt t_remain = dt;
 				
 				bool draw_dbg = draw_debug_overlay; // so that i only draw the debug block overlay once
 
 				while (t_remain > 0) {
 					
 					struct {
-						f32 dist = +INF;
+						flt dist = +INF;
 						v3 hit_pos;
 						v3 normal; // normal of surface/edge we collided with, the player always collides with the outside of the block since we assume the player can never be inside a block if we're doing this raycast
 					} earliest_collision;
@@ -1755,7 +1847,7 @@ int main (int argc, char** argv) {
 							v3 pos_local = pos_world -local_origin;
 							v3 vel = vel_world;
 							
-							auto collision_found = [&] (f32 hit_dist, v3 hit_pos_local, v3 normal_world) {
+							auto collision_found = [&] (flt hit_dist, v3 hit_pos_local, v3 normal_world) {
 								if (hit_dist < earliest_collision.dist) {
 									v3 hit_pos_world = hit_pos_local +local_origin;
 									
@@ -1767,58 +1859,58 @@ int main (int argc, char** argv) {
 							
 							// this geometry we are reycasting our player position onto represents the minowski sum of the block and our players cylinder
 							
-							auto raycast_x_side = [&] (v3 ray_pos, v3 ray_dir, f32 plane_x, f32 normal_x) { // side forming yz plane
+							auto raycast_x_side = [&] (v3 ray_pos, v3 ray_dir, flt plane_x, flt normal_x) { // side forming yz plane
 								if (ray_dir.x == 0 || (ray_dir.x * (plane_x -ray_pos.x)) < 0) return false; // ray parallel to plane or ray points away from plane
 								
-								f32 delta_x = plane_x -ray_pos.x;
+								flt delta_x = plane_x -ray_pos.x;
 								v2 delta_yz = delta_x * (v2(ray_dir.y,ray_dir.z) / ray_dir.x);
 
 								v2 hit_pos_yz = v2(ray_pos.y,ray_pos.z) + delta_yz;
 
-								f32 hit_dist = length(v3(delta_x, delta_yz[0], delta_yz[1]));
+								flt hit_dist = length(v3(delta_x, delta_yz[0], delta_yz[1]));
 								if (!all(hit_pos_yz > v2(0,-player_h) && hit_pos_yz < 1)) return false;
 								
 								collision_found(hit_dist, v3(plane_x, hit_pos_yz[0], hit_pos_yz[1]), v3(normal_x,0,0));
 								return true;
 							};
-							auto raycast_y_side = [&] (v3 ray_pos, v3 ray_dir, f32 plane_y, f32 normal_y) { // side forming xz plane
+							auto raycast_y_side = [&] (v3 ray_pos, v3 ray_dir, flt plane_y, flt normal_y) { // side forming xz plane
 								if (ray_dir.y == 0 || (ray_dir.y * (plane_y -ray_pos.y)) < 0) return false; // ray parallel to plane or ray points away from plane
 								
-								f32 delta_y = plane_y -ray_pos.y;
+								flt delta_y = plane_y -ray_pos.y;
 								v2 delta_xz = delta_y * (v2(ray_dir.x,ray_dir.z) / ray_dir.y);
 								
 								v2 hit_pos_xz = v2(ray_pos.x,ray_pos.z) +delta_xz;
 								
-								f32 hit_dist = length(v3(delta_xz[0], delta_y, delta_xz[1]));
+								flt hit_dist = length(v3(delta_xz[0], delta_y, delta_xz[1]));
 								if (!all(hit_pos_xz > v2(0,-player_h) && hit_pos_xz < 1)) return false;
 								
 								collision_found(hit_dist, v3(hit_pos_xz[0], plane_y, hit_pos_xz[1]), v3(0,normal_y,0));
 								return true;
 							};
 							
-							auto raycast_sides_edge = [&] (v3 ray_pos, v3 ray_dir, v2 cyl_pos2d, f32 cyl_r, f32 cyl_z_l,f32 cyl_z_h) { // edge between block sides which are cylinders in our minowski sum
+							auto raycast_sides_edge = [&] (v3 ray_pos, v3 ray_dir, v2 cyl_pos2d, flt cyl_r, flt cyl_z_l,flt cyl_z_h) { // edge between block sides which are cylinders in our minowski sum
 								// do 2d circle raycase using on xy plane
-								f32 ray_dir2d_len = length(ray_dir.xy());
+								flt ray_dir2d_len = length(ray_dir.xy());
 								if (ray_dir2d_len == 0) return false; // ray parallel to cylinder
 								v2 unit_ray_dir2d = ray_dir.xy() / ray_dir2d_len;
 								
 								v2 circ_rel_p = cyl_pos2d -ray_pos.xy();
 								
-								f32 closest_p_dist = dot(unit_ray_dir2d, circ_rel_p);
+								flt closest_p_dist = dot(unit_ray_dir2d, circ_rel_p);
 								v2 closest_p = unit_ray_dir2d * closest_p_dist;
 								
 								v2 circ_to_closest = closest_p -circ_rel_p;
 								
-								f32 r_sqr = cyl_r*cyl_r;
-								f32 dist_sqr = length_sqr(circ_to_closest);
+								flt r_sqr = cyl_r*cyl_r;
+								flt dist_sqr = length_sqr(circ_to_closest);
 								
 								if (dist_sqr >= r_sqr) return false; // ray does not cross cylinder
 								
-								f32 chord_half_length = sqrt( r_sqr -dist_sqr );
-								f32 closest_hit_dist2d = closest_p_dist -chord_half_length;
-								f32 furthest_hit_dist2d = closest_p_dist +chord_half_length;
+								flt chord_half_length = sqrt( r_sqr -dist_sqr );
+								flt closest_hit_dist2d = closest_p_dist -chord_half_length;
+								flt furthest_hit_dist2d = closest_p_dist +chord_half_length;
 								
-								f32 hit_dist2d;
+								flt hit_dist2d;
 								if (closest_hit_dist2d >= 0)		hit_dist2d = closest_hit_dist2d;
 								else if (furthest_hit_dist2d >= 0)	hit_dist2d = furthest_hit_dist2d;
 								else								return false; // circle hit is on backwards direction of ray, ie. no hit
@@ -1826,7 +1918,7 @@ int main (int argc, char** argv) {
 								v2 rel_hit_xy = hit_dist2d * unit_ray_dir2d;
 								
 								// calc hit z
-								f32 rel_hit_z = length(rel_hit_xy) * (ray_dir.z / ray_dir2d_len);
+								flt rel_hit_z = length(rel_hit_xy) * (ray_dir.z / ray_dir2d_len);
 								
 								v3 rel_hit_pos = v3(rel_hit_xy, rel_hit_z);
 								v3 hit_pos = ray_pos +rel_hit_pos;
@@ -1837,9 +1929,9 @@ int main (int argc, char** argv) {
 								return true;
 							};
 							
-							auto raycast_cap = [&] (v3 ray_pos, v3 ray_dir, f32 plane_z, f32 normal_z) {
+							auto raycast_cap = [&] (v3 ray_pos, v3 ray_dir, flt plane_z, flt normal_z) {
 								// normal axis aligned plane raycast
-								f32 delta_z = plane_z -ray_pos.z;
+								flt delta_z = plane_z -ray_pos.z;
 								
 								if (ray_dir.z == 0 || (ray_dir.z * delta_z) < 0) return false; // if ray parallel to plane or ray points away from plane
 								
@@ -1850,10 +1942,10 @@ int main (int argc, char** argv) {
 								// check if cylinder base/top circle cap intersects with block top/bottom square
 								v2 closest_p = clamp(plane_hit_xy, 0,1);
 								
-								f32 dist_sqr = length_sqr(closest_p -ray_pos.xy());
+								flt dist_sqr = length_sqr(closest_p -ray_pos.xy());
 								if (dist_sqr >= player_r*player_r) return false; // hit outside
 								
-								f32 hit_dist = length(v3(delta_xy, delta_z));
+								flt hit_dist = length(v3(delta_xy, delta_z));
 								collision_found(hit_dist, v3(plane_hit_xy, plane_z), v3(0,0, normal_z));
 								return true;
 							};
@@ -1884,7 +1976,7 @@ int main (int argc, char** argv) {
 						if (draw_dbg) {
 							Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*6);
 							
-							f32 w = get_block_texture_index_from_block_type(BT_EARTH);
+							flt w = get_block_texture_index_from_block_type(BT_EARTH);
 							
 							*out++ = { (v3)bp +v3(+1, 0,+1.01f), v4(1,0, UVZW_BLOCK_FACE_TOP,w), col };
 							*out++ = { (v3)bp +v3(+1,+1,+1.01f), v4(1,1, UVZW_BLOCK_FACE_TOP,w), col };
@@ -1912,9 +2004,9 @@ int main (int argc, char** argv) {
 					
 					//printf(">>> %f %f,%f %f,%f\n", earliest_collision.dist, pos_world.x,pos_world.y, earliest_collision.hit_pos.x,earliest_collision.hit_pos.y);
 					
-					f32 max_dt = min(t_remain, 1.0f / max_component(abs(vel_world))); // if we are moving so fast that we would move by more than one block on any one axis we will do sub steps of exactly one block
+					flt max_dt = min(t_remain, 1.0f / max_component(abs(vel_world))); // if we are moving so fast that we would move by more than one block on any one axis we will do sub steps of exactly one block
 					
-					f32 earliest_collision_t = earliest_collision.dist / length(vel_world); // inf if there is no collision
+					flt earliest_collision_t = earliest_collision.dist / length(vel_world); // inf if there is no collision
 					
 					if (earliest_collision_t >= max_dt) {
 						pos_world += vel_world * max_dt;
@@ -1922,9 +2014,9 @@ int main (int argc, char** argv) {
 					} else {
 						
 						// handle block collision
-						f32 friction;
-						f32 bounciness;
-						f32 min_bounce_speed;
+						flt friction;
+						flt bounciness;
+						flt min_bounce_speed;
 						
 						if (earliest_collision.normal.z == +1) {
 							// hit top of block ie. ground
@@ -1939,19 +2031,19 @@ int main (int argc, char** argv) {
 						}
 						
 						v3 normal = earliest_collision.normal;
-						f32 norm_speed = dot(normal, vel_world); // normal points out of the wall
+						flt norm_speed = dot(normal, vel_world); // normal points out of the wall
 						v3 norm_vel = normal * norm_speed;
 						
 						v3 frict_vel = vel_world -norm_vel;
 						frict_vel.z = 0; // do not apply friction on vertical movement
-						f32 frict_speed = length(frict_vel);
+						flt frict_speed = length(frict_vel);
 						
 						v3 remain_vel = vel_world -norm_vel -frict_vel;
 						
 						if (frict_speed != 0) {
 							v3 frict_dir = frict_vel / frict_speed;
 							
-							f32 friction_dv = friction * max(-norm_speed, 0.0f); // change in speed due to kinetic friction (unbounded ie. can be larger than our actual velocity)
+							flt friction_dv = friction * max(-norm_speed, 0.0f); // change in speed due to kinetic friction (unbounded ie. can be larger than our actual velocity)
 							frict_vel -= frict_dir * min(friction_dv, frict_speed);
 						}
 						
@@ -2031,6 +2123,86 @@ int main (int argc, char** argv) {
 			}
 		}
 		
+		if (shad_main->valid()) {
+			
+			shad_main->bind();
+			// uniforms still bound
+			
+			{
+				test_vbo.clear();
+				
+				bool checker_board = false;
+				
+				auto highlight_block = [&] (bpos block) {
+					Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*ARRLEN(cube_faces));
+					
+					flt w = BLOCK_TEXTURE_INDEX_MISSING;
+					
+					u8 c = checker_board ? 255 : 0;
+					checker_board = !checker_board;
+					
+					for (v3 v : cube_faces) {
+						*out++ = { (v3)block +(v +1) / 2, v4(v2(0.5f),		UVZW_BLOCK_FACE_TOP,w), lrgba8(c,c,c,128) };
+					}
+				};
+				
+				auto ray_cast_block = [&] (v3 ray_pos, v3 ray_dir, flt max_dist) {
+					
+					bpos delta_block = bpos(	(bpos_t)normalize(ray_dir.x),
+												(bpos_t)normalize(ray_dir.y),
+												(bpos_t)normalize(ray_dir.z) ); // direction to step block position on each axis
+					
+					v3 step = v3(	length(ray_dir / abs(ray_dir.x)),
+									length(ray_dir / abs(ray_dir.y)),
+									length(ray_dir / abs(ray_dir.z)) ); // by how much length units we have to move along the ray to cross into the next block on each axis
+					
+					v3 ray_pos_floor = floor(ray_pos);
+					v3 ray_pos_in_block = ray_pos -ray_pos_floor;
+					
+					v3 next = step * select(ray_dir >= 0, 1 -ray_pos_in_block, ray_pos_in_block); // initial dist along ray
+					next = select(ray_dir != 0, next, +INF); // handle direction being parallel to any one axis
+					
+					bpos cur_block = (bpos)ray_pos_floor; // start with block ray is on
+					
+					for (;;) {
+						
+						highlight_block(cur_block);
+						
+						//auto* b = query_block(cur_block);
+						//if ( is_breakable(b->type) ) return b;
+						
+						int axis; // find axis on which we will cross into a different block first
+						if (		next.x < next.y && next.x < next.z )	axis = 0;
+						else if (	next.y < next.z )						axis = 1;
+						else												axis = 2;
+						
+						if (next[axis] >= max_dist) return nullptr;
+						
+						cur_block[axis] += delta_block[axis];
+						
+						next[axis] += step[axis];
+					}
+					
+				};
+				
+				v3 dir = rotate3_Z(player.ori_ae.x) * rotate3_X(player.ori_ae.y) * v3(0,0,-1);
+				
+				ray_cast_block(player.pos_world +v3(0,0,player.eye_height), dir, 30);
+				
+				glDisable(GL_CULL_FACE);
+				glEnable(GL_BLEND);
+				glDisable(GL_DEPTH_TEST);
+				
+				test_vbo.upload();
+				test_vbo.draw_entire(shad_main);
+				
+				glEnable(GL_DEPTH_TEST);
+				glDisable(GL_BLEND);
+				glEnable(GL_CULL_FACE);
+			}
+			
+		}
+		
 		if (shad_main->valid()) { // player collision cylinder
 			
 			shad_main->bind();
@@ -2050,8 +2222,8 @@ int main (int argc, char** argv) {
 			}
 			
 			v3 pos_world = player.pos_world;
-			f32 r = player.collision_r;
-			f32 h = player.collision_h;
+			flt r = player.collision_r;
+			flt h = player.collision_h;
 			
 			test_vbo.clear();
 			
@@ -2060,15 +2232,15 @@ int main (int argc, char** argv) {
 				
 				Mesh_Vertex* out = (Mesh_Vertex*)&*vector_append(&test_vbo.vertecies, sizeof(Mesh_Vertex)*(3+6+3)*cylinder_sides);
 				
-				f32 w = BLOCK_TEXTURE_INDEX_MISSING;
+				flt w = BLOCK_TEXTURE_INDEX_MISSING;
 				
 				lrgba8 col = 255;
 				
 				v2 rv = v2(r,0);
 				
 				for (s32 i=0; i<cylinder_sides; ++i) {
-					f32 rot_a = (f32)(i +0) / (f32)cylinder_sides * deg(360);
-					f32 rot_b = (f32)(i +1) / (f32)cylinder_sides * deg(360);
+					flt rot_a = (flt)(i +0) / (flt)cylinder_sides * deg(360);
+					flt rot_b = (flt)(i +1) / (flt)cylinder_sides * deg(360);
 					
 					m2 ma = rotate2(rot_a);
 					m2 mb = rotate2(rot_b);

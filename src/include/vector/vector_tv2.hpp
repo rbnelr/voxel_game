@@ -45,7 +45,7 @@ union V2 {
 	static constexpr BV2 operator>= (V2 l, V2 r) {	return BV2(l.x >= r.x,	l.y >= r.y); }
 	static constexpr BV2 operator== (V2 l, V2 r) {	return BV2(l.x == r.x,	l.y == r.y); }
 	static constexpr BV2 operator!= (V2 l, V2 r) {	return BV2(l.x != r.x,	l.y != r.y); }
-	static constexpr V2 select (V2 l, V2 r, BV2 c) {
+	static constexpr V2 select (BV2 c, V2 l, V2 r) {
 		return V2(	c.x ? l.x : r.x,	c.y ? l.y : r.y );
 	}
 	

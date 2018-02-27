@@ -48,7 +48,7 @@ union V3 {
 	static constexpr BV3 operator>= (V3 l, V3 r) {	return BV3(l.x >= r.x,	l.y >= r.y,	l.z >= r.z); }
 	static constexpr BV3 operator== (V3 l, V3 r) {	return BV3(l.x == r.x,	l.y == r.y,	l.z == r.z); }
 	static constexpr BV3 operator!= (V3 l, V3 r) {	return BV3(l.x != r.x,	l.y != r.y,	l.z != r.z); }
-	static constexpr V3 select (V3 l, V3 r, BV3 c) {
+	static constexpr V3 select (BV3 c, V3 l, V3 r) {
 		return V3(	c.x ? l.x : r.x,	c.y ? l.y : r.y,	c.z ? l.z : r.z );
 	}
 	
