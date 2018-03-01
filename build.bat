@@ -3,6 +3,7 @@
 	cls
 	color 07
 	
+	rem "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\vcvars64.bat"
 	rem "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64"
 	
 	rem MSVC should be always in path
@@ -101,7 +102,7 @@ rem /main
 	rem glfw static link
 	cl.exe -nologo !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE!
 	
-	cl.exe -nologo /source-charset:utf-8 /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /Ideps/noise/ /I!GLFW_SRC!include !SRC!!proj!.cpp glfw_one_source_file.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /Ideps/noise/ /I!GLFW_SRC!include !SRC!!proj!.cpp glfw_one_source_file.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
 	rem WINMM.lib for simple audio playing (https://msdn.microsoft.com/en-us/library/windows/desktop/dd743680(v=vs.85).aspx)
 	

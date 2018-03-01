@@ -1325,6 +1325,30 @@ struct Vertex_Layout {
 		
 		for (auto& a : attribs) {
 			
+			GLint comps = 1;
+			GLenum type = GL_FLOAT;
+			u32 size = sizeof(f32);
+			
+			bool int_format = false;
+			
+			switch (a.type) {
+				case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(f32);	break;
+				case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(f32);	break;
+				case T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(f32);	break;
+				case T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(f32);	break;
+				
+				case T_INT:	comps = 1;	type = GL_INT;		size = sizeof(s32);	break;
+				case T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(s32);	break;
+				case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(s32);	break;
+				case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(s32);	break;
+				
+				case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(u8);	break;
+				
+				default: dbg_assert(false);
+			}
+			
+			vertex_size += size * comps;
+			
 			GLint loc = glGetAttribLocation(shad->prog, a.name);
 			//if (loc <= -1) logf_warning("Attribute %s is not used in the shader!", a.name);
 			
@@ -1332,31 +1356,6 @@ struct Vertex_Layout {
 				dbg_assert(loc > -1);
 				
 				glEnableVertexAttribArray(loc);
-				
-				GLint comps = 1;
-				GLenum type = GL_FLOAT;
-				u32 size = sizeof(f32);
-				
-				bool int_format = false;
-				
-				switch (a.type) {
-					case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(f32);	break;
-					case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(f32);	break;
-					case T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(f32);	break;
-					case T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(f32);	break;
-					
-					case T_INT:	comps = 1;	type = GL_INT;		size = sizeof(s32);	break;
-					case T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(s32);	break;
-					case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(s32);	break;
-					case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(s32);	break;
-					
-					case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(u8);	break;
-					
-					default: dbg_assert(false);
-				}
-				
-				vertex_size += size * comps;
-				
 				glVertexAttribPointer(loc, comps, type, int_format ? GL_TRUE : GL_FALSE, a.stride, (void*)a.offs);
 				
 			}

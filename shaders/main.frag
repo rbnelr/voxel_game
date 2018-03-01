@@ -6,12 +6,15 @@ $include "common.frag"
 
 in		vec3	vs_pos_cam;
 in		vec4	vs_uvzw_atlas;
+in		float	vs_hp_ratio;
 in		vec4	vs_dbg_tint;
 
 uniform	sampler2D	atlas;
+uniform	sampler2D	breaking;
 
 uniform int texture_res;
 uniform int atlas_textures_count;
+uniform int breaking_frames_count;
 
 vec2 map (vec2 val, vec2 in_a, vec2 in_b) { // val[in_a,in_b] -> [0,1]
 	return mix((val -in_a) / (in_b -in_a), vec2(0), equal(in_a, in_b));
@@ -70,7 +73,20 @@ void main () {
 	uv.y /= atlas_textures_count;
 	uv.y += vs_uvzw_atlas.w / atlas_textures_count;
 	
-	//FRAG_COL( texture(atlas, uv).rgba );
-	FRAG_COL( mix(texture(atlas, uv).rgba, vec4(1), 0.4) * mix(vec4(1), vs_dbg_tint, 1) );
-	//FRAG_COL( vs_dbg_tint );
+	vec4 col = texture(atlas, uv).rgba;
+	
+	if (false && vs_hp_ratio > 0.0f) {
+		vec2 breaking_uv = vs_uvzw_atlas.xy;
+		
+		breaking_uv = manual_nearest_filtering(breaking_uv);
+		
+		int breaking_frame = clamp(int(floor(vs_hp_ratio * float(breaking_frames_count))), 0, breaking_frames_count-1);
+		
+		breaking_uv.y /= float(breaking_frames_count);
+		breaking_uv.y += float(breaking_frame -1 -breaking_frames_count) / float(breaking_frames_count);
+		
+		col *= texture(breaking, breaking_uv).rgba * vec4(2,2,2,1);
+	}
+	
+	FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }

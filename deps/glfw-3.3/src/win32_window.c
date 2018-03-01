@@ -783,9 +783,11 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
             RAWINPUT* data;
             int dx, dy;
 
+#if 0 // Modified
             // Only process input when disabled cursor mode is applied
             if (_glfw.win32.disabledCursorWindow != window)
                 break;
+#endif
 
             GetRawInputData(ri, RID_INPUT, NULL, &size, sizeof(RAWINPUTHEADER));
             if (size > (UINT) _glfw.win32.rawInputSize)
@@ -808,9 +810,10 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
             data = _glfw.win32.rawInput;
             if (data->data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
             {
+#if 0 // Modified
                 dx = data->data.mouse.lLastX - window->win32.lastCursorPosX;
                 dy = data->data.mouse.lLastY - window->win32.lastCursorPosY;
-#if 1 // Modified
+#else
                 _glfwInputError(GLFW_PLATFORM_ERROR,
                                 "Win32: Recieved absoulte mouse input in WM_INPUT (MOUSE_MOVE_ABSOLUTE)");
 #endif
@@ -827,10 +830,10 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
 			
 #if 1 // Modified
             _glfwInputCursorPosRelative(window, dx, dy);
-#endif
-
+#else
             window->win32.lastCursorPosX += dx;
             window->win32.lastCursorPosY += dy;
+#endif
             break;
         }
 
