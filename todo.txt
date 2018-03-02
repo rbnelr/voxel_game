@@ -7,8 +7,14 @@ DONE:
  implement collision in 3d
  implemented jumping
  
+ implemented outlined block highlighting
+ 
 TODO
 -FEATURES:
+ 
+ block placing
+ 
+ blocks inventory (gain blocks on break and lose on place)
  
 -BUGS:
  somtimes can still get stuck on the border of blocks when jumping

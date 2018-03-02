@@ -632,7 +632,7 @@ static s32 get_block_texture_index_from_block_type (block_type bt) {
 
 struct Block {
 	block_type	type;
-	f32			hp_fraction;
+	f32			hp_ratio;
 	lrgba8		dbg_tint;
 };
 
@@ -724,62 +724,62 @@ struct Chunk {
 			if (pos_chunk.x == CHUNK_DIM.x-1	|| get_block(pos_chunk +bpos(+1,0,0))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
 			}
 			if (pos_chunk.x == 0				|| get_block(pos_chunk +bpos(-1,0,0))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
 			}
 			if (pos_chunk.y == CHUNK_DIM.y-1	|| get_block(pos_chunk +bpos(0,+1,0))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
 			}
 			if (pos_chunk.y == 0				|| get_block(pos_chunk +bpos(0,-1,0))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
 			}
 			if (pos_chunk.z == CHUNK_DIM.z-1	|| get_block(pos_chunk +bpos(0,0,+1))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
 			}
 			if (pos_chunk.z == 0				|| get_block(pos_chunk +bpos(0,0,-1))->type == BT_AIR) {
 				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_fraction, b->dbg_tint };
+				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
+				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
 			}
 		};
 		
@@ -801,6 +801,10 @@ struct Chunk {
 		}
 		
 		vbo.upload();
+	}
+	
+	void vbo_update_single_block (bpos pos) {
+		vbo_needs_update = true;
 	}
 	
 };
@@ -899,7 +903,7 @@ void gen_chunk (Chunk* chunk) {
 				auto* b = chunk->get_block(i);
 				
 				b->type = BT_AIR;
-				b->hp_fraction = 0 ? 0 : random::flt();
+				b->hp_ratio = 1;
 				b->dbg_tint = 255;
 				
 				//if (i.z == CHUNK_DIM.z-1) b->type = BT_EARTH;
@@ -1064,7 +1068,7 @@ static bool trigger_regen_chunks =		false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
 static bool trigger_jump =				false;
-static bool trigger_break_block =		false;
+static bool hold_break_block =			false;
 
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
@@ -1180,7 +1184,7 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 				stop_mouse_look();
 			}
 			break;
-		case GLFW_MOUSE_BUTTON_LEFT: if (went_down) trigger_break_block = true; break;
+		case GLFW_MOUSE_BUTTON_LEFT: hold_break_block = went_down; break;
 	}
 }
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
@@ -1357,7 +1361,7 @@ int main (int argc, char** argv) {
 		tex_block_atlas.upload();
 	}
 	
-	Texture2D_File tex_breaking (CS_AUTO, "breaking.png");
+	Texture2D_File tex_breaking (CS_LINEAR, "breaking.png");
 	s32 breaking_frames_count;
 	
 	tex_breaking.load();
@@ -1598,7 +1602,6 @@ int main (int argc, char** argv) {
 		
 		inp.mouse_look_diff = 0;
 		trigger_jump = false;
-		trigger_break_block = false;
 		
 		glfwPollEvents();
 		
@@ -2122,7 +2125,7 @@ int main (int argc, char** argv) {
 		Block*	highlighted_block;
 		bpos	highlighted_block_pos;
 		block_face_e highlighted_block_face;
-		{ // block
+		{ // block raycasting
 			auto raycast_block = [&] (v3 ray_pos, v3 ray_dir, flt max_dist, bpos* hit_block, block_face_e* hit_face) -> Block* {
 				
 				bpos step_delta = bpos(	(bpos_t)normalize(ray_dir.x),
@@ -2179,15 +2182,26 @@ int main (int argc, char** argv) {
 			highlighted_block = raycast_block(player.pos_world +v3(0,0,player.eye_height), dir, 3.5f, &highlighted_block_pos, &highlighted_block_face);
 		}
 		
-		if (highlighted_block && trigger_break_block) {
+		if (highlighted_block && hold_break_block) {
 			
 			Chunk* chunk;
 			Block* b = query_block(highlighted_block_pos, &chunk);
 			dbg_assert( bt_is_breakable(b->type) && chunk );
 			
-			b->type = BT_AIR;
+			b->hp_ratio -= 1.0f / 0.3f * dt;
 			
-			chunk->vbo_needs_update = true;
+			if (b->hp_ratio > 0) {
+				
+				chunk->vbo_update_single_block(highlighted_block_pos);
+				
+			} else {
+				
+				b->hp_ratio = 0;
+				
+				b->type = BT_AIR;
+				
+				chunk->vbo_needs_update = true;
+			}
 		}
 		
 		//// Draw

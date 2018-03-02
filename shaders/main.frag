@@ -63,9 +63,9 @@ vec2 manual_nearest_filtering (vec2 uv) {
 void main () {
 	//FRAG_COL( vec3(1,1,0.8) );
 	
-	vec2 uv = vs_uvzw_atlas.xy;
+	vec2 face_uv = manual_nearest_filtering( vs_uvzw_atlas.xy );
 	
-	uv = manual_nearest_filtering(uv);
+	vec2 uv = face_uv;
 	
 	uv.x /= 3;
 	uv.x += vs_uvzw_atlas.z / 3;
@@ -75,18 +75,19 @@ void main () {
 	
 	vec4 col = texture(atlas, uv).rgba;
 	
-	if (false && vs_hp_ratio > 0.0f) {
-		vec2 breaking_uv = vs_uvzw_atlas.xy;
+	{
+		int breaking_frame = int(floor(vs_hp_ratio * float(breaking_frames_count) +0.1f));
 		
-		breaking_uv = manual_nearest_filtering(breaking_uv);
-		
-		int breaking_frame = clamp(int(floor(vs_hp_ratio * float(breaking_frames_count))), 0, breaking_frames_count-1);
-		
-		breaking_uv.y /= float(breaking_frames_count);
-		breaking_uv.y += float(breaking_frame -1 -breaking_frames_count) / float(breaking_frames_count);
-		
-		col *= texture(breaking, breaking_uv).rgba * vec4(2,2,2,1);
+		if (breaking_frame < 10) {
+			vec2 breaking_uv = face_uv;
+			
+			breaking_uv.y /= float(breaking_frames_count);
+			breaking_uv.y += float(breaking_frame) / float(breaking_frames_count);
+			
+			col.rgb *= (texture(breaking, breaking_uv).rgb * 255 -127) / 127 +1;
+		}
 	}
 	
-	FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
+	FRAG_COL( col );
+	//FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }
