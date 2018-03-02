@@ -328,239 +328,8 @@ template <typename T> static bool save_struct (strcr name, T const& data) {
 }
 
 #include "gl.hpp"
-#include "font.hpp"
 
-static font::Font*	overlay_font;
-static f32			overlay_font_line_y;
-
-static Shader*		shad_font;
-static Vbo			vbo_overlay_font;
-
-static void begin_overlay_text () {
-	vbo_overlay_font.clear();
-	
-	overlay_font_line_y = overlay_font->ascent_plus_gap;
-}
-static void overlay_line (strcr s, v3 col=srgb(255,220,120)*0.8f, v3 outline_col=0, s32 cursor_pos=-1) {
-	overlay_font->emit_line(&vbo_overlay_font.vertecies, &overlay_font_line_y, shad_font, utf8_to_utf32(s), v4(col,1), v4(outline_col,1), cursor_pos);
-}
-
-//
-static v3 option_col =			255;
-static v3 option_highl_col =	srgb(255,240,90)*0.95f;
-static v3 option_edit_col =		srgb(255,255,90)*1.0f;
-
-static enum { OPT_NOT_EDITING=0, OPT_SELECTING, OPT_EDITING } opt_mode = OPT_SELECTING;
-static bool opt_value_edit_flag = false;
-static bool opt_toggle_open = false;
-
-static s32 selected_option = 0;
-static s32 cur_option;
-
-static str opt_val_str;
-static s32 opt_cur_char = 0;
-
-static void begin_options () {
-	cur_option = 0;
-}
-
-static bool parse_s32 (strcr str, s32* val) {
-	char* end = nullptr;
-	*val = strtol(str.c_str(), &end, 10);
-	return end;
-}
-static bool parse_f32 (strcr str, f32* val) {
-	char* end = nullptr;
-	*val = strtof(str.c_str(), &end);
-	return end;
-}
-static bool parse_v2 (strcr str, v2* val) {
-	using namespace parse_n;
-	
-	char* cur = (char*)str.c_str();
-	
-	whitespace(&cur);
-	
-	val->x = strtof(cur, &cur);
-	if (!cur) return false;
-	
-	whitespace(&cur);
-	char_(&cur, ',');
-	
-	whitespace(&cur);
-	
-	val->y = strtof(cur, &cur);
-	if (!cur) return false;
-	
-	return true;
-}
-static bool parse_v3 (strcr str, v3* val) {
-	using namespace parse_n;
-	
-	char* cur = (char*)str.c_str();
-	
-	whitespace(&cur);
-	
-	val->x = strtof(cur, &cur);
-	if (!cur) return false;
-	
-	whitespace(&cur);
-	char_(&cur, ',');
-	
-	whitespace(&cur);
-	
-	val->y = strtof(cur, &cur);
-	if (!cur) return false;
-	
-	whitespace(&cur);
-	char_(&cur, ',');
-	
-	whitespace(&cur);
-	
-	val->z = strtof(cur, &cur);
-	if (!cur) return false;
-	
-	return true;
-}
-
-static bool option_group (strcr name, bool* open=nullptr) {
-	bool option_highl = opt_mode && cur_option++ == selected_option;
-	bool option_edit = option_highl && opt_mode == OPT_EDITING;
-	if (option_highl && opt_toggle_open) {
-		opt_toggle_open = false;
-		if (open) *open = !(*open);
-	}
-	
-	if (option_edit && opt_value_edit_flag) { // started editing
-		opt_value_edit_flag = false;
-	}
-	
-	v3 col = option_col;
-	if (option_highl) {
-		col = option_edit ? option_edit_col : option_highl_col;
-	}
-	
-	overlay_line(prints("%s:%s", name.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? name.size() +2 +opt_cur_char : -1);
-	
-	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
-		opt_value_edit_flag = false;
-		return true;
-	}
-	return false;
-}
-
-static bool _option (strcr name, str& opt_str, bool* open) {
-	bool option_highl = opt_mode && cur_option++ == selected_option;
-	bool option_edit = option_highl && opt_mode == OPT_EDITING;
-	if (option_highl && opt_toggle_open) {
-		opt_toggle_open = false;
-		if (open) *open = !(*open);
-	}
-	
-	if (option_edit && opt_value_edit_flag) { // started editing
-		opt_value_edit_flag = false;
-		opt_val_str = opt_str;
-	}
-	
-	if (option_edit) {
-		opt_str = opt_val_str;
-	}
-	
-	v3 col = option_col;
-	if (option_highl) {
-		col = option_edit ? option_edit_col : option_highl_col;
-	}
-	
-	overlay_line(prints("%s: %s%s", name.c_str(), opt_str.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? name.size() +2 +opt_cur_char : -1);
-	
-	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
-		opt_value_edit_flag = false;
-		return true;
-	}
-	return false;
-}
-
-static bool option (strcr name, bool* val, bool* open=nullptr) {
-	str opt_str = prints("%1d", *val ? 1 : 0);
-	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
-		*val = tmp != 0;
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option (strcr name, s32 (*get)(), void (*set)(s32)=nullptr, bool* open=nullptr) {
-	str opt_str = prints("%4d", get());
-	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp) && set) {
-		set(tmp);
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option (strcr name, s32* val, bool* open=nullptr) {
-	str opt_str = prints("%4d", *val);
-	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
-		*val = tmp;
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option (strcr name, f32* val, bool* open=nullptr) {
-	str opt_str = prints("%8.7g", *val);
-	f32 tmp;
-	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
-		*val = tmp;
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option (strcr name, v2* val, bool* open=nullptr) {
-	str opt_str = prints("%8.7g, %8.7g", val->x,val->y);
-	v2 tmp;
-	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
-		*val = tmp;
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option (strcr name, v3* val, bool* open=nullptr) {
-	str opt_str = prints("%8.7g, %8.7g, %8.7g", val->x,val->y,val->z);
-	v3 tmp;
-	if (_option(name, opt_str, open))	if (parse_v3(opt_val_str, &tmp)) {
-		*val = tmp;
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-
-static bool option_deg (strcr name, f32* val, bool* open=nullptr) {
-	str opt_str = prints("%8.7g", to_deg(*val));
-	f32 tmp;
-	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
-		*val = to_rad(tmp);
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
-static bool option_deg (strcr name, v2* val, bool* open=nullptr) {
-	str opt_str = prints("%8.7g, %8.7g", to_deg(val->x),to_deg(val->y));
-	v2 tmp;
-	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
-		*val = to_rad(tmp);
-		opt_str = opt_val_str;
-		return true;
-	}
-	return false;
-}
+#include "options_overlay.hpp"
 
 //
 #define USI(name)	Uniform(T_INT, name)
@@ -994,6 +763,11 @@ Chunk* inital_chunk () {
 static f32			dt;
 static s32			frame_i; // should only be used for debugging
 
+enum fps_mouse_mode_e { GUI_MODE=0, FPS_MODE };
+
+static fps_mouse_mode_e fps_mouse_mode =	FPS_MODE;
+static bool mouselook_enabled =				fps_mouse_mode == FPS_MODE;
+
 struct Input {
 	iv2		wnd_dim;
 	v2		wnd_dim_aspect;
@@ -1016,7 +790,11 @@ struct Input {
 		{
 			f64 x, y;
 			glfwGetCursorPos(wnd, &x, &y);
-			mcursor_pos_px = iv2((int)x, (int)y);
+			iv2 tmp = iv2((int)x, (int)y);
+			
+			if (mouselook_enabled) mouse_look_diff = (v2)(tmp -mcursor_pos_px);
+			
+			mcursor_pos_px = tmp;
 			
 			mouse = v2(x,y) / (v2)wnd_dim;
 		}
@@ -1069,6 +847,7 @@ static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
 static bool trigger_jump =				false;
 static bool hold_break_block =			false;
+static bool trigger_place_block =		false;
 
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
@@ -1080,19 +859,28 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	
 	bool alt =			(mods & GLFW_MOD_ALT) != 0;
 	
-	if (alt) {
-		switch (key) {
-			case GLFW_KEY_ENTER:		if (went_down) toggle_fullscreen();	return;
+	if (key == GLFW_KEY_F11 || (alt && key == GLFW_KEY_ENTER)) {
+		if (went_down) toggle_fullscreen();
+		return;
+	}
+	
+	if (key == GLFW_KEY_F1) {
+		if (went_down) {
+			if (opt_mode == OPT_OVERLAY_DISABLED)	opt_mode = OPT_SELECTING;
+			else									opt_mode = OPT_OVERLAY_DISABLED;
 		}
-	} else {
-		switch (key) {
-			case GLFW_KEY_F11:			if (went_down) toggle_fullscreen();	return;
-		}
+		return;
+	}
+	if (key == GLFW_KEY_F2) {
+		if (went_down) fps_mouse_mode = (fps_mouse_mode_e)!fps_mouse_mode;
+		if (fps_mouse_mode == GUI_MODE)	stop_mouse_look();
+		else							start_mouse_look();
+		mouselook_enabled = fps_mouse_mode == FPS_MODE;
+		return;
 	}
 	
 	if (opt_mode == OPT_SELECTING) { 
 		switch (key) {
-			case GLFW_KEY_F1:			if (went_down) { opt_mode = OPT_NOT_EDITING; }		return;
 			case GLFW_KEY_ENTER:		if (went_down) {
 					opt_value_edit_flag = true;
 					opt_mode = OPT_EDITING;
@@ -1107,7 +895,6 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 		}
 	} else if (opt_mode == OPT_EDITING) { 
 		switch (key) {
-			case GLFW_KEY_F1:			if (went_down)	opt_mode = OPT_NOT_EDITING;		return;
 			case GLFW_KEY_ENTER:		if (went_down) {
 					opt_value_edit_flag = true;
 					opt_mode = OPT_SELECTING;
@@ -1163,7 +950,6 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				case GLFW_KEY_R:			if (went_down) trigger_regen_chunks = true;		break;
 				case GLFW_KEY_Q:			if (went_down) trigger_respawn_player = true;	break;
 				
-				case GLFW_KEY_F1:			if (went_down) opt_mode = OPT_SELECTING;	break;
 			}
 		}
 	}
@@ -1174,14 +960,20 @@ static void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mod
 	}
 }
 static void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
-    bool went_down = action == GLFW_PRESS;
+	bool went_down = action == GLFW_PRESS;
 	
 	switch (button) {
 		case GLFW_MOUSE_BUTTON_RIGHT:
-			if (went_down) {
-				start_mouse_look();
+			if (fps_mouse_mode == GUI_MODE) {
+				if (went_down) {
+					start_mouse_look();
+					mouselook_enabled = true;
+				} else {
+					stop_mouse_look();
+					mouselook_enabled = false;
+				}
 			} else {
-				stop_mouse_look();
+				trigger_place_block = went_down;
 			}
 			break;
 		case GLFW_MOUSE_BUTTON_LEFT: hold_break_block = went_down; break;
@@ -1200,18 +992,17 @@ static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffse
 		}
 	}
 }
-static void glfw_cursor_move_relative (GLFWwindow* window, double dx, double dy) {
-	v2 diff = v2((f32)dx,(f32)dy);
-	inp.mouse_look_diff += diff;
-}
 
 int main (int argc, char** argv) {
 	cstr app_name = "Voxel Game";
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
 	
+	if (fps_mouse_mode == GUI_MODE)	stop_mouse_look();
+	else							start_mouse_look();
+	
 	//
-	set_vsync(1);
+	set_vsync(-1);
 	
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -1602,6 +1393,8 @@ int main (int argc, char** argv) {
 		
 		inp.mouse_look_diff = 0;
 		trigger_jump = false;
+		opt_toggle_open = false;
+		opt_value_edit_flag = false;
 		
 		glfwPollEvents();
 		
