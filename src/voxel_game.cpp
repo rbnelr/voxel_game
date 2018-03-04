@@ -86,7 +86,10 @@ static void logf_warning (cstr format, ...) {
 }
 
 #define PROFILE_BEGIN(name)	f64 __profile_begin_##name = glfwGetTime()
-#define PROFILE_END(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (glfwGetTime() -__profile_begin_##name) * 1000, __VA_ARGS__)
+#define PROFILE_END_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (glfwGetTime() -__profile_begin_##name) * 1000, __VA_ARGS__)
+
+#define PROFILE_END_ACCUM(name)	name += (glfwGetTime() -__profile_begin_##name)
+#define PROFILE_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), name * 1000, __VA_ARGS__)
 
 namespace random {
 	
@@ -497,7 +500,9 @@ static void gen_chunk (Chunk* chunk) {
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
-std::unordered_map<s64v2_hashmap, Chunk*> chunks_being_processed_by_worker_threads;
+#include <unordered_set>
+std::unordered_set<s64v2_hashmap> chunks_being_processed_by_worker_threads;
+
 static bool chunk_being_processed_by_worker_threads (chunk_pos_t pos) {
 	auto k = chunks_being_processed_by_worker_threads.find({pos});
 	return k != chunks_being_processed_by_worker_threads.end();
@@ -531,7 +536,7 @@ static Chunk* query_chunk (chunk_pos_t pos) {
 		return chunk;
 	}
 }
-static Block* query_block (bpos p, Chunk** out_chunk) {
+static Block* query_block (bpos p, Chunk** out_chunk=nullptr) {
 	if (out_chunk) *out_chunk = nullptr;
 	
 	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
@@ -555,29 +560,40 @@ static std::vector< std::thread > worker_threads;
 
 static std::condition_variable worker_threads_cv;
 
-static std::queue<Chunk*>	worker_threads_job_queue;
-static std::mutex			worker_threads_job_queue_mutex;
-static std::queue<Chunk*>	worker_threads_results_queue;
-static std::mutex			worker_threads_results_queue_mutex;
+static std::queue<chunk_pos_t>	worker_threads_job_queue;
+static std::mutex				worker_threads_job_queue_mutex;
+static std::queue<Chunk*>		worker_threads_results_queue;
+static std::mutex				worker_threads_results_queue_mutex;
 
 static void worker_thread (s32 worker_thread_indx) {
 	
 	for (;;) {
-		Chunk* chunk;
+		chunk_pos_t chunk_pos;
 		{ // get job
 			std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
 			worker_threads_cv.wait(lock, [] { return !worker_threads_job_queue.empty(); }); // wait until there is a job in the job queue
 			
-			chunk = worker_threads_job_queue.front();
+			chunk_pos = worker_threads_job_queue.front();
 			worker_threads_job_queue.pop();
 		}
+		
+		Chunk* chunk = new Chunk();
+		//Chunk* chunk = new ( (Chunk*)malloc(sizeof(Chunk)) ) Chunk();
+		//Chunk* chunk = (Chunk*)malloc(sizeof(Chunk));
+		
+		chunk->pos = chunk_pos;
+		
+		//Sleep(4000);
 		
 		{ // execute job
 			PROFILE_BEGIN(worker_thread_gen_chunk);
 			
 			gen_chunk(chunk);
 			
-			//PROFILE_END(worker_thread_gen_chunk, "");
+			chunk->update_block_brighness();
+			chunk->remesh();
+			
+			PROFILE_END_PRINT(worker_thread_gen_chunk, "");
 		}
 		
 		//Sleep(200);
@@ -589,16 +605,12 @@ static void worker_thread (s32 worker_thread_indx) {
 	}
 }
 
-static void queue_chunk_to_generate (chunk_pos_t pos) {
-	Chunk* chunk = new Chunk();
-	
-	chunk->pos = pos;
-	
-	chunks_being_processed_by_worker_threads.insert({{pos}, chunk});
+static void queue_chunk_to_generate (chunk_pos_t chunk_pos) {
+	chunks_being_processed_by_worker_threads.insert({chunk_pos});
 	
 	{
 		std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
-		worker_threads_job_queue.push(chunk); // put a job in the job queue
+		worker_threads_job_queue.push(chunk_pos); // put a job in the job queue
 	}
 	
 	worker_threads_cv.notify_one(); // wake uo one of the threads waiting for a job
@@ -619,15 +631,15 @@ static void finalize_generated_chunks () {
 			chunk_no_longer_being_processed_by_worker_threads(chunk->pos);
 			
 			chunk->init_gl();
-			chunk->update_whole_chunk_changed();
+			//chunk->update_whole_chunk_changed();
 			
 			chunks.insert({{chunk->pos}, chunk});
 			
-			++count;
+			if (++count == 999999) break;
 		}
 	}
 	
-	if (count != 0) PROFILE_END(finalize_generated_chunks, "frame: %3d count: %d", frame_i, count);
+	if (count != 0) PROFILE_END_PRINT(finalize_generated_chunks, "frame: %3d count: %d", frame_i, count);
 }
 
 //
@@ -1361,7 +1373,6 @@ int main (int argc, char** argv) {
 				[&] (chunk_pos_t l, chunk_pos_t r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
 			);
 			
-			
 			PROFILE_BEGIN(queue_chunk_to_generate);
 			
 			int count = 0;
@@ -1369,8 +1380,7 @@ int main (int argc, char** argv) {
 				queue_chunk_to_generate(cp);
 				++count;
 			}
-			
-			if (count != 0) PROFILE_END(queue_chunk_to_generate, "frame: %3d queued %d chunks", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(queue_chunk_to_generate, "frame: %3d queued %d chunks", frame_i, count);
 			
 			finalize_generated_chunks();
 		}
@@ -1934,9 +1944,8 @@ int main (int argc, char** argv) {
 					chunk->update_block_brighness();
 					++count;
 				}
-				chunk->needs_block_brighness_update = false;
 			}
-			if (count != 0) PROFILE_END(update_block_brighness, "frame: %3d count: %d", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
 			
 			#if 0
 			count = 0;
@@ -1951,11 +1960,52 @@ int main (int argc, char** argv) {
 					chunk->vbo.upload();
 					++count;
 				}
-				chunk->needs_remesh = false;
 				
 				chunk->vbo.draw_entire(shad_main);
 			}
-			if (count != 0) PROFILE_END(remesh_upload_draw, "frame: %3d count: %d", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(remesh_upload_draw, "frame: %3d count: %d", frame_i, count);
+			#elif 0
+			count = 0;
+			
+			PROFILE_BEGIN(remesh);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				if (chunk->needs_remesh) {
+					chunk->remesh();
+					++count;
+				}
+			}
+			if (count != 0) PROFILE_END_PRINT(remesh, "frame: %3d count: %d", frame_i, count);
+			
+			count = 0;
+			
+			PROFILE_BEGIN(upload);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				if (chunk->needs_upload) {
+					chunk->vbo.upload();
+					++count;
+				}
+				chunk->needs_upload = false;
+			}
+			if (count != 0) PROFILE_END_PRINT(upload, "frame: %3d count: %d", frame_i, count);
+			
+			count = 0;
+			
+			PROFILE_BEGIN(draw);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				chunk->vbo.draw_entire(shad_main);
+				
+				++count;
+			}
+			if (count != 0) PROFILE_END_PRINT(draw, "frame: %3d count: %d", frame_i, count);
 			#else
 			count = 0;
 			
@@ -1969,35 +2019,24 @@ int main (int argc, char** argv) {
 					++count;
 				}
 			}
-			if (count != 0) PROFILE_END(remesh, "frame: %3d count: %d", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(remesh, "frame: %3d count: %d", frame_i, count);
 			
 			count = 0;
 			
-			PROFILE_BEGIN(upload);
+			PROFILE_BEGIN(upload_draw);
 			// remesh and draw
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				if (chunk->needs_remesh) {
+				if (chunk->needs_upload) {
 					chunk->vbo.upload();
 					++count;
 				}
-				chunk->needs_remesh = false;
-			}
-			if (count != 0) PROFILE_END(upload, "frame: %3d count: %d", frame_i, count);
-			
-			count = 0;
-			
-			PROFILE_BEGIN(draw);
-			// remesh and draw
-			for (auto& chunk_hash_pair : chunks) {
-				auto& chunk = chunk_hash_pair.second;
+				chunk->needs_upload = false;
 				
 				chunk->vbo.draw_entire(shad_main);
-				
-				++count;
 			}
-			//if (count != 0) PROFILE_END(draw, "frame: %3d count: %d", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(upload_draw, "frame: %3d count: %d", frame_i, count);
 			#endif
 		}
 		
