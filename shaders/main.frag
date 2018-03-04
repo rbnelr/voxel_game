@@ -76,6 +76,8 @@ void main () {
 	
 	vec4 col = texture(atlas, uv).rgba;
 	
+	col.a = col.a == 1 ? 1 : 0.4;
+	
 	{
 		int breaking_frame = int(floor(vs_hp_ratio * float(breaking_frames_count) +0.1f));
 		
@@ -90,8 +92,8 @@ void main () {
 	}
 	
 	//col = vec4(1);
-	col *= vs_brightness;
+	col *= vec4(vec3(vs_brightness), 1);
 	
-	//FRAG_COL( col );
-	FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
+	FRAG_COL( col );
+	//FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }

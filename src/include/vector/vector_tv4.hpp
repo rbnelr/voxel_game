@@ -78,10 +78,11 @@ union V4 {
 	static constexpr V4 clamp (V4 val, V4 l, V4 h) {return min( max(val,l), h ); }
 	
 	#if FLTVEC
-	static constexpr V4 lerp (V4 a, V4 b, T t) {	return (a * V4(T(1) -t)) +(b * V4(t)); }
 	static constexpr V4 lerp (V4 a, V4 b, V4 t) {	return (a * (V4(1) -t)) +(b * t); }
-	static constexpr V4 map (V4 x, V4 a, V4 b) {	return (x -a)/(b -a); }
-
+	static constexpr V4 map (V4 x, V4 in_a, V4 in_b) {	return (x -in_a)/(in_b -in_a); }
+	static constexpr V4 map (V4 x, V4 in_a, V4 in_b, V4 out_a, V4 out_b) {
+													return lerp(out_a, out_b, map(x, in_a, in_b)); }
+	
 	static T length (V4 v) {						return sqrt(v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w); }
 	static T length_sqr (V4 v) {					return v.x*v.x +v.y*v.y +v.z*v.z +v.w*v.w; }
 	static V4 normalize (V4 v) {					return v / V4(length(v)); }

@@ -73,9 +73,10 @@ union V2 {
 	static constexpr V2 clamp (V2 val, V2 l, V2 h) {return min( max(val,l), h ); }
 	
 	#if FLTVEC
-	static constexpr V2 lerp (V2 a, V2 b, T t) {	return (a * V2(T(1) -t)) +(b * V2(t)); }
 	static constexpr V2 lerp (V2 a, V2 b, V2 t) {	return (a * (V2(1) -t)) +(b * t); }
-	static constexpr V2 map (V2 x, V2 a, V2 b) {	return (x -a)/(b -a); }
+	static constexpr V2 map (V2 x, V2 in_a, V2 in_b) {	return (x -in_a)/(in_b -in_a); }
+	static constexpr V2 map (V2 x, V2 in_a, V2 in_b, V2 out_a, V2 out_b) {
+													return lerp(out_a, out_b, map(x, in_a, in_b)); }
 	
 	static T length (V2 v) {						return sqrt(v.x*v.x +v.y*v.y); }
 	static T length_sqr (V2 v) {					return v.x*v.x +v.y*v.y; }

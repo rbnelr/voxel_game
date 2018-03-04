@@ -55,8 +55,10 @@ static constexpr f32 clamp (f32 val, f32 l, f32 h) {	return min( max(val,l), h )
 static constexpr f64 clamp (f64 val, f64 l, f64 h) {	return min( max(val,l), h ); }
 
 static constexpr f32 lerp (f32 a, f32 b, f32 t) {		return a*(1.0f -t) +b*t; }
-//static constexpr f32 mapclamp (f32 x, f32 a, f32 b) {		return clamp((x -a)/(b -a), 0.0f,1.0f); }
-static constexpr f32 map (f32 x, f32 a, f32 b) {		return (x -a)/(b -a); }
+
+static constexpr f32 map (f32 x, f32 in_a, f32 in_b) {	return (x -in_a)/(in_b -in_a); }
+static constexpr f32 map (f32 x, f32 in_a, f32 in_b, f32 out_a, f32 out_b) {
+														return lerp(out_a, out_b, map(x, in_a, in_b)); }
 
 #include <cmath>
 

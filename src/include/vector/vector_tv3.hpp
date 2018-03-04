@@ -80,10 +80,11 @@ union V3 {
 	static constexpr V3 clamp (V3 val, V3 l, V3 h) {return min( max(val,l), h ); }
 	
 #if FLTVEC
-	static constexpr V3 lerp (V3 a, V3 b, T t) {	return (a * V3(T(1) -t)) +(b * V3(t)); }
 	static constexpr V3 lerp (V3 a, V3 b, V3 t) {	return (a * (V3(1) -t)) +(b * t); }
-	static constexpr V3 map (V3 x, V3 a, V3 b) {	return (x -a)/(b -a); }
-
+	static constexpr V3 map (V3 x, V3 in_a, V3 in_b) {	return (x -in_a)/(in_b -in_a); }
+	static constexpr V3 map (V3 x, V3 in_a, V3 in_b, V3 out_a, V3 out_b) {
+													return lerp(out_a, out_b, map(x, in_a, in_b)); }
+	
 	static T length (V3 v) {						return sqrt(v.x*v.x +v.y*v.y +v.z*v.z); }
 	static T length_sqr (V3 v) {					return v.x*v.x +v.y*v.y +v.z*v.z; }
 	static V3 normalize (V3 v) {					return v / V3(length(v)); }

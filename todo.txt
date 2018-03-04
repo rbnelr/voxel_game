@@ -18,6 +18,10 @@ DONE:
  -> i did not calculate the radius test correctly on raycasting with top and bottom of minowski sum
      so the collision was just not detected sometimes
  
+ reimplement nice terrain with new noise function
+ 
+ added water
+ 
 TODO
 -FEATURES:
  

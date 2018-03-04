@@ -412,30 +412,71 @@ struct Noise_Octave {
 	f32	amp;
 };
 std::vector<Noise_Octave> heightmap_noise_octaves = {
-	{ 300,		10	},
-	{ 70,		5	},
-	{ 1.0f,		0	},
-	{ 1.0f,		0	},
+	{ 300,		12		},
+	{ 120,		12		},
+	{ 50,		4.5f	},
+	{ 20,		3		},
+	{ 3,		0.225f	},
 };
 static s32 get_heightmap_noise_octaves_count () {			return (s32)heightmap_noise_octaves.size(); }
 static void set_heightmap_noise_octaves_count (s32 count) {	heightmap_noise_octaves.resize(count); }
 static bool heightmap_noise_octaves_open = true;
 
-static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
-	//using namespace perlin_noise_n;
-	
-	auto noise = [&] (v2 pos, flt period) {
+
+std::vector<Noise_Octave> heightmap_multiplier_noise_octaves = {
+	{ 500,		0.2f		},
+	{ 1000,		0.4f		},
+	{ 200,		0.2f		},
+};
+static s32 get_heightmap_multiplier_noise_octaves_count () {			return (s32)heightmap_multiplier_noise_octaves.size(); }
+static void set_heightmap_multiplier_noise_octaves_count (s32 count) {	heightmap_multiplier_noise_octaves.resize(count); }
+static bool heightmap_multiplier_noise_octaves_open = true;
+
+static f32 heightmap_multiplier (OSN::Noise<2> const& osn_noise, v2 pos_world) {
+	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
+		pos = rotate2(ang_offs) * pos;
 		pos /= period; // period is inverse frequency
+		pos += offs;
 		return osn_noise.eval<flt>(pos.x, pos.y);
 	};
 	
 	f32 tot = 0;
 	
-	for (auto& o : heightmap_noise_octaves) {
-		tot += noise(pos_world, o.period) * o.amp;
+	s32 i = get_heightmap_noise_octaves_count();
+	for (auto& o : heightmap_multiplier_noise_octaves) {
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		tot += noise(pos_world, o.period, deg(37.17f) * (f32)i, offs) * o.amp;
+		
+		++i;
 	}
 	
-	tot *= 1.5f;
+	tot = pow(1.6f, 2.8f * (tot +0.1f));
+	
+	return tot;
+}
+
+static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
+	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
+		pos = rotate2(ang_offs) * pos;
+		pos /= period; // period is inverse frequency
+		pos += offs;
+		return osn_noise.eval<flt>(pos.x, pos.y);
+	};
+	
+	f32 tot = 0;
+	
+	s32 i = 0;
+	for (auto& o : heightmap_noise_octaves) {
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		flt val = noise(pos_world, o.period, deg(37.17f) * (f32)i, offs) * o.amp;
+		tot += val;
+		
+		++i;
+	}
+	
+	tot *= heightmap_multiplier(osn_noise, pos_world);
 	
 	return tot +32;
 }
@@ -456,14 +497,16 @@ static lrgb8 noise_tree (v2 pos_world) {
 
 static u64 world_seed = 0;
 
-static void gen_chunk (Chunk* chunk) {
+static void gen_chunk_blocks (Chunk* chunk) {
+	bpos_t water_level = 21;
+	
 	bpos i; // position in chunk
 	for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
 		for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 			for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 				auto* b = chunk->get_block(i);
 				
-				b->type = BT_AIR;
+				b->type = i.z <= water_level ? BT_WATER : BT_AIR;
 				b->hp_ratio = 1;
 				b->dbg_tint = 255;
 			}
@@ -488,7 +531,7 @@ static void gen_chunk (Chunk* chunk) {
 				} else {
 					b->type = BT_EARTH;
 				}
-				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 50)), 255);
+				b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
 				//b->dbg_tint = lrgba8( noise_tree(pos_world), 255);
 			}
 		}
@@ -499,25 +542,6 @@ static void gen_chunk (Chunk* chunk) {
 
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
-
-#include <unordered_set>
-std::unordered_set<s64v2_hashmap> chunks_being_processed_by_worker_threads;
-
-static bool chunk_being_processed_by_worker_threads (chunk_pos_t pos) {
-	auto k = chunks_being_processed_by_worker_threads.find({pos});
-	return k != chunks_being_processed_by_worker_threads.end();
-}
-static void chunk_no_longer_being_processed_by_worker_threads (chunk_pos_t pos) {
-	dbg_assert( chunks_being_processed_by_worker_threads.erase({pos}) == 1 );
-}
-
-static void inital_chunk () {
-	Chunk* c = new Chunk();
-	c->init_gl();
-	gen_chunk(c);
-	
-	chunks.insert({{c->pos}, c});
-}
 
 static Chunk* _prev_query_chunk = nullptr; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
 
@@ -536,7 +560,7 @@ static Chunk* query_chunk (chunk_pos_t pos) {
 		return chunk;
 	}
 }
-static Block* query_block (bpos p, Chunk** out_chunk=nullptr) {
+static Block* query_block (bpos p, Chunk** out_chunk) {
 	if (out_chunk) *out_chunk = nullptr;
 	
 	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
@@ -551,95 +575,19 @@ static Block* query_block (bpos p, Chunk** out_chunk=nullptr) {
 	return chunk->get_block(block_pos_chunk);
 }
 
-#include <thread>
-#include <mutex>
-#include <queue>
-
-static ui cpu_threads_count = std::thread::hardware_concurrency();
-static std::vector< std::thread > worker_threads;
-
-static std::condition_variable worker_threads_cv;
-
-static std::queue<chunk_pos_t>	worker_threads_job_queue;
-static std::mutex				worker_threads_job_queue_mutex;
-static std::queue<Chunk*>		worker_threads_results_queue;
-static std::mutex				worker_threads_results_queue_mutex;
-
-static void worker_thread (s32 worker_thread_indx) {
+static void generate_new_chunk (chunk_pos_t chunk_pos) {
 	
-	for (;;) {
-		chunk_pos_t chunk_pos;
-		{ // get job
-			std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
-			worker_threads_cv.wait(lock, [] { return !worker_threads_job_queue.empty(); }); // wait until there is a job in the job queue
-			
-			chunk_pos = worker_threads_job_queue.front();
-			worker_threads_job_queue.pop();
-		}
-		
-		Chunk* chunk = new Chunk();
-		//Chunk* chunk = new ( (Chunk*)malloc(sizeof(Chunk)) ) Chunk();
-		//Chunk* chunk = (Chunk*)malloc(sizeof(Chunk));
-		
-		chunk->pos = chunk_pos;
-		
-		//Sleep(4000);
-		
-		{ // execute job
-			PROFILE_BEGIN(worker_thread_gen_chunk);
-			
-			gen_chunk(chunk);
-			
-			chunk->update_block_brighness();
-			chunk->remesh();
-			
-			PROFILE_END_PRINT(worker_thread_gen_chunk, "");
-		}
-		
-		//Sleep(200);
-		
-		{ // put results in result queue
-			std::unique_lock<std::mutex> lock( worker_threads_results_queue_mutex );
-			worker_threads_results_queue.push(chunk);
-		}
-	}
+	Chunk* c = new Chunk();
+	
+	c->pos = chunk_pos;
+	c->init_gl();
+	gen_chunk_blocks(c);
+	
+	chunks.insert({{c->pos}, c});
 }
 
-static void queue_chunk_to_generate (chunk_pos_t chunk_pos) {
-	chunks_being_processed_by_worker_threads.insert({chunk_pos});
-	
-	{
-		std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
-		worker_threads_job_queue.push(chunk_pos); // put a job in the job queue
-	}
-	
-	worker_threads_cv.notify_one(); // wake uo one of the threads waiting for a job
-}
-
-static void finalize_generated_chunks () {
-	PROFILE_BEGIN(finalize_generated_chunks);
-	
-	int count = 0;
-	
-	{ // put results in result queue
-		std::unique_lock<std::mutex> lock( worker_threads_results_queue_mutex );
-		
-		while (!worker_threads_results_queue.empty()) {
-			Chunk* chunk = worker_threads_results_queue.front();
-			worker_threads_results_queue.pop();
-			
-			chunk_no_longer_being_processed_by_worker_threads(chunk->pos);
-			
-			chunk->init_gl();
-			//chunk->update_whole_chunk_changed();
-			
-			chunks.insert({{chunk->pos}, chunk});
-			
-			if (++count == 999999) break;
-		}
-	}
-	
-	if (count != 0) PROFILE_END_PRINT(finalize_generated_chunks, "frame: %3d count: %d", frame_i, count);
+static void inital_chunk (v3 player_pos_world) {
+	generate_new_chunk( get_chunk_from_block_pos( (bpos)floor(player_pos_world) ) );
 }
 
 //
@@ -729,6 +677,7 @@ static f32 jump_impulse_from_jump_height (f32 jump_height, f32 grav_accel_down) 
 //
 static bool trigger_respawn_player =	true;
 static bool trigger_regen_chunks =		false;
+static bool trigger_dbg_heightmap_visualize =	false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
 static bool jump_held =					false;
@@ -881,9 +830,6 @@ static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffse
 
 int main (int argc, char** argv) {
 	cstr app_name = "Voxel Game";
-	
-	for (ui i=0; i<max(cpu_threads_count -1, (ui)1); ++i)
-		worker_threads.push_back( std::thread(worker_thread, i) );
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
 	
@@ -1092,14 +1038,8 @@ int main (int argc, char** argv) {
 		}
 	};
 	
-	#if 1
 	v3	initial_player_pos_world =		v3(4,32,43);
 	v3	initial_player_vel_world =		0;
-	#else // collision bug test
-	// triggers bug with  fixed dt 1.0f / 60  on frame_i == 6 block: 0 31 41
-	v3	initial_player_pos_world =		v3(2, 32, 42.08f);
-	v3	initial_player_vel_world =		v3(-8, -2, 0);
-	#endif
 	
 	struct Player {
 		v3	pos_world;
@@ -1180,10 +1120,65 @@ int main (int argc, char** argv) {
 	
 	load_game();
 	
-	inital_chunk();
+	inital_chunk( player.pos_world );
 	
 	flt chunk_drawing_radius =		INF;
-	flt chunk_generation_radius =	200;
+	flt chunk_generation_radius =	500;
+	
+	Texture2D dbg_heightmap_visualize;
+	Texture2D dbg_heightmap_multiplier_visualize;
+	s32 dbg_heightmap_visualize_radius = 1000;
+	
+	auto regen_dbg_heightmap_visualize = [&] () {
+		lrgba8* pixels = (lrgba8*)dbg_heightmap_visualize.mips[0].data;
+		iv2 dim = dbg_heightmap_visualize.mips[0].dim;
+		
+		auto dst = [&] (iv2 pos) -> lrgba8* {
+			return &pixels[pos.y*dim.x + pos.x];
+		};
+		
+		OSN::Noise<2> noise( world_seed );
+		
+		iv2 i;
+		for (i.y=0; i.y<dim.y; ++i.y) {
+			for (i.x=0; i.x<dim.x; ++i.x) {
+				v2 pos_world = map((v2)i, 0,(v2)(dim-1), -dbg_heightmap_visualize_radius / 2, +dbg_heightmap_visualize_radius / 2);
+				*dst(i) = lrgba8(spectrum_gradient(map( heightmap(noise, pos_world) , 0, 45)), 255);
+			}
+		}
+		
+		dbg_heightmap_visualize.upload();
+	};
+	auto regen_dbg_heightmap_multiplier_visualize = [&] () {
+		lrgba8* pixels = (lrgba8*)dbg_heightmap_multiplier_visualize.mips[0].data;
+		iv2 dim = dbg_heightmap_multiplier_visualize.mips[0].dim;
+		
+		auto dst = [&] (iv2 pos) -> lrgba8* {
+			return &pixels[pos.y*dim.x + pos.x];
+		};
+		
+		OSN::Noise<2> noise( world_seed );
+		
+		iv2 i;
+		for (i.y=0; i.y<dim.y; ++i.y) {
+			for (i.x=0; i.x<dim.x; ++i.x) {
+				v2 pos_world = map((v2)i, 0,(v2)(dim-1), -dbg_heightmap_visualize_radius / 2, +dbg_heightmap_visualize_radius / 2);
+				*dst(i) = lrgba8(spectrum_gradient(map( heightmap_multiplier(noise, pos_world) , 0, 2)), 255);
+			}
+		}
+		
+		dbg_heightmap_multiplier_visualize.upload();
+	};
+	
+	{
+		dbg_heightmap_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
+		dbg_heightmap_multiplier_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
+		
+		regen_dbg_heightmap_visualize();
+		regen_dbg_heightmap_multiplier_visualize();
+	}
+	
+	s32 max_chunks_generated_per_frame = 1;
 	
 	struct Overlay_Vertex {
 		v3		pos_world;
@@ -1243,7 +1238,6 @@ int main (int argc, char** argv) {
 		inp.mouse_look_diff = 0;
 		opt_toggle_open = false;
 		opt_value_edit_flag = false;
-		trigger_regen_chunks = false;
 		
 		glfwPollEvents();
 		
@@ -1327,12 +1321,38 @@ int main (int argc, char** argv) {
 			}
 		}
 		
+		option("heightmap_multiplier_noise_octaves", get_heightmap_multiplier_noise_octaves_count, set_heightmap_multiplier_noise_octaves_count, &heightmap_multiplier_noise_octaves_open);
+		if (heightmap_multiplier_noise_octaves_open) {
+			for (s32 i=0; i<(s32)heightmap_multiplier_noise_octaves.size(); ++i) {
+				auto& o = heightmap_multiplier_noise_octaves[i];
+				
+				v2 tmp = v2(o.period, o.amp);
+				
+				if (option(prints("  [%2d]", i), &tmp)) trigger_regen_chunks = true;
+				
+				o.period = tmp.x;	o.amp = tmp.y;
+			}
+		}
+		
 		if (option("noise_tree_freq", &noise_tree_freq))	trigger_regen_chunks = true;
 		if (option("noise_tree_amp", &noise_tree_amp))		trigger_regen_chunks = true;
 		
 		if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
+			trigger_regen_chunks = false;
 			chunks.clear();
-			inital_chunk();
+			inital_chunk(player.pos_world);
+			trigger_dbg_heightmap_visualize = true;
+		}
+		
+		option("chunk_drawing_radius", &chunk_drawing_radius);
+		option("chunk_generation_radius", &chunk_generation_radius);
+		
+		if (option("dbg_heightmap_visualize_radius", &dbg_heightmap_visualize_radius)) trigger_dbg_heightmap_visualize = true;
+		
+		if (trigger_dbg_heightmap_visualize) {
+			regen_dbg_heightmap_visualize();
+			regen_dbg_heightmap_multiplier_visualize();
+			trigger_dbg_heightmap_visualize = false;
 		}
 		
 		if (trigger_respawn_player) {
@@ -1340,13 +1360,10 @@ int main (int argc, char** argv) {
 			respawn_player();
 		}
 		
-		option("chunk_drawing_radius", &chunk_drawing_radius);
-		option("chunk_generation_radius", &chunk_generation_radius);
-		
 		{ // chunk generation
 			// check all chunk positions within a square of chunk_generation_radius
-			chunk_pos_t start =	get_chunk_from_block_pos( floor(player.pos_world.xy() -chunk_generation_radius) );
-			chunk_pos_t end =	get_chunk_from_block_pos( ceil(player.pos_world.xy() +chunk_generation_radius) );
+			chunk_pos_t start =	(chunk_pos_t)floor(	(player.pos_world.xy() -chunk_generation_radius) / (v2)CHUNK_DIM.xy() );
+			chunk_pos_t end =	(chunk_pos_t)ceil(	(player.pos_world.xy() +chunk_generation_radius) / (v2)CHUNK_DIM.xy() );
 			
 			// check their actual distance to determine if they should be generated or not
 			auto chunk_dist_to_player = [&] (chunk_pos_t pos) {
@@ -1362,7 +1379,7 @@ int main (int argc, char** argv) {
 			chunk_pos_t cp;
 			for (cp.x = start.x; cp.x<end.x; ++cp.x) {
 				for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-					if (chunk_is_in_generation_radius(cp) && !query_chunk(cp) && !chunk_being_processed_by_worker_threads(cp)) {
+					if (chunk_is_in_generation_radius(cp) && !query_chunk(cp)) {
 						// chunk is within chunk_generation_radius and not yet generated
 						chunks_to_generate.push_back(cp);
 					}
@@ -1373,16 +1390,15 @@ int main (int argc, char** argv) {
 				[&] (chunk_pos_t l, chunk_pos_t r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
 			);
 			
-			PROFILE_BEGIN(queue_chunk_to_generate);
+			PROFILE_BEGIN(generate_new_chunk);
 			
 			int count = 0;
 			for (auto& cp : chunks_to_generate) {
-				queue_chunk_to_generate(cp);
-				++count;
+				generate_new_chunk(cp);
+				if (++count == max_chunks_generated_per_frame) break;
 			}
-			if (count != 0) PROFILE_END_PRINT(queue_chunk_to_generate, "frame: %3d queued %d chunks", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(generate_new_chunk, "frame: %3d generated %d chunks", frame_i, count);
 			
-			finalize_generated_chunks();
 		}
 		
 		overlay_line(prints("chunks in ram:   %4d %6d MB (%d KB per chunk) chunk is %dx%dx%d blocks", (s32)chunks.size(), (s32)(sizeof(Chunk)*chunks.size()/1024/1024), (s32)(sizeof(Chunk)/1024), (s32)CHUNK_DIM.x,(s32)CHUNK_DIM.y,(s32)CHUNK_DIM.z));
@@ -1876,7 +1892,7 @@ int main (int argc, char** argv) {
 				
 				block_place_is_inside_player = cylinder_cube_intersect(player.pos_world -(v3)block_place_pos, player.collision_r,player.collision_h);
 				
-				if (b->type == BT_AIR && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
+				if (bt_is_replaceable(b->type) && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 					
 					b->type = BT_EARTH;
 					b->hp_ratio = 1;
@@ -1921,6 +1937,9 @@ int main (int argc, char** argv) {
 		glClear(GL_DEPTH_BUFFER_BIT);
 		
 		if (shad_main->valid()) {
+			
+			glEnable(GL_BLEND);
+			
 			bind_texture_unit(0, &tex_block_atlas);
 			bind_texture_unit(1, &tex_breaking);
 			
@@ -1947,10 +1966,9 @@ int main (int argc, char** argv) {
 			}
 			if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
 			
-			#if 0
 			count = 0;
 			
-			PROFILE_BEGIN(remesh_upload_draw);
+			PROFILE_BEGIN(remesh_upload);
 			// remesh and draw
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
@@ -1958,86 +1976,27 @@ int main (int argc, char** argv) {
 				if (chunk->needs_remesh) {
 					chunk->remesh();
 					chunk->vbo.upload();
-					++count;
-				}
-				
-				chunk->vbo.draw_entire(shad_main);
-			}
-			if (count != 0) PROFILE_END_PRINT(remesh_upload_draw, "frame: %3d count: %d", frame_i, count);
-			#elif 0
-			count = 0;
-			
-			PROFILE_BEGIN(remesh);
-			// remesh and draw
-			for (auto& chunk_hash_pair : chunks) {
-				auto& chunk = chunk_hash_pair.second;
-				
-				if (chunk->needs_remesh) {
-					chunk->remesh();
+					chunk->vbo_transperant.upload();
 					++count;
 				}
 			}
-			if (count != 0) PROFILE_END_PRINT(remesh, "frame: %3d count: %d", frame_i, count);
+			if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
 			
-			count = 0;
-			
-			PROFILE_BEGIN(upload);
-			// remesh and draw
-			for (auto& chunk_hash_pair : chunks) {
-				auto& chunk = chunk_hash_pair.second;
-				
-				if (chunk->needs_upload) {
-					chunk->vbo.upload();
-					++count;
-				}
-				chunk->needs_upload = false;
-			}
-			if (count != 0) PROFILE_END_PRINT(upload, "frame: %3d count: %d", frame_i, count);
-			
-			count = 0;
-			
-			PROFILE_BEGIN(draw);
-			// remesh and draw
+			// draw opaque
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
 				chunk->vbo.draw_entire(shad_main);
-				
-				++count;
 			}
-			if (count != 0) PROFILE_END_PRINT(draw, "frame: %3d count: %d", frame_i, count);
-			#else
-			count = 0;
 			
-			PROFILE_BEGIN(remesh);
-			// remesh and draw
+			// draw transperant
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				if (chunk->needs_remesh) {
-					chunk->remesh();
-					++count;
-				}
+				chunk->vbo_transperant.draw_entire(shad_main);
 			}
-			if (count != 0) PROFILE_END_PRINT(remesh, "frame: %3d count: %d", frame_i, count);
 			
-			count = 0;
-			
-			PROFILE_BEGIN(upload_draw);
-			// remesh and draw
-			for (auto& chunk_hash_pair : chunks) {
-				auto& chunk = chunk_hash_pair.second;
-				
-				if (chunk->needs_upload) {
-					chunk->vbo.upload();
-					++count;
-				}
-				chunk->needs_upload = false;
-				
-				chunk->vbo.draw_entire(shad_main);
-			}
-			if (count != 0) PROFILE_END_PRINT(upload_draw, "frame: %3d count: %d", frame_i, count);
-			#endif
+			glDisable(GL_BLEND);
 		}
 		
 		if (shad_overlay->valid()) {
@@ -2246,7 +2205,8 @@ int main (int argc, char** argv) {
 			if (shad_overlay_tex->valid()) {
 				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
 				//draw_overlay_tex2d(&tex_breaking, UL, 8);
-				//draw_overlay_tex2d(&noise_test, LL, 8);
+				//draw_overlay_tex2d(&dbg_heightmap_multiplier_visualize, UR, 1);
+				//draw_overlay_tex2d(&dbg_heightmap_visualize, LR, 1.5f);
 			}
 			
 		}
@@ -2278,8 +2238,6 @@ int main (int argc, char** argv) {
 			avg_dt = lerp(avg_dt, dt, avg_dt_alpha);
 		}
 	}
-	
-	for (auto& t : worker_threads) t.detach();
 	
 	platform_terminate();
 	
