@@ -11,7 +11,7 @@
 #include "bit_twiddling.hpp"
 #include "vector/vector.hpp"
 #include "intersection_test.hpp"
-#include "noise.hpp"
+#include "open_simplex_noise.hpp"
 
 #define _USING_V110_SDK71_ 1
 #include "glad.c"
@@ -84,6 +84,9 @@ static void logf_warning (cstr format, ...) {
 	
 	printf(ANSI_COLOUR_CODE_YELLOW "%s\n" ANSI_COLOUR_CODE_NC, str.c_str());
 }
+
+#define PROFILE_BEGIN(name)	f64 __profile_begin_##name = glfwGetTime()
+#define PROFILE_END(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (glfwGetTime() -__profile_begin_##name) * 1000, __VA_ARGS__)
 
 namespace random {
 	
@@ -228,6 +231,7 @@ const v3 cube_faces_inward[6*6] = {
 #undef QUAD
 
 static v2			mouse; // for quick debugging
+static s32			frame_i; // should only be used for debugging
 
 //
 struct Source_File {
@@ -292,7 +296,6 @@ struct Source_Files {
 typedef u32 vert_indx_t;
 
 static cstr shaders_base_path =		"shaders/";
-//static cstr meshes_base_path =		"assets";
 static cstr textures_base_path =	"assets_src";
 
 static cstr save_files =			"saves/%s.bin";
@@ -379,6 +382,10 @@ static Vertex_Layout chunk_vbo_vert_layout = {
 #include "blocks.hpp"
 #include "chunks.hpp"
 
+static size_t hash (chunk_pos_t v) {
+	return 53 * (std::hash<s64>()(v.x) + 53) + std::hash<s64>()(v.y);
+};
+
 struct s64v2_hashmap {
 	chunk_pos_t v;
 	
@@ -392,83 +399,61 @@ static_assert(sizeof(size_t) == 8, "");
 namespace std {
 	template<> struct hash<s64v2_hashmap> { // for hash map
 		NOINLINE size_t operator() (s64v2_hashmap const& v) const {
-			return 53 * (hash<s64>()(v.v.x) + 53) + hash<s64>()(v.v.y);
+			return ::hash(v.v);
 		}
 	};
 }
 
-#include <unordered_map>
-std::unordered_map<s64v2_hashmap, Chunk*> chunks;
-
-static Chunk* _prev_query_block_chunk = nullptr; // to avoid hash map lookup most of the time, since most query_block's are going to end up in the same chunk
-
-static Chunk* query_chunk (chunk_pos_t pos) {
-	auto k = chunks.find({pos});
-	if (k == chunks.end()) return nullptr;
-	
-	return k->second;
-}
-static Block* query_block (bpos p, Chunk** out_chunk) {
-	if (out_chunk) *out_chunk = nullptr;
-	
-	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
-	
-	bpos rel_p;
-	chunk_pos_t chunk_p = int_div_by_pot_floor(p, &rel_p);
-	
-	Chunk* chunk;
-	if (_prev_query_block_chunk && equal(_prev_query_block_chunk->pos, chunk_p)) {
-		chunk = _prev_query_block_chunk;
-	} else {
-		
-		chunk = query_chunk(chunk_p);
-		_prev_query_block_chunk = chunk;
-		
-		if (!chunk) return (Block*)&B_NO_CHUNK;
-	}
-	
-	if (out_chunk) *out_chunk = chunk;
-	return chunk->get_block(rel_p);
-}
-
-struct Perlin_Octave {
-	f32	freq;
+struct Noise_Octave {
+	f32	period;
 	f32	amp;
 };
-std::vector<Perlin_Octave> heightmap_perlin2d_octaves = {
-	{ 0.03f,	30		},
-	{ 0.1f,		10		},
-	{ 0.4f,		3		},
-	{ 2.0f,		0.1f	},
+std::vector<Noise_Octave> heightmap_noise_octaves = {
+	{ 300,		10	},
+	{ 70,		5	},
+	{ 1.0f,		0	},
+	{ 1.0f,		0	},
 };
-static s32 get_heightmap_perlin2d_octaves_count () {			return (s32)heightmap_perlin2d_octaves.size(); }
-static void set_heightmap_perlin2d_octaves_count (s32 count) {	heightmap_perlin2d_octaves.resize(count); }
-static bool heightmap_perlin2d_octaves_open = true;
+static s32 get_heightmap_noise_octaves_count () {			return (s32)heightmap_noise_octaves.size(); }
+static void set_heightmap_noise_octaves_count (s32 count) {	heightmap_noise_octaves.resize(count); }
+static bool heightmap_noise_octaves_open = true;
 
-f32 heightmap_perlin2d (v2 v) {
-	using namespace perlin_noise_n;
+static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
+	//using namespace perlin_noise_n;
 	
-	v = abs(v);
-	
-	//v += v2(1,-1)*mouse * 20;
-	
-	//f32 fre = lerp(0.33f, 3.0f, mouse.x);
-	//f32 amp = lerp(0.33f, 3.0f, mouse.y);
+	auto noise = [&] (v2 pos, flt period) {
+		pos /= period; // period is inverse frequency
+		return osn_noise.eval<flt>(pos.x, pos.y);
+	};
 	
 	f32 tot = 0;
 	
-	for (auto& o : heightmap_perlin2d_octaves) {
-		tot += perlin_octave(v, o.freq) * o.amp;
+	for (auto& o : heightmap_noise_octaves) {
+		tot += noise(pos_world, o.period) * o.amp;
 	}
 	
 	tot *= 1.5f;
 	
-	//printf(">>>>>>>>> %.3f %.3f\n", fre, amp);
-	
 	return tot +32;
 }
 
-void gen_chunk (Chunk* chunk) {
+static flt noise_tree_freq = 0.1f;
+static flt noise_tree_amp = 5;
+
+#if 0
+static lrgb8 noise_tree (v2 pos_world) {
+	//using namespace perlin_noise_n;
+	pos_world = abs(pos_world);
+	
+	f32 val = perlin_octave(pos_world, noise_tree_freq) * noise_tree_amp;
+	
+	return spectrum_gradient(val);
+}
+#endif
+
+static u64 world_seed = 0;
+
+static void gen_chunk (Chunk* chunk) {
 	bpos i; // position in chunk
 	for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
 		for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
@@ -478,16 +463,19 @@ void gen_chunk (Chunk* chunk) {
 				b->type = BT_AIR;
 				b->hp_ratio = 1;
 				b->dbg_tint = 255;
-				
-				//if (i.z == CHUNK_DIM.z-1) b->type = BT_EARTH;
 			}
 		}
 	}
 	
+	OSN::Noise<2> noise( world_seed );
+	//OSN::Noise<2> noise( hash(chunk->pos) );
+	
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
-			f32 height = heightmap_perlin2d((v2)(i.xy() +chunk->pos*CHUNK_DIM.xy()));
+			v2 pos_world = (v2)(i.xy() +chunk->pos*CHUNK_DIM.xy());
+			
+			f32 height = heightmap(noise, pos_world);
 			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
@@ -498,70 +486,152 @@ void gen_chunk (Chunk* chunk) {
 					b->type = BT_EARTH;
 				}
 				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 50)), 255);
+				//b->dbg_tint = lrgba8( noise_tree(pos_world), 255);
 			}
 		}
 	}
 	
-	chunk->update_chunk_changed();
+	chunk->update_whole_chunk_changed();
 }
 
-Chunk* new_chunk (v3 cam_pos_world) {
-	dbg_assert(chunks.size() > 0);
-	
-	Chunk* c = new Chunk;
-	c->init();
+#include <unordered_map>
+std::unordered_map<s64v2_hashmap, Chunk*> chunks;
+
+std::unordered_map<s64v2_hashmap, Chunk*> chunks_being_processed_by_worker_threads;
+static bool chunk_being_processed_by_worker_threads (chunk_pos_t pos) {
+	auto k = chunks_being_processed_by_worker_threads.find({pos});
+	return k != chunks_being_processed_by_worker_threads.end();
+}
+static void chunk_no_longer_being_processed_by_worker_threads (chunk_pos_t pos) {
+	dbg_assert( chunks_being_processed_by_worker_threads.erase({pos}) == 1 );
+}
+
+static void inital_chunk () {
+	Chunk* c = new Chunk();
 	c->init_gl();
+	gen_chunk(c);
 	
-	f32			nearest_free_spot_dist = +INF;
-	chunk_pos_t	nearest_free_spot;
-	
-	for (auto& hash_pair : chunks) {
-		auto& c = hash_pair.second;
+	chunks.insert({{c->pos}, c});
+}
+
+static Chunk* _prev_query_chunk = nullptr; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
+
+static Chunk* query_chunk (chunk_pos_t pos) {
+	if (_prev_query_chunk && equal(_prev_query_chunk->pos, pos)) {
+		return _prev_query_chunk;
+	} else {
 		
-		auto check_chunk_spot = [&] (chunk_pos_t pos) {
-			if (query_chunk(pos)) return;
-			// free spot found
-			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
+		auto k = chunks.find({pos});
+		if (k == chunks.end()) return nullptr;
+		
+		Chunk* chunk = k->second;
+		
+		_prev_query_chunk = chunk;
+		
+		return chunk;
+	}
+}
+static Block* query_block (bpos p, Chunk** out_chunk) {
+	if (out_chunk) *out_chunk = nullptr;
+	
+	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
+	
+	bpos block_pos_chunk;
+	chunk_pos_t chunk_pos = get_chunk_from_block_pos(p, &block_pos_chunk);
+	
+	Chunk* chunk = query_chunk(chunk_pos);
+	if (!chunk) return (Block*)&B_NO_CHUNK;
+	
+	if (out_chunk) *out_chunk = chunk;
+	return chunk->get_block(block_pos_chunk);
+}
+
+#include <thread>
+#include <mutex>
+#include <queue>
+
+static ui cpu_threads_count = std::thread::hardware_concurrency();
+static std::vector< std::thread > worker_threads;
+
+static std::condition_variable worker_threads_cv;
+
+static std::queue<Chunk*>	worker_threads_job_queue;
+static std::mutex			worker_threads_job_queue_mutex;
+static std::queue<Chunk*>	worker_threads_results_queue;
+static std::mutex			worker_threads_results_queue_mutex;
+
+static void worker_thread (s32 worker_thread_indx) {
+	
+	for (;;) {
+		Chunk* chunk;
+		{ // get job
+			std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
+			worker_threads_cv.wait(lock, [] { return !worker_threads_job_queue.empty(); }); // wait until there is a job in the job queue
 			
-			f32 dist = length(cam_pos_world.xy() - chunk_center);
-			if (dist < nearest_free_spot_dist
-					//&& all(pos >= 0)
-					) {
-				nearest_free_spot_dist = dist;
-				nearest_free_spot = pos;
-			}
-		};
+			chunk = worker_threads_job_queue.front();
+			worker_threads_job_queue.pop();
+		}
 		
-		check_chunk_spot(c->pos +chunk_pos_t(+1, 0));
-		check_chunk_spot(c->pos +chunk_pos_t( 0,+1));
-		check_chunk_spot(c->pos +chunk_pos_t(-1, 0));
-		check_chunk_spot(c->pos +chunk_pos_t( 0,-1));
+		{ // execute job
+			PROFILE_BEGIN(worker_thread_gen_chunk);
+			
+			gen_chunk(chunk);
+			
+			//PROFILE_END(worker_thread_gen_chunk, "");
+		}
 		
+		//Sleep(200);
+		
+		{ // put results in result queue
+			std::unique_lock<std::mutex> lock( worker_threads_results_queue_mutex );
+			worker_threads_results_queue.push(chunk);
+		}
+	}
+}
+
+static void queue_chunk_to_generate (chunk_pos_t pos) {
+	Chunk* chunk = new Chunk();
+	
+	chunk->pos = pos;
+	
+	chunks_being_processed_by_worker_threads.insert({{pos}, chunk});
+	
+	{
+		std::unique_lock<std::mutex> lock( worker_threads_job_queue_mutex );
+		worker_threads_job_queue.push(chunk); // put a job in the job queue
 	}
 	
-	dbg_assert(nearest_free_spot_dist != +INF);
-	
-	c->pos = nearest_free_spot;
-	
-	chunks.insert({{c->pos}, c});
-	gen_chunk(c);
-	return c;
+	worker_threads_cv.notify_one(); // wake uo one of the threads waiting for a job
 }
-Chunk* inital_chunk () {
-	Chunk* c = new Chunk;
-	c->init();
-	c->init_gl();
+
+static void finalize_generated_chunks () {
+	PROFILE_BEGIN(finalize_generated_chunks);
 	
-	c->pos = 0;
+	int count = 0;
 	
-	chunks.insert({{c->pos}, c});
-	gen_chunk(c);
-	return c;
+	{ // put results in result queue
+		std::unique_lock<std::mutex> lock( worker_threads_results_queue_mutex );
+		
+		while (!worker_threads_results_queue.empty()) {
+			Chunk* chunk = worker_threads_results_queue.front();
+			worker_threads_results_queue.pop();
+			
+			chunk_no_longer_being_processed_by_worker_threads(chunk->pos);
+			
+			chunk->init_gl();
+			chunk->update_whole_chunk_changed();
+			
+			chunks.insert({{chunk->pos}, chunk});
+			
+			++count;
+		}
+	}
+	
+	if (count != 0) PROFILE_END(finalize_generated_chunks, "frame: %3d count: %d", frame_i, count);
 }
 
 //
 static f32			dt;
-static s32			frame_i; // should only be used for debugging
 
 enum fps_mouse_mode_e { DEV_MODE=0, FPS_MODE };
 
@@ -608,11 +678,12 @@ struct Input {
 };
 static Input		inp;
 
-static bool controling_flycam =		false;
+static bool controling_flycam =		true;
+static bool viewing_flycam =		true;
 
 struct Flycam {
-	v3	pos_world =			v3(0, -5, 1);
-	v2	ori_ae =			v2(deg(0), deg(+80)); // azimuth elevation
+	v3	pos_world =			v3(-15, -27, 50);
+	v2	ori_ae =			v2(deg(350), deg(+75)); // azimuth elevation
 	
 	f32	vfov =				deg(70);
 	
@@ -799,6 +870,9 @@ static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffse
 int main (int argc, char** argv) {
 	cstr app_name = "Voxel Game";
 	
+	for (ui i=0; i<max(cpu_threads_count -1, (ui)1); ++i)
+		worker_threads.push_back( std::thread(worker_thread, i) );
+	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
 	
 	if (fps_mouse_mode == DEV_MODE)	stop_mouse_look();
@@ -963,44 +1037,7 @@ int main (int argc, char** argv) {
 	
 	breaking_frames_count = tex_breaking.dim.y / tex_breaking.dim.x;
 	
-	#if 0
-	Texture2D noise_test;
-	auto gen_noise_test = [&] () {
-		iv2 size = CHUNK_DIM.xy();
-		
-		noise_test.alloc_cpu_single_mip(PT_LRGB8, size);
-		
-		dbg_assert(noise_test.get_pixel_size() == 3);
-		u8* dst_pixels = (u8*)noise_test.data.data;
-		auto dst = [&] (s32 x, s32 y) -> u8* {
-			return &dst_pixels[y*size.x*3 + x*3];
-		};
-		
-		iv2 pos;
-		for (pos.y=0; pos.y<size.y; ++pos.y) {
-			for (pos.x=0; pos.x<size.x; ++pos.x) {
-				
-				f32 val = heightmap_perlin2d((v2)pos);
-				heightmap[pos.y][pos.x] = val;
-				
-				val = (val +0.5f) / 8;
-				
-				u32 tmp = (u32)(clamp(val, 0.0f,1.0f) * 255.0f);
-				dst(pos.x,pos.y)[0] = tmp;
-				dst(pos.x,pos.y)[1] = tmp;
-				dst(pos.x,pos.y)[2] = tmp;
-			}
-		}
-		
-		noise_test.upload();
-		
-		gen_chunks();
-	};
-	#endif
-	
 	//
-	static bool viewing_flycam =		false;
-	
 	struct Camera_View {
 		v3	pos_world;
 		v2	ori_ae;
@@ -1008,8 +1045,8 @@ int main (int argc, char** argv) {
 		f32	vfov;
 		f32	hfov;
 		
-		f32 clip_near =		1.0f/256;
-		f32 clip_far =		512;
+		f32 clip_near =		1.0f/32;
+		f32 clip_far =		8192;
 		
 		v2 frust_scale;
 		
@@ -1043,7 +1080,7 @@ int main (int argc, char** argv) {
 		}
 	};
 	
-	#if 0
+	#if 1
 	v3	initial_player_pos_world =		v3(4,32,43);
 	v3	initial_player_vel_world =		0;
 	#else // collision bug test
@@ -1132,11 +1169,9 @@ int main (int argc, char** argv) {
 	load_game();
 	
 	inital_chunk();
-	while (chunks.size() < 32) new_chunk(player.pos_world);
 	
-	bool one_chunk_every_frame = false;
-	bool one_chunk_every_frame_open = false;
-	s32 one_chunk_every_frame_period = 60;
+	flt chunk_drawing_radius =		INF;
+	flt chunk_generation_radius =	200;
 	
 	struct Overlay_Vertex {
 		v3		pos_world;
@@ -1162,6 +1197,8 @@ int main (int argc, char** argv) {
 	bool fixed_dt = 1 || IS_DEBUGGER_PRESENT(); 
 	f32 max_variable_dt = 1.0f / 20; 
 	f32 fixed_dt_dt = 1.0f / 60; 
+	
+	inp.get_non_callback_input(); // get inital mouse pos so that we dont get a invalid mouse delta on the first frame (glfw does not support relative mouse input for some reason)
 	
 	for (frame_i=0;; ++frame_i) {
 		//printf("frame: %d\n", frame_i);
@@ -1194,6 +1231,7 @@ int main (int argc, char** argv) {
 		inp.mouse_look_diff = 0;
 		opt_toggle_open = false;
 		opt_value_edit_flag = false;
+		trigger_regen_chunks = false;
 		
 		glfwPollEvents();
 		
@@ -1219,7 +1257,7 @@ int main (int argc, char** argv) {
 			player.options();
 			
 			option("unloaded_chunks_traversable",	&unloaded_chunks_traversable);
-			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->vbo_needs_update = true;
+			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->needs_remesh = true;
 		}
 		
 		if (glfwWindowShouldClose(wnd)) break;
@@ -1264,34 +1302,80 @@ int main (int argc, char** argv) {
 			cam_to_world_rot = rotate3_Z(view.ori_ae.x) * rotate3_X(view.ori_ae.y);
 		}
 		
-		option("heightmap_perlin2d_octaves", get_heightmap_perlin2d_octaves_count, set_heightmap_perlin2d_octaves_count, &heightmap_perlin2d_octaves_open);
-		if (heightmap_perlin2d_octaves_open) {
-			for (s32 i=0; i<(s32)heightmap_perlin2d_octaves.size(); ++i) {
-				auto& o = heightmap_perlin2d_octaves[i];
+		option("heightmap_noise_octaves", get_heightmap_noise_octaves_count, set_heightmap_noise_octaves_count, &heightmap_noise_octaves_open);
+		if (heightmap_noise_octaves_open) {
+			for (s32 i=0; i<(s32)heightmap_noise_octaves.size(); ++i) {
+				auto& o = heightmap_noise_octaves[i];
 				
-				v2 tmp = v2(o.freq, o.amp);
+				v2 tmp = v2(o.period, o.amp);
 				
 				if (option(prints("  [%2d]", i), &tmp)) trigger_regen_chunks = true;
 				
-				o.freq = tmp.x;	o.amp = tmp.y;
+				o.period = tmp.x;	o.amp = tmp.y;
 			}
 		}
 		
-		if (trigger_regen_chunks) {
-			trigger_regen_chunks = false;
-			for (auto& c : chunks) gen_chunk(c.second);
+		if (option("noise_tree_freq", &noise_tree_freq))	trigger_regen_chunks = true;
+		if (option("noise_tree_amp", &noise_tree_amp))		trigger_regen_chunks = true;
+		
+		if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
+			chunks.clear();
+			inital_chunk();
 		}
+		
 		if (trigger_respawn_player) {
 			trigger_respawn_player = false;
 			respawn_player();
 		}
 		
-		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
-		if (one_chunk_every_frame_open) option("  period", &one_chunk_every_frame_period);
+		option("chunk_drawing_radius", &chunk_drawing_radius);
+		option("chunk_generation_radius", &chunk_generation_radius);
 		
-		if (one_chunk_every_frame && frame_i % one_chunk_every_frame_period == 0 && frame_i != 0) new_chunk(player.pos_world);
+		{ // chunk generation
+			// check all chunk positions within a square of chunk_generation_radius
+			chunk_pos_t start =	get_chunk_from_block_pos( floor(player.pos_world.xy() -chunk_generation_radius) );
+			chunk_pos_t end =	get_chunk_from_block_pos( ceil(player.pos_world.xy() +chunk_generation_radius) );
+			
+			// check their actual distance to determine if they should be generated or not
+			auto chunk_dist_to_player = [&] (chunk_pos_t pos) {
+				bpos2 chunk_origin = pos * CHUNK_DIM.xy();
+				return point_square_nearest_dist(chunk_origin, CHUNK_DIM.xy(), player.pos_world.xy());
+			};
+			auto chunk_is_in_generation_radius = [&] (chunk_pos_t pos) {
+				return chunk_dist_to_player(pos) <= chunk_generation_radius;
+			};
+			
+			std::vector<chunk_pos_t> chunks_to_generate;
+			
+			chunk_pos_t cp;
+			for (cp.x = start.x; cp.x<end.x; ++cp.x) {
+				for (cp.y = start.y; cp.y<end.y; ++cp.y) {
+					if (chunk_is_in_generation_radius(cp) && !query_chunk(cp) && !chunk_being_processed_by_worker_threads(cp)) {
+						// chunk is within chunk_generation_radius and not yet generated
+						chunks_to_generate.push_back(cp);
+					}
+				}
+			}
+			
+			std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
+				[&] (chunk_pos_t l, chunk_pos_t r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
+			);
+			
+			
+			PROFILE_BEGIN(queue_chunk_to_generate);
+			
+			int count = 0;
+			for (auto& cp : chunks_to_generate) {
+				queue_chunk_to_generate(cp);
+				++count;
+			}
+			
+			if (count != 0) PROFILE_END(queue_chunk_to_generate, "frame: %3d queued %d chunks", frame_i, count);
+			
+			finalize_generated_chunks();
+		}
 		
-		overlay_line(prints("chunks:  %4d", (s32)chunks.size()));
+		overlay_line(prints("chunks in ram:   %4d %6d MB (%d KB per chunk) chunk is %dx%dx%d blocks", (s32)chunks.size(), (s32)(sizeof(Chunk)*chunks.size()/1024/1024), (s32)(sizeof(Chunk)/1024), (s32)CHUNK_DIM.x,(s32)CHUNK_DIM.y,(s32)CHUNK_DIM.z));
 		
 		overlay_vbo.clear();
 		
@@ -1756,16 +1840,16 @@ int main (int argc, char** argv) {
 			b->hp_ratio -= 1.0f / 0.3f * dt;
 			
 			if (b->hp_ratio > 0) {
-				
+				chunk->block_only_hp_changed(highlighted_block_pos);
 			} else {
 				
 				b->hp_ratio = 0;
 				b->type = BT_AIR;
 				
+				chunk->block_changed(highlighted_block_pos);
+				
 				dbg_play_sound();
 			}
-			
-			chunk->update_block_changed(highlighted_block_pos);
 		}
 		{ // block placing
 			bool block_place_is_inside_player = false;
@@ -1790,7 +1874,7 @@ int main (int argc, char** argv) {
 					
 					dbg_play_sound();
 					
-					chunk->update_block_changed(block_place_pos);
+					chunk->block_changed(block_place_pos);
 					
 					raycast_highlighted_block(); // make highlighted_block seem more responsive
 				}
@@ -1839,23 +1923,82 @@ int main (int argc, char** argv) {
 			shad_main->set_unif("atlas_textures_count", atlas_textures_count);
 			shad_main->set_unif("breaking_frames_count", breaking_frames_count);
 			
-			// update_block_brighness first because generate_blocks_mesh accesses surrounding chunks for blocks on the edge
-			for (auto& chunk_hash_pair : chunks) {
-				auto& chunk = chunk_hash_pair.second;
-				
-				if (chunk->vbo_needs_update) chunk->update_block_brighness();
-			}
+			s32 count = 0;
 			
-			// generate_blocks_mesh and draw
+			PROFILE_BEGIN(update_block_brighness);
+			// update_block_brighness first because remesh accesses surrounding chunks for blocks on the edge
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				if (chunk->vbo_needs_update) chunk->generate_blocks_mesh();
+				if (chunk->needs_block_brighness_update) {
+					chunk->update_block_brighness();
+					++count;
+				}
+				chunk->needs_block_brighness_update = false;
+			}
+			if (count != 0) PROFILE_END(update_block_brighness, "frame: %3d count: %d", frame_i, count);
+			
+			#if 0
+			count = 0;
+			
+			PROFILE_BEGIN(remesh_upload_draw);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
 				
-				chunk->vbo_needs_update = false;
+				if (chunk->needs_remesh) {
+					chunk->remesh();
+					chunk->vbo.upload();
+					++count;
+				}
+				chunk->needs_remesh = false;
 				
 				chunk->vbo.draw_entire(shad_main);
 			}
+			if (count != 0) PROFILE_END(remesh_upload_draw, "frame: %3d count: %d", frame_i, count);
+			#else
+			count = 0;
+			
+			PROFILE_BEGIN(remesh);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				if (chunk->needs_remesh) {
+					chunk->remesh();
+					++count;
+				}
+			}
+			if (count != 0) PROFILE_END(remesh, "frame: %3d count: %d", frame_i, count);
+			
+			count = 0;
+			
+			PROFILE_BEGIN(upload);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				if (chunk->needs_remesh) {
+					chunk->vbo.upload();
+					++count;
+				}
+				chunk->needs_remesh = false;
+			}
+			if (count != 0) PROFILE_END(upload, "frame: %3d count: %d", frame_i, count);
+			
+			count = 0;
+			
+			PROFILE_BEGIN(draw);
+			// remesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				chunk->vbo.draw_entire(shad_main);
+				
+				++count;
+			}
+			//if (count != 0) PROFILE_END(draw, "frame: %3d count: %d", frame_i, count);
+			#endif
 		}
 		
 		if (shad_overlay->valid()) {
@@ -2060,48 +2203,12 @@ int main (int argc, char** argv) {
 				glEnable(GL_DEPTH_TEST);
 				glDisable(GL_BLEND);
 			};
-			#if 0
-			auto draw_overlay_texCube = [&] (Texture* tex, v2 pos01, v2 size_px) {
-				if (!shad_overlay_cubemap->valid()) {
-					dbg_assert(false);
-					return;
-				}
-				
-				v2 size_screen = size_px;
-				v2 size_clip = size_screen / ((v2)inp.wnd_dim / 2);
-				
-				// pos is the lower left corner of the quad
-				v2 pos_screeen = ((v2)inp.wnd_dim -size_screen) * pos01; // [0,1] => [touches ll corner of screen, touches ur corner of screen]
-				
-				v2 pos_clip = (pos_screeen / (v2)inp.wnd_dim) * 2 -1;
-				
-				glEnable(GL_BLEND);
-				glDisable(GL_DEPTH_TEST);
-				glDisable(GL_CULL_FACE);
-				
-				shad_overlay_cubemap->bind();
-				shad_overlay_cubemap->set_unif("pos_clip", pos_clip);
-				shad_overlay_cubemap->set_unif("size_clip", size_clip);
-				bind_texture_unit(0, tex);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-				
-				glEnable(GL_CULL_FACE);
-				glEnable(GL_DEPTH_TEST);
-				glDisable(GL_BLEND);
-			};
-			#endif
 			
-			if (0 && shad_overlay_tex->valid()) {
-				draw_overlay_tex2d(&tex_block_atlas, LR, 8);
-				draw_overlay_tex2d(&tex_breaking, UL, 8);
+			if (shad_overlay_tex->valid()) {
+				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
+				//draw_overlay_tex2d(&tex_breaking, UL, 8);
 				//draw_overlay_tex2d(&noise_test, LL, 8);
 			}
-			#if 0
-			if (0 && shad_overlay_cubemap->valid()) {
-				//draw_overlay_texCube(tex_test_cubemap1, UR, (v2)min(inp.wnd_dim.x, inp.wnd_dim.y) / 2);
-				//draw_overlay_texCube(tex_test_cubemap2, UL, (v2)min(inp.wnd_dim.x, inp.wnd_dim.y) / 2);
-			}
-			#endif
 			
 		}
 		
@@ -2132,6 +2239,8 @@ int main (int argc, char** argv) {
 			avg_dt = lerp(avg_dt, dt, avg_dt_alpha);
 		}
 	}
+	
+	for (auto& t : worker_threads) t.detach();
 	
 	platform_terminate();
 	

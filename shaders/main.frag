@@ -92,6 +92,6 @@ void main () {
 	//col = vec4(1);
 	col *= vs_brightness;
 	
-	FRAG_COL( col );
-	//FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
+	//FRAG_COL( col );
+	FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }

@@ -15,3 +15,12 @@ static bool cylinder_cube_intersect (fv3 cyl_origin, f32 cyl_radius, f32 cyl_hei
 	
 	return circle_square_intersect(cyl_origin.xy(), cyl_radius);
 }
+
+static f32 point_square_nearest_dist (fv2 square_pos, fv2 square_size, fv2 point) { // nearest distance from point to square (square covers [square_pos, square_pos +square_size] on each axis)
+	
+	fv2 pos_rel = point -square_pos;
+	
+	fv2 nearest_pos_on_square = clamp(pos_rel, 0,square_size);
+	
+	return length(nearest_pos_on_square -pos_rel);
+}

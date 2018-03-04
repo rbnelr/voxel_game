@@ -2,21 +2,19 @@
 static constexpr bpos CHUNK_DIM = bpos(32,32,64);
 
 struct Chunk;
-static Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 static Chunk* query_chunk (chunk_pos_t pos);
+static Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 
 struct Chunk {
 	chunk_pos_t pos;
 	
-	bool vbo_needs_update = false;
+	bool needs_remesh;
+	bool needs_block_brighness_update;
 	
 	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
 	
 	Vbo		vbo;
 	
-	void init () {
-		
-	}
 	void init_gl () {
 		vbo.init(&chunk_vbo_vert_layout);
 	}
@@ -54,7 +52,7 @@ struct Chunk {
 		return bpos(pos * CHUNK_DIM.xy(), 0);
 	}
 	
-	void generate_blocks_mesh () {
+	void remesh () {
 		bpos chunk_origin = chunk_origin_block_pos_world();
 		
 		vbo.vertecies.clear();
@@ -220,27 +218,14 @@ struct Chunk {
 			}
 		}
 		
-		vbo.upload();
 	}
 	
-	void update_chunk_changed () {
-		vbo_needs_update = true;
-		
-		// update surrounding chunks to update lighting properly
-		
-		Chunk* chunk;
-		
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1,-1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t( 0,-1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1,-1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1, 0)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1,+1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t( 0,+1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1,+1)))) chunk->vbo_needs_update = true;
-		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1, 0)))) chunk->vbo_needs_update = true;
+	void block_only_hp_changed (bpos block_pos_world) { // only breaking animation of block changed -> do not need to update block brightness -> do not need to remesh surrounding chunks (only this chunk needs remesh)
+		needs_remesh = true;
 	}
-	void update_block_changed (bpos block_pos_world) {
-		vbo_needs_update = true;
+	void block_changed (bpos block_pos_world) { // block was placed or broken -> need to update our block brightness -> need to remesh surrounding chunks
+		needs_remesh = true;
+		needs_block_brighness_update = true;
 		
 		Chunk* chunk;
 		
@@ -250,24 +235,49 @@ struct Chunk {
 		
 		// update surrounding chunks if the changed block is touching them to update lighting properly
 		if (chunk_edge.x != 0						&& (chunk = query_chunk(this->pos +chunk_pos_t(chunk_edge.x,0))))
-			chunk->vbo_needs_update = true;
+			chunk->needs_remesh = true;
 		if (chunk_edge.y != 0						&& (chunk = query_chunk(this->pos +chunk_pos_t(0,chunk_edge.y))))
-			chunk->vbo_needs_update = true;
+			chunk->needs_remesh = true;
 		if (chunk_edge.x != 0 && chunk_edge.y != 0	&& (chunk = query_chunk(this->pos +chunk_edge)))
-			chunk->vbo_needs_update = true;
+			chunk->needs_remesh = true;
 	}
 	
+	void update_whole_chunk_changed () { // whole chunks could have changed -> update our block brightness -> remesh all surrounding chunks
+		needs_remesh = true;
+		needs_block_brighness_update = true;
+		
+		// update surrounding chunks to update lighting properly
+		
+		Chunk* chunk;
+		
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1,-1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t( 0,-1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1,-1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1, 0)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(+1,+1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t( 0,+1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1,+1)))) chunk->needs_remesh = true;
+		if ((chunk = query_chunk(this->pos +chunk_pos_t(-1, 0)))) chunk->needs_remesh = true;
+	}
 };
 
-static chunk_pos_t int_div_by_pot_floor (bpos pos_world, bpos* bpos_in_chunk) {
+static chunk_pos_t get_chunk_from_block_pos (bpos2 pos_world) {
 	
 	chunk_pos_t chunk_pos;
 	chunk_pos.x = pos_world.x >> GET_CONST_POT(CHUNK_DIM.x); // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
 	chunk_pos.y = pos_world.y >> GET_CONST_POT(CHUNK_DIM.y);
 	
-	*bpos_in_chunk = pos_world;
-	bpos_in_chunk->x = pos_world.x & ((1 << GET_CONST_POT(CHUNK_DIM.x)) -1);
-	bpos_in_chunk->y = pos_world.y & ((1 << GET_CONST_POT(CHUNK_DIM.y)) -1);
+	return chunk_pos;
+}
+static chunk_pos_t get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr) {
+	
+	chunk_pos_t chunk_pos = get_chunk_from_block_pos(pos_world.xy());
+	
+	if (bpos_in_chunk) {
+		bpos_in_chunk->x = pos_world.x & ((1 << GET_CONST_POT(CHUNK_DIM.x)) -1);
+		bpos_in_chunk->y = pos_world.y & ((1 << GET_CONST_POT(CHUNK_DIM.y)) -1);
+		bpos_in_chunk->z = pos_world.z;
+	}
 	
 	return chunk_pos;
 }

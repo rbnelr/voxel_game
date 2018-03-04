@@ -21,6 +21,8 @@ DONE:
 TODO
 -FEATURES:
  
+ add trees
+ 
  improve block AO
  
  improve performance on notebook
