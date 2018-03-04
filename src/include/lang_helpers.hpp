@@ -88,6 +88,7 @@ static constexpr bool _safe_cast (T x);
 
 template<> constexpr bool _safe_cast<u32, u64> (u64 x) { return x <= 0xffffffffull; }
 template<> constexpr bool _safe_cast<s32, u64> (u64 x) { return x <= 0x7fffffffull; }
+template<> constexpr bool _safe_cast<u64, s64> (s64 x) { return x >= 0; }
 
 #define safe_cast(cast_t, val) _safe_cast<cast_t>(val)
 

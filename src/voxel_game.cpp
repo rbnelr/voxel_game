@@ -10,6 +10,35 @@
 #include "math.hpp"
 #include "bit_twiddling.hpp"
 #include "vector/vector.hpp"
+#include "intersection_test.hpp"
+#include "noise.hpp"
+
+#define _USING_V110_SDK71_ 1
+#include "glad.c"
+#include "GLFW/glfw3.h"
+
+#include "Mmsystem.h"
+static void dbg_play_sound () {
+	PlaySound(TEXT("recycle.wav"), NULL, SND_FILENAME|SND_ASYNC);
+}
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#define STBI_ONLY_BMP	1
+#define STBI_ONLY_PNG	1
+#define STBI_ONLY_TGA	1
+//#define STBI_ONLY_JPEG	1
+//#define STBI_ONLY_HDR	1
+
+#include "stb_image.h"
+
+#define STB_RECT_PACK_IMPLEMENTATION
+#define STBRP_STATIC
+#include "stb_rect_pack.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_STATIC
+#include "stb_truetype.h"
 
 typedef f32		flt;
 
@@ -26,6 +55,43 @@ typedef fhm		hm;
 
 typedef u8v3	lrgb8;
 typedef u8v4	lrgba8;
+
+#include "platform.hpp"
+
+static void logf (cstr format, ...) {
+	std::string str;
+	
+	va_list vl;
+	va_start(vl, format);
+	
+	_prints(&str, format, vl);
+	
+	va_end(vl);
+	
+	str.push_back('\n');
+	printf(str.c_str());
+}
+
+static void logf_warning (cstr format, ...) {
+	std::string str;
+	
+	va_list vl;
+	va_start(vl, format);
+	
+	_prints(&str, format, vl);
+	
+	va_end(vl);
+	
+	printf(ANSI_COLOUR_CODE_YELLOW "%s\n" ANSI_COLOUR_CODE_NC, str.c_str());
+}
+
+namespace random {
+	
+	f32 flt (f32 l=0, f32 h=1) {
+		return (f32)rand() / (f32)RAND_MAX;
+	}
+	
+}
 
 static lrgb8 to_lrgb8 (v3 lrgbf) {
 	lrgbf = lrgbf * 255.0f +0.5f;
@@ -161,70 +227,6 @@ const v3 cube_faces_inward[6*6] = {
 
 #undef QUAD
 
-#define _USING_V110_SDK71_ 1
-#include "glad.c"
-#include "GLFW/glfw3.h"
-
-#include "platform.hpp"
-
-#include "Mmsystem.h"
-static void dbg_play_sound () {
-	PlaySound(TEXT("recycle.wav"), NULL, SND_FILENAME|SND_ASYNC);
-}
-
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_STATIC
-#define STBI_ONLY_BMP	1
-#define STBI_ONLY_PNG	1
-#define STBI_ONLY_TGA	1
-//#define STBI_ONLY_JPEG	1
-//#define STBI_ONLY_HDR	1
-
-#include "stb_image.h"
-
-#define STB_RECT_PACK_IMPLEMENTATION
-#define STBRP_STATIC
-#include "stb_rect_pack.h"
-
-#define STB_TRUETYPE_IMPLEMENTATION
-#define STBTT_STATIC
-#include "stb_truetype.h"
-
-static void logf (cstr format, ...) {
-	std::string str;
-	
-	va_list vl;
-	va_start(vl, format);
-	
-	_prints(&str, format, vl);
-	
-	va_end(vl);
-	
-	str.push_back('\n');
-	printf(str.c_str());
-}
-
-static void logf_warning (cstr format, ...) {
-	std::string str;
-	
-	va_list vl;
-	va_start(vl, format);
-	
-	_prints(&str, format, vl);
-	
-	va_end(vl);
-	
-	printf(ANSI_COLOUR_CODE_YELLOW "%s\n" ANSI_COLOUR_CODE_NC, str.c_str());
-}
-
-namespace random {
-	
-	f32 flt (f32 l=0, f32 h=1) {
-		return (f32)rand() / (f32)RAND_MAX;
-	}
-	
-}
-
 static v2			mouse; // for quick debugging
 
 //
@@ -350,11 +352,19 @@ static Shader* new_shader (strcr v, strcr f, std::initializer_list<Uniform> u, s
 }
 
 //
+typedef s64		bpos_t;
+typedef s64v2	bpos2;
+typedef s64v3	bpos;
+
+typedef s64v2	chunk_pos_t;
+
+//
 // TODO: document
 struct Chunk_Vbo_Vertex {
 	v3		pos_world;
 	v4		uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
 	flt		hp_ratio; // [0,1]
+	flt		brightness;
 	lrgba8	dbg_tint;
 };
 
@@ -362,74 +372,12 @@ static Vertex_Layout chunk_vbo_vert_layout = {
 	{ "pos_world",	T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
 	{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
 	{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
+	{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
 	{ "dbg_tint",	T_U8V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
 };
 
-static s32 texture_res = 16;
-
-static constexpr s32 ATLAS_BLOCK_FACES_COUNT = 3;
-
-static constexpr s32 UVZW_BLOCK_FACE_SIDE =		0;
-static constexpr s32 UVZW_BLOCK_FACE_TOP =		1;
-static constexpr s32 UVZW_BLOCK_FACE_BOTTOM =	2;
-
-enum block_type : u8 {
-	BT_AIR		=0,
-	BT_EARTH	,
-	BT_GRASS	,
-	
-	BLOCK_TYPES_COUNT,
-	
-	BT_OUT_OF_BOUNDS	=0xfe,
-	BT_NO_CHUNK			=0xff,
-};
-static bool bt_is_traversable (block_type t) {	return (t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
-static bool bt_is_breakable (block_type t) {	return !(t == BT_AIR || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
-
-static cstr block_texture_name[BLOCK_TYPES_COUNT] = {
-	/* BT_AIR	*/	"missing.png",
-	/* BT_EARTH	*/	"earth.png",
-	/* BT_GRASS	*/	"grass.png",
-};
-static s32 BLOCK_TEXTURE_INDEX_MISSING = 0;
-
-static s32 atlas_textures_count = 3;
-
-static s32 get_block_texture_index_from_block_type (block_type bt) {
-	return bt;
-}
-
-struct Block {
-	block_type	type;
-	f32			hp_ratio;
-	lrgba8		dbg_tint;
-};
-
-static constexpr Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, 1, 255 };
-static constexpr Block B_NO_CHUNK = { BT_NO_CHUNK, 1, 255 };
-
-#undef BF_BOTTOM
-#undef BF_TOP
-
-enum block_face_e : s32 {
-	BF_NEG_X =		0,
-	BF_POS_X =		1,
-	BF_NEG_Y =		2,
-	BF_POS_Y =		3,
-	BF_BOTTOM =		4,
-	BF_TOP =		5,
-};
-DEFINE_ENUM_ITER_OPS(block_face_e, s32)
-static constexpr block_face_e BF_NEG_Z = (block_face_e)4;
-static constexpr block_face_e BF_POS_Z = (block_face_e)5;
-
-#include "noise.hpp"
-
-typedef s64		bpos_t;
-typedef s64v2	bpos2;
-typedef s64v3	bpos;
-
-typedef s64v2	chunk_pos_t;
+#include "blocks.hpp"
+#include "chunks.hpp"
 
 struct s64v2_hashmap {
 	chunk_pos_t v;
@@ -449,154 +397,18 @@ namespace std {
 	};
 }
 
-static constexpr bpos CHUNK_DIM = bpos(32,32,64);
-
-struct Chunk {
-	chunk_pos_t pos;
-	
-	bool		vbo_needs_update = false;
-	
-	Block	data[CHUNK_DIM.z][CHUNK_DIM.y][CHUNK_DIM.x];
-	
-	Vbo		vbo;
-	
-	void init () {
-		
-	}
-	void init_gl () {
-		vbo.init(&chunk_vbo_vert_layout);
-	}
-	
-	Block* get_block (bpos pos) {
-		return &data[pos.z][pos.y][pos.x];
-	}
-	
-	void generate_blocks_mesh () {
-		if (!vbo_needs_update) return;
-		vbo_needs_update = false;
-		
-		bpos chunk_origin = bpos(pos * CHUNK_DIM.xy(), 0);
-		
-		vbo.vertecies.clear();
-		
-		auto cube = [&] (bpos const& pos_world, bpos const& pos_chunk, Block const* b) {
-			
-			f32 XL = (f32)pos_world.x;
-			f32 YL = (f32)pos_world.y;
-			f32 ZL = (f32)pos_world.z;
-			f32 XH = (f32)(pos_world.x +1);
-			f32 YH = (f32)(pos_world.y +1);
-			f32 ZH = (f32)(pos_world.z +1);
-			
-			f32 w = get_block_texture_index_from_block_type(b->type);
-			
-			if (pos_chunk.x == CHUNK_DIM.x-1	|| get_block(pos_chunk +bpos(+1,0,0))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-			}
-			if (pos_chunk.x == 0				|| get_block(pos_chunk +bpos(-1,0,0))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XL,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-			}
-			if (pos_chunk.y == CHUNK_DIM.y-1	|| get_block(pos_chunk +bpos(0,+1,0))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XL,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-			}
-			if (pos_chunk.y == 0				|| get_block(pos_chunk +bpos(0,-1,0))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XH,YL,ZL), v4(1,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,0, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZH), v4(1,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,1, UVZW_BLOCK_FACE_SIDE,w), b->hp_ratio, b->dbg_tint };
-			}
-			if (pos_chunk.z == CHUNK_DIM.z-1	|| get_block(pos_chunk +bpos(0,0,+1))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XH,YL,ZH), v4(1,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZH), v4(0,0, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YH,ZH), v4(1,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZH), v4(0,1, UVZW_BLOCK_FACE_TOP,w), b->hp_ratio, b->dbg_tint };
-			}
-			if (pos_chunk.z == 0				|| get_block(pos_chunk +bpos(0,0,-1))->type == BT_AIR) {
-				Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)&*vector_append(&vbo.vertecies, sizeof(Chunk_Vbo_Vertex)*6);
-				
-				*out++ = { v3(XH,YH,ZL), v4(1,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YH,ZL), v4(0,0, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XH,YL,ZL), v4(1,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-				*out++ = { v3(XL,YL,ZL), v4(0,1, UVZW_BLOCK_FACE_BOTTOM,w), b->hp_ratio, b->dbg_tint };
-			}
-		};
-		
-		{
-			bpos i;
-			for (i.z=0; i.z<CHUNK_DIM.z; ++i.z) {
-				for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
-					for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
-						auto* block = get_block(i);
-						
-						if (block->type != BT_AIR) {
-							
-							cube(i +chunk_origin, i, block);
-							
-						}
-					}
-				}
-			}
-		}
-		
-		vbo.upload();
-	}
-	
-	void vbo_update_single_block (bpos pos) {
-		vbo_needs_update = true;
-	}
-	
-};
-
-static chunk_pos_t int_div_by_pot_floor (bpos pos_world, bpos* bpos_in_chunk) {
-	
-	chunk_pos_t chunk_pos;
-	chunk_pos.x = pos_world.x >> GET_CONST_POT(CHUNK_DIM.x); // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
-	chunk_pos.y = pos_world.y >> GET_CONST_POT(CHUNK_DIM.y);
-	
-	*bpos_in_chunk = pos_world;
-	bpos_in_chunk->x = pos_world.x & ((1 << GET_CONST_POT(CHUNK_DIM.x)) -1);
-	bpos_in_chunk->y = pos_world.y & ((1 << GET_CONST_POT(CHUNK_DIM.y)) -1);
-	
-	return chunk_pos;
-}
-
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
 static Chunk* _prev_query_block_chunk = nullptr; // to avoid hash map lookup most of the time, since most query_block's are going to end up in the same chunk
 
-static Block* query_block (bpos p, Chunk** out_chunk=nullptr) {
+static Chunk* query_chunk (chunk_pos_t pos) {
+	auto k = chunks.find({pos});
+	if (k == chunks.end()) return nullptr;
+	
+	return k->second;
+}
+static Block* query_block (bpos p, Chunk** out_chunk) {
 	if (out_chunk) *out_chunk = nullptr;
 	
 	if (p.z < 0 || p.z >= CHUNK_DIM.z) return (Block*)&B_OUT_OF_BOUNDS;
@@ -609,12 +421,10 @@ static Block* query_block (bpos p, Chunk** out_chunk=nullptr) {
 		chunk = _prev_query_block_chunk;
 	} else {
 		
-		auto k = chunks.find({chunk_p});
-		if (k == chunks.end()) return (Block*)&B_NO_CHUNK;
-		
-		chunk = k->second;
-		
+		chunk = query_chunk(chunk_p);
 		_prev_query_block_chunk = chunk;
+		
+		if (!chunk) return (Block*)&B_NO_CHUNK;
 	}
 	
 	if (out_chunk) *out_chunk = chunk;
@@ -635,16 +445,11 @@ static s32 get_heightmap_perlin2d_octaves_count () {			return (s32)heightmap_per
 static void set_heightmap_perlin2d_octaves_count (s32 count) {	heightmap_perlin2d_octaves.resize(count); }
 static bool heightmap_perlin2d_octaves_open = true;
 
-#define _2D_TEST 0
-
 f32 heightmap_perlin2d (v2 v) {
 	using namespace perlin_noise_n;
 	
 	v = abs(v);
 	
-	#if _2D_TEST
-	return perlin_octave(v, 0.2f) > 0 ? 2 : 1;
-	#else
 	//v += v2(1,-1)*mouse * 20;
 	
 	//f32 fre = lerp(0.33f, 3.0f, mouse.x);
@@ -661,7 +466,6 @@ f32 heightmap_perlin2d (v2 v) {
 	//printf(">>>>>>>>> %.3f %.3f\n", fre, amp);
 	
 	return tot +32;
-	#endif
 }
 
 void gen_chunk (Chunk* chunk) {
@@ -688,21 +492,17 @@ void gen_chunk (Chunk* chunk) {
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
 				auto* b = chunk->get_block(i);
-				if (i.z != highest_block) {
-					b->type = BT_EARTH;
-				} else {
+				if (i.z == highest_block) {
 					b->type = BT_GRASS;
+				} else {
+					b->type = BT_EARTH;
 				}
-				#if _2D_TEST
-				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 3)), 255);
-				#else
 				b->dbg_tint = lrgba8(spectrum_gradient(map(height +0.5f, 0, 50)), 255);
-				#endif
 			}
 		}
 	}
 	
-	chunk->vbo_needs_update = true;
+	chunk->update_chunk_changed();
 }
 
 Chunk* new_chunk (v3 cam_pos_world) {
@@ -719,7 +519,7 @@ Chunk* new_chunk (v3 cam_pos_world) {
 		auto& c = hash_pair.second;
 		
 		auto check_chunk_spot = [&] (chunk_pos_t pos) {
-			if (chunks.find({pos}) != chunks.end()) return;
+			if (query_chunk(pos)) return;
 			// free spot found
 			v2 chunk_center = (v2)(pos * CHUNK_DIM.xy()) +(v2)CHUNK_DIM.xy() / 2;
 			
@@ -763,7 +563,7 @@ Chunk* inital_chunk () {
 static f32			dt;
 static s32			frame_i; // should only be used for debugging
 
-enum fps_mouse_mode_e { GUI_MODE=0, FPS_MODE };
+enum fps_mouse_mode_e { DEV_MODE=0, FPS_MODE };
 
 static fps_mouse_mode_e fps_mouse_mode =	FPS_MODE;
 static bool mouselook_enabled =				fps_mouse_mode == FPS_MODE;
@@ -798,6 +598,8 @@ struct Input {
 			
 			mouse = v2(x,y) / (v2)wnd_dim;
 		}
+		
+		move_dir = clamp(move_dir, -1,+1);
 	}
 	
 	v2 bottom_up_mcursor_pos () {
@@ -841,11 +643,12 @@ static f32 jump_impulse_from_jump_height (f32 jump_height, f32 grav_accel_down) 
 	return sqrt( 2.0f * jump_height * grav_accel_down );
 }
 
+//
 static bool trigger_respawn_player =	true;
 static bool trigger_regen_chunks =		false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
-static bool trigger_jump =				false;
+static bool jump_held =					false;
 static bool hold_break_block =			false;
 static bool trigger_place_block =		false;
 
@@ -873,7 +676,7 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	}
 	if (key == GLFW_KEY_F2) {
 		if (went_down) fps_mouse_mode = (fps_mouse_mode_e)!fps_mouse_mode;
-		if (fps_mouse_mode == GUI_MODE)	stop_mouse_look();
+		if (fps_mouse_mode == DEV_MODE)	stop_mouse_look();
 		else							start_mouse_look();
 		mouselook_enabled = fps_mouse_mode == FPS_MODE;
 		return;
@@ -943,7 +746,7 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 				
 				case GLFW_KEY_LEFT_CONTROL:	inp.move_dir.z -= went_down ? +1 : -1;		break;
 				case GLFW_KEY_SPACE:		inp.move_dir.z += went_down ? +1 : -1;
-											if (went_down) trigger_jump = true;			break;
+											jump_held = went_down;						break;
 				
 				case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
 				
@@ -964,7 +767,7 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 	
 	switch (button) {
 		case GLFW_MOUSE_BUTTON_RIGHT:
-			if (fps_mouse_mode == GUI_MODE) {
+			if (fps_mouse_mode == DEV_MODE) {
 				if (went_down) {
 					start_mouse_look();
 					mouselook_enabled = true;
@@ -998,7 +801,7 @@ int main (int argc, char** argv) {
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
 	
-	if (fps_mouse_mode == GUI_MODE)	stop_mouse_look();
+	if (fps_mouse_mode == DEV_MODE)	stop_mouse_look();
 	else							start_mouse_look();
 	
 	//
@@ -1240,33 +1043,23 @@ int main (int argc, char** argv) {
 		}
 	};
 	
+	#if 0
+	v3	initial_player_pos_world =		v3(4,32,43);
+	v3	initial_player_vel_world =		0;
+	#else // collision bug test
+	// triggers bug with  fixed dt 1.0f / 60  on frame_i == 6 block: 0 31 41
+	v3	initial_player_pos_world =		v3(2, 32, 42.08f);
+	v3	initial_player_vel_world =		v3(-8, -2, 0);
+	#endif
+	
 	struct Player {
-		#if _2D_TEST
-		v3	pos_world =		v3(4,32,3);
-		//v3	pos_world =		v3(12,32,3);
-		//v3	pos_world =		v3(5,32,3);
-		
-		v3	vel_world =		0;
-		
-		// case that triggered nan because of normalize() bug in collision response
-		//v3	pos_world =		v3(4,2,3);
-		//v3	vel_world =		v3(-10,+10,0);
-		
-		// case that triggered undetected collision because we were not raycasting against two blocks i missed when designing the algo
-		//v3	pos_world =		v3(v2(3, 3) +normalize(v2(3.283f, 2.718f) -v2(3, 3)) * (0.4f +0.000001f), 3);
-		//v3	vel_world =		v3(-0.231f, -0.191f, 0);
-		
-		//v3	pos_world =		v3(2.4001f, 2.599f, 3);
-		//v3	vel_world =		v3(-0.1f, 0.1f, 0);
-		#else
-		v3	pos_world =		v3(4,32,43);
-		v3	vel_world =		0;
-		#endif
+		v3	pos_world;
+		v3	vel_world;
 		
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
 		f32	vfov =			deg(80);
 		
-		bool third_person = false;
+		bool third_person = true;
 		
 		f32	eye_height =	1.65f;
 		v3	third_person_camera_offset_cam =		v3(0.5f, -0.4f, 3);
@@ -1284,7 +1077,7 @@ int main (int argc, char** argv) {
 		f32 wall_bounciness =			0.55f;
 		f32 wall_min_bounce_speed =		8;
 		
-		f32	jumping_up_impulse = jump_impulse_from_jump_height(1.3f, grav_accel_down);
+		f32	jumping_up_impulse = jump_impulse_from_jump_height(1.2f, grav_accel_down);
 		
 		bool opt_open = true;
 		void options () {
@@ -1318,6 +1111,12 @@ int main (int argc, char** argv) {
 		}
 	};
 	Player player;
+	
+	auto respawn_player = [&] () {
+		player.pos_world = initial_player_pos_world;
+		player.vel_world = initial_player_vel_world;
+	};
+	respawn_player();
 	
 	bool draw_debug_overlay = false;
 	
@@ -1360,11 +1159,12 @@ int main (int argc, char** argv) {
 	f32 avg_dt_alpha = 0.025f;
 	dt = 0;
 	
-	bool fixed_dt = IS_DEBUGGER_PRESENT(); 
+	bool fixed_dt = 1 || IS_DEBUGGER_PRESENT(); 
 	f32 max_variable_dt = 1.0f / 20; 
 	f32 fixed_dt_dt = 1.0f / 60; 
 	
 	for (frame_i=0;; ++frame_i) {
+		//printf("frame: %d\n", frame_i);
 		
 		if (frame_i == 0) { // Timestep
 			dbg_assert(dt == 0);
@@ -1392,7 +1192,6 @@ int main (int argc, char** argv) {
 		}
 		
 		inp.mouse_look_diff = 0;
-		trigger_jump = false;
 		opt_toggle_open = false;
 		opt_value_edit_flag = false;
 		
@@ -1404,14 +1203,24 @@ int main (int argc, char** argv) {
 		
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
-		option("fixed_dt",			&fixed_dt);
-		option("max_variable_dt",	&max_variable_dt);
-		option("fixed_dt_dt",		&fixed_dt_dt);
-		
-		option("viewing_flycam", &viewing_flycam);
-		option("controling_flycam", &controling_flycam);
-		flycam.options();
-		player.options();
+		{ // various options
+			option("fixed_dt",			&fixed_dt);
+			option("max_variable_dt",	&max_variable_dt);
+			option("fixed_dt_dt",		&fixed_dt_dt);
+			
+			option("viewing_flycam",	&viewing_flycam);
+			option("controling_flycam",	&controling_flycam);
+			
+			flycam.options();
+			
+			option("initial_player_pos_world",		&initial_player_pos_world);
+			option("initial_player_vel_world",		&initial_player_vel_world);
+			
+			player.options();
+			
+			option("unloaded_chunks_traversable",	&unloaded_chunks_traversable);
+			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->vbo_needs_update = true;
+		}
 		
 		if (glfwWindowShouldClose(wnd)) break;
 		
@@ -1474,7 +1283,7 @@ int main (int argc, char** argv) {
 		}
 		if (trigger_respawn_player) {
 			trigger_respawn_player = false;
-			player.pos_world = Player().pos_world;
+			respawn_player();
 		}
 		
 		option("one_chunk_every_frame", &one_chunk_every_frame, &one_chunk_every_frame_open);
@@ -1486,7 +1295,7 @@ int main (int argc, char** argv) {
 		
 		overlay_vbo.clear();
 		
-		if (controling_flycam) { // view/player position
+		if (controling_flycam) { // camera view position
 			f32 cam_speed_forw = flycam.speed;
 			if (inp.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
 			
@@ -1496,7 +1305,9 @@ int main (int argc, char** argv) {
 			flycam.pos_world += (cam_to_world_rot * cam_vel_cam) * dt;
 			
 			//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
-		} else {
+		}
+		
+		{ // player position (collision and movement dynamics)
 			constexpr f32 COLLISION_SEPERATION_EPSILON = 0.001f;
 			
 			v3 pos_world = player.pos_world;
@@ -1507,29 +1318,9 @@ int main (int argc, char** argv) {
 			bool player_on_ground;
 			
 			auto check_blocks_around_player = [&] () {
-				auto circle_square_intersect = [] (v2 circ_origin, f32 circ_radius) { // intersection test between circle and square of edge length 1
-					// square goes from 0-1 on each axis (circ_origin pos is relative to cube)
-					
-					v2 nearest_pos_on_square = clamp( circ_origin, 0,1 );
-					
-					return length_sqr(nearest_pos_on_square -circ_origin) < circ_radius*circ_radius;
-				};
-				auto cylinder_cube_intersect = [&] (v3 cyl_origin, f32 cyl_radius, f32 cyl_height) { // intersection test between cylinder and cube of edge length 1
-					// cube goes from 0-1 on each axis (cyl_origin pos is relative to cube)
-					// cylinder origin is at the center of the circle at the base of the cylinder (-z circle)
-					
-					if (cyl_origin.z >= 1) return false; // cylinder above cube
-					if (cyl_origin.z <= -cyl_height) return false; // cylinder below cube
-					
-					return circle_square_intersect(cyl_origin.xy(), cyl_radius);
-				};
-				
-				f32 player_r = player.collision_r;
-				f32 player_h = player.collision_h;
-				
 				{ // for all blocks we could be touching
-					bpos start =	(bpos)floor(pos_world -v3(player_r,player_r,0));
-					bpos end =		(bpos)ceil(pos_world +v3(player_r,player_r,player_h));
+					bpos start =	(bpos)floor(pos_world -v3(player.collision_r,player.collision_r,0));
+					bpos end =		(bpos)ceil(pos_world +v3(player.collision_r,player.collision_r,player.collision_h));
 					
 					bool any_intersecting = false;
 					
@@ -1541,11 +1332,7 @@ int main (int argc, char** argv) {
 								auto* b = query_block(bp);
 								bool block_solid = !bt_is_traversable(b->type);
 								
-								bool intersecting = false;
-								
-								if (block_solid) {
-									intersecting = cylinder_cube_intersect(pos_world -(v3)bp, player_r,player_h);
-								}
+								bool intersecting = cylinder_cube_intersect(pos_world -(v3)bp, player.collision_r,player.collision_h);
 								
 								if (0) {
 									lrgba8 col;
@@ -1566,7 +1353,7 @@ int main (int argc, char** argv) {
 									*out++ = { (v3)bp +v3( 0,+1,+1.01f), col };
 								}
 								
-								any_intersecting = any_intersecting || intersecting;
+								any_intersecting = any_intersecting || (intersecting && block_solid);
 							}
 						}
 					}
@@ -1582,8 +1369,8 @@ int main (int argc, char** argv) {
 					
 					if ((pos_world.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && vel_world.z == 0) {
 						
-						bpos2 start =	(bpos2)floor(pos_world.xy() -v2(player_r,player_r));
-						bpos2 end =		(bpos2)ceil(pos_world.xy() +v2(player_r,player_r));
+						bpos2 start =	(bpos2)floor(pos_world.xy() -player.collision_r);
+						bpos2 end =		(bpos2)ceil(pos_world.xy() +player.collision_r);
 						
 						bpos bp;
 						bp.z = pos_z -1;
@@ -1594,7 +1381,7 @@ int main (int argc, char** argv) {
 								auto* b = query_block(bp);
 								bool block_solid = !bt_is_traversable(b->type);
 								
-								if (block_solid && circle_square_intersect(pos_world.xy() -(v2)bp.xy(), player_r)) player_on_ground = true;
+								if (block_solid && circle_square_intersect(pos_world.xy() -(v2)bp.xy(), player.collision_r)) player_on_ground = true;
 							}
 						}
 					}
@@ -1603,59 +1390,43 @@ int main (int argc, char** argv) {
 			};
 			check_blocks_around_player();
 			
+			overlay_line(prints(">>> player_on_ground: %d\n", player_on_ground));
+			
 			if (player_stuck_in_solid_block) {
 				vel_world = 0;
+				printf(">>>>>>>>>>>>>> stuck!\n");
 			} else {
 				
-				overlay_line(prints(">>> player_on_ground: %d\n", player_on_ground));
-				
-				{ // player walking dynamics
-					v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
-					
-					v2 feet_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
-					
-					option("feet_vel_world_multiplier", &feet_vel_world_multiplier);
-					
-					feet_vel_world *= feet_vel_world_multiplier;
-					
-					// need some proper way of doing walking dynamics
-					
-					if (player_on_ground) {
-						vel_world = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
-					} else {
-						v3 tmp = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
+				if (!controling_flycam) {
+					{ // player walking dynamics
+						v2 player_walk_speed = 3 * (inp.move_fast ? 3 : 1);
 						
-						if (length(vel_world.xy()) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
+						v2 feet_vel_world = rotate2(player.ori_ae.x) * (normalize_or_zero( (v2)inp.move_dir.xy() ) * player_walk_speed);
+						
+						option("feet_vel_world_multiplier", &feet_vel_world_multiplier);
+						
+						feet_vel_world *= feet_vel_world_multiplier;
+						
+						// need some proper way of doing walking dynamics
+						
+						if (player_on_ground) {
+							vel_world = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
+						} else {
+							v3 tmp = v3( lerp(vel_world.xy(), feet_vel_world, player.walking_friction_alpha), vel_world.z );
+							
+							if (length(vel_world.xy()) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
+						}
+						
+						if (length(vel_world) < 0.01f) vel_world = 0;
 					}
 					
-					if (length(vel_world) < 0.01f) vel_world = 0;
+					if (jump_held && player_on_ground) vel_world += v3(0,0, player.jumping_up_impulse);
 				}
-				
-				if (trigger_jump && player_on_ground) vel_world += v3(0,0, player.jumping_up_impulse);
 				
 				vel_world += v3(0,0, -grav_accel_down) * dt;
 			}
 			
 			option("draw_debug_overlay", &draw_debug_overlay);
-			
-			#if 0
-			// case 1:
-			if (frame_i == 0) {
-				pos_world = v3(int_bits_as_flt(0x40f516b0u),int_bits_as_flt(0x41e54d46u),int_bits_as_flt(0x3f800000u));
-				vel_world = v3(int_bits_as_flt(0x40eb509bu),int_bits_as_flt(0x40a51323u),int_bits_as_flt(0x0u));
-			} else if (frame_i == 1) {
-				vel_world = v3(int_bits_as_flt(0x3f917107u),int_bits_as_flt(0x3f3e664bu),int_bits_as_flt(0x0u));
-			}
-			
-			printf(	"pos_world = v3(int_bits_as_flt(0x%xu),int_bits_as_flt(0x%xu),int_bits_as_flt(0x%xu));\n"
-					"vel_world = v3(int_bits_as_flt(0x%xu),int_bits_as_flt(0x%xu),int_bits_as_flt(0x%xu));\n",
-				flt_bits_as_int(pos_world.x),
-				flt_bits_as_int(pos_world.y),
-				flt_bits_as_int(pos_world.z),
-				flt_bits_as_int(vel_world.x),
-				flt_bits_as_int(vel_world.y),
-				flt_bits_as_int(vel_world.z) );
-			#endif
 			
 			auto trace_player_collision_path = [&] () {
 				f32 player_r = player.collision_r;
@@ -1696,7 +1467,7 @@ int main (int argc, char** argv) {
 								}
 							};
 							
-							// this geometry we are reycasting our player position onto represents the minowski sum of the block and our players cylinder
+							// this geometry we are raycasting our player position onto represents the minowski sum of the block and our players cylinder
 							
 							auto raycast_x_side = [&] (v3 ray_pos, v3 ray_dir, f32 plane_x, f32 normal_x) { // side forming yz plane
 								if (ray_dir.x == 0 || (ray_dir.x * (plane_x -ray_pos.x)) < 0) return false; // ray parallel to plane or ray points away from plane
@@ -1781,7 +1552,7 @@ int main (int argc, char** argv) {
 								// check if cylinder base/top circle cap intersects with block top/bottom square
 								v2 closest_p = clamp(plane_hit_xy, 0,1);
 								
-								f32 dist_sqr = length_sqr(closest_p -ray_pos.xy());
+								f32 dist_sqr = length_sqr(closest_p -plane_hit_xy);
 								if (dist_sqr >= player_r*player_r) return false; // hit outside
 								
 								f32 hit_dist = length(v3(delta_xy, delta_z));
@@ -1918,7 +1689,7 @@ int main (int argc, char** argv) {
 		Block*	highlighted_block;
 		bpos	highlighted_block_pos;
 		block_face_e highlighted_block_face;
-		{ // block raycasting
+		auto raycast_highlighted_block = [&] () {
 			auto raycast_block = [&] (v3 ray_pos, v3 ray_dir, flt max_dist, bpos* hit_block, block_face_e* hit_face) -> Block* {
 				
 				bpos step_delta = bpos(	(bpos_t)normalize(ray_dir.x),
@@ -1973,9 +1744,10 @@ int main (int argc, char** argv) {
 			v3 dir = rotate3_Z(player.ori_ae.x) * rotate3_X(player.ori_ae.y) * v3(0,0,-1);
 			
 			highlighted_block = raycast_block(player.pos_world +v3(0,0,player.eye_height), dir, 3.5f, &highlighted_block_pos, &highlighted_block_face);
-		}
+		};
+		raycast_highlighted_block();
 		
-		if (highlighted_block && hold_break_block) {
+		if (highlighted_block && hold_break_block) { // block breaking
 			
 			Chunk* chunk;
 			Block* b = query_block(highlighted_block_pos, &chunk);
@@ -1985,16 +1757,46 @@ int main (int argc, char** argv) {
 			
 			if (b->hp_ratio > 0) {
 				
-				chunk->vbo_update_single_block(highlighted_block_pos);
-				
 			} else {
 				
 				b->hp_ratio = 0;
-				
 				b->type = BT_AIR;
 				
-				chunk->vbo_needs_update = true;
+				dbg_play_sound();
 			}
+			
+			chunk->update_block_changed(highlighted_block_pos);
+		}
+		{ // block placing
+			bool block_place_is_inside_player = false;
+			
+			if (highlighted_block && trigger_place_block) {
+				
+				bpos dir = 0;
+				dir[highlighted_block_face / 2] = highlighted_block_face % 2 ? +1 : -1;
+				
+				bpos block_place_pos = highlighted_block_pos +dir;
+				
+				Chunk* chunk;
+				Block* b = query_block(block_place_pos, &chunk);
+				
+				block_place_is_inside_player = cylinder_cube_intersect(player.pos_world -(v3)block_place_pos, player.collision_r,player.collision_h);
+				
+				if (b->type == BT_AIR && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
+					
+					b->type = BT_EARTH;
+					b->hp_ratio = 1;
+					b->dbg_tint = 255;
+					
+					dbg_play_sound();
+					
+					chunk->update_block_changed(block_place_pos);
+					
+					raycast_highlighted_block(); // make highlighted_block seem more responsive
+				}
+			}
+			
+			trigger_place_block = trigger_place_block && block_place_is_inside_player; // if we tried to place a block inside the player try again next frame as long as RMB is held down (releasing RMB will set trigger_place_block to false anyway)
 		}
 		
 		//// Draw
@@ -2037,10 +1839,20 @@ int main (int argc, char** argv) {
 			shad_main->set_unif("atlas_textures_count", atlas_textures_count);
 			shad_main->set_unif("breaking_frames_count", breaking_frames_count);
 			
+			// update_block_brighness first because generate_blocks_mesh accesses surrounding chunks for blocks on the edge
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				chunk->generate_blocks_mesh();
+				if (chunk->vbo_needs_update) chunk->update_block_brighness();
+			}
+			
+			// generate_blocks_mesh and draw
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				if (chunk->vbo_needs_update) chunk->generate_blocks_mesh();
+				
+				chunk->vbo_needs_update = false;
 				
 				chunk->vbo.draw_entire(shad_main);
 			}
@@ -2058,15 +1870,25 @@ int main (int argc, char** argv) {
 			auto highlight_block = [&] (bpos block) {
 				s32 cylinder_sides = 32;
 				
-				lrgba8 col = lrgba8(255,255,255,100);
-				lrgba8 side_col = lrgba8(255,255,255,40);
-				
 				#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 				
+				#if 1
+				lrgba8 col = lrgba8(255,255,255,60);
+				lrgba8 side_col = lrgba8(255,255,255,120);
+				
 				f32 r = 1.01f;
-				f32 inset = 1.0f / 20;
+				f32 inset = 1.0f / 50;
+				
+				f32 side_r = r * 0.06f;
+				#else
+				lrgba8 col = lrgba8(255,255,255,140);
+				lrgba8 side_col = lrgba8(255,255,255,60);
+				
+				f32 r = 1.01f;
+				f32 inset = 1.0f / 17;
 				
 				f32 side_r = r * 0.35f;
+				#endif
 				
 				s32 face_quads = 4;
 				s32 quad_vertecies = 6;
@@ -2141,7 +1963,7 @@ int main (int argc, char** argv) {
 			if (highlighted_block) highlight_block(highlighted_block_pos);
 			
 			{ // block visualize
-				//glDisable(GL_CULL_FACE);
+				glDisable(GL_CULL_FACE);
 				glEnable(GL_BLEND);
 				//glDisable(GL_DEPTH_TEST);
 				
@@ -2150,7 +1972,7 @@ int main (int argc, char** argv) {
 				
 				//glEnable(GL_DEPTH_TEST);
 				glDisable(GL_BLEND);
-				//glEnable(GL_CULL_FACE);
+				glEnable(GL_CULL_FACE);
 			}
 			
 			overlay_vbo.clear();
@@ -2194,12 +2016,12 @@ int main (int argc, char** argv) {
 			
 			{
 				glEnable(GL_BLEND);
-				glDisable(GL_DEPTH_TEST);
+				//glDisable(GL_DEPTH_TEST);
 				
 				overlay_vbo.upload();
 				overlay_vbo.draw_entire(shad_overlay);
 				
-				glEnable(GL_DEPTH_TEST);
+				//glEnable(GL_DEPTH_TEST);
 				glDisable(GL_BLEND);
 			}
 		}

@@ -7,6 +7,7 @@ $include "common.frag"
 in		vec3	vs_pos_cam;
 in		vec4	vs_uvzw_atlas;
 in		float	vs_hp_ratio;
+in		float	vs_brightness;
 in		vec4	vs_dbg_tint;
 
 uniform	sampler2D	atlas;
@@ -87,6 +88,9 @@ void main () {
 			col.rgb *= (texture(breaking, breaking_uv).rgb * 255 -127) / 127 +1;
 		}
 	}
+	
+	//col = vec4(1);
+	col *= vs_brightness;
 	
 	FRAG_COL( col );
 	//FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );

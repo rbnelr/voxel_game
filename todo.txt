@@ -9,13 +9,27 @@ DONE:
  
  implemented outlined block highlighting
  
+ block placing
+ 
+ block abient occulusion (AO)
+ 
+ fix collision bug
+ somtimes can still get stuck on the border of blocks when jumping
+ -> i did not calculate the radius test correctly on raycasting with top and bottom of minowski sum
+     so the collision was just not detected sometimes
+ 
 TODO
 -FEATURES:
  
- block placing
+ improve block AO
+ 
+ improve performance on notebook
+ -chunk optimization
+  -view frustrum culling
+ 
+ redesign input system
  
  blocks inventory (gain blocks on break and lose on place)
  
 -BUGS:
- somtimes can still get stuck on the border of blocks when jumping
  

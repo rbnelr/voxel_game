@@ -74,7 +74,9 @@ union V4 {
 
 	static constexpr V4 min(V4 l, V4 r) { return V4(min(l.x, r.x), min(l.y, r.y), min(l.z, r.z), min(l.w, r.w)); }
 	static constexpr V4 max(V4 l, V4 r) { return V4(max(l.x, r.x), max(l.y, r.y), max(l.z, r.z), max(l.w, r.w)); }
-
+	
+	static constexpr V4 clamp (V4 val, V4 l, V4 h) {return min( max(val,l), h ); }
+	
 	#if FLTVEC
 	static constexpr V4 lerp (V4 a, V4 b, T t) {	return (a * V4(T(1) -t)) +(b * V4(t)); }
 	static constexpr V4 lerp (V4 a, V4 b, V4 t) {	return (a * (V4(1) -t)) +(b * t); }
@@ -94,7 +96,6 @@ union V4 {
 	static constexpr V4 to_deg (V4 v) {				return v * RAD_TO_DEG; }
 	static constexpr V4 to_rad (V4 v) {				return v * DEG_TO_RAD; }
 
-	static constexpr V4 clamp (V4 val, V4 l, V4 h) {return min( max(val,l), h ); }
 	static V4 mymod (V4 val, V4 range) {
 		return V4(	mymod(val.x, range.x),
 					mymod(val.y, range.y),

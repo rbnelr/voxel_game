@@ -102,7 +102,7 @@ rem /main
 	rem glfw static link
 	cl.exe -nologo !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE!
 	
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /Ideps/noise/ /I!GLFW_SRC!include !SRC!!proj!.cpp glfw_one_source_file.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /I!GLFW_SRC!include !SRC!!proj!.cpp glfw_one_source_file.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
 	rem WINMM.lib for simple audio playing (https://msdn.microsoft.com/en-us/library/windows/desktop/dd743680(v=vs.85).aspx)
 	
@@ -136,13 +136,14 @@ rem /vs
 	rem glfw static link
 	!GCC!gcc -m64 !opt! !warn! -I!GLFW_SRC!include -I!GLFW_SRC!src -c !GLFW_ONE_SRC_FILE!
 	
-	!GCC!g++ -std=c++11 -m64 -DRZ_PLATF=1 -DRZ_ARCH=1 !opt! !warn! -I!SRC!include -I!GLAD! -I!STB! -Ideps/noise/ -I!GLFW_SRC!include -o !ROOT!!proj!.exe !SRC!!proj!.cpp glfw_one_source_file.o -lKERNEL32 -lUSER32 -lGDI32 -lOPENGL32 -lSHELL32
+	!GCC!g++ -std=c++11 -m64 -DRZ_PLATF=1 -DRZ_ARCH=1 !opt! !warn! -I!SRC!include -I!GLAD! -I!STB! -I!GLFW_SRC!include -o !ROOT!!proj!.exe !SRC!!proj!.cpp glfw_one_source_file.o -lKERNEL32 -lUSER32 -lGDI32 -lOPENGL32 -lSHELL32
 	
 	del *.o
 	
 	exit /b
 rem /llvm
 
+rem unmaintained
 :llvm
 	del !ROOT!!proj!.exe
 	

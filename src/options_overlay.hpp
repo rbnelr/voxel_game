@@ -35,9 +35,14 @@ static void begin_options () {
 	cur_option = 0;
 }
 
-static bool parse_s32 (strcr str, s32* val) {
+static bool parse_sint (strcr str, s32* val) {
 	char* end = nullptr;
 	*val = strtol(str.c_str(), &end, 10);
+	return end;
+}
+static bool parse_sint (strcr str, s64* val) {
+	char* end = nullptr;
+	*val = strtoll(str.c_str(), &end, 10);
 	return end;
 }
 static bool parse_f32 (strcr str, f32* val) {
@@ -100,7 +105,6 @@ static bool option_group (strcr name, bool* open=nullptr) {
 	bool option_highl = opt_mode && cur_option++ == selected_option;
 	bool option_edit = option_highl && opt_mode == OPT_EDITING;
 	if (option_highl && opt_toggle_open) {
-		opt_toggle_open = false;
 		if (open) *open = !(*open);
 	}
 	
@@ -125,7 +129,7 @@ static bool option_group (strcr name, bool* open=nullptr) {
 static bool _option (strcr name, str& opt_str, bool* open) {
 	bool option_highl = opt_mode && cur_option++ == selected_option;
 	bool option_edit = option_highl && opt_mode == OPT_EDITING;
-	if (option_highl) if (open) *open = !(*open);
+	if (option_highl && opt_toggle_open) if (open) *open = !(*open);
 	
 	if (option_edit && opt_value_edit_flag) { // started editing
 		opt_val_str = opt_str;
@@ -140,7 +144,9 @@ static bool _option (strcr name, str& opt_str, bool* open) {
 		col = option_edit ? option_edit_col : option_highl_col;
 	}
 	
-	overlay_line(prints("%s: %s%s", name.c_str(), opt_str.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? name.size() +2 +opt_cur_char : -1);
+	size_t name_w = 30;
+	
+	overlay_line(prints("%s: %*s%s", name.c_str(), name_w -name.size() -2 +opt_str.size(), opt_str.c_str(), open && !(*open) ? " {...}":""), col,0, option_edit ? max(name.size() +2, (size_t)name_w) +opt_cur_char : -1);
 	
 	if (option_highl && !option_edit && opt_value_edit_flag) { // finished editing
 		return true;
@@ -150,9 +156,9 @@ static bool _option (strcr name, str& opt_str, bool* open) {
 
 static bool option (strcr name, bool* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
-	str opt_str = prints("%1d", *val ? 1 : 0);
-	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
+	str opt_str = prints("%8d", *val ? 1 : 0);
+	s64 tmp;
+	if (_option(name, opt_str, open) && parse_sint(opt_val_str, &tmp)) {
 		*val = tmp != 0;
 		opt_str = opt_val_str;
 		return true;
@@ -161,10 +167,10 @@ static bool option (strcr name, bool* val, bool* open=nullptr) {
 }
 static bool option (strcr name, s32 (*get)(), void (*set)(s32)=nullptr, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
-	str opt_str = prints("%4d", get());
-	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp) && set) {
-		set(tmp);
+	str opt_str = prints("%8d", (s32)get());
+	s64 tmp;
+	if (_option(name, opt_str, open) && parse_sint(opt_val_str, &tmp) && set) {
+		set((s32)tmp);
 		opt_str = opt_val_str;
 		return true;
 	}
@@ -172,10 +178,32 @@ static bool option (strcr name, s32 (*get)(), void (*set)(s32)=nullptr, bool* op
 }
 static bool option (strcr name, s32* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
-	str opt_str = prints("%4d", *val);
+	str opt_str = prints("%8d", *val);
 	s32 tmp;
-	if (_option(name, opt_str, open))	if (parse_s32(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_sint(opt_val_str, &tmp)) {
 		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option (strcr name, s64* val, bool* open=nullptr) {
+	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
+	str opt_str = prints("%8d", (s32)*val);
+	s64 tmp;
+	if (_option(name, opt_str, open) && parse_sint(opt_val_str, &tmp)) {
+		*val = tmp;
+		opt_str = opt_val_str;
+		return true;
+	}
+	return false;
+}
+static bool option (strcr name, u64* val, bool* open=nullptr) {
+	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
+	str opt_str = prints("%8d", (u32)*val);
+	s64 tmp;
+	if (_option(name, opt_str, open) && parse_sint(opt_val_str, &tmp) && safe_cast(u64, tmp)) {
+		*val = (u64)tmp;
 		opt_str = opt_val_str;
 		return true;
 	}
@@ -185,7 +213,7 @@ static bool option (strcr name, f32* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
 	str opt_str = prints("%8.7g", *val);
 	f32 tmp;
-	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_f32(opt_val_str, &tmp)) {
 		*val = tmp;
 		opt_str = opt_val_str;
 		return true;
@@ -196,7 +224,7 @@ static bool option (strcr name, v2* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
 	str opt_str = prints("%8.7g, %8.7g", val->x,val->y);
 	v2 tmp;
-	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_v2(opt_val_str, &tmp)) {
 		*val = tmp;
 		opt_str = opt_val_str;
 		return true;
@@ -207,7 +235,7 @@ static bool option (strcr name, v3* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
 	str opt_str = prints("%8.7g, %8.7g, %8.7g", val->x,val->y,val->z);
 	v3 tmp;
-	if (_option(name, opt_str, open))	if (parse_v3(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_v3(opt_val_str, &tmp)) {
 		*val = tmp;
 		opt_str = opt_val_str;
 		return true;
@@ -219,7 +247,7 @@ static bool option_deg (strcr name, f32* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
 	str opt_str = prints("%8.7g", to_deg(*val));
 	f32 tmp;
-	if (_option(name, opt_str, open))	if (parse_f32(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_f32(opt_val_str, &tmp)) {
 		*val = to_rad(tmp);
 		opt_str = opt_val_str;
 		return true;
@@ -230,7 +258,7 @@ static bool option_deg (strcr name, v2* val, bool* open=nullptr) {
 	if (opt_mode == OPT_OVERLAY_DISABLED) return false;
 	str opt_str = prints("%8.7g, %8.7g", to_deg(val->x),to_deg(val->y));
 	v2 tmp;
-	if (_option(name, opt_str, open))	if (parse_v2(opt_val_str, &tmp)) {
+	if (_option(name, opt_str, open) && parse_v2(opt_val_str, &tmp)) {
 		*val = to_rad(tmp);
 		opt_str = opt_val_str;
 		return true;

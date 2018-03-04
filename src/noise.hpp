@@ -12,8 +12,8 @@ namespace perlin_noise_n {
 		n = pow((n << 13), n);
 		return (1.0 - ( (n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0);
 	}*/
-	float noise (int x, int y) {
-		int n;
+	f32 noise (s32 x, s32 y) {
+		s32 n;
 		
 		n = x + y * 57;
 		n = (n << 13) ^ n;
@@ -40,7 +40,7 @@ namespace perlin_noise_n {
 		return (corners + sides + center);
 	}
 
-	f32 perlin_base (v2 v) {
+	f32 perlin_base (fv2 v) {
 		s32		int_val[2];
 		f32		frac_val[2];
 		f32		value[4];
@@ -63,12 +63,12 @@ namespace perlin_noise_n {
 		return (interpolate(res[0], res[1], frac_val[1]));
 	}
 	
-	f32 perlin_octave (v2 v, f32 freq) {
+	f32 perlin_octave (fv2 v, f32 freq) {
 		return perlin_base(v * freq);
 	}
 	
 	#if 1
-	f32 perlin_two (v2 val, s32 octave=1) {
+	f32 perlin_two (fv2 val, s32 octave=1) {
 		f32		total;
 		f32		per;
 		f32		amp;
@@ -82,23 +82,23 @@ namespace perlin_noise_n {
 		while (i < octave) {
 			hz = pow(2, i);
 			amp = pow(per, (f32)i);
-			total += perlin_base(val * (v2)hz) * amp;
+			total += perlin_base(val * (fv2)hz) * amp;
 			i += 1;
 		}
 		
 		return (total);
 	}
 	#else
-	float perlin_two(float x, float y, float gain, int octaves, int hgrid) {
-		int i;
-		float total = 0.0f;
-		float frequency = 1.0f/(float)hgrid;
-		float amplitude = gain;
-		float lacunarity = 2.0;
+	f32 perlin_two(f32 x, f32 y, f32 gain, s32 octaves, s32 hgrid) {
+		s32 i;
+		f32 total = 0.0f;
+		f32 frequency = 1.0f/(f32)hgrid;
+		f32 amplitude = gain;
+		f32 lacunarity = 2.0;
 
 		for (i = 0; i < octaves; ++i)
 		{
-			total += noise_hander((float)x * frequency, (float)y * frequency) * amplitude;         
+			total += noise_hander((f32)x * frequency, (f32)y * frequency) * amplitude;         
 			frequency *= lacunarity;
 			amplitude *= gain;
 		} 
