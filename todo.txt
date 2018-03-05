@@ -26,6 +26,13 @@ TODO
 -FEATURES:
  
  add trees
+  -RNG seeded by chunk pos
+  -generate random chance for each xy block column
+  -calculate tree chance via tree desity noise layer and terrain type
+  -spawn tree if random chance is above tree chance
+  -maybe check if there already are trees nearby and dont spawn it in that case
+  -also do this for all 8 surrounding chunks no matter if the're generated or not
+  -this way we can generate leaves in our chunks of trees in a neibouring chunk
  
  improve block AO
  

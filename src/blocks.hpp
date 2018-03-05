@@ -41,13 +41,13 @@ static s32 get_block_texture_index_from_block_type (block_type bt) {
 
 struct Block {
 	block_type	type;
-	f32			hp_ratio;
 	bool		dark; // any air block that only has air above it (is in sunlight)
+	f32			hp_ratio;
 	lrgba8		dbg_tint;
 };
 
-static Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, 1, false, 255 };
-static Block B_NO_CHUNK = { BT_NO_CHUNK, 1, false, 255 };
+static Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 1, 255 };
+static Block B_NO_CHUNK = { BT_NO_CHUNK, false, 1, 255 };
 
 #undef BF_BOTTOM
 #undef BF_TOP

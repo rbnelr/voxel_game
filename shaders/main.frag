@@ -76,8 +76,6 @@ void main () {
 	
 	vec4 col = texture(atlas, uv).rgba;
 	
-	col.a = col.a == 1 ? 1 : 0.4;
-	
 	{
 		int breaking_frame = int(floor(vs_hp_ratio * float(breaking_frames_count) +0.1f));
 		

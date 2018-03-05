@@ -506,31 +506,41 @@ static void gen_chunk_blocks (Chunk* chunk) {
 			for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 				auto* b = chunk->get_block(i);
 				
-				b->type = i.z <= water_level ? BT_WATER : BT_AIR;
-				b->hp_ratio = 1;
-				b->dbg_tint = 255;
+				if (i.z <= water_level) {
+					b->type = BT_WATER;
+					b->hp_ratio = 1;
+					b->dbg_tint = 255;
+				} else {
+					b->type = BT_AIR;
+					b->hp_ratio = 0;
+					b->dbg_tint = 0;
+				}
 			}
 		}
 	}
 	
 	OSN::Noise<2> noise( world_seed );
-	//OSN::Noise<2> noise( hash(chunk->pos) );
+	//OSN::Noise<2> noise( hash(chunk->coord) );
 	
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
 			
-			v2 pos_world = (v2)(i.xy() +chunk->pos*CHUNK_DIM.xy());
+			v2 pos_world = (v2)(i.xy() +chunk->coord*CHUNK_DIM.xy());
 			
 			f32 height = heightmap(noise, pos_world);
 			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
 				auto* b = chunk->get_block(i);
-				if (i.z == highest_block) {
+				
+				if (i.z == highest_block && i.z >= water_level) {
 					b->type = BT_GRASS;
 				} else {
 					b->type = BT_EARTH;
 				}
+				
+				b->hp_ratio = 1;
+				
 				b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
 				//b->dbg_tint = lrgba8( noise_tree(pos_world), 255);
 			}
@@ -543,14 +553,20 @@ static void gen_chunk_blocks (Chunk* chunk) {
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
+static void delete_all_chunks () {
+	for (auto& c : chunks) delete c.second;
+	
+	chunks.clear();
+}
+
 static Chunk* _prev_query_chunk = nullptr; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
 
-static Chunk* query_chunk (chunk_pos_t pos) {
-	if (_prev_query_chunk && equal(_prev_query_chunk->pos, pos)) {
+static Chunk* query_chunk (chunk_pos_t coord) {
+	if (_prev_query_chunk && equal(_prev_query_chunk->coord, coord)) {
 		return _prev_query_chunk;
 	} else {
 		
-		auto k = chunks.find({pos});
+		auto k = chunks.find({coord});
 		if (k == chunks.end()) return nullptr;
 		
 		Chunk* chunk = k->second;
@@ -579,11 +595,11 @@ static void generate_new_chunk (chunk_pos_t chunk_pos) {
 	
 	Chunk* c = new Chunk();
 	
-	c->pos = chunk_pos;
+	c->coord = chunk_pos;
 	c->init_gl();
 	gen_chunk_blocks(c);
 	
-	chunks.insert({{c->pos}, c});
+	chunks.insert({{c->coord}, c});
 }
 
 static void inital_chunk (v3 player_pos_world) {
@@ -638,8 +654,8 @@ struct Input {
 };
 static Input		inp;
 
-static bool controling_flycam =		true;
-static bool viewing_flycam =		true;
+static bool controling_flycam =		false;
+static bool viewing_flycam =		false;
 
 struct Flycam {
 	v3	pos_world =			v3(-15, -27, 50);
@@ -1048,7 +1064,7 @@ int main (int argc, char** argv) {
 		v2	ori_ae =		v2(deg(0), deg(+80)); // azimuth elevation
 		f32	vfov =			deg(80);
 		
-		bool third_person = true;
+		bool third_person = false;
 		
 		f32	eye_height =	1.65f;
 		v3	third_person_camera_offset_cam =		v3(0.5f, -0.4f, 3);
@@ -1179,6 +1195,9 @@ int main (int argc, char** argv) {
 	}
 	
 	s32 max_chunks_generated_per_frame = 1;
+	
+	flt block_update_frequency = 1.0f;
+	bpos_t cur_chunk_update_block_i = 0;
 	
 	struct Overlay_Vertex {
 		v3		pos_world;
@@ -1337,9 +1356,11 @@ int main (int argc, char** argv) {
 		if (option("noise_tree_freq", &noise_tree_freq))	trigger_regen_chunks = true;
 		if (option("noise_tree_amp", &noise_tree_amp))		trigger_regen_chunks = true;
 		
+		if (option("world_seed", &world_seed))				trigger_regen_chunks = true;
+		
 		if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
 			trigger_regen_chunks = false;
-			chunks.clear();
+			delete_all_chunks();
 			inital_chunk(player.pos_world);
 			trigger_dbg_heightmap_visualize = true;
 		}
@@ -1857,6 +1878,100 @@ int main (int argc, char** argv) {
 		};
 		raycast_highlighted_block();
 		
+		auto block_indicator = [&] (bpos block, block_face_e highlighted_block_face) {
+			s32 cylinder_sides = 32;
+			
+			#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
+			
+			#if 1
+			lrgba8 col = lrgba8(255,255,255,60);
+			lrgba8 side_col = lrgba8(255,255,255,120);
+			
+			f32 r = 1.01f;
+			f32 inset = 1.0f / 50;
+			
+			f32 side_r = r * 0.06f;
+			#else
+			lrgba8 col = lrgba8(255,255,255,140);
+			lrgba8 side_col = lrgba8(255,255,255,60);
+			
+			f32 r = 1.01f;
+			f32 inset = 1.0f / 17;
+			
+			f32 side_r = r * 0.35f;
+			#endif
+			
+			s32 face_quads = 4;
+			s32 quad_vertecies = 6;
+			
+			for (block_face_e face=(block_face_e)0; face<(block_face_e)6; ++face) {
+				
+				f32 up;
+				f32 horiz;
+				switch (face) {
+					case BF_NEG_X:	horiz = 0;	up = -1;	break;
+					case BF_NEG_Y:	horiz = 1;	up = -1;	break;
+					case BF_POS_X:	horiz = 2;	up = -1;	break;
+					case BF_POS_Y:	horiz = 3;	up = -1;	break;
+					case BF_NEG_Z:	horiz = 0;	up = -2;	break;
+					case BF_POS_Z:	horiz = 0;	up = 0;		break;
+				}
+				
+				m3 rot_up =		rotate3_Y( deg(90) * up );
+				m3 rot_horiz =	rotate3_Z( deg(90) * horiz );
+				
+				{
+					Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
+						sizeof(Overlay_Vertex)*face_quads*quad_vertecies);
+					
+					for (s32 edge=0; edge<face_quads; ++edge) {
+						
+						m2 rot_edge = rotate2(deg(90) * -edge);
+						
+						auto vert = [&] (v3 v, lrgba8 col) {
+							*out++ = { (v3)block +((rot_horiz * rot_up * rot_edge * v) * 0.5f +0.5f), col };
+						};
+						auto quad = [&] (v3 a, v3 b, v3 c, v3 d, lrgba8 col) {
+							vert(a, col);	vert(b, col);	vert(d, col);
+							vert(d, col);	vert(b, col);	vert(c, col);
+						};
+						
+						// emit block highlight
+						quad(	v3(-r,-r,+r),
+								v3(+r,-r,+r),
+								v3(+r,-r,+r) +v3(-inset,+inset,0)*2,
+								v3(-r,-r,+r) +v3(+inset,+inset,0)*2,
+								col);
+						
+					}
+				}
+				
+				{
+					Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
+						sizeof(Overlay_Vertex)*quad_vertecies);
+					
+					auto vert = [&] (v3 v, lrgba8 col) {
+						*out++ = { (v3)block +((rot_horiz * rot_up * v) * 0.5f +0.5f), col };
+					};
+					auto quad = [&] (v3 a, v3 b, v3 c, v3 d, lrgba8 col) {
+						vert(a, col);	vert(b, col);	vert(d, col);
+						vert(d, col);	vert(b, col);	vert(c, col);
+					};
+					
+					if (face == highlighted_block_face) { // emit face highlight
+						quad(	v3(-side_r,-side_r,+r),
+								v3(+side_r,-side_r,+r),
+								v3(+side_r,+side_r,+r),
+								v3(-side_r,+side_r,+r),
+								side_col );
+					}
+				}
+			}
+			
+			#undef QUAD
+		};
+		if (highlighted_block) block_indicator(highlighted_block_pos, highlighted_block_face);
+		
 		if (highlighted_block && hold_break_block) { // block breaking
 			
 			Chunk* chunk;
@@ -1874,7 +1989,7 @@ int main (int argc, char** argv) {
 				
 				chunk->block_changed(highlighted_block_pos);
 				
-				dbg_play_sound();
+				//dbg_play_sound();
 			}
 		}
 		{ // block placing
@@ -1898,7 +2013,7 @@ int main (int argc, char** argv) {
 					b->hp_ratio = 1;
 					b->dbg_tint = 255;
 					
-					dbg_play_sound();
+					//dbg_play_sound();
 					
 					chunk->block_changed(block_place_pos);
 					
@@ -1907,6 +2022,39 @@ int main (int argc, char** argv) {
 			}
 			
 			trigger_place_block = trigger_place_block && block_place_is_inside_player; // if we tried to place a block inside the player try again next frame as long as RMB is held down (releasing RMB will set trigger_place_block to false anyway)
+		}
+		
+		if (0) { // chunk update
+			auto block_update = [] (Block* b, bpos pos_world, Chunk* chunk) {
+				if (b->type == BT_AIR && rand() % 1000 == 0) {
+					b->type = BT_WATER;
+					chunk->block_changed(pos_world);
+				}
+			};
+			
+			constexpr bpos_t chunk_block_count = CHUNK_DIM.x * CHUNK_DIM.y * CHUNK_DIM.z;
+			static_assert(chunk_block_count == (1 << 16), "");
+			
+			bpos_t blocks_to_update = (bpos_t)ceil((f32)chunk_block_count / block_update_frequency * dt);
+			
+			printf("frame %d\n", (s32)frame_i);
+			
+			for (auto& chunk_hash_pair : chunks) {
+				auto& chunk = chunk_hash_pair.second;
+				
+				for (bpos_t i=0; i<blocks_to_update; ++i) {
+					Block* b = &chunk->blocks[0][0][cur_chunk_update_block_i];
+					
+					bpos bp;
+					bp.z =  cur_chunk_update_block_i / (CHUNK_DIM.y * CHUNK_DIM.x);
+					bp.y = (cur_chunk_update_block_i % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
+					bp.x = (cur_chunk_update_block_i % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
+					
+					block_update(b, bp +chunk->chunk_origin_block_world(), chunk);
+					
+					cur_chunk_update_block_i = (cur_chunk_update_block_i +1) % chunk_block_count;
+				}
+			}
 		}
 		
 		//// Draw
@@ -1937,8 +2085,6 @@ int main (int argc, char** argv) {
 		glClear(GL_DEPTH_BUFFER_BIT);
 		
 		if (shad_main->valid()) {
-			
-			glEnable(GL_BLEND);
 			
 			bind_texture_unit(0, &tex_block_atlas);
 			bind_texture_unit(1, &tex_breaking);
@@ -1989,6 +2135,8 @@ int main (int argc, char** argv) {
 				chunk->vbo.draw_entire(shad_main);
 			}
 			
+			glEnable(GL_BLEND);
+			
 			// draw transperant
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
@@ -2006,104 +2154,7 @@ int main (int argc, char** argv) {
 			shad_overlay->set_unif("cam_to_world",	view.cam_to_world.m4());
 			shad_overlay->set_unif("cam_to_clip",	view.cam_to_clip);
 			
-			//bool checker = false;
-			
-			auto highlight_block = [&] (bpos block) {
-				s32 cylinder_sides = 32;
-				
-				#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
-				
-				#if 1
-				lrgba8 col = lrgba8(255,255,255,60);
-				lrgba8 side_col = lrgba8(255,255,255,120);
-				
-				f32 r = 1.01f;
-				f32 inset = 1.0f / 50;
-				
-				f32 side_r = r * 0.06f;
-				#else
-				lrgba8 col = lrgba8(255,255,255,140);
-				lrgba8 side_col = lrgba8(255,255,255,60);
-				
-				f32 r = 1.01f;
-				f32 inset = 1.0f / 17;
-				
-				f32 side_r = r * 0.35f;
-				#endif
-				
-				s32 face_quads = 4;
-				s32 quad_vertecies = 6;
-				
-				for (block_face_e face=(block_face_e)0; face<(block_face_e)6; ++face) {
-					
-					f32 up;
-					f32 horiz;
-					switch (face) {
-						case BF_NEG_X:	horiz = 0;	up = -1;	break;
-						case BF_NEG_Y:	horiz = 1;	up = -1;	break;
-						case BF_POS_X:	horiz = 2;	up = -1;	break;
-						case BF_POS_Y:	horiz = 3;	up = -1;	break;
-						case BF_NEG_Z:	horiz = 0;	up = -2;	break;
-						case BF_POS_Z:	horiz = 0;	up = 0;		break;
-					}
-					
-					m3 rot_up =		rotate3_Y( deg(90) * up );
-					m3 rot_horiz =	rotate3_Z( deg(90) * horiz );
-					
-					{
-						Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
-							sizeof(Overlay_Vertex)*face_quads*quad_vertecies);
-						
-						for (s32 edge=0; edge<face_quads; ++edge) {
-							
-							m2 rot_edge = rotate2(deg(90) * -edge);
-							
-							auto vert = [&] (v3 v, lrgba8 col) {
-								*out++ = { (v3)block +((rot_horiz * rot_up * rot_edge * v) * 0.5f +0.5f), col };
-							};
-							auto quad = [&] (v3 a, v3 b, v3 c, v3 d, lrgba8 col) {
-								vert(a, col);	vert(b, col);	vert(d, col);
-								vert(d, col);	vert(b, col);	vert(c, col);
-							};
-							
-							// emit block highlight
-							quad(	v3(-r,-r,+r),
-									v3(+r,-r,+r),
-									v3(+r,-r,+r) +v3(-inset,+inset,0)*2,
-									v3(-r,-r,+r) +v3(+inset,+inset,0)*2,
-									col);
-							
-						}
-					}
-					
-					{
-						Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
-							sizeof(Overlay_Vertex)*quad_vertecies);
-						
-						auto vert = [&] (v3 v, lrgba8 col) {
-							*out++ = { (v3)block +((rot_horiz * rot_up * v) * 0.5f +0.5f), col };
-						};
-						auto quad = [&] (v3 a, v3 b, v3 c, v3 d, lrgba8 col) {
-							vert(a, col);	vert(b, col);	vert(d, col);
-							vert(d, col);	vert(b, col);	vert(c, col);
-						};
-						
-						if (face == highlighted_block_face) { // emit face highlight
-							quad(	v3(-side_r,-side_r,+r),
-									v3(+side_r,-side_r,+r),
-									v3(+side_r,+side_r,+r),
-									v3(-side_r,+side_r,+r),
-									side_col );
-						}
-					}
-				}
-				
-				#undef QUAD
-			};
-			
-			if (highlighted_block) highlight_block(highlighted_block_pos);
-			
-			{ // block visualize
+			{ // block highlighting
 				glDisable(GL_CULL_FACE);
 				glEnable(GL_BLEND);
 				//glDisable(GL_DEPTH_TEST);
