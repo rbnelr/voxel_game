@@ -533,7 +533,9 @@ static void gen_chunk_blocks (Chunk* chunk) {
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
 				auto* b = chunk->get_block(i);
 				
-				if (i.z == highest_block && i.z >= water_level) {
+				if (i.z == highest_block && i.z >= water_level
+						&& !equal(chunk->coord, 0)
+						) {
 					b->type = BT_GRASS;
 				} else {
 					b->type = BT_EARTH;
@@ -553,13 +555,15 @@ static void gen_chunk_blocks (Chunk* chunk) {
 #include <unordered_map>
 std::unordered_map<s64v2_hashmap, Chunk*> chunks;
 
+static Chunk* _prev_query_chunk = nullptr; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
+
 static void delete_all_chunks () {
 	for (auto& c : chunks) delete c.second;
 	
+	_prev_query_chunk = nullptr;
+	
 	chunks.clear();
 }
-
-static Chunk* _prev_query_chunk = nullptr; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
 
 static Chunk* query_chunk (chunk_pos_t coord) {
 	if (_prev_query_chunk && equal(_prev_query_chunk->coord, coord)) {
@@ -1139,7 +1143,7 @@ int main (int argc, char** argv) {
 	inital_chunk( player.pos_world );
 	
 	flt chunk_drawing_radius =		INF;
-	flt chunk_generation_radius =	500;
+	flt chunk_generation_radius =	150;
 	
 	Texture2D dbg_heightmap_visualize;
 	Texture2D dbg_heightmap_multiplier_visualize;
@@ -1196,7 +1200,7 @@ int main (int argc, char** argv) {
 	
 	s32 max_chunks_generated_per_frame = 1;
 	
-	flt block_update_frequency = 1.0f;
+	flt block_update_frequency = 10.0f;
 	bpos_t cur_chunk_update_block_i = 0;
 	
 	struct Overlay_Vertex {
@@ -2024,37 +2028,60 @@ int main (int argc, char** argv) {
 			trigger_place_block = trigger_place_block && block_place_is_inside_player; // if we tried to place a block inside the player try again next frame as long as RMB is held down (releasing RMB will set trigger_place_block to false anyway)
 		}
 		
-		if (0) { // chunk update
+		if (1) { // chunk update
 			auto block_update = [] (Block* b, bpos pos_world, Chunk* chunk) {
-				if (b->type == BT_AIR && rand() % 1000 == 0) {
-					b->type = BT_WATER;
-					chunk->block_changed(pos_world);
+				Block* above = query_block(pos_world +bpos(0,0,+1));
+				
+				if (b->type == BT_EARTH && (above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS) && (
+						query_block(pos_world +bpos(-1, 0,0))->type == BT_GRASS ||
+						query_block(pos_world +bpos( 0,+1,0))->type == BT_GRASS ||
+						query_block(pos_world +bpos(+1, 0,0))->type == BT_GRASS ||
+						query_block(pos_world +bpos( 0,-1,0))->type == BT_GRASS ) ) {
+					{
+						b->type = BT_GRASS;
+						b->hp_ratio = 1;
+						chunk->block_changed(pos_world);
+					}
 				}
 			};
 			
 			constexpr bpos_t chunk_block_count = CHUNK_DIM.x * CHUNK_DIM.y * CHUNK_DIM.z;
 			static_assert(chunk_block_count == (1 << 16), "");
 			
+			auto update_block_pattern = [&] (u16 i) -> u16 {
+				// reverse bits to turn normal x y z block iteration into a somewhat distributed pattern
+				i = ((i & 0x00ff) << 8) | ((i & 0xff00) >> 8);
+				i = ((i & 0x0f0f) << 4) | ((i & 0xf0f0) >> 4);
+				i = ((i & 0x3333) << 2) | ((i & 0xcccc) >> 2);
+				i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1);
+				return i;
+			};
+			
 			bpos_t blocks_to_update = (bpos_t)ceil((f32)chunk_block_count / block_update_frequency * dt);
 			
-			printf("frame %d\n", (s32)frame_i);
+			//printf("frame %d\n", (s32)frame_i);
 			
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
 				for (bpos_t i=0; i<blocks_to_update; ++i) {
-					Block* b = &chunk->blocks[0][0][cur_chunk_update_block_i];
+					u16 indx = (u16)((cur_chunk_update_block_i +i) % chunk_block_count);
+					indx = update_block_pattern(indx);
+					
+					Block* b = &chunk->blocks[0][0][indx];
 					
 					bpos bp;
-					bp.z =  cur_chunk_update_block_i / (CHUNK_DIM.y * CHUNK_DIM.x);
-					bp.y = (cur_chunk_update_block_i % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
-					bp.x = (cur_chunk_update_block_i % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
+					bp.z =  indx / (CHUNK_DIM.y * CHUNK_DIM.x);
+					bp.y = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
+					bp.x = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
+					
+					//printf(">>> %d %d %d\n", (s32)bp.x,(s32)bp.y,(s32)bp.z);
 					
 					block_update(b, bp +chunk->chunk_origin_block_world(), chunk);
-					
-					cur_chunk_update_block_i = (cur_chunk_update_block_i +1) % chunk_block_count;
 				}
 			}
+			
+			cur_chunk_update_block_i = (cur_chunk_update_block_i +blocks_to_update) % chunk_block_count;
 		}
 		
 		//// Draw
@@ -2110,7 +2137,7 @@ int main (int argc, char** argv) {
 					++count;
 				}
 			}
-			if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
+			//if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
 			
 			count = 0;
 			
@@ -2126,7 +2153,7 @@ int main (int argc, char** argv) {
 					++count;
 				}
 			}
-			if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
+			//if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
 			
 			// draw opaque
 			for (auto& chunk_hash_pair : chunks) {

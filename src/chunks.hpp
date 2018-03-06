@@ -327,7 +327,7 @@ Block const* Chunk_Mesher::query_block (bpos_t pos_world_x, bpos_t pos_world_y, 
 #endif
 
 void Chunk_Mesher::mesh (Chunk* chunk) {
-	PROFILE_BEGIN(profile_remesh_total);
+	//PROFILE_BEGIN(profile_remesh_total);
 	
 	vbo_opaque =		&chunk->vbo;
 	vbo_transperant =	&chunk->vbo_transperant;
@@ -373,6 +373,6 @@ void Chunk_Mesher::mesh (Chunk* chunk) {
 		}
 	}
 	
-	PROFILE_END_ACCUM(profile_remesh_total);
-	PROFILE_PRINT(profile_remesh_total, "");
+	//PROFILE_END_ACCUM(profile_remesh_total);
+	//PROFILE_PRINT(profile_remesh_total, "");
 }

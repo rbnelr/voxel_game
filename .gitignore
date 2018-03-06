@@ -1,7 +1,3 @@
-deps/*
-!deps/glad/
-!deps/stb/
-!deps/glfw-3.3/
 
 *.asm
 
