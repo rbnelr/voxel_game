@@ -22,8 +22,14 @@ DONE:
  
  added water
  
+ added imgui to replace my own dev/debug gui
+ 
 TODO
 -FEATURES:
+ 
+ remove my own dev/debug gui and reimplement the Immediate mode option code with imgui controls
+ -remember to remove redundant stb text libs from deps/
+ -clean up unused shaders from shaders/
  
  add trees
   -RNG seeded by chunk pos
