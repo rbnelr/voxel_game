@@ -269,7 +269,7 @@ struct Chunk {
 		needs_remesh = false;
 	}
 	
-	void block_only_hp_changed (bpos block_pos_world) { // only breaking animation of block changed -> do not need to update block brightness -> do not need to remesh surrounding chunks (only this chunk needs remesh)
+	void block_only_texture_changed (bpos block_pos_world) { // only breaking animation of block changed -> do not need to update block brightness -> do not need to remesh surrounding chunks (only this chunk needs remesh)
 		needs_remesh = true;
 	}
 	void block_changed (bpos block_pos_world) { // block was placed or broken -> need to update our block brightness -> need to remesh surrounding chunks

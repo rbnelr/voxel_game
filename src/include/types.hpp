@@ -1,3 +1,4 @@
+#pragma once
 
 typedef signed char			schar;
 typedef unsigned char		uchar;
@@ -10,20 +11,16 @@ typedef unsigned long		ulong;
 typedef long long			sllong;
 typedef unsigned long long	ullong;
 
-static_assert(sizeof(schar) ==	1, "sizeof(schar) !=	1");
-static_assert(sizeof(sshort) ==	2, "sizeof(sshort) !=	2");
-static_assert(sizeof(si) ==		4, "sizeof(si) !=		4");
-static_assert(sizeof(slong) ==	4, "sizeof(slong) !=	4");
-static_assert(sizeof(sllong) ==	8, "sizeof(sllong) !=	8");
+#include "stdint.h"
 
-typedef schar				s8;
-typedef uchar				u8;
-typedef sshort				s16;
-typedef ushort				u16;
-typedef si					s32;
-typedef ui					u32;
-typedef sllong				s64;
-typedef ullong				u64;
+typedef int8_t				s8;
+typedef uint8_t				u8;
+typedef int16_t				s16;
+typedef uint16_t			u16;
+typedef int32_t				s32;
+typedef uint32_t			u32;
+typedef int64_t				s64;
+typedef uint64_t			u64;
 
 typedef u8					byte;
 

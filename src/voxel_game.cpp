@@ -8,10 +8,15 @@
 #include "types.hpp"
 #include "lang_helpers.hpp"
 #include "math.hpp"
+#include "prints.hpp"
 #include "bit_twiddling.hpp"
 #include "vector/vector.hpp"
 #include "intersection_test.hpp"
 #include "open_simplex_noise.hpp"
+
+#include "prints.cpp"
+
+#include "imgui.h"
 
 #define _USING_V110_SDK71_ 1
 #include "glad.c"
@@ -64,7 +69,7 @@ static void logf (cstr format, ...) {
 	va_list vl;
 	va_start(vl, format);
 	
-	_prints(&str, format, vl);
+	vprints(&str, format, vl);
 	
 	va_end(vl);
 	
@@ -78,7 +83,7 @@ static void logf_warning (cstr format, ...) {
 	va_list vl;
 	va_start(vl, format);
 	
-	_prints(&str, format, vl);
+	vprints(&str, format, vl);
 	
 	va_end(vl);
 	
@@ -422,40 +427,6 @@ static s32 get_heightmap_noise_octaves_count () {			return (s32)heightmap_noise_
 static void set_heightmap_noise_octaves_count (s32 count) {	heightmap_noise_octaves.resize(count); }
 static bool heightmap_noise_octaves_open = true;
 
-
-std::vector<Noise_Octave> heightmap_multiplier_noise_octaves = {
-	{ 500,		0.2f		},
-	{ 1000,		0.4f		},
-	{ 200,		0.2f		},
-};
-static s32 get_heightmap_multiplier_noise_octaves_count () {			return (s32)heightmap_multiplier_noise_octaves.size(); }
-static void set_heightmap_multiplier_noise_octaves_count (s32 count) {	heightmap_multiplier_noise_octaves.resize(count); }
-static bool heightmap_multiplier_noise_octaves_open = true;
-
-static f32 heightmap_multiplier (OSN::Noise<2> const& osn_noise, v2 pos_world) {
-	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
-		pos = rotate2(ang_offs) * pos;
-		pos /= period; // period is inverse frequency
-		pos += offs;
-		return osn_noise.eval<flt>(pos.x, pos.y);
-	};
-	
-	f32 tot = 0;
-	
-	s32 i = get_heightmap_noise_octaves_count();
-	for (auto& o : heightmap_multiplier_noise_octaves) {
-		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
-		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
-		tot += noise(pos_world, o.period, deg(37.17f) * (f32)i, offs) * o.amp;
-		
-		++i;
-	}
-	
-	tot = pow(1.6f, 2.8f * (tot +0.1f));
-	
-	return tot;
-}
-
 static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
 		pos = rotate2(ang_offs) * pos;
@@ -464,36 +435,51 @@ static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 		return osn_noise.eval<flt>(pos.x, pos.y);
 	};
 	
-	f32 tot = 0;
+	flt elevation;
+	flt roughness;
+	flt detail;
 	
 	s32 i = 0;
-	for (auto& o : heightmap_noise_octaves) {
+	{
 		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
 		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
-		flt val = noise(pos_world, o.period, deg(37.17f) * (f32)i, offs) * o.amp;
-		tot += val;
+		elevation = noise(pos_world, 300, deg(37.17f) * (f32)i, offs);
+		
+		++i;
+	}
+	{
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		roughness = noise(pos_world, 220, deg(37.17f) * (f32)i, offs);
+		
+		++i;
+	}
+	{
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		detail = noise(pos_world, 50, deg(37.17f) * (f32)i, offs);
 		
 		++i;
 	}
 	
-	tot *= heightmap_multiplier(osn_noise, pos_world);
-	
-	return tot +32;
+	return (elevation +roughness * detail) * 32 +32;
 }
 
-static flt noise_tree_freq = 0.1f;
-static flt noise_tree_amp = 5;
+static flt noise_tree_desity_period = 0.1f;
+static flt noise_tree_density_amp = 1;
 
-#if 0
-static lrgb8 noise_tree (v2 pos_world) {
-	//using namespace perlin_noise_n;
-	pos_world = abs(pos_world);
+static lrgb8 noise_tree_density (OSN::Noise<2> const& osn_noise, v2 pos_world) {
+	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
+		pos = rotate2(ang_offs) * pos;
+		pos /= period; // period is inverse frequency
+		pos += offs;
+		return osn_noise.eval<flt>(pos.x, pos.y);
+	};
 	
-	f32 val = perlin_octave(pos_world, noise_tree_freq) * noise_tree_amp;
+	f32 val = noise(pos_world, noise_tree_desity_period, 0,0) * noise_tree_density_amp;
 	
 	return spectrum_gradient(val);
 }
-#endif
 
 static u64 world_seed = 0;
 
@@ -534,7 +520,8 @@ static void gen_chunk_blocks (Chunk* chunk) {
 				auto* b = chunk->get_block(i);
 				
 				if (i.z == highest_block && i.z >= water_level
-						&& !equal(chunk->coord, 0)
+						//&& equal(chunk->coord, 0)
+						//&& (chunk->coord.x % 2 == 0 && chunk->coord.y % 2 == 0)
 						) {
 					b->type = BT_GRASS;
 				} else {
@@ -543,8 +530,8 @@ static void gen_chunk_blocks (Chunk* chunk) {
 				
 				b->hp_ratio = 1;
 				
-				b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
-				//b->dbg_tint = lrgba8( noise_tree(pos_world), 255);
+				//b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
+				b->dbg_tint = lrgba8( noise_tree_density(noise, pos_world), 255);
 			}
 		}
 	}
@@ -658,8 +645,8 @@ struct Input {
 };
 static Input		inp;
 
-static bool controling_flycam =		false;
-static bool viewing_flycam =		false;
+static bool controling_flycam =		1;
+static bool viewing_flycam =		1;
 
 struct Flycam {
 	v3	pos_world =			v3(-15, -27, 50);
@@ -703,6 +690,9 @@ static bool trigger_load_game =			false;
 static bool jump_held =					false;
 static bool hold_break_block =			false;
 static bool trigger_place_block =		false;
+
+static bool lmb_down = false;
+static bool rmb_down = false;
 
 static void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
 	dbg_assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
@@ -819,6 +809,7 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 	
 	switch (button) {
 		case GLFW_MOUSE_BUTTON_RIGHT:
+			rmb_down = went_down;
 			if (fps_mouse_mode == DEV_MODE) {
 				if (went_down) {
 					start_mouse_look();
@@ -831,7 +822,10 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 				trigger_place_block = went_down;
 			}
 			break;
-		case GLFW_MOUSE_BUTTON_LEFT: hold_break_block = went_down; break;
+		case GLFW_MOUSE_BUTTON_LEFT:
+			lmb_down = went_down;
+			hold_break_block = went_down;
+			break;
 	}
 }
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
@@ -849,15 +843,19 @@ static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffse
 }
 
 int main (int argc, char** argv) {
+	
 	cstr app_name = "Voxel Game";
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
+	
+	ImGui::CreateContext();
+	ImGuiIO& imgui_io = ImGui::GetIO();
 	
 	if (fps_mouse_mode == DEV_MODE)	stop_mouse_look();
 	else							start_mouse_look();
 	
 	//
-	set_vsync(-1);
+	set_vsync(0 ? -1 : 0);
 	
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -903,6 +901,38 @@ int main (int argc, char** argv) {
 		
 		vbo_overlay_font.init(&font::mesh_vert_layout);
 		shad_font = new_shader("font.vert", "font.frag", {UCOM}, {{0,"glyphs"}});
+	}
+	
+	Texture2D imgui_tex_font_atlas;
+	Shader* shad_imgui = new_shader("imgui.vert", "imgui.frag", {UCOM}, {{0,"atlas"}});
+	struct Imgui_Vbo {
+		GLuint						vbo_vert;
+		GLuint						vbo_indx;
+		
+		void init () {
+			glGenBuffers(1, &vbo_vert);
+			glGenBuffers(1, &vbo_indx);
+			
+		}
+		~Imgui_Vbo () {
+			glDeleteBuffers(1, &vbo_vert);
+			glDeleteBuffers(1, &vbo_indx);
+		}
+	};
+	Imgui_Vbo imgui_vbo;
+	imgui_vbo.init();
+	{
+		u8* pixels;
+		s32 w, h;
+		imgui_io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
+		
+		imgui_tex_font_atlas.alloc_cpu_single_mip(PT_SRGB8_LA8, iv2(w,h));
+		
+		memcpy(imgui_tex_font_atlas.mips[0].data, pixels, imgui_tex_font_atlas.mips[0].size);
+		
+		imgui_tex_font_atlas.upload();
+		
+		imgui_io.Fonts->TexID = (void*)&imgui_tex_font_atlas;
 	}
 	
 	//
@@ -1143,10 +1173,9 @@ int main (int argc, char** argv) {
 	inital_chunk( player.pos_world );
 	
 	flt chunk_drawing_radius =		INF;
-	flt chunk_generation_radius =	150;
+	flt chunk_generation_radius =	100;
 	
 	Texture2D dbg_heightmap_visualize;
-	Texture2D dbg_heightmap_multiplier_visualize;
 	s32 dbg_heightmap_visualize_radius = 1000;
 	
 	auto regen_dbg_heightmap_visualize = [&] () {
@@ -1169,38 +1198,17 @@ int main (int argc, char** argv) {
 		
 		dbg_heightmap_visualize.upload();
 	};
-	auto regen_dbg_heightmap_multiplier_visualize = [&] () {
-		lrgba8* pixels = (lrgba8*)dbg_heightmap_multiplier_visualize.mips[0].data;
-		iv2 dim = dbg_heightmap_multiplier_visualize.mips[0].dim;
-		
-		auto dst = [&] (iv2 pos) -> lrgba8* {
-			return &pixels[pos.y*dim.x + pos.x];
-		};
-		
-		OSN::Noise<2> noise( world_seed );
-		
-		iv2 i;
-		for (i.y=0; i.y<dim.y; ++i.y) {
-			for (i.x=0; i.x<dim.x; ++i.x) {
-				v2 pos_world = map((v2)i, 0,(v2)(dim-1), -dbg_heightmap_visualize_radius / 2, +dbg_heightmap_visualize_radius / 2);
-				*dst(i) = lrgba8(spectrum_gradient(map( heightmap_multiplier(noise, pos_world) , 0, 2)), 255);
-			}
-		}
-		
-		dbg_heightmap_multiplier_visualize.upload();
-	};
 	
 	{
 		dbg_heightmap_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
-		dbg_heightmap_multiplier_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
 		
 		regen_dbg_heightmap_visualize();
-		regen_dbg_heightmap_multiplier_visualize();
 	}
 	
 	s32 max_chunks_generated_per_frame = 1;
 	
-	flt block_update_frequency = 10.0f;
+	//flt block_update_frequency = 1.0f;
+	flt block_update_frequency = 1.0f / 10;
 	bpos_t cur_chunk_update_block_i = 0;
 	
 	struct Overlay_Vertex {
@@ -1265,6 +1273,21 @@ int main (int argc, char** argv) {
 		glfwPollEvents();
 		
 		inp.get_non_callback_input();
+		
+		imgui_io.DisplaySize.x = (flt)inp.wnd_dim.x;
+		imgui_io.DisplaySize.y = (flt)inp.wnd_dim.y;
+		imgui_io.DeltaTime = dt;
+		imgui_io.MousePos.x = (flt)inp.mcursor_pos_px.x;
+		imgui_io.MousePos.y = (flt)inp.mcursor_pos_px.y;
+		imgui_io.MouseDown[0] = lmb_down;
+		imgui_io.MouseDown[1] = rmb_down;
+		
+		ImGui::NewFrame();
+		
+		ImGui::ShowDemoWindow();
+		
+		// Render & swap video buffers
+		ImGui::Render();
 		
 		begin_options();
 		
@@ -1344,21 +1367,8 @@ int main (int argc, char** argv) {
 			}
 		}
 		
-		option("heightmap_multiplier_noise_octaves", get_heightmap_multiplier_noise_octaves_count, set_heightmap_multiplier_noise_octaves_count, &heightmap_multiplier_noise_octaves_open);
-		if (heightmap_multiplier_noise_octaves_open) {
-			for (s32 i=0; i<(s32)heightmap_multiplier_noise_octaves.size(); ++i) {
-				auto& o = heightmap_multiplier_noise_octaves[i];
-				
-				v2 tmp = v2(o.period, o.amp);
-				
-				if (option(prints("  [%2d]", i), &tmp)) trigger_regen_chunks = true;
-				
-				o.period = tmp.x;	o.amp = tmp.y;
-			}
-		}
-		
-		if (option("noise_tree_freq", &noise_tree_freq))	trigger_regen_chunks = true;
-		if (option("noise_tree_amp", &noise_tree_amp))		trigger_regen_chunks = true;
+		if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;
+		if (option("noise_tree_density_amp", &noise_tree_density_amp))			trigger_regen_chunks = true;
 		
 		if (option("world_seed", &world_seed))				trigger_regen_chunks = true;
 		
@@ -1376,7 +1386,6 @@ int main (int argc, char** argv) {
 		
 		if (trigger_dbg_heightmap_visualize) {
 			regen_dbg_heightmap_visualize();
-			regen_dbg_heightmap_multiplier_visualize();
 			trigger_dbg_heightmap_visualize = false;
 		}
 		
@@ -1985,7 +1994,7 @@ int main (int argc, char** argv) {
 			b->hp_ratio -= 1.0f / 0.3f * dt;
 			
 			if (b->hp_ratio > 0) {
-				chunk->block_only_hp_changed(highlighted_block_pos);
+				chunk->block_only_texture_changed(highlighted_block_pos);
 			} else {
 				
 				b->hp_ratio = 0;
@@ -2029,23 +2038,79 @@ int main (int argc, char** argv) {
 		}
 		
 		if (1) { // chunk update
-			auto block_update = [] (Block* b, bpos pos_world, Chunk* chunk) {
+			constexpr bpos_t chunk_block_count = CHUNK_DIM.x * CHUNK_DIM.y * CHUNK_DIM.z;
+			bpos_t blocks_to_update = (bpos_t)ceil((f32)chunk_block_count * block_update_frequency * dt);
+			
+			auto mtth_to_prob = [&] (flt mtth) -> flt {
+				return 1 -pow(EULER, -0.693147f / (mtth * block_update_frequency));
+			};
+			
+			flt grass_die_mtth = 5; // seconds
+			flt grass_die_prob = mtth_to_prob(grass_die_mtth);
+			
+			flt grass_grow_min_mtth = 1; // seconds
+			flt grass_grow_max_prob = mtth_to_prob(grass_grow_min_mtth);
+			
+			flt grass_grow_diagonal_multipiler = 0.5f;
+			flt grass_grow_step_down_multipiler = 0.75f;
+			flt grass_grow_step_up_multipiler = 0.6f;
+			
+			// grass_grow_max_prob = 4*grass_grow_side_prob +4*grass_grow_diagonal_prob; grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler
+			flt grass_grow_side_prob = grass_grow_max_prob / (4 * (1 +grass_grow_diagonal_multipiler));
+			flt grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler;
+			
+			auto block_update = [&] (Block* b, bpos pos_world, Chunk* chunk) {
 				Block* above = query_block(pos_world +bpos(0,0,+1));
 				
-				if (b->type == BT_EARTH && (above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS) && (
-						query_block(pos_world +bpos(-1, 0,0))->type == BT_GRASS ||
-						query_block(pos_world +bpos( 0,+1,0))->type == BT_GRASS ||
-						query_block(pos_world +bpos(+1, 0,0))->type == BT_GRASS ||
-						query_block(pos_world +bpos( 0,-1,0))->type == BT_GRASS ) ) {
-					{
+				if (bt_does_autoheal(b->type) && b->hp_ratio < 1.0f) {
+					b->hp_ratio += 1.0f/5 / block_update_frequency;
+					b->hp_ratio = min(b->hp_ratio, 1.0f);
+					
+					chunk->block_only_texture_changed(pos_world);
+				}
+				if (b->type == BT_GRASS && !(above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
+					if (grass_die_prob > random::flt()) {
+						b->type = BT_EARTH;
+						b->hp_ratio = 1;
+						chunk->block_only_texture_changed(pos_world);
+					}
+				}
+				if (b->type == BT_EARTH && (above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
+					flt prob = 0;
+					
+					bpos2 sides[4] = {
+						bpos2(-1,0),
+						bpos2(+1,0),
+						bpos2(0,-1),
+						bpos2(0,+1),
+					};
+					bpos2 diagonals[4] = {
+						bpos2(-1,-1),
+						bpos2(+1,-1),
+						bpos2(-1,+1),
+						bpos2(+1,+1),
+					};
+					
+					for (bpos2 v : sides) {
+						if (	 query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
+						else if (query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_side_prob;
+						else if (query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
+					}
+					
+					for (bpos2 v : diagonals) {
+						if (	 query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
+						else if (query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_diagonal_prob;
+						else if (query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
+					}
+					
+					if (prob > random::flt()) {
 						b->type = BT_GRASS;
 						b->hp_ratio = 1;
-						chunk->block_changed(pos_world);
+						chunk->block_only_texture_changed(pos_world);
 					}
 				}
 			};
 			
-			constexpr bpos_t chunk_block_count = CHUNK_DIM.x * CHUNK_DIM.y * CHUNK_DIM.z;
 			static_assert(chunk_block_count == (1 << 16), "");
 			
 			auto update_block_pattern = [&] (u16 i) -> u16 {
@@ -2056,8 +2121,6 @@ int main (int argc, char** argv) {
 				i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1);
 				return i;
 			};
-			
-			bpos_t blocks_to_update = (bpos_t)ceil((f32)chunk_block_count / block_update_frequency * dt);
 			
 			//printf("frame %d\n", (s32)frame_i);
 			
@@ -2283,13 +2346,13 @@ int main (int argc, char** argv) {
 			if (shad_overlay_tex->valid()) {
 				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
 				//draw_overlay_tex2d(&tex_breaking, UL, 8);
-				//draw_overlay_tex2d(&dbg_heightmap_multiplier_visualize, UR, 1);
 				//draw_overlay_tex2d(&dbg_heightmap_visualize, LR, 1.5f);
+				//draw_overlay_tex2d(&imgui_tex_font_atlas, LR, 1.0f);
 			}
 			
 		}
 		
-		if (shad_font->valid()) {
+		if (shad_font->valid()) { // my own font overlay for options
 			glEnable(GL_BLEND);
 			glDisable(GL_DEPTH_TEST);
 			glDisable(GL_CULL_FACE);
@@ -2305,6 +2368,86 @@ int main (int argc, char** argv) {
 			glEnable(GL_DEPTH_TEST);
 			glDisable(GL_BLEND);
 		}
+		if (shad_imgui->valid()) { // imgui
+			glEnable(GL_BLEND);
+			glDisable(GL_DEPTH_TEST);
+			glDisable(GL_CULL_FACE);
+			glEnable(GL_SCISSOR_TEST);
+			
+			shad_imgui->bind();
+			shad_imgui->set_unif("screen_dim", (v2)inp.wnd_dim);
+			
+			ImDrawData* draw_data = ImGui::GetDrawData();
+			
+			struct Imgui_Vertex {
+				v2		pos_screen;
+				v2		uv;
+				u32		col;
+			};
+			
+			glBindBuffer(GL_ARRAY_BUFFER, imgui_vbo.vbo_vert);
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, imgui_vbo.vbo_indx);
+			
+			GLint pos_loc =	glGetAttribLocation(shad_font->prog, "pos_screen");
+			GLint uv_loc =	glGetAttribLocation(shad_font->prog, "uv");
+			GLint col_loc =	glGetAttribLocation(shad_font->prog, "col");
+			
+			glEnableVertexAttribArray(pos_loc);
+			glVertexAttribPointer(pos_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, pos_screen));
+			
+			glEnableVertexAttribArray(uv_loc);
+			glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, uv));
+			
+			glEnableVertexAttribArray(col_loc);
+			glVertexAttribPointer(col_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, col));
+			
+			for (int n = 0; n < draw_data->CmdListsCount; n++) {
+				auto* cmd_list = draw_data->CmdLists[n];
+				
+				const ImDrawVert* vtx_buffer = cmd_list->VtxBuffer.Data;  // vertex buffer generated by ImGui
+				const ImDrawIdx* idx_buffer = cmd_list->IdxBuffer.Data;   // index buffer generated by ImGui
+				
+				auto vertex_size = cmd_list->VtxBuffer.size() * sizeof(ImDrawVert);
+				auto index_size = cmd_list->IdxBuffer.size() * sizeof(ImDrawIdx);
+				
+				glBufferData(GL_ARRAY_BUFFER, vertex_size, NULL, GL_STREAM_DRAW);
+				glBufferData(GL_ARRAY_BUFFER, vertex_size, vtx_buffer, GL_STREAM_DRAW);
+				
+				glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size, NULL, GL_STREAM_DRAW);
+				glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size, idx_buffer, GL_STREAM_DRAW);
+				
+				const ImDrawIdx* cur_idx_buffer = idx_buffer;
+				
+				for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++) {
+					const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
+					if (pcmd->UserCallback) {
+						pcmd->UserCallback(cmd_list, pcmd);
+					} else {
+						bind_texture_unit(0, (Texture2D*)pcmd->TextureId);
+						
+						flt y0 = (flt)inp.wnd_dim.y -pcmd->ClipRect.w;
+						flt y1 = (flt)inp.wnd_dim.y -pcmd->ClipRect.y;
+						
+						
+						
+						glScissor((int)pcmd->ClipRect.x, y0, (int)(pcmd->ClipRect.z -pcmd->ClipRect.x), (int)(y1 -y0));
+						
+						// Render 'pcmd->ElemCount/3' indexed triangles.
+						// By default the indices ImDrawIdx are 16-bits, you can change them to 32-bits if your engine doesn't support 16-bits indices.
+						glDrawElements(GL_TRIANGLES, pcmd->ElemCount, GL_UNSIGNED_SHORT,
+							(GLvoid const*)((u8 const*)cur_idx_buffer -(u8 const*)idx_buffer));
+					}
+					cur_idx_buffer += pcmd->ElemCount;
+				}
+			}
+			
+			glScissor(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
+			
+			glDisable(GL_SCISSOR_TEST);
+			glEnable(GL_CULL_FACE);
+			glEnable(GL_DEPTH_TEST);
+			glDisable(GL_BLEND);
+		}
 		
 		glfwSwapBuffers(wnd);
 		
@@ -2316,6 +2459,8 @@ int main (int argc, char** argv) {
 			avg_dt = lerp(avg_dt, dt, avg_dt_alpha);
 		}
 	}
+	
+    ImGui::DestroyContext();
 	
 	platform_terminate();
 	

@@ -16,6 +16,7 @@
 	set GLFW=!DEPS!glfw-3.2.1.bin.WIN64/
 	set GLAD=!DEPS!glad/
 	set STB=!DEPS!stb/
+	set IMGUI=!DEPS!dear_imgui/
 	
 	set GLFW_SRC=!DEPS!glfw-3.3/
 	
@@ -100,9 +101,14 @@ rem /main
 	rem cl.exe -nologo /source-charset:utf-8 /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLFW!include /I!GLAD! /I!STB! !SRC!!proj!.cpp /Fe!ROOT!!proj!.exe /link KERNEL32.lib OPENGL32.lib !GLFW!lib-vc2015/glfw3dll.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
 	rem glfw static link
-	cl.exe -nologo !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE!
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE! /Fo!DEPS!glfw_one_source_file.obj
 	
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /I!GLFW_SRC!include /I!DEPS!open_simplex_noise !SRC!!proj!.cpp glfw_one_source_file.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
+	rem imgui static link
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui.cpp /Fo!DEPS!imgui.obj
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_draw.cpp /Fo!DEPS!imgui_draw.obj
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_demo.cpp /Fo!DEPS!imgui_demo.obj
+	
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /I!GLFW_SRC!include /I!DEPS!open_simplex_noise /I!IMGUI! !SRC!!proj!.cpp !DEPS!glfw_one_source_file.obj !DEPS!imgui.obj !DEPS!imgui_draw.obj !DEPS!imgui_demo.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
 	rem WINMM.lib for simple audio playing (https://msdn.microsoft.com/en-us/library/windows/desktop/dd743680(v=vs.85).aspx)
 	

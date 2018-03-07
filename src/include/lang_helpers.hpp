@@ -1,85 +1,5 @@
-
-#define RZ_COMP_GCC				1
-#define RZ_COMP_LLVM			2
-#define RZ_COMP_MSVC			3
-// Determining the compiler
-#if !defined RZ_COMP
-	#if _MSC_VER && !__INTELRZ_COMPILER && !__clan_
-		#define RZ_COMP RZ_COMP_MSVC
-	#elif __GNUC__ && !__clan_
-		#define RZ_COMP RZ_COMP_GCC
-	#elif __clan_
-		#define RZ_COMP RZ_COMP_LLVM
-	#else
-		#warning Cannot determine compiler!.
-	#endif
-#endif
-
-#define RZ_ARCH_X64				1
-#define RZ_ARCH_ARM_CORTEX_M4	2
-#define RZ_ARCH_ARM_V6_HF		3
-
-#define RZ_PLATF_GENERIC_WIN	1
-#define RZ_PLATF_GENERIC_UNIX	2
-#define RZ_PLATF_NONE			3
-
-#undef FORCEINLINE
-
-#if RZ_COMP == RZ_COMP_MSVC
-	#define FORCEINLINE						__forceinline
-	#define NOINLINE						__declspec(noinline)
-	#define DBGBREAK						__debugbreak()
-	
-	#define F32_INF							((float)(1e+300 * 1e+300))
-	#define F64_INF							(1e+300 * 1e+300)
-	#define F32_QNAN						std::numeric_limits<float>::quiet_NaN()
-	#define F64_QNAN						std::numeric_limits<double>::quiet_NaN()
-	
-#elif RZ_COMP == RZ_COMP_LLVM
-	#define FORCEINLINE						__attribute__((always_inline)) inline
-	#define NOINLINE						__attribute__((noinline))
-	#define DBGBREAK						do { asm volatile ("int3"); } while(0)
-		
-	#define F32_INF							(__builtin_inff())
-	#define F64_INF							(__builtin_inf())
-	#define F32_QNAN						((float)__builtin_nan("0"))
-	#define F64_QNAN						(__builtin_nan("0"))
-	
-#elif RZ_COMP == RZ_COMP_GCC
-	#define FORCEINLINE						__attribute__((always_inline)) inline
-	#define NOINLINE						__attribute__((noinline))
-	
-	#if RZ_PLATF == RZ_PLATF_GENERIC_WIN
-		#define DBGBREAK					do { __debugbreak(); } while(0)
-	#elif RZ_PLATF == RZ_PLATF_GENERIC_UNIX
-		#if RZ_ARCH == RZ_ARCH_ARM_V6_HF
-			#define DBGBREAK				do { asm volatile ("bkpt #0"); } while(0)
-		#endif
-	#endif
-	
-	#define F32_INF							(__builtin_inff())
-	#define F64_INF							(__builtin_inf())
-	#define F32_QNAN						((float)__builtin_nan("0"))
-	#define F64_QNAN						(__builtin_nan("0"))
-	
-#endif
-
-////
-#define STRINGIFY(x) #x
-#define TO_STRING(x) STRINGIFY(x)
-
-#define STATIC_ASSERT(cond) static_assert((cond), STRINGIFY(cond))
-
-#include "types.hpp"
-
-#define ANSI_COLOUR_CODE_RED	"\033[1;31m"
-#define ANSI_COLOUR_CODE_YELLOW	"\033[1;33m"
-#define ANSI_COLOUR_CODE_NC		"\033[0m"
-
-#include <cstdarg>
-
-static void _prints (std::string* s, cstr format, va_list vl);
-
+#include "compiler_platform_arch.hpp"
+#include "preprocessor_stuff.hpp"
 #include "assert.hpp"
 
 //
@@ -93,12 +13,6 @@ template<> constexpr bool _safe_cast<u64, s64> (s64 x) { return x >= 0; }
 #define safe_cast(cast_t, val) _safe_cast<cast_t>(val)
 
 //
-#define ARRLEN(arr) (sizeof(arr) / sizeof(arr[0]))
-
-#define EVEN(i)			(((i) % 2) == 0)
-#define ODD(i)			(((i) % 2) == 1)
-
-#define BOOL_XOR(a, b)	(((a) != 0) == ((b) != 0))
 
 static u32 strlen (utf32 const* str) {
 	u32 ret = 0;
@@ -126,8 +40,6 @@ template<typename FUNC>
 static FORCEINLINE At_Scope_Exit<FUNC> operator+(_Defer_Helper, FUNC f) {
 	return At_Scope_Exit<FUNC>(f);
 }
-
-#define CONCAT(a,b) a##b
 
 #define _defer(counter) auto CONCAT(_defer_helper, counter) = _Defer_Helper() +[&] () 
 #define defer _defer(__COUNTER__)
@@ -181,40 +93,6 @@ template <typename T> static typename std::vector<T>::iterator vector_append (st
 
 template <typename T> static uptr vector_size_bytes (std::vector<T> const& vec) {
 	return vec.size() * sizeof(T);
-}
-
-// Printf that outputs to a std::string
-static void _prints (std::string* s, cstr format, va_list vl) { // print 
-	for (;;) {
-		auto ret = vsnprintf(&(*s)[0], s->length()+1, format, vl); // i think i'm technically not allowed to overwrite the null terminator
-		dbg_assert(ret >= 0);
-		bool was_bienough = (u32)ret < s->length()+1;
-		s->resize((u32)ret);
-		if (was_bienough) break;
-		// buffer was to small, buffer size was increased
-		// now snprintf has to succeed, so call it again
-	}
-}
-static void prints (std::string* s, cstr format, ...) {
-	va_list vl;
-	va_start(vl, format);
-	
-	_prints(s, format, vl);
-	
-	va_end(vl);
-}
-static std::string prints (cstr format, ...) {
-	va_list vl;
-	va_start(vl, format);
-	
-	std::string ret;
-	ret.reserve(128); // overallocate to prevent calling printf twice in most cases
-	ret.resize(ret.capacity());
-	_prints(&ret, format, vl);
-	
-	va_end(vl);
-	
-	return ret;
 }
 
 // "foo/bar/README.txt"	-> "foo/bar/"

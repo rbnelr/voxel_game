@@ -1,3 +1,11 @@
+#pragma once
+#include <cmath>
+
+using std::abs;
+using std::sin;
+using std::cos;
+#define mod				fmod
+
 
 #define INFd		F64_INF
 #define INF			F32_INF
@@ -13,6 +21,9 @@
 
 #define SQRT_2d		1.4142135623730950488016887242097
 #define SQRT_2		1.4142135623730950488016887242097f
+
+#define EULERd		2.7182818284590452353602874713527
+#define EULER		2.7182818284590452353602874713527f
 
 #define DEG_TO_RADd	0.01745329251994329576923690768489	// 180/PI
 #define DEG_TO_RAD	0.01745329251994329576923690768489f
@@ -59,13 +70,6 @@ static constexpr f32 lerp (f32 a, f32 b, f32 t) {		return a*(1.0f -t) +b*t; }
 static constexpr f32 map (f32 x, f32 in_a, f32 in_b) {	return (x -in_a)/(in_b -in_a); }
 static constexpr f32 map (f32 x, f32 in_a, f32 in_b, f32 out_a, f32 out_b) {
 														return lerp(out_a, out_b, map(x, in_a, in_b)); }
-
-#include <cmath>
-
-using std::abs;
-using std::sin;
-using std::cos;
-#define mod				fmod
 
 template <typename T> static T mymod (T val, T range) {
 	#if 1

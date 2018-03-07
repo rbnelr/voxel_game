@@ -24,6 +24,7 @@ static bool bt_is_traversable (block_type t) {	return (t == BT_AIR || t == BT_WA
 static bool bt_is_breakable (block_type t) {	return !(t == BT_AIR || t == BT_WATER || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
 static bool bt_is_transparent (block_type t) {	return (t == BT_AIR || t == BT_WATER || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
 static bool bt_is_replaceable (block_type t) {	return (t == BT_AIR || t == BT_WATER); }
+static bool bt_does_autoheal (block_type t) {	return (t == BT_EARTH || t == BT_GRASS); }
 
 static cstr block_texture_name[BLOCK_TYPES_COUNT] = {
 	/* BT_AIR	*/	"missing.png",

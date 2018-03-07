@@ -1,3 +1,9 @@
+#pragma once
+#include "compiler_platform_arch.hpp"
+#include "preprocessor_stuff.hpp"
+#include "types.hpp"
+#include "prints.hpp"
+#include "stdio.h"
 
 #define IS_DEBUGGER_PRESENT()			false
 
@@ -80,7 +86,7 @@ static void dbg_warning (cstr format, ...) {
 	va_list vl;
 	va_start(vl, format);
 	
-	_prints(&str, format, vl);
+	vprints(&str, format, vl);
 	
 	va_end(vl);
 	

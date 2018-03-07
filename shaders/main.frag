@@ -65,6 +65,7 @@ void main () {
 	//FRAG_COL( vec3(1,1,0.8) );
 	
 	vec2 face_uv = manual_nearest_filtering( vs_uvzw_atlas.xy );
+	//vec2 face_uv = vs_uvzw_atlas.xy;
 	
 	vec2 uv = face_uv;
 	

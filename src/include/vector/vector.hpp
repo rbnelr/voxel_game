@@ -1,5 +1,8 @@
+#pragma once
+#include "math.hpp"
 
 #define INL FORCEINLINE
+#define VEC_STATIC static
 
 union u8v2;
 union u8v3;
@@ -130,11 +133,11 @@ union s64v4;
 #undef BV4
 
 // length and normalization for "1 dimensional vectors" ie. scalars
-static f32 length (f32 x) {	return abs(x); }
-static s32 length (s32 x) {	return abs(x); }
+VEC_STATIC f32 length (f32 x) {	return abs(x); }
+VEC_STATIC s32 length (s32 x) {	return abs(x); }
 
-static f32 normalize (f32 x) {	return x / length(x); }
-static s32 normalize (s32 x) {	return x / length(x); }
+VEC_STATIC f32 normalize (f32 x) {	return x / length(x); }
+VEC_STATIC s32 normalize (s32 x) {	return x / length(x); }
 
 
 fv2::operator s64v2() const {	return s64v2((s64)x, (s64)y); }
@@ -228,27 +231,27 @@ public:
 	HM& operator*= (HM r);
 };
 
-static V2 operator* (M2 m, V2 v) {
+VEC_STATIC V2 operator* (M2 m, V2 v) {
 	V2 ret;
 	ret.x = m.arr[0].x * v.x  +m.arr[1].x * v.y;
 	ret.y = m.arr[0].y * v.x  +m.arr[1].y * v.y;
 	return ret;
 }
-static M2 operator* (M2 l, M2 r) {
+VEC_STATIC M2 operator* (M2 l, M2 r) {
 	M2 ret;
 	ret.arr[0] = l * r.arr[0];
 	ret.arr[1] = l * r.arr[1];
 	return ret;
 }
 
-static V3 operator* (M3 m, V3 v) {
+VEC_STATIC V3 operator* (M3 m, V3 v) {
 	V3 ret;
 	ret.x = m.arr[0].x * v.x  +m.arr[1].x * v.y  +m.arr[2].x * v.z;
 	ret.y = m.arr[0].y * v.x  +m.arr[1].y * v.y  +m.arr[2].y * v.z;
 	ret.z = m.arr[0].z * v.x  +m.arr[1].z * v.y  +m.arr[2].z * v.z;
 	return ret;
 }
-static M3 operator* (M3 l, M3 r) {
+VEC_STATIC M3 operator* (M3 l, M3 r) {
 	M3 ret;
 	ret.arr[0] = l * r.arr[0];
 	ret.arr[1] = l * r.arr[1];
@@ -256,7 +259,7 @@ static M3 operator* (M3 l, M3 r) {
 	return ret;
 }
 
-static V4 operator* (M4 m, V4 v) {
+VEC_STATIC V4 operator* (M4 m, V4 v) {
 	V4 ret;
 	ret.x = m.arr[0].x * v.x  +m.arr[1].x * v.y  +m.arr[2].x * v.z  +m.arr[3].x * v.w;
 	ret.y = m.arr[0].y * v.x  +m.arr[1].y * v.y  +m.arr[2].y * v.z  +m.arr[3].y * v.w;
@@ -264,7 +267,7 @@ static V4 operator* (M4 m, V4 v) {
 	ret.w = m.arr[0].w * v.x  +m.arr[1].w * v.y  +m.arr[2].w * v.z  +m.arr[3].w * v.w;
 	return ret;
 }
-static M4 operator* (M4 l, M4 r) {
+VEC_STATIC M4 operator* (M4 l, M4 r) {
 	M4 ret;
 	ret.arr[0] = l * r.arr[0];
 	ret.arr[1] = l * r.arr[1];
@@ -273,7 +276,7 @@ static M4 operator* (M4 l, M4 r) {
 	return ret;
 }
 
-static V3 operator* (HM m, V3 v) { // the common case of wanting to translate/rotate/scale some v3 -> if you just want to rotate/scale instead of doing this "M4*v4(v3,0)" -> just do "M4.m3() * V3"
+VEC_STATIC V3 operator* (HM m, V3 v) { // the common case of wanting to translate/rotate/scale some v3 -> if you just want to rotate/scale instead of doing this "M4*v4(v3,0)" -> just do "M4.m3() * V3"
 	// implicit v.w = 1
 	V3 ret;
 	ret.x = m.arr[0].x * v.x  +m.arr[1].x * v.y  +m.arr[2].x * v.z  +m.arr[3].x;
@@ -281,7 +284,7 @@ static V3 operator* (HM m, V3 v) { // the common case of wanting to translate/ro
 	ret.z = m.arr[0].z * v.x  +m.arr[1].z * v.y  +m.arr[2].z * v.z  +m.arr[3].z;
 	return ret;
 }
-static HM operator* (HM l, HM r) {
+VEC_STATIC HM operator* (HM l, HM r) {
 	HM ret;
 	#if 0
 	ret.arr[0] = l.m3() * r.arr[0];	// implicit r.arr[0].w = 0
@@ -321,7 +324,7 @@ HM& HM::operator*= (HM r) {
 	return *this = *this * r;
 }
 
-static M2 inverse (M2 m) {
+VEC_STATIC M2 inverse (M2 m) {
 	T inv_det = T(1) / ( (m.arr[0].x * m.arr[1].y) -(m.arr[1].x * m.arr[0].y) );
 	
 	M2 ret;
@@ -428,77 +431,77 @@ GLM_FUNC_QUALIFIER tmat4x4<T, P> compute_inverse(tmat4x4<T, P> const & m)
 }
 #endif
 
-static M2 scale2 (V2 v) {
+VEC_STATIC M2 scale2 (V2 v) {
 	return M2::column(	V2(v.x,0),
 						V2(0,v.y) );
 }
-static M2 rotate2 (T ang) {
+VEC_STATIC M2 rotate2 (T ang) {
 	auto sc = sin_cos(ang);
 	return M2::row(	+sc.c,	-sc.s,
 					+sc.s,	+sc.c );
 }
 
-static fv2 rotate2_90 (fv2 v) {
+VEC_STATIC fv2 rotate2_90 (fv2 v) {
 	return V2(-v.y, v.x);
 }
-static fv2 rotate2_180 (fv2 v) {
+VEC_STATIC fv2 rotate2_180 (fv2 v) {
 	return -v;
 }
-static fv2 rotate2_270 (fv2 v) {
+VEC_STATIC fv2 rotate2_270 (fv2 v) {
 	return V2(v.y, -v.x);
 }
 
-static M3 scale3 (V3 v) {
+VEC_STATIC M3 scale3 (V3 v) {
 	return M3::column(	V3(v.x,0,0),
 						V3(0,v.y,0),
 						V3(0,0,v.z) );
 }
-static M3 rotate3_X (T ang) {
+VEC_STATIC M3 rotate3_X (T ang) {
 	auto sc = sin_cos(ang);
 	return M3::row(	1,		0,		0,
 					0,		+sc.c,	-sc.s,
 					0,		+sc.s,	+sc.c);
 }
-static M3 rotate3_Y (T ang) {
+VEC_STATIC M3 rotate3_Y (T ang) {
 	auto sc = sin_cos(ang);
 	return M3::row(	+sc.c,	0,		+sc.s,
 					0,		1,		0,
 					-sc.s,	0,		+sc.c);
 }
-static M3 rotate3_Z (T ang) {
+VEC_STATIC M3 rotate3_Z (T ang) {
 	auto sc = sin_cos(ang);
 	return M3::row(	+sc.c,	-sc.s,	0,
 					+sc.s,	+sc.c,	0,
 					0,		0,		1);
 }
 
-static M4 translate4 (V3 v) {
+VEC_STATIC M4 translate4 (V3 v) {
 	return M4::column(	V4(1,0,0,0),
 						V4(0,1,0,0),
 						V4(0,0,1,0),
 						V4(v,1) );
 }
-static M4 scale4 (V3 v) {
+VEC_STATIC M4 scale4 (V3 v) {
 	return M4::column(	V4(v.x,0,0,0),
 						V4(0,v.y,0,0),
 						V4(0,0,v.z,0),
 						V4(0,0,0,1) );
 }
-static M4 rotate4_X (T ang) {
+VEC_STATIC M4 rotate4_X (T ang) {
 	auto sc = sin_cos(ang);
 	return M4::row(	1,		0,		0,		0,
 					0,		+sc.c,	-sc.s,	0,
 					0,		+sc.s,	+sc.c,	0,
 					0,		0,		0,		1 );
 }
-static M4 rotate4_Y (T ang) {
+VEC_STATIC M4 rotate4_Y (T ang) {
 	auto sc = sin_cos(ang);
 	return M4::row(	+sc.c,	0,		+sc.s,	0,
 					0,		1,		0,		0,
 					-sc.s,	0,		+sc.c,	0,
 					0,		0,		0,		1 );
 }
-static M4 rotate4_Z (T ang) {
+VEC_STATIC M4 rotate4_Z (T ang) {
 	auto sc = sin_cos(ang);
 	return M4::row(	+sc.c,	-sc.s,	0,		0,
 					+sc.s,	+sc.c,	0,		0,
@@ -506,38 +509,38 @@ static M4 rotate4_Z (T ang) {
 					0,		0,		0,		1 );
 }
 
-static HM translateH (V3 v) {
+VEC_STATIC HM translateH (V3 v) {
 	return HM::column(	V3(1,0,0),
 						V3(0,1,0),
 						V3(0,0,1),
 						v );
 }
-static HM scaleH (V3 v) {
+VEC_STATIC HM scaleH (V3 v) {
 	return HM::column(	V3(v.x,0,0),
 						V3(0,v.y,0),
 						V3(0,0,v.z),
 						V3(0,0,0) );
 }
-static HM rotateH_X (T ang) {
+VEC_STATIC HM rotateH_X (T ang) {
 	auto sc = sin_cos(ang);
 	return HM::row(	1,		0,		0,		0,
 					0,		+sc.c,	-sc.s,	0,
 					0,		+sc.s,	+sc.c,	0 );
 }
-static HM rotateH_Y (T ang) {
+VEC_STATIC HM rotateH_Y (T ang) {
 	auto sc = sin_cos(ang);
 	return HM::row(	+sc.c,	0,		+sc.s,	0,
 					0,		1,		0,		0,
 					-sc.s,	0,		+sc.c,	0 );
 }
-static HM rotateH_Z (T ang) {
+VEC_STATIC HM rotateH_Z (T ang) {
 	auto sc = sin_cos(ang);
 	return HM::row(	+sc.c,	-sc.s,	0,		0,
 					+sc.s,	+sc.c,	0,		0,
 					0,		0,		1,		0 );
 }
 
-static HM transl_rot_scale (V3 t, M3 r, V3 s) {
+VEC_STATIC HM transl_rot_scale (V3 t, M3 r, V3 s) {
 	return translateH(t) * HM(r);// * scaleH(s);
 }
 
@@ -552,37 +555,37 @@ static HM transl_rot_scale (V3 t, M3 r, V3 s) {
 //
 #define vround(T, val)	_vround<T>(val)
 
-template <typename T> static T _vround (fv2 v);
+template <typename T> VEC_STATIC T _vround (fv2 v);
 template<> s32v2 _vround<s32v2> (fv2 v) {
 	return s32v2((s32)round(v.x), (s32)round(v.y));
 }
 
 //
-template <typename T>	static T to_linear (T srgb) {
+template <typename T>	VEC_STATIC T to_linear (T srgb) {
 	if (srgb <= T(0.0404482362771082)) {
 		return srgb * T(1/12.92);
 	} else {
 		return pow( (srgb +T(0.055)) * T(1/1.055), T(2.4) );
 	}
 }
-template <typename T>	static T to_srgb (T linear) {
+template <typename T>	VEC_STATIC T to_srgb (T linear) {
 	if (linear <= T(0.00313066844250063)) {
 		return linear * T(12.92);
 	} else {
 		return ( T(1.055) * pow(linear, T(1/2.4)) ) -T(0.055);
 	}
 }
-static fv3 to_linear (fv3 srgb) {
+VEC_STATIC fv3 to_linear (fv3 srgb) {
 	return fv3( to_linear(srgb.x), to_linear(srgb.y), to_linear(srgb.z) );
 }
-static fv3 to_srgb (fv3 linear) {
+VEC_STATIC fv3 to_srgb (fv3 linear) {
 	return fv3( to_srgb(linear.x), to_srgb(linear.y), to_srgb(linear.z) );
 }
 
-static fv3 srgb (f32 x, f32 y, f32 z) {	return to_linear(fv3(x,y,z) * fv3(1.0f/255.0f)); }
-static fv3 srgb (f32 all) {				return srgb(all,all,all); }
+VEC_STATIC fv3 srgb (f32 x, f32 y, f32 z) {	return to_linear(fv3(x,y,z) * fv3(1.0f/255.0f)); }
+VEC_STATIC fv3 srgb (f32 all) {				return srgb(all,all,all); }
 
-static fv3 hsl_to_rgb (fv3 hsl) {
+VEC_STATIC fv3 hsl_to_rgb (fv3 hsl) {
 	#if 0
 	// modified from http://www.easyrgb.com/en/math.php
 	f32 H = hsl.x;
@@ -639,4 +642,5 @@ static fv3 hsl_to_rgb (fv3 hsl) {
 	#endif
 }
 
+#undef VEC_STATIC
 #undef INL
