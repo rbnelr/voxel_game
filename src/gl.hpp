@@ -935,6 +935,8 @@ enum data_type {
 	
 	T_M3		,
 	T_M4		,
+	
+	T_BOOL		,
 };
 
 struct Uniform {
@@ -946,7 +948,7 @@ struct Uniform {
 	
 	void set (f32 v) {
 		dbg_assert(type == T_FLT, "%s", name);
-		glUniform1fv(loc, 1, &v);
+		glUniform1f(loc, v);
 	}
 	void set (v2 v) {
 		dbg_assert(type == T_V2, "%s", name);
@@ -962,7 +964,7 @@ struct Uniform {
 	}
 	void set (s32 v) {
 		dbg_assert(type == T_INT, "%s", name);
-		glUniform1iv(loc, 1, &v);
+		glUniform1i(loc, v);
 	}
 	void set (iv2 v) {
 		dbg_assert(type == T_IV2, "%s", name);
@@ -983,6 +985,10 @@ struct Uniform {
 	void set (m4 v) {
 		dbg_assert(type == T_M4, "%s", name);
 		glUniformMatrix4fv(loc, 1, GL_FALSE, &v.arr[0][0]);
+	}
+	void set (bool b) {
+		dbg_assert(type == T_BOOL, "%s", name);
+		glUniform1i(loc, (s32)b);
 	}
 };
 

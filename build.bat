@@ -11,14 +11,14 @@
 	if [!GCC!] == [] set GCC=D:/pt_proj/tdm_gcc/bin/
 	
 	set ROOT=%~dp0
-	set SRC=!ROOT!src/
-	set DEPS=!ROOT!deps/
-	set GLFW=!DEPS!glfw-3.2.1.bin.WIN64/
-	set GLAD=!DEPS!glad/
-	set STB=!DEPS!stb/
-	set IMGUI=!DEPS!dear_imgui/
+	set SRC=!ROOT!src\
+	set DEPS=!ROOT!deps\
+	set GLFW=!DEPS!glfw-3.2.1.bin.WIN64\
+	set GLAD=!DEPS!glad\
+	set STB=!DEPS!stb\
+	set IMGUI=!DEPS!dear_imgui\
 	
-	set GLFW_SRC=!DEPS!glfw-3.3/
+	set GLFW_SRC=!DEPS!glfw-3.3\
 	
 	rem can do standart compile all link all build with these
 	set GLFW_SOURCES=-D_GLFW_WIN32=1 ^
@@ -100,15 +100,7 @@ rem /main
 	rem glfw dll
 	rem cl.exe -nologo /source-charset:utf-8 /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLFW!include /I!GLAD! /I!STB! !SRC!!proj!.cpp /Fe!ROOT!!proj!.exe /link KERNEL32.lib OPENGL32.lib !GLFW!lib-vc2015/glfw3dll.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
-	rem glfw static link
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE! /Fo!DEPS!glfw_one_source_file.obj
-	
-	rem imgui static link
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui.cpp /Fo!DEPS!imgui.obj
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_draw.cpp /Fo!DEPS!imgui_draw.obj
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_demo.cpp /Fo!DEPS!imgui_demo.obj
-	
-	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /I!GLFW_SRC!include /I!DEPS!open_simplex_noise /I!IMGUI! !SRC!!proj!.cpp !DEPS!glfw_one_source_file.obj !DEPS!imgui.obj !DEPS!imgui_draw.obj !DEPS!imgui_demo.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /I!GLAD! /I!STB! /I!GLFW_SRC!include /I!DEPS!open_simplex_noise /I!IMGUI! !SRC!!proj!.cpp !DEPS!!mode!_glfw_one_source_file.obj !DEPS!!mode!_imgui.obj !DEPS!!mode!_imgui_draw.obj !DEPS!!mode!_imgui_demo.obj /Fe!ROOT!!proj!.exe /link KERNEL32.lib USER32.lib GDI32.lib OPENGL32.lib SHELL32.lib WINMM.lib /INCREMENTAL:NO /SUBSYSTEM:CONSOLE /OPT:REF
 	
 	rem WINMM.lib for simple audio playing (https://msdn.microsoft.com/en-us/library/windows/desktop/dd743680(v=vs.85).aspx)
 	
@@ -116,6 +108,42 @@ rem /main
 	
 	exit /b
 rem /vs
+
+:vs_libs
+	del !DEPS!*.obj
+	
+	set mode=dbg
+	call :vs_lib_mode
+	set mode=opt
+	call :vs_lib_mode
+	set mode=release
+	call :vs_lib_mode
+	exit /b
+rem /vs_libs
+
+:vs_lib_mode
+	if [!mode!] == [dbg] (
+		set dbg=/Od /EHsc /Ob1 /MDd /Zi /DRZ_DBG=1 /DRZ_DEV=1
+	) else if [!mode!] == [opt] (
+		set dbg=/O2 /EHsc /Ob2 /MD /Zi /Zo /Oi /DRZ_DBG=0 /DRZ_DEV=1
+	) else if [!mode!] == [release] (
+		set dbg=/O2 /EHsc /Ob2 /MD /Zi /Zo /Oi /DRZ_DBG=0 /DRZ_DEV=0
+	)
+	
+	set opt=!dbg! /fp:fast /GS-
+	
+	set warn=/wd4577 /wd4005
+	
+	rem glfw static link
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!GLFW_SRC!include /I!GLFW_SRC!src /c !GLFW_ONE_SRC_FILE! /Fo!DEPS!!mode!_glfw_one_source_file.obj
+	
+	rem imgui static link
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui.cpp /Fo!DEPS!!mode!_imgui.obj
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_draw.cpp /Fo!DEPS!!mode!_imgui_draw.obj
+	cl.exe -nologo /DRZ_PLATF=1 /DRZ_ARCH=1 !opt! !warn! /I!SRC!include /c !IMGUI!imgui_demo.cpp /Fo!DEPS!!mode!_imgui_demo.obj
+	
+	exit /b
+rem /vs_lib_mode
 
 :gcc
 	del !ROOT!!proj!.exe

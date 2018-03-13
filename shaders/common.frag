@@ -3,6 +3,8 @@ $include "common.glsl"
 
 in		vec3	vs_barycentric;
 
+uniform bool	draw_wireframe = false;
+
 float wireframe_edge_factor () {
 	vec3 d = fwidth(vs_barycentric);
 	vec3 a3 = smoothstep(vec3(0.0), d*1.5, vs_barycentric);
@@ -56,11 +58,11 @@ void FRAG_COL (vec4 col) {
 		col.rgb = mix(col.rgb, vec3(0.9,0.9,0.1), 0.7);
 	}
 	
-	#if WIREFRAME
+	if (draw_wireframe) {
 		if (wireframe_edge_factor() >= 0.3) discard;
 		
 		//col = mix(vec4(1,1,0,1), vec4(0,0,0,1), wireframe_edge_factor());
-	#endif
+	}
 	
 	frag_col = col;
 }

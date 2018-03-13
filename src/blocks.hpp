@@ -10,16 +10,19 @@ static constexpr s32 UVZW_BLOCK_FACE_BOTTOM =	2;
 static bool unloaded_chunks_traversable = true;
 
 enum block_type : u8 {
-	BT_AIR		=0,
-	BT_EARTH	,
-	BT_GRASS	,
-	BT_WATER	,
+	BT_AIR			=0,
+	BT_EARTH		,
+	BT_GRASS		,
+	BT_WATER		,
+	BT_TREE_LOG		,
+	BT_TREE_LEAVES	,
 	
 	BLOCK_TYPES_COUNT,
 	
 	BT_OUT_OF_BOUNDS	=0xfe,
 	BT_NO_CHUNK			=0xff,
 };
+
 static bool bt_is_traversable (block_type t) {	return (t == BT_AIR || t == BT_WATER || t == BT_OUT_OF_BOUNDS || (t == BT_NO_CHUNK && unloaded_chunks_traversable)); }
 static bool bt_is_breakable (block_type t) {	return !(t == BT_AIR || t == BT_WATER || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
 static bool bt_is_transparent (block_type t) {	return (t == BT_AIR || t == BT_WATER || t == BT_OUT_OF_BOUNDS || t == BT_NO_CHUNK); }
@@ -27,10 +30,12 @@ static bool bt_is_replaceable (block_type t) {	return (t == BT_AIR || t == BT_WA
 static bool bt_does_autoheal (block_type t) {	return (t == BT_EARTH || t == BT_GRASS); }
 
 static cstr block_texture_name[BLOCK_TYPES_COUNT] = {
-	/* BT_AIR	*/	"missing.png",
-	/* BT_EARTH	*/	"earth.png",
-	/* BT_GRASS	*/	"grass.png",
-	/* BT_WATER	*/	"water.png",
+	/* BT_AIR			*/	"missing.png",
+	/* BT_EARTH			*/	"earth.png",
+	/* BT_GRASS			*/	"grass.png",
+	/* BT_WATER			*/	"water.png",
+	/* BT_TREE_LOG		*/	"missing.png",
+	/* BT_TREE_LEAVES	*/	"missing.png",
 };
 static s32 BLOCK_TEXTURE_INDEX_MISSING = 0;
 

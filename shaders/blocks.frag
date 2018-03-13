@@ -1,7 +1,5 @@
 #version 150 core // version 3.2
 
-#define WIREFRAME 0
-
 $include "common.frag"
 
 in		vec3	vs_pos_cam;
@@ -16,6 +14,7 @@ uniform	sampler2D	breaking;
 uniform int texture_res;
 uniform int atlas_textures_count;
 uniform int breaking_frames_count;
+uniform bool show_dbg_tint;
 
 vec2 map (vec2 val, vec2 in_a, vec2 in_b) { // val[in_a,in_b] -> [0,1]
 	return mix((val -in_a) / (in_b -in_a), vec2(0), equal(in_a, in_b));
@@ -93,6 +92,5 @@ void main () {
 	//col = vec4(1);
 	col *= vec4(vec3(vs_brightness), 1);
 	
-	FRAG_COL( col );
-	//FRAG_COL( mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
+	FRAG_COL( !show_dbg_tint ? col : mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }

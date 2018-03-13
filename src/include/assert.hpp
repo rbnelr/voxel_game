@@ -46,7 +46,7 @@
 						"dbg_assert failed!\n"
 						"  \"%s\"\n" ANSI_COLOUR_CODE_NC, cond);
 		
-		BREAK_IF_DEBUGGING_ELSE_STALL;
+		DBGBREAK;
 	}
 	static void _failed_dbg_assert (cstr cond, cstr msg_format, ...) {
 		
@@ -63,7 +63,7 @@
 		
 		fprintf(stderr,	"\n" ANSI_COLOUR_CODE_NC);
 		
-		BREAK_IF_DEBUGGING_ELSE_STALL;
+		DBGBREAK;
 	}
 	
 	#if RZ_COMP == RZ_COMP_MSVC

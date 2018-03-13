@@ -16,8 +16,6 @@
 
 #include "prints.cpp"
 
-#include "imgui.h"
-
 #define _USING_V110_SDK71_ 1
 #include "glad.c"
 #include "GLFW/glfw3.h"
@@ -109,53 +107,51 @@ static lrgb8 to_lrgb8 (v3 lrgbf) {
 	return lrgb8((u8)lrgbf.x, (u8)lrgbf.y, (u8)lrgbf.z);
 }
 
-struct Interpolator_Key {
-	f32	range_begin;
-	v3	col;
+template<typename T> struct Gradient_KV {
+	f32	key;
+	T	val;
 };
-lrgb8 interpolate (f32 val, Interpolator_Key* keys, s32 keys_count) {
-	dbg_assert(keys_count >= 1);
+
+template<typename T> static T gradient (f32 key, Gradient_KV<T> const* kvs, size_t kvs_count) {
+	if (kvs_count == 0) return T(0);
 	
-	s32 i=0;
-	for (; i<keys_count; ++i) {
-		if (val < keys[i].range_begin) break;
+	size_t i=0;
+	for (; i<kvs_count; ++i) {
+		if (key < kvs[i].key) break;
 	}
 	
-	v3 col;
 	if (i == 0) { // val is lower than the entire range
-		col = keys[0].col;
-	} else if (i == keys_count) { // val is higher than the entire range
-		col = keys[i -1].col;
+		return kvs[0].val;
+	} else if (i == kvs_count) { // val is higher than the entire range
+		return kvs[i -1].val;
 	} else {
+		dbg_assert(kvs_count >= 2 && i < kvs_count);
 		
-		dbg_assert(keys_count >= 2 && i < keys_count);
-		
-		auto& a = keys[i -1];
-		auto& b = keys[i];
-		
-		col = lerp(a.col, b.col, map(val, a.range_begin, b.range_begin));
+		auto& a = kvs[i -1];
+		auto& b = kvs[i];
+		return map(key, a.key, b.key, a.val, b.val);
 	}
-	return to_lrgb8(col);
+}
+template<typename T> static T gradient (f32 key, std::initializer_list<Gradient_KV<T>> const& kvs) {
+	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
-static Interpolator_Key _incandescent_gradient_keys[] = {
-	{ 0,		srgb(0)			},
-	{ 0.3333f,	srgb(138,0,0)	},
-	{ 0.6667f,	srgb(255,255,0)	},
-	{ 1,		srgb(255)		},
-};
-static lrgb8 incandescent_gradient (f32 val) {
-	return interpolate(val, _incandescent_gradient_keys, ARRLEN(_incandescent_gradient_keys));
+static lrgb8 incandescent_gradient (f32 key) {
+	return to_lrgb8( gradient<v3>(key, {
+		{ 0,		srgb(0)			},
+		{ 0.3333f,	srgb(138,0,0)	},
+		{ 0.6667f,	srgb(255,255,0)	},
+		{ 1,		srgb(255)		},
+	}) );
 }
-static Interpolator_Key _spectrum_gradient_keys[] = {
-	{ 0,		srgb(0,0,127)	},
-	{ 0.25f,	srgb(0,0,248)	},
-	{ 0.5f,		srgb(0,127,0)	},
-	{ 0.75f,	srgb(255,255,0)	},
-	{ 1,		srgb(255,0,0)	},
-};
-static lrgb8 spectrum_gradient (f32 val) {
-	return interpolate(val, _spectrum_gradient_keys, ARRLEN(_spectrum_gradient_keys));
+static lrgb8 spectrum_gradient (f32 key) {
+	return to_lrgb8( gradient<v3>(key, {
+		{ 0,		srgb(0,0,127)	},
+		{ 0.25f,	srgb(0,0,248)	},
+		{ 0.5f,		srgb(0,127,0)	},
+		{ 0.75f,	srgb(255,255,0)	},
+		{ 1,		srgb(255,0,0)	},
+	}) );
 }
 
 #define LLL	v3(-1,-1,-1)
@@ -342,14 +338,16 @@ template <typename T> static bool save_struct (strcr name, T const& data) {
 
 #include "gl.hpp"
 
-#include "options_overlay.hpp"
-
 //
+#define UBOOL(name)	Uniform(T_BOOL, name)
 #define USI(name)	Uniform(T_INT, name)
 #define UIV2(name)	Uniform(T_IV2, name)
 #define UV2(name)	Uniform(T_V2, name)
 #define UV3(name)	Uniform(T_V3, name)
 #define UM4(name)	Uniform(T_M4, name)
+
+#define UCOM UV2("screen_dim"), UV2("mcursor_pos") // common uniforms
+#define UMAT UM4("world_to_cam"), UM4("cam_to_world"), UM4("cam_to_clip") // transformation uniforms
 
 static std::vector<Shader*>			shaders;
 
@@ -361,6 +359,8 @@ static Shader* new_shader (strcr v, strcr f, std::initializer_list<Uniform> u, s
 	shaders.push_back(s);
 	return s;
 }
+
+#include "gui.hpp"
 
 //
 typedef s64		bpos_t;
@@ -432,7 +432,10 @@ static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 		pos = rotate2(ang_offs) * pos;
 		pos /= period; // period is inverse frequency
 		pos += offs;
-		return osn_noise.eval<flt>(pos.x, pos.y);
+		
+		flt val = osn_noise.eval<flt>(pos.x, pos.y);
+		val = map(val, -0.865773f, 0.865772f, -1,1); // normalize into [-1,1] range
+		return val;
 	};
 	
 	flt elevation;
@@ -465,20 +468,44 @@ static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 	return (elevation +roughness * detail) * 32 +32;
 }
 
-static flt noise_tree_desity_period = 0.1f;
+static flt noise_tree_desity_period = 200;
 static flt noise_tree_density_amp = 1;
 
-static lrgb8 noise_tree_density (OSN::Noise<2> const& osn_noise, v2 pos_world) {
+static flt noise_tree_density (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
 		pos = rotate2(ang_offs) * pos;
 		pos /= period; // period is inverse frequency
 		pos += offs;
-		return osn_noise.eval<flt>(pos.x, pos.y);
+		
+		flt val = osn_noise.eval<flt>(pos.x, pos.y);
+		val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
+		return val;
 	};
 	
 	f32 val = noise(pos_world, noise_tree_desity_period, 0,0) * noise_tree_density_amp;
 	
-	return spectrum_gradient(val);
+	val = gradient<flt>(val, {
+		{ 0.00f,  0						},
+		{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
+		{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
+		{ 0.50f,  4.0f / (32*32)		}, // avg 5 tree in 1 chunk
+		{ 0.75f, 10.0f / (32*32)		}, // avg 15 tree in 1 chunk
+		{ 1.00f, 25.0f / (32*32)		}, // avg 40 tree in 1 chunk
+	});
+	
+	#if 0
+	// TODO: use height of block to alter tree density
+	val = gradient<flt>(val, {
+		{ 0.00f,  0						},
+		{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
+		{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
+		{ 0.50f,  5.0f / (32*32)		}, // avg 5 tree in 1 chunk
+		{ 0.75f, 15.0f / (32*32)		}, // avg 15 tree in 1 chunk
+		{ 1.00f, 40.0f / (32*32)		}, // avg 40 tree in 1 chunk
+	});
+	#endif
+	
+	return val;
 }
 
 static u64 world_seed = 0;
@@ -506,7 +533,17 @@ static void gen_chunk_blocks (Chunk* chunk) {
 	}
 	
 	OSN::Noise<2> noise( world_seed );
-	//OSN::Noise<2> noise( hash(chunk->coord) );
+	
+	srand( hash(chunk->coord) );
+	
+	std::vector<bpos> tree_poss;
+	
+	auto find_min_tree_dist = [&] (bpos2 new_tree_pos) {
+		flt min_dist = +INF;
+		for (bpos p : tree_poss)
+			min_dist = min(min_dist, length((v2)p.xy() -(v2)new_tree_pos));
+		return min_dist;
+	};
 	
 	for (i.y=0; i.y<CHUNK_DIM.y; ++i.y) {
 		for (i.x=0; i.x<CHUNK_DIM.x; ++i.x) {
@@ -515,6 +552,22 @@ static void gen_chunk_blocks (Chunk* chunk) {
 			
 			f32 height = heightmap(noise, pos_world);
 			s32 highest_block = (s32)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
+			
+			flt tree_density = noise_tree_density(noise, pos_world);
+			
+			flt tree_prox_prob = gradient<flt>( find_min_tree_dist(i.xy()), {
+				{ SQRT_2,	0 },		// length(v2(1,1)) -> zero blocks free diagonally
+				{ 2.236f,	0.02f },	// length(v2(1,2)) -> one block free
+				{ 2.828f,	0.15f },	// length(v2(2,2)) -> one block free diagonally
+				{ 4,		0.75f },
+				{ 6,		1 },
+			});
+			flt effective_tree_prob = tree_density * tree_prox_prob;
+			//flt effective_tree_prob = tree_density;
+			
+			flt tree_chance = random::flt();
+			if (tree_chance < effective_tree_prob)
+				tree_poss.push_back( bpos(i.xy(), highest_block +1) );
 			
 			for (i.z=0; i.z <= min(highest_block, (s32)CHUNK_DIM.z-1); ++i.z) {
 				auto* b = chunk->get_block(i);
@@ -531,10 +584,43 @@ static void gen_chunk_blocks (Chunk* chunk) {
 				b->hp_ratio = 1;
 				
 				//b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
-				b->dbg_tint = lrgba8( noise_tree_density(noise, pos_world), 255);
+				b->dbg_tint = lrgba8( spectrum_gradient(tree_density / (25.0f/(32*32))), 255);
 			}
 		}
 	}
+	
+	auto place_tree = [&] (bpos pos_chunk) {
+		auto place_block = [&] (bpos pos_chunk, block_type bt) {
+			if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
+			Block* b = chunk->get_block(pos_chunk);
+			if (b->type == BT_AIR || b->type == BT_WATER) {
+				b->type = bt;
+				b->hp_ratio = 1;
+				b->dbg_tint = 255;
+			}
+		};
+		auto place_block_sphere = [&] (bpos pos_chunk, v3 r, block_type bt) {
+			bpos start = (bpos)floor((v3)pos_chunk +0.5f -r);
+			bpos end = (bpos)ceil((v3)pos_chunk +0.5f +r);
+			
+			bpos i; // position in chunk
+			for (i.z=start.z; i.z<end.z; ++i.z) {
+				for (i.y=start.y; i.y<end.y; ++i.y) {
+					for (i.x=start.x; i.x<end.x; ++i.x) {
+						if (length_sqr((v3)(i -pos_chunk) / r) <= 1) place_block(i, bt);
+					}
+				}
+			}
+		};
+		
+		bpos_t tree_height = 6;
+		
+		for (bpos_t i=0; i<tree_height; ++i) place_block(pos_chunk +bpos(0,0,i), BT_TREE_LOG);
+		
+		place_block_sphere(pos_chunk +bpos(0,0,tree_height-2), v3(v2(3.2f),tree_height/3), BT_TREE_LEAVES);
+	};
+	
+	for (bpos p : tree_poss) place_tree(p);
 	
 	chunk->update_whole_chunk_changed();
 }
@@ -604,6 +690,7 @@ enum fps_mouse_mode_e { DEV_MODE=0, FPS_MODE };
 
 static fps_mouse_mode_e fps_mouse_mode =	FPS_MODE;
 static bool mouselook_enabled =				fps_mouse_mode == FPS_MODE;
+static bool dev_gui_enabled =				true;
 
 struct Input {
 	iv2		wnd_dim;
@@ -710,10 +797,7 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	}
 	
 	if (key == GLFW_KEY_F1) {
-		if (went_down) {
-			if (opt_mode == OPT_OVERLAY_DISABLED)	opt_mode = OPT_SELECTING;
-			else									opt_mode = OPT_OVERLAY_DISABLED;
-		}
+		if (went_down) dev_gui_enabled = !dev_gui_enabled;
 		return;
 	}
 	if (key == GLFW_KEY_F2) {
@@ -722,52 +806,6 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 		else							start_mouse_look();
 		mouselook_enabled = fps_mouse_mode == FPS_MODE;
 		return;
-	}
-	
-	if (opt_mode == OPT_SELECTING) { 
-		switch (key) {
-			case GLFW_KEY_ENTER:		if (went_down) {
-					opt_value_edit_flag = true;
-					opt_mode = OPT_EDITING;
-				}
-				return;
-			
-			case GLFW_KEY_UP:			if (went_down || repeated)	selected_option = max(selected_option -1, 0);				return;
-			case GLFW_KEY_DOWN:			if (went_down || repeated)	selected_option = min(selected_option +1, cur_option);		return;
-			
-			case GLFW_KEY_E:			if (went_down)	opt_toggle_open = true;		return;
-			
-		}
-	} else if (opt_mode == OPT_EDITING) { 
-		switch (key) {
-			case GLFW_KEY_ENTER:		if (went_down) {
-					opt_value_edit_flag = true;
-					opt_mode = OPT_SELECTING;
-				}
-				return;
-			case GLFW_KEY_ESCAPE:		if (went_down) {
-					opt_mode = OPT_SELECTING;
-				}
-				return;
-			
-			case GLFW_KEY_LEFT:			if (went_down || repeated)	opt_cur_char = max(opt_cur_char -1, 0);							return;
-			case GLFW_KEY_RIGHT:		if (went_down || repeated)	opt_cur_char = min(opt_cur_char +1, (s32)opt_val_str.size());	return;
-			
-			case GLFW_KEY_BACKSPACE:	if (went_down || repeated) {
-					if (opt_cur_char > 0) {
-						opt_val_str.erase(opt_val_str.begin() +opt_cur_char -1);
-						--opt_cur_char;
-					}
-				}
-				return;
-			case GLFW_KEY_DELETE:		if (went_down || repeated) {
-					if (opt_cur_char < (s32)opt_val_str.size()) {
-						opt_val_str.erase(opt_val_str.begin() +opt_cur_char);
-					}
-				}
-				return;
-		}
-		return; // do not process input when editing options
 	}
 	
 	if (!repeated) {
@@ -800,9 +838,7 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	}
 }
 static void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
-	if (opt_mode == OPT_EDITING) {
-		opt_val_str.insert(opt_val_str.begin() +opt_cur_char++, (char)codepoint);
-	}
+	
 }
 static void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
 	bool went_down = action == GLFW_PRESS;
@@ -848,14 +884,11 @@ int main (int argc, char** argv) {
 	
 	platform_setup_context_and_open_window(app_name, iv2(1280, 720));
 	
-	ImGui::CreateContext();
-	ImGuiIO& imgui_io = ImGui::GetIO();
-	
 	if (fps_mouse_mode == DEV_MODE)	stop_mouse_look();
 	else							start_mouse_look();
 	
 	//
-	set_vsync(0 ? -1 : 0);
+	set_vsync(1 ? -1 : 0);
 	
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -878,66 +911,11 @@ int main (int argc, char** argv) {
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	}
 	
-	#define UCOM UV2("screen_dim"), UV2("mcursor_pos") // common uniforms
-	#define UMAT UM4("world_to_cam"), UM4("cam_to_world"), UM4("cam_to_clip") // transformation uniforms
-	
-	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
-	
-	{ // init game console overlay
-		f32 sz =	0 ? 24 : 18; // 14 16 24
-		f32 jpsz =	floor(sz * 1.75f);
-		
-		std::initializer_list<font::Glyph_Range> ranges = {
-			{ "consola.ttf",	sz,		  U'\xfffd' }, // missing glyph placeholder, must be the zeroeth glyph
-			{ "consola.ttf",	sz,		  U' ', U'~' },
-			#if 0
-			{ "consola.ttf",	sz,		{ U'ß',U'Ä',U'Ö',U'Ü',U'ä',U'ö',U'ü' } }, // german umlaute
-			{ "meiryo.ttc",		jpsz,	  U'\x3040', U'\x30ff' }, // hiragana +katakana
-			{ "meiryo.ttc",		jpsz,	{ U'　',U'、',U'。',U'”',U'「',U'」' } }, // some jp puncuation
-			#endif
-		};
-		
-		overlay_font = new font::Font(sz, ranges);
-		
-		vbo_overlay_font.init(&font::mesh_vert_layout);
-		shad_font = new_shader("font.vert", "font.frag", {UCOM}, {{0,"glyphs"}});
-	}
-	
-	Texture2D imgui_tex_font_atlas;
-	Shader* shad_imgui = new_shader("imgui.vert", "imgui.frag", {UCOM}, {{0,"atlas"}});
-	struct Imgui_Vbo {
-		GLuint						vbo_vert;
-		GLuint						vbo_indx;
-		
-		void init () {
-			glGenBuffers(1, &vbo_vert);
-			glGenBuffers(1, &vbo_indx);
-			
-		}
-		~Imgui_Vbo () {
-			glDeleteBuffers(1, &vbo_vert);
-			glDeleteBuffers(1, &vbo_indx);
-		}
-	};
-	Imgui_Vbo imgui_vbo;
-	imgui_vbo.init();
-	{
-		u8* pixels;
-		s32 w, h;
-		imgui_io.Fonts->GetTexDataAsRGBA32(&pixels, &w, &h);
-		
-		imgui_tex_font_atlas.alloc_cpu_single_mip(PT_SRGB8_LA8, iv2(w,h));
-		
-		memcpy(imgui_tex_font_atlas.mips[0].data, pixels, imgui_tex_font_atlas.mips[0].size);
-		
-		imgui_tex_font_atlas.upload();
-		
-		imgui_io.Fonts->TexID = (void*)&imgui_tex_font_atlas;
-	}
-	
 	//
 	
 	static GLint OVERLAY_TEXTURE_UNIT = 7;
+	
+	imgui_init();
 	
 	GLuint tex_sampler_nearest;
 	{
@@ -965,7 +943,7 @@ int main (int argc, char** argv) {
 	*/
 	
 	auto* shad_sky = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
-	auto* shad_main = new_shader("main.vert",	"main.frag",	{UCOM, UMAT, USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count")}, {{0,"atlas"}, {1,"breaking"}});
+	auto* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count")}, {{0,"atlas"}, {1,"breaking"}});
 	auto* shad_overlay = new_shader("overlay.vert",	"overlay.frag",	{UCOM, UMAT});
 	
 	Texture2D tex_block_atlas;
@@ -1091,6 +1069,8 @@ int main (int argc, char** argv) {
 	v3	initial_player_pos_world =		v3(4,32,43);
 	v3	initial_player_vel_world =		0;
 	
+	initial_player_pos_world =		v3(-103.5f, -37.5f, 60);
+	
 	struct Player {
 		v3	pos_world;
 		v3	vel_world;
@@ -1158,6 +1138,8 @@ int main (int argc, char** argv) {
 	respawn_player();
 	
 	bool draw_debug_overlay = false;
+	bool draw_wireframe = false;
+	bool show_dbg_tint = 1;
 	
 	auto load_game = [&] () {
 		trigger_load_game = false;
@@ -1173,7 +1155,7 @@ int main (int argc, char** argv) {
 	inital_chunk( player.pos_world );
 	
 	flt chunk_drawing_radius =		INF;
-	flt chunk_generation_radius =	100;
+	flt chunk_generation_radius =	140;
 	
 	Texture2D dbg_heightmap_visualize;
 	s32 dbg_heightmap_visualize_radius = 1000;
@@ -1208,7 +1190,7 @@ int main (int argc, char** argv) {
 	s32 max_chunks_generated_per_frame = 1;
 	
 	//flt block_update_frequency = 1.0f;
-	flt block_update_frequency = 1.0f / 10;
+	flt block_update_frequency = 1.0f / 25;
 	bpos_t cur_chunk_update_block_i = 0;
 	
 	struct Overlay_Vertex {
@@ -1251,7 +1233,7 @@ int main (int argc, char** argv) {
 			}
 		}
 		
-		begin_overlay_text();
+		auto overlay_line = [] (strcr str, v3 col=0) {};
 		
 		{ //
 			f32 fps = 1.0f / dt;
@@ -1267,29 +1249,17 @@ int main (int argc, char** argv) {
 		}
 		
 		inp.mouse_look_diff = 0;
-		opt_toggle_open = false;
-		opt_value_edit_flag = false;
 		
 		glfwPollEvents();
 		
 		inp.get_non_callback_input();
 		
-		imgui_io.DisplaySize.x = (flt)inp.wnd_dim.x;
-		imgui_io.DisplaySize.y = (flt)inp.wnd_dim.y;
-		imgui_io.DeltaTime = dt;
-		imgui_io.MousePos.x = (flt)inp.mcursor_pos_px.x;
-		imgui_io.MousePos.y = (flt)inp.mcursor_pos_px.y;
-		imgui_io.MouseDown[0] = lmb_down;
-		imgui_io.MouseDown[1] = rmb_down;
+		imgui_begin(dt, inp.wnd_dim, inp.mcursor_pos_px, lmb_down, rmb_down);
 		
-		ImGui::NewFrame();
+		option("draw_wireframe", &draw_wireframe);
+		option("show_dbg_tint", &show_dbg_tint);
 		
 		ImGui::ShowDemoWindow();
-		
-		// Render & swap video buffers
-		ImGui::Render();
-		
-		begin_options();
 		
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
@@ -1378,6 +1348,9 @@ int main (int argc, char** argv) {
 			inital_chunk(player.pos_world);
 			trigger_dbg_heightmap_visualize = true;
 		}
+		
+		option("chunk_drawing_radius", &chunk_drawing_radius);
+		option("chunk_drawing_radius", &chunk_drawing_radius);
 		
 		option("chunk_drawing_radius", &chunk_drawing_radius);
 		option("chunk_generation_radius", &chunk_generation_radius);
@@ -2174,19 +2147,22 @@ int main (int argc, char** argv) {
 		}
 		glClear(GL_DEPTH_BUFFER_BIT);
 		
-		if (shad_main->valid()) {
+		if (shad_blocks->valid()) {
 			
 			bind_texture_unit(0, &tex_block_atlas);
 			bind_texture_unit(1, &tex_breaking);
 			
-			shad_main->bind();
-			shad_main->set_unif("world_to_cam",	view.world_to_cam.m4());
-			shad_main->set_unif("cam_to_world",	view.cam_to_world.m4());
-			shad_main->set_unif("cam_to_clip",	view.cam_to_clip);
+			shad_blocks->bind();
+			shad_blocks->set_unif("draw_wireframe",	draw_wireframe);
+			shad_blocks->set_unif("show_dbg_tint",	show_dbg_tint);
 			
-			shad_main->set_unif("texture_res", texture_res);
-			shad_main->set_unif("atlas_textures_count", atlas_textures_count);
-			shad_main->set_unif("breaking_frames_count", breaking_frames_count);
+			shad_blocks->set_unif("world_to_cam",	view.world_to_cam.m4());
+			shad_blocks->set_unif("cam_to_world",	view.cam_to_world.m4());
+			shad_blocks->set_unif("cam_to_clip",	view.cam_to_clip);
+			
+			shad_blocks->set_unif("texture_res", texture_res);
+			shad_blocks->set_unif("atlas_textures_count", atlas_textures_count);
+			shad_blocks->set_unif("breaking_frames_count", breaking_frames_count);
 			
 			s32 count = 0;
 			
@@ -2222,7 +2198,7 @@ int main (int argc, char** argv) {
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				chunk->vbo.draw_entire(shad_main);
+				chunk->vbo.draw_entire(shad_blocks);
 			}
 			
 			glEnable(GL_BLEND);
@@ -2231,7 +2207,7 @@ int main (int argc, char** argv) {
 			for (auto& chunk_hash_pair : chunks) {
 				auto& chunk = chunk_hash_pair.second;
 				
-				chunk->vbo_transperant.draw_entire(shad_main);
+				chunk->vbo_transperant.draw_entire(shad_blocks);
 			}
 			
 			glDisable(GL_BLEND);
@@ -2352,106 +2328,11 @@ int main (int argc, char** argv) {
 			
 		}
 		
-		if (shad_font->valid()) { // my own font overlay for options
-			glEnable(GL_BLEND);
-			glDisable(GL_DEPTH_TEST);
-			glDisable(GL_CULL_FACE);
-			
-			shad_font->bind();
-			shad_font->set_unif("screen_dim", (v2)inp.wnd_dim);
-			bind_texture_unit(0, &overlay_font->tex);
-			
-			vbo_overlay_font.upload();
-			vbo_overlay_font.draw_entire(shad_font);
-			
-			glEnable(GL_CULL_FACE);
-			glEnable(GL_DEPTH_TEST);
-			glDisable(GL_BLEND);
-		}
-		if (shad_imgui->valid()) { // imgui
-			glEnable(GL_BLEND);
-			glDisable(GL_DEPTH_TEST);
-			glDisable(GL_CULL_FACE);
-			glEnable(GL_SCISSOR_TEST);
-			
-			shad_imgui->bind();
-			shad_imgui->set_unif("screen_dim", (v2)inp.wnd_dim);
-			
-			ImDrawData* draw_data = ImGui::GetDrawData();
-			
-			struct Imgui_Vertex {
-				v2		pos_screen;
-				v2		uv;
-				u32		col;
-			};
-			
-			glBindBuffer(GL_ARRAY_BUFFER, imgui_vbo.vbo_vert);
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, imgui_vbo.vbo_indx);
-			
-			GLint pos_loc =	glGetAttribLocation(shad_font->prog, "pos_screen");
-			GLint uv_loc =	glGetAttribLocation(shad_font->prog, "uv");
-			GLint col_loc =	glGetAttribLocation(shad_font->prog, "col");
-			
-			glEnableVertexAttribArray(pos_loc);
-			glVertexAttribPointer(pos_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, pos_screen));
-			
-			glEnableVertexAttribArray(uv_loc);
-			glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, uv));
-			
-			glEnableVertexAttribArray(col_loc);
-			glVertexAttribPointer(col_loc, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Imgui_Vertex), (void*)offsetof(Imgui_Vertex, col));
-			
-			for (int n = 0; n < draw_data->CmdListsCount; n++) {
-				auto* cmd_list = draw_data->CmdLists[n];
-				
-				const ImDrawVert* vtx_buffer = cmd_list->VtxBuffer.Data;  // vertex buffer generated by ImGui
-				const ImDrawIdx* idx_buffer = cmd_list->IdxBuffer.Data;   // index buffer generated by ImGui
-				
-				auto vertex_size = cmd_list->VtxBuffer.size() * sizeof(ImDrawVert);
-				auto index_size = cmd_list->IdxBuffer.size() * sizeof(ImDrawIdx);
-				
-				glBufferData(GL_ARRAY_BUFFER, vertex_size, NULL, GL_STREAM_DRAW);
-				glBufferData(GL_ARRAY_BUFFER, vertex_size, vtx_buffer, GL_STREAM_DRAW);
-				
-				glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size, NULL, GL_STREAM_DRAW);
-				glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_size, idx_buffer, GL_STREAM_DRAW);
-				
-				const ImDrawIdx* cur_idx_buffer = idx_buffer;
-				
-				for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++) {
-					const ImDrawCmd* pcmd = &cmd_list->CmdBuffer[cmd_i];
-					if (pcmd->UserCallback) {
-						pcmd->UserCallback(cmd_list, pcmd);
-					} else {
-						bind_texture_unit(0, (Texture2D*)pcmd->TextureId);
-						
-						flt y0 = (flt)inp.wnd_dim.y -pcmd->ClipRect.w;
-						flt y1 = (flt)inp.wnd_dim.y -pcmd->ClipRect.y;
-						
-						
-						
-						glScissor((int)pcmd->ClipRect.x, y0, (int)(pcmd->ClipRect.z -pcmd->ClipRect.x), (int)(y1 -y0));
-						
-						// Render 'pcmd->ElemCount/3' indexed triangles.
-						// By default the indices ImDrawIdx are 16-bits, you can change them to 32-bits if your engine doesn't support 16-bits indices.
-						glDrawElements(GL_TRIANGLES, pcmd->ElemCount, GL_UNSIGNED_SHORT,
-							(GLvoid const*)((u8 const*)cur_idx_buffer -(u8 const*)idx_buffer));
-					}
-					cur_idx_buffer += pcmd->ElemCount;
-				}
-			}
-			
-			glScissor(0,0, inp.wnd_dim.x,inp.wnd_dim.y);
-			
-			glDisable(GL_SCISSOR_TEST);
-			glEnable(GL_CULL_FACE);
-			glEnable(GL_DEPTH_TEST);
-			glDisable(GL_BLEND);
-		}
+		draw_imgui(inp.wnd_dim);
 		
 		glfwSwapBuffers(wnd);
 		
-		{
+		{ // calculate next dt based on how long this frame took
 			f64 now = glfwGetTime();
 			dt = now -prev_t;
 			prev_t = now;
@@ -2460,8 +2341,7 @@ int main (int argc, char** argv) {
 		}
 	}
 	
-    ImGui::DestroyContext();
-	
+    imgui_destroy();
 	platform_terminate();
 	
 	return 0;

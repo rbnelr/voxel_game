@@ -24,12 +24,25 @@ DONE:
  
  added imgui to replace my own dev/debug gui
  
+ added basic tree generation
+ -> uses a tree density noise layer
+ -> tries to avoid trees being too close to each other by scaling the tree spawn propbablity based on how close other already spawned tress are (this is tree spawn order dependant, but that is deterministic with our method)
+ 
 TODO
 -FEATURES:
  
  remove my own dev/debug gui and reimplement the Immediate mode option code with imgui controls
  -remember to remove redundant stb text libs from deps/
  -clean up unused shaders from shaders/
+ -add viewing of any texture in imgui window
+ 
+ immediate mode debug shapes
+ -arrow for velocity acceleration etc.
+ -path drawing: object user can put outside of main loop -output one point each frame -> get line of last n points
+ -> try to get rid of as much code in main loop as possible by turning player collision cylinder, etc. into code using this
+ -maybe even integrate vector viewing into my imgui debug variables (allow visualizing any vector that gets displayed in the imgui)
+ 
+ redesign input system
  
  add trees
   -RNG seeded by chunk pos
@@ -46,9 +59,9 @@ TODO
  -chunk optimization
   -view frustrum culling
  
- redesign input system
- 
  blocks inventory (gain blocks on break and lose on place)
+ 
+ work on gl abstraction
  
 -BUGS:
  
