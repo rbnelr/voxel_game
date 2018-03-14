@@ -360,6 +360,19 @@ static Shader* new_shader (strcr v, strcr f, std::initializer_list<Uniform> u, s
 	return s;
 }
 
+#include "imgui.h"
+
+static void foliage_alpha_changed ();
+
+struct Graphics_Settings {
+	bool	foliage_alpha = true;
+	
+	void imgui () {
+		if (ImGui::Checkbox("Foliage Alpha", &foliage_alpha)) foliage_alpha_changed();
+	}
+};
+static Graphics_Settings graphics_settings;
+
 #include "gui.hpp"
 
 //
@@ -593,7 +606,7 @@ static void gen_chunk_blocks (Chunk* chunk) {
 		auto place_block = [&] (bpos pos_chunk, block_type bt) {
 			if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
 			Block* b = chunk->get_block(pos_chunk);
-			if (b->type == BT_AIR || b->type == BT_WATER) {
+			if (b->type == BT_AIR || b->type == BT_WATER || (bt == BT_TREE_LOG && b->type == BT_LEAVES)) {
 				b->type = bt;
 				b->hp_ratio = 1;
 				b->dbg_tint = 255;
@@ -617,7 +630,7 @@ static void gen_chunk_blocks (Chunk* chunk) {
 		
 		for (bpos_t i=0; i<tree_height; ++i) place_block(pos_chunk +bpos(0,0,i), BT_TREE_LOG);
 		
-		place_block_sphere(pos_chunk +bpos(0,0,tree_height-2), v3(v2(3.2f),tree_height/3), BT_TREE_LEAVES);
+		place_block_sphere(pos_chunk +bpos(0,0,tree_height-1), v3(v2(3.2f),tree_height/2.5f), BT_LEAVES);
 	};
 	
 	for (bpos p : tree_poss) place_tree(p);
@@ -698,9 +711,32 @@ struct Input {
 	
 	iv2		mcursor_pos_px;
 	
-	//
 	v2		mouse_look_diff;
+	flt		mouse_wheel_diff;
 	
+	bool	Key_Tab		 	= false;
+	bool	Key_LeftArrow	= false;
+	bool	Key_RightArrow 	= false;
+	bool	Key_UpArrow	 	= false;
+	bool	Key_DownArrow	= false;
+	bool	Key_PageUp	 	= false;
+	bool	Key_PageDown	= false;
+	bool	Key_Home		= false;
+	bool	Key_End		 	= false;
+	bool	Key_Insert	 	= false;
+	bool	Key_Delete	 	= false;
+	bool	Key_Backspace	= false;
+	bool	Key_Space		= false;
+	bool	Key_Enter		= false;
+	bool	Key_Escape	 	= false;
+	bool	Key_A			= false;
+	bool	Key_C			= false;
+	bool	Key_V			= false;
+	bool	Key_X			= false;
+	bool	Key_Y			= false;
+	bool	Key_Z			= false;
+	
+	//
 	iv3		move_dir =			0;
 	bool	move_fast =			false;
 	
@@ -732,8 +768,23 @@ struct Input {
 };
 static Input		inp;
 
+//
 static bool controling_flycam =		1;
 static bool viewing_flycam =		1;
+
+static bool trigger_respawn_player =	true;
+static bool trigger_regen_chunks =		false;
+static bool trigger_dbg_heightmap_visualize =	false;
+static bool trigger_save_game =			false;
+static bool trigger_load_game =			false;
+static bool jump_held =					false;
+static bool hold_break_block =			false;
+static bool trigger_place_block =		false;
+
+static void foliage_alpha_changed () {
+	block_props[BT_LEAVES].transparency = graphics_settings.foliage_alpha ? TM_TRANSP_BLOCK : TM_OPAQUE;
+	trigger_regen_chunks = true;
+}
 
 struct Flycam {
 	v3	pos_world =			v3(-15, -27, 50);
@@ -769,15 +820,6 @@ static f32 jump_impulse_from_jump_height (f32 jump_height, f32 grav_accel_down) 
 }
 
 //
-static bool trigger_respawn_player =	true;
-static bool trigger_regen_chunks =		false;
-static bool trigger_dbg_heightmap_visualize =	false;
-static bool trigger_save_game =			false;
-static bool trigger_load_game =			false;
-static bool jump_held =					false;
-static bool hold_break_block =			false;
-static bool trigger_place_block =		false;
-
 static bool lmb_down = false;
 static bool rmb_down = false;
 
@@ -788,6 +830,16 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	bool went_up =		action == GLFW_RELEASE;
 	
 	bool repeated =		!went_down && !went_up; // GLFW_REPEAT
+	
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		
+		dbg_assert(GLFW_RELEASE == 0);
+		dbg_assert(key >= 0 && key < ARRLEN(io.KeysDown));
+		io.KeysDown[key] = action;
+		
+		//io.WantCaptureKeyboard
+	}
 	
 	bool alt =			(mods & GLFW_MOD_ALT) != 0;
 	
@@ -865,6 +917,7 @@ static void glfw_mouse_button_event (GLFWwindow* window, int button, int action,
 	}
 }
 static void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
+	inp.mouse_wheel_diff += yoffset;
 	if (controling_flycam) {
 		if (!inp.move_fast) {
 			f32 delta_log = 0.1f * (f32)yoffset;
@@ -912,110 +965,17 @@ int main (int argc, char** argv) {
 	}
 	
 	//
-	
-	static GLint OVERLAY_TEXTURE_UNIT = 7;
-	
 	imgui_init();
 	
-	GLuint tex_sampler_nearest;
-	{
-		glGenSamplers(1, &tex_sampler_nearest);
-		glBindSampler(OVERLAY_TEXTURE_UNIT, tex_sampler_nearest);
-		
-		glSamplerParameteri(tex_sampler_nearest, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glSamplerParameteri(tex_sampler_nearest, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
-	
-	auto* shad_overlay_tex =		new_shader("overlay_tex.vert",	"overlay_tex.frag",		{UCOM, UV2("pos_clip"), UV2("size_clip")}, {{OVERLAY_TEXTURE_UNIT,"tex0"}});
-	//auto* shad_overlay_cubemap =	new_shader("overlay_tex.vert",	"overlay_cubemap.frag",	{UCOM, UV2("pos_clip"), UV2("size_clip")}, {{0,"tex0"}});
-	
-	//shad_equirectangular_to_cubemap = new_shader("equirectangular_to_cubemap.vert",	"equirectangular_to_cubemap.frag", {UCOM}, {{0,"equirectangular"}});
-	
-	/*
-	std::array<cstr, 6> HUMUS_CUBEMAP_FACE_CODES = {
-		"posx",
-		"negx",
-		"negy", // opengl has the y faces in the wrong order for some reason
-		"posy",
-		"posz",
-		"negz",
-	};
-	*/
-	
 	auto* shad_sky = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
-	auto* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count")}, {{0,"atlas"}, {1,"breaking"}});
+	auto* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	auto* shad_overlay = new_shader("overlay.vert",	"overlay.frag",	{UCOM, UMAT});
 	
-	Texture2D tex_block_atlas;
-	{ // texture atlasing
-		// combine all textures into a texture atlas
-		
-		iv2 tex_atlas_res = (texture_res +0) * iv2(ATLAS_BLOCK_FACES_COUNT,atlas_textures_count); // +2 for one pixel border
-		
-		tex_block_atlas.alloc_cpu_single_mip(PT_SRGB8_LA8, tex_atlas_res);
-		
-		dbg_assert(tex_block_atlas.get_pixel_size() == 4);
-		u32* src_pixels;
-		u32* dst_pixels = (u32*)tex_block_atlas.data.data;
-		
-		s32 face_LUT[ATLAS_BLOCK_FACES_COUNT] = {
-			/* UVZW_BLOCK_FACE_SIDE		*/	1,
-			/* UVZW_BLOCK_FACE_TOP		*/	2,
-			/* UVZW_BLOCK_FACE_BOTTOM	*/	0,
-		};
-
-		auto src = [&] (s32 x, s32 y, s32 face) -> u32* {
-			s32 w = texture_res;
-			s32 h = texture_res;
-			return &src_pixels[face_LUT[face]*h*w + y*w + x];
-		};
-		auto dst = [&] (s32 x, s32 y, s32 face, s32 tex_index) -> u32* {
-			s32 w = texture_res +0;
-			s32 h = texture_res +0;
-			return &dst_pixels[tex_index*h*ATLAS_BLOCK_FACES_COUNT*w + y*ATLAS_BLOCK_FACES_COUNT*w  + face*w + x];
-		};
-		
-		for (s32 tex_index=0; tex_index<atlas_textures_count; ++tex_index) {
-			
-			Texture2D_File earth_tex (CS_AUTO, block_texture_name[tex_index]);
-			earth_tex.load();
-			dbg_assert(earth_tex.type == PT_SRGB8_LA8);
-			
-			dbg_assert(all(earth_tex.dim == iv2(texture_res, texture_res*ATLAS_BLOCK_FACES_COUNT)));
-			
-			dbg_assert(earth_tex.get_pixel_size() == 4);
-			src_pixels = (u32*)earth_tex.data.data;
-			
-			for (s32 block_face_i=0; block_face_i<ATLAS_BLOCK_FACES_COUNT; ++block_face_i) {
-				
-				/*for (s32 x=0; x<texture_res +2; ++x) { // top border
-					*dst(x,0, block_face_i, tex_index) = 0xff0000ff;
-				}*/
-				
-				for (s32 y=0; y<texture_res; ++y) {
-					
-					//*dst(0,y, block_face_i, tex_index) = 0xff0000ff;
-					
-					for (s32 x=0; x<texture_res; ++x) {
-						u32 col = *src(x,y, block_face_i);
-						*dst(x,y, block_face_i, tex_index) = col;
-					}
-					
-					//*dst(texture_res+1,y, block_face_i, tex_index) = 0xff0000ff;
-					
-				}
-				
-				
-				/*for (s32 x=0; x<texture_res +2; ++x) {
-					*dst(x,texture_res+1, block_face_i, tex_index) = 0xff0000ff;
-				}*/
-			}
-		}
-		
-		tex_block_atlas.upload();
-	}
+	Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
 	
 	Texture2D_File tex_breaking (CS_LINEAR, "breaking.png");
+	imgui_showable_textures.push_back(&tex_breaking);
+	
 	s32 breaking_frames_count;
 	
 	tex_breaking.load();
@@ -1068,8 +1028,6 @@ int main (int argc, char** argv) {
 	
 	v3	initial_player_pos_world =		v3(4,32,43);
 	v3	initial_player_vel_world =		0;
-	
-	initial_player_pos_world =		v3(-103.5f, -37.5f, 60);
 	
 	struct Player {
 		v3	pos_world;
@@ -1137,9 +1095,9 @@ int main (int argc, char** argv) {
 	};
 	respawn_player();
 	
-	bool draw_debug_overlay = false;
-	bool draw_wireframe = false;
-	bool show_dbg_tint = 1;
+	bool draw_debug_overlay = 0;
+	bool draw_wireframe = 0;
+	bool show_dbg_tint = 0;
 	
 	auto load_game = [&] () {
 		trigger_load_game = false;
@@ -1157,8 +1115,10 @@ int main (int argc, char** argv) {
 	flt chunk_drawing_radius =		INF;
 	flt chunk_generation_radius =	140;
 	
-	Texture2D dbg_heightmap_visualize;
+	Texture2D dbg_heightmap_visualize("dbg_heightmap_visualize");
 	s32 dbg_heightmap_visualize_radius = 1000;
+	
+	imgui_showable_textures.push_back(&dbg_heightmap_visualize);
 	
 	auto regen_dbg_heightmap_visualize = [&] () {
 		lrgba8* pixels = (lrgba8*)dbg_heightmap_visualize.mips[0].data;
@@ -1249,17 +1209,16 @@ int main (int argc, char** argv) {
 		}
 		
 		inp.mouse_look_diff = 0;
+		inp.mouse_wheel_diff = 0;
 		
 		glfwPollEvents();
 		
 		inp.get_non_callback_input();
 		
-		imgui_begin(dt, inp.wnd_dim, inp.mcursor_pos_px, lmb_down, rmb_down);
+		imgui_begin(dt, inp.wnd_dim, inp.mcursor_pos_px, inp.mouse_wheel_diff, lmb_down, rmb_down);
 		
 		option("draw_wireframe", &draw_wireframe);
 		option("show_dbg_tint", &show_dbg_tint);
-		
-		ImGui::ShowDemoWindow();
 		
 		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
 		
@@ -1278,7 +1237,11 @@ int main (int argc, char** argv) {
 			
 			player.options();
 			
-			option("unloaded_chunks_traversable",	&unloaded_chunks_traversable);
+			{
+				bool tmp = block_props[BT_NO_CHUNK].traversable;
+				option("unloaded_chunks_traversable", &tmp);
+				block_props[BT_NO_CHUNK].traversable = tmp;
+			}
 			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->needs_remesh = true;
 		}
 		
@@ -1447,7 +1410,7 @@ int main (int argc, char** argv) {
 							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 								
 								auto* b = query_block(bp);
-								bool block_solid = !bt_is_traversable(b->type);
+								bool block_solid = !block_props[b->type].traversable;
 								
 								bool intersecting = cylinder_cube_intersect(pos_world -(v3)bp, player.collision_r,player.collision_h);
 								
@@ -1496,7 +1459,7 @@ int main (int argc, char** argv) {
 							for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 								
 								auto* b = query_block(bp);
-								bool block_solid = !bt_is_traversable(b->type);
+								bool block_solid = !block_props[b->type].traversable;
 								
 								if (block_solid && circle_square_intersect(pos_world.xy() -(v2)bp.xy(), player.collision_r)) player_on_ground = true;
 							}
@@ -1565,7 +1528,7 @@ int main (int argc, char** argv) {
 						bool hit = false;
 						
 						auto* b = query_block(bp);
-						bool block_solid = !bt_is_traversable(b->type);
+						bool block_solid = !block_props[b->type].traversable;
 						
 						if (block_solid) {
 							
@@ -1840,7 +1803,7 @@ int main (int argc, char** argv) {
 					
 					//highlight_block(cur_block);
 					Block* b = query_block(cur_block);
-					if (bt_is_breakable(b->type)) {
+					if (block_props[b->type].breakable) {
 						*hit_block = cur_block;
 						*hit_face = face;
 						return b;
@@ -1962,7 +1925,7 @@ int main (int argc, char** argv) {
 			
 			Chunk* chunk;
 			Block* b = query_block(highlighted_block_pos, &chunk);
-			dbg_assert( bt_is_breakable(b->type) && chunk );
+			dbg_assert( block_props[b->type].breakable && chunk );
 			
 			b->hp_ratio -= 1.0f / 0.3f * dt;
 			
@@ -1993,7 +1956,7 @@ int main (int argc, char** argv) {
 				
 				block_place_is_inside_player = cylinder_cube_intersect(player.pos_world -(v3)block_place_pos, player.collision_r,player.collision_h);
 				
-				if (bt_is_replaceable(b->type) && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
+				if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 					
 					b->type = BT_EARTH;
 					b->hp_ratio = 1;
@@ -2035,7 +1998,7 @@ int main (int argc, char** argv) {
 			auto block_update = [&] (Block* b, bpos pos_world, Chunk* chunk) {
 				Block* above = query_block(pos_world +bpos(0,0,+1));
 				
-				if (bt_does_autoheal(b->type) && b->hp_ratio < 1.0f) {
+				if (block_props[b->type].does_autoheal && b->hp_ratio < 1.0f) {
 					b->hp_ratio += 1.0f/5 / block_update_frequency;
 					b->hp_ratio = min(b->hp_ratio, 1.0f);
 					
@@ -2149,7 +2112,7 @@ int main (int argc, char** argv) {
 		
 		if (shad_blocks->valid()) {
 			
-			bind_texture_unit(0, &tex_block_atlas);
+			bind_texture_unit(0, tex_block_atlas);
 			bind_texture_unit(1, &tex_breaking);
 			
 			shad_blocks->bind();
@@ -2163,6 +2126,8 @@ int main (int argc, char** argv) {
 			shad_blocks->set_unif("texture_res", texture_res);
 			shad_blocks->set_unif("atlas_textures_count", atlas_textures_count);
 			shad_blocks->set_unif("breaking_frames_count", breaking_frames_count);
+			
+			shad_blocks->set_unif("alpha_test", graphics_settings.foliage_alpha);
 			
 			s32 count = 0;
 			
@@ -2202,6 +2167,7 @@ int main (int argc, char** argv) {
 			}
 			
 			glEnable(GL_BLEND);
+			shad_blocks->set_unif("alpha_test", false);
 			
 			// draw transperant
 			for (auto& chunk_hash_pair : chunks) {
@@ -2282,50 +2248,6 @@ int main (int argc, char** argv) {
 				//glEnable(GL_DEPTH_TEST);
 				glDisable(GL_BLEND);
 			}
-		}
-		
-		{ // texture debug overlays
-			v2 LL = v2(0,0);
-			v2 LR = v2(1,0);
-			v2 UL = v2(0,1);
-			v2 UR = v2(1,1);
-			
-			auto draw_overlay_tex2d = [&] (Texture2D* tex, v2 pos01, v2 size_multiplier=1) {
-				if (!shad_overlay_tex->valid()) {
-					dbg_assert(false);
-					return;
-				}
-				
-				v2 size_screen = (v2)tex->dim * size_multiplier;
-				v2 size_clip = size_screen / ((v2)inp.wnd_dim / 2);
-				
-				// pos is the lower left corner of the quad
-				v2 pos_screeen = ((v2)inp.wnd_dim -size_screen) * pos01; // [0,1] => [touches ll corner of screen, touches ur corner of screen]
-				
-				v2 pos_clip = (pos_screeen / (v2)inp.wnd_dim) * 2 -1;
-				
-				glEnable(GL_BLEND);
-				glDisable(GL_DEPTH_TEST);
-				glDisable(GL_CULL_FACE);
-				
-				shad_overlay_tex->bind();
-				shad_overlay_tex->set_unif("pos_clip", pos_clip);
-				shad_overlay_tex->set_unif("size_clip", size_clip);
-				bind_texture_unit(OVERLAY_TEXTURE_UNIT, tex);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-				
-				glEnable(GL_CULL_FACE);
-				glEnable(GL_DEPTH_TEST);
-				glDisable(GL_BLEND);
-			};
-			
-			if (shad_overlay_tex->valid()) {
-				//draw_overlay_tex2d(&tex_block_atlas, LR, 8);
-				//draw_overlay_tex2d(&tex_breaking, UL, 8);
-				//draw_overlay_tex2d(&dbg_heightmap_visualize, LR, 1.5f);
-				//draw_overlay_tex2d(&imgui_tex_font_atlas, LR, 1.0f);
-			}
-			
 		}
 		
 		draw_imgui(inp.wnd_dim);

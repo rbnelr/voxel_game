@@ -5,8 +5,8 @@ $include "common.frag"
 in		vec2	vs_uv;
 in		vec4	vs_col;
 
-uniform sampler2D	atlas;
+uniform sampler2D	tex;
 
 void main () {
-	FRAG_COL( texture(atlas, vs_uv) * vs_col );
+	FRAG_COL( texture(tex, vs_uv) * vs_col );
 }

@@ -28,13 +28,28 @@ DONE:
  -> uses a tree density noise layer
  -> tries to avoid trees being too close to each other by scaling the tree spawn propbablity based on how close other already spawned tress are (this is tree spawn order dependant, but that is deterministic with our method)
  
-TODO
--FEATURES:
+ add trees
+  -RNG seeded by chunk pos
+  -generate random chance for each xy block column
+  -calculate tree chance via tree desity noise layer
+  -spawn tree if random chance is above tree chance
+  -maybe check if there already are trees nearby and dont spawn it in that case
  
  remove my own dev/debug gui and reimplement the Immediate mode option code with imgui controls
  -remember to remove redundant stb text libs from deps/
  -clean up unused shaders from shaders/
  -add viewing of any texture in imgui window
+ 
+ added alpha for leaves texture and toggable graphics option that disables alpha for leaves (and does also not generate the invisible faces, since this is to improve performance on low power machines)
+ 
+TODO
+-FEATURES:
+ 
+ convert entire debug optios into new imgui way of doing things
+ 
+ fix cut off trees
+  -also do this for all 8 surrounding chunks no matter if the're generated or not
+  -this way we can generate leaves in our chunks of trees in a neibouring chunk
  
  immediate mode debug shapes
  -arrow for velocity acceleration etc.
@@ -43,15 +58,6 @@ TODO
  -maybe even integrate vector viewing into my imgui debug variables (allow visualizing any vector that gets displayed in the imgui)
  
  redesign input system
- 
- add trees
-  -RNG seeded by chunk pos
-  -generate random chance for each xy block column
-  -calculate tree chance via tree desity noise layer and terrain type
-  -spawn tree if random chance is above tree chance
-  -maybe check if there already are trees nearby and dont spawn it in that case
-  -also do this for all 8 surrounding chunks no matter if the're generated or not
-  -this way we can generate leaves in our chunks of trees in a neibouring chunk
  
  improve block AO
  

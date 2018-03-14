@@ -364,8 +364,10 @@ void Chunk_Mesher::mesh (Chunk* chunk) {
 						block_pos_world_z = i.z +chunk_origin_block_world.z;
 						w = get_block_texture_index_from_block_type(b->type);
 						
-						if (bt_is_transparent(block->type))	cube_transperant();
-						else								cube_opaque();
+						if (block_props[block->type].transparency == TM_TRANSP_MASS)
+							cube_transperant();
+						else
+							cube_opaque();
 						
 					}
 				}

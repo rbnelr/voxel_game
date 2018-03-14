@@ -16,6 +16,8 @@ uniform int atlas_textures_count;
 uniform int breaking_frames_count;
 uniform bool show_dbg_tint;
 
+uniform bool alpha_test;
+
 vec2 map (vec2 val, vec2 in_a, vec2 in_b) { // val[in_a,in_b] -> [0,1]
 	return mix((val -in_a) / (in_b -in_a), vec2(0), equal(in_a, in_b));
 }
@@ -89,8 +91,12 @@ void main () {
 		}
 	}
 	
-	//col = vec4(1);
-	col *= vec4(vec3(vs_brightness), 1);
+	col.rgb *= vec3(vs_brightness);
+	
+	if (alpha_test) {
+		if (col.a <= 100.0/255) discard;
+		col.a = 1;
+	}
 	
 	FRAG_COL( !show_dbg_tint ? col : mix(col, vec4(1), 0.1) * mix(vec4(1), vs_dbg_tint, 1) );
 }

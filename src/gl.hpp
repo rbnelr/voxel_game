@@ -140,13 +140,16 @@ enum src_color_space {
 };
 
 struct Texture {
+	str					name;
 	pixel_type			type;
 	
 	GLuint				tex;
 	
 	Data_Block			data;
 	
-	Texture () {
+	Texture (strcr n) {
+		name = n;
+		
 		glGenTextures(1, &tex);
 		
 		data.data = nullptr;
@@ -208,7 +211,7 @@ struct Texture2D : public Texture {
 	
 	std::vector<Mip>	mips;
 	
-	Texture2D (): Texture{} {
+	Texture2D (strcr n): Texture{n} {
 		glBindTexture(GL_TEXTURE_2D, tex);
 	}
 	
@@ -335,7 +338,7 @@ struct TextureCube : public Texture {
 	
 	std::vector<Mip>	mips;
 	
-	TextureCube (): Texture{} {
+	TextureCube (strcr n): Texture{n} {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, tex);
 	}
 	
@@ -446,13 +449,11 @@ private:
 };
 
 struct Texture2D_File : public Texture2D {
-	str				filename;
-	
 	Source_File		srcf;
 	src_color_space	cs;
 	
-	Texture2D_File (src_color_space cs_, strcr fn): Texture2D{}, filename{fn}, cs{cs_} {
-		auto filepath = prints("%s/%s", textures_base_path, filename.c_str());
+	Texture2D_File (src_color_space cs_, strcr fn): Texture2D{fn}, cs{cs_} {
+		auto filepath = prints("%s/%s", textures_base_path, name.c_str());
 		
 		srcf.init(filepath);
 	}
@@ -467,12 +468,12 @@ struct Texture2D_File : public Texture2D {
 		
 		f64 begin;
 		if (1) {
-			logf("Loading File_Texture2D '%s'...", filename.c_str());
+			logf("Loading File_Texture2D '%s'...", name.c_str());
 			begin = glfwGetTime();
 		}
 		
 		if (!load_texture()) {
-			logf_warning("\"%s\" could not be loaded!", filename.c_str());
+			logf_warning("\"%s\" could not be loaded!", name.c_str());
 			return false;
 		}
 		
@@ -488,7 +489,7 @@ struct Texture2D_File : public Texture2D {
 		bool reloaded = srcf.poll_did_change();
 		if (!reloaded) return false;
 		
-		printf("Texture2D_File source file changed, reloading \"%s\".\n", filename.c_str());
+		printf("Texture2D_File source file changed, reloading \"%s\".\n", name.c_str());
 		
 		reloaded = load();
 		if (reloaded) {
@@ -689,16 +690,14 @@ private:
 };
 
 struct TextureCube_Equirectangular_File : public TextureCube {
-	str				filename;
-	
 	Source_File		srcf;
 	src_color_space	cs;
 	
 	iv2				equirect_max_res;
 	Texture2D_File*	equirect;
 	
-	TextureCube_Equirectangular_File (src_color_space cs_, strcr fn, iv2 equirect_max_res_=4096): TextureCube{}, filename{fn}, cs{cs_}, equirect_max_res{equirect_max_res_}, equirect{nullptr} {
-		auto filepath = prints("%s/%s", textures_base_path, filename.c_str());
+	TextureCube_Equirectangular_File (src_color_space cs_, strcr fn, iv2 equirect_max_res_=4096): TextureCube{fn}, cs{cs_}, equirect_max_res{equirect_max_res_}, equirect{nullptr} {
+		auto filepath = prints("%s/%s", textures_base_path, name.c_str());
 		
 		srcf.init(filepath);
 	}
@@ -715,12 +714,12 @@ struct TextureCube_Equirectangular_File : public TextureCube {
 		
 		f64 begin;
 		if (1) {
-			logf("Loading File_TextureCube '%s'...", filename.c_str());
+			logf("Loading File_TextureCube '%s'...", name.c_str());
 			begin = glfwGetTime();
 		}
 		
 		if (!load_texture()) {
-			logf_warning("\"%s\" could not be loaded!", filename.c_str());
+			logf_warning("\"%s\" could not be loaded!", name.c_str());
 			return false;
 		}
 		
@@ -736,7 +735,7 @@ struct TextureCube_Equirectangular_File : public TextureCube {
 		bool reloaded = srcf.poll_did_change();
 		if (!reloaded) return false;
 		
-		printf("File_TextureCube source file changed, reloading \"%s\".\n", filename.c_str());
+		printf("File_TextureCube source file changed, reloading \"%s\".\n", name.c_str());
 		
 		delete equirect;
 		equirect = nullptr;
@@ -779,7 +778,7 @@ private:
 			// we are loading a cubemap from a equirectangular 2d image
 			
 			delete equirect;
-			equirect = new Texture2D_File(cs, filename);
+			equirect = new Texture2D_File(cs, name);
 			
 			return equirect->load();
 		}
@@ -790,12 +789,10 @@ private:
 };
 
 struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image file per face
-	str				filename;
-	
 	Source_Files	srcf;
 	src_color_space	cs;
 	
-	TextureCube_Multi_File (src_color_space cs_, strcr common_filename, std::array<str, 6>const& filenames): TextureCube{}, filename{common_filename}, cs{cs_} {
+	TextureCube_Multi_File (src_color_space cs_, strcr common_filename, std::array<str, 6>const& filenames): TextureCube{common_filename}, cs{cs_} {
 		for (ui i=0; i<6; ++i) {
 			str filepath = prints("%s/%s", textures_base_path, filenames[i].c_str());
 			
@@ -814,12 +811,12 @@ struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image f
 		
 		f64 begin;
 		if (1) {
-			logf("Loading Multi_File_TextureCube '%s'...", filename.c_str());
+			logf("Loading Multi_File_TextureCube '%s'...", name.c_str());
 			begin = glfwGetTime();
 		}
 		
 		if (!load_textures()) {
-			logf_warning("\"%s\" could not be loaded!", filename.c_str());
+			logf_warning("\"%s\" could not be loaded!", name.c_str());
 			return false;
 		}
 		
@@ -835,7 +832,7 @@ struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image f
 		bool reloaded = srcf.poll_did_change();
 		if (!reloaded) return false;
 		
-		printf("Multi_File_TextureCube source file changed, reloading \"%s\".\n", filename.c_str());
+		printf("Multi_File_TextureCube source file changed, reloading \"%s\".\n", name.c_str());
 		
 		reloaded = load();
 		if (reloaded) {
