@@ -373,6 +373,14 @@ struct Graphics_Settings {
 };
 static Graphics_Settings graphics_settings;
 
+static flt elev_freq = 400, elev_amp = 25;
+static flt rough_freq = 220;
+static flt detail0_freq = 70, detail0_amp = 12;
+static flt detail1_freq = 20, detail1_amp = 3;
+static flt detail2_freq = 3, detail2_amp = 0.14f;
+
+static bool trigger_regen_chunks =		false;
+
 #include "gui.hpp"
 
 //
@@ -425,29 +433,14 @@ namespace std {
 	};
 }
 
-struct Noise_Octave {
-	f32	period;
-	f32	amp;
-};
-std::vector<Noise_Octave> heightmap_noise_octaves = {
-	{ 300,		12		},
-	{ 120,		12		},
-	{ 50,		4.5f	},
-	{ 20,		3		},
-	{ 3,		0.225f	},
-};
-static s32 get_heightmap_noise_octaves_count () {			return (s32)heightmap_noise_octaves.size(); }
-static void set_heightmap_noise_octaves_count (s32 count) {	heightmap_noise_octaves.resize(count); }
-static bool heightmap_noise_octaves_open = true;
-
 static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
-	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs) {
+	auto noise = [&] (v2 pos, flt period, flt ang_offs, v2 offs, flt range_l, flt range_h) {
 		pos = rotate2(ang_offs) * pos;
 		pos /= period; // period is inverse frequency
 		pos += offs;
 		
 		flt val = osn_noise.eval<flt>(pos.x, pos.y);
-		val = map(val, -0.865773f, 0.865772f, -1,1); // normalize into [-1,1] range
+		val = map(val, -0.865773f, 0.865772f, range_l,range_h); // normalize into [range_l,range_h] range
 		return val;
 	};
 	
@@ -459,26 +452,42 @@ static f32 heightmap (OSN::Noise<2> const& osn_noise, v2 pos_world) {
 	{
 		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
 		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
-		elevation = noise(pos_world, 300, deg(37.17f) * (f32)i, offs);
+		elevation = noise(pos_world, elev_freq, deg(37.17f) * (f32)i, offs, -1,+1) * elev_amp;
 		
 		++i;
 	}
 	{
 		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
 		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
-		roughness = noise(pos_world, 220, deg(37.17f) * (f32)i, offs);
-		
-		++i;
-	}
-	{
-		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
-		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
-		detail = noise(pos_world, 50, deg(37.17f) * (f32)i, offs);
+		roughness = noise(pos_world, rough_freq, deg(37.17f) * (f32)i, offs, 0,+1);
 		
 		++i;
 	}
 	
-	return (elevation +roughness * detail) * 32 +32;
+	detail = 0;
+	{
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		detail += noise(pos_world, detail0_freq, deg(37.17f) * (f32)i, offs, -1,+1) * detail0_amp;
+		
+		++i;
+	}
+	{
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		detail += noise(pos_world, detail1_freq, deg(37.17f) * (f32)i, offs, -1,+1) * detail1_amp;
+		
+		++i;
+	}
+	{
+		v2 offs = (i % 3 ? +1 : -1) * 12.34f * (f32)i;
+		offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (f32)i;
+		detail += noise(pos_world, detail2_freq, deg(37.17f) * (f32)i, offs, -1,+1) * detail2_amp;
+		
+		++i;
+	}
+	
+	return (elevation +32) +(roughness * detail);
 }
 
 static flt noise_tree_desity_period = 200;
@@ -773,7 +782,6 @@ static bool controling_flycam =		1;
 static bool viewing_flycam =		1;
 
 static bool trigger_respawn_player =	true;
-static bool trigger_regen_chunks =		false;
 static bool trigger_dbg_heightmap_visualize =	false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
@@ -890,7 +898,10 @@ static void glfw_key_event (GLFWwindow* window, int key, int scancode, int actio
 	}
 }
 static void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
-	
+	{
+		ImGuiIO& io = ImGui::GetIO();
+		io.AddInputCharacter((char)codepoint);
+	}
 }
 static void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
 	bool went_down = action == GLFW_PRESS;
@@ -1110,6 +1121,8 @@ int main (int argc, char** argv) {
 	
 	load_game();
 	
+	ImGui::NewFrame(); // make imgui calls not crash during init
+	
 	inital_chunk( player.pos_world );
 	
 	flt chunk_drawing_radius =		INF;
@@ -1177,6 +1190,8 @@ int main (int argc, char** argv) {
 	bool fixed_dt = 1 || IS_DEBUGGER_PRESENT(); 
 	f32 max_variable_dt = 1.0f / 20; 
 	f32 fixed_dt_dt = 1.0f / 60; 
+	
+	ImGui::End();
 	
 	inp.get_non_callback_input(); // get inital mouse pos so that we dont get a invalid mouse delta on the first frame (glfw does not support relative mouse input for some reason)
 	
@@ -1285,19 +1300,6 @@ int main (int argc, char** argv) {
 			
 			world_to_cam_rot = rotate3_X(-view.ori_ae.y) * rotate3_Z(-view.ori_ae.x);
 			cam_to_world_rot = rotate3_Z(view.ori_ae.x) * rotate3_X(view.ori_ae.y);
-		}
-		
-		option("heightmap_noise_octaves", get_heightmap_noise_octaves_count, set_heightmap_noise_octaves_count, &heightmap_noise_octaves_open);
-		if (heightmap_noise_octaves_open) {
-			for (s32 i=0; i<(s32)heightmap_noise_octaves.size(); ++i) {
-				auto& o = heightmap_noise_octaves[i];
-				
-				v2 tmp = v2(o.period, o.amp);
-				
-				if (option(prints("  [%2d]", i), &tmp)) trigger_regen_chunks = true;
-				
-				o.period = tmp.x;	o.amp = tmp.y;
-			}
 		}
 		
 		if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;

@@ -198,6 +198,18 @@ static void imgui_begin (f32 dt, iv2 wnd_dim, iv2 mcursor_pos_px, flt mouse_whee
 	
 	if (ImGui::TreeNode("World Generation")) {
 		
+		if (ImGui::InputFloat("Elevation Freq", &elev_freq))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Elevation Amp", &elev_amp))		trigger_regen_chunks = true;
+		
+		if (ImGui::InputFloat("Roughness Freq", &rough_freq))	trigger_regen_chunks = true;
+		
+		if (ImGui::InputFloat("Detail 0 Freq", &detail0_freq))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Detail 0 Amp", &detail0_amp))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Detail 1 Freq", &detail1_freq))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Detail 1 Amp", &detail1_amp))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Detail 2 Freq", &detail2_freq))	trigger_regen_chunks = true;
+		if (ImGui::InputFloat("Detail 2 Amp", &detail2_amp))	trigger_regen_chunks = true;
+		
 		ImGui::TreePop();
 	}
 	
@@ -206,6 +218,7 @@ static void imgui_begin (f32 dt, iv2 wnd_dim, iv2 mcursor_pos_px, flt mouse_whee
 		
 		// Sky colors
 		
+		ImGui::TreePop();
 	}
 	
 	// texture_windows

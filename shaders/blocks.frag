@@ -94,7 +94,7 @@ void main () {
 	col.rgb *= vec3(vs_brightness);
 	
 	if (alpha_test) {
-		if (col.a <= 100.0/255) discard;
+		if (col.a <= 110.0/255) discard;
 		col.a = 1;
 	}
 	
