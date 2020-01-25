@@ -1,3 +1,10 @@
+#pragma once
+#include "kissmath.hpp"
+#include "kissmath_colors.hpp"
+
+#include "stdint.h"
+
+#include "gl.hpp"
 
 static int texture_res = 16;
 
@@ -45,7 +52,8 @@ static Block_Properties block_props[PSEUDO_BLOCK_TYPES_COUNT] = {
 	/* BT_EARTH				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
 	/* BT_GRASS				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
 	/* BT_TREE_LOG			*/	{ 0, TM_OPAQUE,			1, 0, 1 },
-	/* BT_LEAVES			*/	{ 0, graphics_settings.foliage_alpha ? TM_TRANSP_BLOCK : TM_OPAQUE,	1, 0, 1 },
+	///* BT_LEAVES			*/	{ 0, graphics_settings.foliage_alpha ? TM_TRANSP_BLOCK : TM_OPAQUE,	1, 0, 1 },
+	/* BT_LEAVES			*/	{ 0, TM_TRANSP_BLOCK,	1, 0, 1 },
 								
 	/* BT_OUT_OF_BOUNDS		*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
 	/* BT_NO_CHUNK			*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
@@ -101,7 +109,7 @@ static Block B_NO_CHUNK = { BT_NO_CHUNK, false, 1, 255 };
 static Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasing
 	// combine all textures into a texture atlas
 	Texture2D* tex = new Texture2D("block_atlas");
-	imgui_showable_textures.push_back(tex);
+	//imgui_showable_textures.push_back(tex);
 	
 	int2 tex_atlas_res = (texture_res +0) * int2(ATLAS_BLOCK_FACES_COUNT,atlas_textures_count); // +2 for one pixel border
 	

@@ -1,0 +1,334 @@
+//#include "glad/glad_wgl.h"
+
+#include "glfw_window.hpp"
+#include "kissmath/int2.hpp"
+#include "kissmath/float2.hpp"
+using namespace kissmath;
+
+#include "timer.hpp"
+#include "input.hpp"
+#include "game.hpp"
+
+#include <memory>
+#include "stdio.h"
+#include "assert.h"
+
+struct Rect {
+	int2 pos;
+	int2 dim;
+};
+
+GLFWwindow*		window;
+
+bool			fullscreen = false;
+
+GLFWmonitor*	primary_monitor;
+Rect			window_positioning;
+
+//// input
+void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
+	assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
+
+	bool went_down =	action == GLFW_PRESS;
+	bool went_up =		action == GLFW_RELEASE;
+
+	bool repeated =		!went_down && !went_up; // GLFW_REPEAT
+
+	//{
+	//	ImGuiIO& io = ImGui::GetIO();
+	//
+	//	assert(GLFW_RELEASE == 0);
+	//	assert(key >= 0 && key < ARRLEN(io.KeysDown));
+	//	io.KeysDown[key] = action;
+	//
+	//	//io.WantCaptureKeyboard
+	//}
+
+	bool alt =			(mods & GLFW_MOD_ALT) != 0;
+
+	if (key == GLFW_KEY_F11 || (alt && key == GLFW_KEY_ENTER)) {
+		if (went_down) toggle_fullscreen();
+		return;
+	}
+
+	if (key == GLFW_KEY_F1) {
+		//if (went_down) toggle_imgui();
+		return;
+	}
+	if (key == GLFW_KEY_F2) {
+		int mode = glfwGetInputMode(window, GLFW_CURSOR);
+
+		if (mode == GLFW_CURSOR_DISABLED)
+			glfwGetInputMode(window, GLFW_CURSOR_NORMAL);
+		else
+			glfwGetInputMode(window, GLFW_CURSOR_DISABLED);
+		return;
+	}
+
+	if (!repeated) {
+		//if (alt) {
+		//	switch (key) {
+		//		//
+		//	case GLFW_KEY_S:			if (went_down) trigger_save_game = true;	break;
+		//	case GLFW_KEY_L:			if (went_down) trigger_load_game = true;	break;
+		//	}
+		//} else {
+		//	switch (key) {
+		//		//
+		//	case GLFW_KEY_A:			inp.move_dir.x -= went_down ? +1 : -1;		break;
+		//	case GLFW_KEY_D:			inp.move_dir.x += went_down ? +1 : -1;		break;
+		//
+		//	case GLFW_KEY_S:			inp.move_dir.y -= went_down ? +1 : -1;		break;
+		//	case GLFW_KEY_W:			inp.move_dir.y += went_down ? +1 : -1;		break;
+		//
+		//	case GLFW_KEY_LEFT_CONTROL:	inp.move_dir.z -= went_down ? +1 : -1;		break;
+		//	case GLFW_KEY_SPACE:		inp.move_dir.z += went_down ? +1 : -1;
+		//		jump_held = went_down;						break;
+		//
+		//	case GLFW_KEY_LEFT_SHIFT:	inp.move_fast = went_down;					break;
+		//
+		//	case GLFW_KEY_R:			if (went_down) trigger_regen_chunks = true;		break;
+		//	case GLFW_KEY_Q:			if (went_down) trigger_respawn_player = true;	break;
+		//
+		//	}
+		//}
+	}
+}
+void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
+	//{
+	//	ImGuiIO& io = ImGui::GetIO();
+	//	io.AddInputCharacter((char)codepoint);
+	//}
+}
+void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
+	bool went_down = action == GLFW_PRESS;
+
+	//switch (button) {
+	//case GLFW_MOUSE_BUTTON_RIGHT:
+	//	rmb_down = went_down;
+	//	if (fps_mouse_mode == DEV_MODE) {
+	//		if (went_down) {
+	//			start_mouse_look();
+	//			mouselook_enabled = true;
+	//		} else {
+	//			stop_mouse_look();
+	//			mouselook_enabled = false;
+	//		}
+	//	} else {
+	//		trigger_place_block = went_down;
+	//	}
+	//	break;
+	//case GLFW_MOUSE_BUTTON_LEFT:
+	//	lmb_down = went_down;
+	//	hold_break_block = went_down;
+	//	break;
+	//}
+}
+void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
+	input.mouse_wheel_delta += (float)yoffset;
+	//if (controling_flycam) {
+	//	if (!inp.move_fast) {
+	//		float delta_log = 0.1f * (float)yoffset;
+	//		flycam.speed = powf( 2, log2(flycam.speed) +delta_log );
+	//		printf(">>> fly_vel: %f", flycam.speed);
+	//	} else {
+	//		float delta_log = -0.1f * (float)yoffset;
+	//		float vfov = powf( 2, log2(flycam.vfov) +delta_log );
+	//		if (vfov >= deg(1.0f/10) && vfov <= deg(170)) flycam.vfov = vfov;
+	//	}
+	//}
+}
+
+void glfw_register_callbacks (GLFWwindow* window) {
+	glfwSetKeyCallback(window,			glfw_key_event);
+	glfwSetCharModsCallback(window,		glfw_char_event);
+	glfwSetMouseButtonCallback(window,	glfw_mouse_button_event);
+	glfwSetScrollCallback(window,		glfw_mouse_scroll);
+}
+
+void glfw_get_non_callback_input (GLFWwindow* window) {
+	glfwGetFramebufferSize(window, &input.window_size.x, &input.window_size.y);
+
+	double x, y;
+	glfwGetCursorPos(window, &x, &y);
+
+	input.cursor_pos = float2((float)x, (float)y);
+}
+
+//// vsync and fullscreen mode
+
+// handle vsync interval allowing -1 or not depending on extension
+int _vsync_on_interval = 1;
+// keep latest vsync for toggle_fullscreen
+bool _vsync;
+
+void set_vsync (bool on) {
+	glfwSwapInterval(on ? _vsync_on_interval : 0);
+	_vsync = on;
+}
+
+void toggle_fullscreen () {
+	if (!fullscreen) {
+		// store windowed window placement
+		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
+		glfwGetWindowSize(window, &window_positioning.dim.x, &window_positioning.dim.y);
+	}
+
+	fullscreen = !fullscreen;
+
+	if (fullscreen) {
+		// set window fullscreenon primary monitor
+		auto* vm = glfwGetVideoMode(primary_monitor);
+		glfwSetWindowMonitor(window, primary_monitor, 0,0, vm->width,vm->height, vm->refreshRate);
+	} else {
+		// restore windowed window placement
+		glfwSetWindowMonitor(window, NULL, window_positioning.pos.x, window_positioning.pos.y, window_positioning.dim.x, window_positioning.dim.y, GLFW_DONT_CARE);
+	}
+
+	// reset vsync to make sure 
+	set_vsync(_vsync);
+}
+
+//// gameloop
+void glfw_gameloop () {
+	auto game = std::make_unique<Game>();
+
+	input.dt = 0; // dt zero on first frame
+	uint64_t prev = get_timestamp();
+
+	for (;;) {
+		input.clear_frame_input();
+
+		glfwPollEvents();
+
+		if (glfwWindowShouldClose(window))
+			break;
+
+		glfw_get_non_callback_input(window);
+
+		game->frame();
+
+		glfwSwapBuffers(window);
+
+		// Calc dt based on prev frame duration
+		uint64_t now = get_timestamp();
+		input.dt = min((float)(now - prev) / (float)timestamp_freq, input.max_dt);
+		prev = now;
+	}
+}
+
+void glfw_error (int err, const char* msg) {
+	fprintf(stderr, "GLFW Error! [0x%x] '%s'\n", err, msg);
+}
+
+void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
+	//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;
+
+	// hiding irrelevant infos/warnings
+	switch (id) {
+	case 131185: // Buffer detailed info (where the memory lives which is supposed to depend on the usage hint)
+				 //case 1282: // using shader that was not compiled successfully
+				 //
+				 //case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
+				 //case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
+				 //
+				 //			 //case 131154: // Pixel transfer sync with rendering warning
+				 //
+				 //			 //case 1282: // Wierd error on notebook when trying to do texture streaming
+				 //			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
+				 //			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
+		return;
+	}
+
+	const char* src_str = "<unknown>";
+	switch (source) {
+		case GL_DEBUG_SOURCE_API_ARB:				src_str = "GL_DEBUG_SOURCE_API_ARB";				break;
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:		src_str = "GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB";		break;
+		case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:	src_str = "GL_DEBUG_SOURCE_SHADER_COMPILER_ARB";	break;
+		case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:		src_str = "GL_DEBUG_SOURCE_THIRD_PARTY_ARB";		break;
+		case GL_DEBUG_SOURCE_APPLICATION_ARB:		src_str = "GL_DEBUG_SOURCE_APPLICATION_ARB";		break;
+		case GL_DEBUG_SOURCE_OTHER_ARB:				src_str = "GL_DEBUG_SOURCE_OTHER_ARB";				break;
+	}
+
+	const char* type_str = "<unknown>";
+	switch (source) {
+		case GL_DEBUG_TYPE_ERROR_ARB:				type_str = "GL_DEBUG_TYPE_ERROR_ARB";				break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB";	break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB";	break;
+		case GL_DEBUG_TYPE_PORTABILITY_ARB:			type_str = "GL_DEBUG_TYPE_PORTABILITY_ARB";			break;
+		case GL_DEBUG_TYPE_PERFORMANCE_ARB:			type_str = "GL_DEBUG_TYPE_PERFORMANCE_ARB";			break;
+		case GL_DEBUG_TYPE_OTHER_ARB:				type_str = "GL_DEBUG_TYPE_OTHER_ARB";				break;
+	}
+
+	const char* severity_str = "<unknown>";
+	switch (severity) {
+		case GL_DEBUG_SEVERITY_HIGH_ARB:			severity_str = "GL_DEBUG_SEVERITY_HIGH_ARB";		break;
+		case GL_DEBUG_SEVERITY_MEDIUM_ARB:			severity_str = "GL_DEBUG_SEVERITY_MEDIUM_ARB";		break;
+		case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "GL_DEBUG_SEVERITY_LOW_ARB";			break;
+	}
+
+	fprintf(stderr, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
+}
+
+#if _DEBUG
+	#define OPENGL_DEBUG
+	#define GLFW_DEBUG
+#endif
+
+void glfw_init_gl () {
+	glfwMakeContextCurrent(window);
+
+	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+#ifdef OPENGL_DEBUG
+	if (glfwExtensionSupported("GL_ARB_debug_output")) {
+		glDebugMessageCallbackARB(ogl_debug, 0);
+		//DEBUG_OUTPUT_SYNCHRONOUS_ARB this exists -> if ogl_debuproc needs to be thread safe
+	}
+#endif
+
+	if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
+		_vsync_on_interval = -1;
+
+	set_vsync(true);
+
+	// srgb enabled by default if supported
+	// TODO: should I use glfwExtensionSupported or GLAD_GL_ARB_framebuffer_sRGB? does it make a difference?
+	if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
+		glEnable(GL_FRAMEBUFFER_SRGB);
+}
+
+int main () {
+
+#ifdef GLFW_DEBUG
+	glfwSetErrorCallback(glfw_error);
+#endif
+
+	if (!glfwInit()) {
+		fprintf(stderr, "glfwInit failed!\n");
+		return 1;
+	}
+
+#ifdef OPENGL_DEBUG
+	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+
+	window = glfwCreateWindow(1280, 720, "Voxel Game", NULL, NULL);
+	if (!window) {
+		fprintf(stderr, "glfwCreateWindow failed!\n");
+		glfwTerminate();
+		return 1;
+	}
+
+	glfw_init_gl();
+
+	glfw_gameloop();
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	return 0;
+}

@@ -160,10 +160,14 @@
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="file_io.hpp" />
+    <ClInclude Include="game.hpp" />
     <ClInclude Include="gl.hpp" />
     <ClInclude Include="glad\glad.h" />
+    <ClInclude Include="glad\glad_wgl.h" />
     <ClInclude Include="glad\khrplatform.h" />
-    <ClInclude Include="gui.hpp" />
+    <ClInclude Include="glfw_window.hpp" />
+    <ClInclude Include="input.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="kissmath.hpp" />
     <ClInclude Include="kissmath\bool.hpp" />
@@ -195,18 +199,24 @@
     <ClInclude Include="kissmath_colors.hpp" />
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="options_overlay.hpp" />
-    <ClInclude Include="platform.hpp" />
     <ClInclude Include="stb\stb_image.h" />
+    <ClInclude Include="stb_image.hpp" />
     <ClInclude Include="string.hpp" />
+    <ClInclude Include="timer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp" />
+    <ClCompile Include="chunks.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="file_io.cpp" />
     <ClCompile Include="glad\glad.c" />
+    <ClCompile Include="glad\glad_wgl.c" />
+    <ClCompile Include="glfw_window.cpp" />
+    <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />
     <ClCompile Include="kissmath\bool3.cpp" />
@@ -233,7 +243,10 @@
     <ClCompile Include="kissmath\uint8v2.cpp" />
     <ClCompile Include="kissmath\uint8v3.cpp" />
     <ClCompile Include="kissmath\uint8v4.cpp" />
+    <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp" />
+    <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="string.cpp" />
+    <ClCompile Include="timer.cpp" />
     <ClCompile Include="voxel_game.cpp" />
   </ItemGroup>
   <ItemGroup>

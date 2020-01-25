@@ -1,3 +1,33 @@
+#pragma once
+#include "kissmath.hpp"
+#include "blocks.hpp"
+
+#include "stdint.h"
+#include <unordered_map>
+
+#include "gl.hpp"
+
+struct Chunk_Vbo_Vertex {
+	float3		pos_world;
+	float4		uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
+	float		hp_ratio; // [0,1]
+	float		brightness;
+	lrgba		dbg_tint;
+};
+
+static Vertex_Layout chunk_vbo_vert_layout = {
+	{ "pos_world",	T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
+	{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
+	{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
+	{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
+	{ "dbg_tint",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
+};
+
+typedef int64_t	bpos_t;
+typedef int64v2	bpos2;
+typedef int64v3	bpos;
+
+typedef int64v2	chunk_pos_t;
 
 #define CHUNK_DIM_X			32
 #define CHUNK_DIM_Y			32
@@ -8,9 +38,37 @@
 #define CHUNK_DIM			bpos(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z)
 #define CHUNK_DIM_2D		bpos2(CHUNK_DIM_X, CHUNK_DIM_Y)
 
+struct s64v2_hashmap {
+	chunk_pos_t v;
+
+	bool operator== (s64v2_hashmap const& r) const { // for hash map
+		return v.x == r.v.x && v.y == r.v.y;
+	}
+};
+
+inline size_t hash (chunk_pos_t v) {
+	return 53 * (std::hash<int64_t>()(v.x) + 53) + std::hash<int64_t>()(v.y);
+};
+
+static_assert(sizeof(size_t) == 8, "");
+
+namespace std {
+	template<> struct hash<s64v2_hashmap> { // for hash map
+		size_t operator() (s64v2_hashmap const& v) const {
+			return ::hash(v.v);
+		}
+	};
+}
+
 struct Chunk;
-static Chunk* query_chunk (chunk_pos_t pos);
-static Block* query_block (bpos p, Chunk** out_chunk=nullptr);
+extern Chunk* _prev_query_chunk; // avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
+
+extern std::unordered_map<s64v2_hashmap, Chunk*> chunks;
+
+inline void delete_all_chunks ();
+
+inline Chunk* query_chunk (chunk_pos_t coord);
+inline Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 
 static chunk_pos_t get_chunk_from_block_pos (bpos2 pos_world) {
 	
@@ -320,7 +378,7 @@ struct Chunk {
 static double profile_remesh_total = 0;
 
 #if AVOID_QUERY_CHUNK_HASH_LOOKUP
-Block const* Chunk_Mesher::query_block (bpos_t pos_world_x, bpos_t pos_world_y, bpos_t pos_world_z) {
+inline Block const* Chunk_Mesher::query_block (bpos_t pos_world_x, bpos_t pos_world_y, bpos_t pos_world_z) {
 	if (pos_world_z < 0 || pos_world_z >= CHUNK_DIM_Z) return &B_OUT_OF_BOUNDS;
 	
 	bpos pos_in_chunk;
@@ -333,7 +391,7 @@ Block const* Chunk_Mesher::query_block (bpos_t pos_world_x, bpos_t pos_world_y, 
 }
 #endif
 
-void Chunk_Mesher::mesh (Chunk* chunk) {
+inline void Chunk_Mesher::mesh (Chunk* chunk) {
 	//PROFILE_BEGIN(profile_remesh_total);
 	
 	vbo_opaque =		&chunk->vbo;
@@ -385,3 +443,43 @@ void Chunk_Mesher::mesh (Chunk* chunk) {
 	//PROFILE_END_ACCUM(profile_remesh_total);
 	//PROFILE_PRINT(profile_remesh_total, "");
 }
+
+
+inline void delete_all_chunks () {
+	for (auto& c : chunks) delete c.second;
+
+	_prev_query_chunk = nullptr;
+
+	chunks.clear();
+}
+
+inline Chunk* query_chunk (chunk_pos_t coord) {
+	if (_prev_query_chunk && equal(_prev_query_chunk->coord, coord)) {
+		return _prev_query_chunk;
+	} else {
+
+		auto k = chunks.find({coord});
+		if (k == chunks.end()) return nullptr;
+
+		Chunk* chunk = k->second;
+
+		_prev_query_chunk = chunk;
+
+		return chunk;
+	}
+}
+inline Block* query_block (bpos p, Chunk** out_chunk) {
+	if (out_chunk) *out_chunk = nullptr;
+
+	if (p.z < 0 || p.z >= CHUNK_DIM_Z) return (Block*)&B_OUT_OF_BOUNDS;
+
+	bpos block_pos_chunk;
+	chunk_pos_t chunk_pos = get_chunk_from_block_pos(p, &block_pos_chunk);
+
+	Chunk* chunk = query_chunk(chunk_pos);
+	if (!chunk) return (Block*)&B_NO_CHUNK;
+
+	if (out_chunk) *out_chunk = chunk;
+	return chunk->get_block(block_pos_chunk);
+}
+

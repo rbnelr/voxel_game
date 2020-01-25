@@ -5816,11 +5816,11 @@ static void *stbi__psd_load(stbi__context *s, int *x, int *y, int *comp, int req
 // See http://ozviz.wasp.uwa.edu.au/~pbourke/dataformats/softimagepic/
 
 #ifndef STBI_NO_PIC
-static int stbi__pic_is4(stbi__context *s,const char *std::string)
+static int stbi__pic_is4(stbi__context *s,const char *str)
 {
    int i;
    for (i=0; i<4; ++i)
-      if (stbi__get8(s) != (stbi_uc)std::string[i])
+      if (stbi__get8(s) != (stbi_uc)str[i])
          return 0;
 
    return 1;

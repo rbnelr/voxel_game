@@ -1,3 +1,98 @@
+#pragma once
+#undef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS 1
+
+#undef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#define WIN32_NOMINMAX
+
+#undef NOMINMAX
+#define NOMINMAX
+
+#include "windows.h"
+
+#undef near
+#undef far
+#undef min
+#undef max
+
+#include "glad/glad.h"
+#include "timer.hpp"
+#include "string.hpp"
+#include "file_io.hpp"
+#include "kissmath.hpp"
+using namespace kiss;
+
+#include "stb_image.hpp"
+
+#include "assert.h"
+
+#include <string>
+#include <vector>
+
+struct Source_File {
+	std::string			filepath;
+
+	HANDLE		fh;
+	FILETIME	last_change_t;
+
+	void init (std::string const& f) {
+		filepath = f;
+		last_change_t = {}; // zero for debuggability
+		open();
+	}
+
+	bool open () {
+		fh = CreateFile(filepath.c_str(), GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (fh != INVALID_HANDLE_VALUE) {
+			GetFileTime(fh, NULL, NULL, &last_change_t);
+		}
+		return fh != INVALID_HANDLE_VALUE;
+	}
+
+	void close () {
+		if (fh != INVALID_HANDLE_VALUE) {
+			auto ret = CloseHandle(fh);
+			assert(ret != 0);
+		}
+	}
+
+	bool poll_did_change () {
+		if (fh == INVALID_HANDLE_VALUE) return open();
+
+		FILETIME cur_last_change_t;
+
+		GetFileTime(fh, NULL, NULL, &cur_last_change_t);
+
+		auto result = CompareFileTime(&last_change_t, &cur_last_change_t);
+		assert(result == 0 || result == -1);
+
+		last_change_t = cur_last_change_t;
+
+		bool did_change = result != 0;
+		if (did_change) {
+			//Sleep(5); // files often are not completely written when the first change get's noticed, so we might want to wait for a bit
+		}
+		return did_change;
+	}
+};
+
+struct Source_Files {
+	std::vector<Source_File>	v;
+
+	bool poll_did_change () {
+		for (auto& i : v) if (i.poll_did_change()) return true;
+		return false;
+	}
+	void close_all () {
+		for (auto& i : v) i.close();
+	}
+};
+
+typedef uint32_t vert_indx_t;
+
+#define SHADERS_BASE_PATH	"shaders/"
+#define TEXTURES_BASE_PATH	"textures"
 
 static void inplace_flip_vertical (void* data, uint64_t h, uint64_t stride) {
 	assert((stride % 4) == 0);
@@ -45,7 +140,7 @@ enum src_color_space {
 };
 
 struct Data_Block {
-	byte*		data;
+	uint8_t*		data;
 	uint64_t			size;
 
 	void free () {
@@ -53,7 +148,7 @@ struct Data_Block {
 	}
 
 	static Data_Block alloc (uint64_t s) {
-		return { new byte[s], s };
+		return { new uint8_t[s], s };
 	}
 };
 
@@ -86,9 +181,9 @@ struct Texture {
 			case PT_LRGB8		:	return 3 * sizeof(uint8_t);
 			case PT_LR8			:	return 1 * sizeof(uint8_t);
 			
-			case PT_DXT1		:	return 8 * sizeof(byte);
-			case PT_DXT3		:	return 16 * sizeof(byte);
-			case PT_DXT5		:	return 16 * sizeof(byte);
+			case PT_DXT1		:	return 8 * sizeof(uint8_t);
+			case PT_DXT3		:	return 16 * sizeof(uint8_t);
+			case PT_DXT5		:	return 16 * sizeof(uint8_t);
 			
 			default: assert(false); return 0;
 		}
@@ -120,7 +215,7 @@ struct Texture2D : public Texture {
 	int2					dim;
 	
 	struct Mip {
-		byte*	data;
+		uint8_t*	data;
 		uint64_t		size;
 		
 		int2		dim;
@@ -246,7 +341,7 @@ struct TextureCube : public Texture {
 	int2					dim;
 	
 	struct Mip {
-		byte*	data;
+		uint8_t*	data;
 		uint64_t		size;
 		
 		int2		dim;
@@ -333,7 +428,7 @@ private:
 		for (mip_i=0; mip_i<(uint32_t)mips.size();) {
 			auto& m = mips[mip_i];
 			
-			byte* data_cur = m.data;
+			uint8_t* data_cur = m.data;
 			
 			for (int face_i=0; face_i<6; ++face_i) {
 				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X +face_i, mip_i, internalFormat, m.dim.x,m.dim.y, 0, format, type, data_cur);
@@ -393,34 +488,12 @@ static bool get_fileext (std::string const& path, std::string* ext) {
 	return false;
 }
 
-static uint64_t get_file_size (FILE* f) {
-	fseek(f, 0, SEEK_END);
-	uint64_t file_size = ftell(f); // only 32 support for now
-	rewind(f);
-	return file_size;
-}
-// reads text file into a std::string by overwriting it's previous contents
-static bool read_text_file (const char* filename, std::string* out) {
-	FILE* f = fopen(filename, "rb"); // read binary because i don't want to convert "\r\n" to "\n"
-	if (!f) return false; // fail
-
-	uint64_t file_size = get_file_size(f);
-
-	out->resize(file_size);
-
-	auto ret = fread(&(*out)[0], 1,file_size, f);
-	assert(ret == file_size);
-
-	fclose(f);
-	return true;
-}
-
 struct Texture2D_File : public Texture2D {
 	Source_File		srcf;
 	src_color_space	cs;
 	
 	Texture2D_File (src_color_space cs_, std::string const& fn): Texture2D{fn}, cs{cs_} {
-		auto filepath = prints("%s/%s", textures_base_path, name.c_str());
+		auto filepath = prints("%s/%s", TEXTURES_BASE_PATH, name.c_str());
 		
 		srcf.init(filepath);
 	}
@@ -433,10 +506,10 @@ struct Texture2D_File : public Texture2D {
 		
 		data.free();
 		
-		double begin;
+		Timer timer;
 		if (1) {
 			printf("Loading File_Texture2D '%s'...", name.c_str());
-			begin = glfwGetTime();
+			timer = Timer::start();
 		}
 		
 		if (!load_texture()) {
@@ -445,7 +518,7 @@ struct Texture2D_File : public Texture2D {
 		}
 		
 		if (1) {
-			auto dt = glfwGetTime() -begin;
+			auto dt = timer.end();
 			printf(">>> %f ms", dt * 1000);
 		}
 		
@@ -518,7 +591,7 @@ private:
 		stbi_set_flip_vertically_on_load(true); // OpenGL has textues bottom-up
 		
 		int n;
-		data->data = (byte*)stbi_loadf(filepath.c_str(), &dim->x, &dim->y, &n, 0);
+		data->data = (uint8_t*)stbi_loadf(filepath.c_str(), &dim->x, &dim->y, &n, 0);
 		if (!data->data) return false;
 		
 		switch (n) {
@@ -556,7 +629,7 @@ struct TextureCube_Equirectangular_File : public TextureCube {
 	Texture2D_File*	equirect;
 	
 	TextureCube_Equirectangular_File (src_color_space cs_, std::string const& fn, int2 equirect_max_res_=4096): TextureCube{fn}, cs{cs_}, equirect_max_res{equirect_max_res_}, equirect{nullptr} {
-		auto filepath = prints("%s/%s", textures_base_path, name.c_str());
+		auto filepath = prints("%s/%s", TEXTURES_BASE_PATH, name.c_str());
 		
 		srcf.init(filepath);
 	}
@@ -571,10 +644,10 @@ struct TextureCube_Equirectangular_File : public TextureCube {
 		
 		data.free();
 		
-		double begin;
+		Timer timer;
 		if (1) {
 			printf("Loading File_TextureCube '%s'...", name.c_str());
-			begin = glfwGetTime();
+			timer = Timer::start();
 		}
 		
 		if (!load_texture()) {
@@ -583,7 +656,7 @@ struct TextureCube_Equirectangular_File : public TextureCube {
 		}
 		
 		if (1) {
-			auto dt = glfwGetTime() -begin;
+			auto dt = timer.end();
 			printf(">>> %f ms", dt * 1000);
 		}
 		
@@ -652,9 +725,9 @@ struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image f
 	Source_Files	srcf;
 	src_color_space	cs;
 	
-	TextureCube_Multi_File (src_color_space cs_, std::string const& common_filename, std::array<std::string, 6>const& filenames): TextureCube{common_filename}, cs{cs_} {
+	TextureCube_Multi_File (src_color_space cs_, std::string const& common_filename, std::string filenames[]): TextureCube{common_filename}, cs{cs_} {
 		for (int i=0; i<6; ++i) {
-			std::string filepath = prints("%s/%s", textures_base_path, filenames[i].c_str());
+			std::string filepath = prints("%s/%s", TEXTURES_BASE_PATH, filenames[i].c_str());
 			
 			srcf.v.emplace_back();
 			srcf.v.back().init(filepath);
@@ -668,11 +741,11 @@ struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image f
 	virtual bool load () {
 		
 		data.free();
-		
-		double begin;
+
+		Timer timer;
 		if (1) {
 			printf("Loading Multi_File_TextureCube '%s'...", name.c_str());
-			begin = glfwGetTime();
+			timer = Timer::start();
 		}
 		
 		if (!load_textures()) {
@@ -681,7 +754,7 @@ struct TextureCube_Multi_File : public TextureCube { // Cubemap with one image f
 		}
 		
 		if (1) {
-			auto dt = glfwGetTime() -begin;
+			auto dt = timer.end();
 			printf(">>> %f ms", dt * 1000);
 		}
 		
@@ -720,7 +793,7 @@ private:
 		
 		int n;
 		
-		byte* data_cur;
+		uint8_t* data_cur;
 		
 		uint64_t stride;
 		uint64_t face_size;
@@ -729,7 +802,7 @@ private:
 			int face_n;
 			int2 face_dim;
 			
-			byte* face_data = stbi_load(filespath.v[i].filepath.c_str(), &face_dim.x, &face_dim.y, &face_n, 0);
+			uint8_t* face_data = stbi_load(filespath.v[i].filepath.c_str(), &face_dim.x, &face_dim.y, &face_n, 0);
 			if (!face_data) return false;
 			
 			if (i == 0) {
@@ -936,7 +1009,7 @@ private:
 	bool load_shader_source (std::string const& filename, std::string* src_text) {
 		
 		{
-			std::string filepath = prints("%s%s", shaders_base_path, filename.c_str());
+			std::string filepath = prints("%s%s", SHADERS_BASE_PATH, filename.c_str());
 			
 			srcf.v.emplace_back(); // add file to list dependent files even before we know if it exist, so that we can find out when it becomes existant
 			srcf.v.back().init(filepath);
@@ -1231,7 +1304,7 @@ struct Vertex_Layout {
 struct Vbo {
 	GLuint						vbo_vert;
 	GLuint						vbo_indx;
-	std::vector<byte>			vertecies;
+	std::vector<uint8_t>		vertecies;
 	std::vector<vert_indx_t>	indices;
 	
 	Vertex_Layout*		layout;
@@ -1299,9 +1372,22 @@ struct Vbo {
 	}
 };
 
+// to add verticies to type-erased std::vector<uint8_t> easier
+template <typename T> static typename T* vector_append (std::vector<T>* vec) {
+	uintptr_t old_len = vec->size();
+	vec->resize( old_len +1 );
+	return &*(vec->begin() +old_len);
+
+}
+template <typename T> static typename T* vector_append (std::vector<T>* vec, uintptr_t n) {
+	uintptr_t old_len = vec->size();
+	vec->resize( old_len +n );
+	return &*(vec->begin() +old_len);
+}
+
 static Shader* shad_equirectangular_to_cubemap;
 
-void TextureCube_Equirectangular_File::gpu_convert_equirectangular_to_cubemap () {
+inline void TextureCube_Equirectangular_File::gpu_convert_equirectangular_to_cubemap () {
 	
 	shad_equirectangular_to_cubemap->bind();
 	bind_texture_unit(0, equirect);
