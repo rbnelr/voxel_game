@@ -100,22 +100,22 @@ template<typename T> static T gradient (float key, std::initializer_list<Gradien
 	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
-static srgb8 incandescent_gradient (float key) {
-	return (srgb8)gradient<float3>(key, {
+static lrgba incandescent_gradient (float key) {
+	return lrgba(gradient<float3>(key, {
 		{ 0,		srgb(0)			},
 		{ 0.3333f,	srgb(138,0,0)	},
 		{ 0.6667f,	srgb(255,255,0)	},
 		{ 1,		srgb(255)		},
-	});
+	}), 1);
 }
-static srgb8 spectrum_gradient (float key) {
-	return (srgb8)gradient<float3>(key, {
+static lrgba spectrum_gradient (float key) {
+	return lrgba(gradient<float3>(key, {
 		{ 0,		srgb(0,0,127)	},
 		{ 0.25f,	srgb(0,0,248)	},
 		{ 0.5f,		srgb(0,127,0)	},
 		{ 0.75f,	srgb(255,255,0)	},
 		{ 1,		srgb(255,0,0)	},
-	});
+	}), 1);
 }
 
 #define LLL	float3(-1,-1,-1)
@@ -327,7 +327,7 @@ struct Chunk_Vbo_Vertex {
 	float4		uvzw_atlas; // xy: [0,1] texture uv;  z: 0=side, 1=top, 2=bottom;  w: texture index
 	float		hp_ratio; // [0,1]
 	float		brightness;
-	srgba8		dbg_tint;
+	lrgba		dbg_tint;
 };
 
 static Vertex_Layout chunk_vbo_vert_layout = {
@@ -335,7 +335,7 @@ static Vertex_Layout chunk_vbo_vert_layout = {
 	{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
 	{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
 	{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
-	{ "dbg_tint",	T_U8V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
+	{ "dbg_tint",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
 };
 
 #include "blocks.hpp"
@@ -536,7 +536,7 @@ static void gen_chunk_blocks (Chunk* chunk) {
 				b->hp_ratio = 1;
 				
 				//b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
-				b->dbg_tint = srgba8(spectrum_gradient(tree_density / (25.0f/(32*32))), 255);
+				b->dbg_tint = spectrum_gradient(tree_density / (25.0f/(32*32)));
 			}
 		}
 	}
@@ -1077,7 +1077,7 @@ int main (int argc, char** argv) {
 		for (i.y=0; i.y<dim.y; ++i.y) {
 			for (i.x=0; i.x<dim.x; ++i.x) {
 				float2 pos_world = map((float2)i, 0,(float2)(dim-1), -dbg_heightmap_visualize_radius / 2.0f, +dbg_heightmap_visualize_radius / 2.0f);
-				*dst(i) = srgba8(spectrum_gradient(map( heightmap(noise, pos_world) , 0, 45)), 255);
+				*dst(i) = to_srgb(spectrum_gradient(map( heightmap(noise, pos_world) , 0, 45)));
 			}
 		}
 		

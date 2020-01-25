@@ -3,13 +3,11 @@
   <ItemGroup>
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
-    <ClInclude Include="compiler_platform_arch.hpp" />
     <ClInclude Include="gl.hpp" />
     <ClInclude Include="gui.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="platform.hpp" />
-    <ClInclude Include="preprocessor_stuff.hpp" />
     <ClInclude Include="glad\glad.h">
       <Filter>glad</Filter>
     </ClInclude>

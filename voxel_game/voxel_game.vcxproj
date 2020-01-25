@@ -158,7 +158,6 @@
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
-    <ClInclude Include="compiler_platform_arch.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="gl.hpp" />
@@ -197,7 +196,6 @@
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="platform.hpp" />
-    <ClInclude Include="preprocessor_stuff.hpp" />
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="string.hpp" />
   </ItemGroup>

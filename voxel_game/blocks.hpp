@@ -1,4 +1,3 @@
-#define ARRLEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static int texture_res = 16;
 
@@ -70,7 +69,7 @@ static Block_Texture_Source block_texture_sources[BLOCK_TYPES_COUNT] = {
 };
 static int BLOCK_TEXTURE_INDEX_MISSING = 0;
 
-static int atlas_textures_count = ARRLEN(block_texture_sources);
+static int atlas_textures_count = sizeof(block_texture_sources) / sizeof(block_texture_sources[0]);
 
 static int get_block_texture_index_from_block_type (block_type bt) {
 	return bt;
@@ -80,7 +79,7 @@ struct Block {
 	block_type	type;
 	bool		dark; // any air block that only has air above it (is in sunlight)
 	float		hp_ratio;
-	srgba8		dbg_tint;
+	lrgba		dbg_tint;
 };
 
 static Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 1, 255 };
