@@ -78,6 +78,9 @@ static GLFWscrollfun        g_PrevUserCallbackScroll = NULL;
 static GLFWkeyfun           g_PrevUserCallbackKey = NULL;
 static GLFWcharfun          g_PrevUserCallbackChar = NULL;
 
+bool _interaction_enabled = true;
+int _disabled_counter = 0;
+
 static const char* ImGui_ImplGlfw_GetClipboardText(void* user_data)
 {
     return glfwGetClipboardString((GLFWwindow*)user_data);
@@ -90,29 +93,35 @@ static void ImGui_ImplGlfw_SetClipboardText(void* user_data, const char* text)
 
 void ImGui_ImplGlfw_MouseButtonCallback(GLFWwindow* window, int button, int action, int mods)
 {
-    if (g_PrevUserCallbackMousebutton != NULL)
+	if (g_PrevUserCallbackMousebutton != NULL)
         g_PrevUserCallbackMousebutton(window, button, action, mods);
 
-    if (action == GLFW_PRESS && button >= 0 && button < IM_ARRAYSIZE(g_MouseJustPressed))
+	if (!_interaction_enabled) return;
+
+	if (action == GLFW_PRESS && button >= 0 && button < IM_ARRAYSIZE(g_MouseJustPressed))
         g_MouseJustPressed[button] = true;
 }
 
 void ImGui_ImplGlfw_ScrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    if (g_PrevUserCallbackScroll != NULL)
+	if (g_PrevUserCallbackScroll != NULL)
         g_PrevUserCallbackScroll(window, xoffset, yoffset);
 
-    ImGuiIO& io = ImGui::GetIO();
+	if (!_interaction_enabled) return;
+
+	ImGuiIO& io = ImGui::GetIO();
     io.MouseWheelH += (float)xoffset;
     io.MouseWheel += (float)yoffset;
 }
 
 void ImGui_ImplGlfw_KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    if (g_PrevUserCallbackKey != NULL)
+	if (g_PrevUserCallbackKey != NULL)
         g_PrevUserCallbackKey(window, key, scancode, action, mods);
 
-    ImGuiIO& io = ImGui::GetIO();
+	if (!_interaction_enabled) return;
+
+	ImGuiIO& io = ImGui::GetIO();
     if (action == GLFW_PRESS)
         io.KeysDown[key] = true;
     if (action == GLFW_RELEASE)
@@ -131,10 +140,12 @@ void ImGui_ImplGlfw_KeyCallback(GLFWwindow* window, int key, int scancode, int a
 
 void ImGui_ImplGlfw_CharCallback(GLFWwindow* window, unsigned int c)
 {
-    if (g_PrevUserCallbackChar != NULL)
+	if (g_PrevUserCallbackChar != NULL)
         g_PrevUserCallbackChar(window, c);
 
-    ImGuiIO& io = ImGui::GetIO();
+	if (!_interaction_enabled) return;
+
+	ImGuiIO& io = ImGui::GetIO();
     io.AddInputCharacter(c);
 }
 
@@ -342,8 +353,24 @@ static void ImGui_ImplGlfw_UpdateGamepads()
         io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
 }
 
-void ImGui_ImplGlfw_NewFrame()
+void ImGui_ImplGlfw_NewFrame(bool interaction_enabled)
 {
+	_interaction_enabled = interaction_enabled;
+	if (!_interaction_enabled) {
+		ImGuiIO& io = ImGui::GetIO();
+		
+		// keyboard selection and typing seem to be canceled by the following calls
+		
+		// pretend mouse cursor is nowhere
+		io.MousePos = ImVec2(-FLT_MAX, -FLT_MAX);
+		// Simulate a escape key press on the first frame where we disabled imgui
+		io.KeysDown[GLFW_KEY_ESCAPE] = _disabled_counter == 0;
+
+		_disabled_counter++;
+	} else {
+		_disabled_counter = 0;
+	}
+
     ImGuiIO& io = ImGui::GetIO();
     IM_ASSERT(io.Fonts->IsBuilt() && "Font atlas not built! It is generally built by the renderer back-end. Missing call to renderer _NewFrame() function? e.g. ImGui_ImplOpenGL3_NewFrame().");
 
@@ -361,9 +388,11 @@ void ImGui_ImplGlfw_NewFrame()
     io.DeltaTime = g_Time > 0.0 ? (float)(current_time - g_Time) : (float)(1.0f/60.0f);
     g_Time = current_time;
 
-    ImGui_ImplGlfw_UpdateMousePosAndButtons();
-    ImGui_ImplGlfw_UpdateMouseCursor();
+	if (_interaction_enabled) {
+		ImGui_ImplGlfw_UpdateMousePosAndButtons();
+		ImGui_ImplGlfw_UpdateMouseCursor();
 
-    // Update game controllers (if enabled and available)
-    ImGui_ImplGlfw_UpdateGamepads();
+		// Update game controllers (if enabled and available)
+		ImGui_ImplGlfw_UpdateGamepads();
+	}
 }

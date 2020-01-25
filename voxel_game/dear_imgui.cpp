@@ -19,23 +19,16 @@ void DearImgui::init () {
 	ImGui_ImplOpenGL3_Init();
 }
 
-bool _enabled; // cache enabled to prevent enabled switching inbetween frame_start and frame_end
-
 void DearImgui::frame_start () {
-	_enabled = enabled;
-	
-	// TODO: how to disable imgui completely (invisible & no interaction) safely?
-	//if (_enabled) {
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplGlfw_NewFrame();
-		ImGui::NewFrame();
-	//}
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
+	ImGui::NewFrame();
 }
 void DearImgui::frame_end () {
-	//if (_enabled) {
-		if (show_demo_window)
-			ImGui::ShowDemoWindow(&show_demo_window);
+	if (show_demo_window)
+		ImGui::ShowDemoWindow(&show_demo_window);
 
+	if (enabled) {
 		ImGui::Render();
 
 		int display_w, display_h;
@@ -43,7 +36,7 @@ void DearImgui::frame_end () {
 		glViewport(0, 0, display_w, display_h);
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	//}
+	}
 }
 
 void DearImgui::destroy () {
