@@ -8,6 +8,7 @@ using namespace kissmath;
 #include "timer.hpp"
 #include "input.hpp"
 #include "game.hpp"
+#include "dear_imgui.hpp"
 
 #include <memory>
 #include "stdio.h"
@@ -52,16 +53,18 @@ void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int 
 	}
 
 	if (key == GLFW_KEY_F1) {
-		//if (went_down) toggle_imgui();
+		if (went_down) imgui.enabled = !imgui.enabled;
 		return;
 	}
 	if (key == GLFW_KEY_F2) {
-		int mode = glfwGetInputMode(window, GLFW_CURSOR);
+		if (went_down) {
+			int mode = glfwGetInputMode(window, GLFW_CURSOR);
 
-		if (mode == GLFW_CURSOR_DISABLED)
-			glfwGetInputMode(window, GLFW_CURSOR_NORMAL);
-		else
-			glfwGetInputMode(window, GLFW_CURSOR_DISABLED);
+			if (mode == GLFW_CURSOR_DISABLED)
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			else
+				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
 		return;
 	}
 
@@ -191,6 +194,8 @@ void toggle_fullscreen () {
 
 //// gameloop
 void glfw_gameloop () {
+	imgui.init();
+
 	auto game = std::make_unique<Game>();
 
 	input.dt = 0; // dt zero on first frame
@@ -206,7 +211,11 @@ void glfw_gameloop () {
 
 		glfw_get_non_callback_input(window);
 
+		imgui.frame_start();
+
 		game->frame();
+
+		imgui.frame_end();
 
 		glfwSwapBuffers(window);
 
@@ -215,6 +224,8 @@ void glfw_gameloop () {
 		input.dt = min((float)(now - prev) / (float)timestamp_freq, input.max_dt);
 		prev = now;
 	}
+
+	imgui.destroy();
 }
 
 void glfw_error (int err, const char* msg) {
@@ -317,12 +328,16 @@ int main () {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 
+	primary_monitor = glfwGetPrimaryMonitor();
+
 	window = glfwCreateWindow(1280, 720, "Voxel Game", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "glfwCreateWindow failed!\n");
 		glfwTerminate();
 		return 1;
 	}
+
+	glfw_register_callbacks(window);
 
 	glfw_init_gl();
 

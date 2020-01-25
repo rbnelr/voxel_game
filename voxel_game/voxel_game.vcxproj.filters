@@ -140,6 +140,9 @@
     <ClInclude Include="stb_image.hpp">
       <Filter>stb</Filter>
     </ClInclude>
+    <ClInclude Include="dear_imgui.hpp">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -262,6 +265,9 @@
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp">
       <Filter>open_simplex_noise</Filter>
+    </ClCompile>
+    <ClCompile Include="dear_imgui.cpp">
+      <Filter>dear_imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
