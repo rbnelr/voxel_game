@@ -1,0 +1,313 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="blocks.hpp" />
+    <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="compiler_platform_arch.hpp" />
+    <ClInclude Include="gl.hpp" />
+    <ClInclude Include="gui.hpp" />
+    <ClInclude Include="intersection_test.hpp" />
+    <ClInclude Include="options_overlay.hpp" />
+    <ClInclude Include="platform.hpp" />
+    <ClInclude Include="preprocessor_stuff.hpp" />
+    <ClInclude Include="glad\glad.h">
+      <Filter>glad</Filter>
+    </ClInclude>
+    <ClInclude Include="glad\khrplatform.h">
+      <Filter>glad</Filter>
+    </ClInclude>
+    <ClInclude Include="stb\stb_image.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp">
+      <Filter>open_simplex_noise</Filter>
+    </ClInclude>
+    <ClInclude Include="dear_imgui\imgui_impl_glfw.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="string.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imconfig.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imgui.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imgui_internal.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imstb_rectpack.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imstb_textedit.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imstb_truetype.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath.hpp" />
+    <ClInclude Include="kissmath\bool.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\bool2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\bool3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\bool4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float2x2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3x3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float4x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\transform2d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\transform3d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath_colors.hpp" />
+    <ClInclude Include="kissmath\uint8.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="voxel_game.cpp" />
+    <ClCompile Include="glad\glad.c">
+      <Filter>glad</Filter>
+    </ClCompile>
+    <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="string.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\dear_imgui\imgui.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\bool.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\bool2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\bool3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\bool4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float2x2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float3x3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float3x4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\float4x4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\transform2d.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\transform3d.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\uint8.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\uint8v2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\uint8v3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\uint8v4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int64.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int64v2.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int64v3.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+    <ClCompile Include="kissmath\int64v4.cpp">
+      <Filter>kissmath</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\blocks.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\blocks.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\common.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\common.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\common.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\imgui.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\imgui.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\overlay.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\overlay.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\skybox.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\skybox.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\texture_window_tex.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\texture_window_tex.vert">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="notes.txt">
+      <Filter>docs</Filter>
+    </Text>
+    <Text Include="todo.txt">
+      <Filter>docs</Filter>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{0eaa38e6-83d2-4302-a2a0-7a58a3caab29}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="glad">
+      <UniqueIdentifier>{1847271f-a9df-43e4-9628-48a6e79317e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="docs">
+      <UniqueIdentifier>{1b11874a-b140-448b-801e-122cdf7ac8f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="stb">
+      <UniqueIdentifier>{8c80bbda-578d-41da-8727-423370554220}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="open_simplex_noise">
+      <UniqueIdentifier>{bcf11987-2db6-4a5f-8768-e9f29417b695}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="dear_imgui">
+      <UniqueIdentifier>{d5fe41fa-cc42-4217-b6e7-4d9d42e7bf08}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{693781ce-252a-4068-a5ae-90b32c774c9e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="kissmath">
+      <UniqueIdentifier>{c72d5d49-a1a5-4087-bcfe-73b53964701b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

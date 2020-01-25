@@ -1,0 +1,74 @@
+
+// to generate the glad files this is using use the glad python scrip
+python -m glad --api gl=3.3 --extensions "GL_ARB_debug_output,GL_ARB_texture_filter_anisotropic,GL_EXT_texture_compression_s3tc" --generator c --local-files --out-path out/
+
+even in WIP GLFW3.3 does only provide windows raw input (WM_INPUT)
+ -not in deltas, but keeps an internal counter for some reason
+ -only gives you raw input while you 'disable' the cursor, so you cant do see the cursor and get raw input at the same time
+
+
+// 2d minecraft player collision approach i came up with
+// it is supposed to exactly trace the path of the player circle, which would result in 100% accurate collision detection/handling and possibly even physics, but might have bad performance
+
+// only do linear constant velocity movement during one dt
+
+float length (float x) = abs(x); // length of a one dimensional vector is abs() obviously
+float normalize (float x) = x / length(x); // normalize returns -1, +1 or NaN (or inf?)
+
+player_block = the center of the player circle is in
+
+for (b : the 9 blocks around player_block) {
+	if (blocks is not soild) {
+		// note that the block was touched, to do stuff like apply lava damage etc. or slow down player movement based on the non-solid blocks he walks through
+	} else {
+		if (player is inside minowski_sum_of_block(b)) {
+			return player_is_stuck;
+		}
+	}
+}
+
+t_remaining = dt;
+
+while (t_remaining > 0) {
+	next_possible_collsion_blocks = the 3 blocks in direction of player movement;
+		// these are:	player_block +int2( normalize(vel.x),                0 )
+		// 				player_block +int2( normalize(vel.x), normalize(vel.y) )
+		// 				player_block +int2(                0, normalize(vel.y) )
+		
+	earliest_collision = null;
+
+	for (b : next_possible_collsion_blocks) {
+		
+		minowski_sum = minowski_sum_of_block(b);
+		
+		assert(player is !inside minowski_sum);
+		
+		collision = find_minowski_ray_collision(ray(pos, vel), minowski_sum); // analytically calculate player circle pos when it touches the block (this is basicly a raycast onto the minowski_sum but should be a very simple formula because our minowski_sum is of a square and circle), later we need the normal of the collision
+		if (collison && (earliest_collision == null || collison.time < earliest_collision.time)) {
+			earliest_collision = collison;
+		}
+	}
+	
+	max_dt = min(t_remaining, 1 / max_component(abs(vel))); // never move further than one block on any given axis
+	
+	if (!earliest_collision || earliest_collision.time >= max_dt) {
+		pos += vel * max_dt; // apply movement
+		t_remaining -= max_dt;
+	} else {
+		// handle block collision
+		vel_into_block = earliest_collision.normal * dot(vel, earliest_collision.normal);
+		vel -= (1 +earliest_collision.block.collision_bouncyness) * vel_into_block; // cancel velocity or bounce
+		
+		// could implement stickyness/friction here by using a abitrary formula like this: new_vel = (old_normal_vel, old_tangential_vel, block characteristics, player characteristics)
+		
+		pos = earliest_collision.pos; // apply movement
+		
+		// make sure we dont process this block again
+		pos += earliest_collision.normal * seperating_dist;
+		
+		assert(dot(vel, earliest_collision.normal) >= 0);
+		
+		
+		t_remaining -= earliest_collision.time;
+	}
+}

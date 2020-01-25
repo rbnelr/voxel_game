@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{D216EA19-A9F5-46B3-A40A-7235E94160CF}</ProjectGuid>
+    <RootNamespace>voxelgame</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\dear_imgui\imconfig.h" />
+    <ClInclude Include="..\..\dear_imgui\imgui.h" />
+    <ClInclude Include="..\..\dear_imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\dear_imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\dear_imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
+    <ClInclude Include="blocks.hpp" />
+    <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="compiler_platform_arch.hpp" />
+    <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="gl.hpp" />
+    <ClInclude Include="glad\glad.h" />
+    <ClInclude Include="glad\khrplatform.h" />
+    <ClInclude Include="gui.hpp" />
+    <ClInclude Include="intersection_test.hpp" />
+    <ClInclude Include="kissmath.hpp" />
+    <ClInclude Include="kissmath\bool.hpp" />
+    <ClInclude Include="kissmath\bool2.hpp" />
+    <ClInclude Include="kissmath\bool3.hpp" />
+    <ClInclude Include="kissmath\bool4.hpp" />
+    <ClInclude Include="kissmath\float.hpp" />
+    <ClInclude Include="kissmath\float2.hpp" />
+    <ClInclude Include="kissmath\float2x2.hpp" />
+    <ClInclude Include="kissmath\float3.hpp" />
+    <ClInclude Include="kissmath\float3x3.hpp" />
+    <ClInclude Include="kissmath\float3x4.hpp" />
+    <ClInclude Include="kissmath\float4.hpp" />
+    <ClInclude Include="kissmath\float4x4.hpp" />
+    <ClInclude Include="kissmath\int.hpp" />
+    <ClInclude Include="kissmath\int2.hpp" />
+    <ClInclude Include="kissmath\int3.hpp" />
+    <ClInclude Include="kissmath\int4.hpp" />
+    <ClInclude Include="kissmath\int64.hpp" />
+    <ClInclude Include="kissmath\int64v2.hpp" />
+    <ClInclude Include="kissmath\int64v3.hpp" />
+    <ClInclude Include="kissmath\int64v4.hpp" />
+    <ClInclude Include="kissmath\transform2d.hpp" />
+    <ClInclude Include="kissmath\transform3d.hpp" />
+    <ClInclude Include="kissmath\uint8.hpp" />
+    <ClInclude Include="kissmath\uint8v2.hpp" />
+    <ClInclude Include="kissmath\uint8v3.hpp" />
+    <ClInclude Include="kissmath\uint8v4.hpp" />
+    <ClInclude Include="kissmath_colors.hpp" />
+    <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
+    <ClInclude Include="options_overlay.hpp" />
+    <ClInclude Include="platform.hpp" />
+    <ClInclude Include="preprocessor_stuff.hpp" />
+    <ClInclude Include="stb\stb_image.h" />
+    <ClInclude Include="string.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\dear_imgui\imgui.cpp" />
+    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp" />
+    <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="glad\glad.c" />
+    <ClCompile Include="kissmath\bool.cpp" />
+    <ClCompile Include="kissmath\bool2.cpp" />
+    <ClCompile Include="kissmath\bool3.cpp" />
+    <ClCompile Include="kissmath\bool4.cpp" />
+    <ClCompile Include="kissmath\float.cpp" />
+    <ClCompile Include="kissmath\float2.cpp" />
+    <ClCompile Include="kissmath\float2x2.cpp" />
+    <ClCompile Include="kissmath\float3.cpp" />
+    <ClCompile Include="kissmath\float3x3.cpp" />
+    <ClCompile Include="kissmath\float3x4.cpp" />
+    <ClCompile Include="kissmath\float4.cpp" />
+    <ClCompile Include="kissmath\float4x4.cpp" />
+    <ClCompile Include="kissmath\int.cpp" />
+    <ClCompile Include="kissmath\int2.cpp" />
+    <ClCompile Include="kissmath\int3.cpp" />
+    <ClCompile Include="kissmath\int4.cpp" />
+    <ClCompile Include="kissmath\int64.cpp" />
+    <ClCompile Include="kissmath\int64v2.cpp" />
+    <ClCompile Include="kissmath\int64v3.cpp" />
+    <ClCompile Include="kissmath\int64v4.cpp" />
+    <ClCompile Include="kissmath\transform2d.cpp" />
+    <ClCompile Include="kissmath\transform3d.cpp" />
+    <ClCompile Include="kissmath\uint8.cpp" />
+    <ClCompile Include="kissmath\uint8v2.cpp" />
+    <ClCompile Include="kissmath\uint8v3.cpp" />
+    <ClCompile Include="kissmath\uint8v4.cpp" />
+    <ClCompile Include="string.cpp" />
+    <ClCompile Include="voxel_game.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\blocks.frag" />
+    <None Include="shaders\blocks.vert" />
+    <None Include="shaders\common.frag" />
+    <None Include="shaders\common.glsl" />
+    <None Include="shaders\common.vert" />
+    <None Include="shaders\imgui.frag" />
+    <None Include="shaders\imgui.vert" />
+    <None Include="shaders\overlay.frag" />
+    <None Include="shaders\overlay.vert" />
+    <None Include="shaders\skybox.frag" />
+    <None Include="shaders\skybox.vert" />
+    <None Include="shaders\texture_window_tex.frag" />
+    <None Include="shaders\texture_window_tex.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="notes.txt" />
+    <Text Include="todo.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
