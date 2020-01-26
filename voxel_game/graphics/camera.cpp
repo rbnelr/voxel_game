@@ -3,26 +3,16 @@
 
 #include "assert.h"
 
-Camera_View Camera::calc_view () {
-	Camera_View v;
-
-	float3x3 world_to_cam_rot = rotate3_Z(rot_aer.z) * rotate3_X(-rot_aer.y) * rotate3_Z(-rot_aer.x);
-	float3x3 cam_to_world_rot = rotate3_Z(rot_aer.x) * rotate3_X(rot_aer.y) * rotate3_Z(-rot_aer.z);
-
-	v.world_to_cam = world_to_cam_rot * translate(-pos);
-	v.cam_to_world = translate(pos) * cam_to_world_rot;
-
+float4x4 Camera::calc_cam_to_clip () {
 	float aspect = (float)input.window_size.x / (float)input.window_size.y;
 
 	if (mode == PERSPECTIVE) {
-		v.cam_to_clip = perspective_matrix(vfov, aspect, clip_near, clip_far);
+		return perspective_matrix(vfov, aspect, clip_near, clip_far);
 	} else {
 		assert(mode == ORTHOGRAPHIC);
 
-		v.cam_to_clip = orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far);
+		return orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far);
 	}
-
-	return v;
 }
 
 float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far) {
@@ -64,34 +54,46 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 	);
 }
 
-void rotate_camera (Camera* cam, float3 aer_delta, float down_limit, float up_limit) {
-	cam->rot_aer -= aer_delta;
-
-	cam->rot_aer.x = wrap(cam->rot_aer.x, deg(-180), deg(180));
-	cam->rot_aer.y = clamp(cam->rot_aer.y, down_limit, deg(180.0f) - up_limit);
-	cam->rot_aer.z = wrap(cam->rot_aer.z, deg(-180), deg(180));
+float wrap_azimuth (float azimuth) {
+	return wrap(azimuth, deg(-180), deg(180));
+}
+float clamp_elevation (float elevation, float down_limit, float up_limit) {
+	return clamp(elevation, down_limit, deg(180.0f) - up_limit);
+}
+float wrap_roll (float roll) {
+	return wrap(roll, deg(-180), deg(180));
 }
 
-void translate_camera (Camera* cam, Camera_View const& view, float3 translation_local) {
-	cam->pos += (float3x3)view.cam_to_world * translation_local;
+void rotate_with_mouselook (float* azimuth, float* elevation, float vfov) {
+	auto raw_mouselook = input.get_mouselook_delta();
+
+	float delta_x = raw_mouselook.x * vfov / input.mouselook_sensitiviy_divider;
+	float delta_y = raw_mouselook.y * vfov / input.mouselook_sensitiviy_divider;
+
+	*azimuth -= delta_x;
+	*elevation -= delta_y;
+
+	*azimuth = wrap_azimuth(*azimuth);
+	*elevation = clamp_elevation(*elevation, input.view_elevation_down_limit, input.view_elevation_up_limit);
 }
 
-void rotate_camera_with_mouselook (Camera* cam, float2 raw_mouselook, float sensitiviy_divider) {
-	float3 aer = 0;
-
-	aer.x += raw_mouselook.x * cam->vfov / sensitiviy_divider;
-	aer.y += raw_mouselook.y * cam->vfov / sensitiviy_divider;
-
-	rotate_camera(cam, aer);
+float3x3 calc_ae_rotation (float2 ae, float3x3* out_inverse) {
+	if (out_inverse)
+		*out_inverse = rotate3_Z(+ae.x) * rotate3_X(+ae.y);
+	return             rotate3_X(-ae.y) * rotate3_Z(-ae.x);
+}
+float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse) {
+	if (out_inverse)
+		*out_inverse = rotate3_Z(+aer.x) * rotate3_X(+aer.y) * rotate3_Z(-aer.z);
+	return             rotate3_Z(+aer.z) * rotate3_X(-aer.y) * rotate3_Z(-aer.x);
 }
 
 Camera_View Flycam::update () {
 
-	auto delta = input.get_mouselook_delta();
-
-	rotate_camera_with_mouselook(this, delta, input.mouselook_sensitiviy_divider);
-
-	Camera_View v = calc_view();
+	rotate_with_mouselook(&rot_aer.x, &rot_aer.y, vfov);
+	
+	float3x3 cam_to_world_rot;
+	float3x3 world_to_cam_rot = calc_aer_rotation(rot_aer, &cam_to_world_rot);
 
 	{ // movement speed
 		float3 move_dir = 0;
@@ -111,12 +113,14 @@ Camera_View Flycam::update () {
 		if (input.buttons[GLFW_KEY_LEFT_SHIFT].is_down) {
 			move_speed *= fast_multiplier;
 
-			cur_speed += base_speed * speedup_factor * input.dt;
+			cur_speed += base_speed * speedup_factor * input.unscaled_dt;
 		}
 
 		cur_speed = clamp(cur_speed, base_speed, max_speed);
 
-		translate_camera(this, v, cur_speed * move_dir * input.dt);
+		float3 translation_cam_space = cur_speed * move_dir * input.unscaled_dt;
+
+		pos += cam_to_world_rot * translation_cam_space;
 	}
 
 	{
@@ -129,5 +133,9 @@ Camera_View Flycam::update () {
 		}
 	}
 
+	Camera_View v;
+	v.world_to_cam = world_to_cam_rot * translate(-pos);
+	v.cam_to_world = translate(pos) * cam_to_world_rot;
+	v.cam_to_clip = calc_cam_to_clip();
 	return v;
 }

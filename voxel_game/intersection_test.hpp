@@ -26,3 +26,8 @@ inline float point_square_nearest_dist (float2 square_pos, float2 square_size, f
 	
 	return length(nearest_pos_on_square -pos_rel);
 }
+
+struct Ray {
+	float3 pos;
+	float3 dir; // normalized
+};

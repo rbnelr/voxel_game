@@ -1,0 +1,72 @@
+#include "player.hpp"
+#include "input.hpp"
+
+float3	player_spawn_point = float3(4,32,43);
+
+void Player::update_controls () {
+	// toggle camera view
+	if (input.buttons[GLFW_KEY_F].went_down)
+		third_person = !third_person;
+
+	Camera& cam = third_person ? tps_camera : fps_camera;
+
+	rotate_with_mouselook(&rot_ae.x, &rot_ae.y, cam.vfov);
+
+	// TODO: player walking velocity and jumping
+	//if (player_stuck_in_solid_block) {
+	//	vel_world = 0;
+	//	printf(">>>>>>>>>>>>>> stuck!\n");
+	//} else {
+	//
+	//	if (!controling_flycam) {
+	//		{ // player walking dynamics
+	//		  //float2 player_walk_speed = 3.0f * (inp.move_fast ? 3 : 1);
+	//		  //
+	//		  //float2 feet_vel_world = rotate2(player.ori_ae.x) * (normalizesafe( (float2)(int2)inp.move_dir ) * player_walk_speed);
+	//		  //
+	//		  ////option("feet_vel_world_multiplier", &feet_vel_world_multiplier);
+	//		  //
+	//		  //feet_vel_world *= feet_vel_world_multiplier;
+	//		  //
+	//		  //// need some proper way of doing walking dynamics
+	//		  //
+	//		  //if (player_on_ground) {
+	//		  //	vel_world = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
+	//		  //} else {
+	//		  //	float3 tmp = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
+	//		  //
+	//		  //	if (length((float2)vel_world) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
+	//		  //}
+	//		  //
+	//		  //if (length(vel_world) < 0.01f) vel_world = 0;
+	//		}
+	//
+	//		if (jump_held && player_on_ground) vel_world += float3(0,0, player.jumping_up_impulse);
+	//	}
+	//
+	//	vel_world += float3(0,0, -grav_accel_down) * input.dt;
+	//}
+}
+
+void Player::update_physics () {
+
+}
+
+Camera_View Player::update_post_physics () {
+	float3x3 body_rotation = rotate3_Z(rot_ae.x);
+	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
+
+	float3x3 head_elevation = rotate3_X(rot_ae.y);
+	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
+
+	Camera& cam = third_person ? tps_camera : fps_camera;
+	
+	Camera_View v;
+	v.world_to_cam = translate(-cam.pos) * head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
+	v.cam_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation * translate(cam.pos);
+	v.cam_to_clip = cam.calc_cam_to_clip();
+
+	// TODO: third person raycast to prevent camera clipping in blocks
+	// TODO: block selection raycast and block break and place controls
+	return v;
+}

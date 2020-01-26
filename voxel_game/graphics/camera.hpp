@@ -21,11 +21,11 @@ struct Camera_View {
 
 class Camera {
 public:
-	std::string			name = "<Camera>";
+	const std::string	name;
 
 	perspective_mode	mode = PERSPECTIVE;
 
-	// camera position (in world)
+	// camera position
 	float3				pos = 0;
 
 	// TODO: add quaternions
@@ -48,15 +48,12 @@ public:
 	// [mode == ORTHOGRAPHIC] vertical size (horizontal size depends on render target aspect ratio)
 	float				ortho_vsize = 10;
 
-	Camera () {}
 	Camera (std::string name, float3 pos=0, float3 rot_aer=float3(0, deg(90), 0)): name{std::move(name)}, pos{pos}, rot_aer{rot_aer} {}
 
 	virtual ~Camera () = default;
 
 	void imgui () {
-		if (!imgui_treepush("Camera")) return;
-
-		ImGui::Text("%s:", name.c_str());
+		if (!imgui_push(name, "Camera")) return;
 
 		int cur_mode = (int)mode;
 		ImGui::Combo("mode", &cur_mode, "PERSPECTIVE\0ORTHOGRAPHIC\0");
@@ -73,24 +70,24 @@ public:
 		ImGui::SliderAngle("vfov", &vfov, 0, 180.0f);
 		ImGui::DragFloat("ortho_vsize", &ortho_vsize, 0.05f);
 
-		imgui_treepop();
+		imgui_pop();
 	}
 
-	// Calculate camera transformation matricies
-	Camera_View calc_view ();
+	// Calculate camera projection matrix
+	float4x4 calc_cam_to_clip ();
 };
 
 float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192);
 float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192);
 
-// rotate camera with azimuth, elevation, roll angles (azimuth and roll wrap and elevation is clamped)
-void rotate_camera (Camera* cam, float3 aer_delta, float down_limit=deg(2), float up_limit=deg(2));
+// rotate azimuth, elevation via mouselook
+void rotate_with_mouselook (float* azimuth, float* elevation, float vfov);
 
-// translate camera with camera space vector
-void translate_camera (Camera* cam, Camera_View const& view, float3 translation_local);
+// Calculate rotation matricies for azimuth, elevation
+float3x3 calc_ae_rotation (float2 ae, float3x3* out_inverse=nullptr);
 
-// rotate camera via mouselook, raw_mouselook should be raw dpi deltas coming from the mouse, sensitiviy_divider describes how many dpi counts it takes to rotate the camera by one visual screen height (so this makes is visually consistent)
-void rotate_camera_with_mouselook (Camera* cam, float2 raw_mouselook, float sensitiviy_divider);
+// Calculate rotation matricies for azimuth, elevation and roll
+float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse=nullptr);
 
 // Free flying camera
 class Flycam : public Camera {
@@ -104,11 +101,10 @@ public:
 
 	// TODO: configurable input bindings
 
-	Flycam () {}
 	Flycam (std::string name, float3 pos=0, float3 rot_aer=float3(0, deg(90), 0), float base_speed=0.5f): Camera(name, pos, rot_aer), base_speed{base_speed} {}
 
 	void imgui () {
-		if (!imgui_treepush("Flycam")) return;
+		if (!imgui_push(name, "Flycam")) return;
 
 		Camera::imgui();
 
@@ -118,7 +114,7 @@ public:
 		ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
 		ImGui::Text("cur_speed: %.3f", cur_speed);
 
-		imgui_treepop();
+		imgui_pop();
 	}
 
 	Camera_View update ();

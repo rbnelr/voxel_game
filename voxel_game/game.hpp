@@ -35,6 +35,7 @@ extern float detail2_freq, detail2_amp;
 #include "blocks.hpp"
 #include "input.hpp"
 #include "graphics/camera.hpp"
+#include "player.hpp"
 
 //
 #define UBOOL(name)	Uniform(T_BOOL, name)
@@ -50,17 +51,6 @@ extern float detail2_freq, detail2_amp;
 extern std::vector<Shader*>			shaders;
 
 Shader* new_shader (std::string const& v, std::string const& f, std::initializer_list<Uniform> u, std::initializer_list<Shader::Uniform_Texture> t={});
-
-static float grav_accel_down = 20;
-
-static float jump_height_from_jump_impulse (float jump_impulse_up, float grav_accel_down) {
-	return jump_impulse_up*jump_impulse_up / grav_accel_down * 0.5f;
-}
-static float jump_impulse_from_jump_height (float jump_height, float grav_accel_down) {
-	return sqrt( 2.0f * jump_height * grav_accel_down );
-}
-
-
 
 #include "chunks.hpp"
 
@@ -185,69 +175,10 @@ static lrgba spectrum_gradient (float key) {
 		}), 1);
 }
 
-struct Player {
-	Camera cam = Camera("player camera");
-
-	float3	pos_world;
-	float3	vel_world;
-
-	float2	ori_ae =		float2(deg(0), deg(+80)); // azimuth elevation
-	
-	bool third_person = false;
-
-	float	eye_height =	1.65f;
-	float3	third_person_camera_offset_cam =		float3(0.5f, -0.4f, 3);
-
-	float collision_r =	0.4f;
-	float collision_h =	1.7f;
-
-	float walking_friction_alpha =	0.15f;
-
-	float falling_ground_friction =	0.0f;
-	float falling_bounciness =		0.25f;
-	float falling_min_bounce_speed =	6;
-
-	float wall_friction =				0.2f;
-	float wall_bounciness =			0.55f;
-	float wall_min_bounce_speed =		8;
-
-	float	jumping_up_impulse = jump_impulse_from_jump_height(1.2f, grav_accel_down);
-
-
-	bool opt_open = true;
-	void options () {
-		//option_group("player", &opt_open);
-		//if (opt_open) {
-		//	option(		"  pos_world",				&pos_world);
-		//	option(		"  vel_world",				&vel_world);
-		//	option_deg(	"  ori_ae",					&ori_ae);
-		//	option_deg(	"  vfov",					&vfov);
-		//
-		//	option(		"  third_person",			&third_person);
-		//
-		//	option(		"  eye_height",				&eye_height);
-		//	option(		"  third_person_camera_offset_cam",		&third_person_camera_offset_cam);
-		//
-		//	option(		"  collision_r",			&collision_r);
-		//	option(		"  collision_h",			&collision_h);
-		//
-		//	option(		"  walking_friction_alpha",	&walking_friction_alpha);
-		//
-		//	option(		"  falling_ground_friction",&falling_ground_friction);
-		//	option(		"  falling_bounciness",		&falling_bounciness);
-		//	option(		"  falling_min_bounce_speed",	&falling_min_bounce_speed);
-		//
-		//	option(		"  wall_bounciness",		&wall_bounciness);
-		//	option(		"  wall_friction",			&wall_friction);
-		//	option(		"  wall_min_bounce_speed",	&wall_min_bounce_speed);
-		//
-		//	option(		"  jumping_up_impulse",		&jumping_up_impulse);
-		//}
-	}
-};
-
 class Game {
-	Player player;
+	bool activate_flycam = false;
+
+	Player player = Player("player");
 
 	Flycam flycam = Flycam("flycam", float3(-5, -10, 50), float3(0, deg(80), 0), 12);
 
@@ -337,9 +268,6 @@ class Game {
 	
 		return val;
 	}
-
-	float3	initial_player_pos_world =		float3(4,32,43);
-	float3	initial_player_vel_world =		0;
 
 	Vbo overlay_vbo;
 
@@ -489,11 +417,6 @@ class Game {
 
 	void inital_chunk (float3 player_pos_world) {
 		generate_new_chunk( get_chunk_from_block_pos( (bpos)floor(player_pos_world) ) );
-	}
-
-	void respawn_player () {
-		player.pos_world = initial_player_pos_world;
-		player.vel_world = initial_player_vel_world;
 	}
 
 	bool draw_debug_overlay = 0;

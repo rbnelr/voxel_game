@@ -201,6 +201,8 @@
     <ClInclude Include="kissmath_colors.hpp" />
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="options_overlay.hpp" />
+    <ClInclude Include="physics.hpp" />
+    <ClInclude Include="player.hpp" />
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="stb_image.hpp" />
     <ClInclude Include="string.hpp" />
@@ -248,6 +250,8 @@
     <ClCompile Include="kissmath\uint8v3.cpp" />
     <ClCompile Include="kissmath\uint8v4.cpp" />
     <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp" />
+    <ClCompile Include="physics.cpp" />
+    <ClCompile Include="player.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="string.cpp" />
     <ClCompile Include="timer.cpp" />

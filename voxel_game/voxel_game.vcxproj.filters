@@ -146,6 +146,8 @@
     <ClInclude Include="graphics\camera.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="player.hpp" />
+    <ClInclude Include="physics.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -275,6 +277,8 @@
     <ClCompile Include="graphics\camera.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="player.cpp" />
+    <ClCompile Include="physics.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.frag">

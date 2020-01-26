@@ -133,7 +133,6 @@ Shader* new_shader (std::string const& v, std::string const& f, std::initializer
 static bool controling_flycam =		1;
 static bool viewing_flycam =		1;
 
-static bool trigger_respawn_player =	true;
 static bool trigger_dbg_heightmap_visualize =	false;
 static bool trigger_save_game =			false;
 static bool trigger_load_game =			false;
@@ -177,7 +176,7 @@ Game::Game () {
 
 	//
 
-	respawn_player();
+	player.respawn();
 
 	auto load_game = [&] () {
 		trigger_load_game = false;
@@ -190,7 +189,7 @@ Game::Game () {
 
 	load_game();
 
-	inital_chunk( player.pos_world );
+	inital_chunk( player.pos );
 
 	{
 		dbg_heightmap_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
@@ -216,17 +215,40 @@ void Game::frame () {
 		}
 
 		ImGui::SameLine();
+		ImGui::Checkbox("ImGui Demo", &imgui.show_demo_window);
+
+		ImGui::SameLine();
 		if (ImGui::Button("exit")) {
 			glfwSetWindowShouldClose(window, 1);
 		}
-
-		ImGui::Checkbox("show_demo_window", &imgui.show_demo_window);
 	}
+
+	input.imgui();
 
 	for (auto* s : shaders)			s->reload_if_needed();
 
-	flycam.imgui();
-	auto view = flycam.update();
+	{
+		bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
+		
+		if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
+		if (input.buttons[GLFW_KEY_P].went_down)
+			activate_flycam = !activate_flycam;
+
+		if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
+		if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
+			player.respawn();
+		}
+
+		ImGui::Separator();
+
+		if (open) flycam.imgui();
+		if (open) player.imgui();
+
+		ImGui::Separator();
+	}
+
+	player.update_controls();
+	player.update_physics();
 
 	//if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;
 	//if (option("noise_tree_density_amp", &noise_tree_density_amp))			trigger_regen_chunks = true;
@@ -236,7 +258,7 @@ void Game::frame () {
 	if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
 		trigger_regen_chunks = false;
 		delete_all_chunks();
-		inital_chunk(player.pos_world);
+		inital_chunk(player.pos);
 		trigger_dbg_heightmap_visualize = true;
 	}
 
@@ -253,20 +275,15 @@ void Game::frame () {
 		trigger_dbg_heightmap_visualize = false;
 	}
 
-	if (trigger_respawn_player) {
-		trigger_respawn_player = false;
-		respawn_player();
-	}
-
 	{ // chunk generation
 	  // check all chunk positions within a square of chunk_generation_radius
-		chunk_pos_t start =	(chunk_pos_t)floor(	((float2)player.pos_world -chunk_generation_radius) / (float2)CHUNK_DIM_2D );
-		chunk_pos_t end =	(chunk_pos_t)ceil(	((float2)player.pos_world +chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_pos_t start =	(chunk_pos_t)floor(	((float2)player.pos -chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_pos_t end =	(chunk_pos_t)ceil(	((float2)player.pos +chunk_generation_radius) / (float2)CHUNK_DIM_2D );
 
 		// check their actual distance to determine if they should be generated or not
 		auto chunk_dist_to_player = [&] (chunk_pos_t pos) {
 			bpos2 chunk_origin = pos * CHUNK_DIM_2D;
-			return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos_world);
+			return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
 		};
 		auto chunk_is_in_generation_radius = [&] (chunk_pos_t pos) {
 			return chunk_dist_to_player(pos) <= chunk_generation_radius;
@@ -306,8 +323,8 @@ void Game::frame () {
 	{ // player position (collision and movement dynamics)
 		constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
 
-		float3 pos_world = player.pos_world;
-		float3 vel_world = player.vel_world;
+		float3 pos_world = player.pos;
+		float3 vel_world = player.vel;
 
 		// 
 		bool player_stuck_in_solid_block;
@@ -419,7 +436,7 @@ void Game::frame () {
 				if (jump_held && player_on_ground) vel_world += float3(0,0, player.jumping_up_impulse);
 			}
 
-			vel_world += float3(0,0, -grav_accel_down) * input.dt;
+			vel_world += physics.grav_accel * input.dt;
 		}
 
 		//option("draw_debug_overlay", &draw_debug_overlay);
@@ -669,18 +686,18 @@ void Game::frame () {
 		};
 		trace_player_collision_path();
 
-		player.vel_world = vel_world;
-		player.pos_world = pos_world;
+		player.vel = vel_world;
+		player.pos = pos_world;
 	}
 
-	//if (viewing_flycam) {
-	//	view.pos_world = flycam.pos_world;
-	//} else {
-	//	view.pos_world = player.pos_world +float3(0,0,player.eye_height);
-	//	if (player.third_person) view.pos_world += cam_to_world_rot * player.third_person_camera_offset_cam;
-	//}
-	//
 
+
+	Camera_View view;
+	if (activate_flycam) {
+		view = flycam.update();
+	} else {
+		view = player.update_post_physics();
+	}
 
 	Block*	highlighted_block;
 	bpos	highlighted_block_pos;
@@ -737,9 +754,10 @@ void Game::frame () {
 
 		};
 
-		float3 dir = rotate3_Z(player.ori_ae.x) * rotate3_X(player.ori_ae.y) * float3(0,0,-1);
+		float3 ray_dir = (float3x3)view.cam_to_world * float3(0,0,-1);
+		float3 ray_pos = view.cam_to_world * float3(0,0,0);
 
-		highlighted_block = raycast_block(player.pos_world +float3(0,0,player.eye_height), dir, 3.5f, &highlighted_block_pos, &highlighted_block_face);
+		highlighted_block = raycast_block(ray_pos, ray_dir, 4.5f, &highlighted_block_pos, &highlighted_block_face);
 	};
 	raycast_highlighted_block();
 
@@ -870,7 +888,7 @@ void Game::frame () {
 			Chunk* chunk;
 			Block* b = query_block(block_place_pos, &chunk);
 
-			block_place_is_inside_player = cylinder_cube_intersect(player.pos_world -(float3)block_place_pos, player.collision_r,player.collision_h);
+			block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.collision_r,player.collision_h);
 
 			if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 
@@ -1104,7 +1122,7 @@ void Game::frame () {
 		overlay_vbo.clear();
 
 		{ // player collision cylinder
-			float3 pos_world = player.pos_world;
+			float3 pos_world = player.pos;
 			float r = player.collision_r;
 			float h = player.collision_h;
 
