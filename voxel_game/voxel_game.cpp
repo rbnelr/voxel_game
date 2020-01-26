@@ -12,6 +12,7 @@
 
 #include "game.hpp"
 #include "input.hpp"
+#include "glfw_window.hpp"
 
 #include "kissmath.hpp"
 #include "kissmath_colors.hpp"
@@ -140,29 +141,6 @@ static bool jump_held =					false;
 static bool hold_break_block =			false;
 static bool trigger_place_block =		false;
 
-struct Flycam {
-	float3	pos_world =			float3(-15, -27, 50);
-	float2	ori_ae =			float2(deg(350), deg(+75)); // azimuth elevation
-	
-	float	vfov =				deg(70);
-	
-	float	speed =				4;
-	float	speed_fast_mul =	4;
-	
-	
-	bool opt_open = true;
-	void options () {
-		//option_group("flycam", &opt_open);
-		//if (opt_open) {
-		//	option(		"  pos_world",		&pos_world);
-		//	option_deg(	"  ori_ae",			&ori_ae);
-		//	option_deg(	"  vfov",			&vfov);
-		//	option(		"  speed",			&speed);
-		//	option(		"  speed_fast_mul",	&speed_fast_mul);
-		//}
-	}
-};
-static Flycam flycam;
 
 //
 GLuint vao;
@@ -192,8 +170,6 @@ Game::Game () {
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	}
 
-	//imgui_showable_textures.push_back(&tex_breaking);
-
 	tex_breaking.load();
 	tex_breaking.upload();
 
@@ -214,11 +190,7 @@ Game::Game () {
 
 	load_game();
 
-	//ImGui::NewFrame(); // make imgui calls not crash during init
-
 	inital_chunk( player.pos_world );
-
-	//imgui_showable_textures.push_back(&dbg_heightmap_visualize);
 
 	{
 		dbg_heightmap_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
@@ -228,49 +200,27 @@ Game::Game () {
 
 	overlay_vbo.init(&overlay_vertex_layout);
 
-	//ImGui::End();
-
-	//imgui_init();
 }
 
 void Game::frame () {
+	{
+		bool fullscreen = get_fullscreen();
+		if (ImGui::Checkbox("fullscreen", &fullscreen)) {
+			toggle_fullscreen();
+		}
+
+		ImGui::Checkbox("show_demo_window", &imgui.show_demo_window);
+
+		bool vsync = get_vsync();
+		if (ImGui::Checkbox("vsync", &vsync)) {
+			set_vsync(vsync);
+		}
+	}
 
 	for (auto* s : shaders)			s->reload_if_needed();
 
-	Camera_View view;
-
-	float3x3 world_to_cam_rot;
-	float3x3 cam_to_world_rot;
-	{ // view/player rotation
-		auto clamped_cam_ae = [] (float2 cam_ae, float2 mouse_look_sens) -> float2 {
-			cam_ae -= input.mouse_delta * mouse_look_sens;
-			cam_ae.x = wrap(cam_ae.x, deg(360));
-			cam_ae.y = clamp(cam_ae.y, deg(2), deg(180.0f -2));
-
-			return cam_ae;
-		};
-
-		if (controling_flycam) {
-			float2 mouse_look_sens = float2(deg(1.0f / 8)) * (flycam.vfov / deg(70));
-
-			flycam.ori_ae = clamped_cam_ae(flycam.ori_ae, mouse_look_sens);
-		} else {
-			float2 mouse_look_sens = float2(deg(1.0f / 8)) * (player.vfov / deg(70));
-
-			player.ori_ae = clamped_cam_ae(player.ori_ae, mouse_look_sens);
-		}
-
-		if (viewing_flycam) {
-			view.vfov = flycam.vfov;
-			view.ori_ae = flycam.ori_ae;
-		} else {
-			view.vfov = player.vfov;
-			view.ori_ae = player.ori_ae;
-		}
-
-		world_to_cam_rot = rotate3_X(-view.ori_ae.y) * rotate3_Z(-view.ori_ae.x);
-		cam_to_world_rot = rotate3_Z(view.ori_ae.x) * rotate3_X(view.ori_ae.y);
-	}
+	flycam.imgui();
+	auto view = flycam.update();
 
 	//if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;
 	//if (option("noise_tree_density_amp", &noise_tree_density_amp))			trigger_regen_chunks = true;
@@ -346,18 +296,6 @@ void Game::frame () {
 	//overlay_line(prints("chunks in ram:   %4d %6d MB (%d KB per chunk) chunk is %dx%dx%d blocks", (int)chunks.size(), (int)(sizeof(Chunk)*chunks.size()/1024/1024), (int)(sizeof(Chunk)/1024), (int)CHUNK_DIM.x,(int)CHUNK_DIM.y,(int)CHUNK_DIM.z));
 
 	overlay_vbo.clear();
-
-	if (controling_flycam) { // camera view position
-		//float cam_speed_forw = flycam.speed;
-		//if (input.move_fast) cam_speed_forw *= flycam.speed_fast_mul;
-		//
-		//float3 cam_vel = cam_speed_forw * float3(1,1,1);
-		//
-		//float3 cam_vel_cam = normalizesafe( (float3)int3(inp.move_dir.x, inp.move_dir.z, -inp.move_dir.y) ) * cam_vel;
-		//flycam.pos_world += (cam_to_world_rot * cam_vel_cam) * input.dt;
-
-		//printf(">>> %f %f %f\n", cam_vel_cam.x, cam_vel_cam.y, cam_vel_cam.z);
-	}
 
 	{ // player position (collision and movement dynamics)
 		constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
@@ -729,14 +667,14 @@ void Game::frame () {
 		player.pos_world = pos_world;
 	}
 
-	if (viewing_flycam) {
-		view.pos_world = flycam.pos_world;
-	} else {
-		view.pos_world = player.pos_world +float3(0,0,player.eye_height);
-		if (player.third_person) view.pos_world += cam_to_world_rot * player.third_person_camera_offset_cam;
-	}
+	//if (viewing_flycam) {
+	//	view.pos_world = flycam.pos_world;
+	//} else {
+	//	view.pos_world = player.pos_world +float3(0,0,player.eye_height);
+	//	if (player.third_person) view.pos_world += cam_to_world_rot * player.third_person_camera_offset_cam;
+	//}
+	//
 
-	view.calc_final_matricies(world_to_cam_rot, cam_to_world_rot);
 
 	Block*	highlighted_block;
 	bpos	highlighted_block_pos;
@@ -1066,21 +1004,7 @@ void Game::frame () {
 
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 
-	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-	if (shad_sky->valid()) { // draw skybox
-		glDisable(GL_DEPTH_TEST);
-
-		shad_sky->bind();
-		shad_sky->set_unif("world_to_cam",	(float4x4)view.world_to_cam);
-		shad_sky->set_unif("cam_to_world",	(float4x4)view.cam_to_world);
-		shad_sky->set_unif("cam_to_clip",	view.cam_to_clip);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6*6);
-
-		glEnable(GL_DEPTH_TEST);
-	}
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	if (shad_blocks->valid()) {
 
@@ -1222,7 +1146,20 @@ void Game::frame () {
 		}
 	}
 
-	//draw_imgui(inp.wnd_dim);
+	if (shad_skybox->valid()) { // draw skybox
+		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
+		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
+
+		shad_skybox->bind();
+		shad_skybox->set_unif("world_to_cam",	(float4x4)view.world_to_cam);
+		shad_skybox->set_unif("cam_to_world",	(float4x4)view.cam_to_world);
+		shad_skybox->set_unif("cam_to_clip",	view.cam_to_clip);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6*6);
+
+		glDisable(GL_DEPTH_CLAMP);
+		glDepthRange(0, 1);
+	}
 
 }
 

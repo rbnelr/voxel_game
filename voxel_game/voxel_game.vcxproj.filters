@@ -143,6 +143,9 @@
     <ClInclude Include="dear_imgui.hpp">
       <Filter>dear_imgui</Filter>
     </ClInclude>
+    <ClInclude Include="graphics\camera.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -269,6 +272,9 @@
     <ClCompile Include="dear_imgui.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
+    <ClCompile Include="graphics\camera.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.frag">
@@ -343,6 +349,9 @@
     </Filter>
     <Filter Include="kissmath">
       <UniqueIdentifier>{c72d5d49-a1a5-4087-bcfe-73b53964701b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="graphics">
+      <UniqueIdentifier>{4271f123-16a3-4d5d-812b-f890d4962a09}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

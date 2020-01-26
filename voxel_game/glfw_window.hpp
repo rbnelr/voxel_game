@@ -23,6 +23,8 @@
 // Global window
 extern GLFWwindow* window;
 
+bool get_vsync ();
 void set_vsync (bool on);
 
+bool get_fullscreen ();
 void toggle_fullscreen ();

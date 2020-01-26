@@ -8,7 +8,7 @@ class DearImgui {
 public:
 	bool enabled = true;
 
-	bool show_demo_window = true;
+	bool show_demo_window = false;
 
 	void init ();
 

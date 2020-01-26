@@ -2,14 +2,14 @@
 
 $include "common.frag"
 
-in		vec3	vs_pos_world_dir;
+in		vec3	vs_world_dir;
 
 vec3 srgb (float r, float g, float b) {
 	return pow( vec3(r,g,b) / 255.0, vec3(2.2) );
 }
 
 void main () {
-	vec3 dir = normalize(vs_pos_world_dir);
+	vec3 dir = normalize(vs_world_dir);
 	
 	vec3 sky_col =		srgb(190,239,255);
 	vec3 horiz_col =	srgb(204,227,235);

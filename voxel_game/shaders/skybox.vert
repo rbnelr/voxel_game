@@ -2,7 +2,7 @@
 
 $include "common.vert"
 
-out		vec3	vs_pos_world_dir;
+out		vec3	vs_world_dir;
 
 uniform	mat4	world_to_clip;
 
@@ -56,8 +56,10 @@ const vec3 arr[6*6] = vec3[] (
 void main () {
 	float r = mix(1, 0.2, mcursor_pos.x / screen_dim.x);
 	
-	gl_Position =		cam_to_clip * vec4(mat3(world_to_cam) * arr[gl_VertexID], 1);
-	vs_pos_world_dir =	arr[gl_VertexID];
+	vec3 world_dir = arr[gl_VertexID];
+
+	gl_Position =	cam_to_clip * vec4(mat3(world_to_cam) * world_dir, 1);
+	vs_world_dir =	world_dir;
 	
 	WIREFRAME_MACRO;
 }

@@ -168,6 +168,7 @@
     <ClInclude Include="glad\glad_wgl.h" />
     <ClInclude Include="glad\khrplatform.h" />
     <ClInclude Include="glfw_window.hpp" />
+    <ClInclude Include="graphics\camera.hpp" />
     <ClInclude Include="input.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="kissmath.hpp" />
@@ -218,6 +219,7 @@
     <ClCompile Include="glad\glad.c" />
     <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
+    <ClCompile Include="graphics\camera.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />

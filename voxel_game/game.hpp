@@ -34,6 +34,7 @@ extern float detail2_freq, detail2_amp;
 #include "gl.hpp"
 #include "blocks.hpp"
 #include "input.hpp"
+#include "graphics/camera.hpp"
 
 //
 #define UBOOL(name)	Uniform(T_BOOL, name)
@@ -49,48 +50,6 @@ extern float detail2_freq, detail2_amp;
 extern std::vector<Shader*>			shaders;
 
 Shader* new_shader (std::string const& v, std::string const& f, std::initializer_list<Uniform> u, std::initializer_list<Shader::Uniform_Texture> t={});
-
-struct Camera_View {
-	float3	pos_world;
-	float2	ori_ae;
-
-	float	vfov;
-	float	hfov;
-
-	float clip_near =		1.0f/32;
-	float clip_far =		8192;
-
-	float2 frust_scale;
-
-	float3x4	world_to_cam;
-	float3x4	cam_to_world;
-	float4x4	cam_to_clip;
-
-	void calc_final_matricies (float3x3 world_to_cam_rot, float3x3 cam_to_world_rot) {
-		world_to_cam = world_to_cam_rot * translate(-pos_world);
-		cam_to_world = translate(pos_world) * cam_to_world_rot;
-
-		{
-			frust_scale.y = tan(vfov / 2);
-			frust_scale.x = frust_scale.y * ((float)input.window_size.x / (float)input.window_size.y);
-
-			hfov = atan(frust_scale.x) * 2;
-
-			float2 frust_scale_inv = 1.0f / frust_scale;
-
-			float x = frust_scale_inv.x;
-			float y = frust_scale_inv.y;
-			float a = (clip_far +clip_near) / (clip_near -clip_far);
-			float b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
-
-			cam_to_clip = float4x4(
-				x, 0, 0, 0,
-				0, y, 0, 0,
-				0, 0, a, b,
-				0, 0, -1, 0 );
-		}
-	}
-};
 
 static float grav_accel_down = 20;
 
@@ -227,12 +186,13 @@ static lrgba spectrum_gradient (float key) {
 }
 
 struct Player {
+	Camera cam = Camera("player camera");
+
 	float3	pos_world;
 	float3	vel_world;
 
 	float2	ori_ae =		float2(deg(0), deg(+80)); // azimuth elevation
-	float	vfov =			deg(80);
-
+	
 	bool third_person = false;
 
 	float	eye_height =	1.65f;
@@ -252,6 +212,7 @@ struct Player {
 	float wall_min_bounce_speed =		8;
 
 	float	jumping_up_impulse = jump_impulse_from_jump_height(1.2f, grav_accel_down);
+
 
 	bool opt_open = true;
 	void options () {
@@ -288,7 +249,9 @@ struct Player {
 class Game {
 	Player player;
 
-	Shader* shad_sky = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
+	Flycam flycam = Flycam("flycam", float3(-5, -10, 50), float3(0, deg(80), 0), 12);
+
+	Shader* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
 	Shader* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	Shader* shad_overlay = new_shader("overlay.vert",	"overlay.frag",	{UCOM, UMAT});
 
