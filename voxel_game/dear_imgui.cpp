@@ -46,3 +46,5 @@ void DearImgui::destroy () {
 }
 
 DearImgui imgui;
+
+int tree_depth = 0;

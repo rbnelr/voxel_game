@@ -209,12 +209,18 @@ void Game::frame () {
 			toggle_fullscreen();
 		}
 
-		ImGui::Checkbox("show_demo_window", &imgui.show_demo_window);
-
+		ImGui::SameLine();
 		bool vsync = get_vsync();
 		if (ImGui::Checkbox("vsync", &vsync)) {
 			set_vsync(vsync);
 		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("exit")) {
+			glfwSetWindowShouldClose(window, 1);
+		}
+
+		ImGui::Checkbox("show_demo_window", &imgui.show_demo_window);
 	}
 
 	for (auto* s : shaders)			s->reload_if_needed();

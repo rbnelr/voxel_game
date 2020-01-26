@@ -19,3 +19,17 @@ public:
 };
 
 extern DearImgui imgui;
+
+extern int tree_depth;
+
+// root level is closed by default, sublevels are open by default
+//  for printing inherited baseclasses in their derived classes
+inline bool imgui_treepush (char const* label) {
+	bool ret = ImGui::TreeNodeEx(label, tree_depth == 0 ? 0 : ImGuiTreeNodeFlags_DefaultOpen);
+	if (ret) tree_depth++;
+	return ret;
+}
+inline void imgui_treepop () {
+	ImGui::TreePop();
+	tree_depth--;
+}
