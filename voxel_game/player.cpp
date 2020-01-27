@@ -31,11 +31,24 @@ void Player::update_controls (bool player_on_ground) {
 
 		bool walk_fast = input.buttons[GLFW_KEY_LEFT_SHIFT].is_down;
 
-		float2 player_walk_speed = walk_fast ? run_speed : walk_speed;
+		float player_walk_speed = walk_fast ? run_speed : walk_speed;
 		
 		float2 feet_vel_world = body_rotation * (move_dir * player_walk_speed);
+		
+		// accel test
+		float speed = length((float2)vel);
+		float accel = clamp(player_walk_speed / (speed + 0.0001f) - 1, 0.0f, 1.0f);
 
-		float3 tmp = float3( lerp((float2)vel, feet_vel_world, walking_friction_alpha), vel.z );
+		float2 delta_vel = feet_vel_world - (float2)vel;
+		float2 new_vel = feet_vel_world + normalizesafe(delta_vel) * accel * input.dt;
+
+		float3 tmp = float3(new_vel, vel.z );
+
+		ImGui::DragFloat("accel", &accel);
+		ImGui::DragFloat2("delta_vel", &delta_vel.x);
+		ImGui::DragFloat2("new_vel", &new_vel.x);
+
+		//float3 tmp = float3( lerp((float2)vel, feet_vel_world, walking_friction_alpha), vel.z );
 
 		if (player_on_ground) {
 			vel = tmp;
@@ -43,7 +56,24 @@ void Player::update_controls (bool player_on_ground) {
 			if (length((float2)vel) < length(player_walk_speed)*0.5f)
 				vel = tmp; // only allow speeding up to slow speed with air control
 		}
-		
+	}
+
+	{
+		static float vels[512] = {};
+		static float poss[512] = {};
+		static int cur = 0;
+
+		if (!input.pause_time) {
+			vels[cur] = length((float2)vel);
+			poss[cur++] = pos.x;
+			cur %= 512;
+		}
+
+		ImGui::SetNextItemWidth(-1);
+		ImGui::PlotLines("###_debug_vel", vels, 512, cur, "player.vel", 0, 15, ImVec2(0, 100));
+
+		ImGui::SetNextItemWidth(-1);
+		ImGui::PlotLines("###_debug_pos", poss, 512, cur, "player.pos", -7, 7, ImVec2(0, 100));
 	}
 	
 	//// jumping
