@@ -36,6 +36,7 @@ extern float detail2_freq, detail2_amp;
 #include "input.hpp"
 #include "graphics/camera.hpp"
 #include "player.hpp"
+#include "running_average.hpp"
 
 //
 #define UBOOL(name)	Uniform(T_BOOL, name)
@@ -177,7 +178,40 @@ static lrgba spectrum_gradient (float key) {
 		}), 1);
 }
 
+struct FPS_Display {
+	RunningAverage<float> dt_avg = RunningAverage<float>(64);
+	float latest_avg_dt;
+
+	float update_period = .5f; // sec
+	float update_timer = 0;
+
+	int histogram_height = 40;
+
+	void display_fps () {
+		dt_avg.push(input.real_dt);
+
+		if (update_timer <= 0) {
+			latest_avg_dt = dt_avg.calc_avg();
+			update_timer += update_period;
+		}
+		update_timer -= input.real_dt;
+
+		float avg_fps = 1.0f / latest_avg_dt;
+		ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
+
+		ImGui::SetNextItemWidth(-1);
+		ImGui::PlotHistogram("###frametimes_histogram", dt_avg.values.get(), dt_avg.count, 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
+
+		if (ImGui::BeginPopupContextItem()) {
+			ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);
+			ImGui::EndPopup();
+		}
+	}
+};
+
 class Game {
+	FPS_Display fps_display;
+
 	bool activate_flycam = false;
 
 	Player player = Player("player");

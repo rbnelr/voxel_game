@@ -148,6 +148,9 @@
     </ClInclude>
     <ClInclude Include="player.hpp" />
     <ClInclude Include="physics.hpp" />
+    <ClInclude Include="running_average.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />

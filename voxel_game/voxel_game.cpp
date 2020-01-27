@@ -230,6 +230,8 @@ void Game::frame () {
 		if (ImGui::Button("exit")) {
 			glfwSetWindowShouldClose(window, 1);
 		}
+
+		fps_display.display_fps();
 	}
 
 	input.imgui();

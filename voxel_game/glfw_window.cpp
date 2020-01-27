@@ -206,9 +206,9 @@ void glfw_gameloop () {
 
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
-		float real_dt = (float)(now - prev) / (float)timestamp_freq;
-		input.dt = min(real_dt * (input.pause_time ? 0 : input.time_scale), input.max_dt);
-		input.unscaled_dt = min(real_dt, input.max_dt);
+		input.real_dt = (float)(now - prev) / (float)timestamp_freq;
+		input.dt = min(input.real_dt * (input.pause_time ? 0 : input.time_scale), input.max_dt);
+		input.unscaled_dt = min(input.real_dt, input.max_dt);
 		prev = now;
 
 		frame_counter++;

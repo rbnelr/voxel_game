@@ -203,6 +203,7 @@
     <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="physics.hpp" />
     <ClInclude Include="player.hpp" />
+    <ClInclude Include="running_average.hpp" />
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="stb_image.hpp" />
     <ClInclude Include="string.hpp" />

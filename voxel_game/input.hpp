@@ -26,6 +26,8 @@ public:
 	// use for camera flying, potentially for player physics if slow motion is not supposed to affect player for ex.
 	float unscaled_dt;
 
+	float real_dt; // for displaying fps etc.
+
 	int2 window_size;
 	float2 cursor_pos; // in pixels, float because glfw retuns doubles
 
