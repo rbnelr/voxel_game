@@ -247,9 +247,6 @@ void Game::frame () {
 		ImGui::Separator();
 	}
 
-	player.update_controls();
-	player.update_physics();
-
 	//if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;
 	//if (option("noise_tree_density_amp", &noise_tree_density_amp))			trigger_regen_chunks = true;
 	//
@@ -323,17 +320,14 @@ void Game::frame () {
 	{ // player position (collision and movement dynamics)
 		constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
 
-		float3 pos_world = player.pos;
-		float3 vel_world = player.vel;
-
 		// 
 		bool player_stuck_in_solid_block;
 		bool player_on_ground;
 
 		auto check_blocks_around_player = [&] () {
 			{ // for all blocks we could be touching
-				bpos start =	(bpos)floor(pos_world -float3(player.collision_r,player.collision_r,0));
-				bpos end =		(bpos)ceil(pos_world +float3(player.collision_r,player.collision_r,player.collision_h));
+				bpos start =	(bpos)floor(player.pos -float3(player.collision_r,player.collision_r,0));
+				bpos end =		(bpos)ceil(player.pos +float3(player.collision_r,player.collision_r,player.collision_h));
 
 				bool any_intersecting = false;
 
@@ -345,7 +339,7 @@ void Game::frame () {
 							auto* b = query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
-							bool intersecting = cylinder_cube_intersect(pos_world -(float3)bp, player.collision_r,player.collision_h);
+							bool intersecting = cylinder_cube_intersect(player.pos -(float3)bp, player.collision_r,player.collision_h);
 
 							if (0) {
 								srgba8 col;
@@ -376,14 +370,14 @@ void Game::frame () {
 
 			{ // for all blocks we could be standing on
 
-				bpos_t pos_z = floori(pos_world.z);
+				bpos_t pos_z = floori(player.pos.z);
 
 				player_on_ground = false;
 
-				if ((pos_world.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && vel_world.z == 0) {
+				if ((player.pos.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && player.vel.z == 0) {
 
-					bpos2 start =	(bpos2)floor((float2)pos_world -player.collision_r);
-					bpos2 end =		(bpos2)ceil((float2)pos_world +player.collision_r);
+					bpos2 start =	(bpos2)floor((float2)player.pos -player.collision_r);
+					bpos2 end =		(bpos2)ceil((float2)player.pos +player.collision_r);
 
 					bpos bp;
 					bp.z = pos_z -1;
@@ -394,7 +388,7 @@ void Game::frame () {
 							auto* b = query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
-							if (block_solid && circle_square_intersect((float2)pos_world -(float2)(bpos2)bp, player.collision_r)) player_on_ground = true;
+							if (block_solid && circle_square_intersect((float2)player.pos -(float2)(bpos2)bp, player.collision_r)) player_on_ground = true;
 						}
 					}
 				}
@@ -403,43 +397,15 @@ void Game::frame () {
 		};
 		check_blocks_around_player();
 
-		//overlay_line(prints(">>> player_on_ground: %d\n", player_on_ground));
-
-		if (player_stuck_in_solid_block) {
-			vel_world = 0;
-			printf(">>>>>>>>>>>>>> stuck!\n");
-		} else {
-
-			if (!controling_flycam) {
-				{ // player walking dynamics
-					//float2 player_walk_speed = 3.0f * (inp.move_fast ? 3 : 1);
-					//
-					//float2 feet_vel_world = rotate2(player.ori_ae.x) * (normalizesafe( (float2)(int2)inp.move_dir ) * player_walk_speed);
-					//
-					////option("feet_vel_world_multiplier", &feet_vel_world_multiplier);
-					//
-					//feet_vel_world *= feet_vel_world_multiplier;
-					//
-					//// need some proper way of doing walking dynamics
-					//
-					//if (player_on_ground) {
-					//	vel_world = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
-					//} else {
-					//	float3 tmp = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
-					//
-					//	if (length((float2)vel_world) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
-					//}
-					//
-					//if (length(vel_world) < 0.01f) vel_world = 0;
-				}
-
-				if (jump_held && player_on_ground) vel_world += float3(0,0, player.jumping_up_impulse);
-			}
-
-			vel_world += physics.grav_accel * input.dt;
+		if (!activate_flycam) {
+			player.update_controls(player_on_ground);
 		}
+		player.update_physics(player_on_ground);
 
 		//option("draw_debug_overlay", &draw_debug_overlay);
+
+		float3 pos_world = player.pos;
+		float3 vel_world = player.vel;
 
 		auto trace_player_collision_path = [&] () {
 			float player_r = player.collision_r;

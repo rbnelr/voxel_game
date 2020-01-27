@@ -45,6 +45,46 @@ DONE:
 TODO
 -FEATURES:
  
+ port all player code to player class
+ -factor out all the relevant raycast, physics etc. code into their own utility files
+ -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
+ 
+ code order:
+	 for all players: player.controls_update(); // control look dir -> check grounded state -> control desired walk velocity, jump, crouch etc.
+	 physics_manager.update_rigidbody_physics(); // rigidbody == the cylinder of players or the box of npcs, ie. update pos and vel using physics parameters (bounciness etc.) using the cylinder cast timestepping algo and afterwards potentially add seperation forces to force npcs/players apart
+	 for all players: player.post_phys_update(); // position is final -> update camera positions, and do block placement / breaking with final rays (block placement should probably happen instantly, since order with block placing should not be important)
+ 
+ look at COLLISION_SEPERATION_EPSILON, and if the raycast physics can live without it, being grounded should leave pos==block_top and vel.z==0
+
+ even if getting stuck inside a block (which should be numerically impossible with a timestep of 0.05 as long as the integers are representable as floats (max would be 16,777,217))
+  there should be a way of getting out of a block you are stuck in (since that should during gameplay), for example to fix being teleported into a wall or the ground
+  allthough since you can break blocks, that might not be all that important
+  getting out of deep inside a mountain should maybe not be possible
+  but getting out of a wall you are only stuck in slightly should be possible
+  maybe the physics does not let you enter blocks but once inside you get a force pushing you out and the collision does not stop you from exiting
+  don't allow directed movement when in a wall or this might allow tunneling through walls
+  a force might cause you to be flung away so the best way might just be:
+   in the center of a block: stuck (no movement / "drowning" gameplay effect)
+   you penetrate the wall by less than 0.5f block widths -> you are clearly on one side of the block, so just teleport you so you don't penetrate (player.pos -= pen_vector;)
+   -> but only if the space you teleport to is free -> when stuck in completely solid rock you are stuck
+ 
+ check if the atlas filtering works like it should, i think I see atlas bleeding happening currently
+ -do we use mipmaps?
+ -maybe do use mipmaps but put special code in the fragment shader that clamps the uvs to never filter outside the tile?
+
+ factor out all the drawing code too, and either just manually do all the gl things "manually"
+  or add real abstractions for gl
+  -> maybe actually follow the "factor into function if similar code appears 3+ times" rule
+      ie. just stupidly type out all required code and then see what gets repeated
+  the main loop should probably never know about textures at all, just graphics.draw_world(); for p in players: graphics.draw_player(p) etc.
+  and the graphics class handles all the stuff itself, this way it can decide if it wants the textures to have it's own class
+ 
+ make sure movement code is framerate independent, the lerp(old_vel, desired_vel, alpha) is framrate dependant
+ -I did like the feel of the movement on 60 fps
+  -> maybe plot speed via imgui and screenshot it
+  -> and then develop new movement code with better force based movement that closely matches that curve
+
+-OLD version:
  convert entire debug optios into new imgui way of doing things
  
  fix cut off trees
@@ -61,13 +101,13 @@ TODO
  
  improve block AO
  
+ view frustrum culling
+
  improve performance on notebook
- -chunk optimization
-  -view frustrum culling
+ -chunk optimization ????
  
  blocks inventory (gain blocks on break and lose on place)
  
  work on gl abstraction
  
 -BUGS:
- 

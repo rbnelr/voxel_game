@@ -1,55 +1,65 @@
 #include "player.hpp"
 #include "input.hpp"
+#include "physics.hpp"
 
 float3	player_spawn_point = float3(4,32,43);
 
-void Player::update_controls () {
-	// toggle camera view
+void Player::update_controls (bool player_on_ground) {
+	//// toggle camera view
 	if (input.buttons[GLFW_KEY_F].went_down)
 		third_person = !third_person;
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
 
+	//// look
 	rotate_with_mouselook(&rot_ae.x, &rot_ae.y, cam.vfov);
 
-	// TODO: player walking velocity and jumping
+	//// walking
+	float2x2 body_rotation = rotate2(rot_ae.x);
+
 	//if (player_stuck_in_solid_block) {
 	//	vel_world = 0;
 	//	printf(">>>>>>>>>>>>>> stuck!\n");
 	//} else {
-	//
-	//	if (!controling_flycam) {
-	//		{ // player walking dynamics
-	//		  //float2 player_walk_speed = 3.0f * (inp.move_fast ? 3 : 1);
-	//		  //
-	//		  //float2 feet_vel_world = rotate2(player.ori_ae.x) * (normalizesafe( (float2)(int2)inp.move_dir ) * player_walk_speed);
-	//		  //
-	//		  ////option("feet_vel_world_multiplier", &feet_vel_world_multiplier);
-	//		  //
-	//		  //feet_vel_world *= feet_vel_world_multiplier;
-	//		  //
-	//		  //// need some proper way of doing walking dynamics
-	//		  //
-	//		  //if (player_on_ground) {
-	//		  //	vel_world = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
-	//		  //} else {
-	//		  //	float3 tmp = float3( lerp((float2)vel_world, feet_vel_world, player.walking_friction_alpha), vel_world.z );
-	//		  //
-	//		  //	if (length((float2)vel_world) < length(player_walk_speed)*0.5f) vel_world = tmp; // only allow speeding up to slow speed with air control
-	//		  //}
-	//		  //
-	//		  //if (length(vel_world) < 0.01f) vel_world = 0;
-	//		}
-	//
-	//		if (jump_held && player_on_ground) vel_world += float3(0,0, player.jumping_up_impulse);
-	//	}
-	//
-	//	vel_world += float3(0,0, -grav_accel_down) * input.dt;
-	//}
+	{
+		float2 move_dir = 0;
+		if (input.buttons[GLFW_KEY_A].is_down) move_dir.x -= 1;
+		if (input.buttons[GLFW_KEY_D].is_down) move_dir.x += 1;
+		if (input.buttons[GLFW_KEY_S].is_down) move_dir.y -= 1;
+		if (input.buttons[GLFW_KEY_W].is_down) move_dir.y += 1;
+		move_dir = normalizesafe(move_dir);
+
+		bool walk_fast = input.buttons[GLFW_KEY_LEFT_SHIFT].is_down;
+
+		float2 player_walk_speed = walk_fast ? run_speed : walk_speed;
+		
+		float2 feet_vel_world = body_rotation * (move_dir * player_walk_speed);
+
+		float3 tmp = float3( lerp((float2)vel, feet_vel_world, walking_friction_alpha), vel.z );
+
+		if (player_on_ground) {
+			vel = tmp;
+		} else {
+			if (length((float2)vel) < length(player_walk_speed)*0.5f)
+				vel = tmp; // only allow speeding up to slow speed with air control
+		}
+		
+	}
+	
+	//// jumping
+	if (input.buttons[GLFW_KEY_SPACE].is_down && player_on_ground)
+		vel += jump_impulse;
 }
 
-void Player::update_physics () {
+void Player::update_physics (bool player_on_ground) {
 
+	//// gravity
+	// if on ground only?
+	vel += physics.grav_accel * input.dt;
+
+	// kill velocity if too small
+	if (length(vel) < 0.01f)
+		vel = 0;
 }
 
 Camera_View Player::update_post_physics () {

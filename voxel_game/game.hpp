@@ -277,8 +277,6 @@ class Game {
 	float block_update_frequency = 1.0f / 25;
 	bpos_t cur_chunk_update_block_i = 0;
 
-	float feet_vel_world_multiplier = 1;
-
 	struct Overlay_Vertex {
 		float3	pos_world;
 		srgba8	color;

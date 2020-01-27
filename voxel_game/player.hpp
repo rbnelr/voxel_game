@@ -33,6 +33,9 @@ public:
 	Camera tps_camera = Camera("tps_camera", float3(0.5f, -0.4f, 1));
 
 	//// Physics
+	float walk_speed = 5.0f;
+	float run_speed = 13.0f;
+
 	float collision_r =	0.4f;
 	float collision_h =	1.7f;
 
@@ -46,7 +49,7 @@ public:
 	float wall_bounciness =				0.55f;
 	float wall_min_bounce_speed =		8;
 
-	float jumping_up_impulse = physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY); // jump height based on the default gravity, tweaked gravity will change the jump height
+	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
 	Player (std::string name): name{name} {} 
 
@@ -71,9 +74,9 @@ public:
 		imgui_pop();
 	}
 
-	void update_controls ();
+	void update_controls (bool player_on_ground);
 
-	void update_physics ();
+	void update_physics (bool player_on_ground);
 
 	Camera_View update_post_physics ();
 

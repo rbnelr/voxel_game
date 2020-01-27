@@ -36,13 +36,13 @@ public:
 
 	//// Input Settings
 	// Max dt to prevent large physics time steps
-	float max_dt = 0.2f;
+	float max_dt = 1.0f / 20;
 	// Timer scaler (does not scale unscaled_dt)
 	float time_scale = 1;
 	// Pause time (equivalent to time_scale=0)
 	bool pause_time = false;
 
-	float mouselook_sensitiviy_divider = 400;
+	float mouselook_sensitiviy_divider = 500;
 
 	float view_elevation_down_limit = deg(5);
 	float view_elevation_up_limit = deg(5);
