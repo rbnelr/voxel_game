@@ -108,7 +108,7 @@
 #include <GLES3/gl3.h>          // Use GL ES 3
 #endif
 #else
-/////////////////////////////// MODIFIED: "./dear_imgui/*" needs to refer to "./glad/glad.h"
+/////////////////////////////// MODIFIED
 // About Desktop OpenGL function loaders:
 //  Modern desktop OpenGL doesn't have a standard portable header file to load OpenGL function pointers.
 //  Helper libraries are often used for this purpose! Here we are supporting a few common ones (gl3w, glew, glad).
@@ -118,7 +118,7 @@
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
 #include <../GL/glew.h>    // Needs to be initialized with glewInit() in user's code
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-#include <../glad/glad.h>  // Needs to be initialized with gladLoadGL() in user's code
+#include "../glad/glad.h"  // Needs to be initialized with gladLoadGL() in user's code
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLBINDING)
 #include <../glbinding/gl/gl.h>  // Initialize with glbinding::initialize()
 #include ../<glbinding/glbinding.h>

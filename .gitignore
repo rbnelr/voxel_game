@@ -1,3 +1,4 @@
+._*.txt # for ._need_potatomode.txt
 
 *.exe
 *.bin

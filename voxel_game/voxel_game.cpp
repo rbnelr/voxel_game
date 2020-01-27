@@ -140,6 +140,15 @@ static bool jump_held =					false;
 static bool hold_break_block =			false;
 static bool trigger_place_block =		false;
 
+bool FileExists (const char* path) {
+	DWORD dwAttrib = GetFileAttributes(path);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+bool _need_potatomode () {
+	return FileExists("._need_potatomode.txt");
+}
+bool _use_potatomode = _need_potatomode();
 
 //
 GLuint vao;

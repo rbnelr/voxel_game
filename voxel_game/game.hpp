@@ -111,8 +111,10 @@ static float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world) {
 	return (elevation +32) +(roughness * detail);
 }
 
+extern bool _use_potatomode;
+
 struct Graphics_Settings {
-	bool	foliage_alpha = true;
+	bool	foliage_alpha = !_use_potatomode;
 
 	void imgui () {
 		//if (ImGui::Checkbox("Foliage Alpha", &foliage_alpha)) foliage_alpha_changed();
@@ -190,8 +192,8 @@ class Game {
 
 	Texture2D_File tex_breaking = Texture2D_File(CS_LINEAR, "breaking.png");
 
-	float chunk_drawing_radius =		INF;
-	float chunk_generation_radius =	140;
+	float chunk_drawing_radius =	_use_potatomode ? 20.0f : INF;
+	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
 
 	Texture2D dbg_heightmap_visualize = Texture2D("dbg_heightmap_visualize");
 	int dbg_heightmap_visualize_radius = 1000;
