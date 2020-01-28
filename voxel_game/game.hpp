@@ -230,8 +230,7 @@ class Game {
 
 	Shader* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
 	Shader* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
-	Shader* shad_overlay = new_shader("overlay.vert",	"overlay.frag",	{UCOM, UMAT});
-
+	
 	Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
 
 	Texture2D_File tex_breaking = Texture2D_File(CS_LINEAR, "breaking.png");
@@ -315,23 +314,11 @@ class Game {
 		return val;
 	}
 
-	Vbo overlay_vbo;
-
 	int max_chunks_generated_per_frame = 1;
 
 	//float block_update_frequency = 1.0f;
 	float block_update_frequency = 1.0f / 25;
 	bpos_t cur_chunk_update_block_i = 0;
-
-	struct Overlay_Vertex {
-		float3	pos_world;
-		srgba8	color;
-	};
-
-	Vertex_Layout overlay_vertex_layout = {
-		{ "pos_world",	T_V3,	sizeof(Overlay_Vertex), offsetof(Overlay_Vertex, pos_world) },
-		{ "color",		T_U8V4,	sizeof(Overlay_Vertex), offsetof(Overlay_Vertex, color) },
-	};
 	
 	void gen_chunk_blocks (Chunk* chunk) {
 		bpos_t water_level = 21;

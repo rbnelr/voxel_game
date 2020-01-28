@@ -17,10 +17,6 @@ void Player::update_controls (bool player_on_ground) {
 	//// walking
 	float2x2 body_rotation = rotate2(rot_ae.x);
 
-	//if (player_stuck_in_solid_block) {
-	//	vel_world = 0;
-	//	printf(">>>>>>>>>>>>>> stuck!\n");
-	//} else {
 	{
 		float2 input_dir = 0;
 		if (input.buttons[GLFW_KEY_A].is_down) input_dir.x -= 1;

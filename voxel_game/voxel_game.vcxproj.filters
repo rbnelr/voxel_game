@@ -151,6 +151,8 @@
     <ClInclude Include="running_average.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="debug_draw.hpp" />
+    <ClInclude Include="no_copy.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -282,6 +284,7 @@
     </ClCompile>
     <ClCompile Include="player.cpp" />
     <ClCompile Include="physics.cpp" />
+    <ClCompile Include="debug_draw.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.frag">

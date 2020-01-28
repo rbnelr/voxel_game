@@ -11,6 +11,7 @@
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 #include "game.hpp"
+#include "debug_draw.hpp"
 #include "input.hpp"
 #include "glfw_window.hpp"
 
@@ -30,90 +31,6 @@ using namespace kiss;
 
 #define PROFILE_END_ACCUM(name)	name += (__profile_##name).end()
 #define PROFILE_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), name * 1000, __VA_ARGS__)
-
-
-#define LLL	float3(-1,-1,-1)
-#define HLL	float3(+1,-1,-1)
-#define LHL	float3(-1,+1,-1)
-#define HHL	float3(+1,+1,-1)
-#define LLH	float3(-1,-1,+1)
-#define HLH	float3(+1,-1,+1)
-#define LHH	float3(-1,+1,+1)
-#define HHH	float3(+1,+1,+1)
-
-#define QUAD(a,b,c,d) a,d,b, b,d,c // facing inward
-
-const float3 cube_faces[6*6] = {
-	QUAD(	LHL,
-			LLL,
-			LLH,
-			LHH ),
-	
-	QUAD(	HLL,
-			HHL,
-			HHH,
-			HLH ),
-	
-	QUAD(	LLL,
-			HLL,
-			HLH,
-			LLH ),
-	
-	QUAD(	HHL,
-			LHL,
-			LHH,
-			HHH ),
-	
-	QUAD(	HLL,
-			LLL,
-			LHL,
-			HHL ),
-	
-	QUAD(	LLH,
-			HLH,
-			HHH,
-			LHH )
-};
-
-#undef QUAD
-#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
-
-const float3 cube_faces_inward[6*6] = {
-	QUAD(	LHL,
-			LLL,
-			LLH,
-			LHH ),
-	
-	QUAD(	HLL,
-			HHL,
-			HHH,
-			HLH ),
-	
-	QUAD(	LLL,
-			HLL,
-			HLH,
-			LLH ),
-	
-	QUAD(	HHL,
-			LHL,
-			LHH,
-			HHH ),
-	
-	QUAD(	HLL,
-			LLL,
-			LHL,
-			HHL ),
-	
-	QUAD(	LLH,
-			HLH,
-			HHH,
-			LHH )
-};
-
-#undef QUAD
-
-static float2			mouse; // for quick debugging
-static int			frame_i; // should only be used for debugging
 
 //
 std::vector<Shader*>			shaders;
@@ -189,8 +106,6 @@ Game::Game () {
 
 		regen_dbg_heightmap_visualize();
 	}
-
-	overlay_vbo.init(&overlay_vertex_layout);
 
 }
 
@@ -304,13 +219,11 @@ void Game::frame () {
 			generate_new_chunk(cp);
 			if (++count == max_chunks_generated_per_frame) break;
 		}
-		if (count != 0) PROFILE_END_PRINT(generate_new_chunk, "frame: %3d generated %d chunks", frame_i, count);
+		if (count != 0) PROFILE_END_PRINT(generate_new_chunk, "frame: %3d generated %d chunks", frame_counter, count);
 
 	}
 
 	//overlay_line(prints("chunks in ram:   %4d %6d MB (%d KB per chunk) chunk is %dx%dx%d blocks", (int)chunks.size(), (int)(sizeof(Chunk)*chunks.size()/1024/1024), (int)(sizeof(Chunk)/1024), (int)CHUNK_DIM.x,(int)CHUNK_DIM.y,(int)CHUNK_DIM.z));
-
-	overlay_vbo.clear();
 
 	{ // player position (collision and movement dynamics)
 		constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
@@ -337,22 +250,15 @@ void Game::frame () {
 							bool intersecting = cylinder_cube_intersect(player.pos -(float3)bp, player.collision_r,player.collision_h);
 
 							if (0) {
-								srgba8 col;
+								lrgba col;
 
 								if (!block_solid) {
-									col = srgba8(40,40,40,100);
+									col = srgb(40,40,40,100);
 								} else {
-									col = intersecting ? srgba8(255,40,40,200) : srgba8(255,255,255,150);
+									col = intersecting ? srgb(255,40,40,200) : srgb(255,255,255,150);
 								}
 
-								Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies, sizeof(Overlay_Vertex)*6);
-
-								*out++ = { (float3)bp +float3(+1, 0,+1.01f), col };
-								*out++ = { (float3)bp +float3(+1,+1,+1.01f), col };
-								*out++ = { (float3)bp +float3( 0, 0,+1.01f), col };
-								*out++ = { (float3)bp +float3( 0, 0,+1.01f), col };
-								*out++ = { (float3)bp +float3(+1,+1,+1.01f), col };
-								*out++ = { (float3)bp +float3( 0,+1,+1.01f), col };
+								debug_draw.push_wire_cube(0.5f, 1, col);
 							}
 
 							any_intersecting = any_intersecting || (intersecting && block_solid);
@@ -549,23 +455,16 @@ void Game::frame () {
 
 					}
 
-					srgba8 col;
+					lrgba col;
 
 					if (!block_solid) {
-						col = srgba8(40,40,40,100);
+						col = srgb(40,40,40,100);
 					} else {
-						col = hit ? srgba8(255,40,40,200) : srgba8(255,255,255,150);
+						col = hit ? srgb(255,40,40,200) : srgb(255,255,255,150);
 					}
 
 					if (draw_dbg) {
-						Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies, sizeof(Overlay_Vertex)*6);
-
-						*out++ = { (float3)bp +float3(+1, 0,+1.01f), col };
-						*out++ = { (float3)bp +float3(+1,+1,+1.01f), col };
-						*out++ = { (float3)bp +float3( 0, 0,+1.01f), col };
-						*out++ = { (float3)bp +float3( 0, 0,+1.01f), col };
-						*out++ = { (float3)bp +float3(+1,+1,+1.01f), col };
-						*out++ = { (float3)bp +float3( 0,+1,+1.01f), col };
+						debug_draw.push_wire_cube((float3)bp + 0.5f, 1, col);
 					}
 				};
 
@@ -744,7 +643,7 @@ void Game::frame () {
 
 		float side_r = r * 0.35f;
 #endif
-
+#if 0
 		int face_quads = 4;
 		int quad_vertecies = 6;
 
@@ -765,9 +664,6 @@ void Game::frame () {
 			float3x3 rot_horiz =	rotate3_Z( deg(90) * horiz );
 
 			{
-				Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
-					sizeof(Overlay_Vertex)*face_quads*quad_vertecies);
-
 				for (int edge=0; edge<face_quads; ++edge) {
 
 					float3x3 rot_edge = (float3x3)rotate2(deg(90) * -edge);
@@ -811,6 +707,7 @@ void Game::frame () {
 				}
 			}
 		}
+#endif
 
 #undef QUAD
 	};
@@ -1065,76 +962,9 @@ void Game::frame () {
 		glDisable(GL_BLEND);
 	}
 
-	if (shad_overlay->valid()) {
-		shad_overlay->bind();
-
-		shad_overlay->set_unif("world_to_cam",	(float4x4)view.world_to_cam);
-		shad_overlay->set_unif("cam_to_world",	(float4x4)view.cam_to_world);
-		shad_overlay->set_unif("cam_to_clip",	view.cam_to_clip);
-
-		{ // block highlighting
-			glDisable(GL_CULL_FACE);
-			glEnable(GL_BLEND);
-			//glDisable(GL_DEPTH_TEST);
-
-			overlay_vbo.upload();
-			overlay_vbo.draw_entire(shad_overlay);
-
-			//glEnable(GL_DEPTH_TEST);
-			glDisable(GL_BLEND);
-			glEnable(GL_CULL_FACE);
-		}
-
-		overlay_vbo.clear();
-
-		{ // player collision cylinder
-			float3 pos_world = player.pos;
-			float r = player.collision_r;
-			float h = player.collision_h;
-
-			int cylinder_sides = 32;
-
-			Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies, sizeof(Overlay_Vertex)*(3+6+3)*cylinder_sides);
-
-			srgba8 col = srgba8(255, 40, 255, 230);
-
-			float2 rv = float2(r,0);
-
-			for (int i=0; i<cylinder_sides; ++i) {
-				float rot_a = (float)(i +0) / (float)cylinder_sides * deg(360);
-				float rot_b = (float)(i +1) / (float)cylinder_sides * deg(360);
-
-				float2x2 ma = rotate2(rot_a);
-				float2x2 mb = rotate2(rot_b);
-
-				*out++ = { pos_world +float3(0,0,     h), col };
-				*out++ = { pos_world +float3(ma * rv, h), col };
-				*out++ = { pos_world +float3(mb * rv, h), col };
-
-				*out++ = { pos_world +float3(mb * rv, 0), col };
-				*out++ = { pos_world +float3(mb * rv, h), col };
-				*out++ = { pos_world +float3(ma * rv, 0), col };
-				*out++ = { pos_world +float3(ma * rv, 0), col };
-				*out++ = { pos_world +float3(mb * rv, h), col };
-				*out++ = { pos_world +float3(ma * rv, h), col };
-
-				*out++ = { pos_world +float3(0,0,     0), col };
-				*out++ = { pos_world +float3(mb * rv, 0), col };
-				*out++ = { pos_world +float3(ma * rv, 0), col };
-			}
-		}
-
-		{
-			glEnable(GL_BLEND);
-			//glDisable(GL_DEPTH_TEST);
-
-			overlay_vbo.upload();
-			overlay_vbo.draw_entire(shad_overlay);
-
-			//glEnable(GL_DEPTH_TEST);
-			glDisable(GL_BLEND);
-		}
-	}
+	debug_draw.push_cylinder(player.pos + player.collision_h/2, player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
+	
+	debug_draw.draw(view);
 
 	if (shad_skybox->valid()) { // draw skybox
 		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
@@ -1198,22 +1028,7 @@ int main (int argc, char** argv) {
 			}
 			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->needs_remesh = true;
 		}
-		
-		if (glfwWindowShouldClose(wnd)) break;
-		
-		glfwSwapBuffers(wnd);
-		
-		{ // calculate next dt based on how long this frame took
-			double now = glfwGetTime();
-			dt = (float)(now -prev_t);
-			prev_t = now;
-			
-			avg_dt = lerp(avg_dt, dt, avg_dt_alpha);
-		}
 	}
-	
-    imgui_destroy();
-	platform_terminate();
 	
 	return 0;
 }

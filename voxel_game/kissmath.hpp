@@ -19,3 +19,5 @@
 #include "kissmath/transform2d.hpp"
 #include "kissmath/transform3d.hpp"
 using namespace kissmath;
+
+#include "kissmath_colors.hpp"

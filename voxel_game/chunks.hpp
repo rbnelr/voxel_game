@@ -14,13 +14,12 @@ struct Chunk_Vbo_Vertex {
 	float		brightness;
 	lrgba		dbg_tint;
 };
-
-static Vertex_Layout chunk_vbo_vert_layout = {
-	{ "pos_world",	T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
-	{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
-	{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
-	{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
-	{ "dbg_tint",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
+static constexpr std::array<Vertex_Attribute, 5> chunk_vbo_vert_layout = {
+	Vertex_Attribute{ "pos_world",	T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
+	Vertex_Attribute{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
+	Vertex_Attribute{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
+	Vertex_Attribute{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
+	Vertex_Attribute{ "dbg_tint",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
 };
 
 typedef int64_t	bpos_t;
@@ -93,8 +92,8 @@ static chunk_pos_t get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk
 
 struct Chunk_Mesher {
 	
-	Vbo* vbo_opaque;
-	Vbo* vbo_transperant;
+	Vbo_old* vbo_opaque;
+	Vbo_old* vbo_transperant;
 	
 	bpos chunk_origin_block_world;
 	
@@ -160,7 +159,7 @@ struct Chunk_Mesher {
 	bpos_t block_pos_world_z;
 	float w;
 
-	void face_px (Vbo* vbo) {
+	void face_px (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -171,7 +170,7 @@ struct Chunk_Mesher {
 		};
 		FACE
 	}
-	void face_nx (Vbo* vbo) {
+	void face_nx (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -182,7 +181,7 @@ struct Chunk_Mesher {
 		};
 		FACE
 	}
-	void face_py (Vbo* vbo) {
+	void face_py (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -193,7 +192,7 @@ struct Chunk_Mesher {
 		};
 		FACE
 	}
-	void face_ny (Vbo* vbo) {
+	void face_ny (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -204,7 +203,7 @@ struct Chunk_Mesher {
 		};
 		FACE
 	}
-	void face_pz (Vbo* vbo) {
+	void face_pz (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -215,7 +214,7 @@ struct Chunk_Mesher {
 		};
 		FACE
 	}
-	void face_nz (Vbo* vbo) {
+	void face_nz (Vbo_old* vbo) {
 		Chunk_Vbo_Vertex* out = (Chunk_Vbo_Vertex*)vector_append(&vbo->vertecies, sizeof(Chunk_Vbo_Vertex)*6);
 		
 		Chunk_Vbo_Vertex vert[4] = {
@@ -280,12 +279,12 @@ struct Chunk {
 	
 	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
 	
-	Vbo		vbo;
-	Vbo		vbo_transperant;
+	Vbo_old		vbo				= Vbo_old(chunk_vbo_vert_layout);
+	Vbo_old		vbo_transperant = Vbo_old(chunk_vbo_vert_layout);
 	
 	void init_gl () {
-		vbo.init(&chunk_vbo_vert_layout);
-		vbo_transperant.init(&chunk_vbo_vert_layout);
+		vbo.init();
+		vbo_transperant.init();
 	}
 	
 	Block* get_block (bpos pos) {

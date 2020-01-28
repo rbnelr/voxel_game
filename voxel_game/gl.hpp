@@ -1244,83 +1244,110 @@ private:
 	
 };
 
+#include <array>
+#include <string_view>
+
+struct Vertex_Attribute {
+	std::string_view	name; // must be null-terminated
+	data_type			type;
+	uint64_t			stride;
+	uint64_t			offs;
+
+	constexpr Vertex_Attribute (std::string_view name, data_type type, uint64_t stride, uint64_t offs): name{name}, type{type}, stride{stride}, offs{offs} {}
+};
+
 struct Vertex_Layout {
-	struct Attribute {
-		const char*		name;
-		data_type	type;
-		uint64_t			stride;
-		uint64_t			offs;
-	};
-	
-	std::vector<Attribute>	attribs;
-	
-	Vertex_Layout (std::initializer_list<Attribute> a): attribs{a} {}
-	
+	Vertex_Attribute const* attribs = nullptr;
+	int count = 0;
+
+	Vertex_Layout () {}
+
+	template<int N> Vertex_Layout (std::array<Vertex_Attribute, N> const& arr): attribs{&arr[0]}, count{N} {}
+
 	uint32_t bind_attrib_arrays (Shader const* shad) {
 		uint32_t vertex_size = 0;
-		
-		for (auto& a : attribs) {
-			
+
+		for (int i=0; i<count; ++i) {
+			auto& a = attribs[i];
+
 			GLint comps = 1;
 			GLenum type = GL_FLOAT;
 			uint32_t size = sizeof(float);
-			
+
 			bool int_format = false;
-			
+
 			switch (a.type) {
 				case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(float);	break;
 				case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(float);	break;
 				case T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(float);	break;
 				case T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(float);	break;
-				
+
 				case T_INT:	comps = 1;	type = GL_INT;		size = sizeof(int);	break;
 				case T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(int);	break;
 				case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(int);	break;
 				case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(int);	break;
-				
+
 				case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(uint8_t);	break;
-				
+
 				default: assert(false);
 			}
-			
+
 			vertex_size += size * comps;
-			
-			GLint loc = glGetAttribLocation(shad->prog, a.name);
+
+			GLint loc = glGetAttribLocation(shad->prog, a.name.data()); // potentially unsafe to assume std::string_view is null-terminated
 			//if (loc <= -1) fprintf(stderr,"Attribute %s is not used in the shader!", a.name);
-			
+
 			if (loc != -1) {
 				assert(loc > -1);
-				
+
 				glEnableVertexAttribArray(loc);
 				glVertexAttribPointer(loc, comps, type, int_format ? GL_TRUE : GL_FALSE, (GLsizei)a.stride, (void*)a.offs);
-				
+
 			}
 		}
-		
+
 		return vertex_size;
 	}
 };
 
-struct Vbo {
+class Vbo {
+	GLuint vbo = 0; // represents null
+
+public:
+	Vbo (const Vbo& other)            = delete;
+	Vbo& operator= (const Vbo& other) = delete;
+	Vbo (Vbo&& other)                 = default;
+	Vbo& operator= (Vbo&& other)      = default;
+
+	Vbo () {
+		glGenBuffers(1, &vbo);
+	}
+	~Vbo () {
+		if (vbo != 0)
+			glDeleteBuffers(1, &vbo);
+	}
+};
+
+struct Vbo_old {
 	GLuint						vbo_vert;
 	GLuint						vbo_indx;
 	std::vector<uint8_t>		vertecies;
 	std::vector<vert_indx_t>	indices;
 	
-	Vertex_Layout*		layout;
+	Vertex_Layout				layout;
+
+	Vbo_old (Vertex_Layout layout): layout{layout} {}
 	
 	bool format_is_indexed () {
 		return indices.size() > 0;
 	}
 	
-	void init (Vertex_Layout* l) {
-		layout = l;
-		
+	void init () {
 		glGenBuffers(1, &vbo_vert);
 		glGenBuffers(1, &vbo_indx);
 		
 	}
-	~Vbo () {
+	~Vbo_old () {
 		glDeleteBuffers(1, &vbo_vert);
 		glDeleteBuffers(1, &vbo_indx);
 	}
@@ -1346,7 +1373,7 @@ struct Vbo {
 		
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_vert);
 		
-		uint32_t vertex_size = layout->bind_attrib_arrays(shad);
+		uint32_t vertex_size = layout.bind_attrib_arrays(shad);
 		
 		if (format_is_indexed()) {
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_indx);

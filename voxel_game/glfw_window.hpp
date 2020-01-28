@@ -23,6 +23,8 @@
 // Global window
 extern GLFWwindow* window;
 
+extern int frame_counter;
+
 bool get_vsync ();
 void set_vsync (bool on);
 

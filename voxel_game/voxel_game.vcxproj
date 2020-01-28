@@ -88,6 +88,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -103,6 +104,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -120,6 +122,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -139,6 +142,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -161,6 +165,7 @@
     <ClInclude Include="dear_imgui.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="debug_draw.hpp" />
     <ClInclude Include="file_io.hpp" />
     <ClInclude Include="game.hpp" />
     <ClInclude Include="gl.hpp" />
@@ -199,6 +204,7 @@
     <ClInclude Include="kissmath\uint8v3.hpp" />
     <ClInclude Include="kissmath\uint8v4.hpp" />
     <ClInclude Include="kissmath_colors.hpp" />
+    <ClInclude Include="no_copy.hpp" />
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="physics.hpp" />
@@ -218,6 +224,7 @@
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="debug_draw.cpp" />
     <ClCompile Include="file_io.cpp" />
     <ClCompile Include="glad\glad.c" />
     <ClCompile Include="glad\glad_wgl.c" />

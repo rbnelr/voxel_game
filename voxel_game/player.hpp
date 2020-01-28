@@ -30,7 +30,7 @@ public:
 	float3 head_pivot = float3(0, 0, 1.6f);
 
 	Camera fps_camera = Camera("fps_camera", 0);
-	Camera tps_camera = Camera("tps_camera", float3(0.5f, -0.4f, 1));
+	Camera tps_camera = Camera("tps_camera", float3(0.5f, -0.4f, 4));
 
 	//// Physics
 	float walk_speed = 5.0f;
