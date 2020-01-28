@@ -83,6 +83,19 @@ TODO
  -I did like the feel of the movement on 60 fps
   -> maybe plot speed via imgui and screenshot it
   -> and then develop new movement code with better force based movement that closely matches that curve
+ 
+ make better sprinting code
+  sprinting should have a drawback over walking, or it just gets used all the time
+   -> stamina?
+   -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
+   -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
+ 
+ add headbob?
+
+ make a shader inspector in imgui that can edit shader code
+
+ add shader directory change notify to reload all shaders that contain a changed file
+
 
 -OLD version:
  convert entire debug optios into new imgui way of doing things

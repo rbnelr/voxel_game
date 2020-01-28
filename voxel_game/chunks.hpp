@@ -14,12 +14,12 @@ struct Chunk_Vbo_Vertex {
 	float		brightness;
 	lrgba		dbg_tint;
 };
-static constexpr std::array<Vertex_Attribute, 5> chunk_vbo_vert_layout = {
-	Vertex_Attribute{ "pos_world",	T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
-	Vertex_Attribute{ "uvzw_atlas",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
-	Vertex_Attribute{ "hp_ratio",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
-	Vertex_Attribute{ "brightness",	T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
-	Vertex_Attribute{ "dbg_tint",	T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
+static constexpr std::array<old::Vertex_Attribute, 5> chunk_vbo_vert_layout = {
+	old::Vertex_Attribute{ "pos_world",		old::T_V3,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, pos_world) },
+	old::Vertex_Attribute{ "uvzw_atlas",	old::T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, uvzw_atlas) },
+	old::Vertex_Attribute{ "hp_ratio",		old::T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, hp_ratio) },
+	old::Vertex_Attribute{ "brightness",	old::T_FLT,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, brightness) },
+	old::Vertex_Attribute{ "dbg_tint",		old::T_V4,	sizeof(Chunk_Vbo_Vertex), offsetof(Chunk_Vbo_Vertex, dbg_tint) },
 };
 
 typedef int64_t	bpos_t;

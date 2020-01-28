@@ -21,6 +21,7 @@
 #include "string.hpp"
 #include "file_io.hpp"
 #include "kissmath.hpp"
+#include "move_only_class.hpp"
 using namespace kiss;
 
 #include "stb_image.hpp"
@@ -850,79 +851,81 @@ private:
 
 };
 
-enum data_type {
-	T_FLT		=0,
-	T_V2		,
-	T_V3		,
-	T_V4		,
+namespace old {
+	enum data_type {
+		T_FLT		=0,
+		T_V2		,
+		T_V3		,
+		T_V4		,
 	
-	T_INT		,
-	T_IV2		,
-	T_IV3		,
-	T_IV4		,
+		T_INT		,
+		T_IV2		,
+		T_IV3		,
+		T_IV4		,
 	
-	T_U8V4		,
+		T_U8V4		,
 	
-	T_M3		,
-	T_M4		,
+		T_M3		,
+		T_M4		,
 	
-	T_BOOL		,
-};
+		T_BOOL		,
+	};
 
-struct Uniform {
-	GLint		loc;
-	data_type	type;
-	const char*		name;
+	struct Uniform {
+		GLint		loc;
+		data_type	type;
+		const char*		name;
 	
-	Uniform (data_type t, const char* n): type{t}, name{n} {}
+		Uniform (data_type t, const char* n): type{t}, name{n} {}
 	
-	void set (float v) {
-		//assert(type == T_FLT, "%s", name);
-		glUniform1f(loc, v);
-	}
-	void set (float2 v) {
-		//assert(type == T_V2, "%s", name);
-		glUniform2fv(loc, 1, &v.x);
-	}
-	void set (float3 v) {
-		//assert(type == T_V3, "%s", name);
-		glUniform3fv(loc, 1, &v.x);
-	}
-	void set (float4 v) {
-		//assert(type == T_V4, "%s", name);
-		glUniform4fv(loc, 1, &v.x);
-	}
-	void set (int v) {
-		//assert(type == T_INT, "%s", name);
-		glUniform1i(loc, v);
-	}
-	void set (int2 v) {
-		//assert(type == T_IV2, "%s", name);
-		glUniform2iv(loc, 1, &v.x);
-	}
-	void set (int3 v) {
-		//assert(type == T_IV3, "%s", name);
-		glUniform3iv(loc, 1, &v.x);
-	}
-	void set (int4 v) {
-		//assert(type == T_IV4, "%s", name);
-		glUniform4iv(loc, 1, &v.x);
-	}
-	void set (float3x3 v) {
-		//assert(type == T_M3, "%s", name);
-		glUniformMatrix3fv(loc, 1, GL_FALSE, &v.arr[0][0]);
-	}
-	void set (float4x4 v) {
-		//assert(type == T_M4, "%s", name);
-		glUniformMatrix4fv(loc, 1, GL_FALSE, &v.arr[0][0]);
-	}
-	void set (bool b) {
-		//assert(type == T_BOOL, "%s", name);
-		glUniform1i(loc, (int)b);
-	}
-};
+		void set (float v) {
+			//assert(type == T_FLT, "%s", name);
+			glUniform1f(loc, v);
+		}
+		void set (float2 v) {
+			//assert(type == T_V2, "%s", name);
+			glUniform2fv(loc, 1, &v.x);
+		}
+		void set (float3 v) {
+			//assert(type == T_V3, "%s", name);
+			glUniform3fv(loc, 1, &v.x);
+		}
+		void set (float4 v) {
+			//assert(type == T_V4, "%s", name);
+			glUniform4fv(loc, 1, &v.x);
+		}
+		void set (int v) {
+			//assert(type == T_INT, "%s", name);
+			glUniform1i(loc, v);
+		}
+		void set (int2 v) {
+			//assert(type == T_IV2, "%s", name);
+			glUniform2iv(loc, 1, &v.x);
+		}
+		void set (int3 v) {
+			//assert(type == T_IV3, "%s", name);
+			glUniform3iv(loc, 1, &v.x);
+		}
+		void set (int4 v) {
+			//assert(type == T_IV4, "%s", name);
+			glUniform4iv(loc, 1, &v.x);
+		}
+		void set (float3x3 v) {
+			//assert(type == T_M3, "%s", name);
+			glUniformMatrix3fv(loc, 1, GL_FALSE, &v.arr[0][0]);
+		}
+		void set (float4x4 v) {
+			//assert(type == T_M4, "%s", name);
+			glUniformMatrix4fv(loc, 1, GL_FALSE, &v.arr[0][0]);
+		}
+		void set (bool b) {
+			//assert(type == T_BOOL, "%s", name);
+			glUniform1i(loc, (int)b);
+		}
+	};
+}
 
-struct Shader {
+struct Shader_old {
 	std::string								vert_filename;
 	std::string								frag_filename;
 	
@@ -941,13 +944,13 @@ struct Shader {
 	
 	GLuint							prog;
 	
-	std::vector<Uniform>			uniforms;
+	std::vector<old::Uniform>			uniforms;
 	std::vector<Uniform_Texture>	textures;
 	
-	Shader (std::string const& v, std::string const& f, std::vector<Uniform> const& u, std::vector<Uniform_Texture> const& t):
+	Shader_old (std::string const& v, std::string const& f, std::vector<old::Uniform> const& u, std::vector<Uniform_Texture> const& t):
 			vert_filename{v}, frag_filename{f}, prog{0}, uniforms{u}, textures{t} {}
 	
-	~Shader () {
+	~Shader_old () {
 		unload_program();
 		srcf.close_all();
 	}
@@ -987,7 +990,7 @@ struct Shader {
 		glUseProgram(prog);
 	}
 	
-	Uniform* get_uniform (const char* name) {
+	old::Uniform* get_uniform (const char* name) {
 		for (auto& u : uniforms) {
 			if (strcmp(u.name, name) == 0) {
 				return &u;
@@ -1247,86 +1250,70 @@ private:
 #include <array>
 #include <string_view>
 
-struct Vertex_Attribute {
-	std::string_view	name; // must be null-terminated
-	data_type			type;
-	uint64_t			stride;
-	uint64_t			offs;
+namespace old {
+	struct Vertex_Attribute {
+		std::string_view	name; // must be null-terminated
+		data_type			type;
+		uint64_t			stride;
+		uint64_t			offs;
 
-	constexpr Vertex_Attribute (std::string_view name, data_type type, uint64_t stride, uint64_t offs): name{name}, type{type}, stride{stride}, offs{offs} {}
-};
+		constexpr Vertex_Attribute (std::string_view name, data_type type, uint64_t stride, uint64_t offs): name{name}, type{type}, stride{stride}, offs{offs} {}
+	};
 
-struct Vertex_Layout {
-	Vertex_Attribute const* attribs = nullptr;
-	int count = 0;
+	struct Vertex_Layout {
+		Vertex_Attribute const* attribs = nullptr;
+		int count = 0;
 
-	Vertex_Layout () {}
+		Vertex_Layout () {}
 
-	template<int N> Vertex_Layout (std::array<Vertex_Attribute, N> const& arr): attribs{&arr[0]}, count{N} {}
+		template<int N> Vertex_Layout (std::array<Vertex_Attribute, N> const& arr): attribs{&arr[0]}, count{N} {}
 
-	uint32_t bind_attrib_arrays (Shader const* shad) {
-		uint32_t vertex_size = 0;
+		uint32_t bind_attrib_arrays (Shader_old const* shad) {
+			uint32_t vertex_size = 0;
 
-		for (int i=0; i<count; ++i) {
-			auto& a = attribs[i];
+			for (int i=0; i<count; ++i) {
+				auto& a = attribs[i];
 
-			GLint comps = 1;
-			GLenum type = GL_FLOAT;
-			uint32_t size = sizeof(float);
+				GLint comps = 1;
+				GLenum type = GL_FLOAT;
+				uint32_t size = sizeof(float);
 
-			bool int_format = false;
+				bool int_format = false;
 
-			switch (a.type) {
-				case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(float);	break;
-				case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(float);	break;
-				case T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(float);	break;
-				case T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(float);	break;
+				switch (a.type) {
+					case T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(float);	break;
+					case T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(float);	break;
+					case T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(float);	break;
+					case T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(float);	break;
 
-				case T_INT:	comps = 1;	type = GL_INT;		size = sizeof(int);	break;
-				case T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(int);	break;
-				case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(int);	break;
-				case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(int);	break;
+					case T_INT:	comps = 1;	type = GL_INT;		size = sizeof(int);	break;
+					case T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(int);	break;
+					case T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(int);	break;
+					case T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(int);	break;
 
-				case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(uint8_t);	break;
+					case T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(uint8_t);	break;
 
-				default: assert(false);
+					default: assert(false);
+				}
+
+				vertex_size += size * comps;
+
+				GLint loc = glGetAttribLocation(shad->prog, a.name.data()); // potentially unsafe to assume std::string_view is null-terminated
+				//if (loc <= -1) fprintf(stderr,"Attribute %s is not used in the shader!", a.name);
+
+				if (loc != -1) {
+					assert(loc > -1);
+
+					glEnableVertexAttribArray(loc);
+					glVertexAttribPointer(loc, comps, type, int_format ? GL_TRUE : GL_FALSE, (GLsizei)a.stride, (void*)a.offs);
+
+				}
 			}
 
-			vertex_size += size * comps;
-
-			GLint loc = glGetAttribLocation(shad->prog, a.name.data()); // potentially unsafe to assume std::string_view is null-terminated
-			//if (loc <= -1) fprintf(stderr,"Attribute %s is not used in the shader!", a.name);
-
-			if (loc != -1) {
-				assert(loc > -1);
-
-				glEnableVertexAttribArray(loc);
-				glVertexAttribPointer(loc, comps, type, int_format ? GL_TRUE : GL_FALSE, (GLsizei)a.stride, (void*)a.offs);
-
-			}
+			return vertex_size;
 		}
-
-		return vertex_size;
-	}
-};
-
-class Vbo {
-	GLuint vbo = 0; // represents null
-
-public:
-	Vbo (const Vbo& other)            = delete;
-	Vbo& operator= (const Vbo& other) = delete;
-	Vbo (Vbo&& other)                 = default;
-	Vbo& operator= (Vbo&& other)      = default;
-
-	Vbo () {
-		glGenBuffers(1, &vbo);
-	}
-	~Vbo () {
-		if (vbo != 0)
-			glDeleteBuffers(1, &vbo);
-	}
-};
+	};
+}
 
 struct Vbo_old {
 	GLuint						vbo_vert;
@@ -1334,9 +1321,9 @@ struct Vbo_old {
 	std::vector<uint8_t>		vertecies;
 	std::vector<vert_indx_t>	indices;
 	
-	Vertex_Layout				layout;
+	old::Vertex_Layout				layout;
 
-	Vbo_old (Vertex_Layout layout): layout{layout} {}
+	Vbo_old (old::Vertex_Layout layout): layout{layout} {}
 	
 	bool format_is_indexed () {
 		return indices.size() > 0;
@@ -1369,7 +1356,7 @@ struct Vbo_old {
 		}
 	}
 	
-	uint32_t bind (Shader const* shad) {
+	uint32_t bind (Shader_old const* shad) {
 		
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_vert);
 		
@@ -1384,7 +1371,7 @@ struct Vbo_old {
 		return vertex_size;
 	}
 	
-	void draw_entire (Shader const* shad) {
+	void draw_entire (Shader_old const* shad) {
 		uint32_t vertex_size = bind(shad);
 		
 		if (format_is_indexed()) {
@@ -1412,7 +1399,7 @@ template <typename T> static typename T* vector_append (std::vector<T>* vec, uin
 	return &*(vec->begin() +old_len);
 }
 
-static Shader* shad_equirectangular_to_cubemap;
+static Shader_old* shad_equirectangular_to_cubemap;
 
 inline void TextureCube_Equirectangular_File::gpu_convert_equirectangular_to_cubemap () {
 	

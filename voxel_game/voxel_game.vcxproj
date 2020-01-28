@@ -165,7 +165,6 @@
     <ClInclude Include="dear_imgui.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="debug_draw.hpp" />
     <ClInclude Include="file_io.hpp" />
     <ClInclude Include="game.hpp" />
     <ClInclude Include="gl.hpp" />
@@ -174,6 +173,10 @@
     <ClInclude Include="glad\khrplatform.h" />
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="graphics\camera.hpp" />
+    <ClInclude Include="graphics\debug_draw.hpp" />
+    <ClInclude Include="graphics\globjects.hpp" />
+    <ClInclude Include="graphics\glshader.hpp" />
+    <ClInclude Include="graphics\util.hpp" />
     <ClInclude Include="input.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="kissmath.hpp" />
@@ -204,9 +207,8 @@
     <ClInclude Include="kissmath\uint8v3.hpp" />
     <ClInclude Include="kissmath\uint8v4.hpp" />
     <ClInclude Include="kissmath_colors.hpp" />
-    <ClInclude Include="no_copy.hpp" />
+    <ClInclude Include="move_only_class.hpp" />
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
-    <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="physics.hpp" />
     <ClInclude Include="player.hpp" />
     <ClInclude Include="running_average.hpp" />
@@ -224,12 +226,14 @@
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="debug_draw.cpp" />
     <ClCompile Include="file_io.cpp" />
     <ClCompile Include="glad\glad.c" />
     <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
+    <ClCompile Include="graphics\debug_draw.cpp" />
+    <ClCompile Include="graphics\globjects.cpp" />
+    <ClCompile Include="graphics\glshader.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />
@@ -273,8 +277,8 @@
     <None Include="shaders\common.vert" />
     <None Include="shaders\imgui.frag" />
     <None Include="shaders\imgui.vert" />
-    <None Include="shaders\overlay.frag" />
-    <None Include="shaders\overlay.vert" />
+    <None Include="shaders\overlay.frag.glsl" />
+    <None Include="shaders\overlay.vert.glsl" />
     <None Include="shaders\skybox.frag" />
     <None Include="shaders\skybox.vert" />
     <None Include="shaders\texture_window_tex.frag" />

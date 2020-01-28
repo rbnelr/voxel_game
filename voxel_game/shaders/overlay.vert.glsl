@@ -1,7 +1,5 @@
 #version 150 core // version 3.2
 
-$include "common.vert"
-
 in		vec3	pos_world;
 in		vec4	color;
 
@@ -18,6 +16,4 @@ void main () {
 	
 	vs_pos_cam =		pos_cam;
 	vs_color =			color;
-	
-	WIREFRAME_MACRO;
 }

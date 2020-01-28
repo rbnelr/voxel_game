@@ -39,19 +39,19 @@ extern float detail2_freq, detail2_amp;
 #include "running_average.hpp"
 
 //
-#define UBOOL(name)	Uniform(T_BOOL, name)
-#define USI(name)	Uniform(T_INT, name)
-#define UIV2(name)	Uniform(T_IV2, name)
-#define UV2(name)	Uniform(T_V2, name)
-#define UV3(name)	Uniform(T_V3, name)
-#define UM4(name)	Uniform(T_M4, name)
+#define UBOOL(name)	old::Uniform(old::T_BOOL, name)
+#define USI(name)	old::Uniform(old::T_INT, name)
+#define UIV2(name)	old::Uniform(old::T_IV2, name)
+#define UV2(name)	old::Uniform(old::T_V2, name)
+#define UV3(name)	old::Uniform(old::T_V3, name)
+#define UM4(name)	old::Uniform(old::T_M4, name)
 
 #define UCOM UV2("screen_dim"), UV2("mcursor_pos") // common uniforms
 #define UMAT UM4("world_to_cam"), UM4("cam_to_world"), UM4("cam_to_clip") // transformation uniforms
 
-extern std::vector<Shader*>			shaders;
+extern std::vector<Shader_old*>			shaders;
 
-Shader* new_shader (std::string const& v, std::string const& f, std::initializer_list<Uniform> u, std::initializer_list<Shader::Uniform_Texture> t={});
+Shader_old* new_shader (std::string const& v, std::string const& f, std::initializer_list<old::Uniform> u, std::initializer_list<Shader_old::Uniform_Texture> t={});
 
 #include "chunks.hpp"
 
@@ -228,8 +228,8 @@ class Game {
 
 	bool trigger_place_block = false;
 
-	Shader* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
-	Shader* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
+	Shader_old* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
+	Shader_old* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	
 	Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
 

@@ -5,7 +5,6 @@
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="gl.hpp" />
     <ClInclude Include="intersection_test.hpp" />
-    <ClInclude Include="options_overlay.hpp" />
     <ClInclude Include="glad\glad.h">
       <Filter>glad</Filter>
     </ClInclude>
@@ -151,8 +150,19 @@
     <ClInclude Include="running_average.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="debug_draw.hpp" />
-    <ClInclude Include="no_copy.hpp" />
+    <ClInclude Include="move_only_class.hpp" />
+    <ClInclude Include="graphics\globjects.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\glshader.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\debug_draw.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\util.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -284,7 +294,15 @@
     </ClCompile>
     <ClCompile Include="player.cpp" />
     <ClCompile Include="physics.cpp" />
-    <ClCompile Include="debug_draw.cpp" />
+    <ClCompile Include="graphics\globjects.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\glshader.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\debug_draw.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.frag">
@@ -308,12 +326,6 @@
     <None Include="shaders\imgui.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\overlay.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\overlay.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\skybox.frag">
       <Filter>shaders</Filter>
     </None>
@@ -324,6 +336,12 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\texture_window_tex.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\overlay.frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\overlay.vert.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

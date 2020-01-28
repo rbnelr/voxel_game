@@ -11,7 +11,7 @@
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 #include "game.hpp"
-#include "debug_draw.hpp"
+#include "graphics/debug_draw.hpp"
 #include "input.hpp"
 #include "glfw_window.hpp"
 
@@ -23,6 +23,7 @@ using namespace kiss;
 #include "glad/glad.h"
 
 #include "stb_image.hpp"
+#include "gl.hpp"
 
 #define STRINGIFY(x) #x
 
@@ -33,10 +34,10 @@ using namespace kiss;
 #define PROFILE_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), name * 1000, __VA_ARGS__)
 
 //
-std::vector<Shader*>			shaders;
+std::vector<Shader_old*>			shaders;
 
-Shader* new_shader (std::string const& v, std::string const& f, std::initializer_list<Uniform> u, std::initializer_list<Shader::Uniform_Texture> t) {
-	Shader* s = new Shader(v,f,u,t);
+Shader_old* new_shader (std::string const& v, std::string const& f, std::initializer_list<old::Uniform> u, std::initializer_list<Shader_old::Uniform_Texture> t) {
+	Shader_old* s = new Shader_old(v,f,u,t);
 
 	s->load(); // NOTE: Load shaders instantly on creation
 
@@ -58,7 +59,7 @@ bool FileExists (const char* path) {
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
 }
 bool _need_potatomode () {
-	return FileExists("._need_potatomode.txt");
+	return FileExists("../../._need_potatomode.txt");
 }
 bool _use_potatomode = _need_potatomode();
 
@@ -107,6 +108,7 @@ Game::Game () {
 		regen_dbg_heightmap_visualize();
 	}
 
+	debug_draw.init();
 }
 
 void Game::frame () {
@@ -965,6 +967,7 @@ void Game::frame () {
 	debug_draw.push_cylinder(player.pos + player.collision_h/2, player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
 	
 	debug_draw.draw(view);
+	glBindVertexArray(vao);
 
 	if (shad_skybox->valid()) { // draw skybox
 		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
