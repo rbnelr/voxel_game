@@ -296,6 +296,8 @@ void glfw_init_gl () {
 	// TODO: should I use glfwExtensionSupported or GLAD_GL_ARB_framebuffer_sRGB? does it make a difference?
 	if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
 		glEnable(GL_FRAMEBUFFER_SRGB);
+	else
+		fprintf(stderr, "No sRGB supported! Shading will be non-linear!\n");
 }
 
 int main () {

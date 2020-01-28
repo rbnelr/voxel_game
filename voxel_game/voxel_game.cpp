@@ -134,11 +134,6 @@ static bool controling_flycam =		1;
 static bool viewing_flycam =		1;
 
 static bool trigger_dbg_heightmap_visualize =	false;
-static bool trigger_save_game =			false;
-static bool trigger_load_game =			false;
-static bool jump_held =					false;
-static bool hold_break_block =			false;
-static bool trigger_place_block =		false;
 
 bool FileExists (const char* path) {
 	DWORD dwAttrib = GetFileAttributes(path);
@@ -186,17 +181,6 @@ Game::Game () {
 	//
 
 	player.respawn();
-
-	auto load_game = [&] () {
-		trigger_load_game = false;
-		//load_struct("flycam", &flycam);
-	};
-	auto save_game = [&] () {
-		trigger_save_game = false;
-		//save_struct("flycam", flycam);
-	};
-
-	load_game();
 
 	inital_chunk( player.pos );
 
@@ -832,7 +816,7 @@ void Game::frame () {
 	};
 	if (highlighted_block) block_indicator(highlighted_block_pos, highlighted_block_face);
 
-	if (highlighted_block && hold_break_block) { // block breaking
+	if (highlighted_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
 
 		Chunk* chunk;
 		Block* b = query_block(highlighted_block_pos, &chunk);
@@ -853,9 +837,13 @@ void Game::frame () {
 		}
 	}
 	{ // block placing
-		bool block_place_is_inside_player = false;
+		// keep trying to place block if it was inside player but rmb is still held down
+		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && highlighted_block;
+		
+		if (input.buttons[GLFW_MOUSE_BUTTON_RIGHT].went_down)
+			trigger_place_block = true;
 
-		if (highlighted_block && trigger_place_block) {
+		if (trigger_place_block && highlighted_block) {
 
 			bpos dir = 0;
 			dir[highlighted_block_face / 2] = highlighted_block_face % 2 ? +1 : -1;
@@ -865,7 +853,7 @@ void Game::frame () {
 			Chunk* chunk;
 			Block* b = query_block(block_place_pos, &chunk);
 
-			block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.collision_r,player.collision_h);
+			bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.collision_r,player.collision_h);
 
 			if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 
@@ -878,10 +866,11 @@ void Game::frame () {
 				chunk->block_changed(block_place_pos);
 
 				raycast_highlighted_block(); // make highlighted_block seem more responsive
+
+				trigger_place_block = false;
 			}
 		}
 
-		trigger_place_block = trigger_place_block && block_place_is_inside_player; // if we tried to place a block inside the player try again next frame as long as RMB is held down (releasing RMB will set trigger_place_block to false anyway)
 	}
 
 	if (1) { // chunk update

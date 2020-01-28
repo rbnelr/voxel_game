@@ -22,58 +22,122 @@ void Player::update_controls (bool player_on_ground) {
 	//	printf(">>>>>>>>>>>>>> stuck!\n");
 	//} else {
 	{
-		float2 move_dir = 0;
-		if (input.buttons[GLFW_KEY_A].is_down) move_dir.x -= 1;
-		if (input.buttons[GLFW_KEY_D].is_down) move_dir.x += 1;
-		if (input.buttons[GLFW_KEY_S].is_down) move_dir.y -= 1;
-		if (input.buttons[GLFW_KEY_W].is_down) move_dir.y += 1;
-		move_dir = normalizesafe(move_dir);
+		float2 input_dir = 0;
+		if (input.buttons[GLFW_KEY_A].is_down) input_dir.x -= 1;
+		if (input.buttons[GLFW_KEY_D].is_down) input_dir.x += 1;
+		if (input.buttons[GLFW_KEY_S].is_down) input_dir.y -= 1;
+		if (input.buttons[GLFW_KEY_W].is_down) input_dir.y += 1;
+		input_dir = normalizesafe(input_dir);
 
-		bool walk_fast = input.buttons[GLFW_KEY_LEFT_SHIFT].is_down;
+		bool input_fast = input.buttons[GLFW_KEY_LEFT_SHIFT].is_down;
 
-		float player_walk_speed = walk_fast ? run_speed : walk_speed;
+		float target_speed = input_fast ? run_speed : walk_speed;
+		float2 target_vel = body_rotation * (input_dir * target_speed);
+
+		static int movement_code = 4;
+		ImGui::DragInt("movement_code", &movement_code);
+	
+		switch (movement_code) {
+			case -1: {
+				vel = float3(target_vel, vel.z);
+			} break;
+			case 0: { // old movement code
+
+				float3 tmp = float3( lerp((float2)vel, target_vel, walking_friction_alpha), vel.z );
+
+				if (player_on_ground) {
+					vel = tmp;
+				} else {
+					if (length((float2)vel) < length(target_speed)*0.5f)
+						vel = tmp; // only allow speeding up to slow speed with air control
+				}
+			} break;
+			case 1: { // const accel based code
+				
+				static float accel = 20;
+				static float accel_kickoff = 100;
+				static float accel_kickoff_thres = -0.2f;
+
+				ImGui::DragFloat("accel", &accel, 0.2f);
+				ImGui::DragFloat("accel_kickoff", &accel_kickoff, 0.2f);
+				ImGui::DragFloat("accel_kickoff_thres", &accel_kickoff_thres, 0.2f);
 		
-		float2 feet_vel_world = body_rotation * (move_dir * player_walk_speed);
-		
-		// accel test
-		float speed = length((float2)vel);
-		float accel = clamp(player_walk_speed / (speed + 0.0001f) - 1, 0.0f, 1.0f);
+				float2 delta_vel = target_vel - (float2)vel;
+				float delta_speed = length(delta_vel);
 
-		float2 delta_vel = feet_vel_world - (float2)vel;
-		float2 new_vel = feet_vel_world + normalizesafe(delta_vel) * accel * input.dt;
+				float acc = accel;
 
-		float3 tmp = float3(new_vel, vel.z );
+				// Get a kick of initial accel if starting or stopping to walk or if direction changes by ~90 deg
+				if (dot((float2)vel, target_vel) <= accel_kickoff_thres) {
+					acc += accel_kickoff;
+				}
 
-		ImGui::DragFloat("accel", &accel);
-		ImGui::DragFloat2("delta_vel", &delta_vel.x);
-		ImGui::DragFloat2("new_vel", &new_vel.x);
+				delta_vel = normalizesafe(delta_vel) * min(acc * input.dt, delta_speed); // don't overshoot
 
-		//float3 tmp = float3( lerp((float2)vel, feet_vel_world, walking_friction_alpha), vel.z );
+				vel += float3(delta_vel, 0);
+			} break;
+			case 2: {
 
-		if (player_on_ground) {
-			vel = tmp;
-		} else {
-			if (length((float2)vel) < length(player_walk_speed)*0.5f)
-				vel = tmp; // only allow speeding up to slow speed with air control
+				static float accel = 30;
+				static float drag = 5;
+				static bool drag_square = false;
+
+				ImGui::DragFloat("accel", &accel, 0.2f);
+				ImGui::DragFloat("drag", &drag, 0.2f);
+				ImGui::Checkbox("drag_square", &drag_square);
+
+				float2 delta_vel = target_vel - (float2)vel;
+				float delta_speed = length(delta_vel);
+
+				if (length(target_vel) > 0) { // let drag slow the player down
+					delta_vel = normalizesafe(delta_vel) * min(accel * input.dt, delta_speed);
+					vel += float3(delta_vel, 0);
+				}
+
+				if (player_on_ground) {
+					float2 v = (float2)vel;
+					float speed = length(v);
+					float2 drag_force = -normalizesafe(v) * (drag_square ? speed * speed : speed) * drag;
+					vel += float3(drag_force * input.dt, 0);
+				}
+			} break;
+			case 4: {
+
+				static float accel_base = 5;
+				static float accel_proport = 10;
+
+				ImGui::DragFloat("accel_base", &accel_base, 0.2f);
+				ImGui::DragFloat("accel_proport", &accel_proport, 0.2f);
+
+				float2 delta_vel = target_vel - (float2)vel;
+				float delta_speed = length(delta_vel);
+
+				float accel = delta_speed * accel_proport + accel_base;
+
+				delta_vel = normalizesafe(delta_vel) * min(accel * input.dt, delta_speed);
+				vel += float3(delta_vel, 0);
+
+			} break;
 		}
 	}
 
 	{
-		static float vels[512] = {};
-		static float poss[512] = {};
+		static constexpr int COUNT = 128;
+		static float vels[COUNT] = {};
+		static float poss[COUNT] = {};
 		static int cur = 0;
 
 		if (!input.pause_time) {
 			vels[cur] = length((float2)vel);
 			poss[cur++] = pos.x;
-			cur %= 512;
+			cur %= COUNT;
 		}
 
 		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_vel", vels, 512, cur, "player.vel", 0, 15, ImVec2(0, 100));
+		ImGui::PlotLines("###_debug_vel", vels, COUNT, cur, "player.vel", 0, 15, ImVec2(0, 100));
 
 		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_pos", poss, 512, cur, "player.pos", -7, 7, ImVec2(0, 100));
+		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player.pos", -7, 7, ImVec2(0, 100));
 	}
 	
 	//// jumping

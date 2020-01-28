@@ -196,15 +196,23 @@ struct FPS_Display {
 		}
 		update_timer -= input.real_dt;
 
-		float avg_fps = 1.0f / latest_avg_dt;
-		ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
+		{
+			float avg_fps = 1.0f / latest_avg_dt;
+			ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
 
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotHistogram("###frametimes_histogram", dt_avg.values.get(), dt_avg.count, 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.values.get(), dt_avg.count, 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
 
-		if (ImGui::BeginPopupContextItem()) {
-			ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);
-			ImGui::EndPopup();
+			if (ImGui::BeginPopupContextItem("##frametimes_histogram popup")) {
+				ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);
+				
+				int count = dt_avg.count;
+				if (ImGui::SliderInt("avg_count", &count, 16, 1024)) {
+					dt_avg.resize(count);
+				}
+
+				ImGui::EndPopup();
+			}
 		}
 	}
 };
@@ -217,6 +225,8 @@ class Game {
 	Player player = Player("player");
 
 	Flycam flycam = Flycam("flycam", float3(-5, -10, 50), float3(0, deg(80), 0), 12);
+
+	bool trigger_place_block = false;
 
 	Shader* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
 	Shader* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
