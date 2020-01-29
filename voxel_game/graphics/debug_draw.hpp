@@ -23,13 +23,15 @@ public:
 
 	void init () {
 		shader = shader_manager.load_shader("overlay");
-
-		world_to_cam = shader->get_uniform("world_to_cam", gl::T_M4);
-		cam_to_world = shader->get_uniform("cam_to_world", gl::T_M4);
-		cam_to_clip  = shader->get_uniform("cam_to_clip", gl::T_M4);
-
-		faces.init(shader, layout);
-		lines.init(shader, layout);
+		
+		if (shader) {
+			world_to_cam = shader->get_uniform("world_to_cam", gl::T_M4);
+			cam_to_world = shader->get_uniform("cam_to_world", gl::T_M4);
+			cam_to_clip  = shader->get_uniform("cam_to_clip", gl::T_M4);
+		
+			faces.init(shader, layout);
+			lines.init(shader, layout);
+		}
 	}
 
 	// draw quad

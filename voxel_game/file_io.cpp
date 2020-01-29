@@ -39,4 +39,26 @@ namespace kiss {
 		read_text_file(filename, &s);
 		return s;
 	}
+
+	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {
+		auto pos = filepath.find_first_of('/');
+		if (pos == std::string::npos)
+			pos = 0; // no '/' found => '/' is considered to be at position 0
+		else
+			pos += 1;
+
+		if (out_filename) *out_filename = filepath.substr(pos, filepath.size() - pos);
+		return filepath.substr(0, pos);
+	}
+
+	std::string_view get_ext (std::string_view filepath, std::string_view* out_filename) {
+		auto pos = filepath.find_last_of('.');
+		if (pos == std::string::npos) {
+			if (out_filename) *out_filename = filepath;
+			return filepath.substr(0,0);
+		}
+		
+		if (out_filename) *out_filename = filepath.substr(0, pos);
+		return filepath.substr(pos + 1, filepath.size()); // don't include '.' in ext
+	}
 }

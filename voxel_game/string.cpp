@@ -2,7 +2,7 @@
 
 namespace kiss {
 	// Printf that appends to a std::string
-	void vprints (std::string* s, cstr format, va_list vl) { // print 
+	void vprints (std::string* s, char const* format, va_list vl) { // print 
 		size_t old_size = s->size();
 		for (;;) {
 			auto ret = vsnprintf(&(*s)[old_size], s->size() -old_size +1, format, vl); // i think i'm technically not allowed to overwrite the null terminator
@@ -16,7 +16,7 @@ namespace kiss {
 	}
 
 	// Printf that appends to a std::string
-	void prints (std::string* s, cstr format, ...) {
+	void prints (std::string* s, char const* format, ...) {
 		va_list vl;
 		va_start(vl, format);
 
@@ -26,7 +26,7 @@ namespace kiss {
 	}
 
 	// Printf that outputs to a std::string
-	std::string prints (cstr format, ...) {
+	std::string prints (char const* format, ...) {
 		va_list vl;
 		va_start(vl, format);
 

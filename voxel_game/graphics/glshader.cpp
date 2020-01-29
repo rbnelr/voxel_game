@@ -1,6 +1,11 @@
 #include "glshader.hpp"
 #include "../file_io.hpp"
+#include "../string.hpp"
 #include "assert.h"
+using namespace kiss;
+using std::string;
+using std::string_view;
+using std::vector;
 
 bool get_shader_compile_log (GLuint shad, std::string* log) {
 	GLsizei log_len;
@@ -51,19 +56,189 @@ bool get_program_link_log (GLuint prog, std::string* log) {
 	}
 }
 
-GLuint _load_shader (GLenum type, char const* directory, const char* ext, std::vector<Shader::ShaderPart>* sources, GLuint prog, std::string const& name) {
-	std::string filename = directory + name + ext;
+// recursive $if not supported, but $if inside a $include'd file that is included within an if is supported (since $if state is per recursive call and each include gets a call)
+struct ShaderPreprocessor {
+	const char*		shader_name;
+	vector<string>*	sources;
+	string_view		type;
+	
+	// shader had a $compile <type> command with matching type
+	bool			compile_shader = false;
 
-	std::string source;
-	if (!kiss::read_text_file(filename.c_str(), &source))
+	string			result;
+
+	int line_i;
+
+	bool is_ident_c (char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+	}
+	void whitespace (const char** c) {
+		while (**c == ' ' || **c == '\t')
+			(*c)++;
+	}
+	bool newline (const char** c) {
+		if (**c == '\r' || **c == '\n') {
+			char ch = **c;
+			(*c)++;
+
+			if ((**c == '\r' || **c == '\n') && ch != **c) { // "\n" "\r" "\n\r" "\r\n" are each one newline but "\n\n" "\r\r" count as two, this should handle even inconsistent newline files reasonably (empty $if is ok, but would probably not compile)
+				(*c)++;
+			}
+
+			line_i++;
+			return true;
+		}
+		return false;
+	}
+	bool line_comment (const char** c) {
+		if ((*c)[0] == '/' && (*c)[1] == '/') {
+			(*c) += 2;
+			while (!newline(c))
+				(*c)++;
+			return true;
+		}
+		return false;
+	}
+
+	void syntax_error (char const* reason) {
+		fprintf(stderr, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", shader_name, line_i, reason);
+	}
+
+	bool preprocess_shader (const char* source, string_view path) {
+		bool in_if = false;
+		bool skip_code = false;
+
+		line_i = 1;
+
+		const char* c = source;
+		while (*c != '\0') {
+
+			if (*c != '$') { // copy normal char
+				if (skip_code) {
+					if (!newline(&c)) {
+						c++;
+					}
+				} else {
+					if (newline(&c)) {
+						result.push_back('\n'); // convert newlines to '\n'
+					} else {
+						result.push_back(*c++);
+					}
+				}
+				continue;
+			}
+
+			auto dollar = c++;
+
+			whitespace(&c);
+
+			auto cmd_begin = c; // begin of dollar command
+
+			while (is_ident_c(*c)) c++; // find end of command identifier
+
+			auto cmd = string_view(cmd_begin, c - cmd_begin);
+
+			whitespace(&c);
+
+			string_view arg;
+
+			if (*c == '"') {
+				c++;
+
+				auto arg_begin = c;
+
+				while (*c != '"' && *c != '\0' && !newline(&c)) {
+					++c; // skip until end of quotes
+				}
+
+				if (*c != '"') {
+					syntax_error("EOF or newline in quotes");
+					return false;
+				}
+
+				arg = string_view(arg_begin, c - arg_begin);
+
+				c++; // skip '"'
+
+			} else if (is_ident_c(*c)) {
+
+				auto arg_begin = c;
+
+				while (is_ident_c(*c)) ++c; // skip until end of argument
+
+				arg = string_view(arg_begin, c - arg_begin);
+
+			} else {
+				// no argument
+			}
+
+			whitespace(&c);
+
+			if (!(newline(&c) || line_comment(&c) || *c == '\0')) {
+				syntax_error("$cmd did not end with newline or EOF");
+				return false;
+			}
+
+			if (cmd.compare("if") == 0) {
+
+				if (in_if) {
+					syntax_error("recursive $if not supported (but you can use it in a $include'd file even if the include happens inside an $if)");
+					return false;
+				}
+
+				in_if = true;
+				skip_code = arg.compare(type) != 0;
+
+			} else if (cmd.compare("endif") == 0) {
+
+				if (!in_if) {
+					syntax_error("$endif without $if");
+					return false;
+				}
+				in_if = false;
+				skip_code = false;
+
+			} else if (cmd.compare("compile") == 0) {
+
+				if (arg.compare(type) == 0)
+					compile_shader = true;
+
+			} else if (cmd.compare("include") == 0) {
+
+			} else {
+				syntax_error("unknown $cmd");
+				return false;
+			}
+		}
+
+		if (in_if) {
+			syntax_error("$if without $endif");
+			return false;
+		}
+
+		return true;
+	}
+};
+
+GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view path, std::vector<std::string>* sources, GLuint prog, std::string const& name, bool* error) {
+	
+	ShaderPreprocessor pp;
+	pp.type = type;
+	pp.shader_name = name.c_str();
+	pp.sources = sources;
+	if (!pp.preprocess_shader(source.c_str(), path)) {
+		*error = true;
 		return 0;
+	}
+	if (!(pp.compile_shader || strcmp(type, "vertex") == 0 || strcmp(type, "fragment") == 0)) // only compiler shader part if it had a $compile <type> command but always compile vertex and fragment shaders
+		return 0; // don't create shader of this type
 
-	GLuint shad = glCreateShader(type);
+	GLuint shad = glCreateShader(gl_type);
 
 	glAttachShader(prog, shad);
 
 	{
-		const char* ptr = source.c_str();
+		const char* ptr = pp.result.c_str();
 		glShaderSource(shad, 1, &ptr, NULL);
 	}
 
@@ -80,121 +255,44 @@ GLuint _load_shader (GLenum type, char const* directory, const char* ext, std::v
 		success = status == GL_TRUE;
 		if (!success) {
 			// compilation failed
-			fprintf(stderr,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", filename.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+			fprintf(stderr,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 		} else {
 			// compilation success
 			if (log_avail) {
-				fprintf(stderr,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", filename.c_str(), log_str.c_str());
+				fprintf(stderr,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 			}
 		}
 	}
 
-	sources->push_back({ std::move(filename), std::move(source) });
 	return shad;
 }
-
-#if 0
-void preprocess (const char* filename, std::string* src_text) {
-
-	{
-		std::string filepath = prints("%s%s", SHADERS_BASE_PATH, filename.c_str());
-
-		srcf.v.emplace_back(); // add file to list dependent files even before we know if it exist, so that we can find out when it becomes existant
-		srcf.v.back().init(filepath);
-
-		if (!read_text_file(filepath.c_str(), src_text)) {
-			fprintf(stderr,"load_shader_source:: $include \"%s\" could not be loaded!", filename.c_str());
-			return false;
-		}
-	}
-
-	for (auto c=src_text->begin(); c!=src_text->end();) {
-
-		if (*c == '$') {
-			auto line_begin = c;
-			++c;
-
-			auto syntax_error = [&] () {
-
-				while (*c != '\n' && *c != '\r') ++c;
-				std::string line (line_begin, c);
-
-				fprintf(stderr,"load_shader_source:: expected '$include \"filename\"' syntax but got: '%s'!", line.c_str());
-			};
-
-			while (*c == ' ' || *c == '\t') ++c;
-
-			auto cmd = c;
-
-			while ((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || *c == '_') ++c;
-
-			if (std::string(cmd, c).compare("include") == 0) {
-
-				while (*c == ' ' || *c == '\t') ++c;
-
-				if (*c != '"') {
-					syntax_error();
-					return false;
-				}
-				++c;
-
-				auto filename_str_begin = c;
-
-				while (*c != '"') ++c;
-
-				std::string inc_filename(filename_str_begin, c);
-
-				if (*c != '"') {
-					syntax_error();
-					return false;
-				}
-				++c;
-
-				while (*c == ' ' || *c == '\t') ++c;
-
-				if (*c != '\r' && *c != '\n') {
-					syntax_error();
-					return false;
-				}
-
-				auto line_end = c;
-
-				{
-					inc_filename = get_path_dir(filename).append(inc_filename);
-
-					std::string inc_text;
-					if (!load_shader_source(inc_filename, &inc_text)) return false;
-
-					auto line_begin_i = line_begin -src_text->begin();
-
-					src_text->erase(line_begin, line_end);
-					src_text->insert(src_text->begin() +line_begin_i, inc_text.begin(), inc_text.end());
-
-					c = src_text->begin() +line_begin_i +inc_text.length();
-				}
-
-			}
-		} else {
-			++c;
-		}
-
-	}
-
-	return true;
-}
-#endif
 
 std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
 	Shader s;
 	s.shad = gl::ShaderProgram::alloc();
 	
-	GLuint vert = _load_shader(GL_VERTEX_SHADER  , shaders_directory.c_str(), ".vert.glsl", &s.sources, s.shad, name);
-	GLuint frag = _load_shader(GL_FRAGMENT_SHADER, shaders_directory.c_str(), ".frag.glsl", &s.sources, s.shad, name);
-	GLuint geom = _load_shader(GL_GEOMETRY_SHADER, shaders_directory.c_str(), ".geom.glsl", &s.sources, s.shad, name);
+	// Load shader base source file
+	std::string filepath = prints("%s%s.glsl", shaders_directory.c_str(), name.c_str());
+	std::string source;
+	if (!kiss::read_text_file(filepath.c_str(), &source)) {
+		fprintf(stderr, "Could not load base source file for shader \"%s\"!\n", name.c_str());
+		return nullptr;
+	}
+
+	auto path = get_path(filepath);
+
+	// Load, proprocess and compile shader parts
+	bool error = false;
+	GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, path, &s.sources, s.shad, name, &error);
+	GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, path, &s.sources, s.shad, name, &error);
+	GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, path, &s.sources, s.shad, name, &error);
+
+	// Insert source file into sources set
+	if (std::find(s.sources.begin(), s.sources.end(), filepath) == s.sources.end())
+		s.sources.push_back(std::move(filepath));
 
 	glLinkProgram(s.shad);
 
-	bool success;
 	{
 		GLint status;
 		glGetProgramiv(s.shad, GL_LINK_STATUS, &status);
@@ -202,8 +300,8 @@ std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
 		std::string log_str;
 		bool log_avail = get_program_link_log(s.shad, &log_str);
 
-		success = status == GL_TRUE;
-		if (!success) {
+		error = status == GL_FALSE;
+		if (error) {
 			// linking failed
 			fprintf(stderr,"OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 		} else {
@@ -222,7 +320,11 @@ std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
 	if (frag) glDeleteShader(frag);
 	if (geom) glDeleteShader(geom);
 
-	return success ? std::make_shared<Shader>(std::move(s)) : nullptr;
+	if (error) {
+		fprintf(stderr, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
+		return nullptr;
+	}
+	return std::make_shared<Shader>(std::move(s));
 }
 
 bool ShaderManager::check_file_changes () {
