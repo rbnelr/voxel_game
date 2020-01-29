@@ -41,7 +41,7 @@ namespace kiss {
 	}
 
 	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {
-		auto pos = filepath.find_first_of('/');
+		auto pos = filepath.find_last_of('/');
 		if (pos == std::string::npos)
 			pos = 0; // no '/' found => '/' is considered to be at position 0
 		else

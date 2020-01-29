@@ -65,8 +65,6 @@ struct ShaderPreprocessor {
 	// shader had a $compile <type> command with matching type
 	bool			compile_shader = false;
 
-	string			result;
-
 	int line_i;
 
 	bool is_ident_c (char c) {
@@ -104,7 +102,7 @@ struct ShaderPreprocessor {
 		fprintf(stderr, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", shader_name, line_i, reason);
 	}
 
-	bool preprocess_shader (const char* source, string_view path) {
+	bool preprocess_shader (const char* source, string_view path, string* result) {
 		bool in_if = false;
 		bool skip_code = false;
 
@@ -120,9 +118,9 @@ struct ShaderPreprocessor {
 					}
 				} else {
 					if (newline(&c)) {
-						result.push_back('\n'); // convert newlines to '\n'
+						result->push_back('\n'); // convert newlines to '\n'
 					} else {
-						result.push_back(*c++);
+						result->push_back(*c++);
 					}
 				}
 				continue;
@@ -205,6 +203,29 @@ struct ShaderPreprocessor {
 
 			} else if (cmd.compare("include") == 0) {
 
+				std::string incl_result;
+				{
+					std::string filepath = string(path).append(arg);
+					std::string source;
+					if (!kiss::read_text_file(filepath.c_str(), &source)) {
+						fprintf(stderr, "Could not find include file \"%s\" for shader \"%s\"!\n", filepath.c_str(), shader_name);
+						return false;
+					}
+
+					auto incl_path = get_path(filepath);
+
+					if (!preprocess_shader(source.c_str(), incl_path, &incl_result)) {
+						return false;
+					}
+
+					// Insert source file into sources set
+					if (std::find(sources->begin(), sources->end(), filepath) == sources->end())
+						sources->push_back(std::move(filepath));
+				}
+
+				result->append(incl_result);
+				result->append("\n");
+
 			} else {
 				syntax_error("unknown $cmd");
 				return false;
@@ -222,23 +243,26 @@ struct ShaderPreprocessor {
 
 GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view path, std::vector<std::string>* sources, GLuint prog, std::string const& name, bool* error) {
 	
-	ShaderPreprocessor pp;
-	pp.type = type;
-	pp.shader_name = name.c_str();
-	pp.sources = sources;
-	if (!pp.preprocess_shader(source.c_str(), path)) {
-		*error = true;
-		return 0;
+	std::string preprocessed;
+	{
+		ShaderPreprocessor pp;
+		pp.type = type;
+		pp.shader_name = name.c_str();
+		pp.sources = sources;
+		if (!pp.preprocess_shader(source.c_str(), path, &preprocessed)) {
+			*error = true;
+			return 0;
+		}
+		if (!(pp.compile_shader || strcmp(type, "vertex") == 0 || strcmp(type, "fragment") == 0)) // only compiler shader part if it had a $compile <type> command but always compile vertex and fragment shaders
+			return 0; // don't create shader of this type
 	}
-	if (!(pp.compile_shader || strcmp(type, "vertex") == 0 || strcmp(type, "fragment") == 0)) // only compiler shader part if it had a $compile <type> command but always compile vertex and fragment shaders
-		return 0; // don't create shader of this type
 
 	GLuint shad = glCreateShader(gl_type);
 
 	glAttachShader(prog, shad);
 
 	{
-		const char* ptr = pp.result.c_str();
+		const char* ptr = preprocessed.c_str();
 		glShaderSource(shad, 1, &ptr, NULL);
 	}
 
