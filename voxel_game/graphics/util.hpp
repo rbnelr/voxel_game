@@ -96,7 +96,7 @@ struct MeshStreamDrawer {
 			glBufferData(GL_ARRAY_BUFFER, mesh.size() * sizeof(mesh[0]), NULL, GL_STREAM_DRAW);
 			glBufferData(GL_ARRAY_BUFFER, mesh.size() * sizeof(mesh[0]), mesh.data(), GL_STREAM_DRAW);
 
-			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)mesh.size() / sizeof(mesh[0]));
+			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)mesh.size());
 		}
 
 		mesh.clear();

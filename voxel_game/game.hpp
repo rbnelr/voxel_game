@@ -218,6 +218,11 @@ struct FPS_Display {
 };
 
 class Game {
+	bool _init_first = [] () {
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
+		return true;
+	} ();
+
 	FPS_Display fps_display;
 
 	bool activate_flycam = false;

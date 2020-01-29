@@ -1,7 +1,4 @@
 
-// to generate the glad files this is using use the glad python scrip
-python -m glad --api gl=3.3 --extensions "GL_ARB_debug_output,GL_ARB_texture_filter_anisotropic,GL_EXT_texture_compression_s3tc" --generator c --local-files --out-path out/
-
 even in WIP GLFW3.3 does only provide windows raw input (WM_INPUT)
  -not in deltas, but keeps an internal counter for some reason
  -only gives you raw input while you 'disable' the cursor, so you cant do see the cursor and get raw input at the same time

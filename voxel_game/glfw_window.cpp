@@ -227,16 +227,16 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	// hiding irrelevant infos/warnings
 	switch (id) {
 	case 131185: // Buffer detailed info (where the memory lives which is supposed to depend on the usage hint)
-				 //case 1282: // using shader that was not compiled successfully
-				 //
-				 //case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
-				 //case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
-				 //
-				 //			 //case 131154: // Pixel transfer sync with rendering warning
-				 //
-				 //			 //case 1282: // Wierd error on notebook when trying to do texture streaming
-				 //			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
-				 //			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
+	//case 1282: // using shader that was not compiled successfully
+	//
+	//case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
+	case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
+	
+	//			 //case 131154: // Pixel transfer sync with rendering warning
+	//
+	//			 //case 1282: // Wierd error on notebook when trying to do texture streaming
+	//			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
+	//			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
 		return;
 	}
 
@@ -270,7 +270,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	fprintf(stderr, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 }
 
-#if _DEBUG
+#if _DEBUG || 1
 	#define OPENGL_DEBUG
 	#define GLFW_DEBUG
 #endif
@@ -283,7 +283,9 @@ void glfw_init_gl () {
 #ifdef OPENGL_DEBUG
 	if (glfwExtensionSupported("GL_ARB_debug_output")) {
 		glDebugMessageCallbackARB(ogl_debug, 0);
-		//DEBUG_OUTPUT_SYNCHRONOUS_ARB this exists -> if ogl_debuproc needs to be thread safe
+#if _DEBUG // when displaying opengl debug output in release mode, don't do it syncronously as to (theoretically) not hurt performance
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB); // this exists -> if ogl_debuproc needs to be thread safe
+#endif
 	}
 #endif
 

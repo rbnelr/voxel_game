@@ -84,27 +84,26 @@ public:
 			cam_to_world.set((float4x4)view.cam_to_world);
 			cam_to_clip.set(view.cam_to_clip);
 
+			glEnable(GL_BLEND);
 			{ // triangles
 				//glDisable(GL_CULL_FACE);
-				glEnable(GL_BLEND);
 				//glDisable(GL_DEPTH_TEST);
 
 				faces.draw();
 
 				//glEnable(GL_DEPTH_TEST);
-				glDisable(GL_BLEND);
 				//glEnable(GL_CULL_FACE);
 			}
 
 			{ // lines
-				glEnable(GL_BLEND);
 				//glDisable(GL_DEPTH_TEST);
 
 				lines.draw();
 
 				//glEnable(GL_DEPTH_TEST);
-				glDisable(GL_BLEND);
 			}
+			
+			glDisable(GL_BLEND);
 
 			glBindBuffer(GL_ARRAY_BUFFER, 0);
 			glUseProgram(0);

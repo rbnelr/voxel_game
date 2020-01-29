@@ -109,6 +109,7 @@ Game::Game () {
 	}
 
 	debug_draw.init();
+	glBindVertexArray(vao);
 }
 
 void Game::frame () {
@@ -964,7 +965,7 @@ void Game::frame () {
 		glDisable(GL_BLEND);
 	}
 
-	debug_draw.push_cylinder(player.pos + player.collision_h/2, player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
+	debug_draw.push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
 	
 	debug_draw.draw(view);
 	glBindVertexArray(vao);

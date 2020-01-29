@@ -243,6 +243,7 @@ struct Texture2D : public Texture {
 	}
 	
 	void upload () {
+
 		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		
 		glBindTexture(GL_TEXTURE_2D, tex);
@@ -268,7 +269,13 @@ struct Texture2D : public Texture {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,		GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,			GL_REPEAT);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,			GL_REPEAT);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY,	max_aniso);
+
+		// always produces an error
+		// maybe just works on sampler objects??
+		//if (GLAD_GL_ARB_texture_filter_anisotropic)
+		//	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY,	max_aniso);
+		//else if (GLAD_GL_EXT_texture_filter_anisotropic)
+		//	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT,	max_aniso);
 	}
 	
 	virtual void bind () {
@@ -509,18 +516,18 @@ struct Texture2D_File : public Texture2D {
 		
 		Timer timer;
 		if (1) {
-			printf("Loading File_Texture2D '%s'...", name.c_str());
+			printf("Loading File_Texture2D '%s'...\n", name.c_str());
 			timer = Timer::start();
 		}
 		
 		if (!load_texture()) {
-			fprintf(stderr,"\"%s\" could not be loaded!", name.c_str());
+			fprintf(stderr,"\"%s\" could not be loaded!\n", name.c_str());
 			return false;
 		}
 		
 		if (1) {
 			auto dt = timer.end();
-			printf(">>> %f ms", dt * 1000);
+			printf(">>> %f ms\n", dt * 1000);
 		}
 		
 		return true;

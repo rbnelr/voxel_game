@@ -1,6 +1,6 @@
 #version 150 core // version 3.2
 
-in		vec3	pos_world;
+in		vec3	pos;
 in		vec4	color;
 
 out		vec3	vs_pos_cam;
@@ -10,7 +10,7 @@ uniform	mat4	world_to_cam;
 uniform	mat4	cam_to_clip;
 
 void main () {
-	vec3 pos_cam =		(world_to_cam * vec4(pos_world,1)).xyz;
+	vec3 pos_cam =		(world_to_cam * vec4(pos,1)).xyz;
 	
 	gl_Position =		cam_to_clip * vec4(pos_cam, 1);
 	
