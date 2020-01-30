@@ -3,6 +3,8 @@
 #include "glfw_window.hpp"
 #include "kissmath/int2.hpp"
 #include "kissmath/float2.hpp"
+#include "graphics/glshader.hpp"
+#include "graphics/debug_graphics.hpp"
 using namespace kissmath;
 
 #include "timer.hpp"
@@ -13,6 +15,10 @@ using namespace kissmath;
 #include <memory>
 #include "stdio.h"
 #include "assert.h"
+
+constexpr int GL_VERSION_MAJOR = 3;
+constexpr int GL_VERSION_MINOR = 3;
+constexpr bool VAO_REQUIRED = (GL_VERSION_MAJOR * 100 + GL_VERSION_MINOR) >= 303;
 
 struct Rect {
 	int2 pos;
@@ -173,6 +179,15 @@ void toggle_fullscreen () {
 
 //// gameloop
 void glfw_gameloop () {
+	GLuint vao;
+	if (VAO_REQUIRED) {
+		glGenVertexArrays(1, &vao);
+		glBindVertexArray(vao);
+	}
+
+	shader_manager = std::make_unique<ShaderManager>();
+	debug_graphics = std::make_unique<DebugGraphics>();
+
 	imgui.init();
 
 	auto game = std::make_unique<Game>();
@@ -215,6 +230,13 @@ void glfw_gameloop () {
 	}
 
 	imgui.destroy();
+
+	shader_manager = nullptr;
+	debug_graphics = nullptr;
+
+	if (VAO_REQUIRED) {
+		glDeleteVertexArrays(1, &vao);
+	}
 }
 
 void glfw_error (int err, const char* msg) {

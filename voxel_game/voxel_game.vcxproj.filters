@@ -157,10 +157,13 @@
     <ClInclude Include="graphics\glshader.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\debug_draw.hpp">
+    <ClInclude Include="graphics\util.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\util.hpp">
+    <ClInclude Include="graphics\graphics.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\debug_graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
@@ -300,7 +303,13 @@
     <ClCompile Include="graphics\glshader.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\debug_draw.cpp">
+    <ClCompile Include="graphics\graphics.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\debug_graphics.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\util.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -326,12 +335,6 @@
     <None Include="shaders\imgui.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\skybox.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\skybox.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\texture_window_tex.frag">
       <Filter>shaders</Filter>
     </None>
@@ -339,6 +342,9 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\overlay.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\skybox.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

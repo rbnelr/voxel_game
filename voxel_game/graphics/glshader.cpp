@@ -56,19 +56,31 @@ bool get_program_link_log (GLuint prog, std::string* log) {
 	}
 }
 
+void get_all_uniforms (ShaderManager::_Shader* shad, const char* name) {
+	for (auto& kv : shad->uniforms) {
+		kv.second.loc = glGetUniformLocation(shad->shad, kv.first.str.c_str());
+		if (kv.second.loc < 0) {
+			fprintf(stderr, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
+		}
+	}
+}
+
 // recursive $if not supported, but $if inside a $include'd file that is included within an if is supported (since $if state is per recursive call and each include gets a call)
 struct ShaderPreprocessor {
-	const char*		shader_name;
-	vector<string>*	sources;
-	string_view		type;
+	const char*					shader_name;
+	ShaderManager::_Shader*		shader;
+	string_view					type;
 	
 	// shader had a $compile <type> command with matching type
 	bool			compile_shader = false;
 
-	int line_i;
+	int				line_i;
 
-	bool is_ident_c (char c) {
+	bool is_ident_start_c (char c) {
 		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+	}
+	bool is_ident_c (char c) {
+		return is_ident_start_c(c) || (c >= '0' && c <= '9');
 	}
 	void whitespace (const char** c) {
 		while (**c == ' ' || **c == '\t')
@@ -97,9 +109,74 @@ struct ShaderPreprocessor {
 		}
 		return false;
 	}
+	bool identifier (const char** c, string_view* ident) {
+		if (is_ident_start_c(**c)) {
+			auto begin = *c;
+
+			while (is_ident_c(**c)) (*c)++; // find end of identifier
+
+			*ident = string_view(begin, *c - begin);
+			return true;
+		}
+		return false;
+	}
 
 	void syntax_error (char const* reason) {
 		fprintf(stderr, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", shader_name, line_i, reason);
+	}
+
+	struct TypeMap {
+		const char*		glsl_type;
+		gl::data_type	type;
+	};
+	static constexpr TypeMap _type_map[] = {
+		{ "float", gl::T_FLT	},
+		{ "vec2",  gl::T_V2		},
+		{ "vec3",  gl::T_V3		},
+		{ "vec4",  gl::T_V4		},
+		{ "int",   gl::T_INT	},
+		{ "ivec2", gl::T_IV2	},
+		{ "ivec3", gl::T_IV3	},
+		{ "ivec4", gl::T_IV4	},
+		{ "mat3",  gl::T_M3		},
+		{ "mat4",  gl::T_M4		},
+		{ "bool",  gl::T_BOOL	},
+	};
+	bool get_type (string_view glsl_type, gl::data_type* type) {
+		for (auto& tm : _type_map) {
+			if (glsl_type.compare(tm.glsl_type) == 0) {
+				*type = tm.type;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void uniform_found (string_view glsl_type, string_view name) {
+		gl::data_type type;
+		if (!get_type(glsl_type, &type))
+			return;
+
+		if (shader->uniforms.find(name) == shader->uniforms.end())
+			shader->uniforms.emplace(string(name), type);
+	}
+
+	void ident_found (string_view ident, const char* c) {
+		if (ident.compare("uniform") == 0) {
+			string_view type, name;
+
+			whitespace(&c);
+
+			if (!identifier(&c, &type))
+				return;
+
+			whitespace(&c);
+
+			if (!identifier(&c, &name))
+				return;
+
+			uniform_found(type, name);
+		}
 	}
 
 	bool preprocess_shader (const char* source, string_view path, string* result) {
@@ -108,8 +185,23 @@ struct ShaderPreprocessor {
 
 		line_i = 1;
 
+		const char* ident_begin = nullptr;
+		const char* ident = nullptr;
+
 		const char* c = source;
 		while (*c != '\0') {
+
+			if (is_ident_start_c(*c)) {
+				if (!ident_begin)
+					ident_begin = c;
+			} else {
+				if (ident_begin) {
+					if (!skip_code) {
+						ident_found(string_view(ident_begin, c - ident_begin), c);
+					}
+					ident_begin = nullptr;
+				}
+			}
 
 			if (*c != '$') { // copy normal char
 				if (skip_code) {
@@ -128,17 +220,13 @@ struct ShaderPreprocessor {
 
 			auto dollar = c++;
 
-			whitespace(&c);
-
-			auto cmd_begin = c; // begin of dollar command
-
-			while (is_ident_c(*c)) c++; // find end of command identifier
-
-			auto cmd = string_view(cmd_begin, c - cmd_begin);
+			string_view cmd, arg;
 
 			whitespace(&c);
 
-			string_view arg;
+			identifier(&c, &cmd);
+
+			whitespace(&c);
 
 			if (*c == '"') {
 				c++;
@@ -158,13 +246,9 @@ struct ShaderPreprocessor {
 
 				c++; // skip '"'
 
-			} else if (is_ident_c(*c)) {
+			} else if (is_ident_start_c(*c)) {
 
-				auto arg_begin = c;
-
-				while (is_ident_c(*c)) ++c; // skip until end of argument
-
-				arg = string_view(arg_begin, c - arg_begin);
+				identifier(&c, &arg);
 
 			} else {
 				// no argument
@@ -219,8 +303,8 @@ struct ShaderPreprocessor {
 					}
 
 					// Insert source file into sources set
-					if (std::find(sources->begin(), sources->end(), filepath) == sources->end())
-						sources->push_back(std::move(filepath));
+					if (std::find(shader->sources.begin(), shader->sources.end(), filepath) == shader->sources.end())
+						shader->sources.push_back(std::move(filepath));
 				}
 
 				result->append(incl_result);
@@ -241,14 +325,14 @@ struct ShaderPreprocessor {
 	}
 };
 
-GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view path, std::vector<std::string>* sources, GLuint prog, std::string const& name, bool* error) {
+GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view path, _Shader* shader, std::string const& name, bool* error) {
 	
 	std::string preprocessed;
 	{
 		ShaderPreprocessor pp;
 		pp.type = type;
 		pp.shader_name = name.c_str();
-		pp.sources = sources;
+		pp.shader = shader;
 		if (!pp.preprocess_shader(source.c_str(), path, &preprocessed)) {
 			*error = true;
 			return 0;
@@ -259,7 +343,7 @@ GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::s
 
 	GLuint shad = glCreateShader(gl_type);
 
-	glAttachShader(prog, shad);
+	glAttachShader(shader->shad, shad);
 
 	{
 		const char* ptr = preprocessed.c_str();
@@ -291,38 +375,39 @@ GLuint ShaderManager::load_shader_part (const char* type, GLenum gl_type, std::s
 	return shad;
 }
 
-std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
-	Shader s;
-	s.shad = gl::ShaderProgram::alloc();
+std::unique_ptr<ShaderManager::_Shader> ShaderManager::_load_shader (std::string const& name) {
+	auto s = std::make_unique<_Shader>();
 	
 	// Load shader base source file
 	std::string filepath = prints("%s%s.glsl", shaders_directory.c_str(), name.c_str());
 	std::string source;
 	if (!kiss::read_text_file(filepath.c_str(), &source)) {
 		fprintf(stderr, "Could not load base source file for shader \"%s\"!\n", name.c_str());
-		return nullptr;
+		return s;
 	}
 
 	auto path = get_path(filepath);
 
+	s->shad = glCreateProgram();
+
 	// Load, proprocess and compile shader parts
 	bool error = false;
-	GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, path, &s.sources, s.shad, name, &error);
-	GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, path, &s.sources, s.shad, name, &error);
-	GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, path, &s.sources, s.shad, name, &error);
+	GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, path, s.get(), name, &error);
+	GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, path, s.get(), name, &error);
+	GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, path, s.get(), name, &error);
 
 	// Insert source file into sources set
-	if (std::find(s.sources.begin(), s.sources.end(), filepath) == s.sources.end())
-		s.sources.push_back(std::move(filepath));
+	if (std::find(s->sources.begin(), s->sources.end(), filepath) == s->sources.end())
+		s->sources.push_back(std::move(filepath));
 
-	glLinkProgram(s.shad);
+	glLinkProgram(s->shad);
 
 	{
 		GLint status;
-		glGetProgramiv(s.shad, GL_LINK_STATUS, &status);
+		glGetProgramiv(s->shad, GL_LINK_STATUS, &status);
 
 		std::string log_str;
-		bool log_avail = get_program_link_log(s.shad, &log_str);
+		bool log_avail = get_program_link_log(s->shad, &log_str);
 
 		error = status == GL_FALSE;
 		if (error) {
@@ -336,9 +421,9 @@ std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
 		}
 	}
 
-	if (vert) glDetachShader(s.shad, vert);
-	if (frag) glDetachShader(s.shad, frag);
-	if (geom) glDetachShader(s.shad, geom);
+	if (vert) glDetachShader(s->shad, vert);
+	if (frag) glDetachShader(s->shad, frag);
+	if (geom) glDetachShader(s->shad, geom);
 
 	if (vert) glDeleteShader(vert);
 	if (frag) glDeleteShader(frag);
@@ -346,23 +431,34 @@ std::shared_ptr<Shader> ShaderManager::load_shader (std::string name) {
 
 	if (error) {
 		fprintf(stderr, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
-		return nullptr;
+
+		glDeleteProgram(s->shad);
+		s->shad = 0;
+		return s;
 	}
-	return std::make_shared<Shader>(std::move(s));
+
+	get_all_uniforms(s.get(), name.c_str());
+	return s;
+}
+
+ShaderManager::_Shader* ShaderManager::load_shader (std::string name) {
+	auto ptr = ShaderManager::_load_shader(name);
+	_Shader* s = ptr.get();
+	shaders.emplace(std::move(name), std::move(ptr));
+
+	return s;
 }
 
 bool ShaderManager::check_file_changes () {
 	return false;
 }
 
-Uniform Shader::get_uniform (char const* name, gl::data_type type) {
-	// hope that type is correct
-	Uniform u;
-	u.name = name;
-	u.type = type;
-	u.loc = glGetUniformLocation(shad, u.name);
-	//if (u.loc <= -1) log_warning("Uniform not valid %s!", u.name);
-	return u;
+bool ShaderManager::_Shader::get_uniform (std::string_view name, Uniform* u) {
+	auto ret = uniforms.find(name);
+	if (ret == uniforms.end())
+		return false;
+	*u = ret->second;
+	return true;
 }
 
-ShaderManager shader_manager;
+std::unique_ptr<ShaderManager> shader_manager = nullptr;

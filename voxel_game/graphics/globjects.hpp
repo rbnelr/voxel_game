@@ -25,61 +25,19 @@ namespace gl {
 
 		T_BOOL		,
 	};
-	
-	class ShaderProgram { // OpenGL "Program" ie. Combination of vertex shader, fragment shader, etc. (usually just called a shader)
-		MOVE_ONLY_CLASS_DECL(ShaderProgram)
-		GLuint prog = 0;
-	public:
-
-		ShaderProgram () {}
-		static ShaderProgram alloc () {
-			ShaderProgram shad;
-			shad.prog = glCreateProgram();
-			return shad;
-		}
-		~ShaderProgram () {
-			if (prog)
-				glDeleteProgram(prog);
-		}
-
-		operator GLuint () const { return prog; }
-	};
 
 	class Vbo {
 		MOVE_ONLY_CLASS_DECL(Vbo)
-		GLuint vbo = 0;
+		GLuint vbo;
 	public:
 
-		Vbo () {}
-		static Vbo alloc () {
-			Vbo vbo;
-			glGenBuffers(1, &vbo.vbo);
-			return vbo;
+		Vbo () {
+			glGenBuffers(1, &vbo);
 		}
 		~Vbo () {
-			if (vbo)
-				glDeleteBuffers(1, &vbo);
+			glDeleteBuffers(1, &vbo);
 		}
 
 		operator GLuint () const { return vbo; }
-	};
-
-	class Vao {
-		MOVE_ONLY_CLASS_DECL(Vao)
-		GLuint vao = 0;
-	public:
-
-		Vao () {}
-		static Vao alloc () {
-			Vao vao;
-			glGenVertexArrays(1, &vao.vao);
-			return vao;
-		}
-		~Vao () {
-			if (vao)
-				glDeleteVertexArrays(1, &vao);
-		}
-
-		operator GLuint () const { return vao; }
 	};
 }

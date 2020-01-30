@@ -11,7 +11,7 @@
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 #include "game.hpp"
-#include "graphics/debug_draw.hpp"
+#include "graphics/debug_graphics.hpp"
 #include "input.hpp"
 #include "glfw_window.hpp"
 
@@ -64,12 +64,7 @@ bool _need_potatomode () {
 bool _use_potatomode = _need_potatomode();
 
 //
-GLuint vao;
-
 Game::Game () {
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
 
@@ -107,9 +102,6 @@ Game::Game () {
 
 		regen_dbg_heightmap_visualize();
 	}
-
-	debug_draw.init();
-	glBindVertexArray(vao);
 }
 
 void Game::frame () {
@@ -261,7 +253,7 @@ void Game::frame () {
 									col = intersecting ? srgb(255,40,40,200) : srgb(255,255,255,150);
 								}
 
-								debug_draw.push_wire_cube(0.5f, 1, col);
+								debug_graphics->push_wire_cube(0.5f, 1, col);
 							}
 
 							any_intersecting = any_intersecting || (intersecting && block_solid);
@@ -467,7 +459,7 @@ void Game::frame () {
 					}
 
 					if (draw_dbg) {
-						debug_draw.push_wire_cube((float3)bp + 0.5f, 1, col);
+						debug_graphics->push_wire_cube((float3)bp + 0.5f, 1, col);
 					}
 				};
 
@@ -965,26 +957,10 @@ void Game::frame () {
 		glDisable(GL_BLEND);
 	}
 
-	debug_draw.push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
+	debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
 	
-	debug_draw.draw(view);
-	glBindVertexArray(vao);
-
-	if (shad_skybox->valid()) { // draw skybox
-		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
-		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
-
-		shad_skybox->bind();
-		shad_skybox->set_unif("world_to_cam",	(float4x4)view.world_to_cam);
-		shad_skybox->set_unif("cam_to_world",	(float4x4)view.cam_to_world);
-		shad_skybox->set_unif("cam_to_clip",	view.cam_to_clip);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6*6);
-
-		glDisable(GL_DEPTH_CLAMP);
-		glDepthRange(0, 1);
-	}
-
+	debug_graphics->draw(view);
+	skybox_graphics.draw(view);
 }
 
 float elev_freq = 400, elev_amp = 25;

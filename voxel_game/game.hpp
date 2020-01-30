@@ -35,6 +35,7 @@ extern float detail2_freq, detail2_amp;
 #include "blocks.hpp"
 #include "input.hpp"
 #include "graphics/camera.hpp"
+#include "graphics/graphics.hpp"
 #include "player.hpp"
 #include "running_average.hpp"
 
@@ -233,9 +234,10 @@ class Game {
 
 	bool trigger_place_block = false;
 
-	Shader_old* shad_skybox = new_shader("skybox.vert",	"skybox.frag",	{UCOM, UMAT});
 	Shader_old* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	
+	SkyboxGraphics skybox_graphics;
+
 	Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
 
 	Texture2D_File tex_breaking = Texture2D_File(CS_LINEAR, "breaking.png");

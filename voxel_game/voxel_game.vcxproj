@@ -173,7 +173,8 @@
     <ClInclude Include="glad\khrplatform.h" />
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="graphics\camera.hpp" />
-    <ClInclude Include="graphics\debug_draw.hpp" />
+    <ClInclude Include="graphics\debug_graphics.hpp" />
+    <ClInclude Include="graphics\graphics.hpp" />
     <ClInclude Include="graphics\globjects.hpp" />
     <ClInclude Include="graphics\glshader.hpp" />
     <ClInclude Include="graphics\util.hpp" />
@@ -231,9 +232,11 @@
     <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
-    <ClCompile Include="graphics\debug_draw.cpp" />
+    <ClCompile Include="graphics\debug_graphics.cpp" />
+    <ClCompile Include="graphics\graphics.cpp" />
     <ClCompile Include="graphics\globjects.cpp" />
     <ClCompile Include="graphics\glshader.cpp" />
+    <ClCompile Include="graphics\util.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />
@@ -278,8 +281,7 @@
     <None Include="shaders\imgui.frag" />
     <None Include="shaders\imgui.vert" />
     <None Include="shaders\overlay.glsl" />
-    <None Include="shaders\skybox.frag" />
-    <None Include="shaders\skybox.vert" />
+    <None Include="shaders\skybox.glsl" />
     <None Include="shaders\texture_window_tex.frag" />
     <None Include="shaders\texture_window_tex.vert" />
   </ItemGroup>
