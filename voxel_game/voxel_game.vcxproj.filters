@@ -329,12 +329,6 @@
     <None Include="shaders\common.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\imgui.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\imgui.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\texture_window_tex.frag">
       <Filter>shaders</Filter>
     </None>

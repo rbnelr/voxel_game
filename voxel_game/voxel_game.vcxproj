@@ -278,8 +278,6 @@
     <None Include="shaders\common.frag" />
     <None Include="shaders\common.glsl" />
     <None Include="shaders\common.vert" />
-    <None Include="shaders\imgui.frag" />
-    <None Include="shaders\imgui.vert" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\texture_window_tex.frag" />

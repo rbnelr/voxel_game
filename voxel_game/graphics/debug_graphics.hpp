@@ -4,12 +4,12 @@
 
 struct DebugGraphics {
 	struct Vertex {
-		float3	pos;
+		float3	pos_world;
 		lrgba	color;
 
 		static constexpr Vertex_Layout<2> layout = {
-			Attribute{ "pos",   gl::T_V3, 7*4, 0 },
-			Attribute{ "color", gl::T_V4, 7*4, 3*4 }
+			Attribute{ "pos_world", gl::T_V3, 7*4, 0 },
+			Attribute{ "color",		gl::T_V4, 7*4, 3*4 }
 		};
 	};
 	static_assert(sizeof(Vertex) == 7*4);

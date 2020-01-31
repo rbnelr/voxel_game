@@ -14,19 +14,19 @@ uint32_t bind_attrib_arrays (_Vertex_Layout layout, Shader& shad) {
 		bool int_format = false;
 
 		switch (a.type) {
-		case gl::T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(float);	break;
-		case gl::T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(float);	break;
-		case gl::T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(float);	break;
-		case gl::T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(float);	break;
+			case gl::T_FLT:	comps = 1;	type = GL_FLOAT;	size = sizeof(float);	break;
+			case gl::T_V2:	comps = 2;	type = GL_FLOAT;	size = sizeof(float);	break;
+			case gl::T_V3:	comps = 3;	type = GL_FLOAT;	size = sizeof(float);	break;
+			case gl::T_V4:	comps = 4;	type = GL_FLOAT;	size = sizeof(float);	break;
 
-		case gl::T_INT:	comps = 1;	type = GL_INT;		size = sizeof(int);	break;
-		case gl::T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(int);	break;
-		case gl::T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(int);	break;
-		case gl::T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(int);	break;
+			case gl::T_INT:	comps = 1;	type = GL_INT;		size = sizeof(int);	break;
+			case gl::T_IV2:	comps = 2;	type = GL_INT;		size = sizeof(int);	break;
+			case gl::T_IV3:	comps = 3;	type = GL_INT;		size = sizeof(int);	break;
+			case gl::T_IV4:	comps = 4;	type = GL_INT;		size = sizeof(int);	break;
 
-		case gl::T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(uint8_t);	break;
+			case gl::T_U8V4:	int_format = true;	comps = 4;	type = GL_UNSIGNED_BYTE;		size = sizeof(uint8_t);	break;
 
-		default: assert(false);
+			default: assert(false);
 		}
 
 		vertex_size += size * comps;
