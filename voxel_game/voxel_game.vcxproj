@@ -275,6 +275,7 @@
   <ItemGroup>
     <None Include="shaders\blocks.frag" />
     <None Include="shaders\blocks.vert" />
+    <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.frag" />
     <None Include="shaders\common.glsl" />
     <None Include="shaders\common.vert" />

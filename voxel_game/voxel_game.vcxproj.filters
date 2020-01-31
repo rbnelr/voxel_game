@@ -341,6 +341,9 @@
     <None Include="shaders\skybox.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\block_highlight.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt">

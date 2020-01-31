@@ -96,15 +96,17 @@ static Block B_NO_CHUNK = { BT_NO_CHUNK, false, 1, 255 };
 #undef BF_BOTTOM
 #undef BF_TOP
 
-#define BF_NEG_X		0
-#define BF_POS_X		1
-#define BF_NEG_Y		2
-#define BF_POS_Y		3
-#define BF_BOTTOM		4
-#define BF_TOP			5
+enum BlockFace {
+	BF_NEG_X	=0,
+	BF_POS_X	,
+	BF_NEG_Y	,
+	BF_POS_Y	,
+	BF_NEG_Z	,
+	BF_POS_Z	,
 
-#define BF_NEG_Z		4
-#define BF_POS_Z		5
+	BF_BOTTOM	=BF_NEG_Z,
+	BF_TOP		=BF_POS_Z,
+};
 
 static Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasing
 	// combine all textures into a texture atlas

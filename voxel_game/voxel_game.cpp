@@ -616,98 +616,6 @@ void Game::frame () {
 	};
 	raycast_highlighted_block();
 
-	auto block_indicator = [&] (bpos block, int highlighted_block_face) {
-		int cylinder_sides = 32;
-
-#define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
-
-#if 1
-		srgba8 col = srgba8(255,255,255,60);
-		srgba8 side_col = srgba8(255,255,255,120);
-
-		float r = 1.01f;
-		float inset = 1.0f / 50;
-
-		float side_r = r * 0.06f;
-#else
-		lrgba8 col = lrgba8(255,255,255,140);
-		lrgba8 side_col = lrgba8(255,255,255,60);
-
-		float r = 1.01f;
-		float inset = 1.0f / 17;
-
-		float side_r = r * 0.35f;
-#endif
-#if 0
-		int face_quads = 4;
-		int quad_vertecies = 6;
-
-		for (int face=0; face<6; ++face) {
-
-			float up;
-			float horiz;
-			switch (face) {
-			case BF_NEG_X:	horiz = 0;	up = -1;	break;
-			case BF_NEG_Y:	horiz = 1;	up = -1;	break;
-			case BF_POS_X:	horiz = 2;	up = -1;	break;
-			case BF_POS_Y:	horiz = 3;	up = -1;	break;
-			case BF_NEG_Z:	horiz = 0;	up = -2;	break;
-			case BF_POS_Z:	horiz = 0;	up = 0;		break;
-			}
-
-			float3x3 rot_up =		rotate3_Y( deg(90) * up );
-			float3x3 rot_horiz =	rotate3_Z( deg(90) * horiz );
-
-			{
-				for (int edge=0; edge<face_quads; ++edge) {
-
-					float3x3 rot_edge = (float3x3)rotate2(deg(90) * -edge);
-
-					auto vert = [&] (float3 v, srgba8 col) {
-						*out++ = { (float3)block +((rot_horiz * rot_up * rot_edge * v) * 0.5f +0.5f), col };
-					};
-					auto quad = [&] (float3 a, float3 b, float3 c, float3 d, srgba8 col) {
-						vert(a, col);	vert(b, col);	vert(d, col);
-						vert(d, col);	vert(b, col);	vert(c, col);
-					};
-
-					// emit block highlight
-					quad(	float3(-r,-r,+r),
-						float3(+r,-r,+r),
-						float3(+r,-r,+r) +float3(-inset,+inset,0)*2,
-						float3(-r,-r,+r) +float3(+inset,+inset,0)*2,
-						col);
-
-				}
-			}
-
-			{
-				Overlay_Vertex* out = (Overlay_Vertex*)&*vector_append(&overlay_vbo.vertecies,
-					sizeof(Overlay_Vertex)*quad_vertecies);
-
-				auto vert = [&] (float3 v, srgba8 col) {
-					*out++ = { (float3)block +((rot_horiz * rot_up * v) * 0.5f +0.5f), col };
-				};
-				auto quad = [&] (float3 a, float3 b, float3 c, float3 d, srgba8 col) {
-					vert(a, col);	vert(b, col);	vert(d, col);
-					vert(d, col);	vert(b, col);	vert(c, col);
-				};
-
-				if (face == highlighted_block_face) { // emit face highlight
-					quad(	float3(-side_r,-side_r,+r),
-						float3(+side_r,-side_r,+r),
-						float3(+side_r,+side_r,+r),
-						float3(-side_r,+side_r,+r),
-						side_col );
-				}
-			}
-		}
-#endif
-
-#undef QUAD
-	};
-	if (highlighted_block) block_indicator(highlighted_block_pos, highlighted_block_face);
-
 	if (highlighted_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
 
 		Chunk* chunk;
@@ -956,6 +864,9 @@ void Game::frame () {
 
 		glDisable(GL_BLEND);
 	}
+
+	if (highlighted_block)
+		block_highlight_graphics.draw(view, (float3)highlighted_block_pos, (BlockFace)highlighted_block_face);
 
 	debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
 	

@@ -34,10 +34,14 @@ namespace kissmath {
 		explicit float3x3 (float all);
 		
 		// supply all cells, in row major order for readability -> c<row><column>
-		explicit float3x3 (float c00, float c01, float c02,
-						   float c10, float c11, float c12,
-						   float c20, float c21, float c22);
-		
+		constexpr explicit float3x3 (float c00, float c01, float c02,
+						             float c10, float c11, float c12,
+						             float c20, float c21, float c22): 
+			arr{float3(c00, c10, c20),
+			    float3(c01, c11, c21),
+			    float3(c02, c12, c22)} {
+
+		}
 		
 		// static rows() and columns() methods are preferred over constructors, to avoid confusion if column or row vectors are supplied to the constructor
 		// supply all row vectors
@@ -58,8 +62,11 @@ namespace kissmath {
 		
 		
 		// identity matrix
-		static float3x3 identity ();
-		
+		static constexpr float3x3 identity () {
+			return float3x3(1,0,0,
+						    0,1,0,
+						    0,0,1);
+		}
 		
 		// Casting operators
 		

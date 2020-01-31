@@ -34,14 +34,14 @@ namespace kissmath {
 	// sets all components to one value
 	// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable
 	// and short initialization like float3 a = 0; works
-	float4::float4 (float all): x{all}, y{all}, z{all}, w{all} {
-		
-	}
-	
-	// supply all components
-	float4::float4 (float x, float y, float z, float w): x{x}, y{y}, z{z}, w{w} {
-		
-	}
+	//constexpr float4::float4 (float all): x{all}, y{all}, z{all}, w{all} {
+	//	
+	//}
+	//
+	//// supply all components
+	//constexpr float4::float4 (float x, float y, float z, float w): x{x}, y{y}, z{z}, w{w} {
+	//	
+	//}
 	
 	// extend vector
 	float4::float4 (float2 xy, float z, float w): x{xy.x}, y{xy.y}, z{z}, w{w} {

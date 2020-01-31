@@ -42,17 +42,17 @@ namespace kissmath {
 		
 	}
 	
-	// supply all cells, in row major order for readability -> c<row><column>
-	float4x4::float4x4 (float c00, float c01, float c02, float c03,
-						float c10, float c11, float c12, float c13,
-						float c20, float c21, float c22, float c23,
-						float c30, float c31, float c32, float c33): 
-	arr{float4(c00, c10, c20, c30),
-		float4(c01, c11, c21, c31),
-		float4(c02, c12, c22, c32),
-		float4(c03, c13, c23, c33)} {
-		
-	}
+	//// supply all cells, in row major order for readability -> c<row><column>
+	//float4x4::float4x4 (float c00, float c01, float c02, float c03,
+	//					float c10, float c11, float c12, float c13,
+	//					float c20, float c21, float c22, float c23,
+	//					float c30, float c31, float c32, float c33): 
+	//arr{float4(c00, c10, c20, c30),
+	//	float4(c01, c11, c21, c31),
+	//	float4(c02, c12, c22, c32),
+	//	float4(c03, c13, c23, c33)} {
+	//	
+	//}
 	
 	// static rows() and columns() methods are preferred over constructors, to avoid confusion if column or row vectors are supplied to the constructor
 	
