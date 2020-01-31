@@ -36,6 +36,9 @@ public:
 	float walk_speed = 5.0f;
 	float run_speed = 13.0f;
 
+	float walk_accel_base = 5;
+	float walk_accel_proport = 10;
+
 	float collision_r =	0.4f;
 	float collision_h =	1.7f;
 
@@ -69,7 +72,10 @@ public:
 		fps_camera.imgui();
 		tps_camera.imgui();
 
-
+		ImGui::DragFloat("walk_speed", &walk_speed, 0.05f);
+		ImGui::DragFloat("run_speed", &run_speed, 0.05f);
+		ImGui::DragFloat("walk_accel_base", &walk_accel_base, 0.05f);
+		ImGui::DragFloat("walk_accel_proport", &walk_accel_proport, 0.05f);
 
 		imgui_pop();
 	}

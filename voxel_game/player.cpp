@@ -30,93 +30,17 @@ void Player::update_controls (bool player_on_ground) {
 		float target_speed = input_fast ? run_speed : walk_speed;
 		float2 target_vel = body_rotation * (input_dir * target_speed);
 
-		static int movement_code = 4;
-		ImGui::DragInt("movement_code", &movement_code);
-	
-		switch (movement_code) {
-			case -1: {
-				vel = float3(target_vel, vel.z);
-			} break;
-			case 0: { // old movement code
-
-				float3 tmp = float3( lerp((float2)vel, target_vel, walking_friction_alpha), vel.z );
-
-				if (player_on_ground) {
-					vel = tmp;
-				} else {
-					if (length((float2)vel) < length(target_speed)*0.5f)
-						vel = tmp; // only allow speeding up to slow speed with air control
-				}
-			} break;
-			case 1: { // const accel based code
-				
-				static float accel = 20;
-				static float accel_kickoff = 100;
-				static float accel_kickoff_thres = -0.2f;
-
-				ImGui::DragFloat("accel", &accel, 0.2f);
-				ImGui::DragFloat("accel_kickoff", &accel_kickoff, 0.2f);
-				ImGui::DragFloat("accel_kickoff_thres", &accel_kickoff_thres, 0.2f);
 		
-				float2 delta_vel = target_vel - (float2)vel;
-				float delta_speed = length(delta_vel);
+		float2 delta_vel = target_vel - (float2)vel;
+		float delta_speed = length(delta_vel);
 
-				float acc = accel;
+		float accel = delta_speed * walk_accel_proport + walk_accel_base;
 
-				// Get a kick of initial accel if starting or stopping to walk or if direction changes by ~90 deg
-				if (dot((float2)vel, target_vel) <= accel_kickoff_thres) {
-					acc += accel_kickoff;
-				}
-
-				delta_vel = normalizesafe(delta_vel) * min(acc * input.dt, delta_speed); // don't overshoot
-
-				vel += float3(delta_vel, 0);
-			} break;
-			case 2: {
-
-				static float accel = 30;
-				static float drag = 5;
-				static bool drag_square = false;
-
-				ImGui::DragFloat("accel", &accel, 0.2f);
-				ImGui::DragFloat("drag", &drag, 0.2f);
-				ImGui::Checkbox("drag_square", &drag_square);
-
-				float2 delta_vel = target_vel - (float2)vel;
-				float delta_speed = length(delta_vel);
-
-				if (length(target_vel) > 0) { // let drag slow the player down
-					delta_vel = normalizesafe(delta_vel) * min(accel * input.dt, delta_speed);
-					vel += float3(delta_vel, 0);
-				}
-
-				if (player_on_ground) {
-					float2 v = (float2)vel;
-					float speed = length(v);
-					float2 drag_force = -normalizesafe(v) * (drag_square ? speed * speed : speed) * drag;
-					vel += float3(drag_force * input.dt, 0);
-				}
-			} break;
-			case 4: {
-
-				static float accel_base = 5;
-				static float accel_proport = 10;
-
-				ImGui::DragFloat("accel_base", &accel_base, 0.2f);
-				ImGui::DragFloat("accel_proport", &accel_proport, 0.2f);
-
-				float2 delta_vel = target_vel - (float2)vel;
-				float delta_speed = length(delta_vel);
-
-				float accel = delta_speed * accel_proport + accel_base;
-
-				delta_vel = normalizesafe(delta_vel) * min(accel * input.dt, delta_speed);
-				vel += float3(delta_vel, 0);
-
-			} break;
-		}
+		delta_vel = normalizesafe(delta_vel) * min(accel * input.dt, delta_speed);
+		vel += float3(delta_vel, 0);
 	}
 
+#if 0 // movement speed plotting to better develop movement code
 	{
 		static constexpr int COUNT = 128;
 		static float vels[COUNT] = {};
@@ -135,6 +59,7 @@ void Player::update_controls (bool player_on_ground) {
 		ImGui::SetNextItemWidth(-1);
 		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player.pos", -7, 7, ImVec2(0, 100));
 	}
+#endif
 	
 	//// jumping
 	if (input.buttons[GLFW_KEY_SPACE].is_down && player_on_ground)

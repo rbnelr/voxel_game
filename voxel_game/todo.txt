@@ -42,6 +42,11 @@ DONE:
  
  added alpha for leaves texture and toggable graphics option that disables alpha for leaves (and does also not generate the invisible faces, since this is to improve performance on low power machines)
  
+ make sure movement code is framerate independent, the lerp(old_vel, desired_vel, alpha) is framrate dependant
+ -I did like the feel of the movement on 60 fps
+  -> maybe plot speed via imgui and screenshot it
+  -> and then develop new movement code with better force based movement that closely matches that curve
+ 
 TODO
 -FEATURES:
  
@@ -78,11 +83,6 @@ TODO
       ie. just stupidly type out all required code and then see what gets repeated
   the main loop should probably never know about textures at all, just graphics.draw_world(); for p in players: graphics.draw_player(p) etc.
   and the graphics class handles all the stuff itself, this way it can decide if it wants the textures to have it's own class
- 
- make sure movement code is framerate independent, the lerp(old_vel, desired_vel, alpha) is framrate dependant
- -I did like the feel of the movement on 60 fps
-  -> maybe plot speed via imgui and screenshot it
-  -> and then develop new movement code with better force based movement that closely matches that curve
  
  make better sprinting code
   sprinting should have a drawback over walking, or it just gets used all the time
