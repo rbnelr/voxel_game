@@ -38,11 +38,10 @@ struct SkyboxGraphics {
 	struct Vertex {
 		float3 world_dir;
 
-		static constexpr Vertex_Layout<1> layout = {
-			Attribute{ "world_dir", gl::T_V3, 3*4, 0 },
-		};
+		VERTEX_LAYOUT(Vertex,
+			VERTEX_ATTRIBUTE(Vertex, world_dir)
+		)
 	};
-	static_assert(sizeof(Vertex) == 3*4);
 
 	Shader shader = Shader("skybox");
 
@@ -59,12 +58,11 @@ struct BlockHighlightGraphics {
 		float3	pos_model;
 		lrgba	color;
 
-		static constexpr Vertex_Layout<2> layout = {
-			Attribute{ "pos_model", gl::T_V3, 7*4, 0 },
-			Attribute{ "color",		gl::T_V4, 7*4, 3*4 }
-		};
+		VERTEX_LAYOUT(Vertex,
+			VERTEX_ATTRIBUTE(Vertex, pos_model),
+			VERTEX_ATTRIBUTE(Vertex, color)
+		)
 	};
-	static_assert(sizeof(Vertex) == 7*4);
 
 	Shader shader = Shader("block_highlight");
 

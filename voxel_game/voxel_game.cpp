@@ -25,8 +25,6 @@ using namespace kiss;
 #include "stb_image.hpp"
 #include "gl.hpp"
 
-#define STRINGIFY(x) #x
-
 #define PROFILE_BEGIN(name)	auto __profile_##name = Timer::start()
 #define PROFILE_END_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (__profile_##name).end() * 1000, __VA_ARGS__)
 

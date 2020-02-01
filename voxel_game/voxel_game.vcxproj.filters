@@ -166,6 +166,9 @@
     <ClInclude Include="graphics\debug_graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="graphics\vertex_layout.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -310,6 +313,9 @@
       <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="graphics\util.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\vertex_layout.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>

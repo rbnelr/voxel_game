@@ -2,7 +2,7 @@
 #include "input.hpp"
 #include "physics.hpp"
 
-float3	player_spawn_point = float3(4,32,43);
+float3	player_spawn_point = float3(4,32,28.001f);
 
 void Player::update_controls (bool player_on_ground) {
 	//// toggle camera view

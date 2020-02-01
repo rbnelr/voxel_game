@@ -61,7 +61,7 @@ void SkyboxGraphics::draw (Camera_View& view) {
 		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
 
 		glBindBuffer(GL_ARRAY_BUFFER, mesh);
-		bind_attrib_arrays(Vertex::layout, shader);
+		bind_attrib_arrays(Vertex::layout(), shader);
 
 		glDrawArrays(GL_TRIANGLES, 0, 6*6);
 
@@ -148,7 +148,7 @@ void BlockHighlightGraphics::draw (Camera_View& view, float3 pos, BlockFace face
 		glEnable(GL_BLEND);
 
 		glBindBuffer(GL_ARRAY_BUFFER, mesh);
-		bind_attrib_arrays(Vertex::layout, shader);
+		bind_attrib_arrays(Vertex::layout(), shader);
 
 		glDrawArrays(GL_TRIANGLES, 0, vertices_count);
 

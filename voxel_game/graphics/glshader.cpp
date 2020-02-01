@@ -127,22 +127,22 @@ struct ShaderPreprocessor {
 
 	struct TypeMap {
 		const char*		glsl_type;
-		gl::data_type	type;
+		gl::type		type;
 	};
 	static constexpr TypeMap _type_map[] = {
-		{ "float", gl::T_FLT	},
-		{ "vec2",  gl::T_V2		},
-		{ "vec3",  gl::T_V3		},
-		{ "vec4",  gl::T_V4		},
-		{ "int",   gl::T_INT	},
-		{ "ivec2", gl::T_IV2	},
-		{ "ivec3", gl::T_IV3	},
-		{ "ivec4", gl::T_IV4	},
-		{ "mat3",  gl::T_M3		},
-		{ "mat4",  gl::T_M4		},
-		{ "bool",  gl::T_BOOL	},
+		{ "float", gl::FLOAT	},
+		{ "vec2",  gl::FLOAT2	},
+		{ "vec3",  gl::FLOAT3	},
+		{ "vec4",  gl::FLOAT4	},
+		{ "int",   gl::INT		},
+		{ "ivec2", gl::INT2		},
+		{ "ivec3", gl::INT3		},
+		{ "ivec4", gl::INT4		},
+		{ "mat3",  gl::MAT3		},
+		{ "mat4",  gl::MAT4		},
+		{ "bool",  gl::BOOL		},
 	};
-	bool get_type (string_view glsl_type, gl::data_type* type) {
+	bool get_type (string_view glsl_type, gl::type* type) {
 		for (auto& tm : _type_map) {
 			if (glsl_type.compare(tm.glsl_type) == 0) {
 				*type = tm.type;
@@ -153,7 +153,7 @@ struct ShaderPreprocessor {
 	}
 
 	void uniform_found (string_view glsl_type, string_view name) {
-		gl::data_type type;
+		gl::type type;
 		if (!get_type(glsl_type, &type))
 			return;
 

@@ -7,12 +7,11 @@ struct DebugGraphics {
 		float3	pos_world;
 		lrgba	color;
 
-		static constexpr Vertex_Layout<2> layout = {
-			Attribute{ "pos_world", gl::T_V3, 7*4, 0 },
-			Attribute{ "color",		gl::T_V4, 7*4, 3*4 }
-		};
+		VERTEX_LAYOUT(Vertex,
+			VERTEX_ATTRIBUTE(Vertex, pos_world),
+			VERTEX_ATTRIBUTE(Vertex, color    )
+		)
 	};
-	static_assert(sizeof(Vertex) == 7*4);
 
 	Shader shader = Shader("overlay");
 

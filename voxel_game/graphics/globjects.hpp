@@ -7,23 +7,26 @@
 ////
 
 namespace gl {
-	enum data_type {
-		T_FLT		=0,
-		T_V2		,
-		T_V3		,
-		T_V4		,
+	enum type {
+		FLOAT			,
+		FLOAT2			,
+		FLOAT3			,
+		FLOAT4			,
+		INT				,
+		INT2			,
+		INT3			,
+		INT4			,
+		U8V4			,
+		MAT3			,
+		MAT4			,
+		BOOL			,
+	};
 
-		T_INT		,
-		T_IV2		,
-		T_IV3		,
-		T_IV4		,
-
-		T_U8V4		,
-
-		T_M3		,
-		T_M4		,
-
-		T_BOOL		,
+	enum class Enum : GLenum {
+		FLOAT			= GL_FLOAT,
+		INT				= GL_INT,
+		UNSIGNED_BYTE	= GL_UNSIGNED_BYTE,
+		BOOL			= GL_BOOL,
 	};
 
 	class Vbo {

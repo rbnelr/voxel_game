@@ -10,10 +10,10 @@
 struct ShaderManager {
 	struct Uniform {
 		GLint			loc = -1;
-		gl::data_type	type;
+		gl::type		type;
 
 		Uniform () {}
-		Uniform (gl::data_type t): type{t} {}
+		Uniform (gl::type t): type{t} {}
 	};
 	struct _Shader {
 		GLuint shad = 0; // 0 == shader no loaded successfully
@@ -71,77 +71,77 @@ struct Shader {
 	void set_uniform (std::string_view name, float v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_FLT);
+			assert(u.type == gl::FLOAT);
 			glUniform1f(u.loc, v);
 		}
 	}
 	void set_uniform (std::string_view name, float2 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_V2);
+			assert(u.type == gl::FLOAT2);
 			glUniform2fv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, float3 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_V3);
+			assert(u.type == gl::FLOAT3);
 			glUniform3fv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, float4 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_V4);
+			assert(u.type == gl::FLOAT4);
 			glUniform4fv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, int v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_INT);
+			assert(u.type == gl::INT);
 			glUniform1i(u.loc, v);
 		}
 	}
 	void set_uniform (std::string_view name, int2 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_IV2);
+			assert(u.type == gl::INT2);
 			glUniform2iv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, int3 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_IV3);
+			assert(u.type == gl::INT3);
 			glUniform3iv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, int4 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_IV4);
+			assert(u.type == gl::INT4);
 			glUniform4iv(u.loc, 1, &v.x);
 		}
 	}
 	void set_uniform (std::string_view name, float3x3 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_M3);
+			assert(u.type == gl::MAT3);
 			glUniformMatrix3fv(u.loc, 1, GL_FALSE, &v.arr[0][0]);
 		}
 	}
 	void set_uniform (std::string_view name, float4x4 v) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_M4);
+			assert(u.type == gl::MAT4);
 			glUniformMatrix4fv(u.loc, 1, GL_FALSE, &v.arr[0][0]);
 		}
 	}
 	void set_uniform (std::string_view name, bool b) {
 		ShaderManager::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(u.type == gl::T_BOOL);
+			assert(u.type == gl::BOOL);
 			glUniform1i(u.loc, (int)b);
 		}
 	}
