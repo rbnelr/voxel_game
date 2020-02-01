@@ -1,9 +1,9 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "glshader.hpp"
-#include "globjects.hpp"
 #include "debug_graphics.hpp"
 #include "../blocks.hpp"
+#include "gl.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -38,14 +38,14 @@ struct SkyboxGraphics {
 	struct Vertex {
 		float3 world_dir;
 
-		VERTEX_LAYOUT(Vertex,
-			VERTEX_ATTRIBUTE(Vertex, world_dir)
-		)
+		static void bind (Attributes& a) {
+			a.add<decltype(world_dir)>(0, "world_dir", sizeof(Vertex), offsetof(Vertex, world_dir));
+		}
 	};
 
 	Shader shader = Shader("skybox");
 
-	gl::Vbo mesh; // a inward facing cube of size 1
+	Mesh<Vertex> mesh; // a inward facing cube of size 1
 
 	SkyboxGraphics ();
 
@@ -58,16 +58,15 @@ struct BlockHighlightGraphics {
 		float3	pos_model;
 		lrgba	color;
 
-		VERTEX_LAYOUT(Vertex,
-			VERTEX_ATTRIBUTE(Vertex, pos_model),
-			VERTEX_ATTRIBUTE(Vertex, color)
-		)
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_model)>(0, "pos_model", sizeof(Vertex), offsetof(Vertex, pos_model));
+			a.add<decltype(color    )>(1, "color"    , sizeof(Vertex), offsetof(Vertex, color    ));
+		}
 	};
 
 	Shader shader = Shader("block_highlight");
 
-	gl::Vbo mesh; // a inward facing cube of size 1
-	int vertices_count;
+	Mesh<Vertex> mesh;
 
 	BlockHighlightGraphics ();
 

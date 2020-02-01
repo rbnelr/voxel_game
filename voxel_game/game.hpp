@@ -219,6 +219,8 @@ struct FPS_Display {
 };
 
 class Game {
+	GLuint vao;
+
 	bool _init_first = [] () {
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
 		return true;
@@ -466,6 +468,7 @@ class Game {
 
 public:
 	Game ();
+	~Game ();
 
 	void frame ();
 

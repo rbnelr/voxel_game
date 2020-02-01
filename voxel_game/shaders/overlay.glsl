@@ -1,8 +1,8 @@
-#version 150 core // version 3.2
+#version 330 core
 
 $if vertex
-	in		vec3	pos_world;
-	in		vec4	color;
+	layout (location = 0) in vec3 pos_world;
+	layout (location = 1) in vec4 color;
 
 	out		vec3	vs_pos_cam;
 	out		vec4	vs_color;

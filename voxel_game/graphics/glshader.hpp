@@ -1,11 +1,11 @@
 #pragma once
-#include "globjects.hpp"
 #include "../kissmath.hpp"
 #include "../string.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include "assert.h"
+#include "gl.hpp"
 
 struct ShaderManager {
 	struct Uniform {
@@ -59,10 +59,15 @@ extern std::unique_ptr<ShaderManager> shader_manager;
 // User facing shader
 struct Shader {
 	// lifetime is ok because shader manager keeps shaders alive until it gets destroyed with the gl context, at which point using shaders is not safe anyway
-	ShaderManager::_Shader* shader;
+	ShaderManager::_Shader* shader = nullptr;
 
+	Shader () {}
 	Shader (std::string name) {
 		shader = shader_manager->load_shader(std::move(name));
+	}
+
+	void bind () {
+		glUseProgram(shader->shad);
 	}
 
 	// check if the shader is successfully loaded

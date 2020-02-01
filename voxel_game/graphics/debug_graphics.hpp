@@ -7,10 +7,10 @@ struct DebugGraphics {
 		float3	pos_world;
 		lrgba	color;
 
-		VERTEX_LAYOUT(Vertex,
-			VERTEX_ATTRIBUTE(Vertex, pos_world),
-			VERTEX_ATTRIBUTE(Vertex, color    )
-		)
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_world)>(0, "pos_world", sizeof(Vertex), offsetof(Vertex, pos_world));
+			a.add<decltype(color    )>(1, "color"    , sizeof(Vertex), offsetof(Vertex, color    ));
+		}
 	};
 
 	Shader shader = Shader("overlay");

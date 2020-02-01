@@ -1,19 +1,21 @@
 #include "graphics.hpp"
 
+//
+
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 #define QUAD_INWARD(a,b,c,d) a,d,b, b,d,c // facing inward
 
 SkyboxGraphics::SkyboxGraphics () {
-	static constexpr float3 LLL = float3(-1,-1,-1);
-	static constexpr float3 HLL = float3(+1,-1,-1);
-	static constexpr float3 LHL = float3(-1,+1,-1);
-	static constexpr float3 HHL = float3(+1,+1,-1);
-	static constexpr float3 LLH = float3(-1,-1,+1);
-	static constexpr float3 HLH = float3(+1,-1,+1);
-	static constexpr float3 LHH = float3(-1,+1,+1);
-	static constexpr float3 HHH = float3(+1,+1,+1);
+	static constexpr Vertex LLL = { float3(-1,-1,-1) };
+	static constexpr Vertex HLL = { float3(+1,-1,-1) };
+	static constexpr Vertex LHL = { float3(-1,+1,-1) };
+	static constexpr Vertex HHL = { float3(+1,+1,-1) };
+	static constexpr Vertex LLH = { float3(-1,-1,+1) };
+	static constexpr Vertex HLH = { float3(+1,-1,+1) };
+	static constexpr Vertex LHH = { float3(-1,+1,+1) };
+	static constexpr Vertex HHH = { float3(+1,+1,+1) };
 
-	static constexpr float3 arr[6*6] = {
+	static constexpr Vertex arr[6*6] = {
 		QUAD_INWARD(	LHL,
 						LLL,
 						LLH,
@@ -45,13 +47,12 @@ SkyboxGraphics::SkyboxGraphics () {
 						LHH )
 	};
 
-	glBindBuffer(GL_ARRAY_BUFFER, mesh);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(arr), arr, GL_STATIC_DRAW);
+	mesh.upload(arr, 6*6);
 }
 
 void SkyboxGraphics::draw (Camera_View& view) {
 	if (shader) {
-		glUseProgram(shader.shader->shad);
+		shader.bind();
 
 		shader.set_uniform("world_to_cam", (float4x4)view.world_to_cam);
 		shader.set_uniform("cam_to_world", (float4x4)view.cam_to_world);
@@ -60,10 +61,8 @@ void SkyboxGraphics::draw (Camera_View& view) {
 		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
 		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
 
-		glBindBuffer(GL_ARRAY_BUFFER, mesh);
-		bind_attrib_arrays(Vertex::layout(), shader);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6*6);
+		mesh.bind();
+		mesh.draw();
 
 		glDepthRange(0, 1);
 		glDisable(GL_DEPTH_CLAMP);
@@ -126,15 +125,12 @@ BlockHighlightGraphics::BlockHighlightGraphics () {
 		}
 	}
 
-	vertices_count = vertices.size();
-
-	glBindBuffer(GL_ARRAY_BUFFER, mesh);
-	glBufferData(GL_ARRAY_BUFFER, vertices_count * sizeof(vertices[0]), vertices.data(), GL_STATIC_DRAW);
+	mesh.upload(vertices);
 }
 
 void BlockHighlightGraphics::draw (Camera_View& view, float3 pos, BlockFace face) {
 	if (shader) {
-		glUseProgram(shader.shader->shad);
+		shader.bind();
 
 		shader.set_uniform("world_to_cam", (float4x4)view.world_to_cam);
 		shader.set_uniform("cam_to_world", (float4x4)view.cam_to_world);
@@ -143,14 +139,10 @@ void BlockHighlightGraphics::draw (Camera_View& view, float3 pos, BlockFace face
 		shader.set_uniform("block_pos", pos);
 		shader.set_uniform("face_rotation", face_rotation[face]);
 
-		ImGui::Text("face: %d", face);
-
 		glEnable(GL_BLEND);
 
-		glBindBuffer(GL_ARRAY_BUFFER, mesh);
-		bind_attrib_arrays(Vertex::layout(), shader);
-
-		glDrawArrays(GL_TRIANGLES, 0, vertices_count);
+		mesh.bind();
+		mesh.draw();
 
 		glDisable(GL_BLEND);
 	}

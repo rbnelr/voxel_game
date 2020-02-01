@@ -151,13 +151,7 @@
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="move_only_class.hpp" />
-    <ClInclude Include="graphics\globjects.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\glshader.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\util.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="graphics\graphics.hpp">
@@ -166,7 +160,10 @@
     <ClInclude Include="graphics\debug_graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\vertex_layout.hpp">
+    <ClInclude Include="graphics\gl.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\util.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
@@ -300,9 +297,6 @@
     </ClCompile>
     <ClCompile Include="player.cpp" />
     <ClCompile Include="physics.cpp" />
-    <ClCompile Include="graphics\globjects.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="graphics\glshader.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -312,10 +306,10 @@
     <ClCompile Include="graphics\debug_graphics.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\util.cpp">
+    <ClCompile Include="graphics\gl.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\vertex_layout.cpp">
+    <ClCompile Include="graphics\util.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>

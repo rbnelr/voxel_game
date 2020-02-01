@@ -9,7 +9,7 @@ void DebugGraphics::push_wire_cube (float3 center, float size, lrgba col) {
 // draw arrow
 
 void DebugGraphics::push_cylinder (float3 center, float radius, float height, lrgba col, int sides) {
-	faces.mesh.resize(faces.mesh.size() + 12 * sides);
+	faces.data.resize(faces.data.size() + 12 * sides);
 
 	float2 rv = float2(radius, 0);
 	float h = height;
@@ -24,20 +24,20 @@ void DebugGraphics::push_cylinder (float3 center, float radius, float height, lr
 
 		prev_rot = mb;
 
-		faces.mesh[i*12 +  0] = { center +float3(0,0,     +h/2), col };
-		faces.mesh[i*12 +  1] = { center +float3(ma * rv, +h/2), col };
-		faces.mesh[i*12 +  2] = { center +float3(mb * rv, +h/2), col };
+		faces.data[i*12 +  0] = { center +float3(0,0,     +h/2), col };
+		faces.data[i*12 +  1] = { center +float3(ma * rv, +h/2), col };
+		faces.data[i*12 +  2] = { center +float3(mb * rv, +h/2), col };
 
-		faces.mesh[i*12 +  3] = { center +float3(mb * rv, -h/2), col };
-		faces.mesh[i*12 +  4] = { center +float3(mb * rv, +h/2), col };
-		faces.mesh[i*12 +  5] = { center +float3(ma * rv, -h/2), col };
-		faces.mesh[i*12 +  6] = { center +float3(ma * rv, -h/2), col };
-		faces.mesh[i*12 +  7] = { center +float3(mb * rv, +h/2), col };
-		faces.mesh[i*12 +  8] = { center +float3(ma * rv, +h/2), col };
+		faces.data[i*12 +  3] = { center +float3(mb * rv, -h/2), col };
+		faces.data[i*12 +  4] = { center +float3(mb * rv, +h/2), col };
+		faces.data[i*12 +  5] = { center +float3(ma * rv, -h/2), col };
+		faces.data[i*12 +  6] = { center +float3(ma * rv, -h/2), col };
+		faces.data[i*12 +  7] = { center +float3(mb * rv, +h/2), col };
+		faces.data[i*12 +  8] = { center +float3(ma * rv, +h/2), col };
 
-		faces.mesh[i*12 +  9] = { center +float3(0,0,     -h/2), col };
-		faces.mesh[i*12 + 10] = { center +float3(mb * rv, -h/2), col };
-		faces.mesh[i*12 + 11] = { center +float3(ma * rv, -h/2), col };
+		faces.data[i*12 +  9] = { center +float3(0,0,     -h/2), col };
+		faces.data[i*12 + 10] = { center +float3(mb * rv, -h/2), col };
+		faces.data[i*12 + 11] = { center +float3(ma * rv, -h/2), col };
 	}
 }
 

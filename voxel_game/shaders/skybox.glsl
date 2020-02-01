@@ -1,7 +1,7 @@
-#version 150 core // version 3.2
+#version 330 core
 
 $if vertex
-	in		vec3	world_dir;
+	layout (location = 0) in vec3 world_dir;
 	
 	out		vec3	vs_world_dir;
 

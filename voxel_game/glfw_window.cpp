@@ -179,11 +179,13 @@ void toggle_fullscreen () {
 
 //// gameloop
 void glfw_gameloop () {
+#if 0 // actually using VAOs now
 	GLuint vao;
 	if (VAO_REQUIRED) {
 		glGenVertexArrays(1, &vao);
 		glBindVertexArray(vao);
 	}
+#endif
 
 	shader_manager = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
@@ -234,9 +236,11 @@ void glfw_gameloop () {
 	shader_manager = nullptr;
 	debug_graphics = nullptr;
 
+#if 0
 	if (VAO_REQUIRED) {
 		glDeleteVertexArrays(1, &vao);
 	}
+#endif
 }
 
 void glfw_error (int err, const char* msg) {

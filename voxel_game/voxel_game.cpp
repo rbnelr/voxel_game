@@ -25,6 +25,9 @@ using namespace kiss;
 #include "stb_image.hpp"
 #include "gl.hpp"
 
+#define _STRINGIFY(x) #x
+#define STRINGIFY(x) _STRINGIFY(x)
+
 #define PROFILE_BEGIN(name)	auto __profile_##name = Timer::start()
 #define PROFILE_END_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (__profile_##name).end() * 1000, __VA_ARGS__)
 
@@ -100,9 +103,18 @@ Game::Game () {
 
 		regen_dbg_heightmap_visualize();
 	}
+
+	glGenVertexArrays(1, &vao);
+}
+
+Game::~Game () {
+	glDeleteVertexArrays(1, &vao);
 }
 
 void Game::frame () {
+
+	glBindVertexArray(vao);
+
 	{
 		bool fullscreen = get_fullscreen();
 		if (ImGui::Checkbox("fullscreen", &fullscreen)) {
@@ -793,6 +805,7 @@ void Game::frame () {
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
 	if (shad_blocks->valid()) {
 
