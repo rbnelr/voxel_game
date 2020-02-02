@@ -147,6 +147,7 @@ void ChunkGraphics::draw_chunks (Chunks& chunks) {
 
 		glActiveTexture(GL_TEXTURE0 + 0);
 		test.bind();
+		sampler.bind(0);
 
 		for (auto& kv : chunks.chunks) {
 			Chunk* chunk = &kv.second;

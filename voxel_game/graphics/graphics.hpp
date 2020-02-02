@@ -114,9 +114,15 @@ struct ChunkGraphics {
 
 	Shader shader = Shader("blocks");
 
+	Sampler2D sampler;
+
 	//TileTexture tile_texture;
 
 	Texture2D test = { "textures/earth.png" };
+
+	void imgui () {
+		sampler.imgui("Texture 1");
+	}
 
 	void draw_chunks (Chunks& chunks);
 };

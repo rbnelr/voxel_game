@@ -108,6 +108,14 @@ void Game::frame () {
 	input.imgui();
 
 	{
+		bool open = ImGui::CollapsingHeader("Graphics");
+
+		if (open) chunk_graphics.imgui();
+
+		if (open) ImGui::Separator();
+	}
+
+	{
 		bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
 		
 		if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
@@ -119,12 +127,12 @@ void Game::frame () {
 			player.respawn();
 		}
 
-		ImGui::Separator();
+		if (open) ImGui::Separator();
 
 		if (open) flycam.imgui();
 		if (open) player.imgui();
 
-		ImGui::Separator();
+		if (open) ImGui::Separator();
 	}
 
 	//if (option("noise_tree_desity_period", &noise_tree_desity_period))	trigger_regen_chunks = true;

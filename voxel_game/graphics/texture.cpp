@@ -49,6 +49,8 @@ void Texture2D::upload (int2 size, void* data, bool gen_mips, GLenum internal_fo
 
 	if (gen_mips && size.x != 1 || size.y != 1) {
 		glGenerateMipmap(GL_TEXTURE_2D);
+	} else {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	}
 }
 

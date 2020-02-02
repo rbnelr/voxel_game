@@ -33,6 +33,19 @@ namespace gl {
 		INT				= GL_INT,
 		UNSIGNED_BYTE	= GL_UNSIGNED_BYTE,
 		BOOL			= GL_BOOL,
+
+		NEAREST					= GL_NEAREST,
+		LINEAR					= GL_LINEAR,
+		NEAREST_MIPMAP_NEAREST	= GL_NEAREST_MIPMAP_NEAREST,
+		LINEAR_MIPMAP_NEAREST	= GL_LINEAR_MIPMAP_NEAREST,
+		NEAREST_MIPMAP_LINEAR	= GL_NEAREST_MIPMAP_LINEAR,
+		LINEAR_MIPMAP_LINEAR	= GL_LINEAR_MIPMAP_LINEAR,
+
+		REPEAT					= GL_REPEAT,
+		MIRRORED_REPEAT			= GL_MIRRORED_REPEAT,
+		CLAMP_TO_EDGE			= GL_CLAMP_TO_EDGE,
+		CLAMP_TO_BORDER			= GL_CLAMP_TO_BORDER,
+		MIRROR_CLAMP_TO_EDGE	= GL_MIRROR_CLAMP_TO_EDGE,
 	};
 
 	// Simple VBO class to manage lifetime
@@ -97,6 +110,22 @@ namespace gl {
 		}
 
 		operator GLuint () const { return tex; }
+	};
+
+	// Sampler Sampler class to manage lifetime
+	class Sampler {
+		MOVE_ONLY_CLASS_DECL(Sampler)
+		GLuint sampler;
+	public:
+
+		Sampler () {
+			glGenSamplers(1, &sampler);
+		}
+		~Sampler () {
+			glDeleteSamplers(1, &sampler);
+		}
+
+		operator GLuint () const { return sampler; }
 	};
 }
 
@@ -319,4 +348,3 @@ public:
 		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_count);
 	}
 };
-

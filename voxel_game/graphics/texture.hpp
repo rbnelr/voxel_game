@@ -1,6 +1,104 @@
 #pragma once
 #include "gl.hpp"
 #include "image.hpp"
+#include "../dear_imgui.hpp"
+
+class Sampler2D {
+	gl::Sampler sampler;
+
+public:
+	gl::Enum mag_filter = gl::Enum::NEAREST;
+	gl::Enum min_filter = gl::Enum::LINEAR_MIPMAP_LINEAR;
+
+	gl::Enum wrap_s = gl::Enum::REPEAT;
+	gl::Enum wrap_t = gl::Enum::REPEAT;
+
+	int mipmap_levels = 1000;
+
+	float lod_bias = 0;
+
+	float anisotropy = 16;
+
+	Sampler2D () {
+		set();
+	}
+
+	void set () {
+		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, (GLint)mag_filter);
+		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, (GLint)min_filter);
+
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, (GLint)wrap_s);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, (GLint)wrap_t);
+
+		glSamplerParameteri(sampler, GL_TEXTURE_MAX_LOD, mipmap_levels);
+		glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, lod_bias);
+
+		if (GLAD_GL_ARB_texture_filter_anisotropic)
+			glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY, anisotropy);
+		else if (GLAD_GL_EXT_texture_filter_anisotropic)
+			glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
+	}
+
+	void bind (int texture_unit) {
+		glBindSampler(texture_unit, sampler);
+	}
+
+	void imgui (const char* name) {
+		using namespace gl;
+		static constexpr Enum mag_filters[] = { Enum::NEAREST, Enum::LINEAR };
+		static constexpr const char* mag_filters_str = "NEAREST\0LINEAR";
+
+		static constexpr Enum min_filters[] = {
+			Enum::NEAREST, Enum::LINEAR, Enum::NEAREST_MIPMAP_NEAREST, Enum::LINEAR_MIPMAP_NEAREST, Enum::NEAREST_MIPMAP_LINEAR, Enum::LINEAR_MIPMAP_LINEAR	};
+		static constexpr const char* min_filters_str = "NEAREST\0LINEAR\0NEAREST_MIPMAP_NEAREST\0LINEAR_MIPMAP_NEAREST\0NEAREST_MIPMAP_LINEAR\0LINEAR_MIPMAP_LINEAR";
+
+		static constexpr Enum wraps[] = { Enum::REPEAT, Enum::MIRRORED_REPEAT, Enum::CLAMP_TO_EDGE, Enum::CLAMP_TO_BORDER, Enum::MIRROR_CLAMP_TO_EDGE };
+		static constexpr const char* wraps_str = "REPEAT\0MIRRORED_REPEAT\0CLAMP_TO_EDGE\0CLAMP_TO_BORDER\0MIRROR_CLAMP_TO_EDGE";
+
+		if (!imgui_push(name, "Sampler2D")) return;
+
+		auto _indexof = [] (gl::Enum const* arr, gl::Enum val) {
+			for (int i=0; i<100; ++i) {
+				if (arr[i] == val)
+					return i;
+			}
+			return 0;
+		};
+
+		bool changed = false;
+
+		int cur = _indexof(mag_filters, mag_filter);
+		changed = ImGui::Combo("mag_filter", &cur, mag_filters_str) || changed;
+		mag_filter = mag_filters[cur];
+
+		cur = _indexof(min_filters, min_filter);
+		changed = ImGui::Combo("min_filter", &cur, min_filters_str) || changed;
+		min_filter = min_filters[cur];
+
+		cur = _indexof(wraps, wrap_s);
+		changed = ImGui::Combo("wrap_s", &cur, wraps_str) || changed;
+		wrap_s = wraps[cur];
+
+		cur = _indexof(wraps, wrap_t);
+		changed = ImGui::Combo("wrap_t", &cur, wraps_str) || changed;
+		wrap_t = wraps[cur];
+
+		cur = mipmap_levels == 1000 ? 0 : mipmap_levels;
+		changed = ImGui::SliderInt("mipmap_levels", &cur, 0, 20) || changed;
+		mipmap_levels = cur == 0 ? 1000 : cur;
+
+		changed = ImGui::SliderFloat("lod_bias", &lod_bias, -2, 2) || changed;
+
+		cur = roundi(anisotropy);
+		changed = ImGui::SliderInt("anisotropy", &cur, 1, 16) || changed;
+		anisotropy = (float)cur;
+
+		imgui_pop();
+
+		if (changed)
+			set();
+	}
+};
 
 class Texture2D {
 	//std::string name;
@@ -29,6 +127,9 @@ public:
 	inline Texture2D (Image<uint8v4> const& img, bool srgb, bool gen_mips) {
 		upload(img, srgb, gen_mips);
 	}
+
+	// Manual uploading of mipmaps might require
+	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
 
 	// Upload image to mipmap
 	void upload_mip (int mip, int2 size, void* data, GLenum internal_format, GLenum format, GLenum type);

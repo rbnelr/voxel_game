@@ -21,4 +21,9 @@ namespace gl {
 	void swap (Texture& l, Texture& r) {
 		std::swap(l.tex, r.tex);
 	}
+
+	MOVE_ONLY_CLASS_DEF(Sampler)
+		void swap (Sampler& l, Sampler& r) {
+		std::swap(l.sampler, r.sampler);
+	}
 }
