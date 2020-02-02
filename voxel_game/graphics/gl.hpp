@@ -96,7 +96,7 @@ namespace gl {
 		operator GLuint () const { return ubo; }
 	};
 
-	// Simple UBO class to manage lifetime
+	// Simple Texture class to manage lifetime
 	class Texture {
 		MOVE_ONLY_CLASS_DECL(Texture)
 		GLuint tex;

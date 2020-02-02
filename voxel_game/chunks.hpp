@@ -88,27 +88,38 @@ struct Chunks {
 	void remove (chunk_pos chunk_pos);
 };
 
+#define AVOID_QUERY_CHUNK_HASH_LOOKUP 1
+
 struct Chunk_Mesher {
 	std::vector<ChunkMesh::Vertex>* opaque_vertices;
 
-	#define AVOID_QUERY_CHUNK_HASH_LOOKUP 1
-	
-	#if AVOID_QUERY_CHUNK_HASH_LOOKUP
+#if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	Chunk* neighbour_chunks[3][3];
 	
 	Block const* query_block (bpos_t pos_x, bpos_t pos_y, bpos_t pos_z);
 	Block const* query_block (bpos p) {
 		return query_block(p.x, p.y, p.z);
 	}
-	#else
+#else
 	Block const* query_block (bpos_t pos_x, bpos_t pos_y, bpos_t pos_z) {
 		return ::query_block(bpos(pos_x,pos_y,pos_z));
 	}
 	Block const* query_block (bpos p) {
 		return ::query_block(p);
 	}
-	#endif
-	
+#endif
+
+	// per block
+	Block const* b;
+
+	bpos_t block_pos_x;
+	bpos_t block_pos_y;
+	bpos_t block_pos_z;
+
+	BlockTileInfo tile;
+
+	lrgba color;
+
 	float brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {
 		int brightness = 0;
 		
@@ -117,10 +128,12 @@ struct Chunk_Mesher {
 		brightness += query_block(vert_pos +plane -axis_a -axis_b)->dark ? 0 : 1;
 		brightness += query_block(vert_pos +plane      +0 -axis_b)->dark ? 0 : 1;
 		
-		return (float)brightness;
+		static constexpr float LUT[] = { 0.02f, 0.08f, 0.3f, 0.6f, 1.0f };
+
+		return LUT[brightness];
 	}
 	
-	void mesh (Chunks& chunks, Chunk* chunk);
+	void mesh (Chunks& chunks, ChunkGraphics& graphics, Chunk* chunk);
 
 	#define XL (block_pos_x)
 	#define YL (block_pos_y)
@@ -152,16 +165,13 @@ struct Chunk_Mesher {
 		else \
 			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]);
 	
-	// per block
-	Block const* b;
-	bpos_t block_pos_x;
-	bpos_t block_pos_y;
-	bpos_t block_pos_z;
-	int texture_base_index;
-	lrgba color;
-
 	float calc_texture_index (BlockFace face) {
-		return 0;
+		int index = tile.base_index;
+		if (face == BF_POS_Z)
+			index += tile.top;
+		else if (face == BF_NEG_Z)
+			index += tile.bottom;
+		return (float)index;
 	}
 
 	void face_nx (std::vector<ChunkMesh::Vertex>* verts) {
@@ -336,10 +346,10 @@ public:
 		return chunk_pos_world(coord);
 	}
 	
-	void remesh (Chunks& chunks) {
+	void remesh (Chunks& chunks, ChunkGraphics& graphics) {
 		Chunk_Mesher mesher;
 		
-		mesher.mesh(chunks, this);
+		mesher.mesh(chunks, graphics, this);
 		
 		needs_remesh = false;
 	}
@@ -401,14 +411,14 @@ inline Block const* Chunk_Mesher::query_block (bpos_t pos_x, bpos_t pos_y, bpos_
 }
 #endif
 
-inline void Chunk_Mesher::mesh (Chunks& chunks, Chunk* chunk) {
+inline void Chunk_Mesher::mesh (Chunks& chunks, ChunkGraphics& graphics, Chunk* chunk) {
 	//PROFILE_BEGIN(profile_remesh_total);
 	
 	opaque_vertices = &chunk->mesh.vertex_data;
 	
 	opaque_vertices->clear();
 	
-	#if AVOID_QUERY_CHUNK_HASH_LOOKUP
+#if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	neighbour_chunks[0][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,-1));
 	neighbour_chunks[0][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,-1));
 	neighbour_chunks[0][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,-1));
@@ -418,7 +428,7 @@ inline void Chunk_Mesher::mesh (Chunks& chunks, Chunk* chunk) {
 	neighbour_chunks[2][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,+1));
 	neighbour_chunks[2][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,+1));
 	neighbour_chunks[2][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,+1));
-	#endif
+#endif
 	
 	{
 		bpos i;
@@ -433,7 +443,7 @@ inline void Chunk_Mesher::mesh (Chunks& chunks, Chunk* chunk) {
 						block_pos_x = i.x;
 						block_pos_y = i.y;
 						block_pos_z = i.z;
-						texture_base_index = get_block_texture_base_index(b->type);
+						tile = graphics.tile_textures.block_tile_info[b->type];
 						
 						if (block_props[block->type].transparency == TM_TRANSP_MASS)
 							cube_transperant();

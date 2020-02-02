@@ -794,7 +794,7 @@ void Game::frame () {
 			Chunk* chunk = &kv.second;
 
 			if (chunk->needs_remesh) {
-				chunk->remesh(chunks);
+				chunk->remesh(chunks, chunk_graphics);
 				++count;
 			}
 		}

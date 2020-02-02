@@ -94,17 +94,46 @@ struct ChunkMesh {
 	Mesh<Vertex> gpu_mesh;
 };
 
+struct BlockTileInfo {
+	int base_index;
+
+	//int anim_frames = 1;
+	//int variations = 1;
+
+	// side is always at base_index
+	int top = 0; // base_index + top to get block top tile
+	int bottom = 0; // base_index + bottom to get block bottom tile
+
+	//bool random_rotation = false;
+};
+
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
-struct TileTexture {
-	//Texture2D texture;
+struct TileTextures {
+	Texture2DArray tile_textures;
+	Texture2DArray breaking_textures;
 
-	int tile_base_index[BLOCK_TYPES_COUNT];
+	BlockTileInfo block_tile_info[BLOCK_TYPES_COUNT];
 
-	TileTexture ();
+	int2 tile_size;
+
+	int breaking_index = 0;
+	int breaking_frames_count = 1;
+
+	float breaking_mutliplier = 1.15f;
+
+	TileTextures ();
 
 	inline int get_tile_base_index (block_type bt) {
-		return tile_base_index[bt];
+		return block_tile_info[bt].base_index;
+	}
+
+	void imgui (const char* name) {
+		if (!imgui_push(name, "TileTextures")) return;
+
+		ImGui::SliderFloat("breaking_mutliplier", &breaking_mutliplier, 0, 3);
+
+		imgui_pop();
 	}
 };
 
@@ -116,12 +145,12 @@ struct ChunkGraphics {
 
 	Sampler2D sampler;
 
-	//TileTexture tile_texture;
-
-	Texture2D test = { "textures/earth.png" };
+	TileTextures tile_textures;
 
 	void imgui () {
-		sampler.imgui("Texture 1");
+		sampler.imgui("sampler");
+
+		tile_textures.imgui("tile_textures");
 	}
 
 	void draw_chunks (Chunks& chunks);

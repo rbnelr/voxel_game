@@ -206,3 +206,53 @@ public:
 		upload(img.size, (void*)img.data(), gen_mips, GL_RGBA32F, GL_RGBA, GL_FLOAT);
 	}
 };
+
+class Texture2DArray {
+	gl::Texture tex;
+
+public:
+	int2 size; // size in pixels
+	int count; // number of slots in array
+
+	Texture2DArray ();
+
+	// Construct empty Texture2D (can upload images later)
+	template <typename T, bool srgb=true>
+	Texture2DArray (int2 size, int count) {
+		alloc<T, srgb>(size, count);
+	}
+
+	// Upload one image to slot in texture array
+	void alloc (int2 size, int count, GLenum internal_format);
+
+	// Upload one image to slot in texture array
+	void upload (int index, void* data, GLenum format, GLenum type);
+
+	void gen_mipmaps ();
+
+	template <typename T, bool srgb>
+	void alloc (int2 size, int count);
+
+	template<> void alloc<uint8, false> (int2 size, int count) {
+		alloc(size, count, GL_R8);
+	}
+	template<> void alloc<uint8v4, false> (int2 size, int count) {
+		alloc(size, count, GL_RGBA8);
+	}
+	template<> void alloc<uint8v4, true> (int2 size, int count) {
+		alloc(size, count, GL_SRGB8_ALPHA8);
+	}
+
+	// Upload new image to mipmap
+	inline void upload (int index, Image<uint8> const& img) {
+		assert(equal(img.size, size));
+		upload(index, (void*)img.data(), GL_RED, GL_UNSIGNED_BYTE);
+	}
+	// Upload new image to mipmap
+	inline void upload (int index, Image<uint8v4> const& img) {
+		assert(equal(img.size, size));
+		upload(index, (void*)img.data(), GL_RGBA, GL_UNSIGNED_BYTE);
+	}
+
+	void bind ();
+};

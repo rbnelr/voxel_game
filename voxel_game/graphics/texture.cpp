@@ -2,11 +2,17 @@
 #include "../stb_image.hpp"
 
 Texture2D::Texture2D () {
-	
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,		GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,		GL_LINEAR_MIPMAP_LINEAR);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,			GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,			GL_REPEAT);
 }
 
 // Construct by loading from file
-Texture2D::Texture2D (char const* filename, bool gen_mips) {
+Texture2D::Texture2D (char const* filename, bool gen_mips): Texture2D() {
 	bool flt = stbi_is_hdr(filename);
 	int channels;
 	int2 size;
@@ -56,4 +62,39 @@ void Texture2D::upload (int2 size, void* data, bool gen_mips, GLenum internal_fo
 
 void Texture2D::bind () {
 	glBindTexture(GL_TEXTURE_2D, tex);
+}
+
+Texture2DArray::Texture2DArray () {
+	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER,		GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER,		GL_LINEAR_MIPMAP_LINEAR);
+
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S,			GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T,			GL_REPEAT);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+}
+
+void Texture2DArray::alloc (int2 size, int count, GLenum internal_format) {
+	this->size = size;
+	this->count = count;
+
+	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, internal_format, size.x, size.y, count);
+}
+
+void Texture2DArray::upload (int index, void* data, GLenum format, GLenum type) {
+	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, index, size.x, size.y, 1, format, type, data);
+}
+
+void Texture2DArray::gen_mipmaps () {
+	if (size.x != 1 || size.y != 1) {
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+}
+
+void Texture2DArray::bind () {
+	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
 }

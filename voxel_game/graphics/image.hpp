@@ -37,6 +37,7 @@ struct Image {
 	int2 size = -1;
 
 	Image () {}
+	Image (int2 size): pixels{std::unique_ptr<T[], deleter_free>((T*)malloc(size.x * size.y * sizeof(T)))}, size{size} {}
 	Image (std::unique_ptr<T[], deleter_free> pixels, int2 size): pixels{std::move(pixels)}, size{size} {}
 	
 	// Loads a image file from disk
@@ -108,8 +109,6 @@ struct Image {
 					assert(false);
 			}
 		}
-
-		assert(n == format.channels);
 
 		*out = Image( std::unique_ptr<T[], deleter_free>((T*)pixels), size );
 		return true;

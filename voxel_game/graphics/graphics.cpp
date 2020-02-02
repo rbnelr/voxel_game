@@ -1,5 +1,7 @@
 #include "graphics.hpp"
 #include "../chunks.hpp"
+#include "../util/string.hpp"
+using namespace kiss;
 
 //
 
@@ -141,13 +143,150 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	}
 }
 
+inline Image<srgba8> get_sub_tile (Image<srgba8> const& c, int2 pos, int2 size) {
+	auto i = Image<srgba8>(size);
+	for (int y=0; y<size.y; ++y) {
+		for (int x=0; x<size.x; ++x) {
+			auto C = c.get(x + pos.x * size.x, y + pos.y * size.y);
+			i.set(x,y, C);
+		}
+	}
+	return i;
+}
+
+struct TileLoader {
+	std::vector< Image<srgba8> > images;
+	int2 size;
+
+	int add_texture (Image<srgba8>&& img) {
+		if (images.size() == 0) {
+			size = img.size;
+		} else {
+			if (!equal(size, img.size)) {
+				fprintf(stderr, "Texture size does not match textures/missing.png, all textures must be of the same size!\n");
+				assert(false);
+				return 0;
+			}
+		}
+
+		int index = (int)images.size();
+		images.emplace_back(std::move(img));
+		return index;
+	}
+
+	void set_alpha (Image<srgba8>& c, Image<uint8> const& a) {
+		for (int y=0; y<c.size.y; ++y) {
+			for (int x=0; x<c.size.x; ++x) {
+				auto C = c.get(x,y);
+				auto A = a.get(x,y);
+				C.w = A;
+				c.set(x,y, C);
+			}
+		}
+	}
+
+	BlockTileInfo add_block (block_type bt) {
+		auto name = BLOCK_NAMES[bt];
+		
+		if (!name)
+			return {0};
+
+		auto color_filename = prints("textures/%s.png", name);
+		auto alpha_filename = prints("textures/%s.alpha.png", name);
+		
+		Image<srgba8> color;
+		Image<uint8> alpha;
+
+		if (!Image<srgba8>::load_file(color_filename.c_str(), &color))
+			return {0};
+
+		bool has_alpha = Image<uint8>::load_file(alpha_filename.c_str(), &alpha);
+
+		if (has_alpha && !equal(color.size, alpha.size)) {
+			fprintf(stderr, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!\n");
+			assert(false);
+			return {0};
+		}
+
+		if (has_alpha)
+			set_alpha(color, alpha);
+		
+		BlockTileInfo info;
+		info.base_index = (int)images.size();
+
+		if (color.size.y == size.x) {
+
+			add_texture(std::move(color));
+
+		} else if (color.size.y == size.x*2) {
+
+			info.top = 1;
+			info.bottom = 1;
+			add_texture(get_sub_tile(color, int2(0,0), size));
+			add_texture(get_sub_tile(color, int2(0,1), size));
+
+		} else if (color.size.y == size.x*3) {
+
+			info.top = 1;
+			info.bottom = 2;
+			add_texture(get_sub_tile(color, int2(0,1), size));
+			add_texture(get_sub_tile(color, int2(0,2), size));
+			add_texture(get_sub_tile(color, int2(0,0), size));
+
+		}
+		
+		return info;
+	}
+};
+
+TileTextures::TileTextures () {
+	{
+		TileLoader tl;
+
+		tl.add_texture(Image<srgba8>("textures/missing.png"));
+
+		for (int i=0; i<BLOCK_TYPES_COUNT; ++i) {
+			block_tile_info[i] = tl.add_block((block_type)i);
+		}
+
+		tile_size = tl.size;
+
+		tile_textures.alloc<srgba8, true>(tl.size, (int)tl.images.size());
+		for (int i=0; i<(int)tl.images.size(); ++i) {
+			tile_textures.upload(i, tl.images[i]);
+		}
+	}
+
+	{
+		auto breaking = Image<srgba8>("textures/breaking.png");
+
+		breaking_frames_count = breaking.size.y / tile_size.x;
+
+		breaking_textures.alloc<uint8, false>(tile_size, breaking_frames_count);
+
+		for (int i=0; i<breaking_frames_count; ++i) {
+			breaking_textures.upload(i, get_sub_tile(breaking, int2(0,i), tile_size));
+		}
+	}
+}
+
 void ChunkGraphics::draw_chunks (Chunks& chunks) {
 	if (shader) {
 		shader.bind();
 
+		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+
 		glActiveTexture(GL_TEXTURE0 + 0);
-		test.bind();
+		tile_textures.tile_textures.bind();
 		sampler.bind(0);
+
+		glActiveTexture(GL_TEXTURE0 + 1);
+		tile_textures.breaking_textures.bind();
+		sampler.bind(1);
 
 		for (auto& kv : chunks.chunks) {
 			Chunk* chunk = &kv.second;
