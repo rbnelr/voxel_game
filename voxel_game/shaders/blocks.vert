@@ -1,6 +1,6 @@
 #version 150 core // version 3.2
 
-$include "common.vert"
+$include "_common.vert"
 
 in		vec3	pos_world;
 in		vec4	uvzw_atlas;

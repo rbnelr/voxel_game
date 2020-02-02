@@ -1,5 +1,5 @@
 
-$include "common.glsl"
+$include "_common.glsl"
 
 in		vec3	vs_barycentric;
 

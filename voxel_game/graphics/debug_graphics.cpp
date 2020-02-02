@@ -9,7 +9,9 @@ void DebugGraphics::push_wire_cube (float3 center, float size, lrgba col) {
 // draw arrow
 
 void DebugGraphics::push_cylinder (float3 center, float radius, float height, lrgba col, int sides) {
-	faces.data.resize(faces.data.size() + 12 * sides);
+	faces.resize(faces.size() + 12 * sides);
+
+	col = lrgba(0, 1, 0, 1);
 
 	float2 rv = float2(radius, 0);
 	float h = height;
@@ -24,44 +26,57 @@ void DebugGraphics::push_cylinder (float3 center, float radius, float height, lr
 
 		prev_rot = mb;
 
-		faces.data[i*12 +  0] = { center +float3(0,0,     +h/2), col };
-		faces.data[i*12 +  1] = { center +float3(ma * rv, +h/2), col };
-		faces.data[i*12 +  2] = { center +float3(mb * rv, +h/2), col };
+		faces[i*12 +  0] = { center +float3(0,0,     +h/2), col };
+		faces[i*12 +  1] = { center +float3(ma * rv, +h/2), col };
+		faces[i*12 +  2] = { center +float3(mb * rv, +h/2), col };
 
-		faces.data[i*12 +  3] = { center +float3(mb * rv, -h/2), col };
-		faces.data[i*12 +  4] = { center +float3(mb * rv, +h/2), col };
-		faces.data[i*12 +  5] = { center +float3(ma * rv, -h/2), col };
-		faces.data[i*12 +  6] = { center +float3(ma * rv, -h/2), col };
-		faces.data[i*12 +  7] = { center +float3(mb * rv, +h/2), col };
-		faces.data[i*12 +  8] = { center +float3(ma * rv, +h/2), col };
+		faces[i*12 +  3] = { center +float3(mb * rv, -h/2), col };
+		faces[i*12 +  4] = { center +float3(mb * rv, +h/2), col };
+		faces[i*12 +  5] = { center +float3(ma * rv, -h/2), col };
+		faces[i*12 +  6] = { center +float3(ma * rv, -h/2), col };
+		faces[i*12 +  7] = { center +float3(mb * rv, +h/2), col };
+		faces[i*12 +  8] = { center +float3(ma * rv, +h/2), col };
 
-		faces.data[i*12 +  9] = { center +float3(0,0,     -h/2), col };
-		faces.data[i*12 + 10] = { center +float3(mb * rv, -h/2), col };
-		faces.data[i*12 + 11] = { center +float3(ma * rv, -h/2), col };
+		faces[i*12 +  9] = { center +float3(0,0,     -h/2), col };
+		faces[i*12 + 10] = { center +float3(mb * rv, -h/2), col };
+		faces[i*12 + 11] = { center +float3(ma * rv, -h/2), col };
 	}
 }
 
-void DebugGraphics::draw (Camera_View& view) {
+void DebugGraphics::draw () {
+	if (shader) {
+		shader.bind();
 
+		//glDisable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
 
 		//// triangles
 		//glDisable(GL_CULL_FACE);
-		//glDisable(GL_DEPTH_TEST);
 
-		faces.draw(shader, view);
+		if (faces.size() != 0) {
+			faces_mesh.upload(faces);
 
-		//glEnable(GL_DEPTH_TEST);
+			faces_mesh.bind();
+			faces_mesh.draw();
+		}
+
 		//glEnable(GL_CULL_FACE);
 
 		//// lines
-		//glDisable(GL_DEPTH_TEST);
 
-		lines.draw(shader, view);
+		if (lines.size() != 0) {
+			lines_mesh.upload(lines);
 
-		//glEnable(GL_DEPTH_TEST);
+			lines_mesh.bind();
+			lines_mesh.draw();
+		}
 
 		glDisable(GL_BLEND);
+		//glEnable(GL_DEPTH_TEST);
+	}
+
+	faces.clear();
+	lines.clear();
 }
 
 std::unique_ptr<DebugGraphics> debug_graphics = nullptr;

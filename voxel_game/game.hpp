@@ -32,6 +32,7 @@ extern float detail1_freq, detail1_amp;
 extern float detail2_freq, detail2_amp;
 
 #include "gl.hpp"
+#include "graphics/common.hpp"
 #include "blocks.hpp"
 #include "input.hpp"
 #include "graphics/camera.hpp"
@@ -230,14 +231,16 @@ class Game {
 
 	bool activate_flycam = false;
 
-	Player player = Player("player");
+	Player player = { "player" };
 
-	Flycam flycam = Flycam("flycam", float3(-5, -10, 50), float3(0, deg(80), 0), 12);
+	Flycam flycam = { "flycam", float3(-5, -10, 50), float3(0, deg(80), 0), 12 };
 
 	bool trigger_place_block = false;
 
 	Shader_old* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	
+	CommonUniforms common_uniforms;
+
 	SkyboxGraphics skybox_graphics;
 	BlockHighlightGraphics block_highlight_graphics;
 

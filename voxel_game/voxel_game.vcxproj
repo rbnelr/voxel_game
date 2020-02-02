@@ -181,11 +181,12 @@
     <ClInclude Include="glad\khrplatform.h" />
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="graphics\camera.hpp" />
+    <ClInclude Include="graphics\common.hpp" />
     <ClInclude Include="graphics\debug_graphics.hpp" />
     <ClInclude Include="graphics\graphics.hpp" />
     <ClInclude Include="graphics\gl.hpp" />
     <ClInclude Include="graphics\glshader.hpp" />
-    <ClInclude Include="graphics\util.hpp" />
+    <ClInclude Include="graphics\shader_manager.hpp" />
     <ClInclude Include="input.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="kissmath.hpp" />
@@ -240,11 +241,12 @@
     <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
+    <ClCompile Include="graphics\common.cpp" />
     <ClCompile Include="graphics\debug_graphics.cpp" />
     <ClCompile Include="graphics\graphics.cpp" />
     <ClCompile Include="graphics\gl.cpp" />
     <ClCompile Include="graphics\glshader.cpp" />
-    <ClCompile Include="graphics\util.cpp" />
+    <ClCompile Include="graphics\shader_manager.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />
@@ -284,13 +286,14 @@
     <None Include="shaders\blocks.frag" />
     <None Include="shaders\blocks.vert" />
     <None Include="shaders\block_highlight.glsl" />
-    <None Include="shaders\common.frag" />
     <None Include="shaders\common.glsl" />
-    <None Include="shaders\common.vert" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\texture_window_tex.frag" />
     <None Include="shaders\texture_window_tex.vert" />
+    <None Include="shaders\_common.frag" />
+    <None Include="shaders\_common.glsl" />
+    <None Include="shaders\_common.vert" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt" />

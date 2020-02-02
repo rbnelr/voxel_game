@@ -163,7 +163,10 @@
     <ClInclude Include="graphics\gl.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\util.hpp">
+    <ClInclude Include="graphics\common.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\shader_manager.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
@@ -309,7 +312,10 @@
     <ClCompile Include="graphics\gl.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\util.cpp">
+    <ClCompile Include="graphics\common.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\shader_manager.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -318,15 +324,6 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\blocks.vert">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\common.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\common.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\common.vert">
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\texture_window_tex.frag">
@@ -342,6 +339,18 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\block_highlight.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\common.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\_common.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\_common.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\_common.vert">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

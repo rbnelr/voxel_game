@@ -43,13 +43,13 @@ struct SkyboxGraphics {
 		}
 	};
 
-	Shader shader = Shader("skybox");
+	Shader shader = { "skybox" };
 
 	Mesh<Vertex> mesh; // a inward facing cube of size 1
 
 	SkyboxGraphics ();
 
-	void draw (Camera_View& view);
+	void draw ();
 };
 
 struct BlockHighlightGraphics {
@@ -64,13 +64,13 @@ struct BlockHighlightGraphics {
 		}
 	};
 
-	Shader shader = Shader("block_highlight");
+	Shader shader = { "block_highlight" };
 
 	Mesh<Vertex> mesh;
 
 	BlockHighlightGraphics ();
 
-	void draw (Camera_View& view, float3 pos, BlockFace face);
+	void draw (float3 pos, BlockFace face);
 };
 
 //struct ChunkMesh {

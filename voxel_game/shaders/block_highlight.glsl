@@ -1,14 +1,13 @@
 #version 330 core
 
+$include "common.glsl"
+
 $if vertex
 	layout (location = 0) in vec3 pos_model;
 	layout (location = 1) in vec4 color;
 
 	out		vec3	vs_pos_cam;
 	out		vec4	vs_color;
-
-	uniform	mat4	world_to_cam;
-	uniform	mat4	cam_to_clip;
 
 	uniform	vec3	block_pos;
 	uniform	mat3	face_rotation;

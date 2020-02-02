@@ -564,6 +564,9 @@ void Game::frame () {
 		view = player.update_post_physics();
 	}
 
+	common_uniforms.set_view_uniforms(view);
+	common_uniforms.set_debug_uniforms();
+
 	Block*	highlighted_block;
 	bpos	highlighted_block_pos;
 	int		highlighted_block_face;
@@ -876,13 +879,14 @@ void Game::frame () {
 		glDisable(GL_BLEND);
 	}
 
-	if (highlighted_block)
-		block_highlight_graphics.draw(view, (float3)highlighted_block_pos, (BlockFace)highlighted_block_face);
+	if (highlighted_block) {
+		block_highlight_graphics.draw((float3)highlighted_block_pos, (BlockFace)highlighted_block_face);
+	}
 
 	debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
 	
-	debug_graphics->draw(view);
-	skybox_graphics.draw(view);
+	debug_graphics->draw();
+	skybox_graphics.draw();
 }
 
 float elev_freq = 400, elev_amp = 25;

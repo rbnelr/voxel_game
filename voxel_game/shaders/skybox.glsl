@@ -1,12 +1,11 @@
 #version 330 core
 
+$include "common.glsl"
+
 $if vertex
 	layout (location = 0) in vec3 world_dir;
 	
 	out		vec3	vs_world_dir;
-
-	uniform	mat4	world_to_cam;
-	uniform	mat4	cam_to_clip;
 
 	void main () {
 		gl_Position =	cam_to_clip * vec4(mat3(world_to_cam) * world_dir, 1);

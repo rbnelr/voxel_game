@@ -1,6 +1,6 @@
 #version 150 core // version 3.2
 
-$include "common.frag"
+$include "_common.frag"
 
 in		vec3	vs_pos_cam;
 in		vec4	vs_uvzw_atlas;

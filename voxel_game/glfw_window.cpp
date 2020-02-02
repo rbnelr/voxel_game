@@ -233,8 +233,8 @@ void glfw_gameloop () {
 
 	imgui.destroy();
 
-	shader_manager = nullptr;
 	debug_graphics = nullptr;
+	shader_manager = nullptr;
 
 #if 0
 	if (VAO_REQUIRED) {

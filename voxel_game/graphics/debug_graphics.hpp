@@ -1,6 +1,6 @@
 #pragma once
 #include "../kissmath.hpp"
-#include "util.hpp"
+#include "shader_manager.hpp"
 
 struct DebugGraphics {
 	struct Vertex {
@@ -13,10 +13,13 @@ struct DebugGraphics {
 		}
 	};
 
-	Shader shader = Shader("overlay");
+	Shader shader = { "overlay" };
 
-	MeshStreamDrawer<Vertex> faces;
-	MeshStreamDrawer<Vertex> lines;
+	std::vector<Vertex> faces;
+	std::vector<Vertex> lines;
+
+	Mesh<Vertex> faces_mesh;
+	Mesh<Vertex> lines_mesh;
 
 	// draw quad
 	
@@ -26,7 +29,7 @@ struct DebugGraphics {
 
 	void push_cylinder (float3 center, float radius, float height, lrgba col, int sides);
 
-	void draw (Camera_View& view);
+	void draw ();
 };
 
 // global DebugGraphics

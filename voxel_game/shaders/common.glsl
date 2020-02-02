@@ -1,15 +1,20 @@
 
-uniform	vec2	mcursor_pos;
-uniform	vec2	screen_dim;
+layout(std140) uniform View {
+	// world space to cam space, ie. view transform
+	mat4 world_to_cam;
+	// cam space to world space, ie. inverse view transform
+	mat4 cam_to_world;
+	// cam space to clip space, ie. projection transform
+	mat4 cam_to_clip;
+	// viewport size in pixels
+	vec2 viewport_size;
+};
 
-vec2 mouse () {		return mcursor_pos / screen_dim; }
+layout(std140) uniform Debug {
+	// mouse cursor pos in pixels
+	vec2 cursor_pos;
+};
 
-float map (float x, float a, float b) { return (x -a) / (b -a); }
-
-#define PI 3.1415926535897932384626433832795
-
-const mat3 Z_UP_CONVENTION_TO_OPENGL_CUBEMAP_CONVENTION = mat3(
-	vec3(+1, 0, 0),
-	vec3( 0, 0,+1),
-	vec3( 0,-1, 0) );	// my z-up convention:			+x = right,		+y = forward,	+z = up
-						// opengl cubemap convention:	+x = left,		+y = down,		+z = forward
+float map (float x, float a, float b) {
+	return (x - a) / (b - a);
+}

@@ -3,6 +3,7 @@
 #include "../kissmath.hpp"
 #include "../glad/glad.h"
 #include <vector>
+#include "assert.h"
 
 /////
 // OpenGL abstractions
@@ -65,9 +66,103 @@ namespace gl {
 
 		operator GLuint () const { return vao; }
 	};
+
+	// Simple UBO class to manage lifetime
+	class Ubo {
+		MOVE_ONLY_CLASS_DECL(Ubo)
+		GLuint ubo;
+	public:
+
+		Ubo () {
+			glGenBuffers(1, &ubo);
+		}
+		~Ubo () {
+			glDeleteBuffers(1, &ubo);
+		}
+
+		operator GLuint () const { return ubo; }
+	};
 }
 
 //// user facing stuff that hopefully is generic enough to work across OpenGL, D3D, Vulkan etc.
+
+struct SharedUniformsLayoutChecker {
+	int offset = 0;
+	bool valid = true;
+
+	static constexpr int N = 4;
+
+	static constexpr int align (int offs, int alignment) {
+		int mod = offs % alignment;
+		return offs + (mod == 0 ? 0 : alignment - mod);
+	}
+
+	template <typename T>
+	static constexpr int get_align ();
+
+	template<> static constexpr int get_align<float   > () { return N; }
+	template<> static constexpr int get_align<float2  > () { return 2*N; }
+	template<> static constexpr int get_align<float3  > () { return 4*N; }
+	template<> static constexpr int get_align<float4  > () { return 4*N; }
+	template<> static constexpr int get_align<float4x4> () { return 4*N; }
+
+	template<typename T>
+	constexpr void member (int offs) {
+		offset = align(offset, get_align<T>());
+		valid = valid && offset == offs;
+		offset += sizeof(T);
+	}
+
+	template <typename T>
+	constexpr bool is_valid () {
+		return valid && sizeof(T) == offset;
+	}
+};
+
+struct SharedUniformsInfo {
+	char const* name;
+	int binding_point;
+};
+
+template <typename T>
+class SharedUniforms {
+	gl::Ubo ubo;
+
+	static constexpr bool check_std140_layout () {
+		SharedUniformsLayoutChecker c;
+		T::check_layout(c);
+		return c.is_valid<T>();
+	}
+
+	// NOTE:
+	// error C2131: expression did not evaluate to a constant
+	// note: failure was caused by call of undefined function or one not declared 'constexpr'
+	// note: see usage of 'SharedUniformsLayoutChecker::get_align'
+	// when a type is not registered via a get_align template
+	static_assert(SharedUniforms<T>::check_std140_layout(), "SharedUniforms: layout of T is not how std140 expects it!");
+
+public:
+	// needed because explicit uniform block locations are not core in OpenGL 3.3
+	SharedUniformsInfo info;
+
+	SharedUniforms (SharedUniformsInfo info): info{info} {
+		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(T), NULL, GL_STATIC_DRAW);
+
+		glBindBufferBase(GL_UNIFORM_BUFFER, info.binding_point, ubo); 
+
+		// dont unbind GL_UNIFORM_BUFFER
+	}
+
+	void set (T const& val) {
+		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+
+		glBufferData(GL_UNIFORM_BUFFER, sizeof(T), &val, GL_STATIC_DRAW);
+
+		// dont unbind GL_UNIFORM_BUFFER
+	}
+};
 
 // Required to define custom vertex formats
 class Attributes {

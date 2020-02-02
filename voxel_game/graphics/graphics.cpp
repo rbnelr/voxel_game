@@ -50,13 +50,9 @@ SkyboxGraphics::SkyboxGraphics () {
 	mesh.upload(arr, 6*6);
 }
 
-void SkyboxGraphics::draw (Camera_View& view) {
+void SkyboxGraphics::draw () {
 	if (shader) {
 		shader.bind();
-
-		shader.set_uniform("world_to_cam", (float4x4)view.world_to_cam);
-		shader.set_uniform("cam_to_world", (float4x4)view.cam_to_world);
-		shader.set_uniform("cam_to_clip", view.cam_to_clip);
 
 		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
 		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
@@ -128,13 +124,9 @@ BlockHighlightGraphics::BlockHighlightGraphics () {
 	mesh.upload(vertices);
 }
 
-void BlockHighlightGraphics::draw (Camera_View& view, float3 pos, BlockFace face) {
+void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	if (shader) {
 		shader.bind();
-
-		shader.set_uniform("world_to_cam", (float4x4)view.world_to_cam);
-		shader.set_uniform("cam_to_world", (float4x4)view.cam_to_world);
-		shader.set_uniform("cam_to_clip", view.cam_to_clip);
 
 		shader.set_uniform("block_pos", pos);
 		shader.set_uniform("face_rotation", face_rotation[face]);
