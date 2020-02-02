@@ -169,6 +169,12 @@
     <ClInclude Include="graphics\shader_manager.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="graphics\image.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\texture.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="voxel_game.cpp" />
@@ -318,14 +324,14 @@
     <ClCompile Include="graphics\shader_manager.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="graphics\image.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\texture.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\blocks.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\blocks.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\texture_window_tex.frag">
       <Filter>shaders</Filter>
     </None>
@@ -351,6 +357,15 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\_common.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\_blocks.vert">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\_blocks.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\blocks.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

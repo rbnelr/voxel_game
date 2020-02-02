@@ -45,7 +45,6 @@ namespace kissmath {
 		// truncate vector
 		int2 (int4 v);
 		
-		
 		//// Truncating cast operators
 		
 		

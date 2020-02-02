@@ -1,4 +1,5 @@
 #include "graphics.hpp"
+#include "../chunks.hpp"
 
 //
 
@@ -137,5 +138,25 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 		mesh.draw();
 
 		glDisable(GL_BLEND);
+	}
+}
+
+void ChunkGraphics::draw_chunks (Chunks& chunks) {
+	if (shader) {
+		shader.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		test.bind();
+
+		for (auto& kv : chunks.chunks) {
+			Chunk* chunk = &kv.second;
+
+			if (chunk->mesh.gpu_mesh.vertex_count != 0) {
+				shader.set_uniform("chunk_pos", (float3)chunk->chunk_pos_world());
+
+				chunk->mesh.gpu_mesh.bind();
+				chunk->mesh.gpu_mesh.draw();
+			}
+		}
 	}
 }

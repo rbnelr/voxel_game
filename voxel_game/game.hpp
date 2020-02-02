@@ -229,6 +229,8 @@ class Game {
 
 	FPS_Display fps_display;
 
+	Chunks chunks;
+
 	bool activate_flycam = false;
 
 	Player player = { "player" };
@@ -237,21 +239,23 @@ class Game {
 
 	bool trigger_place_block = false;
 
-	Shader_old* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
+	//Shader_old* shad_blocks = new_shader("blocks.vert",	"blocks.frag",	{UCOM, UMAT, UBOOL("draw_wireframe"), UBOOL("show_dbg_tint"), USI("texture_res"), USI("atlas_textures_count"), USI("breaking_frames_count"), UBOOL("alpha_test")}, {{0,"atlas"}, {1,"breaking"}});
 	
 	CommonUniforms common_uniforms;
+
+	ChunkGraphics chunk_graphics;
 
 	SkyboxGraphics skybox_graphics;
 	BlockHighlightGraphics block_highlight_graphics;
 
-	Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
+	old::Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
 
-	Texture2D_File tex_breaking = Texture2D_File(CS_LINEAR, "breaking.png");
+	old::Texture2D_File tex_breaking = old::Texture2D_File(CS_LINEAR, "breaking.png");
 
 	float chunk_drawing_radius =	_use_potatomode ? 20.0f : INF;
 	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
 
-	Texture2D dbg_heightmap_visualize = Texture2D("dbg_heightmap_visualize");
+	old::Texture2D dbg_heightmap_visualize = old::Texture2D("dbg_heightmap_visualize");
 	int dbg_heightmap_visualize_radius = 1000;
 
 	int64_t world_seed = 0;
@@ -445,22 +449,12 @@ class Game {
 	
 		for (bpos p : tree_poss) place_tree(p);
 	
-		chunk->update_whole_chunk_changed();
-	}
-
-	void generate_new_chunk (chunk_pos_t chunk_pos) {
-
-		Chunk* c = new Chunk();
-
-		c->coord = chunk_pos;
-		c->init_gl();
-		gen_chunk_blocks(c);
-
-		chunks.insert({{c->coord}, c});
+		chunk->update_whole_chunk_changed(chunks);
 	}
 
 	void inital_chunk (float3 player_pos_world) {
-		generate_new_chunk( get_chunk_from_block_pos( (bpos)floor(player_pos_world) ) );
+		auto* chunk = chunks.create( get_chunk_from_block_pos( (bpos)floor(player_pos_world) ) );
+		gen_chunk_blocks(chunk);
 	}
 
 	bool draw_debug_overlay = 0;

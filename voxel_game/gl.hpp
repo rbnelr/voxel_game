@@ -212,6 +212,11 @@ static void unbind_texture_unit (GLint tex_unit) { // just for debugging
 	glBindTexture(GL_TEXTURE_2D, 0); // TODO: We dont care if we bound a cubemap to this tex unit?
 }
 
+#include <vector>
+#include <string>
+#include <string_view>
+
+namespace old {
 struct Texture2D : public Texture {
 	int2					dim;
 	
@@ -858,6 +863,8 @@ private:
 
 };
 
+}
+
 namespace old {
 	enum data_type {
 		T_FLT		=0,
@@ -1082,7 +1089,7 @@ private:
 					auto line_end = c;
 					
 					{
-						inc_filename = get_path_dir(filename).append(inc_filename);
+						inc_filename = old::get_path_dir(filename).append(inc_filename);
 						
 						std::string inc_text;
 						if (!load_shader_source(inc_filename, &inc_text)) return false;
@@ -1408,6 +1415,7 @@ template <typename T> static typename T* vector_append (std::vector<T>* vec, uin
 
 static Shader_old* shad_equirectangular_to_cubemap;
 
+namespace old {
 inline void TextureCube_Equirectangular_File::gpu_convert_equirectangular_to_cubemap () {
 	
 	shad_equirectangular_to_cubemap->bind();
@@ -1432,4 +1440,5 @@ inline void TextureCube_Equirectangular_File::gpu_convert_equirectangular_to_cub
 	
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glDeleteFramebuffers(1, &fbo);
+}
 }

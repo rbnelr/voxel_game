@@ -1,6 +1,7 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "glshader.hpp"
+#include "texture.hpp"
 #include "debug_graphics.hpp"
 #include "../blocks.hpp"
 #include "gl.hpp"
@@ -73,17 +74,49 @@ struct BlockHighlightGraphics {
 	void draw (float3 pos, BlockFace face);
 };
 
-//struct ChunkMesh {
-//
-//	std::vecot
-//
-//	Shader shader = Shader("skybox");
-//
-//	void draw (Camera_View& view);
-//};
-//struct ChunkGraphics {
-//
-//	Shader shader = Shader("skybox");
-//
-//	void draw (Camera_View& view);
-//};
+struct ChunkMesh {
+	struct Vertex {
+		float3	pos_model;
+		float	brightness;
+		float4	uv_indx_hp; // xy: [0,1] face uv; z: texture index, w: hp_ratio [0,1]
+		lrgba	color;
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
+			a.add<decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness));
+			a.add<decltype(uv_indx_hp)>(2, "uv_indx_hp", sizeof(Vertex), offsetof(Vertex, uv_indx_hp));
+			a.add<decltype(color     )>(3, "color"     , sizeof(Vertex), offsetof(Vertex, color     ));
+		}
+	};
+
+	std::vector<Vertex> vertex_data;
+
+	Mesh<Vertex> gpu_mesh;
+};
+
+// A single texture object that stores all block tiles
+// could be implemented as a texture atlas but texture arrays are the better choice here
+struct TileTexture {
+	//Texture2D texture;
+
+	int tile_base_index[BLOCK_TYPES_COUNT];
+
+	TileTexture ();
+
+	inline int get_tile_base_index (block_type bt) {
+		return tile_base_index[bt];
+	}
+};
+
+struct Chunks;
+
+struct ChunkGraphics {
+
+	Shader shader = Shader("blocks");
+
+	//TileTexture tile_texture;
+
+	Texture2D test = { "textures/earth.png" };
+
+	void draw_chunks (Chunks& chunks);
+};

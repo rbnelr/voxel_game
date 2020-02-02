@@ -82,6 +82,22 @@ namespace gl {
 
 		operator GLuint () const { return ubo; }
 	};
+
+	// Simple UBO class to manage lifetime
+	class Texture {
+		MOVE_ONLY_CLASS_DECL(Texture)
+		GLuint tex;
+	public:
+
+		Texture () {
+			glGenTextures(1, &tex);
+		}
+		~Texture () {
+			glDeleteTextures(1, &tex);
+		}
+
+		operator GLuint () const { return tex; }
+	};
 }
 
 //// user facing stuff that hopefully is generic enough to work across OpenGL, D3D, Vulkan etc.
@@ -236,22 +252,11 @@ public:
 };
 */
 
-/*
-// CPU mesh data
-template <typename T>
-struct MeshData {
-	std::vector<T> vertex_data;
-
-	void 
-};*/
-
 // GPU mesh data
 template <typename T>
 class Mesh {
 	gl::Vbo vbo;
 	gl::Vao vao;
-
-	uintptr_t vertex_count = 0;
 
 	void init_vao () {
 		glBindVertexArray(vao);
@@ -267,6 +272,8 @@ class Mesh {
 	}
 
 public:
+
+	uintptr_t vertex_count = 0;
 
 	// Construct empty Mesh (can upload data later)
 	Mesh () {
@@ -285,8 +292,6 @@ public:
 	}
 	// Construct by Mesh with uploaded data (can reupload different data later)
 	Mesh (std::vector<T> const& data): Mesh(data.data(), data.size()) {}
-	//// Construct by Mesh with uploaded data (can reupload different data later)
-	//Mesh (MeshData<T> const& data): Mesh(data.vertex_data.data(), data.vertex_data.size()) {}
 
 	// Upload new data to Mesh
 	void upload (T const* data, uintptr_t count) {
@@ -303,10 +308,6 @@ public:
 	void upload (std::vector<T> const& data) {
 		upload(data.data(), data.size());
 	}
-	//// Upload new data to Mesh
-	//void upload (MeshData<T> const& data) {
-	//	upload(data.vertex_data.data(), data.vertex_data.size());
-	//}
 
 	// Bind to be able to draw
 	void bind () {

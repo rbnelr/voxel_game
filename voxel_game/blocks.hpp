@@ -79,7 +79,7 @@ static int BLOCK_TEXTURE_INDEX_MISSING = 0;
 
 static int atlas_textures_count = sizeof(block_texture_sources) / sizeof(block_texture_sources[0]);
 
-static int get_block_texture_index_from_block_type (block_type bt) {
+static int get_block_texture_base_index (block_type bt) {
 	return bt;
 }
 
@@ -108,9 +108,9 @@ enum BlockFace {
 	BF_TOP		=BF_POS_Z,
 };
 
-static Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasing
+static old::Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasing
 	// combine all textures into a texture atlas
-	Texture2D* tex = new Texture2D("block_atlas");
+	old::Texture2D* tex = new old::Texture2D("block_atlas");
 	//imgui_showable_textures.push_back(tex);
 	
 	int2 tex_atlas_res = (texture_res +0) * int2(ATLAS_BLOCK_FACES_COUNT,atlas_textures_count); // +2 for one pixel border
@@ -148,8 +148,8 @@ static Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasi
 		
 		auto& src_tex = block_texture_sources[tex_index];
 		
-		Texture2D_File col_tex (CS_AUTO, src_tex.texture_filename);
-		Texture2D_File alpha_tex (CS_AUTO, src_tex.alpha_texture_filename ? src_tex.alpha_texture_filename : "");
+		old::Texture2D_File col_tex (CS_AUTO, src_tex.texture_filename);
+		old::Texture2D_File alpha_tex (CS_AUTO, src_tex.alpha_texture_filename ? src_tex.alpha_texture_filename : "");
 		
 		col_tex.load();
 		assert(col_tex.type == PT_SRGB8_LA8);

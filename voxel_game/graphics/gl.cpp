@@ -8,7 +8,17 @@ namespace gl {
 	}
 
 	MOVE_ONLY_CLASS_DEF(Vao)
-		void swap (Vao& l, Vao& r) {
+	void swap (Vao& l, Vao& r) {
 		std::swap(l.vao, r.vao);
+	}
+
+	MOVE_ONLY_CLASS_DEF(Ubo)
+	void swap (Ubo& l, Ubo& r) {
+		std::swap(l.ubo, r.ubo);
+	}
+
+	MOVE_ONLY_CLASS_DEF(Texture)
+	void swap (Texture& l, Texture& r) {
+		std::swap(l.tex, r.tex);
 	}
 }

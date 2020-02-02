@@ -169,7 +169,7 @@ void Game::frame () {
 
 	if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
 		trigger_regen_chunks = false;
-		delete_all_chunks();
+		chunks.delete_all_chunks();
 		inital_chunk(player.pos);
 		trigger_dbg_heightmap_visualize = true;
 	}
@@ -189,24 +189,24 @@ void Game::frame () {
 
 	{ // chunk generation
 	  // check all chunk positions within a square of chunk_generation_radius
-		chunk_pos_t start =	(chunk_pos_t)floor(	((float2)player.pos -chunk_generation_radius) / (float2)CHUNK_DIM_2D );
-		chunk_pos_t end =	(chunk_pos_t)ceil(	((float2)player.pos +chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_pos start =	(chunk_pos)floor(	((float2)player.pos -chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_pos end =	(chunk_pos)ceil(	((float2)player.pos +chunk_generation_radius) / (float2)CHUNK_DIM_2D );
 
 		// check their actual distance to determine if they should be generated or not
-		auto chunk_dist_to_player = [&] (chunk_pos_t pos) {
+		auto chunk_dist_to_player = [&] (chunk_pos pos) {
 			bpos2 chunk_origin = pos * CHUNK_DIM_2D;
 			return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
 		};
-		auto chunk_is_in_generation_radius = [&] (chunk_pos_t pos) {
+		auto chunk_is_in_generation_radius = [&] (chunk_pos pos) {
 			return chunk_dist_to_player(pos) <= chunk_generation_radius;
 		};
 
-		std::vector<chunk_pos_t> chunks_to_generate;
+		std::vector<chunk_pos> chunks_to_generate;
 
-		chunk_pos_t cp;
+		chunk_pos cp;
 		for (cp.x = start.x; cp.x<end.x; ++cp.x) {
 			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-				if (chunk_is_in_generation_radius(cp) && !query_chunk(cp)) {
+				if (chunk_is_in_generation_radius(cp) && !chunks.query_chunk(cp)) {
 					// chunk is within chunk_generation_radius and not yet generated
 					chunks_to_generate.push_back(cp);
 				}
@@ -214,14 +214,16 @@ void Game::frame () {
 		}
 
 		std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
-			[&] (chunk_pos_t l, chunk_pos_t r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
+			[&] (chunk_pos l, chunk_pos r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
 		);
 
 		PROFILE_BEGIN(generate_new_chunk);
 
 		int count = 0;
 		for (auto& cp : chunks_to_generate) {
-			generate_new_chunk(cp);
+			Chunk* new_chunk = chunks.create(cp);
+			gen_chunk_blocks(new_chunk);
+
 			if (++count == max_chunks_generated_per_frame) break;
 		}
 		if (count != 0) PROFILE_END_PRINT(generate_new_chunk, "frame: %3d generated %d chunks", frame_counter, count);
@@ -249,10 +251,10 @@ void Game::frame () {
 					for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 						for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-							auto* b = query_block(bp);
+							auto* b = chunks.query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
-							bool intersecting = cylinder_cube_intersect(player.pos -(float3)bp, player.collision_r,player.collision_h);
+							bool intersecting = block_solid && cylinder_cube_intersect(player.pos -(float3)bp, player.collision_r,player.collision_h);
 
 							if (0) {
 								lrgba col;
@@ -291,7 +293,7 @@ void Game::frame () {
 					for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 						for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-							auto* b = query_block(bp);
+							auto* b = chunks.query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
 							if (block_solid && circle_square_intersect((float2)player.pos -(float2)(bpos2)bp, player.collision_r)) player_on_ground = true;
@@ -332,7 +334,7 @@ void Game::frame () {
 				auto find_earliest_collision_with_block_by_raycast_minkowski_sum = [&] (bpos bp) {
 					bool hit = false;
 
-					auto* b = query_block(bp);
+					auto* b = chunks.query_block(bp);
 					bool block_solid = !block_props[b->type].traversable;
 
 					if (block_solid) {
@@ -603,7 +605,7 @@ void Game::frame () {
 			for (;;) {
 
 				//highlight_block(cur_block);
-				Block* b = query_block(cur_block);
+				Block* b = chunks.query_block(cur_block);
 				if (block_props[b->type].breakable) {
 					*hit_block = cur_block;
 					*hit_face = face;
@@ -632,7 +634,7 @@ void Game::frame () {
 	if (highlighted_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
 
 		Chunk* chunk;
-		Block* b = query_block(highlighted_block_pos, &chunk);
+		Block* b = chunks.query_block(highlighted_block_pos, &chunk);
 		assert( block_props[b->type].breakable && chunk );
 
 		b->hp_ratio -= 1.0f / 0.3f * input.dt;
@@ -644,7 +646,7 @@ void Game::frame () {
 			b->hp_ratio = 0;
 			b->type = BT_AIR;
 
-			chunk->block_changed(highlighted_block_pos);
+			chunk->block_changed(chunks, highlighted_block_pos);
 
 			//dbg_play_sound();
 		}
@@ -664,7 +666,7 @@ void Game::frame () {
 			bpos block_place_pos = highlighted_block_pos +dir;
 
 			Chunk* chunk;
-			Block* b = query_block(block_place_pos, &chunk);
+			Block* b = chunks.query_block(block_place_pos, &chunk);
 
 			bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.collision_r,player.collision_h);
 
@@ -676,7 +678,7 @@ void Game::frame () {
 
 				//dbg_play_sound();
 
-				chunk->block_changed(block_place_pos);
+				chunk->block_changed(chunks, block_place_pos);
 
 				raycast_highlighted_block(); // make highlighted_block seem more responsive
 
@@ -709,7 +711,7 @@ void Game::frame () {
 		float grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler;
 
 		auto block_update = [&] (Block* b, bpos pos_world, Chunk* chunk) {
-			Block* above = query_block(pos_world +bpos(0,0,+1));
+			Block* above = chunks.query_block(pos_world +bpos(0,0,+1));
 
 			if (block_props[b->type].does_autoheal && b->hp_ratio < 1.0f) {
 				b->hp_ratio += 1.0f/5 / block_update_frequency;
@@ -741,15 +743,15 @@ void Game::frame () {
 				};
 
 				for (bpos2 v : sides) {
-					if (	 query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
-					else if (query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_side_prob;
-					else if (query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
+					if (	 chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
+					else if (chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_side_prob;
+					else if (chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
 				}
 
 				for (bpos2 v : diagonals) {
-					if (	 query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
-					else if (query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_diagonal_prob;
-					else if (query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
+					if (	 chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
+					else if (chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_diagonal_prob;
+					else if (chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
 				}
 
 				if (prob > random::flt()) {
@@ -773,8 +775,8 @@ void Game::frame () {
 
 		//printf("frame %d\n", (int)frame_i);
 
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
+		for (auto& kv : chunks.chunks) {
+			Chunk* chunk = &kv.second;
 
 			for (bpos_t i=0; i<blocks_to_update; ++i) {
 				uint16_t indx = (uint16_t)((cur_chunk_update_block_i +i) % chunk_block_count);
@@ -789,7 +791,7 @@ void Game::frame () {
 
 				//printf(">>> %d %d %d\n", (int)bp.x,(int)bp.y,(int)bp.z);
 
-				block_update(b, bp +chunk->chunk_origin_block_world(), chunk);
+				block_update(b, bp +chunk->chunk_pos_world(), chunk);
 			}
 		}
 
@@ -809,7 +811,37 @@ void Game::frame () {
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	{
+		int count = 0;
 
+		PROFILE_BEGIN(update_block_brighness);
+		// update_block_brighness first because remesh accesses surrounding chunks for blocks on the edge
+		for (auto& kv : chunks.chunks) {
+			Chunk* chunk = &kv.second;
+
+			if (chunk->needs_block_brighness_update) {
+				chunk->update_block_brighness();
+				++count;
+			}
+		}
+		//if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
+
+		count = 0;
+
+		PROFILE_BEGIN(remesh_upload);
+		// remesh and draw
+		for (auto& kv : chunks.chunks) {
+			Chunk* chunk = &kv.second;
+
+			if (chunk->needs_remesh) {
+				chunk->remesh(chunks);
+				++count;
+			}
+		}
+		//if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
+	}
+
+#if 0
 	if (shad_blocks->valid()) {
 
 		bind_texture_unit(0, tex_block_atlas);
@@ -829,36 +861,7 @@ void Game::frame () {
 
 		shad_blocks->set_unif("alpha_test", graphics_settings.foliage_alpha);
 
-		int count = 0;
-
-		PROFILE_BEGIN(update_block_brighness);
-		// update_block_brighness first because remesh accesses surrounding chunks for blocks on the edge
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
-
-			if (chunk->needs_block_brighness_update) {
-				chunk->update_block_brighness();
-				++count;
-			}
-		}
-		//if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_i, count);
-
-		count = 0;
-
-		PROFILE_BEGIN(remesh_upload);
-		// remesh and draw
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
-
-			if (chunk->needs_remesh) {
-				chunk->remesh();
-				chunk->vbo.upload();
-				chunk->vbo_transperant.upload();
-				++count;
-			}
-		}
-		//if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
-
+		
 		// draw opaque
 		for (auto& chunk_hash_pair : chunks) {
 			auto& chunk = chunk_hash_pair.second;
@@ -878,6 +881,9 @@ void Game::frame () {
 
 		glDisable(GL_BLEND);
 	}
+#endif
+
+	chunk_graphics.draw_chunks(chunks);
 
 	if (highlighted_block) {
 		block_highlight_graphics.draw((float3)highlighted_block_pos, (BlockFace)highlighted_block_face);
