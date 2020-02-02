@@ -37,7 +37,7 @@ extern float detail2_freq, detail2_amp;
 #include "graphics/camera.hpp"
 #include "graphics/graphics.hpp"
 #include "player.hpp"
-#include "running_average.hpp"
+#include "util/running_average.hpp"
 #include "chunks.hpp"
 
 static float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world) {

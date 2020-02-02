@@ -1,5 +1,5 @@
 #pragma once
-#include "../move_only_class.hpp"
+#include "../util/move_only_class.hpp"
 #include "../kissmath.hpp"
 #include "../glad/glad.h"
 #include <vector>

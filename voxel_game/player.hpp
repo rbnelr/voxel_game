@@ -2,7 +2,6 @@
 #include "graphics/camera.hpp"
 #include "physics.hpp"
 #include "kissmath.hpp"
-#include "intersection_test.hpp"
 #include <string>
 
 // Global for now, the world should store this if it is not randomized

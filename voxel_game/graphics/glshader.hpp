@@ -1,6 +1,6 @@
 #pragma once
 #include "../kissmath.hpp"
-#include "../string.hpp"
+#include "../util/string.hpp"
 #include <string>
 #include <vector>
 #include <unordered_map>

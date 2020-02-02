@@ -1,7 +1,7 @@
 #include "glshader.hpp"
 #include "common.hpp"
-#include "../file_io.hpp"
-#include "../string.hpp"
+#include "../util/file_io.hpp"
+#include "../util/string.hpp"
 #include "assert.h"
 using namespace kiss;
 using std::string;

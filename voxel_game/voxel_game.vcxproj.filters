@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
-    <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="glad\glad.h">
       <Filter>glad</Filter>
     </ClInclude>
@@ -21,9 +20,6 @@
     </ClInclude>
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h">
       <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="string.hpp">
-      <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="..\..\dear_imgui\imconfig.h">
       <Filter>dear_imgui</Filter>
@@ -129,12 +125,6 @@
     <ClInclude Include="glad\glad_wgl.h">
       <Filter>glad</Filter>
     </ClInclude>
-    <ClInclude Include="timer.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="file_io.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.hpp">
       <Filter>stb</Filter>
     </ClInclude>
@@ -146,10 +136,6 @@
     </ClInclude>
     <ClInclude Include="player.hpp" />
     <ClInclude Include="physics.hpp" />
-    <ClInclude Include="running_average.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="move_only_class.hpp" />
     <ClInclude Include="graphics\glshader.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
@@ -174,6 +160,24 @@
     <ClInclude Include="graphics\texture.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="util\file_io.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\running_average.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\string.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\timer.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\move_only_class.hpp">
+      <Filter>shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="util\intersection_test.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -184,9 +188,6 @@
     </ClCompile>
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp">
       <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="string.cpp">
-      <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
       <Filter>dear_imgui</Filter>
@@ -286,12 +287,6 @@
     <ClCompile Include="stb_image.cpp">
       <Filter>stb</Filter>
     </ClCompile>
-    <ClCompile Include="timer.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="file_io.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp">
       <Filter>open_simplex_noise</Filter>
@@ -329,6 +324,15 @@
       <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="game.cpp" />
+    <ClCompile Include="util\file_io.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="util\string.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="util\timer.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">

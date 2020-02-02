@@ -173,7 +173,6 @@
     <ClInclude Include="dear_imgui.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="file_io.hpp" />
     <ClInclude Include="game.hpp" />
     <ClInclude Include="glad\glad.h" />
     <ClInclude Include="glad\glad_wgl.h" />
@@ -189,7 +188,6 @@
     <ClInclude Include="graphics\shader_manager.hpp" />
     <ClInclude Include="graphics\texture.hpp" />
     <ClInclude Include="input.hpp" />
-    <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="kissmath.hpp" />
     <ClInclude Include="kissmath\bool.hpp" />
     <ClInclude Include="kissmath\bool2.hpp" />
@@ -218,15 +216,17 @@
     <ClInclude Include="kissmath\uint8v3.hpp" />
     <ClInclude Include="kissmath\uint8v4.hpp" />
     <ClInclude Include="kissmath_colors.hpp" />
-    <ClInclude Include="move_only_class.hpp" />
     <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="physics.hpp" />
     <ClInclude Include="player.hpp" />
-    <ClInclude Include="running_average.hpp" />
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="stb_image.hpp" />
-    <ClInclude Include="string.hpp" />
-    <ClInclude Include="timer.hpp" />
+    <ClInclude Include="util\file_io.hpp" />
+    <ClInclude Include="util\intersection_test.hpp" />
+    <ClInclude Include="util\move_only_class.hpp" />
+    <ClInclude Include="util\running_average.hpp" />
+    <ClInclude Include="util\string.hpp" />
+    <ClInclude Include="util\timer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp" />
@@ -237,7 +237,6 @@
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="file_io.cpp" />
     <ClCompile Include="glad\glad.c" />
     <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
@@ -281,9 +280,10 @@
     <ClCompile Include="physics.cpp" />
     <ClCompile Include="player.cpp" />
     <ClCompile Include="stb_image.cpp" />
-    <ClCompile Include="string.cpp" />
-    <ClCompile Include="timer.cpp" />
     <ClCompile Include="game.cpp" />
+    <ClCompile Include="util\file_io.cpp" />
+    <ClCompile Include="util\string.cpp" />
+    <ClCompile Include="util\timer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.glsl" />

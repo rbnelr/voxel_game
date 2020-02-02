@@ -7,7 +7,7 @@
 #include <string>
 
 
-#include "intersection_test.hpp"
+#include "util/intersection_test.hpp"
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 #include "game.hpp"
@@ -17,8 +17,8 @@
 
 #include "kissmath.hpp"
 #include "kissmath_colors.hpp"
-#include "string.hpp"
-#include "timer.hpp"
+#include "util/string.hpp"
+#include "util/timer.hpp"
 using namespace kiss;
 
 #include "glad/glad.h"
