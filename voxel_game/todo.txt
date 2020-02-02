@@ -47,6 +47,23 @@ DONE:
   -> maybe plot speed via imgui and screenshot it
   -> and then develop new movement code with better force based movement that closely matches that curve
  
+ check if the atlas filtering works like it should, i think I see atlas bleeding happening currently
+ -do we use mipmaps?
+ -maybe do use mipmaps but put special code in the fragment shader that clamps the uvs to never filter outside the tile?
+ -> Switched to texture arrays, no bleeding possible
+ -> using nearest for mag and linear_mipmap_linear for min with alias 16
+ 
+ factor out all the drawing code too, and either just manually do all the gl things "manually"
+  or add real abstractions for gl
+  -> maybe actually follow the "factor into function if similar code appears 3+ times" rule
+      ie. just stupidly type out all required code and then see what gets repeated
+  the main loop should probably never know about textures at all, just graphics.draw_world(); for p in players: graphics.draw_player(p) etc.
+  and the graphics class handles all the stuff itself, this way it can decide if it wants the textures to have it's own class
+ -> factored out drawing code into a bunch of *Graphics classes that are responsible for drawing and keep all texture shader etc. state
+ -> created some sensible opengl abstractions, but some stuff is still missing and there could potentially be WAY less code
+     if i just followed my own advice and just wrote down all the opengl code by hand and then factored things out into functions as i went
+     I guess i just don't like doing that in opengl, because i like turning glGen* and glDelete* into automatic ctors dtors
+     
 TODO
 -FEATURES:
  
@@ -73,17 +90,6 @@ TODO
    you penetrate the wall by less than 0.5f block widths -> you are clearly on one side of the block, so just teleport you so you don't penetrate (player.pos -= pen_vector;)
    -> but only if the space you teleport to is free -> when stuck in completely solid rock you are stuck
  
- check if the atlas filtering works like it should, i think I see atlas bleeding happening currently
- -do we use mipmaps?
- -maybe do use mipmaps but put special code in the fragment shader that clamps the uvs to never filter outside the tile?
-
- factor out all the drawing code too, and either just manually do all the gl things "manually"
-  or add real abstractions for gl
-  -> maybe actually follow the "factor into function if similar code appears 3+ times" rule
-      ie. just stupidly type out all required code and then see what gets repeated
-  the main loop should probably never know about textures at all, just graphics.draw_world(); for p in players: graphics.draw_player(p) etc.
-  and the graphics class handles all the stuff itself, this way it can decide if it wants the textures to have it's own class
- 
  make better sprinting code
   sprinting should have a drawback over walking, or it just gets used all the time
    -> stamina?
@@ -96,6 +102,15 @@ TODO
 
  add shader directory change notify to reload all shaders that contain a changed file
 
+ voxel cone tracing for indirect lighting?
+ -voxelize scene (no op for us, just need albedo for each voxel which is just it's avg texture color)
+ -inject direct lighting -> torch light is already calculated in minecraft style light, sunlight should also be feasable even with a moving sun
+ -filter down -> 8 voxels average down to 1 voxel to create "mipmaps", alpha could represent opacity
+ -cone trace all surface faces
+  -spawn a few cones at the surface, cone has a angle -> at dist x the radius is y -> sample the mipmap that best fits that radius
+  -this way you prevent having N voxel samples for a NxNxN world, and instead have log N
+  -the resulting sum of light now represent the indirect bounced light (just 1 bounce)
+  -if that bounced light is now used as lighting of the voxel a second pass could add another bounce
 
 -OLD version:
  convert entire debug optios into new imgui way of doing things
