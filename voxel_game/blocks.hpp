@@ -4,8 +4,6 @@
 
 #include "stdint.h"
 
-#include "gl.hpp"
-
 static int texture_res = 16;
 
 static constexpr int ATLAS_BLOCK_FACES_COUNT =	3;
@@ -107,99 +105,3 @@ enum BlockFace {
 	BF_BOTTOM	=BF_NEG_Z,
 	BF_TOP		=BF_POS_Z,
 };
-
-static old::Texture2D* generate_and_upload_block_texture_atlas () { // texture atlasing
-	// combine all textures into a texture atlas
-	old::Texture2D* tex = new old::Texture2D("block_atlas");
-	//imgui_showable_textures.push_back(tex);
-	
-	int2 tex_atlas_res = (texture_res +0) * int2(ATLAS_BLOCK_FACES_COUNT,atlas_textures_count); // +2 for one pixel border
-	
-	tex->alloc_cpu_single_mip(PT_SRGB8_LA8, tex_atlas_res);
-	
-	assert(tex->get_pixel_size() == 4);
-	uint32_t* src_pixels;
-	uint32_t* aplha_src_pixels;
-	uint32_t* dst_pixels = (uint32_t*)tex->data.data;
-	
-	int face_LUT[ATLAS_BLOCK_FACES_COUNT] = {
-		/* UVZW_BLOCK_FACE_SIDE		*/	1,
-		/* UVZW_BLOCK_FACE_TOP		*/	2,
-		/* UVZW_BLOCK_FACE_BOTTOM	*/	0,
-	};
-	
-	auto src = [&] (int x, int y, int face) -> uint32_t* {
-		int w = texture_res;
-		int h = texture_res;
-		return &src_pixels[face_LUT[face]*h*w + y*w + x];
-	};
-	auto aplha_src = [&] (int x, int y, int face) -> uint32_t* {
-		int w = texture_res;
-		int h = texture_res;
-		return &aplha_src_pixels[face_LUT[face]*h*w + y*w + x];
-	};
-	auto dst = [&] (int x, int y, int face, int tex_index) -> uint32_t* {
-		int w = texture_res +0;
-		int h = texture_res +0;
-		return &dst_pixels[tex_index*h*ATLAS_BLOCK_FACES_COUNT*w + y*ATLAS_BLOCK_FACES_COUNT*w  + face*w + x];
-	};
-	
-	for (int tex_index=0; tex_index<atlas_textures_count; ++tex_index) {
-		
-		auto& src_tex = block_texture_sources[tex_index];
-		
-		old::Texture2D_File col_tex (CS_AUTO, src_tex.texture_filename);
-		old::Texture2D_File alpha_tex (CS_AUTO, src_tex.alpha_texture_filename ? src_tex.alpha_texture_filename : "");
-		
-		col_tex.load();
-		assert(col_tex.type == PT_SRGB8_LA8);
-		assert(all(col_tex.dim == int2(texture_res, texture_res*ATLAS_BLOCK_FACES_COUNT)));
-		assert(col_tex.get_pixel_size() == 4);
-		
-		src_pixels = (uint32_t*)col_tex.data.data;
-		
-		if (src_tex.optional_apha) {
-			alpha_tex.load();
-			assert(alpha_tex.type == PT_SRGB8_LA8);
-			assert(all(alpha_tex.dim == int2(texture_res, texture_res*ATLAS_BLOCK_FACES_COUNT)));
-			assert(alpha_tex.get_pixel_size() == 4);
-			
-			aplha_src_pixels = (uint32_t*)alpha_tex.data.data;
-		}
-		
-		for (int block_face_i=0; block_face_i<ATLAS_BLOCK_FACES_COUNT; ++block_face_i) {
-			
-			/*for (int x=0; x<texture_res +2; ++x) { // top border
-				*dst(x,0, block_face_i, tex_index) = 0xff0000ff;
-			}*/
-			
-			for (int y=0; y<texture_res; ++y) {
-				
-				//*dst(0,y, block_face_i, tex_index) = 0xff0000ff;
-				
-				for (int x=0; x<texture_res; ++x) {
-					uint32_t col = *src(x,y, block_face_i);
-					
-					if (src_tex.optional_apha) {
-						uint32_t alpha = *aplha_src(x,y, block_face_i);
-						col &= ~0xff000000;
-						col |= (alpha & 0xff) << 24;
-					}
-					
-					*dst(x,y, block_face_i, tex_index) = col;
-				}
-				
-				//*dst(texture_res+1,y, block_face_i, tex_index) = 0xff0000ff;
-				
-			}
-			
-			
-			/*for (int x=0; x<texture_res +2; ++x) {
-				*dst(x,texture_res+1, block_face_i, tex_index) = 0xff0000ff;
-			}*/
-		}
-	}
-	
-	tex->upload();
-	return tex;
-}

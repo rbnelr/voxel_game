@@ -175,7 +175,6 @@
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="file_io.hpp" />
     <ClInclude Include="game.hpp" />
-    <ClInclude Include="gl.hpp" />
     <ClInclude Include="glad\glad.h" />
     <ClInclude Include="glad\glad_wgl.h" />
     <ClInclude Include="glad\khrplatform.h" />
@@ -284,21 +283,14 @@
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="string.cpp" />
     <ClCompile Include="timer.cpp" />
-    <ClCompile Include="voxel_game.cpp" />
+    <ClCompile Include="game.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.glsl" />
-    <None Include="shaders\_blocks.frag" />
-    <None Include="shaders\_blocks.vert" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
-    <None Include="shaders\texture_window_tex.frag" />
-    <None Include="shaders\texture_window_tex.vert" />
-    <None Include="shaders\_common.frag" />
-    <None Include="shaders\_common.glsl" />
-    <None Include="shaders\_common.vert" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt" />

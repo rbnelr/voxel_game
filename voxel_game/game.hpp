@@ -31,7 +31,6 @@ extern float detail0_freq, detail0_amp;
 extern float detail1_freq, detail1_amp;
 extern float detail2_freq, detail2_amp;
 
-#include "gl.hpp"
 #include "graphics/common.hpp"
 #include "blocks.hpp"
 #include "input.hpp"
@@ -39,22 +38,6 @@ extern float detail2_freq, detail2_amp;
 #include "graphics/graphics.hpp"
 #include "player.hpp"
 #include "running_average.hpp"
-
-//
-#define UBOOL(name)	old::Uniform(old::T_BOOL, name)
-#define USI(name)	old::Uniform(old::T_INT, name)
-#define UIV2(name)	old::Uniform(old::T_IV2, name)
-#define UV2(name)	old::Uniform(old::T_V2, name)
-#define UV3(name)	old::Uniform(old::T_V3, name)
-#define UM4(name)	old::Uniform(old::T_M4, name)
-
-#define UCOM UV2("screen_dim"), UV2("mcursor_pos") // common uniforms
-#define UMAT UM4("world_to_cam"), UM4("cam_to_world"), UM4("cam_to_clip") // transformation uniforms
-
-extern std::vector<Shader_old*>			shaders;
-
-Shader_old* new_shader (std::string const& v, std::string const& f, std::initializer_list<old::Uniform> u, std::initializer_list<Shader_old::Uniform_Texture> t={});
-
 #include "chunks.hpp"
 
 static float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world) {
@@ -220,13 +203,6 @@ struct FPS_Display {
 };
 
 class Game {
-	GLuint vao;
-
-	bool _init_first = [] () {
-		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
-		return true;
-	} ();
-
 	FPS_Display fps_display;
 
 	Chunks chunks;
@@ -248,15 +224,8 @@ class Game {
 	SkyboxGraphics skybox_graphics;
 	BlockHighlightGraphics block_highlight_graphics;
 
-	old::Texture2D* tex_block_atlas = generate_and_upload_block_texture_atlas();
-
-	old::Texture2D_File tex_breaking = old::Texture2D_File(CS_LINEAR, "breaking.png");
-
 	float chunk_drawing_radius =	_use_potatomode ? 20.0f : INF;
 	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
-
-	old::Texture2D dbg_heightmap_visualize = old::Texture2D("dbg_heightmap_visualize");
-	int dbg_heightmap_visualize_radius = 1000;
 
 	int64_t world_seed = 0;
 
@@ -272,28 +241,6 @@ class Game {
 
 	bool trigger_regen_chunks =		false;
 
-	void regen_dbg_heightmap_visualize () {
-		srgba8* pixels = (srgba8*)dbg_heightmap_visualize.mips[0].data;
-		int2 dim = dbg_heightmap_visualize.mips[0].dim;
-
-		auto dst = [&] (int2 pos) -> srgba8* {
-			return &pixels[pos.y*dim.x + pos.x];
-		};
-
-		OSN::Noise<2> noise( world_seed );
-
-		int2 i;
-		for (i.y=0; i.y<dim.y; ++i.y) {
-			for (i.x=0; i.x<dim.x; ++i.x) {
-				float2 pos_world = map((float2)i, 0,(float2)(dim-1), -dbg_heightmap_visualize_radius / 2.0f, +dbg_heightmap_visualize_radius / 2.0f);
-				*dst(i) = to_srgb(spectrum_gradient(map( heightmap(noise, pos_world) , 0, 45)));
-			}
-		}
-
-		dbg_heightmap_visualize.upload();
-	};
-
-	
 	float noise_tree_density (OSN::Noise<2> const& osn_noise, float2 pos_world) {
 		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
 			pos = rotate2(ang_offs) * pos;
@@ -465,7 +412,6 @@ class Game {
 
 public:
 	Game ();
-	~Game ();
 
 	void frame ();
 

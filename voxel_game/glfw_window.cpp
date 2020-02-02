@@ -11,6 +11,7 @@ using namespace kissmath;
 #include "input.hpp"
 #include "game.hpp"
 #include "dear_imgui.hpp"
+using namespace kiss;
 
 #include <memory>
 #include "stdio.h"

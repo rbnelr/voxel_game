@@ -3,7 +3,6 @@
   <ItemGroup>
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
-    <ClInclude Include="gl.hpp" />
     <ClInclude Include="intersection_test.hpp" />
     <ClInclude Include="glad\glad.h">
       <Filter>glad</Filter>
@@ -177,7 +176,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="voxel_game.cpp" />
     <ClCompile Include="glad\glad.c">
       <Filter>glad</Filter>
     </ClCompile>
@@ -330,14 +328,9 @@
     <ClCompile Include="graphics\texture.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="game.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\texture_window_tex.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\texture_window_tex.vert">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\overlay.glsl">
       <Filter>shaders</Filter>
     </None>
@@ -348,21 +341,6 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\common.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\_common.frag">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\_common.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\_common.vert">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\_blocks.vert">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\_blocks.frag">
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\blocks.glsl">

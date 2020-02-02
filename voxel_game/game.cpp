@@ -18,12 +18,12 @@
 #include "kissmath.hpp"
 #include "kissmath_colors.hpp"
 #include "string.hpp"
+#include "timer.hpp"
 using namespace kiss;
 
 #include "glad/glad.h"
 
 #include "stb_image.hpp"
-#include "gl.hpp"
 
 #define _STRINGIFY(x) #x
 #define STRINGIFY(x) _STRINGIFY(x)
@@ -33,18 +33,6 @@ using namespace kiss;
 
 #define PROFILE_END_ACCUM(name)	name += (__profile_##name).end()
 #define PROFILE_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), name * 1000, __VA_ARGS__)
-
-//
-std::vector<Shader_old*>			shaders;
-
-Shader_old* new_shader (std::string const& v, std::string const& f, std::initializer_list<old::Uniform> u, std::initializer_list<Shader_old::Uniform_Texture> t) {
-	Shader_old* s = new Shader_old(v,f,u,t);
-
-	s->load(); // NOTE: Load shaders instantly on creation
-
-	shaders.push_back(s);
-	return s;
-}
 
 //static void foliage_alpha_changed ();
 
@@ -82,38 +70,17 @@ Game::Game () {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
-
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	}
-
-	tex_breaking.load();
-	tex_breaking.upload();
-
-	breaking_frames_count = tex_breaking.dim.y / tex_breaking.dim.x;
 
 	//
 
 	player.respawn();
 
 	inital_chunk( player.pos );
-
-	{
-		dbg_heightmap_visualize.alloc_cpu_single_mip(PT_LRGBA8, 512);
-
-		regen_dbg_heightmap_visualize();
-	}
-
-	glGenVertexArrays(1, &vao);
-}
-
-Game::~Game () {
-	glDeleteVertexArrays(1, &vao);
 }
 
 void Game::frame () {
-
-	glBindVertexArray(vao);
 
 	{
 		bool fullscreen = get_fullscreen();
@@ -139,8 +106,6 @@ void Game::frame () {
 	}
 
 	input.imgui();
-
-	for (auto* s : shaders)			s->reload_if_needed();
 
 	{
 		bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
@@ -181,11 +146,6 @@ void Game::frame () {
 	//option("chunk_generation_radius", &chunk_generation_radius);
 
 	//if (option("dbg_heightmap_visualize_radius", &dbg_heightmap_visualize_radius)) trigger_dbg_heightmap_visualize = true;
-
-	if (trigger_dbg_heightmap_visualize) {
-		regen_dbg_heightmap_visualize();
-		trigger_dbg_heightmap_visualize = false;
-	}
 
 	{ // chunk generation
 	  // check all chunk positions within a square of chunk_generation_radius
@@ -799,17 +759,9 @@ void Game::frame () {
 	}
 
 	//// Draw
-	for (auto* s : shaders) { // set common uniforms
-		if (s->valid()) {
-			s->bind();
-			s->set_unif("screen_dim", (float2)input.window_size);
-			//s->set_unif("mcursor_pos", inp.bottom_up_mcursor_pos());
-		}
-	}
-
 	glViewport(0,0, input.window_size.x, input.window_size.y);
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_DEPTH_BUFFER_BIT);
 
 	{
 		int count = 0;
