@@ -1,8 +1,10 @@
 #include "player.hpp"
+#include "world.hpp"
 #include "input.hpp"
 #include "physics.hpp"
+#include "util/collision.hpp"
 
-float3	player_spawn_point = float3(4,32,28.001f);
+float3	player_spawn_point = float3(0,0,34);
 
 void Player::update_controls (bool player_on_ground) {
 	//// toggle camera view
@@ -77,14 +79,30 @@ void Player::update_physics (bool player_on_ground) {
 		vel = 0;
 }
 
-Camera_View Player::update_post_physics () {
+void Player::position_third_person_cam (World& world, float3x3 body_rotation, float3x3 head_elevation) {
+	Ray ray;
+	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
+	ray.dir = body_rotation * head_elevation * tps_camera_dir;
+
+	float dist = tps_camera_dist;
+	
+	{
+		BlockHit hit;
+		if (world.raycast_solid_blocks(ray, dist, &hit))
+			dist = max(hit.dist - 0.05f, 0.0f);
+	}
+
+	tps_camera.pos = tps_camera_base_pos + tps_camera_dir * dist;
+}
+
+Camera_View Player::update_post_physics (World& world) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
 	float3x3 head_elevation = rotate3_X(rot_ae.y);
 	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
 
-	//position_third_person_cam();
+	position_third_person_cam(world, body_rotation, head_elevation);
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
 	

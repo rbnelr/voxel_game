@@ -297,14 +297,13 @@ void ChunkGraphics::draw_chunks (Chunks& chunks) {
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all opaque chunk meshes
-		for (auto& kv : chunks.chunks) {
-			Chunk* chunk = &kv.second;
+		for (Chunk& chunk : chunks) {
 
-			if (chunk->mesh.opaque_mesh.vertex_count != 0) {
-				shader.set_uniform("chunk_pos", (float3)chunk->chunk_pos_world());
+			if (chunk.mesh.opaque_mesh.vertex_count != 0) {
+				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
-				chunk->mesh.opaque_mesh.bind();
-				chunk->mesh.opaque_mesh.draw();
+				chunk.mesh.opaque_mesh.bind();
+				chunk.mesh.opaque_mesh.draw();
 			}
 		}
 	}
@@ -331,14 +330,13 @@ void ChunkGraphics::draw_chunks_transparent (Chunks& chunks) {
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all transparent chunk meshes
-		for (auto& kv : chunks.chunks) {
-			Chunk* chunk = &kv.second;
+		for (Chunk& chunk : chunks) {
 
-			if (chunk->mesh.transparent_mesh.vertex_count != 0) {
-				shader.set_uniform("chunk_pos", (float3)chunk->chunk_pos_world());
+			if (chunk.mesh.transparent_mesh.vertex_count != 0) {
+				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
-				chunk->mesh.transparent_mesh.bind();
-				chunk->mesh.transparent_mesh.draw();
+				chunk.mesh.transparent_mesh.bind();
+				chunk.mesh.transparent_mesh.draw();
 			}
 		}
 	}

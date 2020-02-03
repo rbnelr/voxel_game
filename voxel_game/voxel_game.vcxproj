@@ -168,8 +168,11 @@
     <ClInclude Include="..\..\dear_imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\dear_imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="world_generator.hpp" />
+    <ClInclude Include="chunk_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
@@ -224,16 +227,21 @@
     <ClInclude Include="util\file_io.hpp" />
     <ClInclude Include="util\collision.hpp" />
     <ClInclude Include="util\move_only_class.hpp" />
+    <ClInclude Include="util\random.hpp" />
     <ClInclude Include="util\running_average.hpp" />
     <ClInclude Include="util\string.hpp" />
     <ClInclude Include="util\timer.hpp" />
+    <ClInclude Include="world.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="chunks.cpp" />
+    <ClCompile Include="world_generator.cpp" />
+    <ClCompile Include="chunk_mesher.cpp" />
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
@@ -281,9 +289,12 @@
     <ClCompile Include="player.cpp" />
     <ClCompile Include="stb_image.cpp" />
     <ClCompile Include="game.cpp" />
+    <ClCompile Include="util\collision.cpp" />
     <ClCompile Include="util\file_io.cpp" />
+    <ClCompile Include="util\random.cpp" />
     <ClCompile Include="util\string.cpp" />
     <ClCompile Include="util\timer.cpp" />
+    <ClCompile Include="world.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\blocks.glsl" />

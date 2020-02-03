@@ -96,6 +96,9 @@ TODO
    -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
    -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
  
+ better third person camera object avoidance
+ -camera should never clip into blocks! currently the camera focus point does not, but the near plane still goes into the block partly
+
  add headbob?
 
  make a shader inspector in imgui that can edit shader code

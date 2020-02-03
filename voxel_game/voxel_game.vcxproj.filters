@@ -182,6 +182,15 @@
     <ClInclude Include="util\collision.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="world.hpp" />
+    <ClInclude Include="util\random.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="chunk_mesher.hpp" />
+    <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="world_generator.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -337,6 +346,18 @@
     <ClCompile Include="util\timer.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="util\collision.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="world.cpp" />
+    <ClCompile Include="util\random.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="chunk_mesher.cpp" />
+    <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="world_generator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">

@@ -13,6 +13,12 @@ namespace kiss {
 	// Printf that outputs to a std::string
 	std::string prints (char const* format, ...);
 
+	static constexpr inline bool is_whitespace_c (char c) {
+		return c == ' ' || c == '\t';
+	}
+
+	// remove whitespace at front and back
+	std::string_view trim (std::string_view sv);
 
 	// wrapper class around a std::string to use as a key for unordered_maps that allows find with string_view to avoid heap allocs
 	struct map_string {
