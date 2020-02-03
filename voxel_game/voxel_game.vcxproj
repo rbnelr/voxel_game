@@ -222,7 +222,7 @@
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="stb_image.hpp" />
     <ClInclude Include="util\file_io.hpp" />
-    <ClInclude Include="util\intersection_test.hpp" />
+    <ClInclude Include="util\collision.hpp" />
     <ClInclude Include="util\move_only_class.hpp" />
     <ClInclude Include="util\running_average.hpp" />
     <ClInclude Include="util\string.hpp" />

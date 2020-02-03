@@ -1,5 +1,10 @@
 #pragma once
-#include "kissmath.hpp"
+#include "../kissmath.hpp"
+
+struct Ray {
+	float3 pos;
+	float3 dir; // normalized
+};
 
 inline bool circle_square_intersect (float2 circ_origin, float circ_radius) { // intersection test between circle and square of edge length 1
 	// square goes from 0-1 on each axis (circ_origin pos is relative to cube)
@@ -26,8 +31,3 @@ inline float point_square_nearest_dist (float2 square_pos, float2 square_size, f
 	
 	return length(nearest_pos_on_square -pos_rel);
 }
-
-struct Ray {
-	float3 pos;
-	float3 dir; // normalized
-};

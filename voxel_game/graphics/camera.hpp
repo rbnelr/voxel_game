@@ -53,7 +53,7 @@ public:
 	virtual ~Camera () = default;
 
 	void imgui () {
-		if (!imgui_push(name, "Camera")) return;
+		if (!imgui_push(name, "Camera", false)) return;
 
 		int cur_mode = (int)mode;
 		ImGui::Combo("mode", &cur_mode, "PERSPECTIVE\0ORTHOGRAPHIC\0");

@@ -69,7 +69,7 @@ void Player::update_controls (bool player_on_ground) {
 void Player::update_physics (bool player_on_ground) {
 
 	//// gravity
-	// if on ground only?
+	// if !on ground only?
 	vel += physics.grav_accel * input.dt;
 
 	// kill velocity if too small
@@ -83,6 +83,8 @@ Camera_View Player::update_post_physics () {
 
 	float3x3 head_elevation = rotate3_X(rot_ae.y);
 	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
+
+	//position_third_person_cam();
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
 	

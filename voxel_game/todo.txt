@@ -102,6 +102,7 @@ TODO
 
  add shader directory change notify to reload all shaders that contain a changed file
 
+IDEAS:
  voxel cone tracing for indirect lighting?
  -voxelize scene (no op for us, just need albedo for each voxel which is just it's avg texture color)
  -inject direct lighting -> torch light is already calculated in minecraft style light, sunlight should also be feasable even with a moving sun
@@ -118,6 +119,27 @@ TODO
  -mesh data gets generated like usual, uploaded, the giant (100MB) slot for the chunk is mostly unused
  -but that is fine because the actual memory is virtualized and only the used pages are commited via the extension
  -indirect drawcalls can then be used to draw all the actual filled parts of the giant vbo
+
+ explore ray marching for rendering:
+ -no chunk meshes at all, gpu does ray marching
+  -how is the complexity, performance and artifacting
+ -feasable without octree?
+  -performance difference with octree?
+ -options: pixel shader, compute shader, opencl, cuda
+  -> compute shader probably makes the most sense, but pixel shader might also be finde since i am basicly trying to display the image anyway
+ -automatic order independent transparency!
+ -reflections on water / glass
+
+ instead of floating blocks everywhere create a basic structural simulation
+ -minecraft proved that having large amounts of blocks be "falling blocks" (sand, eg. in desert) is possible
+ -checks when blocks start falling just need to be limited
+ -can this idea be extended to include checks along connected blocks, to see how "stable" they are?
+ -stablity is at say 100 for fixed blocks and decreases for each block that is not fixed by some value depending on the block type
+  (similar to how torch light falls off)
+ -blocks with stablity 0 cannot be placed or just fall down (randomly maybe)
+ -stablity could be visualized by having blocks "sag" with low stablity, ie. the mesher just shifts them down a bit
+ -1 block wide towsers would still be 100% stable
+  -maybe a noita-like system (the powder pixels) could be used so that falling blocks also randomly fall off the side of a block to form 
 
 -OLD version:
  convert entire debug optios into new imgui way of doing things

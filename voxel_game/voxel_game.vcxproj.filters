@@ -39,7 +39,6 @@
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
-    <ClInclude Include="kissmath.hpp" />
     <ClInclude Include="kissmath\bool.hpp">
       <Filter>kissmath</Filter>
     </ClInclude>
@@ -94,7 +93,6 @@
     <ClInclude Include="kissmath\transform3d.hpp">
       <Filter>kissmath</Filter>
     </ClInclude>
-    <ClInclude Include="kissmath_colors.hpp" />
     <ClInclude Include="kissmath\uint8.hpp">
       <Filter>kissmath</Filter>
     </ClInclude>
@@ -175,7 +173,13 @@
     <ClInclude Include="util\move_only_class.hpp">
       <Filter>shaders</Filter>
     </ClInclude>
-    <ClInclude Include="util\intersection_test.hpp">
+    <ClInclude Include="kissmath.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath_colors.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\collision.hpp">
       <Filter>util</Filter>
     </ClInclude>
   </ItemGroup>

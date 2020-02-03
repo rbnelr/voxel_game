@@ -4,6 +4,26 @@
 
 #define DEFAULT_GRAVITY 20
 
+struct CollisionResponse {
+	float falling_ground_friction =		0.0f;
+	float falling_bounciness =			0.25f;
+	float falling_min_bounce_speed =	6;
+
+	float wall_friction =				0.2f;
+	float wall_bounciness =				0.55f;
+	float wall_min_bounce_speed =		8;
+
+	void imgui () {
+		ImGui::DragFloat("falling_ground_friction", &falling_ground_friction, 0.05f);
+		ImGui::DragFloat("falling_bounciness", &falling_bounciness, 0.05f);
+		ImGui::DragFloat("falling_min_bounce_speed", &falling_min_bounce_speed, 0.05f);
+
+		ImGui::DragFloat("wall_friction", &wall_friction, 0.05f);
+		ImGui::DragFloat("wall_bounciness", &wall_bounciness, 0.05f);
+		ImGui::DragFloat("wall_min_bounce_speed", &wall_min_bounce_speed, 0.05f);
+	}
+};
+
 class Physics {
 
 public:

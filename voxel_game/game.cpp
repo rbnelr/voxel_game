@@ -7,7 +7,7 @@
 #include <string>
 
 
-#include "util/intersection_test.hpp"
+#include "util/collision.hpp"
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 #include "game.hpp"
@@ -211,8 +211,8 @@ void Game::frame () {
 
 		auto check_blocks_around_player = [&] () {
 			{ // for all blocks we could be touching
-				bpos start =	(bpos)floor(player.pos -float3(player.collision_r,player.collision_r,0));
-				bpos end =		(bpos)ceil(player.pos +float3(player.collision_r,player.collision_r,player.collision_h));
+				bpos start =	(bpos)floor(player.pos -float3(player.radius, player.radius, 0));
+				bpos end =		(bpos)ceil(player.pos +float3(player.radius, player.radius, player.height));
 
 				bool any_intersecting = false;
 
@@ -224,7 +224,7 @@ void Game::frame () {
 							auto* b = chunks.query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
-							bool intersecting = block_solid && cylinder_cube_intersect(player.pos -(float3)bp, player.collision_r,player.collision_h);
+							bool intersecting = block_solid && cylinder_cube_intersect(player.pos -(float3)bp, player.radius, player.height);
 
 							if (0) {
 								lrgba col;
@@ -254,8 +254,8 @@ void Game::frame () {
 
 				if ((player.pos.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && player.vel.z == 0) {
 
-					bpos2 start =	(bpos2)floor((float2)player.pos -player.collision_r);
-					bpos2 end =		(bpos2)ceil((float2)player.pos +player.collision_r);
+					bpos2 start =	(bpos2)floor((float2)player.pos -player.radius);
+					bpos2 end =		(bpos2)ceil((float2)player.pos +player.radius);
 
 					bpos bp;
 					bp.z = pos_z -1;
@@ -266,7 +266,7 @@ void Game::frame () {
 							auto* b = chunks.query_block(bp);
 							bool block_solid = !block_props[b->type].traversable;
 
-							if (block_solid && circle_square_intersect((float2)player.pos -(float2)(bpos2)bp, player.collision_r)) player_on_ground = true;
+							if (block_solid && circle_square_intersect((float2)player.pos -(float2)(bpos2)bp, player.radius)) player_on_ground = true;
 						}
 					}
 				}
@@ -286,8 +286,8 @@ void Game::frame () {
 		float3 vel_world = player.vel;
 
 		auto trace_player_collision_path = [&] () {
-			float player_r = player.collision_r;
-			float player_h = player.collision_h;
+			float player_r = player.radius;
+			float player_h = player.height;
 
 			float t_remain = input.dt;
 
@@ -478,14 +478,14 @@ void Game::frame () {
 
 					if (earliest_collision.normal.z == +1) {
 						// hit top of block ie. ground
-						friction = player.falling_ground_friction;
-						bounciness = player.falling_bounciness;
-						min_bounce_speed = player.falling_min_bounce_speed;
+						friction = player.collison_response.falling_ground_friction;
+						bounciness = player.collison_response.falling_bounciness;
+						min_bounce_speed = player.collison_response.falling_min_bounce_speed;
 					} else {
 						// hit side of block or bottom of block ie. wall or ceiling
-						friction = player.wall_friction;
-						bounciness = player.wall_bounciness;
-						min_bounce_speed = player.wall_min_bounce_speed;
+						friction = player.collison_response.wall_friction;
+						bounciness = player.collison_response.wall_bounciness;
+						min_bounce_speed = player.collison_response.wall_min_bounce_speed;
 					}
 
 					float3 normal = earliest_collision.normal;
@@ -535,9 +535,6 @@ void Game::frame () {
 	} else {
 		view = player.update_post_physics();
 	}
-
-	common_uniforms.set_view_uniforms(view);
-	common_uniforms.set_debug_uniforms();
 
 	Block*	highlighted_block;
 	bpos	highlighted_block_pos;
@@ -638,7 +635,7 @@ void Game::frame () {
 			Chunk* chunk;
 			Block* b = chunks.query_block(block_place_pos, &chunk);
 
-			bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.collision_r,player.collision_h);
+			bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
 			if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 
@@ -773,6 +770,9 @@ void Game::frame () {
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
+	common_uniforms.set_view_uniforms(view);
+	common_uniforms.set_debug_uniforms();
+
 	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
 
 	{
@@ -806,7 +806,7 @@ void Game::frame () {
 	}
 
 	if (viewing_flycam || player.third_person)
-		debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 130), 32);
+		debug_graphics->push_cylinder(player.pos + float3(0,0, player.height/2), player.radius, player.height, srgb(255, 40, 255, 130), 32);
 
 	// opaque draw
 	chunk_graphics.draw_chunks(chunks);
