@@ -47,12 +47,6 @@ $if fragment
 
 	void main () {
 		float hp = vs_uv_indx_hp.w;
-		
-		//uv.x /= 3;
-		//uv.x += vs_uvzw_atlas.z / 3;
-		//
-		//uv.y /= atlas_textures_count;
-		//uv.y += vs_uvzw_atlas.w / atlas_textures_count;
 
 		vec4 col = texture(tile_textures, vs_uv_indx_hp.xyz);
 	

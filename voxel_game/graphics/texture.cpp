@@ -64,6 +64,18 @@ void Texture2D::bind () {
 	glBindTexture(GL_TEXTURE_2D, tex);
 }
 
+int calc_mipmap_count (int2 size) {
+	int mips = 1;
+	while (size.x > 1 && size.y > 1) {
+		mips++;
+
+		size.x = max(1, size.x / 2);
+		size.y = max(1, size.y / 2);
+	}
+
+	return mips;
+}
+
 Texture2DArray::Texture2DArray () {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
 
@@ -76,13 +88,15 @@ Texture2DArray::Texture2DArray () {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 }
 
-void Texture2DArray::alloc (int2 size, int count, GLenum internal_format) {
+void Texture2DArray::alloc (int2 size, int count, GLenum internal_format, bool mipmaps) {
 	this->size = size;
 	this->count = count;
 
+	int mip_count = mipmaps ? calc_mipmap_count(size) : 1;
+
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
 
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, internal_format, size.x, size.y, count);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, mip_count, internal_format, size.x, size.y, count);
 }
 
 void Texture2DArray::upload (int index, void* data, GLenum format, GLenum type) {
@@ -91,7 +105,7 @@ void Texture2DArray::upload (int index, void* data, GLenum format, GLenum type) 
 
 void Texture2DArray::gen_mipmaps () {
 	if (size.x != 1 || size.y != 1) {
-		glGenerateMipmap(GL_TEXTURE_2D);
+		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 	}
 }
 

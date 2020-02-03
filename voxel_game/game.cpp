@@ -635,21 +635,23 @@ void Game::frame () {
 			Chunk* chunk;
 			Block* b = chunks.query_block(block_place_pos, &chunk);
 
-			bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
+			if (b && chunk) {
+				bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
-			if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
+				if (block_props[b->type].replaceable && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
 
-				b->type = BT_EARTH;
-				b->hp_ratio = 1;
-				b->dbg_tint = 255;
+					b->type = BT_EARTH;
+					b->hp_ratio = 1;
+					b->dbg_tint = 255;
 
-				//dbg_play_sound();
+					//dbg_play_sound();
 
-				chunk->block_changed(chunks, block_place_pos);
+					chunk->block_changed(chunks, block_place_pos);
 
-				raycast_highlighted_block(); // make highlighted_block seem more responsive
+					raycast_highlighted_block(); // make highlighted_block seem more responsive
 
-				trigger_place_block = false;
+					trigger_place_block = false;
+				}
 			}
 		}
 

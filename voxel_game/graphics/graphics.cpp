@@ -139,8 +139,9 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	}
 }
 
-inline Image<srgba8> get_sub_tile (Image<srgba8> const& c, int2 pos, int2 size) {
-	auto i = Image<srgba8>(size);
+template <typename T>
+inline Image<T> get_sub_tile (Image<T> const& c, int2 pos, int2 size) {
+	auto i = Image<T>(size);
 	for (int y=0; y<size.y; ++y) {
 		for (int x=0; x<size.x; ++x) {
 			auto C = c.get(x + pos.x * size.x, y + pos.y * size.y);
@@ -247,22 +248,21 @@ TileTextures::TileTextures () {
 
 		tile_size = tl.size;
 
-		tile_textures.alloc<srgba8, true>(tl.size, (int)tl.images.size());
-		for (int i=0; i<(int)tl.images.size(); ++i) {
-			tile_textures.upload(i, tl.images[i]);
-		}
+		tile_textures.upload<srgba8, true>(tl.images);
 	}
 
 	{
-		auto breaking = Image<srgba8>("textures/breaking.png");
+		auto breaking = Image<uint8>("textures/breaking.png");
 
 		breaking_frames_count = breaking.size.y / tile_size.x;
 
-		breaking_textures.alloc<uint8, false>(tile_size, breaking_frames_count);
+		std::vector< Image<uint8> > imgs;
 
 		for (int i=0; i<breaking_frames_count; ++i) {
-			breaking_textures.upload(i, get_sub_tile(breaking, int2(0,i), tile_size));
+			imgs.push_back(get_sub_tile(breaking, int2(0,i), tile_size));
 		}
+
+		breaking_textures.upload<uint8, false>(imgs);
 	}
 }
 

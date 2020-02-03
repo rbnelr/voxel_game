@@ -223,24 +223,28 @@ public:
 	}
 
 	// Upload one image to slot in texture array
-	void alloc (int2 size, int count, GLenum internal_format);
+	void alloc (int2 size, int count, GLenum internal_format, bool mipmaps=true);
 
 	// Upload one image to slot in texture array
 	void upload (int index, void* data, GLenum format, GLenum type);
 
 	void gen_mipmaps ();
 
+	// if mipmaps=true then call gen_mipmaps after all textues have been uploaded
 	template <typename T, bool srgb>
-	void alloc (int2 size, int count);
+	void alloc (int2 size, int count, bool mipmaps=true);
 
-	template<> void alloc<uint8, false> (int2 size, int count) {
-		alloc(size, count, GL_R8);
+	// if mipmaps=true then call gen_mipmaps after all textues have been uploaded
+	template<> void alloc<uint8, false> (int2 size, int count, bool mipmaps) {
+		alloc(size, count, GL_R8, mipmaps);
 	}
-	template<> void alloc<uint8v4, false> (int2 size, int count) {
-		alloc(size, count, GL_RGBA8);
+	// if mipmaps=true then call gen_mipmaps after all textues have been uploaded
+	template<> void alloc<uint8v4, false> (int2 size, int count, bool mipmaps) {
+		alloc(size, count, GL_RGBA8, mipmaps);
 	}
-	template<> void alloc<uint8v4, true> (int2 size, int count) {
-		alloc(size, count, GL_SRGB8_ALPHA8);
+	// if mipmaps=true then call gen_mipmaps after all textues have been uploaded
+	template<> void alloc<uint8v4, true> (int2 size, int count, bool mipmaps) {
+		alloc(size, count, GL_SRGB8_ALPHA8, mipmaps);
 	}
 
 	// Upload new image to mipmap
@@ -252,6 +256,21 @@ public:
 	inline void upload (int index, Image<uint8v4> const& img) {
 		assert(equal(img.size, size));
 		upload(index, (void*)img.data(), GL_RGBA, GL_UNSIGNED_BYTE);
+	}
+
+	// alloc, upload and gen mipmaps from array of images
+	template <typename T, bool srgb=true>
+	inline void upload (std::vector< Image<T> > const& images, bool mipmaps=true) {
+		assert(images.size() > 0);
+
+		alloc<T, srgb>(images[0].size, (int)images.size(), mipmaps);
+
+		for (int i=0; i<(int)images.size(); ++i) {
+			upload(i, images[i]);
+		}
+
+		if (mipmaps)
+			gen_mipmaps();
 	}
 
 	void bind ();
