@@ -102,6 +102,7 @@ bool _prev_cursor_enabled;
 // But when toggling the cursor from disabled to visible cursor jumps back to the prev position, and an event reports this as delta so we need to discard this 
 void glfw_mouse_move_event (GLFWwindow* window, double xpos, double ypos) {
 	float2 delta = float2((float)(xpos - _prev_mouse_pos_x), (float)(ypos - _prev_mouse_pos_y));
+	delta.y = -delta.y; // convert to bottom up
 
 	_prev_mouse_pos_x = xpos;
 	_prev_mouse_pos_y = ypos;
@@ -136,6 +137,9 @@ void glfw_get_non_callback_input (GLFWwindow* window) {
 	glfwGetCursorPos(window, &x, &y);
 
 	input.cursor_pos = float2((float)x, (float)y);
+	input.cursor_pos.y = input.window_size.y - 1 - input.cursor_pos.y;
+
+	//printf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
 }
 
 //// vsync and fullscreen mode

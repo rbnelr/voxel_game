@@ -11,8 +11,6 @@ void DebugGraphics::push_wire_cube (float3 center, float size, lrgba col) {
 void DebugGraphics::push_cylinder (float3 center, float radius, float height, lrgba col, int sides) {
 	faces.resize(faces.size() + 12 * sides);
 
-	col = lrgba(0, 1, 0, 1);
-
 	float2 rv = float2(radius, 0);
 	float h = height;
 
@@ -48,7 +46,6 @@ void DebugGraphics::draw () {
 		shader.bind();
 
 		//glDisable(GL_DEPTH_TEST);
-		glEnable(GL_BLEND);
 
 		//// triangles
 		//glDisable(GL_CULL_FACE);
@@ -71,7 +68,6 @@ void DebugGraphics::draw () {
 			lines_mesh.draw();
 		}
 
-		glDisable(GL_BLEND);
 		//glEnable(GL_DEPTH_TEST);
 	}
 

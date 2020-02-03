@@ -1,11 +1,13 @@
 #pragma once
 #include "kissmath.hpp"
 #include "blocks.hpp"
+#include "graphics/graphics.hpp"
+#include "util/move_only_class.hpp"
 
 #include "stdint.h"
 #include <unordered_map>
 
-#include "graphics/graphics.hpp"
+//#include "graphics/graphics.hpp"
 
 typedef int64_t	bpos_t;
 typedef int64v2	bpos2;
@@ -82,16 +84,21 @@ struct Chunks {
 	Chunk* query_chunk (chunk_pos coord);
 	Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 
-	void delete_all_chunks ();
-
 	Chunk* create (chunk_pos chunk_pos);
 	void remove (chunk_pos chunk_pos);
+
+	void remesh_all ();
+	void delete_all ();
 };
 
 #define AVOID_QUERY_CHUNK_HASH_LOOKUP 1
 
 struct Chunk_Mesher {
+
+	bool alpha_test;
+
 	std::vector<ChunkMesh::Vertex>* opaque_vertices;
+	std::vector<ChunkMesh::Vertex>* tranparent_vertices;
 
 #if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	Chunk* neighbour_chunks[3][3];
@@ -258,7 +265,14 @@ struct Chunk_Mesher {
 	#undef XH
 	#undef YH
 	#undef ZH
-	
+
+	bool bt_is_transparent (block_type t) {
+		if (alpha_test)
+			return block_props[t].transparency != TM_OPAQUE;
+		else
+			return block_props[t].transparency == TM_TRANSPARENT;
+	}
+
 	void cube_opaque () {
 		if (bt_is_transparent(query_block(block_pos_x -1, block_pos_y, block_pos_z)->type)) face_nx(opaque_vertices);
 		if (bt_is_transparent(query_block(block_pos_x +1, block_pos_y, block_pos_z)->type)) face_px(opaque_vertices);
@@ -268,26 +282,25 @@ struct Chunk_Mesher {
 		if (bt_is_transparent(query_block(block_pos_x, block_pos_y, block_pos_z +1)->type)) face_pz(opaque_vertices);
 	};
 	void cube_transperant () {
+		block_type bt;
 		
-		//block_type bt;
-		//
-		//bt = query_block(block_pos_x -1, block_pos_y, block_pos_z)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_nx(vbo_transperant);
-		//
-		//bt = query_block(block_pos_x +1, block_pos_y, block_pos_z)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_px(vbo_transperant);
-		//
-		//bt = query_block(block_pos_x, block_pos_y -1, block_pos_z)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_ny(vbo_transperant);
-		//
-		//bt = query_block(block_pos_x, block_pos_y +1, block_pos_z)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_py(vbo_transperant);
-		//
-		//bt = query_block(block_pos_x, block_pos_y, block_pos_z -1)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_nz(vbo_transperant);
-		//
-		//bt = query_block(block_pos_x, block_pos_y, block_pos_z +1)->type;
-		//if (bt_is_transparent(bt) && bt != b->type) face_pz(vbo_transperant);
+		bt = query_block(block_pos_x -1, block_pos_y, block_pos_z)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_nx(tranparent_vertices);
+		
+		bt = query_block(block_pos_x +1, block_pos_y, block_pos_z)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_px(tranparent_vertices);
+		
+		bt = query_block(block_pos_x, block_pos_y -1, block_pos_z)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_ny(tranparent_vertices);
+		
+		bt = query_block(block_pos_x, block_pos_y +1, block_pos_z)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_py(tranparent_vertices);
+		
+		bt = query_block(block_pos_x, block_pos_y, block_pos_z -1)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_nz(tranparent_vertices);
+		
+		bt = query_block(block_pos_x, block_pos_y, block_pos_z +1)->type;
+		if (bt_is_transparent(bt) && bt != b->type) face_pz(tranparent_vertices);
 	};
 	
 };
@@ -410,54 +423,3 @@ inline Block const* Chunk_Mesher::query_block (bpos_t pos_x, bpos_t pos_y, bpos_
 	return chunk->get_block(pos_in_chunk);
 }
 #endif
-
-inline void Chunk_Mesher::mesh (Chunks& chunks, ChunkGraphics& graphics, Chunk* chunk) {
-	//PROFILE_BEGIN(profile_remesh_total);
-	
-	opaque_vertices = &chunk->mesh.vertex_data;
-	
-	opaque_vertices->clear();
-	
-#if AVOID_QUERY_CHUNK_HASH_LOOKUP
-	neighbour_chunks[0][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,-1));
-	neighbour_chunks[0][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,-1));
-	neighbour_chunks[0][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,-1));
-	neighbour_chunks[1][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1, 0));
-	neighbour_chunks[1][1] = chunk                                          ;
-	neighbour_chunks[1][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1, 0));
-	neighbour_chunks[2][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,+1));
-	neighbour_chunks[2][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,+1));
-	neighbour_chunks[2][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,+1));
-#endif
-	
-	{
-		bpos i;
-		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-					auto* block = chunk->get_block(i);
-					
-					if (block->type != BT_AIR) {
-						
-						b = block;
-						block_pos_x = i.x;
-						block_pos_y = i.y;
-						block_pos_z = i.z;
-						tile = graphics.tile_textures.block_tile_info[b->type];
-						
-						if (block_props[block->type].transparency == TM_TRANSP_MASS)
-							cube_transperant();
-						else
-							cube_opaque();
-						
-					}
-				}
-			}
-		}
-	}
-
-	chunk->mesh.gpu_mesh.upload(chunk->mesh.vertex_data);
-	
-	//PROFILE_END_ACCUM(profile_remesh_total);
-	//PROFILE_PRINT(profile_remesh_total, "");
-}

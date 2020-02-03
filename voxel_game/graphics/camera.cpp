@@ -71,7 +71,7 @@ void rotate_with_mouselook (float* azimuth, float* elevation, float vfov) {
 	float delta_y = raw_mouselook.y * vfov / input.mouselook_sensitiviy_divider;
 
 	*azimuth -= delta_x;
-	*elevation -= delta_y;
+	*elevation += delta_y;
 
 	*azimuth = wrap_azimuth(*azimuth);
 	*elevation = clamp_elevation(*elevation, input.view_elevation_down_limit, input.view_elevation_up_limit);

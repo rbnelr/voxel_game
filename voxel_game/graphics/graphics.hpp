@@ -89,9 +89,11 @@ struct ChunkMesh {
 		}
 	};
 
-	std::vector<Vertex> vertex_data;
+	std::vector<Vertex> opaque_faces;
+	std::vector<Vertex> transparent_faces;
 
-	Mesh<Vertex> gpu_mesh;
+	Mesh<Vertex> opaque_mesh;
+	Mesh<Vertex> transparent_mesh;
 };
 
 struct BlockTileInfo {
@@ -147,11 +149,10 @@ struct ChunkGraphics {
 
 	TileTextures tile_textures;
 
-	void imgui () {
-		sampler.imgui("sampler");
+	bool alpha_test = true;
 
-		tile_textures.imgui("tile_textures");
-	}
+	void imgui (Chunks& chunks);
 
 	void draw_chunks (Chunks& chunks);
+	void draw_chunks_transparent (Chunks& chunks);
 };

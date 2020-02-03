@@ -28,7 +28,7 @@ $if fragment
 		vec3 sky_col =		srgb(190,239,255);
 		vec3 horiz_col =	srgb(204,227,235);
 		vec3 down_col =		srgb(41,49,52);
-	
+		
 		vec3 col;
 		if (dir.z > 0)
 			col = mix(horiz_col, sky_col, dir.z);

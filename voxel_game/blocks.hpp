@@ -26,8 +26,8 @@ enum block_type : uint8_t {
 
 enum transparency_mode : uint32_t {
 	TM_OPAQUE		=0,
-	TM_TRANSP_MASS	, // only surface of a group of transparent blocks of same type is rendered (like water where only the surface is visible)
-	TM_TRANSP_BLOCK	, // all faces of these blocks are rendered (like leaves)
+	TM_ALPHA_TEST	, // only surface of a group of transparent blocks of same type is rendered (like water where only the surface is visible)
+	TM_TRANSPARENT	, // all faces of these blocks are rendered (like leaves)
 };
 
 struct Block_Properties {
@@ -39,19 +39,16 @@ struct Block_Properties {
 };
 
 static Block_Properties block_props[PSEUDO_BLOCK_TYPES_COUNT] = {
-	/* BT_AIR				*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
-	/* BT_WATER				*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
+	/* BT_AIR				*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
+	/* BT_WATER				*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
 	/* BT_EARTH				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
 	/* BT_GRASS				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
 	/* BT_TREE_LOG			*/	{ 0, TM_OPAQUE,			1, 0, 1 },
-	///* BT_LEAVES			*/	{ 0, graphics_settings.foliage_alpha ? TM_TRANSP_BLOCK : TM_OPAQUE,	1, 0, 1 },
-	/* BT_LEAVES			*/	{ 0, TM_TRANSP_BLOCK,	1, 0, 1 },
+	/* BT_LEAVES			*/	{ 0, TM_ALPHA_TEST,		1, 0, 1 },
 								
-	/* BT_OUT_OF_BOUNDS		*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
-	/* BT_NO_CHUNK			*/	{ 1, TM_TRANSP_MASS,	0, 1, 0 },
+	/* BT_OUT_OF_BOUNDS		*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
+	/* BT_NO_CHUNK			*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
 };
-
-static bool bt_is_transparent (block_type t) {	return block_props[t].transparency != TM_OPAQUE; }
 
 static constexpr const char* BLOCK_NAMES[BLOCK_TYPES_COUNT] = {
 	/* BT_AIR			*/	nullptr		,

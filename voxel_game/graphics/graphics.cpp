@@ -1,6 +1,6 @@
 #include "graphics.hpp"
-#include "../chunks.hpp"
 #include "../util/string.hpp"
+#include "../chunks.hpp"
 using namespace kiss;
 
 //
@@ -134,12 +134,8 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 		shader.set_uniform("block_pos", pos);
 		shader.set_uniform("face_rotation", face_rotation[face]);
 
-		glEnable(GL_BLEND);
-
 		mesh.bind();
 		mesh.draw();
-
-		glDisable(GL_BLEND);
 	}
 }
 
@@ -270,32 +266,79 @@ TileTextures::TileTextures () {
 	}
 }
 
+void ChunkGraphics::imgui (Chunks& chunks) {
+	sampler.imgui("sampler");
+
+	tile_textures.imgui("tile_textures");
+
+	if (ImGui::Checkbox("alpha_test", &alpha_test)) {
+		chunks.remesh_all();
+	}
+}
+
 void ChunkGraphics::draw_chunks (Chunks& chunks) {
+	glActiveTexture(GL_TEXTURE0 + 0);
+	tile_textures.tile_textures.bind();
+	sampler.bind(0);
+
+	glActiveTexture(GL_TEXTURE0 + 1);
+	tile_textures.breaking_textures.bind();
+	sampler.bind(1);
+
 	if (shader) {
 		shader.bind();
 
 		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
 		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
 
+		shader.set_uniform("alpha_test", alpha_test);
+
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
-		glActiveTexture(GL_TEXTURE0 + 0);
-		tile_textures.tile_textures.bind();
-		sampler.bind(0);
-
-		glActiveTexture(GL_TEXTURE0 + 1);
-		tile_textures.breaking_textures.bind();
-		sampler.bind(1);
-
+		// Draw all opaque chunk meshes
 		for (auto& kv : chunks.chunks) {
 			Chunk* chunk = &kv.second;
 
-			if (chunk->mesh.gpu_mesh.vertex_count != 0) {
+			if (chunk->mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk->chunk_pos_world());
 
-				chunk->mesh.gpu_mesh.bind();
-				chunk->mesh.gpu_mesh.draw();
+				chunk->mesh.opaque_mesh.bind();
+				chunk->mesh.opaque_mesh.draw();
+			}
+		}
+	}
+}
+
+void ChunkGraphics::draw_chunks_transparent (Chunks& chunks) {
+	glActiveTexture(GL_TEXTURE0 + 0);
+	tile_textures.tile_textures.bind();
+	sampler.bind(0);
+
+	glActiveTexture(GL_TEXTURE0 + 1);
+	tile_textures.breaking_textures.bind();
+	sampler.bind(1);
+
+	if (shader) {
+		shader.bind();
+
+		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+
+		shader.set_uniform("alpha_test", false);
+
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+
+		// Draw all transparent chunk meshes
+		for (auto& kv : chunks.chunks) {
+			Chunk* chunk = &kv.second;
+
+			if (chunk->mesh.transparent_mesh.vertex_count != 0) {
+				shader.set_uniform("chunk_pos", (float3)chunk->chunk_pos_world());
+
+				chunk->mesh.transparent_mesh.bind();
+				chunk->mesh.transparent_mesh.draw();
 			}
 		}
 	}

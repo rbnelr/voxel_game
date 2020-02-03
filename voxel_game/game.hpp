@@ -234,11 +234,6 @@ class Game {
 
 	Graphics_Settings graphics_settings;
 
-	void foliage_alpha_changed () {
-		block_props[BT_LEAVES].transparency = graphics_settings.foliage_alpha ? TM_TRANSP_BLOCK : TM_OPAQUE;
-		trigger_regen_chunks = true;
-	}
-
 	bool trigger_regen_chunks =		false;
 
 	float noise_tree_density (OSN::Noise<2> const& osn_noise, float2 pos_world) {

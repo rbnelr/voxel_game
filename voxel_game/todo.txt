@@ -112,6 +112,13 @@ TODO
   -the resulting sum of light now represent the indirect bounced light (just 1 bounce)
   -if that bounced light is now used as lighting of the voxel a second pass could add another bounce
 
+ The only feasable way to render all chunks in one draw call i found is an extension for sparse vbos
+ -allocate a vbo large enough for all possible chunks with each single face added in the mesh data
+ -each chunk gets a slot in there
+ -mesh data gets generated like usual, uploaded, the giant (100MB) slot for the chunk is mostly unused
+ -but that is fine because the actual memory is virtualized and only the used pages are commited via the extension
+ -indirect drawcalls can then be used to draw all the actual filled parts of the giant vbo
+
 -OLD version:
  convert entire debug optios into new imgui way of doing things
  

@@ -130,6 +130,23 @@ namespace gl {
 }
 
 //// user facing stuff that hopefully is generic enough to work across OpenGL, D3D, Vulkan etc.
+inline void gl_enable (GLenum cap, bool on) {
+	if (on)
+		glEnable(cap);
+	else
+		glDisable(cap);
+}
+
+// use glsl_bool bool instead of bool in uniform blocks because glsl bools are 32 bit and the padding after a c++ bool might be unitialized -> bool has random value in shader
+struct glsl_bool {
+	uint32_t val;
+
+	glsl_bool () {}
+	constexpr glsl_bool (bool b): val{(uint32_t)b} {}
+	constexpr operator bool () {
+		return val != 0;
+	}
+};
 
 struct SharedUniformsLayoutChecker {
 	int offset = 0;
@@ -145,11 +162,13 @@ struct SharedUniformsLayoutChecker {
 	template <typename T>
 	static constexpr int get_align ();
 
-	template<> static constexpr int get_align<float   > () { return N; }
-	template<> static constexpr int get_align<float2  > () { return 2*N; }
-	template<> static constexpr int get_align<float3  > () { return 4*N; }
-	template<> static constexpr int get_align<float4  > () { return 4*N; }
-	template<> static constexpr int get_align<float4x4> () { return 4*N; }
+	template<> static constexpr int get_align<float    > () { return N; }
+	template<> static constexpr int get_align<int      > () { return N; }
+	template<> static constexpr int get_align<glsl_bool> () { return N; }
+	template<> static constexpr int get_align<float2   > () { return 2*N; }
+	template<> static constexpr int get_align<float3   > () { return 4*N; }
+	template<> static constexpr int get_align<float4   > () { return 4*N; }
+	template<> static constexpr int get_align<float4x4 > () { return 4*N; }
 
 	template<typename T>
 	constexpr void member (int offs) {

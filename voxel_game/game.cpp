@@ -67,7 +67,7 @@ Game::Game () {
 		glCullFace(GL_BACK);
 		glFrontFace(GL_CCW);
 
-		glEnable(GL_BLEND);
+		glDisable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -110,7 +110,9 @@ void Game::frame () {
 	{
 		bool open = ImGui::CollapsingHeader("Graphics");
 
-		if (open) chunk_graphics.imgui();
+		if (open) common_uniforms.imgui();
+
+		if (open) chunk_graphics.imgui(chunks);
 
 		if (open) ImGui::Separator();
 	}
@@ -142,7 +144,7 @@ void Game::frame () {
 
 	if (trigger_regen_chunks) { // chunks currently being processed by thread pool will not be regenerated
 		trigger_regen_chunks = false;
-		chunks.delete_all_chunks();
+		chunks.delete_all();
 		inital_chunk(player.pos);
 		trigger_dbg_heightmap_visualize = true;
 	}
@@ -771,6 +773,8 @@ void Game::frame () {
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
+	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+
 	{
 		int count = 0;
 
@@ -801,58 +805,30 @@ void Game::frame () {
 		//if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_i, count);
 	}
 
-#if 0
-	if (shad_blocks->valid()) {
+	if (viewing_flycam || player.third_person)
+		debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 130), 32);
 
-		bind_texture_unit(0, tex_block_atlas);
-		bind_texture_unit(1, &tex_breaking);
-
-		shad_blocks->bind();
-		shad_blocks->set_unif("draw_wireframe",	draw_wireframe);
-		shad_blocks->set_unif("show_dbg_tint",	show_dbg_tint);
-
-		shad_blocks->set_unif("world_to_cam",	(float4x4)view.world_to_cam);
-		shad_blocks->set_unif("cam_to_world",	(float4x4)view.cam_to_world);
-		shad_blocks->set_unif("cam_to_clip",	view.cam_to_clip);
-
-		shad_blocks->set_unif("texture_res", texture_res);
-		shad_blocks->set_unif("atlas_textures_count", atlas_textures_count);
-		shad_blocks->set_unif("breaking_frames_count", breaking_frames_count);
-
-		shad_blocks->set_unif("alpha_test", graphics_settings.foliage_alpha);
-
-		
-		// draw opaque
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
-
-			chunk->vbo.draw_entire(shad_blocks);
-		}
-
-		glEnable(GL_BLEND);
-		shad_blocks->set_unif("alpha_test", false);
-
-		// draw transperant
-		for (auto& chunk_hash_pair : chunks) {
-			auto& chunk = chunk_hash_pair.second;
-
-			chunk->vbo_transperant.draw_entire(shad_blocks);
-		}
-
-		glDisable(GL_BLEND);
-	}
-#endif
-
+	// opaque draw
 	chunk_graphics.draw_chunks(chunks);
+
+	skybox_graphics.draw();
+
+	// transparent draw
+	glEnable(GL_BLEND);
 
 	if (highlighted_block) {
 		block_highlight_graphics.draw((float3)highlighted_block_pos, (BlockFace)highlighted_block_face);
 	}
 
-	debug_graphics->push_cylinder(player.pos + float3(0,0, player.collision_h/2), player.collision_r, player.collision_h, srgb(255, 40, 255, 230), 32);
-	
+	//glCullFace(GL_FRONT);
+	//chunk_graphics.draw_chunks_transparent(chunks);
+	//glCullFace(GL_BACK);
+	chunk_graphics.draw_chunks_transparent(chunks);
+
+	glEnable(GL_CULL_FACE);
 	debug_graphics->draw();
-	skybox_graphics.draw();
+
+	glDisable(GL_BLEND);
 }
 
 float elev_freq = 400, elev_amp = 25;
@@ -860,48 +836,3 @@ float rough_freq = 220;
 float detail0_freq = 70, detail0_amp = 12;
 float detail1_freq = 20, detail1_amp = 3;
 float detail2_freq = 3, detail2_amp = 0.14f;
-
-#if 0
-int main (int argc, char** argv) {
-	
-	
-	//
-	imgui_init();
-	
-	for (frame_i=0;; ++frame_i) {
-		//printf("frame: %d\n", frame_i);
-		
-		imgui_begin(dt, inp.wnd_dim, inp.mcursor_pos_px, inp.mouse_wheel_diff, lmb_down, rmb_down);
-		
-		option("draw_wireframe", &draw_wireframe);
-		option("show_dbg_tint", &show_dbg_tint);
-		
-		overlay_line(prints("mouse:   %4d %4d -> %.2f %.2f", inp.mcursor_pos_px.x,inp.mcursor_pos_px.y, mouse.x,mouse.y));
-		
-		{ // various options
-			option("fixed_dt",			&fixed_dt);
-			option("max_variable_dt",	&max_variable_dt);
-			option("fixed_dt_dt",		&fixed_dt_dt);
-			
-			option("viewing_flycam",	&viewing_flycam);
-			option("controling_flycam",	&controling_flycam);
-			
-			flycam.options();
-			
-			option("initial_player_pos_world",		&initial_player_pos_world);
-			option("initial_player_vel_world",		&initial_player_vel_world);
-			
-			player.options();
-			
-			{
-				bool tmp = block_props[BT_NO_CHUNK].traversable;
-				option("unloaded_chunks_traversable", &tmp);
-				block_props[BT_NO_CHUNK].traversable = tmp;
-			}
-			if (option("unloaded_chunks_dark",		&B_NO_CHUNK.dark)) for (auto& c : chunks) c.second->needs_remesh = true;
-		}
-	}
-	
-	return 0;
-}
-#endif

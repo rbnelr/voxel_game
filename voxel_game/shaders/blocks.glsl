@@ -1,5 +1,6 @@
 #version 330 core
 
+#define ALLOW_WIREFRAME 1
 $include "common.glsl"
 
 $if vertex
@@ -24,6 +25,8 @@ $if vertex
 		vs_brightness =		brightness;
 		vs_uv_indx_hp =		uv_indx_hp;
 		vs_color =			color;
+
+		WIREFRAME_MACRO;
 	}
 $endif
 
@@ -39,13 +42,8 @@ $if fragment
 	uniform float breaking_frames_count;
 	uniform float breaking_mutliplier;
 
-	//uniform int texture_res;
-	//uniform int atlas_textures_count;
-	//uniform bool show_dbg_tint;
-	//
-	//uniform bool alpha_test;
-
-	out vec4 frag_col;
+	uniform bool alpha_test;
+	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
 		float hp = vs_uv_indx_hp.w;
@@ -55,8 +53,8 @@ $if fragment
 		//
 		//uv.y /= atlas_textures_count;
 		//uv.y += vs_uvzw_atlas.w / atlas_textures_count;
-	
-		vec4 col = texture(tile_textures, vs_uv_indx_hp.xyz).rgba;
+
+		vec4 col = texture(tile_textures, vs_uv_indx_hp.xyz);
 	
 		if (hp < 1) {
 			float breaking_frame = floor(hp * breaking_frames_count + 0.00001f);
@@ -68,11 +66,12 @@ $if fragment
 	
 		col.rgb *= vec3(vs_brightness);
 		
-		//if (alpha_test) {
-		//	if (col.a <= 110.0/255) discard;
-		//	col.a = 1;
-		//}
-	
-		frag_col = col;
+		if (alpha_test) {
+			if (col.a <= ALPHA_TEST_THRES / 255.0)
+				DISCARD();
+			col.a = 1.0;
+		}
+
+		FRAG_COL(col);
 	}
 $endif
