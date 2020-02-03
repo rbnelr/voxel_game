@@ -1,6 +1,96 @@
 #include "chunks.hpp"
+#include "chunk_mesher.hpp"
+#include "player.hpp"
+#include "world.hpp"
+#include "util/collision.hpp"
+#include <algorithm> // std::sort
 
-Chunk* Chunks::_lookup_chunk (chunk_pos coord) {
+
+//// Chunk
+
+Chunk::Chunk (chunk_coord coord): coord{coord} {
+	
+}
+
+void Chunk::remesh (Chunks& chunks, ChunkGraphics& graphics) {
+	mesh_chunk(chunks, graphics, this);
+
+	needs_remesh = false;
+}
+
+void Chunk::update_block_brighness () {
+	bpos i; // position in chunk
+	for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
+		for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
+
+			i.z = CHUNK_DIM_Z -1;
+
+			for (; i.z > -1; --i.z) {
+				auto* b = get_block(i);
+
+				if (b->type != BT_AIR) break;
+
+				b->dark = false;
+			}
+
+			for (; i.z > -1; --i.z) {
+				auto* b = get_block(i);
+
+				b->dark = true;
+			}
+
+		}
+	}
+
+	needs_block_brighness_update = false;
+}
+
+void Chunk::block_only_texture_changed (bpos block_pos_world) { // only breaking animation of block changed -> do not need to update block brightness -> do not need to remesh surrounding chunks (only this chunk needs remesh)
+	needs_remesh = true;
+}
+void Chunk::block_changed (Chunks& chunks, bpos block_pos_world) { // block was placed or broken -> need to update our block brightness -> need to remesh ourselves and surrounding chunks
+	needs_remesh = true;
+	needs_block_brighness_update = true;
+
+	Chunk* chunk;
+
+	bpos pos = block_pos_world - chunk_pos_world();
+
+	bpos2 chunk_edge = select((bpos2)pos == bpos2(0), bpos2(-1), select((bpos2)pos == CHUNK_DIM_2D -1, bpos2(+1), bpos2(0))); // -1 or +1 for each component if it is on negative or positive chunk edge
+
+																															  // update surrounding chunks if the changed block is touching them to update lighting properly
+	if (chunk_edge.x != 0						&& (chunk = chunks.query_chunk(coord +chunk_coord(chunk_edge.x,0))))
+		chunk->needs_remesh = true;
+	if (chunk_edge.y != 0						&& (chunk = chunks.query_chunk(coord +chunk_coord(0,chunk_edge.y))))
+		chunk->needs_remesh = true;
+	if (chunk_edge.x != 0 && chunk_edge.y != 0	&& (chunk = chunks.query_chunk(coord +chunk_edge)))
+		chunk->needs_remesh = true;
+}
+
+void Chunk::whole_chunk_changed (Chunks& chunks) { // whole chunk could have changed -> update our block brightness -> remesh all surrounding chunks
+	needs_remesh = true;
+	needs_block_brighness_update = true;
+
+	// update surrounding chunks to update lighting properly
+	chunks.remesh_neighbours(coord);
+}
+
+void Chunks::remesh_neighbours (chunk_coord coord) {
+	Chunk* chunk;
+
+	if ((chunk = query_chunk(coord + chunk_coord(-1,-1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord( 0,-1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord(+1,-1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord(+1, 0)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord(+1,+1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord( 0,+1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord(-1,+1)))) chunk->needs_remesh = true;
+	if ((chunk = query_chunk(coord + chunk_coord(-1, 0)))) chunk->needs_remesh = true;
+}
+
+//// Chunks
+
+Chunk* Chunks::_lookup_chunk (chunk_coord coord) {
 	auto kv = chunks.find(s64v2_hashmap{ coord });
 	if (kv == chunks.end())
 		return nullptr;
@@ -10,7 +100,7 @@ Chunk* Chunks::_lookup_chunk (chunk_pos coord) {
 	return chunk;
 }
 
-Chunk* Chunks::query_chunk (chunk_pos coord) {
+Chunk* Chunks::query_chunk (chunk_coord coord) {
 	if (_prev_query_chunk && equal(_prev_query_chunk->coord, coord)) {
 		return _prev_query_chunk;
 	} else {
@@ -22,90 +112,102 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 		*out_chunk = nullptr;
 
 	if (p.z < 0 || p.z >= CHUNK_DIM_Z)
-		return (Block*)&B_OUT_OF_BOUNDS;
+		return (Block*)&B_OUT_OF_BOUNDS; // cast const away, check before you write into the returned block for this special case
 
 	bpos block_pos_chunk;
-	chunk_pos chunk_pos = get_chunk_from_block_pos(p, &block_pos_chunk);
+	chunk_coord chunk_pos = get_chunk_from_block_pos(p, &block_pos_chunk);
 
 	Chunk* chunk = query_chunk(chunk_pos);
 	if (!chunk)
-		return (Block*)&B_NO_CHUNK;
+		return (Block*)&B_NO_CHUNK; // cast const away, check before you write into the returned block for this special case
 
 	if (out_chunk)
 		*out_chunk = chunk;
 	return chunk->get_block(block_pos_chunk);
 }
 
-Chunk* Chunks::create (chunk_pos chunk_pos) {
-	auto kv = chunks.emplace(s64v2_hashmap{ chunk_pos }, chunk_pos).first;
-	return &kv->second;
+Chunk* Chunks::load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos) {
+	assert(!query_chunk(chunk_pos));
+	
+	Chunk* chunk = &chunks.emplace(s64v2_hashmap{ chunk_pos }, chunk_pos).first->second;
+	
+	world_gen.generate_chunk(*chunk, world.seed);
+
+	chunk->whole_chunk_changed(*this);
+	
+	return chunk;
 }
-void Chunks::remove (chunk_pos chunk_pos) {
-	chunks.erase(s64v2_hashmap{ chunk_pos });
+Chunks::Iterator Chunks::unload_chunk (Iterator it) {
+	remesh_neighbours(it.it->second.coord);
+	// reset this pointer to prevent use after free
+	_prev_query_chunk = nullptr;
+	// delete chunk
+	return Iterator( chunks.erase(it.it) );
 }
 
-void Chunks::delete_all () {
-	_prev_query_chunk = nullptr;
-	chunks.clear();
-}
 void Chunks::remesh_all () {
 	for (auto& kv : chunks) {
 		kv.second.needs_remesh = true;
 	}
 }
 
-void Chunk_Mesher::mesh (Chunks& chunks, ChunkGraphics& graphics, Chunk* chunk) {
-	//PROFILE_BEGIN(profile_remesh_total);
+void Chunks::update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player) {
 
-	alpha_test = graphics.alpha_test;
+	// check their actual distance to determine if they should be generated or not
+	auto chunk_dist_to_player = [&] (chunk_coord pos) {
+		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
+		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
+	};
+	auto chunk_is_in_load_radius = [&] (chunk_coord pos) {
+		return chunk_dist_to_player(pos) <= chunk_generation_radius;
+	};
+	auto chunk_is_out_of_unload_radius = [&] (chunk_coord pos) {
+		return chunk_dist_to_player(pos) > (chunk_generation_radius + chunk_deletion_hysteresis);
+	};
 
-	opaque_vertices = &chunk->mesh.opaque_faces;
-	tranparent_vertices = &chunk->mesh.transparent_faces;
-
-	opaque_vertices->clear();
-	tranparent_vertices->clear();
-
-#if AVOID_QUERY_CHUNK_HASH_LOOKUP
-	neighbour_chunks[0][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,-1));
-	neighbour_chunks[0][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,-1));
-	neighbour_chunks[0][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,-1));
-	neighbour_chunks[1][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1, 0));
-	neighbour_chunks[1][1] = chunk                                          ;
-	neighbour_chunks[1][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1, 0));
-	neighbour_chunks[2][0] = chunks.query_chunk(chunk->coord +chunk_pos(-1,+1));
-	neighbour_chunks[2][1] = chunks.query_chunk(chunk->coord +chunk_pos( 0,+1));
-	neighbour_chunks[2][2] = chunks.query_chunk(chunk->coord +chunk_pos(+1,+1));
-#endif
-
-	{
-		bpos i;
-		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-					auto* block = chunk->get_block(i);
-
-					if (block->type != BT_AIR) {
-
-						b = block;
-						block_pos_x = i.x;
-						block_pos_y = i.y;
-						block_pos_z = i.z;
-						tile = graphics.tile_textures.block_tile_info[b->type];
-
-						if (block_props[block->type].transparency == TM_TRANSPARENT)
-							cube_transperant();
-						else
-							cube_opaque();
-
-					}
-				}
+	{ // chunk unloading
+		for (auto it=begin(); it!=end();) {
+			if (chunk_is_out_of_unload_radius((*it).coord)) {
+				it = unload_chunk(it);
+			} else {
+				++it;
 			}
 		}
 	}
 
-	chunk->mesh.opaque_mesh.upload(chunk->mesh.opaque_faces);
-	chunk->mesh.transparent_mesh.upload(chunk->mesh.transparent_faces);
+	{ // chunk loading
+		chunk_coord start =	(chunk_coord)floor(	((float2)player.pos - chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_coord end =	(chunk_coord)ceil(	((float2)player.pos + chunk_generation_radius) / (float2)CHUNK_DIM_2D );
 
-	//PROFILE_END_ACCUM(profile_remesh_total);
-	//PROFILE_PRINT(profile_remesh_total, "");
+		// check all chunk positions within a square of chunk_generation_radius
+		std::vector<chunk_coord> chunks_to_generate;
+
+		chunk_coord cp;
+		for (cp.x = start.x; cp.x<end.x; ++cp.x) {
+			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
+				if (chunk_is_in_load_radius(cp) && !query_chunk(cp)) {
+					// chunk is within chunk_generation_radius and not yet generated
+					chunks_to_generate.push_back(cp);
+				}
+			}
+		}
+
+		// load chunks nearest to player first
+		std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
+			[&] (chunk_coord l, chunk_coord r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
+		);
+
+		int count = 0;
+		for (auto& cp : chunks_to_generate) {
+			Chunk* new_chunk = load_chunk(world, world_gen, cp);
+
+			if (++count == max_chunks_generated_per_frame)
+				break;
+		}
+	}
+
+}
+
+void Chunks::update_chunk_mesh_and_light () {
+
 }

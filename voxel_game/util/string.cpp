@@ -37,4 +37,16 @@ namespace kiss {
 
 		return std::move(ret);
 	}
+
+	std::string_view trim (std::string_view sv) {
+		size_t start=0, end=sv.size();
+
+		while (start<sv.size() && is_whitespace_c(sv[start]))
+			start++;
+
+		while (end>0 && is_whitespace_c(sv[end-1]))
+			end--;
+
+		return sv.substr(start, end - start);
+	}
 }

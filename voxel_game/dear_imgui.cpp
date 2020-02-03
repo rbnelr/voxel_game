@@ -1,8 +1,5 @@
 #include "dear_imgui.hpp"
 
-#include "dear_imgui/imgui_impl_glfw.h"
-#include "dear_imgui/imgui_impl_opengl3.h"
-
 #include "glfw_window.hpp"
 
 void DearImgui::init () {

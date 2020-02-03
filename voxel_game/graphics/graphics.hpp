@@ -139,7 +139,8 @@ struct TileTextures {
 	}
 };
 
-struct Chunks;
+extern bool _use_potatomode;
+class Chunks;
 
 struct ChunkGraphics {
 
@@ -149,7 +150,7 @@ struct ChunkGraphics {
 
 	TileTextures tile_textures;
 
-	bool alpha_test = true;
+	bool alpha_test = !_use_potatomode;
 
 	void imgui (Chunks& chunks);
 

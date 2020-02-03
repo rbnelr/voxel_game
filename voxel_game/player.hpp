@@ -12,6 +12,10 @@ class Player {
 public:
 	const std::string name;
 
+	Player (std::string name): name{std::move(name)} {
+		respawn();
+	}
+
 	// Player ground position
 	float3	pos;
 
@@ -28,8 +32,15 @@ public:
 	//  First and third person cameras rotate around this
 	float3 head_pivot = float3(0, 0, 1.6f);
 
-	Camera fps_camera = Camera("fps_camera", 0);
-	Camera tps_camera = Camera("tps_camera", float3(0.5f, -0.4f, 4));
+	// Closest position the third person camera can go relative to head_pivot
+	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
+	// In which direction the camera moves back if no blocks are in the way
+	float3 tps_camera_dir = float3(0,0,1);
+	// How far the camera will move back
+	float tps_camera_dist = 4;
+
+	Camera fps_camera = Camera("fps_camera");
+	Camera tps_camera = Camera("tps_camera");
 
 	//// Physics
 	float radius = 0.4f;
@@ -45,8 +56,6 @@ public:
 
 	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
-	Player (std::string name): name{name} {} 
-
 	void imgui () {
 		if (!imgui_push(name, "Player")) return;
 
@@ -59,6 +68,11 @@ public:
 			rot_ae = to_radians(rot_ae_deg);
 
 		ImGui::Checkbox("third_person", &third_person);
+
+		ImGui::DragFloat3("head_pivot", &head_pivot.x, 0.05f);
+		ImGui::DragFloat3("tps_camera_base_pos", &tps_camera_base_pos.x, 0.05f);
+		ImGui::DragFloat3("tps_camera_dir", &tps_camera_dir.x, 0.05f);
+		ImGui::DragFloat("tps_camera_dist", &tps_camera_dist, 0.05f);
 
 		fps_camera.imgui();
 		tps_camera.imgui();
@@ -87,4 +101,5 @@ public:
 		vel = 0;
 	}
 
+	void position_third_person_cam (float3x3 body_rotation, float3x3 head_elevation);
 };

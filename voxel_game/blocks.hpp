@@ -4,9 +4,21 @@
 
 #include "stdint.h"
 
-static int texture_res = 16;
+enum collision_mode : uint8_t {
+	CM_GAS			=0, // fall through
+	CM_SOLID		,   // cannot enter
+	CM_LIQUID		,   // swim in (water, etc.)
+};
+enum transparency_mode : uint8_t {
+	TM_OPAQUE		=0, // only opaque to non-opaque faces are rendered
+	TM_TRANSPARENT	,   // all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
+	TM_ALPHA_TEST	,   // all faces facing non-opaque blocks of these blocks are rendered (like leaves)
+};
 
-static bool unloaded_chunks_traversable = true;
+struct Block_Properties {
+	collision_mode		collision;
+	transparency_mode	transparency;
+};
 
 enum block_type : uint8_t {
 	BT_AIR				=0,
@@ -15,39 +27,13 @@ enum block_type : uint8_t {
 	BT_GRASS			,
 	BT_TREE_LOG			,
 	BT_LEAVES			,
-	
+
 	BLOCK_TYPES_COUNT	,
-	
+
 	BT_OUT_OF_BOUNDS	=BLOCK_TYPES_COUNT,
 	BT_NO_CHUNK			,
-	
+
 	PSEUDO_BLOCK_TYPES_COUNT,
-};
-
-enum transparency_mode : uint32_t {
-	TM_OPAQUE		=0,
-	TM_ALPHA_TEST	, // only surface of a group of transparent blocks of same type is rendered (like water where only the surface is visible)
-	TM_TRANSPARENT	, // all faces of these blocks are rendered (like leaves)
-};
-
-struct Block_Properties {
-	bool				traversable			: 1;
-	transparency_mode	transparency		: 2;
-	bool				breakable			: 1;
-	bool				replaceable			: 1;
-	bool				does_autoheal		: 1;
-};
-
-static Block_Properties block_props[PSEUDO_BLOCK_TYPES_COUNT] = {
-	/* BT_AIR				*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
-	/* BT_WATER				*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
-	/* BT_EARTH				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
-	/* BT_GRASS				*/	{ 0, TM_OPAQUE,			1, 0, 1 },
-	/* BT_TREE_LOG			*/	{ 0, TM_OPAQUE,			1, 0, 1 },
-	/* BT_LEAVES			*/	{ 0, TM_ALPHA_TEST,		1, 0, 1 },
-								
-	/* BT_OUT_OF_BOUNDS		*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
-	/* BT_NO_CHUNK			*/	{ 1, TM_TRANSPARENT,	0, 1, 0 },
 };
 
 static constexpr const char* BLOCK_NAMES[BLOCK_TYPES_COUNT] = {
@@ -59,6 +45,18 @@ static constexpr const char* BLOCK_NAMES[BLOCK_TYPES_COUNT] = {
 	/* BT_LEAVES		*/	"leaves"	,
 };
 
+static Block_Properties block_props[PSEUDO_BLOCK_TYPES_COUNT] = {
+	/* BT_AIR				*/	{ CM_GAS	, TM_TRANSPARENT	 },
+	/* BT_WATER				*/	{ CM_LIQUID	, TM_TRANSPARENT	 },
+	/* BT_EARTH				*/	{ CM_SOLID	, TM_OPAQUE			 },
+	/* BT_GRASS				*/	{ CM_SOLID	, TM_OPAQUE			 },
+	/* BT_TREE_LOG			*/	{ CM_SOLID	, TM_OPAQUE			 },
+	/* BT_LEAVES			*/	{ CM_SOLID	, TM_ALPHA_TEST		 },
+								
+	/* BT_OUT_OF_BOUNDS		*/	{ CM_GAS	, TM_TRANSPARENT	 },
+	/* BT_NO_CHUNK			*/	{ CM_SOLID	, TM_TRANSPARENT	 },
+};
+
 struct Block {
 	block_type	type;
 	bool		dark; // any air block that only has air above it (is in sunlight)
@@ -66,9 +64,11 @@ struct Block {
 	lrgba		dbg_tint;
 };
 
-static Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 1, 1 };
-static Block B_NO_CHUNK = { BT_NO_CHUNK, false, 1, 1 };
+// global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
+static constexpr inline Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 1, 1 };
+static constexpr inline Block B_NO_CHUNK      = { BT_NO_CHUNK     , false, 1, 1 };
 
+// garbage from windows.h
 #undef BF_BOTTOM
 #undef BF_TOP
 
