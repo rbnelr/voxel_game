@@ -195,6 +195,9 @@
     <ClInclude Include="util\move_only_class.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="util\animation.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

@@ -6,6 +6,7 @@
 #include "texture.hpp"
 #include "debug_graphics.hpp"
 #include "gl.hpp"
+#include "../util/animation.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -91,8 +92,14 @@ struct PlayerGraphics {
 
 	Shader shader = { "generic" };
 
-	float3 pos = float3(.64f, 1.57f, -1.22f) / 2;
-	float3x3 rot = rotate3_Z(deg(15)) * rotate3_Y(deg(-5)) * rotate3_X(deg(57));
+	Animation<AnimPosRot, AIM_LINEAR> animation = {{
+		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
+		{  8 / 30.0f, float3(0.624f, 1.30f, -0.94f) / 2, AnimRotation::from_euler(deg(33), deg(-8), deg(16)) },
+		{ 13 / 30.0f, float3(0.397f, 1.92f, -1.16f) / 2, AnimRotation::from_euler(deg(22), deg(1), deg(14)) },
+	}};
+	float anim_hit_t = 8 / 30.0f;
+
+	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
 
 	Mesh<GenericVertex> fist_mesh;
 

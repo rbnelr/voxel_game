@@ -74,7 +74,8 @@ void Player::update_movement_controls (bool player_on_ground) {
 #endif
 	
 	//// jumping
-	if (input.buttons[GLFW_KEY_SPACE].is_down && player_on_ground)
+	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
+	if (input.buttons[GLFW_KEY_SPACE].is_down/*went_down*/ && player_on_ground)
 		vel += jump_impulse;
 }
 

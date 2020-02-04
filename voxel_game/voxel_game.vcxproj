@@ -172,6 +172,7 @@
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="util\animation.hpp" />
     <ClInclude Include="util\geometry.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />

@@ -142,7 +142,7 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 PlayerGraphics::PlayerGraphics () {
 	std::vector<GenericVertex> verts;
 	push_cube<GenericVertex>([&] (float3 pos, int face, float2 face_uv) {
-		verts.push_back({ pos * float3(0.15f, 0.4f, 0.15f), srgba(255) });
+		verts.push_back({ pos * arm_size, srgba(255) });
 	});
 
 	fist_mesh = Mesh<GenericVertex>(verts);
@@ -151,8 +151,10 @@ PlayerGraphics::PlayerGraphics () {
 void PlayerGraphics::draw (Player const& player) {
 	if (shader) {
 		shader.bind();
+		
+		auto a = animation.calc(player.tool.anim_t);
 
-		float3x4 mat = player.head_to_world * translate(pos) * rot;
+		float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
 
 		shader.set_uniform("model_to_world", (float4x4)mat);
 

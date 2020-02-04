@@ -24,7 +24,7 @@ struct HighlightedBlock {
 class Tool {
 public:
 
-	float anim_freq = 1;
+	float anim_freq = 3;
 	float damage = 0.4f;
 
 	float anim_t = 0;
