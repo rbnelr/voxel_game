@@ -8,7 +8,7 @@ Block* World::raycast_solid_blocks (Ray ray, float max_dist, BlockHit* out_hit) 
 			out_hit->dist = dist;
 			out_hit->pos_world = ray.pos + ray.dir * dist;
 			out_hit->block = bp;
-			out_hit->face = face;
+			out_hit->face = (BlockFace)face;
 			return true;
 		}
 		return false;

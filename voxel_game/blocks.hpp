@@ -2,8 +2,6 @@
 #include "kissmath.hpp"
 #include "kissmath_colors.hpp"
 
-#include "stdint.h"
-
 enum collision_mode : uint8_t {
 	CM_GAS			=0, // fall through
 	CM_SOLID		,   // cannot enter
@@ -73,6 +71,8 @@ static constexpr inline Block B_NO_CHUNK      = { BT_NO_CHUNK     , false, 1, 1 
 #undef BF_TOP
 
 enum BlockFace {
+	BF_NULL		=1,
+
 	BF_NEG_X	=0,
 	BF_POS_X	,
 	BF_NEG_Y	,

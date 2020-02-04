@@ -1,9 +1,10 @@
 #pragma once
 #include "../kissmath.hpp"
+#include "../blocks.hpp"
+#include "common.hpp"
 #include "glshader.hpp"
 #include "texture.hpp"
 #include "debug_graphics.hpp"
-#include "../blocks.hpp"
 #include "gl.hpp"
 
 // rotate from facing up to facing in a block face direction
@@ -72,6 +73,32 @@ struct BlockHighlightGraphics {
 	BlockHighlightGraphics ();
 
 	void draw (float3 pos, BlockFace face);
+};
+
+struct GenericVertex {
+	float3	pos_model;
+	lrgba	color;
+
+	static void bind (Attributes& a) {
+		a.add<decltype(pos_model)>(0, "pos_model", sizeof(GenericVertex), offsetof(GenericVertex, pos_model));
+		a.add<decltype(color    )>(1, "color"    , sizeof(GenericVertex), offsetof(GenericVertex, color    ));
+	}
+};
+
+class Player;
+
+struct PlayerGraphics {
+
+	Shader shader = { "generic" };
+
+	float3 pos = float3(.64f, 1.57f, -1.22f) / 2;
+	float3x3 rot = rotate3_Z(deg(15)) * rotate3_Y(deg(-5)) * rotate3_X(deg(57));
+
+	Mesh<GenericVertex> fist_mesh;
+
+	PlayerGraphics ();
+
+	void draw (Player const& player);
 };
 
 struct ChunkMesh {
@@ -154,6 +181,32 @@ struct ChunkGraphics {
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks& chunks);
-	void draw_chunks_transparent (Chunks& chunks);
+	void draw_chunks (Chunks const& chunks);
+	void draw_chunks_transparent (Chunks const& chunks);
+};
+
+class World;
+struct HighlightedBlock;
+
+class Graphics {
+public:
+	CommonUniforms			common_uniforms;
+
+	ChunkGraphics			chunk_graphics;
+
+	SkyboxGraphics			skybox;
+	BlockHighlightGraphics	block_highlight;
+	PlayerGraphics			player;
+
+	void imgui (Chunks& chunks) {
+		if (ImGui::CollapsingHeader("Graphics")) {
+			common_uniforms.imgui();
+
+			chunk_graphics.imgui(chunks);
+
+			ImGui::Separator();
+		}
+	}
+
+	void draw (World const& world, Camera_View const& view, bool activate_flycam, HighlightedBlock highlighted_block);
 };

@@ -1,45 +1,12 @@
-
-#define _CRT_SECURE_NO_WARNINGS 1
-
-#include <cstdio>
-#include <array>
-#include <vector>
-#include <string>
-
-
-#include "util/collision.hpp"
-#include "open_simplex_noise/open_simplex_noise.hpp"
-
 #include "game.hpp"
-#include "graphics/debug_graphics.hpp"
-#include "input.hpp"
+
+#undef APIENTRY
+#include "windows.h"
+
+#include "graphics/gl.hpp"
 #include "glfw_window.hpp"
 
-#include "kissmath.hpp"
-#include "kissmath_colors.hpp"
-#include "util/string.hpp"
-#include "util/timer.hpp"
-using namespace kiss;
-
-#include "glad/glad.h"
-
-#include "stb_image.hpp"
-
-#define _STRINGIFY(x) #x
-#define STRINGIFY(x) _STRINGIFY(x)
-
-#define PROFILE_BEGIN(name)	auto __profile_##name = Timer::start()
-#define PROFILE_END_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), (__profile_##name).end() * 1000, __VA_ARGS__)
-
-#define PROFILE_END_ACCUM(name)	name += (__profile_##name).end()
-#define PROFILE_PRINT(name, format, ...)	printf(">> PROFILE: %s took %8.3f ms  " format "\n", STRINGIFY(name), name * 1000, __VA_ARGS__)
-
 //
-static bool controling_flycam =		1;
-static bool viewing_flycam =		1;
-
-static bool trigger_dbg_heightmap_visualize =	false;
-
 bool FileExists (const char* path) {
 	DWORD dwAttrib = GetFileAttributes(path);
 
@@ -98,14 +65,7 @@ void Game::frame () {
 	}
 
 	input.imgui();
-
-	if (ImGui::CollapsingHeader("Graphics")) {
-		common_uniforms.imgui();
-
-		chunk_graphics.imgui(world->chunks);
-
-		ImGui::Separator();
-	}
+	graphics.imgui(world->chunks);
 
 	{
 		bool open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
@@ -137,8 +97,8 @@ void Game::frame () {
 
 		if (open) ImGui::Separator();
 
-		if (open) flycam.imgui();
-		if (open) world->player.imgui();
+		if (open) flycam.imgui("flycam");
+		if (open) world->player.imgui("player");
 
 		if (open) ImGui::Separator();
 	}
@@ -173,9 +133,9 @@ void Game::frame () {
 								lrgba col;
 
 								if (!block_solid) {
-									col = srgb(40,40,40,100);
+									col = srgba(40,40,40,100);
 								} else {
-									col = intersecting ? srgb(255,40,40,200) : srgb(255,255,255,150);
+									col = intersecting ? srgba(255,40,40,200) : srgba(255,255,255,150);
 								}
 
 								debug_graphics->push_wire_cube(0.5f, 1, col);
@@ -219,7 +179,7 @@ void Game::frame () {
 		check_blocks_around_player();
 
 		if (!activate_flycam) {
-			world->player.update_controls(player_on_ground);
+			world->player.update_movement_controls(player_on_ground);
 		}
 		world->player.update_physics(player_on_ground);
 
@@ -378,9 +338,9 @@ void Game::frame () {
 					lrgba col;
 
 					if (!block_solid) {
-						col = srgb(40,40,40,100);
+						col = srgba(40,40,40,100);
 					} else {
-						col = hit ? srgb(255,40,40,200) : srgb(255,255,255,150);
+						col = hit ? srgba(255,40,40,200) : srgba(255,255,255,150);
 					}
 
 					if (draw_dbg) {
@@ -477,34 +437,38 @@ void Game::frame () {
 		view = world->player.update_post_physics(*world);
 	}
 
-	BlockHit highlighted_block_info;
-	Block* highlighted_block;
+	HighlightedBlock highlighted_block;
 
 	auto raycast_highlighted_block = [&] () {
 		Ray ray;
 		ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
 		ray.pos = view.cam_to_world * float3(0,0,0);
 	
-		highlighted_block = world->raycast_solid_blocks(ray, 5.0f, &highlighted_block_info);
+		BlockHit hit;
+		highlighted_block.block = world->raycast_solid_blocks(ray, 5.0f, &hit);
+		if (highlighted_block.block) {
+			highlighted_block.pos = hit.block;
+			highlighted_block.face = hit.face;
+		}
 	};
 	raycast_highlighted_block();
 
 	if (highlighted_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
 
 		Chunk* chunk;
-		Block* b = world->chunks.query_block(highlighted_block_info.block, &chunk);
+		Block* b = world->chunks.query_block(highlighted_block.pos, &chunk);
 		assert( block_props[b->type].collision == CM_SOLID && chunk );
 
 		b->hp_ratio -= 1.0f / 0.3f * input.dt;
 
 		if (b->hp_ratio > 0) {
-			chunk->block_only_texture_changed(highlighted_block_info.block);
+			chunk->block_only_texture_changed(highlighted_block.pos);
 		} else {
 
 			b->hp_ratio = 0;
 			b->type = BT_AIR;
 
-			chunk->block_changed(world->chunks, highlighted_block_info.block);
+			chunk->block_changed(world->chunks, highlighted_block.pos);
 
 			//dbg_play_sound();
 		}
@@ -516,12 +480,12 @@ void Game::frame () {
 		if (input.buttons[GLFW_MOUSE_BUTTON_RIGHT].went_down)
 			trigger_place_block = true;
 
-		if (trigger_place_block && highlighted_block && highlighted_block_info.face >= 0) {
+		if (trigger_place_block && highlighted_block && highlighted_block.face >= 0) {
 
 			bpos dir = 0;
-			dir[highlighted_block_info.face / 2] = highlighted_block_info.face % 2 ? +1 : -1;
+			dir[highlighted_block.face / 2] = highlighted_block.face % 2 ? +1 : -1;
 
-			bpos block_place_pos = highlighted_block_info.block +dir;
+			bpos block_place_pos = highlighted_block.pos + dir;
 
 			Chunk* chunk;
 			Block* b = world->chunks.query_block(block_place_pos, &chunk);
@@ -546,176 +510,11 @@ void Game::frame () {
 
 	}
 
-	if (1) { // chunk update
-		constexpr bpos_t chunk_block_count = CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z;
-		bpos_t blocks_to_update = (bpos_t)ceil((float)chunk_block_count * block_update_frequency * input.dt);
+	block_update.update_blocks(world->chunks);
+	world->chunks.update_chunks_brightness();
 
-		auto mtth_to_prob = [&] (float mtth) -> float {
-			return 1 -pow(EULER, -0.693147f / (mtth * block_update_frequency));
-		};
-
-		float grass_die_mtth = 5; // seconds
-		float grass_die_prob = mtth_to_prob(grass_die_mtth);
-
-		float grass_grow_min_mtth = 1; // seconds
-		float grass_grow_max_prob = mtth_to_prob(grass_grow_min_mtth);
-
-		float grass_grow_diagonal_multipiler = 0.5f;
-		float grass_grow_step_down_multipiler = 0.75f;
-		float grass_grow_step_up_multipiler = 0.6f;
-
-		// grass_grow_max_prob = 4*grass_grow_side_prob +4*grass_grow_diagonal_prob; grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler
-		float grass_grow_side_prob = grass_grow_max_prob / (4 * (1 +grass_grow_diagonal_multipiler));
-		float grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler;
-
-		auto block_update = [&] (Block* b, bpos pos_world, Chunk& chunk) {
-			Block* above = world->chunks.query_block(pos_world +bpos(0,0,+1));
-
-			if (/*block_props[b->type].does_autoheal &&*/ b->hp_ratio < 1.0f) {
-				b->hp_ratio += 1.0f/5 / block_update_frequency;
-				b->hp_ratio = min(b->hp_ratio, 1.0f);
-
-				chunk.block_only_texture_changed(pos_world);
-			}
-			if (b->type == BT_GRASS && !(above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
-				if (grass_die_prob > random.uniform()) {
-					b->type = BT_EARTH;
-					b->hp_ratio = 1;
-					chunk.block_only_texture_changed(pos_world);
-				}
-			}
-			if (b->type == BT_EARTH && (above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
-				float prob = 0;
-
-				bpos2 sides[4] = {
-					bpos2(-1,0),
-					bpos2(+1,0),
-					bpos2(0,-1),
-					bpos2(0,+1),
-				};
-				bpos2 diagonals[4] = {
-					bpos2(-1,-1),
-					bpos2(+1,-1),
-					bpos2(-1,+1),
-					bpos2(+1,+1),
-				};
-
-				for (bpos2 v : sides) {
-					if (	 world->chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
-					else if (world->chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_side_prob;
-					else if (world->chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
-				}
-
-				for (bpos2 v : diagonals) {
-					if (	 world->chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
-					else if (world->chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_diagonal_prob;
-					else if (world->chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
-				}
-
-				if (prob > random.uniform()) {
-					b->type = BT_GRASS;
-					b->hp_ratio = 1;
-					chunk.block_only_texture_changed(pos_world);
-				}
-			}
-		};
-
-		static_assert(chunk_block_count == (1 << 16), "");
-
-		auto update_block_pattern = [&] (uint16_t i) -> uint16_t {
-			// reverse bits to turn normal x y z block iteration into a somewhat distributed pattern
-			i = ((i & 0x00ff) << 8) | ((i & 0xff00) >> 8);
-			i = ((i & 0x0f0f) << 4) | ((i & 0xf0f0) >> 4);
-			i = ((i & 0x3333) << 2) | ((i & 0xcccc) >> 2);
-			i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1);
-			return i;
-		};
-
-		//printf("frame %d\n", (int)frame_i);
-
-		for (Chunk& chunk : world->chunks) {
-
-			for (bpos_t i=0; i<blocks_to_update; ++i) {
-				uint16_t indx = (uint16_t)((cur_chunk_update_block_i +i) % chunk_block_count);
-				indx = update_block_pattern(indx);
-
-				Block* b = &chunk.blocks[0][0][indx];
-
-				bpos bp;
-				bp.z =  indx / (CHUNK_DIM.y * CHUNK_DIM.x);
-				bp.y = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
-				bp.x = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
-
-				//printf(">>> %d %d %d\n", (int)bp.x,(int)bp.y,(int)bp.z);
-
-				block_update(b, bp +chunk.chunk_pos_world(), chunk);
-			}
-		}
-
-		cur_chunk_update_block_i = (cur_chunk_update_block_i +blocks_to_update) % chunk_block_count;
-	}
-
-	world->chunks.update_chunk_mesh_and_light();
+	world->chunks.update_chunk_graphics(graphics.chunk_graphics);
 
 	//// Draw
-	glViewport(0,0, input.window_size.x, input.window_size.y);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
-
-	common_uniforms.set_view_uniforms(view);
-	common_uniforms.set_debug_uniforms();
-
-	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
-
-	{
-		int count = 0;
-
-		PROFILE_BEGIN(update_block_brighness);
-		// update_block_brighness first because remesh accesses surrounding chunks for blocks on the edge
-		for (Chunk& chunk : world->chunks) {
-			if (chunk.needs_block_brighness_update) {
-				chunk.update_block_brighness();
-				++count;
-			}
-		}
-		if (count != 0) PROFILE_END_PRINT(update_block_brighness, "frame: %3d count: %d", frame_counter, count);
-
-		count = 0;
-
-		PROFILE_BEGIN(remesh_upload);
-		// remesh and draw
-		for (Chunk& chunk : world->chunks) {
-
-			if (chunk.needs_remesh) {
-				chunk.remesh(world->chunks, chunk_graphics);
-				++count;
-			}
-		}
-		if (count != 0) PROFILE_END_PRINT(remesh_upload, "frame: %3d count: %d", frame_counter, count);
-	}
-
-	if (viewing_flycam || world->player.third_person)
-		debug_graphics->push_cylinder(world->player.pos + float3(0,0, world->player.height/2), world->player.radius, world->player.height, srgb(255, 40, 255, 130), 32);
-
-	// opaque draw
-	chunk_graphics.draw_chunks(world->chunks);
-
-	skybox_graphics.draw();
-
-	// transparent draw
-	glEnable(GL_BLEND);
-
-	if (highlighted_block) {
-		block_highlight_graphics.draw((float3)highlighted_block_info.block, (BlockFace)(highlighted_block_info.face >= 0 ? highlighted_block_info.face : 0));
-	}
-
-	//glCullFace(GL_FRONT);
-	//chunk_graphics.draw_chunks_transparent(chunks);
-	//glCullFace(GL_BACK);
-	chunk_graphics.draw_chunks_transparent(world->chunks);
-
-	glEnable(GL_CULL_FACE);
-	debug_graphics->draw();
-
-	glDisable(GL_BLEND);
+	graphics.draw(*world, view, activate_flycam, highlighted_block);
 }

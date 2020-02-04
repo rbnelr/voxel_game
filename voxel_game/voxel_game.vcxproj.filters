@@ -170,9 +170,6 @@
     <ClInclude Include="util\timer.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="util\move_only_class.hpp">
-      <Filter>shaders</Filter>
-    </ClInclude>
     <ClInclude Include="kissmath.hpp">
       <Filter>util</Filter>
     </ClInclude>
@@ -191,6 +188,13 @@
       <Filter>dear_imgui</Filter>
     </ClInclude>
     <ClInclude Include="world_generator.hpp" />
+    <ClInclude Include="util\geometry.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="block_update.hpp" />
+    <ClInclude Include="util\move_only_class.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -358,6 +362,7 @@
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="world_generator.cpp" />
+    <ClCompile Include="block_update.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -373,6 +378,9 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\blocks.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\generic.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

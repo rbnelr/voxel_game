@@ -58,7 +58,7 @@ float wrap_azimuth (float azimuth) {
 	return wrap(azimuth, deg(-180), deg(180));
 }
 float clamp_elevation (float elevation, float down_limit, float up_limit) {
-	return clamp(elevation, down_limit, deg(180.0f) - up_limit);
+	return clamp(elevation, deg(-90) + down_limit, deg(+90) - up_limit);
 }
 float wrap_roll (float roll) {
 	return wrap(roll, deg(-180), deg(180));
@@ -79,13 +79,13 @@ void rotate_with_mouselook (float* azimuth, float* elevation, float vfov) {
 
 float3x3 calc_ae_rotation (float2 ae, float3x3* out_inverse) {
 	if (out_inverse)
-		*out_inverse = rotate3_Z(+ae.x) * rotate3_X(+ae.y);
-	return             rotate3_X(-ae.y) * rotate3_Z(-ae.x);
+		*out_inverse = rotate3_Z(+ae.x) * rotate3_X(+ae.y + deg(90));
+	return             rotate3_X(-ae.y - deg(90)) * rotate3_Z(-ae.x);
 }
 float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse) {
 	if (out_inverse)
-		*out_inverse = rotate3_Z(+aer.x) * rotate3_X(+aer.y) * rotate3_Z(-aer.z);
-	return             rotate3_Z(+aer.z) * rotate3_X(-aer.y) * rotate3_Z(-aer.x);
+		*out_inverse = rotate3_Z(+aer.x) * rotate3_X(+aer.y + deg(90)) * rotate3_Z(-aer.z);
+	return             rotate3_Z(+aer.z) * rotate3_X(-aer.y - deg(90)) * rotate3_Z(-aer.x);
 }
 
 Camera_View Flycam::update () {

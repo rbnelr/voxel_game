@@ -21,12 +21,8 @@ struct Camera_View {
 
 class Camera {
 public:
-	const std::string	name;
-
-	perspective_mode	mode = PERSPECTIVE;
-
 	// camera position
-	float3				pos = 0;
+	float3				pos;
 
 	// TODO: add quaternions
 	//quaternion		base_ori = quaternion::identity;
@@ -35,7 +31,9 @@ public:
 	//  azimuth 0 has the camera looking towards +y, rotates the camera ccw around the z axis (deg(90) would have it face -x)
 	//  elevation [0, deg(128)] represents [looking_down (-z), looking_up (+z)]
 	//  roll rolls ccw with 0 having the camera top point up (+z)
-	float3				rot_aer = float3(0, deg(90), 0);
+	float3				rot_aer;
+
+	perspective_mode	mode = PERSPECTIVE;
 
 	// near clipping plane
 	float				clip_near = 1.0f/32;
@@ -48,12 +46,12 @@ public:
 	// [mode == ORTHOGRAPHIC] vertical size (horizontal size depends on render target aspect ratio)
 	float				ortho_vsize = 10;
 
-	Camera (std::string name, float3 pos=0, float3 rot_aer=float3(0, deg(90), 0)): name{std::move(name)}, pos{pos}, rot_aer{rot_aer} {}
+	Camera (float3 pos=0, float3 rot_aer=0): pos{pos}, rot_aer{rot_aer} {}
 
 	virtual ~Camera () = default;
 
-	void imgui () {
-		if (!imgui_push(name, "Camera", false)) return;
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("Camera", name, false)) return;
 
 		int cur_mode = (int)mode;
 		ImGui::Combo("mode", &cur_mode, "PERSPECTIVE\0ORTHOGRAPHIC\0");
@@ -101,12 +99,12 @@ public:
 
 	// TODO: configurable input bindings
 
-	Flycam (std::string name, float3 pos=0, float3 rot_aer=float3(0, deg(90), 0), float base_speed=0.5f): Camera(name, pos, rot_aer), base_speed{base_speed} {}
+	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): Camera(pos, rot_aer), base_speed{base_speed} {}
 
-	void imgui () {
-		if (!imgui_push(name, "Flycam")) return;
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("Flycam", name)) return;
 
-		Camera::imgui();
+		Camera::imgui(name);
 
 		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
 		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);

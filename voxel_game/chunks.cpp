@@ -2,6 +2,7 @@
 #include "chunk_mesher.hpp"
 #include "player.hpp"
 #include "world.hpp"
+#include "util/timer.hpp"
 #include "util/collision.hpp"
 #include <algorithm> // std::sort
 
@@ -12,7 +13,7 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 	
 }
 
-void Chunk::remesh (Chunks& chunks, ChunkGraphics& graphics) {
+void Chunk::remesh (Chunks& chunks, ChunkGraphics const& graphics) {
 	mesh_chunk(chunks, graphics, this);
 
 	needs_remesh = false;
@@ -208,6 +209,35 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 
 }
 
-void Chunks::update_chunk_mesh_and_light () {
+extern int frame_counter;
 
+void Chunks::update_chunks_brightness () {
+	int count = 0;
+	auto timer = Timer::start();
+
+	for (Chunk& chunk : *this) {
+		if (chunk.needs_block_brighness_update) {
+			chunk.update_block_brighness();
+			++count;
+		}
+	}
+
+	if (count != 0)
+		printf("brightness update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
+}
+
+void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
+	int count = 0;
+	auto timer = Timer::start();
+
+	for (Chunk& chunk : *this) {
+
+		if (chunk.needs_remesh) {
+			chunk.remesh(*this, graphics);
+			++count;
+		}
+	}
+
+	if (count != 0)
+		printf("mesh update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
 }

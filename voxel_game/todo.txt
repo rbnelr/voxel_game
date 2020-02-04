@@ -71,11 +71,8 @@ TODO
  -factor out all the relevant raycast, physics etc. code into their own utility files
  -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
  
- code order:
-	 for all players: player.controls_update(); // control look dir -> check grounded state -> control desired walk velocity, jump, crouch etc.
-	 physics_manager.update_rigidbody_physics(); // rigidbody == the cylinder of players or the box of npcs, ie. update pos and vel using physics parameters (bounciness etc.) using the cylinder cast timestepping algo and afterwards potentially add seperation forces to force npcs/players apart
-	 for all players: player.post_phys_update(); // position is final -> update camera positions, and do block placement / breaking with final rays (block placement should probably happen instantly, since order with block placing should not be important)
- 
+ implement light level, night and torches
+
  look at COLLISION_SEPERATION_EPSILON, and if the raycast physics can live without it, being grounded should leave pos==block_top and vel.z==0
 
  even if getting stuck inside a block (which should be numerically impossible with a timestep of 0.05 as long as the integers are representable as floats (max would be 16,777,217))

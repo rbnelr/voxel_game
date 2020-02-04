@@ -154,10 +154,10 @@ float Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 #define YH (block_pos_y +1)
 #define ZH (block_pos_z +1)
 
-	// float3	pos_model;
-	// float	brightness;
-	// float4	uvz_hp; // xy: [0,1] face uv; z: texture index, w: hp_ratio [0,1]
-	// lrgba	color;
+// float3	pos_model;
+// float	brightness;
+// float4	uvz_hp; // xy: [0,1] face uv; z: texture index, w: hp_ratio [0,1]
+// lrgba	color;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
 		{ (float3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), float4(u,v, calc_texture_index(face), b->hp_ratio), color }

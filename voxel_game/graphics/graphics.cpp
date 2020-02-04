@@ -1,9 +1,9 @@
 #include "graphics.hpp"
 #include "../util/string.hpp"
+#include "../util/geometry.hpp"
 #include "../chunks.hpp"
+#include "../world.hpp"
 using namespace kiss;
-
-//
 
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 #define QUAD_INWARD(a,b,c,d) a,d,b, b,d,c // facing inward
@@ -70,8 +70,8 @@ void SkyboxGraphics::draw () {
 
 BlockHighlightGraphics::BlockHighlightGraphics () {
 
-	lrgba col = srgb(40,40,40,240);
-	lrgba dot_col = srgb(40,40,40,240);
+	lrgba col = srgba(40,40,40,240);
+	lrgba dot_col = srgba(40,40,40,240);
 
 	float r = 0.504f;
 	float inset = 1.0f / 100;
@@ -136,6 +136,28 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 
 		mesh.bind();
 		mesh.draw();
+	}
+}
+
+PlayerGraphics::PlayerGraphics () {
+	std::vector<GenericVertex> verts;
+	push_cube<GenericVertex>([&] (float3 pos, int face, float2 face_uv) {
+		verts.push_back({ pos * float3(0.15f, 0.4f, 0.15f), srgba(255) });
+	});
+
+	fist_mesh = Mesh<GenericVertex>(verts);
+}
+
+void PlayerGraphics::draw (Player const& player) {
+	if (shader) {
+		shader.bind();
+
+		float3x4 mat = player.head_to_world * translate(pos) * rot;
+
+		shader.set_uniform("model_to_world", (float4x4)mat);
+
+		fist_mesh.bind();
+		fist_mesh.draw();
 	}
 }
 
@@ -276,7 +298,7 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks& chunks) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -297,7 +319,7 @@ void ChunkGraphics::draw_chunks (Chunks& chunks) {
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all opaque chunk meshes
-		for (Chunk& chunk : chunks) {
+		for (Chunk const& chunk : chunks) {
 
 			if (chunk.mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
@@ -309,7 +331,7 @@ void ChunkGraphics::draw_chunks (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks_transparent (Chunks& chunks) {
+void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -330,7 +352,7 @@ void ChunkGraphics::draw_chunks_transparent (Chunks& chunks) {
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all transparent chunk meshes
-		for (Chunk& chunk : chunks) {
+		for (Chunk const& chunk : chunks) {
 
 			if (chunk.mesh.transparent_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
@@ -340,4 +362,42 @@ void ChunkGraphics::draw_chunks_transparent (Chunks& chunks) {
 			}
 		}
 	}
+}
+
+void Graphics::draw (World const& world, Camera_View const& view, bool activate_flycam, HighlightedBlock highlighted_block) {
+	glViewport(0,0, input.window_size.x, input.window_size.y);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	common_uniforms.set_view_uniforms(view);
+	common_uniforms.set_debug_uniforms();
+
+	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+
+	if (activate_flycam || world.player.third_person)
+		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
+
+	// opaque draw
+	player.draw(world.player);
+
+	chunk_graphics.draw_chunks(world.chunks);
+
+	skybox.draw();
+
+	// transparent draw
+	glEnable(GL_BLEND);
+
+	if (highlighted_block) {
+		block_highlight.draw((float3)highlighted_block.pos, (BlockFace)(highlighted_block.face >= 0 ? highlighted_block.face : 0));
+	}
+
+	//glCullFace(GL_FRONT);
+	//chunk_graphics.draw_chunks_transparent(chunks);
+	//glCullFace(GL_BACK);
+	chunk_graphics.draw_chunks_transparent(world.chunks);
+
+	glEnable(GL_CULL_FACE);
+	debug_graphics->draw();
+
+	glDisable(GL_BLEND);
 }

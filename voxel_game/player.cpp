@@ -6,7 +6,17 @@
 
 float3	player_spawn_point = float3(0,0,34);
 
-void Player::update_controls (bool player_on_ground) {
+void Tool::update () {
+	bool inp = input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down;
+
+	if (anim_t > 0 || inp)
+		anim_t += anim_freq * input.dt;
+
+	if (anim_t >= 1)
+		anim_t = 0;
+}
+
+void Player::update_movement_controls (bool player_on_ground) {
 	//// toggle camera view
 	if (input.buttons[GLFW_KEY_F].went_down)
 		third_person = !third_person;
@@ -79,7 +89,7 @@ void Player::update_physics (bool player_on_ground) {
 		vel = 0;
 }
 
-void Player::position_third_person_cam (World& world, float3x3 body_rotation, float3x3 head_elevation) {
+float3 Player::find_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation) {
 	Ray ray;
 	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
 	ray.dir = body_rotation * head_elevation * tps_camera_dir;
@@ -92,7 +102,7 @@ void Player::position_third_person_cam (World& world, float3x3 body_rotation, fl
 			dist = max(hit.dist - 0.05f, 0.0f);
 	}
 
-	tps_camera.pos = tps_camera_base_pos + tps_camera_dir * dist;
+	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
 Camera_View Player::update_post_physics (World& world) {
@@ -102,16 +112,22 @@ Camera_View Player::update_post_physics (World& world) {
 	float3x3 head_elevation = rotate3_X(rot_ae.y);
 	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
 
-	position_third_person_cam(world, body_rotation, head_elevation);
+	float3 cam_pos = 0;
+	if (third_person)
+		cam_pos = find_third_person_cam_pos(world, body_rotation, head_elevation);
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
+
+	float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
+	         head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
 	
 	Camera_View v;
-	v.world_to_cam = translate(-cam.pos) * head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
-	v.cam_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation * translate(cam.pos);
+	v.world_to_cam = translate(-cam_pos) * rotate3_X(-deg(90)) * world_to_head;
+	v.cam_to_world = head_to_world * rotate3_X(deg(90)) * translate(cam_pos);
 	v.cam_to_clip = cam.calc_cam_to_clip();
 
-	// TODO: third person raycast to prevent camera clipping in blocks
+	tool.update();
+
 	// TODO: block selection raycast and block break and place controls
 	return v;
 }

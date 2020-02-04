@@ -25,8 +25,8 @@ struct BlockHit {
 
 	// Coord of block that was hit
 	bpos block;
-	// Face that was hit, -1 if not face was hit because the ray started inside a block
-	int face;
+	// Face that was hit, BF_NULL if not face was hit because the ray started inside a block
+	BlockFace face;
 };
 
 class World {
@@ -35,7 +35,7 @@ public:
 	const std::string seed_str;
 	const uint64_t seed;
 
-	Player player = { "player" };
+	Player player;
 
 	Chunks chunks;
 

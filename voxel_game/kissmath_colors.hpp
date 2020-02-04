@@ -65,25 +65,24 @@ namespace kissmath {
 						float_to_u8(        lrgba.w ) );
 	}
 
-	inline lrgb srgb (srgb8 srgb) {
-		return to_linear(srgb);
-	}
-	// alpha is linear
-	inline lrgba srgb (srgba8 srgba) {
-		return to_linear(srgba);
-	}
-
 	inline lrgb srgb (uint8_t all) {
 		return to_linear(srgb8(all));
 	}
 	inline lrgb srgb (uint8_t r, uint8_t g, uint8_t b) {
 		return to_linear(srgb8(r,g,b));
 	}
-	// alpha is linear
-	inline lrgba srgb (uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-		return to_linear(srgba8(r,g,b,a));
+
+	inline lrgba srgba (uint8_t r, uint8_t g, uint8_t b) {
+		return lrgba(to_linear(srgb8(r,g,b)), 1);
 	}
 
+	// alpha is linear
+	inline lrgba srgba (uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+		return to_linear(srgba8(r,g,b,a));
+	}
+	inline lrgba srgba (uint8_t col, uint8_t a=255) {
+		return to_linear(srgba8(col,col,col,a));
+	}
 
 	inline lrgb hsl_to_rgb (float3 hsl) {
 #if 0

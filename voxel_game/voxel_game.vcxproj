@@ -170,7 +170,9 @@
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
     <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="blocks.hpp" />
+    <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="util\geometry.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />
@@ -239,6 +241,7 @@
     <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
+    <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />
@@ -300,6 +303,7 @@
     <None Include="shaders\blocks.glsl" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
+    <None Include="shaders\generic.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
   </ItemGroup>

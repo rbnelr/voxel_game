@@ -329,11 +329,11 @@ public:
 	}
 
 	// Construct by Mesh with uploaded data (can reupload different data later)
-	Mesh (T const* data, int count) {
+	Mesh (T const* data, size_t count) {
 		init_vao();
 
 		// assume GL_STATIC_DRAW
-		glBufferData(GL_ARRAY_BUFFER, count * sizeof(T), data, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), data, GL_STATIC_DRAW);
 		vertex_count = count;
 
 		// dont unbind GL_ARRAY_BUFFER
@@ -358,12 +358,12 @@ public:
 	}
 
 	// Bind to be able to draw
-	void bind () {
+	void bind () const {
 		glBindVertexArray(vao);
 	}
 
 	// Shader and mesh must be bound
-	void draw () {
+	void draw () const {
 		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_count);
 	}
 };

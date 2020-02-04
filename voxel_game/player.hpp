@@ -1,6 +1,8 @@
 #pragma once
 #include "graphics/camera.hpp"
+#include "chunks.hpp"
 #include "physics.hpp"
+#include "kissmath.hpp"
 #include "kissmath.hpp"
 #include <string>
 
@@ -9,12 +11,36 @@ extern float3	player_spawn_point;
 
 class World;
 
-class Player {
+struct HighlightedBlock {
+	Block*		block = nullptr;
+	bpos		pos;
+	BlockFace	face = (BlockFace)-1; // -1 == no face
 
+	operator bool () {
+		return block;
+	}
+};
+
+class Tool {
 public:
-	const std::string name;
 
-	Player (std::string name): name{std::move(name)} {
+	float anim_freq = 1;
+	float damage = 0.4f;
+
+	float anim_t = 0;
+
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("Fists", name)) return;
+
+		imgui_pop();
+	}
+	void update ();
+};
+
+class Player {
+public:
+
+	Player () {
 		respawn();
 	}
 
@@ -25,7 +51,10 @@ public:
 	float3	vel;
 
 	// Player look rotation
-	float2	rot_ae =		float2(deg(0), deg(+80)); // azimuth elevation
+	float2	rot_ae =		float2(deg(0), deg(-10)); // azimuth elevation
+
+	////
+	Tool tool;
 
 	//// Cameras
 	bool third_person = false;
@@ -41,8 +70,8 @@ public:
 	// How far the camera will move back
 	float tps_camera_dist = 4;
 
-	Camera fps_camera = Camera("fps_camera");
-	Camera tps_camera = Camera("tps_camera");
+	Camera fps_camera;
+	Camera tps_camera;
 
 	//// Physics
 	float radius = 0.4f;
@@ -58,8 +87,8 @@ public:
 
 	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
-	void imgui () {
-		if (!imgui_push(name, "Player")) return;
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("Player", name)) return;
 
 		ImGui::DragFloat3("pos", &pos.x, 0.05f);
 
@@ -69,6 +98,8 @@ public:
 		if (ImGui::DragFloat2("rot_ae", &rot_ae_deg.x, 0.05f))
 			rot_ae = to_radians(rot_ae_deg);
 
+		tool.imgui("tool");
+
 		ImGui::Checkbox("third_person", &third_person);
 
 		ImGui::DragFloat3("head_pivot", &head_pivot.x, 0.05f);
@@ -76,8 +107,8 @@ public:
 		ImGui::DragFloat3("tps_camera_dir", &tps_camera_dir.x, 0.05f);
 		ImGui::DragFloat("tps_camera_dist", &tps_camera_dist, 0.05f);
 
-		fps_camera.imgui();
-		tps_camera.imgui();
+		fps_camera.imgui("fps_camera");
+		tps_camera.imgui("tps_camera");
 
 		ImGui::DragFloat("radius", &radius, 0.05f);
 		ImGui::DragFloat("height", &height, 0.05f);
@@ -92,9 +123,11 @@ public:
 		imgui_pop();
 	}
 
-	void update_controls (bool player_on_ground);
+	void update_movement_controls (bool player_on_ground);
 
 	void update_physics (bool player_on_ground);
+
+	float3x4 head_to_world;
 
 	Camera_View update_post_physics (World& world);
 
@@ -103,5 +136,6 @@ public:
 		vel = 0;
 	}
 
-	void position_third_person_cam (World& world, float3x3 body_rotation, float3x3 head_elevation);
+
+	float3 find_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
 };

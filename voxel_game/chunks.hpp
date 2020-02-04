@@ -3,12 +3,9 @@
 #include "blocks.hpp"
 #include "graphics/graphics.hpp"
 #include "util/move_only_class.hpp"
-#include "player.hpp"
 
 #include "stdint.h"
 #include <unordered_map>
-
-//#include "graphics/graphics.hpp"
 
 typedef int64_t	bpos_t;
 typedef int64v2	bpos2;
@@ -74,6 +71,7 @@ namespace std {
 
 class World;
 struct WorldGenerator;
+class Player;
 
 class Chunk {
 	NO_MOVE_COPY_CLASS(Chunk)
@@ -85,7 +83,7 @@ public:
 	static bpos chunk_pos_world (chunk_coord coord) {
 		return bpos(coord * CHUNK_DIM_2D, 0);
 	}
-	bpos chunk_pos_world () {
+	bpos chunk_pos_world () const {
 		return chunk_pos_world(coord);
 	}
 
@@ -104,7 +102,7 @@ public:
 		return &blocks[pos.z][pos.y][pos.x];
 	}
 
-	void remesh (Chunks& chunks, ChunkGraphics& graphics);
+	void remesh (Chunks& chunks, ChunkGraphics const& graphics);
 
 	void update_block_brighness ();
 
@@ -150,10 +148,29 @@ public:
 		Iterator operator++ () { ++it; return *this; }
 		Iterator operator++ (int) { it++; return *this; }
 	};
+	struct CIterator {
+		decltype(chunks)::const_iterator it;
+
+		CIterator (decltype(chunks)::const_iterator it): it{it} {} 
+
+		bool operator== (CIterator const& r) { return it == r.it; }
+		bool operator!= (CIterator const& r) { return it != r.it; }
+
+		Chunk const& operator* () { return it->second; }
+
+		CIterator operator++ () { ++it; return *this; }
+		CIterator operator++ (int) { it++; return *this; }
+	};
 	Iterator begin () {
 		return { chunks.begin() };
 	}
 	Iterator end () {
+		return { chunks.end() };
+	}
+	CIterator begin () const {
+		return { chunks.begin() };
+	}
+	CIterator end () const {
 		return { chunks.end() };
 	}
 
@@ -173,6 +190,8 @@ public:
 
 	void update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player);
 
-	void update_chunk_mesh_and_light ();
+	void update_chunks_brightness ();
+
+	void update_chunk_graphics (ChunkGraphics const& graphics);
 };
 
