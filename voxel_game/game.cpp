@@ -438,41 +438,6 @@ void Game::frame () {
 		view = world->player.update_post_physics(*world, graphics.player, &selected_block);
 	}
 
-	{ // block placing
-		// keep trying to place block if it was inside player but rmb is still held down
-		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block;
-		
-		if (input.buttons[GLFW_MOUSE_BUTTON_RIGHT].went_down)
-			trigger_place_block = true;
-
-		if (trigger_place_block && selected_block && selected_block.face >= 0) {
-
-			bpos dir = 0;
-			dir[selected_block.face / 2] = selected_block.face % 2 ? +1 : -1;
-
-			bpos block_place_pos = selected_block.pos + dir;
-
-			Chunk* chunk;
-			Block* b = world->chunks.query_block(block_place_pos, &chunk);
-
-			if (b && chunk) {
-				bool block_place_is_inside_player = cylinder_cube_intersect(world->player.pos -(float3)block_place_pos, world->player.radius, world->player.height);
-
-				if (block_props[b->type].collision != CM_SOLID && !block_place_is_inside_player) { // could be BT_NO_CHUNK or BT_OUT_OF_BOUNDS or BT_AIR 
-
-					b->type = BT_EARTH;
-					b->hp_ratio = 1;
-					b->dbg_tint = 255;
-
-					chunk->block_changed(world->chunks, block_place_pos);
-
-					trigger_place_block = false;
-				}
-			}
-		}
-
-	}
-
 	block_update.update_blocks(world->chunks);
 	world->chunks.update_chunks_brightness();
 

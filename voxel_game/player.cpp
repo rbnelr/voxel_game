@@ -25,6 +25,32 @@ void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock c
 	}
 }
 
+void BlockPlace::update (World& world, Player const& player, SelectedBlock const& selected_block) {
+
+	bool trigger = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && anim_t == 0;
+
+	if (trigger || anim_t > 0) {
+		anim_t += anim_freq * input.dt;
+
+		if (anim_t >= 1) {
+			anim_t = 0;
+		}
+	}
+
+	if (trigger && selected_block) {
+		bpos offs = 0;
+		offs[selected_block.face / 2] = (selected_block.face % 2) ? +1 : -1;
+
+		bpos block_place_pos = selected_block.pos + offs;
+
+		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
+
+		if (!block_place_is_inside_player) {
+			world.try_place_block(block_place_pos, BT_EARTH);
+		}
+	}
+}
+
 void Player::update_movement_controls (bool player_on_ground) {
 	//// toggle camera view
 	if (input.buttons[GLFW_KEY_F].went_down)
@@ -138,6 +164,7 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 
 	*selected_block = calc_selected_block(world);
 	tool.update(world, graphics, *selected_block);
+	block_place.update(world, *this, *selected_block);
 
 	return view;
 }

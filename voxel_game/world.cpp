@@ -47,3 +47,18 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 		chunk->block_changed(chunks, block.pos);
 	}
 }
+
+bool World::try_place_block (bpos pos, block_type bt) {
+	Chunk* chunk;
+	Block* b = chunks.query_block(pos, &chunk);
+
+	if (b && chunk && block_props[b->type].collision != CM_SOLID) { // can replace liquid and gas blocks
+		b->type = bt;
+		b->hp_ratio = 1;
+		b->dbg_tint = 255;
+
+		chunk->block_changed(chunks, pos);
+		return true;
+	}
+	return false;
+}

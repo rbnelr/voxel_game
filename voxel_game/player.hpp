@@ -43,6 +43,25 @@ public:
 	void update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
 };
 
+class BlockPlace {
+public:
+
+	float anim_freq = 6;
+	float reach = 4.5f;
+
+	float anim_t = 0;
+
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("BlockPlace", name)) return;
+
+		ImGui::DragFloat("anim_freq", &anim_freq, 0.05f);
+		ImGui::DragFloat("reach", &reach, 0.05f);
+
+		imgui_pop();
+	}
+	void update (World& world, Player const& player, SelectedBlock const& selected_block);
+};
+
 class Player {
 public:
 
@@ -61,6 +80,7 @@ public:
 
 	////
 	Tool tool;
+	BlockPlace block_place;
 
 	//// Cameras
 	bool third_person = false;
@@ -105,6 +125,7 @@ public:
 			rot_ae = to_radians(rot_ae_deg);
 
 		tool.imgui("tool");
+		block_place.imgui("block_place");
 
 		ImGui::Checkbox("third_person", &third_person);
 
