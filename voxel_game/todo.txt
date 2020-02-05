@@ -67,6 +67,22 @@ DONE:
 TODO
 -FEATURES:
  
+ add inventory
+
+ write actual air control
+ -no slowdown in air with wasd not pressed, press s to slow down when going forward
+ -ie. apply accel not based on vel - desired_vel but directly from move dir, but clamped to a max speed
+ -max speed set when starting jump? so that walk->jump->press sprint does not speed you up in the air, but sprint jump also does not slow you down
+ -at least a little air control is needed to get up blocks when jumping while touching a block
+ 
+ make better sprinting code
+  sprinting should have a drawback over walking, or it just gets used all the time
+   -> stamina?
+   -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
+   -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
+ 
+ add headbob?
+
  port all player code to player class
  -factor out all the relevant raycast, physics etc. code into their own utility files
  -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
@@ -87,16 +103,8 @@ TODO
    you penetrate the wall by less than 0.5f block widths -> you are clearly on one side of the block, so just teleport you so you don't penetrate (player.pos -= pen_vector;)
    -> but only if the space you teleport to is free -> when stuck in completely solid rock you are stuck
  
- make better sprinting code
-  sprinting should have a drawback over walking, or it just gets used all the time
-   -> stamina?
-   -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
-   -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
- 
  better third person camera object avoidance
  -camera should never clip into blocks! currently the camera focus point does not, but the near plane still goes into the block partly
-
- add headbob?
 
  make a shader inspector in imgui that can edit shader code
 
