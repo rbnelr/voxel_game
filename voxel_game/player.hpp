@@ -16,7 +16,7 @@ struct SelectedBlock {
 	bpos		pos;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
 
-	operator bool () {
+	operator bool () const {
 		return block;
 	}
 };
@@ -29,13 +29,14 @@ public:
 	float reach = 4.5f;
 
 	float anim_t = 0;
+	bool anim_triggered;
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Fists", name)) return;
 
 		imgui_pop();
 	}
-	void update ();
+	void update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
 };
 
 class Player {
@@ -130,7 +131,7 @@ public:
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (World& world, SelectedBlock* highlighted_block);
+	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, SelectedBlock* highlighted_block);
 
 	void respawn () {
 		pos = player_spawn_point;

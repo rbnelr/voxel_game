@@ -6,14 +6,23 @@
 
 float3	player_spawn_point = float3(0,0,34);
 
-void Tool::update () {
-	bool inp = input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down;
+void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
+	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];
+	bool inp = selected_block ? button.is_down : button.went_down;
 
-	if (anim_t > 0 || inp)
+	if (anim_t > 0 || inp) {
 		anim_t += anim_freq * input.dt;
-
-	if (anim_t >= 1)
+	}
+	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
+		if (selected_block && button.is_down) { // only hit if key is still down (can cancel tool use even though anim triggers
+			world.apply_damage(selected_block, damage);
+		}
+		anim_triggered = true;
+	}
+	if (anim_t >= 1) {
 		anim_t = 0;
+		anim_triggered = false;
+	}
 }
 
 void Player::update_movement_controls (bool player_on_ground) {
@@ -98,15 +107,15 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	float dist = tps_camera_dist;
 	
 	{
-		BlockHit hit;
-		if (world.raycast_solid_blocks(ray, dist, &hit))
-			dist = max(hit.dist - 0.05f, 0.0f);
+		float hit_dist;
+		if (world.raycast_solid_blocks(ray, dist, &hit_dist))
+			dist = max(hit_dist - 0.05f, 0.0f);
 	}
 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (World& world, SelectedBlock* highlighted_block) {
+Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, SelectedBlock* selected_block) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -127,25 +136,16 @@ Camera_View Player::update_post_physics (World& world, SelectedBlock* highlighte
 	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
 	view.cam_to_clip = cam.calc_cam_to_clip();
 
-	*highlighted_block = calc_selected_block(world);
-	tool.update();
+	*selected_block = calc_selected_block(world);
+	tool.update(world, graphics, *selected_block);
 
 	return view;
 }
 
 SelectedBlock Player::calc_selected_block (World& world) {
-	SelectedBlock selected_block;
-	
 	Ray ray;
 	ray.dir = (float3x3)head_to_world * float3(0,+1,0);
 	ray.pos = head_to_world * float3(0,0,0);
 
-	BlockHit hit;
-	selected_block.block = world.raycast_solid_blocks(ray, tool.reach, &hit);
-	if (selected_block) {
-		selected_block.pos = hit.block;
-		selected_block.face = hit.face;
-	}
-
-	return selected_block;
+	return world.raycast_solid_blocks(ray, tool.reach);
 }

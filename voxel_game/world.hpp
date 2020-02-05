@@ -19,16 +19,6 @@ inline uint64_t get_seed (std::string_view str) {
 	return std::hash<std::string_view>()(str);
 }
 
-struct BlockHit {
-	float dist;
-	float3 pos_world;
-
-	// Coord of block that was hit
-	bpos block;
-	// Face that was hit, BF_NULL if not face was hit because the ray started inside a block
-	BlockFace face;
-};
-
 class World {
 
 public:
@@ -55,5 +45,7 @@ public:
 
 	//// Raycasting into the world
 
-	Block* raycast_solid_blocks (Ray ray, float max_dist, BlockHit* out_hit);
+	SelectedBlock raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);
+
+	void apply_damage (SelectedBlock const& block, float damage);
 };

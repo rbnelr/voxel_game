@@ -431,46 +431,26 @@ void Game::frame () {
 	}
 
 	Camera_View view;
-	SelectedBlock slected_block;
+	SelectedBlock selected_block;
 	if (activate_flycam) {
 		view = flycam.update();
 	} else {
-		view = world->player.update_post_physics(*world, &slected_block);
+		view = world->player.update_post_physics(*world, graphics.player, &selected_block);
 	}
 
-	if (slected_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
-
-		Chunk* chunk;
-		Block* b = world->chunks.query_block(slected_block.pos, &chunk);
-		assert( block_props[b->type].collision == CM_SOLID && chunk );
-
-		b->hp_ratio -= 1.0f / 0.3f * input.dt;
-
-		if (b->hp_ratio > 0) {
-			chunk->block_only_texture_changed(slected_block.pos);
-		} else {
-
-			b->hp_ratio = 0;
-			b->type = BT_AIR;
-
-			chunk->block_changed(world->chunks, slected_block.pos);
-
-			//dbg_play_sound();
-		}
-	}
 	{ // block placing
 		// keep trying to place block if it was inside player but rmb is still held down
-		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && slected_block;
+		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block;
 		
 		if (input.buttons[GLFW_MOUSE_BUTTON_RIGHT].went_down)
 			trigger_place_block = true;
 
-		if (trigger_place_block && slected_block && slected_block.face >= 0) {
+		if (trigger_place_block && selected_block && selected_block.face >= 0) {
 
 			bpos dir = 0;
-			dir[slected_block.face / 2] = slected_block.face % 2 ? +1 : -1;
+			dir[selected_block.face / 2] = selected_block.face % 2 ? +1 : -1;
 
-			bpos block_place_pos = slected_block.pos + dir;
+			bpos block_place_pos = selected_block.pos + dir;
 
 			Chunk* chunk;
 			Block* b = world->chunks.query_block(block_place_pos, &chunk);
@@ -499,5 +479,5 @@ void Game::frame () {
 	world->chunks.update_chunk_graphics(graphics.chunk_graphics);
 
 	//// Draw
-	graphics.draw(*world, view, activate_flycam, slected_block);
+	graphics.draw(*world, view, activate_flycam, selected_block);
 }

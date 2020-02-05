@@ -1,22 +1,25 @@
 #include "world.hpp"
 
-Block* World::raycast_solid_blocks (Ray ray, float max_dist, BlockHit* out_hit) {
-	Block* b;
+SelectedBlock World::raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist) {
+	SelectedBlock b;
+	float _dist;
 	auto hit_block = [&] (bpos bp, int face, float dist) {
-		b = chunks.query_block(bp);
-		if (b && block_props[b->type].collision == CM_SOLID) {
-			out_hit->dist = dist;
-			out_hit->pos_world = ray.pos + ray.dir * dist;
-			out_hit->block = bp;
-			out_hit->face = (BlockFace)face;
+		b.block = chunks.query_block(bp);
+		if (b.block && block_props[b.block->type].collision == CM_SOLID) {
+			//hit.pos_world = ray.pos + ray.dir * dist;
+			b.pos = bp;
+			b.face = (BlockFace)face;
+			_dist = dist;
 			return true;
 		}
 		return false;
 	};
 
 	if (!raycast_voxels(ray, max_dist, hit_block)) {
-		return nullptr;
+		return { nullptr };
 	}
+
+	if (hit_dist) *hit_dist = _dist;
 	return b;
 }
 
@@ -24,4 +27,23 @@ void World::update (WorldGenerator const& world_gen) {
 
 	chunks.update_chunks_load(*this, world_gen, player);
 
+}
+
+void World::apply_damage (SelectedBlock const& block, float damage) {
+	assert(block);
+	Chunk* chunk;
+	Block* b = chunks.query_block(block.pos, &chunk);
+	assert(block_props[b->type].collision == CM_SOLID && chunk );
+
+	b->hp_ratio -= damage;
+
+	if (b->hp_ratio > 0) {
+		chunk->block_only_texture_changed(block.pos);
+	} else {
+
+		b->hp_ratio = 0;
+		b->type = BT_AIR;
+
+		chunk->block_changed(chunks, block.pos);
+	}
 }
