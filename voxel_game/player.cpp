@@ -14,7 +14,7 @@ void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock c
 		anim_t += anim_freq * input.dt;
 	}
 	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
-		if (selected_block && button.is_down) { // only hit if key is still down (can cancel tool use even though anim triggers
+		if (selected_block) {
 			world.apply_damage(selected_block, damage);
 		}
 		anim_triggered = true;
