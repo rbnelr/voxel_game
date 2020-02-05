@@ -67,6 +67,12 @@ DONE:
 TODO
 -FEATURES:
  
+ crosshair
+
+ rethink tool animations
+
+ sounds!
+
  add inventory
 
  write actual air control

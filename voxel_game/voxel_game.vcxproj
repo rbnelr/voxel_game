@@ -304,6 +304,7 @@
     <None Include="shaders\blocks.glsl" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
+    <None Include="shaders\crosshair.glsl" />
     <None Include="shaders\generic.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />

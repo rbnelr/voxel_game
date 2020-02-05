@@ -11,7 +11,7 @@ void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock c
 	bool inp = selected_block ? button.is_down : button.went_down;
 
 	if (anim_t > 0 || inp) {
-		anim_t += anim_freq * input.dt;
+		anim_t += anim_speed * input.dt;
 	}
 	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
 		if (selected_block) {
@@ -30,7 +30,7 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 	bool trigger = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && anim_t == 0;
 
 	if (trigger || anim_t > 0) {
-		anim_t += anim_freq * input.dt;
+		anim_t += anim_speed * input.dt;
 
 		if (anim_t >= 1) {
 			anim_t = 0;

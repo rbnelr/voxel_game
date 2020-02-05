@@ -24,7 +24,7 @@ struct SelectedBlock {
 class Tool {
 public:
 
-	float anim_freq = 4;
+	float anim_speed = 4;
 	float damage = 0.25f;
 	float reach = 4.5f;
 
@@ -34,7 +34,7 @@ public:
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Fists", name)) return;
 
-		ImGui::DragFloat("anim_freq", &anim_freq, 0.05f);
+		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
 		ImGui::DragFloat("damage", &damage, 0.05f);
 		ImGui::DragFloat("reach", &reach, 0.05f);
 
@@ -46,7 +46,7 @@ public:
 class BlockPlace {
 public:
 
-	float anim_freq = 6;
+	float anim_speed = 6;
 	float reach = 4.5f;
 
 	float anim_t = 0;
@@ -54,7 +54,7 @@ public:
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("BlockPlace", name)) return;
 
-		ImGui::DragFloat("anim_freq", &anim_freq, 0.05f);
+		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
 		ImGui::DragFloat("reach", &reach, 0.05f);
 
 		imgui_pop();

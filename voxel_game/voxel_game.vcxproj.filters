@@ -386,6 +386,9 @@
     <None Include="shaders\generic.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\crosshair.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt">

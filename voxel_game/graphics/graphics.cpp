@@ -139,6 +139,45 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	}
 }
 
+void CrosshairGraphics::draw () {
+	if (!equal(input.window_size, prev_window_size)) {
+		prev_window_size = input.window_size;
+
+		int2 size = texture.size * crosshair_size;
+
+		int2 a_px = input.window_size / 2 - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
+		int2 b_px = a_px + size;
+
+		// * 2 - 1 to convert to clip
+		float2 a = (float2)a_px / (float2)input.window_size * 2 - 1;
+		float2 b = (float2)b_px / (float2)input.window_size * 2 - 1;
+
+		Vertex vertices[6] = {
+			QUAD(
+				Vertex( float4(a.x, a.y, 0, 1), float2(0,0) ),
+				Vertex( float4(b.x, a.y, 0, 1), float2(1,0) ),
+				Vertex( float4(b.x, b.y, 0, 1), float2(1,1) ),
+				Vertex( float4(a.x, b.y, 0, 1), float2(0,1) )
+			)
+		};
+
+		mesh.upload(vertices, 6);
+	}
+
+	if (shader) {
+		shader.bind();
+
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		texture.bind();
+		sampler.bind(1);
+
+		mesh.bind();
+		mesh.draw();
+	}
+}
+
 PlayerGraphics::PlayerGraphics () {
 	std::vector<GenericVertex> verts;
 	push_cube<GenericVertex>([&] (float3 pos, int face, float2 face_uv) {
@@ -367,39 +406,51 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 }
 
 void Graphics::draw (World const& world, Camera_View const& view, bool activate_flycam, SelectedBlock selected_block) {
+	if (activate_flycam || world.player.third_person)
+		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
+
+	//// OpenGL drawcalls
+	common_uniforms.set_view_uniforms(view);
+	common_uniforms.set_debug_uniforms();
+
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	common_uniforms.set_view_uniforms(view);
-	common_uniforms.set_debug_uniforms();
-
 	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
 
-	if (activate_flycam || world.player.third_person)
-		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
+	{ //// Opaque pass
+		player.draw(world.player);
 
-	// opaque draw
-	player.draw(world.player);
+		chunk_graphics.draw_chunks(world.chunks);
 
-	chunk_graphics.draw_chunks(world.chunks);
-
-	skybox.draw();
-
-	// transparent draw
-	glEnable(GL_BLEND);
-
-	if (selected_block) {
-		block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
+		skybox.draw();
 	}
 
-	//glCullFace(GL_FRONT);
-	//chunk_graphics.draw_chunks_transparent(chunks);
-	//glCullFace(GL_BACK);
-	chunk_graphics.draw_chunks_transparent(world.chunks);
+	glEnable(GL_BLEND);
 
-	glEnable(GL_CULL_FACE);
-	debug_graphics->draw();
+	{ //// Transparent pass
+
+		if (selected_block) {
+			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
+		}
+
+		//glCullFace(GL_FRONT);
+		//chunk_graphics.draw_chunks_transparent(chunks);
+		//glCullFace(GL_BACK);
+		chunk_graphics.draw_chunks_transparent(world.chunks);
+
+		glEnable(GL_CULL_FACE);
+		debug_graphics->draw();
+	}
+
+	{ //// Overlay pass
+		glDisable(GL_DEPTH_TEST);
+
+		crosshair.draw();
+
+		glEnable(GL_DEPTH_TEST);
+	}
 
 	glDisable(GL_BLEND);
 }

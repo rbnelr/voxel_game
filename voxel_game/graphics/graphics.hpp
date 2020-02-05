@@ -76,6 +76,33 @@ struct BlockHighlightGraphics {
 	void draw (float3 pos, BlockFace face);
 };
 
+struct CrosshairGraphics {
+
+	struct Vertex {
+		float4	pos_clip;
+		float2	uv;
+
+		Vertex (float4 p, float2 uv): pos_clip{p}, uv{uv} {}
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_clip)>(0, "pos_clip", sizeof(Vertex), offsetof(Vertex, pos_clip));
+			a.add<decltype(uv      )>(1, "",         sizeof(Vertex), offsetof(Vertex, uv      ));
+		}
+	};
+
+	Shader shader = { "crosshair" };
+	Texture2D texture = { "textures/crosshair.png", false };
+
+	Sampler2D sampler;
+
+	int2 prev_window_size = -1;
+	Mesh<Vertex> mesh;
+
+	int crosshair_size = 2;
+
+	void draw ();
+};
+
 struct GenericVertex {
 	float3	pos_model;
 	lrgba	color;
@@ -200,10 +227,12 @@ public:
 	CommonUniforms			common_uniforms;
 
 	ChunkGraphics			chunk_graphics;
-
-	SkyboxGraphics			skybox;
-	BlockHighlightGraphics	block_highlight;
 	PlayerGraphics			player;
+
+	BlockHighlightGraphics	block_highlight;
+
+	CrosshairGraphics		crosshair;
+	SkyboxGraphics			skybox;
 
 	void imgui (Chunks& chunks) {
 		if (ImGui::CollapsingHeader("Graphics")) {
