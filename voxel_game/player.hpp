@@ -66,7 +66,7 @@ public:
 	// Closest position the third person camera can go relative to head_pivot
 	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
 	// In which direction the camera moves back if no blocks are in the way
-	float3 tps_camera_dir = float3(0,0,1);
+	float3 tps_camera_dir = float3(0,-1,0);
 	// How far the camera will move back
 	float tps_camera_dist = 4;
 

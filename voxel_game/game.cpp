@@ -441,8 +441,8 @@ void Game::frame () {
 
 	auto raycast_highlighted_block = [&] () {
 		Ray ray;
-		ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
-		ray.pos = view.cam_to_world * float3(0,0,0);
+		ray.dir = (float3x3)world->player.head_to_world * float3(0,+1,0);
+		ray.pos = world->player.head_to_world * float3(0,0,0);
 	
 		BlockHit hit;
 		highlighted_block.block = world->raycast_solid_blocks(ray, 5.0f, &hit);

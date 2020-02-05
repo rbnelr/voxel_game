@@ -123,8 +123,8 @@ Camera_View Player::update_post_physics (World& world) {
 	         head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
 	
 	Camera_View v;
-	v.world_to_cam = translate(-cam_pos) * rotate3_X(-deg(90)) * world_to_head;
-	v.cam_to_world = head_to_world * rotate3_X(deg(90)) * translate(cam_pos);
+	v.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
+	v.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
 	v.cam_to_clip = cam.calc_cam_to_clip();
 
 	tool.update();
