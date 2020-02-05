@@ -366,7 +366,7 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 	}
 }
 
-void Graphics::draw (World const& world, Camera_View const& view, bool activate_flycam, HighlightedBlock highlighted_block) {
+void Graphics::draw (World const& world, Camera_View const& view, bool activate_flycam, SelectedBlock highlighted_block) {
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);

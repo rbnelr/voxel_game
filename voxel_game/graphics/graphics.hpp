@@ -193,7 +193,7 @@ struct ChunkGraphics {
 };
 
 class World;
-struct HighlightedBlock;
+struct SelectedBlock;
 
 class Graphics {
 public:
@@ -215,5 +215,5 @@ public:
 		}
 	}
 
-	void draw (World const& world, Camera_View const& view, bool activate_flycam, HighlightedBlock highlighted_block);
+	void draw (World const& world, Camera_View const& view, bool activate_flycam, SelectedBlock highlighted_block);
 };

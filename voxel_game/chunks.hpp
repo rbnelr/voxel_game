@@ -130,7 +130,7 @@ public:
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float chunk_deletion_hysteresis = CHUNK_DIM_X;
+	float chunk_deletion_hysteresis = CHUNK_DIM_X*1.5f;
 
 	// prevent giant lag because chunk gen is in main thread for now
 	int max_chunks_generated_per_frame = 1;

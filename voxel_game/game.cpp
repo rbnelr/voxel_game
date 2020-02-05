@@ -431,61 +431,46 @@ void Game::frame () {
 	}
 
 	Camera_View view;
+	SelectedBlock slected_block;
 	if (activate_flycam) {
 		view = flycam.update();
 	} else {
-		view = world->player.update_post_physics(*world);
+		view = world->player.update_post_physics(*world, &slected_block);
 	}
 
-	HighlightedBlock highlighted_block;
-
-	auto raycast_highlighted_block = [&] () {
-		Ray ray;
-		ray.dir = (float3x3)world->player.head_to_world * float3(0,+1,0);
-		ray.pos = world->player.head_to_world * float3(0,0,0);
-	
-		BlockHit hit;
-		highlighted_block.block = world->raycast_solid_blocks(ray, 5.0f, &hit);
-		if (highlighted_block.block) {
-			highlighted_block.pos = hit.block;
-			highlighted_block.face = hit.face;
-		}
-	};
-	raycast_highlighted_block();
-
-	if (highlighted_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
+	if (slected_block && input.buttons[GLFW_MOUSE_BUTTON_LEFT].is_down) { // block breaking
 
 		Chunk* chunk;
-		Block* b = world->chunks.query_block(highlighted_block.pos, &chunk);
+		Block* b = world->chunks.query_block(slected_block.pos, &chunk);
 		assert( block_props[b->type].collision == CM_SOLID && chunk );
 
 		b->hp_ratio -= 1.0f / 0.3f * input.dt;
 
 		if (b->hp_ratio > 0) {
-			chunk->block_only_texture_changed(highlighted_block.pos);
+			chunk->block_only_texture_changed(slected_block.pos);
 		} else {
 
 			b->hp_ratio = 0;
 			b->type = BT_AIR;
 
-			chunk->block_changed(world->chunks, highlighted_block.pos);
+			chunk->block_changed(world->chunks, slected_block.pos);
 
 			//dbg_play_sound();
 		}
 	}
 	{ // block placing
 		// keep trying to place block if it was inside player but rmb is still held down
-		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && highlighted_block;
+		trigger_place_block = trigger_place_block && input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && slected_block;
 		
 		if (input.buttons[GLFW_MOUSE_BUTTON_RIGHT].went_down)
 			trigger_place_block = true;
 
-		if (trigger_place_block && highlighted_block && highlighted_block.face >= 0) {
+		if (trigger_place_block && slected_block && slected_block.face >= 0) {
 
 			bpos dir = 0;
-			dir[highlighted_block.face / 2] = highlighted_block.face % 2 ? +1 : -1;
+			dir[slected_block.face / 2] = slected_block.face % 2 ? +1 : -1;
 
-			bpos block_place_pos = highlighted_block.pos + dir;
+			bpos block_place_pos = slected_block.pos + dir;
 
 			Chunk* chunk;
 			Block* b = world->chunks.query_block(block_place_pos, &chunk);
@@ -501,8 +486,6 @@ void Game::frame () {
 
 					chunk->block_changed(world->chunks, block_place_pos);
 
-					raycast_highlighted_block(); // make highlighted_block seem more responsive
-
 					trigger_place_block = false;
 				}
 			}
@@ -516,5 +499,5 @@ void Game::frame () {
 	world->chunks.update_chunk_graphics(graphics.chunk_graphics);
 
 	//// Draw
-	graphics.draw(*world, view, activate_flycam, highlighted_block);
+	graphics.draw(*world, view, activate_flycam, slected_block);
 }

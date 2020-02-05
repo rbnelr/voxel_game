@@ -11,7 +11,7 @@ extern float3	player_spawn_point;
 
 class World;
 
-struct HighlightedBlock {
+struct SelectedBlock {
 	Block*		block = nullptr;
 	bpos		pos;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
@@ -26,6 +26,7 @@ public:
 
 	float anim_freq = 3;
 	float damage = 0.4f;
+	float reach = 4.5f;
 
 	float anim_t = 0;
 
@@ -129,13 +130,13 @@ public:
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (World& world);
+	Camera_View update_post_physics (World& world, SelectedBlock* highlighted_block);
 
 	void respawn () {
 		pos = player_spawn_point;
 		vel = 0;
 	}
 
-
-	float3 find_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
+	SelectedBlock calc_selected_block (World& world);
+	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
 };

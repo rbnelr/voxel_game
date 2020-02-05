@@ -90,7 +90,7 @@ void Player::update_physics (bool player_on_ground) {
 		vel = 0;
 }
 
-float3 Player::find_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation) {
+float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation) {
 	Ray ray;
 	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
 	ray.dir = body_rotation * head_elevation * tps_camera_dir;
@@ -106,7 +106,7 @@ float3 Player::find_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (World& world) {
+Camera_View Player::update_post_physics (World& world, SelectedBlock* highlighted_block) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -115,20 +115,37 @@ Camera_View Player::update_post_physics (World& world) {
 
 	float3 cam_pos = 0;
 	if (third_person)
-		cam_pos = find_third_person_cam_pos(world, body_rotation, head_elevation);
+		cam_pos = calc_third_person_cam_pos(world, body_rotation, head_elevation);
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
 
 	float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
 	         head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
 	
-	Camera_View v;
-	v.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
-	v.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
-	v.cam_to_clip = cam.calc_cam_to_clip();
+	Camera_View view;
+	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
+	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
+	view.cam_to_clip = cam.calc_cam_to_clip();
 
+	*highlighted_block = calc_selected_block(world);
 	tool.update();
 
-	// TODO: block selection raycast and block break and place controls
-	return v;
+	return view;
+}
+
+SelectedBlock Player::calc_selected_block (World& world) {
+	SelectedBlock selected_block;
+	
+	Ray ray;
+	ray.dir = (float3x3)head_to_world * float3(0,+1,0);
+	ray.pos = head_to_world * float3(0,0,0);
+
+	BlockHit hit;
+	selected_block.block = world.raycast_solid_blocks(ray, tool.reach, &hit);
+	if (selected_block) {
+		selected_block.pos = hit.block;
+		selected_block.face = hit.face;
+	}
+
+	return selected_block;
 }
