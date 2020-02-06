@@ -72,6 +72,24 @@ DONE:
  
 TODO
 -FEATURES:
+ 
+ The epsilon is very finnicky,
+ -it needs to be small enough to actually act like an epsilon (we teleport the player slightly above the ground and away from walls by this epsilon)
+   if it is too big then gravity will not accelerate the player fast enough with my 144hz framerate too "reach" the ground fast enough so that suddenly the player only "touches" the ground every 3 frames
+   and the position stutters slightly, which also trips up the grounded detection.
+ -an epsilon should be close to the limit of float precision to avoid this.
+   but it cannot be that small because then simply by moving 1000 blocks in one direction not the epsilon rounds to 0
+   > not good
+ -doubles would probably solve this issue even for far distances, but gpus do not support doubles usually so that is not an option
+ -the only remaining solution is to have a "moving" origin, where the graphics and physics happens with these relative coords
+   but the actual positions store an additional int to keep track of their real value
+ -in this case of already having int indexes for blocks and floats for player, npcs etc. it is advantageous to just split the coords into block pos and fract pos with fract being a float
+  -> floor(pos_world) reduces to pos_world.block > nice
+  -> opengl matricies now need to store their coords relative to the player block, all block pos passed into shaders also need to get the player block substracted
+  -> all fractional world positons need to use the new block_pos, fract_pos pair instead, which needs to wrap() its fract part and modify its block pos if the fract part moves wraps
+  -> per frame you can simply work with this moving origin being constant, ie. use floats
+   -> at the beginning of the frame a global block pos gets set as origin for that frame, coord->float just substracts that origin and float->coord adds it again,
+      now this is almost automatic, you just need to make sure to not store float pos_worlds across frames because they get invalidated by the origin moving, just like an iterator into a vector gets invalidated by the vector expanding
 
  rethink tool animations
 
