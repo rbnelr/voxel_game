@@ -154,8 +154,6 @@ public:
 
 	void update_movement_controls (World& world);
 
-	void update_physics ();
-
 	float3x4 head_to_world;
 
 	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, SelectedBlock* highlighted_block);

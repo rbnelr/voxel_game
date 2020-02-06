@@ -447,7 +447,8 @@ void Graphics::draw (World const& world, Camera_View const& view, bool activate_
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		crosshair.draw();
+		if (!activate_flycam)
+			crosshair.draw();
 
 		glEnable(GL_DEPTH_TEST);
 	}

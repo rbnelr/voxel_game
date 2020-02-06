@@ -1,6 +1,7 @@
 #pragma once
 #include "kissmath.hpp"
 #include "dear_imgui.hpp"
+#include "util/collision.hpp"
 
 #define DEFAULT_GRAVITY 20
 
@@ -27,8 +28,21 @@ struct CollisionResponse {
 	}
 };
 
-class Physics {
+struct PhysicsObject {
+	float3 pos;
+	float3 vel;
 
+	// always a cylinder for now
+	float r;
+	float h;
+
+	CollisionResponse coll;
+};
+
+class Player;
+class World;
+
+class Physics {
 public:
 
 	float3 grav_accel = float3(0, 0, -DEFAULT_GRAVITY);
@@ -45,6 +59,10 @@ public:
 	static float jump_impulse_for_jump_height (float jump_height, float grav_mag) {
 		return sqrt( 2.0f * jump_height * grav_mag );
 	}
+
+	void update_object (World& world, PhysicsObject& obj);
+
+	void update_player (World& world, Player& player);
 };
 
 // Global physics

@@ -59,3 +59,17 @@ bool raycast_voxels (Ray ray, float max_dist, FUNC hit_block) {
 
 	return false;
 }
+
+struct CollisionHit {
+	float dist; // how far obj A moved relative to obj B to hit it
+	float3 pos; // pos of obj A relative to obj B at collision time
+	float3 normal; // normal of the collision pointing from obj B to obj A
+};
+
+// Calculate first collision CollisionHit between axis aligned unit cube and a axis aligned cylinder (cylinder axis is z)
+//  offset = cylinder.pos - cube.pos  (cylinder.pos is it's center)
+//  dir    = cylinder.vel - cube.vel  (does not need to be normalized)
+//  cyl_r  = cylinder.radius
+//  cyl_h  = cylinder.height
+// coll gets written to if calculated dist < coll->dist (init coll->dist to INF intially)
+void cylinder_cube_cast (float3 offset, float3 dir, float cyl_r, float cyl_h, CollisionHit* coll);

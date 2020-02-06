@@ -183,17 +183,6 @@ void Player::update_movement_controls (World& world) {
 		vel += jump_impulse;
 }
 
-void Player::update_physics () {
-
-	//// gravity
-	// if !on ground only?
-	vel += physics.grav_accel * input.dt;
-
-	// kill velocity if too small
-	if (length(vel) < 0.01f)
-		vel = 0;
-}
-
 float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation) {
 	Ray ray;
 	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
