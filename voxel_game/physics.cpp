@@ -88,7 +88,8 @@ void handle_collison (PhysicsObject& obj, CollisionHit const& hit) {
 
 	obj.pos = hit.pos;
 
-	obj.pos += float3(hit.normal * COLLISION_SEPERATION_EPSILON); // move player a epsilon distance away from the wall to prevent problems, having this value be 1/1000 instead of sothing very samll prevents small intersection problems that i don't want to debug now
+	// Floating point calculations in the raycasting code seem to produce small errors than can leave us a tiny bit inside the wall at which point the next raycast (not sure why it would do that) does not see the wall anymore
+	obj.pos += float3(hit.normal * COLLISION_EPSILON);
 }
 
 extern int frame_counter;
@@ -112,7 +113,7 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 		// inf if there is no collision
 		float earliest_collision_t = earliest_collision.dist / length(obj.vel);
 
-		printf("%5d: pos.z: %7.4f vel.z: %7.4f coll.dist: %7.4f coll.pos.z: %7.4f\n", frame_counter, obj.pos.z, obj.vel.z, earliest_collision.dist, earliest_collision.pos.z);
+		//printf("%5d: pos.z: %7.4f vel.z: %7.4f coll.dist: %7.4f coll.pos.z: %7.4f\n", frame_counter, obj.pos.z, obj.vel.z, earliest_collision.dist, earliest_collision.pos.z);
 
 		if (earliest_collision_t >= max_dt) {
 			obj.pos += obj.vel * max_dt;
@@ -128,6 +129,8 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 	//// kill velocity if too small
 	if (length(obj.vel) < 0.01f)
 		obj.vel = 0;
+
+	printf("%5d: pos.z: %7.4f vel.z: %7.4f\n", frame_counter, obj.pos.z, obj.vel.z);
 }
 
 void Physics::update_player (World& world, Player& player) {
@@ -135,19 +138,19 @@ void Physics::update_player (World& world, Player& player) {
 	
 	obj.pos = player.pos;
 	obj.vel = player.vel;
-
+	
 	obj.r = player.radius;
 	obj.h = player.height;
 	
 	obj.coll = player.collison_response;
-
+	
 	update_object(world, obj);
-
+	
 	player.pos = obj.pos;
 	player.vel = obj.vel;
 
-	//static float3 pos = float3(-3.5f, 4.5f, 33.1f);
-	//static float3 vel = float3(-5, -5, 0);
+	//static float3 pos = float3(-18.4f, -32.5f, 40.1f);
+	//static float3 vel = float3(-10.85f, 0, 0);
 	//
 	//ImGui::DragFloat3("pos", &pos.x, 0.05f);
 	//ImGui::DragFloat3("vel", &vel.x, 0.05f);
@@ -165,4 +168,9 @@ void Physics::update_player (World& world, Player& player) {
 	//update_object(world, obj);
 	//
 	//debug_graphics->push_cylinder(obj.pos + float3(0,0, player.height/2), player.radius, player.height, srgba(200,20,20,100), 32);
+	//
+	//obj.vel = vel;
+	//update_object(world, obj);
+	//
+	//debug_graphics->push_cylinder(obj.pos + float3(0,0, player.height/2), player.radius, player.height, srgba(20,20,200,100), 32);
 }

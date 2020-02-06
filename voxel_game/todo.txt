@@ -63,9 +63,13 @@ DONE:
  -> created some sensible opengl abstractions, but some stuff is still missing and there could potentially be WAY less code
      if i just followed my own advice and just wrote down all the opengl code by hand and then factored things out into functions as i went
      I guess i just don't like doing that in opengl, because i like turning glGen* and glDelete* into automatic ctors dtors
- 
+  
  crosshair
-
+ 
+ port all player code to player class
+ -factor out all the relevant raycast, physics etc. code into their own utility files
+ -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
+ 
 TODO
 -FEATURES:
 
@@ -94,10 +98,6 @@ TODO
  reflections for water?
  -screenspace reflection
 
- port all player code to player class
- -factor out all the relevant raycast, physics etc. code into their own utility files
- -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
- 
  implement light level, night and torches
 
  look at COLLISION_SEPERATION_EPSILON, and if the raycast physics can live without it, being grounded should leave pos==block_top and vel.z==0

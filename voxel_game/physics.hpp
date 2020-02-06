@@ -5,8 +5,7 @@
 
 #define DEFAULT_GRAVITY 20
 
-// TODO: HACK: try to fix this, this should not be needed
-constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
+static inline constexpr float COLLISION_EPSILON = 0.0001f; // floats have about 7 decimal digits of precision, so this only works up to about 10km in each direction, at some point the collision system just gets unreliable
 
 struct CollisionResponse {
 	float falling_ground_friction =		0.0f;
