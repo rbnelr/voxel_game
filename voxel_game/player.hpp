@@ -150,9 +150,11 @@ public:
 		imgui_pop();
 	}
 
-	void update_movement_controls (bool player_on_ground);
+	bool calc_ground_contact (World& world, bool* stuck);
 
-	void update_physics (bool player_on_ground);
+	void update_movement_controls (World& world);
+
+	void update_physics ();
 
 	float3x4 head_to_world;
 

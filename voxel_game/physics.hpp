@@ -4,6 +4,9 @@
 
 #define DEFAULT_GRAVITY 20
 
+// TODO: HACK: try to fix this, this should not be needed
+constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
+
 struct CollisionResponse {
 	float falling_ground_friction =		0.0f;
 	float falling_bounciness =			0.25f;

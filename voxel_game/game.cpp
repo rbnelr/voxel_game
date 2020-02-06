@@ -106,82 +106,11 @@ void Game::frame () {
 	world->update(world_gen);
 
 	{ // player position (collision and movement dynamics)
-		constexpr float COLLISION_SEPERATION_EPSILON = 0.001f;
-
-		// 
-		bool player_stuck_in_solid_block;
-		bool player_on_ground;
-
-		auto check_blocks_around_player = [&] () {
-			{ // for all blocks we could be touching
-				bpos start =	(bpos)floor(world->player.pos -float3(world->player.radius, world->player.radius, 0));
-				bpos end =		(bpos)ceil(world->player.pos +float3(world->player.radius, world->player.radius, world->player.height));
-
-				bool any_intersecting = false;
-
-				bpos bp;
-				for (bp.z=start.z; bp.z<end.z; ++bp.z) {
-					for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-						for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-
-							auto* b = world->chunks.query_block(bp);
-							bool block_solid = block_props[b->type].collision == CM_SOLID;
-							
-							bool intersecting = block_solid && cylinder_cube_intersect(world->player.pos -(float3)bp, world->player.radius, world->player.height);
-
-							if (0) {
-								lrgba col;
-
-								if (!block_solid) {
-									col = srgba(40,40,40,100);
-								} else {
-									col = intersecting ? srgba(255,40,40,200) : srgba(255,255,255,150);
-								}
-
-								debug_graphics->push_wire_cube(0.5f, 1, col);
-							}
-
-							any_intersecting = any_intersecting || (intersecting && block_solid);
-						}
-					}
-				}
-
-				player_stuck_in_solid_block = any_intersecting; // player somehow ended up inside a block
-			}
-
-			{ // for all blocks we could be standing on
-
-				bpos_t pos_z = floori(world->player.pos.z);
-
-				player_on_ground = false;
-
-				if ((world->player.pos.z -pos_z) <= COLLISION_SEPERATION_EPSILON*1.05f && world->player.vel.z == 0) {
-
-					bpos2 start =	(bpos2)floor((float2)world->player.pos -world->player.radius);
-					bpos2 end =		(bpos2)ceil((float2)world->player.pos +world->player.radius);
-
-					bpos bp;
-					bp.z = pos_z -1;
-
-					for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-						for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-
-							auto* b = world->chunks.query_block(bp);
-							bool block_solid = block_props[b->type].collision == CM_SOLID;
-
-							if (block_solid && circle_square_intersect((float2)world->player.pos -(float2)(bpos2)bp, world->player.radius)) player_on_ground = true;
-						}
-					}
-				}
-			}
-
-		};
-		check_blocks_around_player();
 
 		if (!activate_flycam) {
-			world->player.update_movement_controls(player_on_ground);
+			world->player.update_movement_controls(*world);
 		}
-		world->player.update_physics(player_on_ground);
+		world->player.update_physics();
 
 		//option("draw_debug_overlay", &draw_debug_overlay);
 

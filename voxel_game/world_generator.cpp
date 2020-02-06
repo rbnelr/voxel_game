@@ -142,7 +142,7 @@ struct Generator {
 
 		for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
 			for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-
+				
 				float2 pos_world = (float2)((bpos2)i +chunk.coord * CHUNK_DIM_2D);
 
 				float height = heightmap(noise, pos_world);
@@ -160,27 +160,24 @@ struct Generator {
 				float effective_tree_prob = tree_density * tree_prox_prob;
 				//float effective_tree_prob = tree_density;
 
-				float tree_chance = rand.uniform();
-				if (tree_chance < effective_tree_prob)
-					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
-
-				for (i.z=0; i.z <= min(highest_block, (int)CHUNK_DIM_Z-1); ++i.z) {
+				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM_Z-1); ++i.z) {
 					auto* b = chunk.get_block(i);
 
-					if (i.z == highest_block && i.z >= water_level
-						//&& equal(chunk->coord, 0)
-						//&& (chunk->coord.x % 2 == 0 && chunk->coord.y % 2 == 0)
-						) {
+					if (i.z == highest_block && i.z >= water_level) {
 						b->type = BT_GRASS;
 					} else {
 						b->type = BT_EARTH;
 					}
 
 					b->hp_ratio = 1;
-
-					//b->dbg_tint = lrgba8(spectrum_gradient(map(height, 0, 45)), 255);
-					//b->dbg_tint = spectrum_gradient(tree_density / (25.0f/(32*32)));
 				}
+
+				float tree_chance = rand.uniform();
+				if (	tree_chance < effective_tree_prob &&
+						highest_block >= 0 && highest_block < CHUNK_DIM_Z &&
+						chunk.get_block(bpos(i.x, i.y, i.z))->type != BT_WATER)
+					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
+
 			}
 		}
 

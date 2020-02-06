@@ -51,7 +51,76 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 	}
 }
 
-void Player::update_movement_controls (bool player_on_ground) {
+bool Player::calc_ground_contact (World& world, bool* stuck) {
+	{ // Check block intersection to see if we are somehow stuck inside a block
+		bpos start =	(bpos)floor(pos -float3(radius, radius, 0));
+		bpos end =		(bpos)ceil(pos +float3(radius, radius, height));
+
+		bool any_intersecting = false;
+
+		bpos bp;
+		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
+			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
+				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+
+					auto* b = world.chunks.query_block(bp);
+					bool block_solid = block_props[b->type].collision == CM_SOLID;
+
+					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
+
+					if (0) {
+						lrgba col;
+
+						if (!block_solid) {
+							col = srgba(40,40,40,100);
+						} else {
+							col = intersecting ? srgba(255,40,40,200) : srgba(255,255,255,150);
+						}
+
+						debug_graphics->push_wire_cube(0.5f, 1, col);
+					}
+
+					any_intersecting = any_intersecting || (intersecting && block_solid);
+				}
+			}
+		}
+
+		*stuck = any_intersecting; // player somehow ended up inside a block
+	}
+
+	bool grounded = false;
+	{ // for all blocks we could be standing on
+
+		bpos_t pos_z = floori(pos.z);
+
+		if ((pos.z -pos_z) <= COLLISION_SEPERATION_EPSILON * 1.05f && vel.z == 0) {
+
+			bpos2 start =	(bpos2)floor((float2)pos - radius);
+			bpos2 end =		(bpos2)ceil ((float2)pos + radius);
+
+			bpos bp;
+			bp.z = pos_z -1;
+
+			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
+				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+
+					auto* b = world.chunks.query_block(bp);
+
+					bool block_solid = block_props[b->type].collision == CM_SOLID;
+					if (block_solid && circle_square_intersect((float2)pos -(float2)(bpos2)bp, radius))
+						grounded = true; // cylinder base touches at least one soild block
+				}
+			}
+		}
+	}
+
+	return grounded;
+}
+
+void Player::update_movement_controls (World& world) {
+	bool stuck;
+	bool grounded = calc_ground_contact(world, &stuck);
+
 	//// toggle camera view
 	if (input.buttons[GLFW_KEY_F].went_down)
 		third_person = !third_person;
@@ -110,11 +179,11 @@ void Player::update_movement_controls (bool player_on_ground) {
 	
 	//// jumping
 	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
-	if (input.buttons[GLFW_KEY_SPACE].is_down/*went_down*/ && player_on_ground)
+	if (input.buttons[GLFW_KEY_SPACE].is_down/*went_down*/ && grounded)
 		vel += jump_impulse;
 }
 
-void Player::update_physics (bool player_on_ground) {
+void Player::update_physics () {
 
 	//// gravity
 	// if !on ground only?

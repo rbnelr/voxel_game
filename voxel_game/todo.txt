@@ -63,11 +63,11 @@ DONE:
  -> created some sensible opengl abstractions, but some stuff is still missing and there could potentially be WAY less code
      if i just followed my own advice and just wrote down all the opengl code by hand and then factored things out into functions as i went
      I guess i just don't like doing that in opengl, because i like turning glGen* and glDelete* into automatic ctors dtors
-     
-TODO
--FEATURES:
  
  crosshair
+
+TODO
+-FEATURES:
 
  rethink tool animations
 
@@ -88,6 +88,11 @@ TODO
    -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
  
  add headbob?
+
+ underwater fog
+
+ reflections for water?
+ -screenspace reflection
 
  port all player code to player class
  -factor out all the relevant raycast, physics etc. code into their own utility files
