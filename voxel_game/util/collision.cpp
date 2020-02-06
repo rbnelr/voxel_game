@@ -223,8 +223,8 @@ void cylinder_cube_cast (float3 offset, float3 dir, float cyl_r, float cyl_h, Co
 	_minkowski_cylinder_cube__raycast_y_plane(  offset, dir,   -cyl_r, -1, cyl_h, hit); // block -Y
 	_minkowski_cylinder_cube__raycast_y_plane(  offset, dir, 1 +cyl_r, +1, cyl_h, hit); // block +Y
 
-	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2( 0, 0), -cyl_h, cyl_r, hit); // block rouned edge
-	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2( 0,+1), -cyl_h, cyl_r, hit); // block rouned edge
-	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2(+1, 0), -cyl_h, cyl_r, hit); // block rouned edge
-	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2(+1,+1), -cyl_h, cyl_r, hit); // block rouned edge
+	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2( 0, 0), cyl_h, cyl_r, hit); // block rouned edge
+	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2( 0,+1), cyl_h, cyl_r, hit); // block rouned edge
+	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2(+1, 0), cyl_h, cyl_r, hit); // block rouned edge
+	_minkowski_cylinder_cube__raycast_cylinder_side( offset, dir, float2(+1,+1), cyl_h, cyl_r, hit); // block rouned edge
 }

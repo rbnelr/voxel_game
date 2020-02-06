@@ -145,4 +145,24 @@ void Physics::update_player (World& world, Player& player) {
 
 	player.pos = obj.pos;
 	player.vel = obj.vel;
+
+	//static float3 pos = float3(-3.5f, 4.5f, 33.1f);
+	//static float3 vel = float3(-5, -5, 0);
+	//
+	//ImGui::DragFloat3("pos", &pos.x, 0.05f);
+	//ImGui::DragFloat3("vel", &vel.x, 0.05f);
+	//
+	//obj.pos = pos;
+	//obj.vel = vel;
+	//
+	//debug_graphics->push_cylinder(obj.pos + float3(0,0, player.height/2), player.radius, player.height, srgba(20,200,20,100), 32);
+	//
+	//obj.r = player.radius;
+	//obj.h = player.height;
+	//
+	//obj.coll = player.collison_response;
+	//
+	//update_object(world, obj);
+	//
+	//debug_graphics->push_cylinder(obj.pos + float3(0,0, player.height/2), player.radius, player.height, srgba(200,20,20,100), 32);
 }
