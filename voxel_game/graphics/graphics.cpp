@@ -223,7 +223,7 @@ struct TileLoader {
 			size = img.size;
 		} else {
 			if (!equal(size, img.size)) {
-				fprintf(stderr, "Texture size does not match textures/missing.png, all textures must be of the same size!\n");
+				logf(ERROR, "Texture size does not match textures/missing.png, all textures must be of the same size!\n");
 				assert(false);
 				return 0;
 			}
@@ -263,7 +263,7 @@ struct TileLoader {
 		bool has_alpha = Image<uint8>::load_file(alpha_filename.c_str(), &alpha);
 
 		if (has_alpha && !equal(color.size, alpha.size)) {
-			fprintf(stderr, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!\n");
+			logf(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!\n");
 			assert(false);
 			return {0};
 		}

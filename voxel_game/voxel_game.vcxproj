@@ -174,6 +174,7 @@
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="util\animation.hpp" />
     <ClInclude Include="util\circular_buffer.hpp" />
+    <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />

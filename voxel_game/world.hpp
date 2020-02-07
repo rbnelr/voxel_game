@@ -1,14 +1,9 @@
 #pragma once
 #include "kissmath.hpp"
-#include "util/string.hpp"
 #include "util/random.hpp"
-#include "blocks.hpp"
 #include "chunks.hpp"
 #include "player.hpp"
-#include "graphics/camera.hpp"
-#include "world_generator.hpp"
-#include "util/collision.hpp"
-using namespace kiss;
+#include <string>
 
 inline uint64_t get_seed (std::string_view str) {
 	str = trim(str);
@@ -18,6 +13,8 @@ inline uint64_t get_seed (std::string_view str) {
 
 	return std::hash<std::string_view>()(str);
 }
+
+struct WorldGenerator;
 
 class World {
 

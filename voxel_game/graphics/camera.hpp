@@ -1,7 +1,6 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "../dear_imgui.hpp"
-#include <string>
 
 enum perspective_mode {
 	PERSPECTIVE,

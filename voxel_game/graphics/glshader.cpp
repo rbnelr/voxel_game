@@ -62,7 +62,7 @@ namespace gl {
 		for (auto& kv : shad->uniforms) {
 			kv.second.loc = glGetUniformLocation(shad->shad, kv.first.str.c_str());
 			if (kv.second.loc < 0) {
-				fprintf(stderr, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
+				logf(ERROR, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
 			}
 		}
 	}
@@ -133,7 +133,7 @@ namespace gl {
 		}
 
 		void syntax_error (char const* reason) {
-			fprintf(stderr, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", shader_name, line_i, reason);
+			logf(ERROR, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", shader_name, line_i, reason);
 		}
 
 		struct TypeMap {
@@ -303,7 +303,7 @@ namespace gl {
 						std::string filepath = string(path).append(arg);
 						std::string source;
 						if (!kiss::read_text_file(filepath.c_str(), &source)) {
-							fprintf(stderr, "Could not find include file \"%s\" for shader \"%s\"!\n", filepath.c_str(), shader_name);
+							logf(ERROR, "Could not find include file \"%s\" for shader \"%s\"!\n", filepath.c_str(), shader_name);
 							return false;
 						}
 
@@ -374,11 +374,11 @@ namespace gl {
 			success = status == GL_TRUE;
 			if (!success) {
 				// compilation failed
-				fprintf(stderr,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+				logf(ERROR,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 			} else {
 				// compilation success
 				if (log_avail) {
-					fprintf(stderr,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					logf(ERROR,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
@@ -393,7 +393,7 @@ namespace gl {
 		string filepath = prints("%s%s.glsl", shaders_directory, name.c_str());
 		string source;
 		if (!kiss::read_text_file(filepath.c_str(), &source)) {
-			fprintf(stderr, "Could not load base source file for shader \"%s\"!\n", name.c_str());
+			logf(ERROR, "Could not load base source file for shader \"%s\"!\n", name.c_str());
 			return s;
 		}
 
@@ -423,11 +423,11 @@ namespace gl {
 			error = status == GL_FALSE;
 			if (error) {
 				// linking failed
-				fprintf(stderr,"OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+				logf(ERROR,"OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 			} else {
 				// linking success
 				if (log_avail) {
-					fprintf(stderr,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					logf(ERROR,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
@@ -441,7 +441,7 @@ namespace gl {
 		if (geom) glDeleteShader(geom);
 
 		if (error) {
-			fprintf(stderr, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
+			logf(ERROR, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
 
 			glDeleteProgram(s->shad);
 			s->shad = 0;

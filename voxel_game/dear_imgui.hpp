@@ -4,6 +4,7 @@
 #include "dear_imgui/imgui_impl_glfw.h"
 #include "dear_imgui/imgui_impl_opengl3.h"
 #include "util/circular_buffer.hpp"
+
 #include <string>
 
 class DearImgui {
@@ -41,3 +42,32 @@ inline void imgui_pop () {
 	ImGui::TreePop();
 	tree_depth--;
 }
+
+enum LogLevel {
+	INFO	=0,
+	WARNING	=10,
+	ERROR	=15,
+};
+
+class GuiConsole {
+	bool imgui_uncollapse = false;
+public:
+	struct Line {
+		std::string str;
+		LogLevel level;
+	};
+
+	circular_buffer<Line> lines = circular_buffer<Line>(500);
+	bool shown = true;
+	int added_this_frame = 0;
+
+	void imgui ();
+
+	void add_line (Line line);
+};
+
+// Global GuiConsole
+extern GuiConsole gui_console;
+
+void logf (char const* format, ...);
+void logf (LogLevel level, char const* format, ...);

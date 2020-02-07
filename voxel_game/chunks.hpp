@@ -1,10 +1,11 @@
 #pragma once
 #include "kissmath.hpp"
 #include "blocks.hpp"
-#include "graphics/graphics.hpp"
 #include "util/move_only_class.hpp"
 #include "util/string.hpp"
 using namespace kiss;
+
+#include "graphics/graphics.hpp" // for ChunkMesh
 
 #include "stdint.h"
 #include <unordered_map>

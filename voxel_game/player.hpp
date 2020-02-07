@@ -1,14 +1,13 @@
 #pragma once
-#include "graphics/camera.hpp"
+#include "kissmath.hpp"
 #include "chunks.hpp"
+#include "graphics/camera.hpp"
 #include "physics.hpp"
-#include "kissmath.hpp"
-#include "kissmath.hpp"
-#include <string>
 
 // Global for now, the world should store this if it is not randomized
 extern float3	player_spawn_point;
 
+struct Block;
 class World;
 
 struct SelectedBlock {

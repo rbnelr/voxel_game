@@ -1,6 +1,5 @@
 #pragma once
 #include "kissmath.hpp"
-#include "kissmath_colors.hpp"
 
 enum collision_mode : uint8_t {
 	CM_GAS			=0, // fall through
@@ -64,10 +63,6 @@ struct Block {
 // global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
 static constexpr inline Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 255 };
 static constexpr inline Block B_NO_CHUNK      = { BT_NO_CHUNK     , false, 255 };
-
-// garbage from windows.h
-#undef BF_BOTTOM
-#undef BF_TOP
 
 enum BlockFace {
 	BF_NULL		=1,

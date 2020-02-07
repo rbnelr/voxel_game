@@ -1,8 +1,5 @@
 #include "player.hpp"
 #include "world.hpp"
-#include "input.hpp"
-#include "physics.hpp"
-#include "util/collision.hpp"
 
 float3	player_spawn_point = float3(0,0,34);
 
@@ -93,7 +90,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 
 		bpos_t pos_z = floori(pos.z);
 
-		//printf("pos.z fract: %10.8f  vel.z: %10.8f\n", (pos.z - pos_z), vel.z);
+		//logf("pos.z fract: %10.8f  vel.z: %10.8f\n", (pos.z - pos_z), vel.z);
 		if ((pos.z - pos_z) <= COLLISION_EPSILON * 1.5f && vel.z == 0) {
 
 			bpos2 start =	(bpos2)floor((float2)pos - radius);

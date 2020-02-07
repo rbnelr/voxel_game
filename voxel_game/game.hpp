@@ -48,6 +48,8 @@ struct FPS_Display {
 };
 
 class Game {
+	bool dbg_pause = false;
+
 	FPS_Display fps_display;
 
 	WorldGenerator world_gen;

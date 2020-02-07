@@ -1,6 +1,8 @@
 #include "dear_imgui.hpp"
-
 #include "glfw_window.hpp"
+#include "util/string.hpp"
+#include "kissmath_colors.hpp"
+using namespace kissmath;
 
 void DearImgui::init () {
 	// Setup Dear ImGui context
@@ -45,3 +47,83 @@ void DearImgui::destroy () {
 DearImgui imgui;
 
 int tree_depth = 0;
+
+
+////
+GuiConsole gui_console;
+
+void GuiConsole::imgui () {
+	if (!gui_console.shown) return;
+
+	if (imgui_uncollapse)
+		ImGui::SetNextWindowCollapsed(false);
+	imgui_uncollapse = false;
+
+	ImGui::Begin("Console", &gui_console.shown);
+	
+
+	int size = (int)lines.capacity();
+	if (ImGui::DragInt("buffer size", &size, 0.5f, 1, 10000)) 
+		lines.resize(size);
+
+	ImGui::BeginChild("Console lines", ImVec2(0, 0), true);
+
+	bool autoscroll = ImGui::GetScrollMaxY() == ImGui::GetScrollY();
+
+	for (int i=0; i<(int)lines.count(); ++i) {
+		auto& line = lines.get_oldest(i);
+
+		lrgba col = srgba(250);
+		if (line.level == WARNING)		col = srgba(255, 220, 80);
+		else if (line.level == ERROR)	col = srgba(255, 100, 40);
+
+		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line.str.c_str());
+	}
+
+	if (autoscroll) // keep scroll set to end of console buffer if it was at the end previously
+		ImGui::SetScrollHereY();
+	else
+		ImGui::SetScrollY( ImGui::GetScrollY() - ImGui::GetTextLineHeightWithSpacing() * (float)added_this_frame );
+
+	ImGui::EndChild();
+
+	ImGui::End();
+
+	added_this_frame = 0;
+}
+
+void GuiConsole::add_line (Line line) {
+
+	lines.push(std::move(line));
+	added_this_frame++;
+
+	if (line.level == ERROR) {
+		imgui_uncollapse = true;
+		shown = true;
+	}
+}
+
+void vlogf (LogLevel level, char const* format, va_list vl) {
+	std::string line;
+	kiss::vprints(&line, format, vl);
+
+	vfprintf(level == ERROR || level == WARNING ? stdout : stderr, format, vl);
+
+	gui_console.add_line({ std::move(line), level });
+}
+void logf (char const* format, ...) {
+	va_list vl;
+	va_start(vl, format);
+
+	vlogf(INFO, format, vl);
+
+	va_end(vl);
+}
+void logf (LogLevel level, char const* format, ...) {
+	va_list vl;
+	va_start(vl, format);
+
+	vlogf(level, format, vl);
+
+	va_end(vl);
+}

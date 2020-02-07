@@ -4,6 +4,7 @@
 #include "world.hpp"
 #include "util/timer.hpp"
 #include "util/collision.hpp"
+#include "world_generator.hpp"
 #include <algorithm> // std::sort
 
 
@@ -223,7 +224,7 @@ void Chunks::update_chunks_brightness () {
 	}
 
 	if (count != 0)
-		printf("brightness update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
+		logf("brightness update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
 }
 
 void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
@@ -239,5 +240,5 @@ void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
 	}
 
 	if (count != 0)
-		printf("mesh update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
+		logf("mesh update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
 }

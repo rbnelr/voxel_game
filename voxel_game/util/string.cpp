@@ -46,7 +46,7 @@ namespace kiss {
 
 		int num, commas;
 
-		num = sprintf(src, printformat, i);
+		num = snprintf(src, 27, printformat, i);
 
 		char* cur = src;
 

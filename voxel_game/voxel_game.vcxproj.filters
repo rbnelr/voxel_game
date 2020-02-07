@@ -201,6 +201,9 @@
     <ClInclude Include="util\circular_buffer.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="util\clean_windows_h.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

@@ -1,6 +1,5 @@
 #include "timer.hpp"
-
-#include "windows.h"
+#include "clean_windows_h.hpp"
 
 namespace kiss {
 	uint64_t get_timestamp () {

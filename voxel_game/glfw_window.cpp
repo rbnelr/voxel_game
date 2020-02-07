@@ -113,7 +113,7 @@ void glfw_mouse_move_event (GLFWwindow* window, double xpos, double ypos) {
 
 	bool discard_delta = cursor_toggled;
 
-	//printf("glfw_mouse_move_event: %7d: %f %f%s\n", frame_counter, delta.x, delta.y, discard_delta ? " (discarded)":"");
+	//logf("glfw_mouse_move_event: %7d: %f %f%s\n", frame_counter, delta.x, delta.y, discard_delta ? " (discarded)":"");
 	
 	if (!discard_delta)
 		input.mouse_delta += delta;
@@ -139,7 +139,7 @@ void glfw_get_non_callback_input (GLFWwindow* window) {
 	input.cursor_pos = float2((float)x, (float)y);
 	input.cursor_pos.y = input.window_size.y - 1 - input.cursor_pos.y;
 
-	//printf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
+	//logf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
 }
 
 //// vsync and fullscreen mode
@@ -249,7 +249,7 @@ void glfw_gameloop () {
 }
 
 void glfw_error (int err, const char* msg) {
-	fprintf(stderr, "GLFW Error! [0x%x] '%s'\n", err, msg);
+	logf(ERROR, "GLFW Error! [0x%x] '%s'\n", err, msg);
 }
 
 void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
@@ -298,7 +298,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 		case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "GL_DEBUG_SEVERITY_LOW_ARB";			break;
 	}
 
-	fprintf(stderr, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
+	logf(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 }
 
 #if _DEBUG || 1
@@ -330,7 +330,7 @@ void glfw_init_gl () {
 	if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
 		glEnable(GL_FRAMEBUFFER_SRGB);
 	else
-		fprintf(stderr, "No sRGB supported! Shading will be non-linear!\n");
+		logf(ERROR, "No sRGB supported! Shading will be non-linear!\n");
 }
 
 int main () {
@@ -340,7 +340,7 @@ int main () {
 #endif
 
 	if (!glfwInit()) {
-		fprintf(stderr, "glfwInit failed!\n");
+		logf(ERROR, "glfwInit failed!\n");
 		return 1;
 	}
 
@@ -356,7 +356,7 @@ int main () {
 
 	window = glfwCreateWindow(1280, 720, "Voxel Game", NULL, NULL);
 	if (!window) {
-		fprintf(stderr, "glfwCreateWindow failed!\n");
+		logf(ERROR, "glfwCreateWindow failed!\n");
 		glfwTerminate();
 		return 1;
 	}
