@@ -41,6 +41,8 @@ Game::Game () {
 
 void Game::frame () {
 
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() * 0.5f);
+
 	{
 		bool fullscreen = get_fullscreen();
 		if (ImGui::Checkbox("fullscreen", &fullscreen)) {
@@ -81,6 +83,9 @@ void Game::frame () {
 		}
 
 		world->imgui(open);
+
+		world_gen.imgui();
+		world->chunks.imgui();
 	}
 
 	{
@@ -126,4 +131,6 @@ void Game::frame () {
 
 	//// Draw
 	graphics.draw(*world, view, activate_flycam, selected_block);
+
+	ImGui::PopItemWidth();
 }

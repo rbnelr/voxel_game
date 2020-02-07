@@ -38,7 +38,6 @@ public:
 
 	void imgui (bool open) {
 		if (open) ImGui::Text("seed: \"%s\" (0x%016p)", seed_str.c_str(), seed);
-
 	}
 
 	void update (WorldGenerator const& world_gen);

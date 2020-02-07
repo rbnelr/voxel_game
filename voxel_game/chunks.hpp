@@ -133,6 +133,15 @@ public:
 	// prevent giant lag because chunk gen is in main thread for now
 	int max_chunks_generated_per_frame = 1;
 
+	void imgui () {
+		if (!imgui_push("Chunks")) return;
+
+		ImGui::DragFloat("chunk_generation_radius", &chunk_generation_radius, 1);
+		ImGui::DragFloat("chunk_deletion_hysteresis", &chunk_deletion_hysteresis, 1);
+
+		imgui_pop();
+	}
+
 	struct Iterator {
 		decltype(chunks)::iterator it;
 

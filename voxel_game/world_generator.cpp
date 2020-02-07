@@ -42,24 +42,10 @@ struct Generator {
 		}
 
 		detail = 0;
-		{
+		for (auto& d : worldgen.detail) {
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			detail += noise(pos_world, worldgen.detail0_freq, deg(37.17f) * (float)i, offs, -1,+1) * worldgen.detail0_amp;
-
-			++i;
-		}
-		{
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			detail += noise(pos_world, worldgen.detail1_freq, deg(37.17f) * (float)i, offs, -1,+1) * worldgen.detail1_amp;
-
-			++i;
-		}
-		{
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			detail += noise(pos_world, worldgen.detail2_freq, deg(37.17f) * (float)i, offs, -1,+1) * worldgen.detail2_amp;
+			detail += noise(pos_world, d.freq, deg(37.17f) * (float)i, offs, -1,+1) * d.amp;
 
 			++i;
 		}
@@ -78,7 +64,7 @@ struct Generator {
 			return val;
 		};
 
-		float val = noise(pos_world, worldgen.noise_tree_desity_period, 0,0) * worldgen.noise_tree_density_amp;
+		float val = noise(pos_world, worldgen.tree_desity_period, 0,0) * worldgen.tree_density_amp;
 
 		val = gradient<float>(val, {
 			{ 0.00f,  0						},

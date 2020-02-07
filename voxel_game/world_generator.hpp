@@ -1,5 +1,6 @@
 #pragma once
 #include "chunks.hpp"
+#include <vector>
 
 template<typename T>
 struct Gradient_KV {
@@ -38,12 +39,45 @@ class Chunk;
 struct WorldGenerator {
 	float elev_freq = 400, elev_amp = 25;
 	float rough_freq = 220;
-	float detail0_freq = 70, detail0_amp = 12;
-	float detail1_freq = 20, detail1_amp = 3;
-	float detail2_freq = 3, detail2_amp = 0.14f;
 
-	float noise_tree_desity_period = 200;
-	float noise_tree_density_amp = 1;
+	struct Detail {
+		float freq, amp;
+	};
+	std::vector<Detail> detail = {
+		{ 70, 12 },
+		{ 20,  3 },
+		{  3, 0.14f },
+	};
+
+	float tree_desity_period = 200;
+	float tree_density_amp = 1;
+
+	void imgui () {
+		if (!imgui_push("WorldGenerator")) return;
+
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() * 0.2f);
+
+		ImGui::DragFloat("elev_freq", &elev_freq, 0.05f);
+		ImGui::SameLine();
+		ImGui::DragFloat("amp##elev", &elev_amp, 0.05f);
+
+		ImGui::DragFloat("rough_freq", &rough_freq, 0.05f);
+
+		for (int i=0; i<(int)detail.size(); ++i) {
+			ImGui::PushID(i);
+				ImGui::DragFloat("freq", &detail[i].freq, 0.05f);
+				ImGui::SameLine();
+				ImGui::DragFloat("amp",  &detail[i].amp,  0.05f);
+			ImGui::PopID();
+		}
+
+		ImGui::DragFloat("tree_des_per", &tree_desity_period, 0.05f);
+		ImGui::SameLine();
+		ImGui::DragFloat("amp##tree_dens",  &tree_density_amp,  0.05f);
+
+		ImGui::PopItemWidth();
+		imgui_pop();
+	}
 
 	void generate_chunk (Chunk& chunk, uintptr_t world_seed) const;
 };
