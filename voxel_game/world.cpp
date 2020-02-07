@@ -24,7 +24,7 @@ SelectedBlock World::raycast_solid_blocks (Ray ray, float max_dist, float* hit_d
 	return b;
 }
 
-void World::update (WorldGenerator const& world_gen) {
+void World::update (WorldGenerator& world_gen) {
 
 	chunks.update_chunks_load(*this, world_gen, player);
 

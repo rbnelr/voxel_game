@@ -103,13 +103,17 @@ void GuiConsole::add_line (Line line) {
 	}
 }
 
+extern int frame_counter;
+
 void vlogf (LogLevel level, char const* format, va_list vl) {
+	std::string new_format = kiss::prints("[%5d] %s\n", frame_counter, format);
+	
 	std::string line;
-	kiss::vprints(&line, format, vl);
+	kiss::vprints(&line, new_format.c_str(), vl);
 
-	vfprintf(level == ERROR || level == WARNING ? stdout : stderr, format, vl);
+	fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
 
-	gui_console.add_line({ std::move(line), level });
+	gui_console.add_line({ std::move(line), level, frame_counter });
 }
 void logf (char const* format, ...) {
 	va_list vl;

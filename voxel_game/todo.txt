@@ -70,10 +70,10 @@ DONE:
  -factor out all the relevant raycast, physics etc. code into their own utility files
  -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
  
+ imgui console log
+
 TODO
 -FEATURES:
- 
- imgui console log
 
  view frustrum colling of chunk drawcalls
 

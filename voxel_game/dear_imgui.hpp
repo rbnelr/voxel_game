@@ -57,6 +57,7 @@ public:
 	struct Line {
 		std::string str;
 		LogLevel level;
+		int frame;
 	};
 
 	circular_buffer<Line> lines = circular_buffer<Line>(500);

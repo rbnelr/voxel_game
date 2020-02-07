@@ -128,7 +128,7 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 	return chunk->get_block(block_pos_chunk);
 }
 
-Chunk* Chunks::load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos) {
+Chunk* Chunks::load_chunk (World const& world, WorldGenerator& world_gen, chunk_coord chunk_pos) {
 	assert(!query_chunk(chunk_pos));
 	
 	Chunk* chunk = &chunks.emplace(chunk_coord_hashmap{ chunk_pos }, chunk_pos).first->second;
@@ -153,7 +153,7 @@ void Chunks::remesh_all () {
 	}
 }
 
-void Chunks::update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player) {
+void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player) {
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
@@ -210,35 +210,31 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 
 }
 
-extern int frame_counter;
-
 void Chunks::update_chunks_brightness () {
-	int count = 0;
-	auto timer = Timer::start();
-
 	for (Chunk& chunk : *this) {
 		if (chunk.needs_block_brighness_update) {
+			auto timer = Timer::start();
+
 			chunk.update_block_brighness();
-			++count;
+
+			auto time = timer.end();
+			brightness_time.push(time);
+			logf("Chunk (%3d,%3d) brightness update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
 		}
 	}
-
-	if (count != 0)
-		logf("brightness update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
 }
 
 void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
-	int count = 0;
-	auto timer = Timer::start();
-
 	for (Chunk& chunk : *this) {
 
 		if (chunk.needs_remesh) {
+			auto timer = Timer::start();
+
 			chunk.remesh(*this, graphics);
-			++count;
+
+			auto time = timer.end();
+			meshing_time.push(time);
+			logf("Chunk (%3d,%3d) meshing update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
 		}
 	}
-
-	if (count != 0)
-		logf("mesh update took %7.3f ms  (frame: %3d chunk count: %d)\n", timer.end() * 1000, frame_counter, count);
 }

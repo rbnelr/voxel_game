@@ -23,7 +23,7 @@ struct DebugGraphics {
 
 	// draw quad
 	
-	void push_wire_cube (float3 center, float size, lrgba col);
+	void push_wire_cube (float3 center, float3 size, lrgba col);
 
 	// draw arrow
 

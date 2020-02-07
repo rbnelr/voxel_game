@@ -2,11 +2,12 @@
 #include "blocks.hpp"
 #include "chunks.hpp"
 #include "util/random.hpp"
+#include "util/timer.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 struct Generator {
-	WorldGenerator const& worldgen;
+	WorldGenerator& worldgen;
 	Chunk& chunk;
 	uintptr_t world_seed;
 
@@ -206,7 +207,14 @@ struct Generator {
 	}
 };
 
-void WorldGenerator::generate_chunk (Chunk& chunk, uintptr_t world_seed) const {
+void WorldGenerator::generate_chunk (Chunk& chunk, uintptr_t world_seed) {
+	auto timer = Timer::start();
+
 	Generator gen = { *this, chunk, world_seed };
+
 	gen.gen();
+
+	float time = timer.end();
+	chunk_gen_time.push(time);
+	logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", chunk.coord.x,chunk.coord.y, time * 1024);
 }

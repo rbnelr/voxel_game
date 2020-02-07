@@ -113,7 +113,7 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 		// inf if there is no collision
 		float earliest_collision_t = earliest_collision.dist / length(obj.vel);
 
-		//logf("%5d: pos.z: %7.4f vel.z: %7.4f coll.dist: %7.4f coll.pos.z: %7.4f\n", frame_counter, obj.pos.z, obj.vel.z, earliest_collision.dist, earliest_collision.pos.z);
+		//logf("%5d: pos.z: %7.4f vel.z: %7.4f coll.dist: %7.4f coll.pos.z: %7.4f", frame_counter, obj.pos.z, obj.vel.z, earliest_collision.dist, earliest_collision.pos.z);
 
 		if (earliest_collision_t >= max_dt) {
 			obj.pos += obj.vel * max_dt;
@@ -130,7 +130,7 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 	if (length(obj.vel) < 0.01f)
 		obj.vel = 0;
 
-	//logf("%5d: pos.z: %7.4f vel.z: %7.4f\n", frame_counter, obj.pos.z, obj.vel.z);
+	//logf("%5d: pos.z: %7.4f vel.z: %7.4f", frame_counter, obj.pos.z, obj.vel.z);
 }
 
 void Physics::update_player (World& world, Player& player) {

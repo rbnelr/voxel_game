@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef>
 #include <memory>
+#include "assert.h"
 
 // like a queue but is just implemented as a flat array, push() pop() like queue, but a push when the size is at it's max capacity will pop() automatically
 //  push() add the items to the "head" of the collection which is accessed via [0] (so everything shifts by one index in the process, but the implementation does not copy anything)

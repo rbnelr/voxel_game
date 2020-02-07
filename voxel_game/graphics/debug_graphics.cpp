@@ -1,10 +1,11 @@
 #include "debug_graphics.hpp"
 #include "../util/geometry.hpp"
 
-void DebugGraphics::push_wire_cube (float3 center, float size, lrgba col) {
-	//vector_append(
-
-	//vertices.push_back
+void DebugGraphics::push_wire_cube (float3 center, float3 size, lrgba col) {
+	float3 l = center - size / 2;
+	float3 h = center + size / 2;
+	
+	//lines.
 }
 
 // draw arrow

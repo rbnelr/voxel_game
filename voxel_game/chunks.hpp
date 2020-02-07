@@ -3,9 +3,9 @@
 #include "blocks.hpp"
 #include "util/move_only_class.hpp"
 #include "util/string.hpp"
-using namespace kiss;
-
+#include "util/running_average.hpp"
 #include "graphics/graphics.hpp" // for ChunkMesh
+using namespace kiss;
 
 #include "stdint.h"
 #include <unordered_map>
@@ -124,6 +124,9 @@ class Chunks {
 	Chunk* _lookup_chunk (chunk_coord coord);
 
 public:
+	RunningAverage<float> brightness_time = { 64 };
+	RunningAverage<float> meshing_time = { 64 };
+
 	// load chunks in this radius in order of distance to the player 
 	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
 	
@@ -146,7 +149,7 @@ public:
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
 		uint64_t block_mem = block_count * sizeof(Block);
 
-		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5llu MB)", chunk_count, format_thousands(block_count).c_str(), block_mem/1024/1024);
+		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 
 		uint64_t face_count = 0;
 		for (Chunk& c : *this) {
@@ -155,7 +158,7 @@ public:
 		}
 		uint64_t mesh_mem = face_count * 6 * sizeof(ChunkMesh::Vertex);
 
-		ImGui::Text("Mesh data:  %11s faces (%5llu MB)", format_thousands(face_count).c_str(), mesh_mem/1024/1024);
+		ImGui::Text("Mesh data:  %11s faces (%5.0f MB  %5.0f KB avg / chunk)", format_thousands(face_count).c_str(), (float)mesh_mem/1024/1024, (float)mesh_mem/1024 / chunk_count);
 
 		imgui_pop();
 	}
@@ -205,7 +208,7 @@ public:
 	Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 
 	// load chunk at coord (invalidates iterators, so dont call this in a loop)
-	Chunk* load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos);
+	Chunk* load_chunk (World const& world, WorldGenerator& world_gen, chunk_coord chunk_pos);
 	// unload chunk at coord (invalidates iterators, so dont call this in a loop)
 	Iterator unload_chunk (Iterator it);
 
@@ -213,7 +216,7 @@ public:
 
 	void remesh_all ();
 
-	void update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player);
+	void update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player);
 
 	void update_chunks_brightness ();
 

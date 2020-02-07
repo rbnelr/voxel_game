@@ -1,6 +1,7 @@
 #pragma once
 #include "dear_imgui.hpp"
 #include "kissmath.hpp"
+#include "util/running_average.hpp"
 #include <vector>
 
 template<typename T>
@@ -38,6 +39,8 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 class Chunk;
 
 struct WorldGenerator {
+	RunningAverage<float> chunk_gen_time = { 64 };
+
 	float elev_freq = 400, elev_amp = 25;
 	float rough_freq = 220;
 
@@ -80,5 +83,5 @@ struct WorldGenerator {
 		imgui_pop();
 	}
 
-	void generate_chunk (Chunk& chunk, uintptr_t world_seed) const;
+	void generate_chunk (Chunk& chunk, uintptr_t world_seed);
 };
