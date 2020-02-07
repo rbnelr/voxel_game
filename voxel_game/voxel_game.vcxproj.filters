@@ -198,6 +198,9 @@
     <ClInclude Include="util\animation.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="util\circular_buffer.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

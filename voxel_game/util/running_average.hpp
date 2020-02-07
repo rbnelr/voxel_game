@@ -1,43 +1,42 @@
 #pragma once
-#include <memory>
+#include "circular_buffer.hpp"
 
 // Running average with circular buffer
 //  resize allowed (although the array loses it's values then)
 //  avg is simply sum(values) / count
 //  T should probably be a float type
-template <typename T>
+template <typename T=float>
 class RunningAverage {
-
+	circular_buffer<T> buf;
 public:
-	std::unique_ptr<T[]> values;
-	int count;
-	int cur = 0;
 
-	RunningAverage (int initial_count, T initial_values = 0) {
-		resize(initial_count, initial_values);
+	T* data () {
+		return buf.data();
+	}
+	size_t capacity () {
+		return buf.capacity();
+	}
+	size_t count () {
+		return buf.count();
 	}
 
-	void resize (int new_count, T initial_values = 0) {
-		values = std::make_unique<T[]>(new_count);
-		count = new_count;
+	RunningAverage (int initial_count) {
+		buf.resize(initial_count);
+	}
 
-		for (int i=0; i<count; ++i)
-			values[i] = initial_values;
+	void resize (int new_count) {
+		buf.resize(new_count);
 	}
 
 	void push (T val) {
-		if (cur >= count)
-			cur = 0; // safeguard against size changes
-
-		values[cur++] = val;
-		cur %= count;
+		buf.push(val);
 	}
 
 	T calc_avg () {
 		T total = 0;
-		for (int i=0; i<count; ++i)
-			total += values[i];
+		for (size_t i=0; i<buf.count(); ++i)
+			total += buf.get_oldest(i);
 
-		return total / count;
+		return total / (T)buf.count();
 	}
 };

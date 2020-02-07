@@ -31,14 +31,14 @@ struct FPS_Display {
 			ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
 
 			ImGui::SetNextItemWidth(-1);
-			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.values.get(), dt_avg.count, 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
+			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.data(), (int)dt_avg.count(), 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
 
 			if (ImGui::BeginPopupContextItem("##frametimes_histogram popup")) {
 				ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);
 				
-				int count = dt_avg.count;
-				if (ImGui::SliderInt("avg_count", &count, 16, 1024)) {
-					dt_avg.resize(count);
+				int cap = (int)dt_avg.capacity();
+				if (ImGui::SliderInt("avg_count", &cap, 16, 1024)) {
+					dt_avg.resize(cap);
 				}
 
 				ImGui::EndPopup();
