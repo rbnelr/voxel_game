@@ -1,4 +1,5 @@
 ._*.txt # for ._need_potatomode.txt
+*/stb/
 
 *.exe
 *.bin
