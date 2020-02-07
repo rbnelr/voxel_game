@@ -56,7 +56,7 @@ struct WorldGenerator {
 	void imgui () {
 		if (!imgui_push("WorldGenerator")) return;
 
-		ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() * 0.2f);
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.2f);
 
 		ImGui::DragFloat("elev_freq", &elev_freq, 0.05f);
 		ImGui::SameLine();

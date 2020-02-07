@@ -1,9 +1,9 @@
 #pragma once
-#include "../kissmath_colors.hpp"
 #include "../kissmath.hpp"
-#include <memory>
-#include "assert.h"
+#include "../util/file_io.hpp"
 #include "../stb_image.hpp"
+#include "../util/move_only_class.hpp"
+#include "assert.h"
 
 struct _Format {
 	bool flt;
@@ -12,45 +12,51 @@ struct _Format {
 };
 
 template <typename T>
-_Format static inline constexpr get_format ();
+constexpr _Format get_format ();
 
-template<> _Format static inline constexpr get_format<uint8  > () { return { false, 8, 1 }; } // greyscale as 8 bit uint
-template<> _Format static inline constexpr get_format<uint8v2> () { return { false, 8, 2 }; } // greyscale, alpha as 8 bit uint
-template<> _Format static inline constexpr get_format<uint8v3> () { return { false, 8, 3 }; } // rgb as 8 bit uint
-template<> _Format static inline constexpr get_format<uint8v4> () { return { false, 8, 4 }; } // rgb, alpha as 8 bit uint
+template<> constexpr _Format get_format<uint8  > () { return { false, 8, 1 }; } // greyscale as 8 bit uint
+template<> constexpr _Format get_format<uint8v2> () { return { false, 8, 2 }; } // greyscale, alpha as 8 bit uint
+template<> constexpr _Format get_format<uint8v3> () { return { false, 8, 3 }; } // rgb as 8 bit uint
+template<> constexpr _Format get_format<uint8v4> () { return { false, 8, 4 }; } // rgb, alpha as 8 bit uint
 
-template<> _Format static inline constexpr get_format<float  > () { return { true, 32, 1 }; } // greyscale as 8 bit uint
-template<> _Format static inline constexpr get_format<float2 > () { return { true, 32, 2 }; } // greyscale, alpha as 8 bit uint
-template<> _Format static inline constexpr get_format<float3 > () { return { true, 32, 3 }; } // rgb as 8 bit uint
-template<> _Format static inline constexpr get_format<float4 > () { return { true, 32, 4 }; } // rgb, alpha as 8 bit uint
-
-struct deleter_free {
-	void operator() (void* ptr) {
-		free(ptr);
-	}
-};
+template<> constexpr _Format get_format<float  > () { return { true, 32, 1 }; } // greyscale as 8 bit uint
+template<> constexpr _Format get_format<float2 > () { return { true, 32, 2 }; } // greyscale, alpha as 8 bit uint
+template<> constexpr _Format get_format<float3 > () { return { true, 32, 3 }; } // rgb as 8 bit uint
+template<> constexpr _Format get_format<float4 > () { return { true, 32, 4 }; } // rgb, alpha as 8 bit uint
 
 template <typename T>
-struct Image {
-	// need deleter_free since stb_image used malloc to alloc pixel data
-	std::unique_ptr<T[], deleter_free> pixels = nullptr;
+class Image {
+public:
+	MOVE_ONLY_CLASS(Image)
+	static void swap (Image& l, Image& r) {
+		std::swap(l.pixels, r.pixels);
+		std::swap(l.size, r.size);
+	}
+
+private:
+	T* pixels = nullptr; // malloc'ed so we can put stb_image data directly into this
+public:
 	int2 size = -1;
 
+	~Image () {
+		if (pixels)
+			free(pixels);
+	}
+
 	Image () {}
-	Image (int2 size): pixels{std::unique_ptr<T[], deleter_free>((T*)malloc(size.x * size.y * sizeof(T)))}, size{size} {}
-	Image (std::unique_ptr<T[], deleter_free> pixels, int2 size): pixels{std::move(pixels)}, size{size} {}
+	Image (int2 size): pixels{(T*)malloc(size.x * size.y * sizeof(T))}, size{size} {}
 	
 	// Loads a image file from disk
 	Image (const char* filepath) {
-		if (!load_file(filepath, this))
+		if (!load_from_file(filepath, this))
 			assert(false);
 	}
 
 	inline T* data () {
-		return pixels.get();
+		return pixels;
 	}
 	inline T const* data () const {
-		return pixels.get();
+		return pixels;
 	}
 
 	inline T& get (int x, int y) {
@@ -77,30 +83,35 @@ struct Image {
 	}
 
 	// Loads a image file from disk, potentially converting it to the target pixel type
-	static bool load_file (const char* filepath, Image* out) {
+	static bool load_from_file (const char* filepath, Image<T>* out) {
+		uint64_t file_size;
+		auto file_data = kiss::read_binary_file(filepath, &file_size);
+		if (!file_data)
+			return false;
+
 		auto format = get_format<T>();
 
-		void* pixels;
+		T* pixels;
 		int2 size;
 		int n;
 
 		stbi_set_flip_vertically_on_load(true); // OpenGL has textues bottom-up
 
 		if (format.flt) {
-			pixels = (void*)stbi_loadf(filepath, &size.x, &size.y, &n, format.channels);
+			pixels = (T*)stbi_loadf_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
 			if (!pixels)
 				return false;
 		} else {
 			switch (format.bits) {
 
 				case 8: {
-					pixels = (void*)stbi_load(filepath, &size.x, &size.y, &n, format.channels);
+					pixels = (T*)stbi_load_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
 					if (!pixels)
 						return false;
 				} break;
 
 				case 16: {
-					pixels = (void*)stbi_load_16(filepath, &size.x, &size.y, &n, format.channels);
+					pixels = (T*)stbi_load_16_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
 					if (!pixels)
 						return false;
 				} break;
@@ -110,7 +121,8 @@ struct Image {
 			}
 		}
 
-		*out = Image( std::unique_ptr<T[], deleter_free>((T*)pixels), size );
+		out->pixels = pixels;
+		out->size = size;
 		return true;
 	}
 

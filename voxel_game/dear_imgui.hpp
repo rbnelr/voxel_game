@@ -1,8 +1,10 @@
 #pragma once
 #include "imgui.h"
+
 #include "misc/cpp/imgui_stdlib.h"
 #include "dear_imgui/imgui_impl_glfw.h"
 #include "dear_imgui/imgui_impl_opengl3.h"
+
 #include "util/circular_buffer.hpp"
 
 #include <string>

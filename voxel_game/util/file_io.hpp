@@ -2,6 +2,7 @@
 #include "stdint.h"
 #include <string>
 #include <string_view>
+#include <memory>
 
 namespace kiss {
 	uint64_t get_file_size (FILE* f);
@@ -13,6 +14,11 @@ namespace kiss {
 	// reads text file into a std::string
 	// returns "" on fail (file not found etc.)
 	std::string read_text_file (const char* filename);
+
+	typedef unsigned char byte;
+	typedef std::unique_ptr<byte[]> raw_data;
+
+	raw_data read_binary_file (const char* filename, uint64_t* size);
 
 	// out_filename is optional
 	// "hello/world.txt" => path: "hello/" out_filename: "world.txt"

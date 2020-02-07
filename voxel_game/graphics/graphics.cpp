@@ -257,10 +257,10 @@ struct TileLoader {
 		Image<srgba8> color;
 		Image<uint8> alpha;
 
-		if (!Image<srgba8>::load_file(color_filename.c_str(), &color))
+		if (!Image<srgba8>::load_from_file(color_filename.c_str(), &color))
 			return {0};
 
-		bool has_alpha = Image<uint8>::load_file(alpha_filename.c_str(), &alpha);
+		bool has_alpha = Image<uint8>::load_from_file(alpha_filename.c_str(), &alpha);
 
 		if (has_alpha && !equal(color.size, alpha.size)) {
 			logf(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!\n");

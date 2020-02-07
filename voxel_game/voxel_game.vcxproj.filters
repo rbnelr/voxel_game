@@ -21,9 +21,6 @@
     <ClInclude Include="dear_imgui\imgui_impl_opengl3.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imconfig.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\dear_imgui\imgui.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
@@ -204,6 +201,9 @@
     <ClInclude Include="util\clean_windows_h.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\dear_imgui\imconfig.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -216,9 +216,6 @@
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp">
@@ -372,6 +369,9 @@
     </ClCompile>
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="block_update.cpp" />
+    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">

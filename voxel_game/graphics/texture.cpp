@@ -1,4 +1,5 @@
 #include "texture.hpp"
+#include "../util/file_io.hpp"
 #include "../stb_image.hpp"
 
 Texture2D::Texture2D () {
@@ -12,34 +13,43 @@ Texture2D::Texture2D () {
 }
 
 // Construct by loading from file
-Texture2D::Texture2D (char const* filename, bool gen_mips): Texture2D() {
-	bool flt = stbi_is_hdr(filename);
+Texture2D::Texture2D (char const* filename, bool srgb, bool gen_mips): Texture2D() {
+	uint64_t file_size;
+	auto file_data = kiss::read_binary_file(filename, &file_size);
+	if (!file_data) {
+		logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
+		return;
+	}
+	
+	bool flt = stbi_is_hdr_from_memory(file_data.get(), (int)file_size);
 	int channels;
 	int2 size;
 
-	if (!stbi_info(filename, &size.x, &size.y, &channels)) {
+	if (!stbi_info_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &channels)) {
 		channels = 4;
 	}
 
 	if (flt) {
-		switch (channels) {
-			case 1: upload(Image<float >(filename), gen_mips); break;
-			case 2: upload(Image<float2>(filename), gen_mips); break;
-			case 3: upload(Image<float3>(filename), gen_mips); break;
-			case 4: upload(Image<float4>(filename), gen_mips); break;
+		auto pixels = stbi_loadf_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, NULL, channels);
+		if (!pixels) {
+			logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
+			return;
 		}
+
+		upload(pixels, size, channels, gen_mips);
 	} else {
-		switch (channels) {
-			case 1: upload(Image<uint8  >(filename), gen_mips); break;
-			case 2: upload(Image<uint8v2>(filename), gen_mips); break;
-			case 3: upload(Image<uint8v3>(filename), gen_mips); break;
-			case 4: upload(Image<uint8v4>(filename), gen_mips); break;
+		auto pixels = stbi_load_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, NULL, channels);
+		if (!pixels) {
+			logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
+			return;
 		}
+
+		upload(pixels, size, channels, srgb, gen_mips);
 	}
 }
 
 // Upload image to mipmap
-void Texture2D::upload_mip (int mip, int2 size, void* data, GLenum internal_format, GLenum format, GLenum type) {
+void Texture2D::upload_mip (int mip, void const* data, int2 size, GLenum internal_format, GLenum format, GLenum type) {
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -48,10 +58,10 @@ void Texture2D::upload_mip (int mip, int2 size, void* data, GLenum internal_form
 }
 
 // Upload image to texture, texture.size becomes size and optionally generate mipmaps
-void Texture2D::upload (int2 size, void* data, bool gen_mips, GLenum internal_format, GLenum format, GLenum type) {
+void Texture2D::upload (void const* data, int2 size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type) {
 	this->size = size;
 
-	upload_mip(0, size, data, internal_format, format, type);
+	upload_mip(0, data, size, internal_format, format, type);
 
 	if (gen_mips && size.x != 1 || size.y != 1) {
 		glGenerateMipmap(GL_TEXTURE_2D);

@@ -44,8 +44,6 @@ VoxelRaycast::VoxelRaycast (Ray ray, float max_dist) {
 	step_dist = float3(	length(ray.dir / abs(ray.dir.x)),
 						length(ray.dir / abs(ray.dir.y)),
 						length(ray.dir / abs(ray.dir.z)) );
-	// NaN -> Inf
-	step_dist = select(ray.dir != 0, step_dist, INF);
 
 	// get initial positon in block and intial voxel coord
 	float3 ray_pos_floor = floor(ray.pos);
@@ -55,6 +53,9 @@ VoxelRaycast::VoxelRaycast (Ray ray, float max_dist) {
 
 	// how far to step along ray to step into the next voxel for each axis
 	next = step_dist * select(ray.dir > 0, 1 -pos_in_block, pos_in_block);
+
+	// NaN -> Inf
+	next = select(ray.dir != 0, next, INF);
 
 	// find the axis of the next voxel step
 	cur_axis = find_next_axis(next);

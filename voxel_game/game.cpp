@@ -38,7 +38,7 @@ Game::Game () {
 void Game::frame () {
 
 	ImGui::Begin("Debug");
-	ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() * 0.5f);
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
 	{
 		bool fullscreen = get_fullscreen();
@@ -138,9 +138,6 @@ void Game::frame () {
 	}
 	ImGui::PopItemWidth();
 	ImGui::End();
-
-	logf(WARNING, "WARNING");
-	logf(ERROR, "ERROR");
 
 	gui_console.imgui();
 }

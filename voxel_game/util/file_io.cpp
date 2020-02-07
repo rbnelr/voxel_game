@@ -40,6 +40,24 @@ namespace kiss {
 		return s;
 	}
 
+	raw_data read_binary_file (const char* filename, uint64_t* size) {
+		auto f = fopen(filename, "rb");
+		if (!f) {
+			return nullptr;
+		}
+
+		uint64_t sz = get_file_size(f);
+		auto data = std::make_unique<byte[]>(sz);
+
+		auto ret = fread(data.get(), 1,sz, f);
+		assert(ret == sz);
+
+		fclose(f);
+
+		*size = sz;
+		return data;
+	}
+
 	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {
 		auto pos = filepath.find_last_of('/');
 		if (pos == std::string::npos)
