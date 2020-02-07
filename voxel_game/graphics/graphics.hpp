@@ -139,12 +139,16 @@ struct ChunkMesh {
 	struct Vertex {
 		float3	pos_model;
 		float	brightness;
-		float4	uv_indx_hp; // xy: [0,1] face uv; z: texture index, w: hp_ratio [0,1]
+		float2	uv;
+		float	tex_indx;
+		float	hp_ratio;
 
 		static void bind (Attributes& a) {
 			a.add<decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
 			a.add<decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness));
-			a.add<decltype(uv_indx_hp)>(2, "uv_indx_hp", sizeof(Vertex), offsetof(Vertex, uv_indx_hp));
+			a.add<decltype(uv        )>(2, "uv",         sizeof(Vertex), offsetof(Vertex, uv        ));
+			a.add<decltype(tex_indx  )>(3, "tex_indx",   sizeof(Vertex), offsetof(Vertex, tex_indx  ));
+			a.add<decltype(hp_ratio  )>(4, "hp_ratio",   sizeof(Vertex), offsetof(Vertex, hp_ratio  ));
 		}
 	};
 

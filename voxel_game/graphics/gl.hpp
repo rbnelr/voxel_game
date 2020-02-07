@@ -245,6 +245,9 @@ class Attributes {
 	template<> static inline constexpr _Attribute to_attrib<int2    > () { return { gl::Enum::INT          , 2 }; }
 	template<> static inline constexpr _Attribute to_attrib<int3    > () { return { gl::Enum::INT          , 3 }; }
 	template<> static inline constexpr _Attribute to_attrib<int4    > () { return { gl::Enum::INT          , 4 }; }
+	template<> static inline constexpr _Attribute to_attrib<uint8   > () { return { gl::Enum::UNSIGNED_BYTE, 1 }; }
+	template<> static inline constexpr _Attribute to_attrib<uint8v2 > () { return { gl::Enum::UNSIGNED_BYTE, 2 }; }
+	template<> static inline constexpr _Attribute to_attrib<uint8v3 > () { return { gl::Enum::UNSIGNED_BYTE, 3 }; }
 	template<> static inline constexpr _Attribute to_attrib<uint8v4 > () { return { gl::Enum::UNSIGNED_BYTE, 4 }; }
 	//template<> static inline constexpr _Attribute to_attrib<bool    > (Attribute<bool    > a) { return { a.name, Type::BOOL , 1, a.normalized, a.stride, a.offs }; }
 

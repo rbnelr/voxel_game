@@ -6,20 +6,26 @@ $include "common.glsl"
 $if vertex
 	layout (location = 0) in vec3	pos_model;
 	layout (location = 1) in float	brightness;
-	layout (location = 2) in vec4	uv_indx_hp;
+	layout (location = 2) in vec2	uv;
+	layout (location = 3) in float	tex_indx;
+	layout (location = 4) in float	hp_ratio;
 
 	uniform vec3 chunk_pos;
 
 	//out vec3	vs_pos_cam;
 	out float	vs_brightness;
-	out vec4	vs_uv_indx_hp;
+	out vec2	vs_uv;
+	out float	vs_tex_indx;
+	out float	vs_hp_ratio;
 
 	void main () {
 		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
 
 		//vs_pos_cam =		pos_cam.xyz;
 		vs_brightness =		brightness;
-		vs_uv_indx_hp =		uv_indx_hp;
+		vs_uv =		        uv;
+		vs_tex_indx =		tex_indx;
+		vs_hp_ratio =		hp_ratio;
 
 		WIREFRAME_MACRO;
 	}
@@ -28,7 +34,9 @@ $endif
 $if fragment
 	//in vec3		vs_pos_cam;
 	in float	vs_brightness;
-	in vec4		vs_uv_indx_hp;
+	in vec2	    vs_uv;
+	in float	vs_tex_indx;
+	in float	vs_hp_ratio;
 
 	uniform	sampler2DArray tile_textures;
 	uniform	sampler2DArray breaking_textures;
@@ -40,15 +48,13 @@ $if fragment
 	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
-		float hp = vs_uv_indx_hp.w;
-
-		vec4 col = texture(tile_textures, vs_uv_indx_hp.xyz);
+		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	
-		if (hp < 1) {
-			float breaking_frame = floor(hp * breaking_frames_count + 0.00001f);
+		if (vs_hp_ratio < 1) {
+			float breaking_frame = floor(vs_hp_ratio * breaking_frames_count + 0.00001f);
 		
 			if (breaking_frame < breaking_frames_count) {
-				col.rgb *= 1 + (texture(breaking_textures, vec3(vs_uv_indx_hp.xy, breaking_frame)).rrr * 255.0 - 127.0) / 127.0 * breaking_mutliplier;
+				col.rgb *= 1 + (texture(breaking_textures, vec3(vs_uv, breaking_frame)).rrr * 255.0 - 127.0) / 127.0 * breaking_mutliplier;
 			}
 		}
 	
