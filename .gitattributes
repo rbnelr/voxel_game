@@ -61,3 +61,7 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+voxel_game/dear_imgui/* linguist-vendored
+voxel_game/glad/* linguist-vendored
+voxel_game/open_simplex_noise/* linguist-vendored
