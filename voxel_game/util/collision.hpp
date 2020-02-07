@@ -16,8 +16,8 @@ bool cylinder_cube_intersect (float3 cyl_origin, float cyl_radius, float cyl_hei
 // nearest distance from point to square (square covers [square_pos, square_pos +square_size] on each axis)
 float point_square_nearest_dist (float2 square_pos, float2 square_size, float2 point);
 
-typedef int64 voxel_coord_t;
-typedef int64v3 voxel_coord;
+typedef int voxel_coord_t;
+typedef int3 voxel_coord;
 
 struct VoxelRaycast {
 	float		max_dist;

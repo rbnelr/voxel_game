@@ -92,7 +92,7 @@ void Chunks::remesh_neighbours (chunk_coord coord) {
 //// Chunks
 
 Chunk* Chunks::_lookup_chunk (chunk_coord coord) {
-	auto kv = chunks.find(s64v2_hashmap{ coord });
+	auto kv = chunks.find(chunk_coord_hashmap{ coord });
 	if (kv == chunks.end())
 		return nullptr;
 
@@ -130,7 +130,7 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 Chunk* Chunks::load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos) {
 	assert(!query_chunk(chunk_pos));
 	
-	Chunk* chunk = &chunks.emplace(s64v2_hashmap{ chunk_pos }, chunk_pos).first->second;
+	Chunk* chunk = &chunks.emplace(chunk_coord_hashmap{ chunk_pos }, chunk_pos).first->second;
 	
 	world_gen.generate_chunk(*chunk, world.seed);
 

@@ -37,7 +37,7 @@ public:
 	}
 
 	void imgui (bool open) {
-		if (open) ImGui::Text("seed: \"%s\" (%20llu)", seed_str.c_str(), seed);
+		if (open) ImGui::Text("seed: \"%s\" (0x%016p)", seed_str.c_str(), seed);
 
 	}
 

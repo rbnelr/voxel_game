@@ -7,12 +7,12 @@
 #include "stdint.h"
 #include <unordered_map>
 
-typedef int64_t	bpos_t;
-typedef int64v2	bpos2;
-typedef int64v3	bpos;
+typedef int		bpos_t;
+typedef int2	bpos2;
+typedef int3	bpos;
 
-typedef int64_t	chunk_pos_t;
-typedef int64v2	chunk_coord;
+typedef int		chunk_pos_t;
+typedef int2	chunk_coord;
 
 #define CHUNK_DIM_X			32
 #define CHUNK_DIM_Y			32
@@ -47,23 +47,21 @@ inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk
 }
 
 // Hashmap key type for chunk_pos
-struct s64v2_hashmap {
+struct chunk_coord_hashmap {
 	chunk_coord v;
 
-	bool operator== (s64v2_hashmap const& r) const { // for hash map
+	bool operator== (chunk_coord_hashmap const& r) const { // for hash map
 		return v.x == r.v.x && v.y == r.v.y;
 	}
 };
 
 inline size_t hash (chunk_coord v) {
-	return 53 * (std::hash<bpos_t>()(v.x) + 53) + std::hash<bpos_t>()(v.y);
+	return 53ull * (std::hash<bpos_t>()(v.x) + 53ull) + std::hash<bpos_t>()(v.y);
 };
 
-static_assert(sizeof(size_t) == sizeof(bpos_t), "");
-
 namespace std {
-	template<> struct hash<s64v2_hashmap> { // for hash map
-		size_t operator() (s64v2_hashmap const& v) const {
+	template<> struct hash<chunk_coord_hashmap> { // for hash map
+		size_t operator() (chunk_coord_hashmap const& v) const {
 			return ::hash(v.v);
 		}
 	};
@@ -118,7 +116,7 @@ class Chunks {
 	Chunk* _prev_query_chunk = nullptr;
 
 	// Chunk hashmap
-	std::unordered_map<s64v2_hashmap, Chunk> chunks;
+	std::unordered_map<chunk_coord_hashmap, Chunk> chunks;
 
 	Chunk* _lookup_chunk (chunk_coord coord);
 
