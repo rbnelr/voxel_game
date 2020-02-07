@@ -61,3 +61,7 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+dear_imgui/* linguist-vendored
+glad/* linguist-vendored
+open_simplex_noise/* linguist-vendored
