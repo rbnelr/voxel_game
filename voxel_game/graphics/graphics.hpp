@@ -137,18 +137,18 @@ struct PlayerGraphics {
 
 struct ChunkMesh {
 	struct Vertex {
-		float3	pos_model;
-		float	brightness;
-		float2	uv;
-		float	tex_indx;
-		float	hp_ratio;
+		uint8v3	pos_model;
+		uint8	brightness;
+		uint8v2	uv;
+		uint8	tex_indx;
+		uint8	hp_ratio;
 
 		static void bind (Attributes& a) {
-			a.add<decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
-			a.add<decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness));
-			a.add<decltype(uv        )>(2, "uv",         sizeof(Vertex), offsetof(Vertex, uv        ));
-			a.add<decltype(tex_indx  )>(3, "tex_indx",   sizeof(Vertex), offsetof(Vertex, tex_indx  ));
-			a.add<decltype(hp_ratio  )>(4, "hp_ratio",   sizeof(Vertex), offsetof(Vertex, hp_ratio  ));
+			a.add    <decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
+			a.add_int<decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness));
+			a.add    <decltype(uv        )>(2, "uv",         sizeof(Vertex), offsetof(Vertex, uv        ));
+			a.add    <decltype(tex_indx  )>(3, "tex_indx",   sizeof(Vertex), offsetof(Vertex, tex_indx  ));
+			a.add    <decltype(hp_ratio  )>(4, "hp_ratio",   sizeof(Vertex), offsetof(Vertex, hp_ratio  ), true);
 		}
 	};
 

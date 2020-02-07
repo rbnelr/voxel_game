@@ -5,12 +5,14 @@ $include "common.glsl"
 
 $if vertex
 	layout (location = 0) in vec3	pos_model;
-	layout (location = 1) in float	brightness;
+	layout (location = 1) in uint	brightness;
 	layout (location = 2) in vec2	uv;
 	layout (location = 3) in float	tex_indx;
 	layout (location = 4) in float	hp_ratio;
 
 	uniform vec3 chunk_pos;
+
+	const float[] LUT = float[]( 0.02, 0.08, 0.3, 0.6, 1.0 );
 
 	//out vec3	vs_pos_cam;
 	out float	vs_brightness;
@@ -22,7 +24,7 @@ $if vertex
 		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
 
 		//vs_pos_cam =		pos_cam.xyz;
-		vs_brightness =		brightness;
+		vs_brightness =		LUT[brightness];
 		vs_uv =		        uv;
 		vs_tex_indx =		tex_indx;
 		vs_hp_ratio =		hp_ratio;

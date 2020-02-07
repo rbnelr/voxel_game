@@ -260,13 +260,22 @@ public:
 	Attributes (Shader& associated_shader): associated_shader{associated_shader} {}
 #endif
 
-	// Add a interleaved vertex attribute of type T
+	// Add a interleaved vertex attribute of type T which gets read as float in the shader
 	template <typename T>
 	void add (int location, const char* name, int stride, uintptr_t offset, bool normalized=false) {
 		static constexpr auto a = to_attrib<T>();
 
 		glEnableVertexAttribArray(location);
 		glVertexAttribPointer(location, a.components, (GLenum)a.type, normalized, (GLsizei)stride, (void*)offset);
+	}
+
+	// Add a interleaved vertex attribute of type T which gets read as int in the shader
+	template <typename T>
+	void add_int (int location, const char* name, int stride, uintptr_t offset, bool normalized=false) {
+		static constexpr auto a = to_attrib<T>();
+
+		glEnableVertexAttribArray(location);
+		glVertexAttribIPointer(location, a.components, (GLenum)a.type, (GLsizei)stride, (void*)offset);
 	}
 
 #if 0

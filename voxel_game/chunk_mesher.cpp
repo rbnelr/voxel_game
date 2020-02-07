@@ -45,9 +45,7 @@ struct Chunk_Mesher {
 
 	BlockTileInfo tile;
 
-	float hp;
-
-	float calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane);
+	uint8 calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane);
 
 	bool bt_is_non_opaque (block_type t) {
 		if (alpha_test)
@@ -56,13 +54,13 @@ struct Chunk_Mesher {
 			return block_props[t].transparency == TM_TRANSPARENT;
 	}
 
-	float calc_texture_index (BlockFace face) {
+	uint8 calc_texture_index (BlockFace face) {
 		int index = tile.base_index;
 		if (face == BF_POS_Z)
 			index += tile.top;
 		else if (face == BF_NEG_Z)
 			index += tile.bottom;
-		return (float)index;
+		return (uint8)index;
 	}
 
 	void face_nx (std::vector<ChunkMesh::Vertex>* verts);
@@ -118,7 +116,6 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 						block_pos_y = i.y;
 						block_pos_z = i.z;
 						tile = graphics.tile_textures.block_tile_info[b->type];
-						hp = (float)b->hp / 255.0f;
 
 						if (block_props[block->type].transparency == TM_TRANSPARENT)
 							cube_transperant();
@@ -135,7 +132,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 	chunk->mesh.transparent_mesh.upload(chunk->mesh.transparent_faces);
 }
 
-float Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {
+uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {
 	int brightness = 0;
 
 	brightness += query_block(vert_pos +plane -axis_a      +0)->dark ? 0 : 1;
@@ -143,9 +140,7 @@ float Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 	brightness += query_block(vert_pos +plane -axis_a -axis_b)->dark ? 0 : 1;
 	brightness += query_block(vert_pos +plane      +0 -axis_b)->dark ? 0 : 1;
 
-	static constexpr float LUT[] = { 0.02f, 0.08f, 0.3f, 0.6f, 1.0f };
-
-	return LUT[brightness];
+	return (uint8)brightness;
 }
 
 #define XL (block_pos_x)
@@ -162,7 +157,7 @@ float Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 // float	hp_ratio;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
-		{ (float3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), float2(u,v), calc_texture_index(face), hp }
+		{ (uint8v3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u,v), calc_texture_index(face), b->hp }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \
