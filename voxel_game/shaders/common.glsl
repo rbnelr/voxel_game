@@ -6,6 +6,8 @@ layout(std140) uniform View {
 	mat4 cam_to_world;
 	// cam space to clip space, ie. projection transform
 	mat4 cam_to_clip;
+	// world space to clip space, ie. view projection transform, to avoid two matrix multiplies when they are not needed
+	mat4 world_to_clip;
 	// viewport size in pixels
 	vec2 viewport_size;
 };

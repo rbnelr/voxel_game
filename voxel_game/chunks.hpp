@@ -3,6 +3,8 @@
 #include "blocks.hpp"
 #include "graphics/graphics.hpp"
 #include "util/move_only_class.hpp"
+#include "util/string.hpp"
+using namespace kiss;
 
 #include "stdint.h"
 #include <unordered_map>
@@ -138,6 +140,21 @@ public:
 
 		ImGui::DragFloat("chunk_generation_radius", &chunk_generation_radius, 1);
 		ImGui::DragFloat("chunk_deletion_hysteresis", &chunk_deletion_hysteresis, 1);
+
+		int chunk_count = (int)chunks.size();
+		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
+		uint64_t block_mem = block_count * sizeof(Block);
+
+		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5llu MB)", chunk_count, format_thousands(block_count).c_str(), block_mem/1024/1024);
+
+		uint64_t face_count = 0;
+		for (Chunk& c : *this) {
+			face_count += c.mesh.opaque_faces.size() / 6;
+			face_count += c.mesh.transparent_faces.size() / 6;
+		}
+		uint64_t mesh_mem = face_count * 6 * sizeof(ChunkMesh::Vertex);
+
+		ImGui::Text("Mesh data:  %11s faces (%5llu MB)", format_thousands(face_count).c_str(), mesh_mem/1024/1024);
 
 		imgui_pop();
 	}

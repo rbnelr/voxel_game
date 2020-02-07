@@ -7,34 +7,28 @@ $if vertex
 	layout (location = 0) in vec3	pos_model;
 	layout (location = 1) in float	brightness;
 	layout (location = 2) in vec4	uv_indx_hp;
-	layout (location = 3) in vec4	color;
 
 	uniform vec3 chunk_pos;
 
-	out vec3	vs_pos_cam;
+	//out vec3	vs_pos_cam;
 	out float	vs_brightness;
 	out vec4	vs_uv_indx_hp;
-	out vec4	vs_color;
 
 	void main () {
-		vec3 pos_cam =		(world_to_cam * vec4(pos_model + chunk_pos, 1)).xyz;
+		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
 
-		gl_Position =		cam_to_clip * vec4(pos_cam, 1);
-
-		vs_pos_cam =		pos_cam;
+		//vs_pos_cam =		pos_cam.xyz;
 		vs_brightness =		brightness;
 		vs_uv_indx_hp =		uv_indx_hp;
-		vs_color =			color;
 
 		WIREFRAME_MACRO;
 	}
 $endif
 
 $if fragment
-	in vec3		vs_pos_cam;
+	//in vec3		vs_pos_cam;
 	in float	vs_brightness;
 	in vec4		vs_uv_indx_hp;
-	in vec4		vs_color;
 
 	uniform	sampler2DArray tile_textures;
 	uniform	sampler2DArray breaking_textures;

@@ -13,6 +13,11 @@ namespace kiss {
 	// Printf that outputs to a std::string
 	std::string prints (char const* format, ...);
 
+	std::string format_thousands (int i, char sep=',');
+	std::string format_thousands (unsigned i, char sep=',');
+	std::string format_thousands (long long i, char sep=',');
+	std::string format_thousands (unsigned long long i, char sep=',');
+
 	static constexpr inline bool is_whitespace_c (char c) {
 		return c == ' ' || c == '\t';
 	}

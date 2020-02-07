@@ -45,7 +45,7 @@ struct Chunk_Mesher {
 
 	BlockTileInfo tile;
 
-	lrgba color;
+	float hp;
 
 	float calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane);
 
@@ -118,6 +118,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 						block_pos_y = i.y;
 						block_pos_z = i.z;
 						tile = graphics.tile_textures.block_tile_info[b->type];
+						hp = (float)b->hp / 255.0f;
 
 						if (block_props[block->type].transparency == TM_TRANSPARENT)
 							cube_transperant();
@@ -157,10 +158,9 @@ float Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 // float3	pos_model;
 // float	brightness;
 // float4	uvz_hp; // xy: [0,1] face uv; z: texture index, w: hp_ratio [0,1]
-// lrgba	color;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
-		{ (float3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), float4(u,v, calc_texture_index(face), b->hp_ratio), color }
+		{ (float3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), float4(u,v, calc_texture_index(face), hp) }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \

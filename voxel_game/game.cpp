@@ -86,6 +86,7 @@ void Game::frame () {
 
 		world_gen.imgui();
 		world->chunks.imgui();
+		block_update.imgui();
 	}
 
 	{

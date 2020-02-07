@@ -101,12 +101,10 @@ struct Generator {
 
 					if (i.z <= water_level) {
 						b->type = BT_WATER;
-						b->hp_ratio = 1;
-						b->dbg_tint = 255;
+						b->hp = 255;
 					} else {
 						b->type = BT_AIR;
-						b->hp_ratio = 1;
-						b->dbg_tint = 0;
+						b->hp = 255;
 					}
 				}
 			}
@@ -155,7 +153,7 @@ struct Generator {
 						b->type = BT_EARTH;
 					}
 
-					b->hp_ratio = 1;
+					b->hp = 255;
 				}
 
 				float tree_chance = rand.uniform();
@@ -177,8 +175,7 @@ struct Generator {
 				Block* b = chunk.get_block(pos_chunk);
 				if (b->type == BT_AIR || b->type == BT_WATER || (bt == BT_TREE_LOG && b->type == BT_LEAVES)) {
 					b->type = bt;
-					b->hp_ratio = 1;
-					b->dbg_tint = 255;
+					b->hp = 255;
 				}
 			};
 			auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_type bt) {

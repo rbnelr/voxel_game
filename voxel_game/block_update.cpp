@@ -5,16 +5,15 @@
 void BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block* b, bpos pos_world) {
 	Block* above = chunks.query_block(pos_world +bpos(0,0,+1));
 
-	if (/*block_props[b->type].does_autoheal &&*/ b->hp_ratio < 1.0f) {
-		b->hp_ratio += 1.0f/5 / block_update_frequency;
-		b->hp_ratio = min(b->hp_ratio, 1.0f);
+	if (/*block_props[b->type].does_autoheal &&*/ b->hp < 255) {
+		b->hp += min((uint8)ceili(1.0f/5 / block_update_frequency * 255), 255u - b->hp);
 
 		chunk.block_only_texture_changed(pos_world);
 	}
 	if (b->type == BT_GRASS && !(above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
 		if (grass_die_prob > random.uniform()) {
 			b->type = BT_EARTH;
-			b->hp_ratio = 1;
+			b->hp = 255;
 			chunk.block_only_texture_changed(pos_world);
 		}
 	}
@@ -48,7 +47,7 @@ void BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block* b, bpos pos
 
 		if (prob > random.uniform()) {
 			b->type = BT_GRASS;
-			b->hp_ratio = 1;
+			b->hp = 255;
 			chunk.block_only_texture_changed(pos_world);
 		}
 	}

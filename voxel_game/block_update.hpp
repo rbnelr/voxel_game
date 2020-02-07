@@ -29,7 +29,24 @@ public:
 	}
 
 	void imgui () {
+		if (!imgui_push("BlockUpdate")) return;
 
+		ImGui::DragFloat("block_update_frequency", &block_update_frequency, 0.05f);
+
+		ImGui::DragFloat("grass_die_mtth", &grass_die_mtth, 0.05f);
+		grass_die_prob = mtth_to_prob(grass_die_mtth);
+
+		ImGui::DragFloat("grass_grow_min_mtth", &grass_grow_min_mtth, 0.05f);
+		grass_grow_max_prob = mtth_to_prob(grass_grow_min_mtth);
+
+		ImGui::DragFloat("grass_grow_diagonal_multipiler", &grass_grow_diagonal_multipiler, 0.05f);
+		ImGui::DragFloat("grass_grow_step_down_multipiler", &grass_grow_step_down_multipiler, 0.05f);
+		ImGui::DragFloat("grass_grow_step_up_multipiler", &grass_grow_step_up_multipiler, 0.05f);
+
+		float grass_grow_side_prob = grass_grow_max_prob / (4 * (1 +grass_grow_diagonal_multipiler));
+		float grass_grow_diagonal_prob = grass_grow_side_prob * grass_grow_diagonal_multipiler;
+
+		imgui_pop();
 	}
 
 	void update_block (Chunks& chunks, Chunk& chunk, Block* b, bpos pos_world);

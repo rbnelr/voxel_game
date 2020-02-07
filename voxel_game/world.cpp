@@ -35,13 +35,13 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 	Block* b = chunks.query_block(block.pos, &chunk);
 	assert(block_props[b->type].collision == CM_SOLID && chunk );
 
-	b->hp_ratio -= damage;
+	b->hp -= min((uint8)ceili(damage * 255), b->hp);
 
-	if (b->hp_ratio > 0) {
+	if (b->hp > 0) {
 		chunk->block_only_texture_changed(block.pos);
 	} else {
 
-		b->hp_ratio = 0;
+		b->hp = 0;
 		b->type = BT_AIR;
 
 		chunk->block_changed(chunks, block.pos);
@@ -54,8 +54,7 @@ bool World::try_place_block (bpos pos, block_type bt) {
 
 	if (b && chunk && block_props[b->type].collision != CM_SOLID) { // can replace liquid and gas blocks
 		b->type = bt;
-		b->hp_ratio = 1;
-		b->dbg_tint = 255;
+		b->hp = 255;
 
 		chunk->block_changed(chunks, pos);
 		return true;

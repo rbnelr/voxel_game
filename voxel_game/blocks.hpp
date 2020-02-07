@@ -58,13 +58,12 @@ static Block_Properties block_props[PSEUDO_BLOCK_TYPES_COUNT] = {
 struct Block {
 	block_type	type;
 	bool		dark; // any air block that only has air above it (is in sunlight)
-	float		hp_ratio;
-	lrgba		dbg_tint;
+	uint8		hp;
 };
 
 // global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
-static constexpr inline Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 1, 1 };
-static constexpr inline Block B_NO_CHUNK      = { BT_NO_CHUNK     , false, 1, 1 };
+static constexpr inline Block B_OUT_OF_BOUNDS = { BT_OUT_OF_BOUNDS, false, 255 };
+static constexpr inline Block B_NO_CHUNK      = { BT_NO_CHUNK     , false, 255 };
 
 // garbage from windows.h
 #undef BF_BOTTOM

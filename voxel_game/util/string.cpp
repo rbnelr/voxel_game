@@ -38,6 +38,45 @@ namespace kiss {
 		return std::move(ret);
 	}
 
+	std::string _format_thousands (long long i, char sep, const char* printformat) {
+		std::string dst;
+		dst.reserve(27);
+
+		char src[27];
+
+		int num, commas;
+
+		num = sprintf(src, printformat, i);
+
+		char* cur = src;
+
+		if (*cur == '-' || *cur == '+') {
+			dst.push_back(*cur++);
+			num--;
+		}
+
+		for (commas = 2 - num % 3; *cur; commas = (commas + 1) % 3) {
+			dst.push_back(*cur++);
+			if (commas == 1 && *cur != '\0') {
+				dst.push_back(sep);
+			}
+		}
+
+		return dst;
+	}
+	std::string format_thousands (int i, char sep) {
+		return _format_thousands(i, sep, "%d");
+	}
+	std::string format_thousands (unsigned i, char sep) {
+		return _format_thousands(i, sep, "%u");
+	}
+	std::string format_thousands (long long i, char sep) {
+		return _format_thousands(i, sep, "%lld");
+	}
+	std::string format_thousands (unsigned long long i, char sep) {
+		return _format_thousands(i, sep, "%llu");
+	}
+
 	std::string_view trim (std::string_view sv) {
 		size_t start=0, end=sv.size();
 
