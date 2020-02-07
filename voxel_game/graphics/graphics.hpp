@@ -246,5 +246,5 @@ public:
 		}
 	}
 
-	void draw (World const& world, Camera_View const& view, bool activate_flycam, SelectedBlock highlighted_block);
+	void draw (World const& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);
 };

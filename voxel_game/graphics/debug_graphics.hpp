@@ -1,6 +1,7 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "shader_manager.hpp"
+#include "camera.hpp"
 
 struct DebugGraphics {
 	struct Vertex {
@@ -24,6 +25,8 @@ struct DebugGraphics {
 	// draw quad
 	
 	void push_wire_cube (float3 center, float3 size, lrgba col);
+
+	void push_wire_frustrum (Camera_View const& view, lrgba col);
 
 	// draw arrow
 

@@ -2,10 +2,44 @@
 #include "../util/geometry.hpp"
 
 void DebugGraphics::push_wire_cube (float3 center, float3 size, lrgba col) {
-	float3 l = center - size / 2;
-	float3 h = center + size / 2;
+	float3 L = center - size / 2;
+	float3 H = center + size / 2;
 	
-	//lines.
+	float3 LLL = float3(L.x,L.y,L.z);
+	float3 HLL = float3(H.x,L.y,L.z);
+	float3 LHL = float3(L.x,H.y,L.z);
+	float3 HHL = float3(H.x,H.y,L.z);
+	float3 LLH = float3(L.x,L.y,H.z);
+	float3 HLH = float3(H.x,L.y,H.z);
+	float3 LHH = float3(L.x,H.y,H.z);
+	float3 HHH = float3(H.x,H.y,H.z);
+
+	lines.push_back({ LLL, col });
+	lines.push_back({ HLL, col });
+	lines.push_back({ HLL, col });
+	lines.push_back({ HHL, col });
+	lines.push_back({ HHL, col });
+	lines.push_back({ LHL, col });
+	lines.push_back({ LHL, col });
+	lines.push_back({ LLL, col });
+
+	lines.push_back({ LLL, col });
+	lines.push_back({ LLH, col });
+	lines.push_back({ HLL, col });
+	lines.push_back({ HLH, col });
+	lines.push_back({ HHL, col });
+	lines.push_back({ HHH, col });
+	lines.push_back({ LHL, col });
+	lines.push_back({ LHH, col });
+
+	lines.push_back({ LLH, col });
+	lines.push_back({ HLH, col });
+	lines.push_back({ HLH, col });
+	lines.push_back({ HHH, col });
+	lines.push_back({ HHH, col });
+	lines.push_back({ LHH, col });
+	lines.push_back({ LHH, col });
+	lines.push_back({ LLH, col });
 }
 
 // draw arrow
@@ -14,6 +48,36 @@ void DebugGraphics::push_cylinder (float3 center, float radius, float height, lr
 	::push_cylinder<Vertex>(sides, [&] (float3 pos) {
 		faces.push_back({ center + pos * float3(radius, radius, height), col });
 	});
+}
+
+void DebugGraphics::push_wire_frustrum (Camera_View const& view, lrgba col) {
+
+	lines.push_back({ view.frustrum.corners[0], col });
+	lines.push_back({ view.frustrum.corners[1], col });
+	lines.push_back({ view.frustrum.corners[1], col });
+	lines.push_back({ view.frustrum.corners[2], col });
+	lines.push_back({ view.frustrum.corners[2], col });
+	lines.push_back({ view.frustrum.corners[3], col });
+	lines.push_back({ view.frustrum.corners[3], col });
+	lines.push_back({ view.frustrum.corners[0], col });
+
+	lines.push_back({ view.frustrum.corners[0], col });
+	lines.push_back({ view.frustrum.corners[4], col });
+	lines.push_back({ view.frustrum.corners[1], col });
+	lines.push_back({ view.frustrum.corners[5], col });
+	lines.push_back({ view.frustrum.corners[2], col });
+	lines.push_back({ view.frustrum.corners[6], col });
+	lines.push_back({ view.frustrum.corners[3], col });
+	lines.push_back({ view.frustrum.corners[7], col });
+
+	lines.push_back({ view.frustrum.corners[4], col });
+	lines.push_back({ view.frustrum.corners[5], col });
+	lines.push_back({ view.frustrum.corners[5], col });
+	lines.push_back({ view.frustrum.corners[6], col });
+	lines.push_back({ view.frustrum.corners[6], col });
+	lines.push_back({ view.frustrum.corners[7], col });
+	lines.push_back({ view.frustrum.corners[7], col });
+	lines.push_back({ view.frustrum.corners[4], col });
 }
 
 void DebugGraphics::draw () {
@@ -40,7 +104,7 @@ void DebugGraphics::draw () {
 			lines_mesh.upload(lines);
 
 			lines_mesh.bind();
-			lines_mesh.draw();
+			lines_mesh.draw_lines();
 		}
 
 		//glEnable(GL_DEPTH_TEST);

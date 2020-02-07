@@ -3,19 +3,26 @@
 
 #include "assert.h"
 
-float4x4 Camera::calc_cam_to_clip () {
+void Camera_View::calc_frustrum () {
+	// frustrum_corners set to cam space by perspective_matrix() or orthographic_matrix()
+
+	for (int i=0; i<8; ++i)
+		frustrum.corners[i] = cam_to_world * frustrum.corners[i];
+}
+
+float4x4 Camera::calc_cam_to_clip (View_Frustrum* frust, float4x4* clip_to_cam) {
 	float aspect = (float)input.window_size.x / (float)input.window_size.y;
 
 	if (mode == PERSPECTIVE) {
-		return perspective_matrix(vfov, aspect, clip_near, clip_far);
+		return perspective_matrix(vfov, aspect, clip_near, clip_far, frust, clip_to_cam);
 	} else {
 		assert(mode == ORTHOGRAPHIC);
 
-		return orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far);
+		return orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far, frust, clip_to_cam);
 	}
 }
 
-float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far) {
+float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far, View_Frustrum* frust, float4x4* clip_to_cam) {
 	float2 frust_scale;
 	frust_scale.y = tan(vfov / 2);
 	frust_scale.x = frust_scale.y * aspect;
@@ -29,6 +36,24 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 	float a = (clip_far +clip_near) / (clip_near -clip_far);
 	float b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
 
+	if (frust) {
+		frust->corners[0] = float3(-frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
+		frust->corners[1] = float3(+frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
+		frust->corners[2] = float3(+frust_scale.x * clip_near, +frust_scale.y * clip_near, -clip_near);
+		frust->corners[3] = float3(-frust_scale.x * clip_near, +frust_scale.y * clip_near, -clip_near);
+		frust->corners[4] = float3(-frust_scale.x * clip_far , -frust_scale.y * clip_far , -clip_far );
+		frust->corners[5] = float3(+frust_scale.x * clip_far , -frust_scale.y * clip_far , -clip_far );
+		frust->corners[6] = float3(+frust_scale.x * clip_far , +frust_scale.y * clip_far , -clip_far );
+		frust->corners[7] = float3(-frust_scale.x * clip_far , +frust_scale.y * clip_far , -clip_far );
+	}
+	if (clip_to_cam) {
+		*clip_to_cam = float4x4(
+			1.0f/x,      0,      0,       0,
+			     0, 1.0f/y,      0,       0,
+			     0,      0, 1.0f/a,      -1,
+			     0,      0, 1.0f/b,  1.0f/b
+		);
+	}
 	return float4x4(
 		x, 0, 0, 0,
 		0, y, 0, 0,
@@ -37,7 +62,7 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 	);
 }
 
-float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float clip_far) {
+float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float clip_far, View_Frustrum* frust, float4x4* clip_to_cam) {
 	float hsize = vsize * aspect;
 
 	float x = 2.0f / hsize;
@@ -46,6 +71,24 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 	float a = -2.0f / (clip_far - clip_near);
 	float b = clip_near * a - 1;
 
+	if (frust) {
+		frust->corners[0] = float3(1.0f / -x, 1.0f / -y, -clip_near);
+		frust->corners[1] = float3(1.0f / +x, 1.0f / -y, -clip_near);
+		frust->corners[2] = float3(1.0f / +x, 1.0f / +y, -clip_near);
+		frust->corners[3] = float3(1.0f / -x, 1.0f / +y, -clip_near);
+		frust->corners[4] = float3(1.0f / -x, 1.0f / -y, -clip_far );
+		frust->corners[5] = float3(1.0f / +x, 1.0f / -y, -clip_far );
+		frust->corners[6] = float3(1.0f / +x, 1.0f / +y, -clip_far );
+		frust->corners[7] = float3(1.0f / -x, 1.0f / +y, -clip_far );
+	}
+	if (clip_to_cam) {
+		*clip_to_cam = float4x4(
+			1.0f/x,      0,      0,       0,
+			     0, 1.0f/y,      0,       0,
+			     0,      0, 1.0f/a,    -b/a,
+			     0,      0,      0,       1
+		);
+	}
 	return float4x4(
 		x, 0, 0, 0,
 		0, y, 0, 0,
@@ -138,6 +181,7 @@ Camera_View Flycam::update () {
 	Camera_View v;
 	v.world_to_cam = world_to_cam_rot * translate(-pos);
 	v.cam_to_world = translate(pos) * cam_to_world_rot;
-	v.cam_to_clip = calc_cam_to_clip();
+	v.cam_to_clip = calc_cam_to_clip(&v.frustrum, &v.clip_to_cam);
+	v.calc_frustrum();
 	return v;
 }

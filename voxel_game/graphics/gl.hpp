@@ -378,4 +378,8 @@ public:
 	void draw () const {
 		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_count);
 	}
+
+	void draw_lines () const {
+		glDrawArrays(GL_LINES, 0, (GLsizei)vertex_count);
+	}
 };

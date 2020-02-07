@@ -126,12 +126,15 @@ void Game::frame () {
 
 		physics.update_player(*world, world->player);
 
-		Camera_View view;
 		SelectedBlock selected_block;
+
+		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, &selected_block);
+
+		Camera_View view;
 		if (activate_flycam) {
 			view = flycam.update();
 		} else {
-			view = world->player.update_post_physics(*world, graphics.player, &selected_block);
+			view = player_view;
 		}
 
 		block_update.update_blocks(world->chunks);
@@ -140,7 +143,7 @@ void Game::frame () {
 		world->chunks.update_chunk_graphics(graphics.chunk_graphics);
 
 		//// Draw
-		graphics.draw(*world, view, activate_flycam, selected_block);
+		graphics.draw(*world, view, player_view, activate_flycam, selected_block);
 	}
 	ImGui::PopItemWidth();
 	ImGui::End();

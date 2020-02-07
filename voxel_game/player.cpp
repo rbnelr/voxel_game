@@ -197,7 +197,7 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, SelectedBlock* selected_block) {
+Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* selected_block) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -216,11 +216,14 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 	Camera_View view;
 	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
 	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
-	view.cam_to_clip = cam.calc_cam_to_clip();
+	view.cam_to_clip = cam.calc_cam_to_clip(&view.frustrum, &view.clip_to_cam);
+	view.calc_frustrum();
 
-	*selected_block = calc_selected_block(world);
-	tool.update(world, graphics, *selected_block);
-	block_place.update(world, *this, *selected_block);
+	if (active) {
+		*selected_block = calc_selected_block(world);
+		tool.update(world, graphics, *selected_block);
+		block_place.update(world, *this, *selected_block);
+	}
 
 	return view;
 }

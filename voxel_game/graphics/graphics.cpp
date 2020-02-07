@@ -362,6 +362,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks) {
 		// Draw all opaque chunk meshes
 		for (Chunk const& chunk : chunks) {
 
+			debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, srgba(255,100,50));
+
 			if (chunk.mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
@@ -405,9 +407,13 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 	}
 }
 
-void Graphics::draw (World const& world, Camera_View const& view, bool activate_flycam, SelectedBlock selected_block) {
-	if (activate_flycam || world.player.third_person)
+void Graphics::draw (World const& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
+	if (activate_flycam || world.player.third_person) {
+
+		debug_graphics->push_wire_frustrum(player_view, srgba(20, 20, 255));
+
 		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
+	}
 
 	//// OpenGL drawcalls
 	common_uniforms.set_view_uniforms(view);

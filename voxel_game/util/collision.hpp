@@ -5,6 +5,10 @@ struct Ray {
 	float3 pos;
 	float3 dir; // normalized
 };
+struct Plane {
+	float3 pos;
+	float3 normal;
+};
 
 // intersection test between circle and 1x1 square going from 0,0 to 1,1
 bool circle_square_intersect (float2 circ_origin, float circ_radius);

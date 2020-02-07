@@ -155,7 +155,7 @@ public:
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, SelectedBlock* highlighted_block);
+	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* highlighted_block);
 
 	void respawn () {
 		pos = player_spawn_point;

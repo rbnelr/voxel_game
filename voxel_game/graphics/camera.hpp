@@ -1,10 +1,23 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "../dear_imgui.hpp"
+#include "../util/collision.hpp"
 
 enum perspective_mode {
 	PERSPECTIVE,
 	ORTHOGRAPHIC
+};
+
+struct View_Frustrum {
+	// The view frustrum planes in world space
+	// in the order: near, left, right, bottom, up, far
+	// far was put last because it is not really needed in view frustrum culling since it is undesirable for the far plane to intersect any geometry anyway, so it usually gets get to far enough to never cull anything
+	Plane		planes[6];
+
+	// Frustrum corners in world space
+	// in the order: LBN, RBN, RTN, LTN, LBF, RBF, RTF, LTF
+	// (L=left R=right B=bottom T=top N=near F=far)
+	float3		corners[8];
 };
 
 struct Camera_View {
@@ -16,6 +29,13 @@ struct Camera_View {
 
 	// Camera space to clip space transform
 	float4x4	cam_to_clip;
+
+	// Clip space to camera space transform
+	float4x4	clip_to_cam;
+
+	View_Frustrum frustrum;
+
+	void calc_frustrum();
 };
 
 class Camera {
@@ -71,11 +91,11 @@ public:
 	}
 
 	// Calculate camera projection matrix
-	float4x4 calc_cam_to_clip ();
+	float4x4 calc_cam_to_clip (View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
 };
 
-float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192);
-float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192);
+float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
+float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
 
 // rotate azimuth, elevation via mouselook
 void rotate_with_mouselook (float* azimuth, float* elevation, float vfov);
