@@ -8,6 +8,40 @@ void Camera_View::calc_frustrum () {
 
 	for (int i=0; i<8; ++i)
 		frustrum.corners[i] = cam_to_world * frustrum.corners[i];
+
+	//near, left, right, bottom, up, far
+
+	auto& corn = frustrum.corners;
+
+	frustrum.planes[0] = {
+		(corn[0] + corn[2]) / 2,
+		normalize(cross(corn[2] - corn[1], corn[0] - corn[1]))
+	};
+
+	frustrum.planes[1] = {
+		(corn[0] + corn[3]) / 2,
+		normalize(cross(corn[3] - corn[0], corn[4] - corn[0]))
+	};
+
+	frustrum.planes[2] = {
+		(corn[1] + corn[2]) / 2,
+		normalize(cross(corn[1] - corn[2], corn[6] - corn[2]))
+	};
+
+	frustrum.planes[3] = {
+		(corn[0] + corn[1]) / 2,
+		normalize(cross(corn[0] - corn[1], corn[5] - corn[1]))
+	};
+
+	frustrum.planes[4] = {
+		(corn[3] + corn[2]) / 2,
+		normalize(cross(corn[2] - corn[3], corn[7] - corn[3]))
+	};
+
+	frustrum.planes[5] = {
+		(corn[4] + corn[6]) / 2,
+		normalize(cross(corn[7] - corn[4], corn[5] - corn[4]))
+	};
 }
 
 float4x4 Camera::calc_cam_to_clip (View_Frustrum* frust, float4x4* clip_to_cam) {

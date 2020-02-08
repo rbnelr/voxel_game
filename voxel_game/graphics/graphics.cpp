@@ -339,7 +339,7 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -362,9 +362,10 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks) {
 		// Draw all opaque chunk meshes
 		for (Chunk const& chunk : chunks) {
 
-			debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, srgba(255,100,50));
+			if (debug_frustrum_culling)
+				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.frustrum_culled ? srgba(255,50,50) : srgba(50,255,50));
 
-			if (chunk.mesh.opaque_mesh.vertex_count != 0) {
+			if (!chunk.frustrum_culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.opaque_mesh.bind();
@@ -397,7 +398,7 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 		// Draw all transparent chunk meshes
 		for (Chunk const& chunk : chunks) {
 
-			if (chunk.mesh.transparent_mesh.vertex_count != 0) {
+			if (!chunk.frustrum_culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.transparent_mesh.bind();
@@ -407,11 +408,32 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 	}
 }
 
-void Graphics::draw (World const& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
-	if (activate_flycam || world.player.third_person) {
+void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
+	int count = 0;
+	for (Chunk& chunk : chunks) {
+		AABB aabb;
+		aabb.lo = (float3)chunk.chunk_pos_world();
+		aabb.hi = aabb.lo + (float3)CHUNK_DIM;
+
+		chunk.frustrum_culled = frustrum_cull_aabb(view.frustrum, aabb);
+		if (chunk.frustrum_culled)
+			count++;
+	}
+
+	chunks.count_frustrum_culled = count;
+}
+
+void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
+	frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
+	
+	if (activate_flycam && debug_frustrum_culling) {
 
 		debug_graphics->push_wire_frustrum(player_view, srgba(20, 20, 255));
+		//for (int i=0; i<6; ++i)
+		//	debug_graphics->push_arrow(player_view.frustrum.planes[i].pos, player_view.frustrum.planes[i].normal * 5, cols[i]);
 
+	}
+	if (activate_flycam || world.player.third_person) {
 		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
 	}
 
@@ -428,7 +450,7 @@ void Graphics::draw (World const& world, Camera_View const& view, Camera_View co
 	{ //// Opaque pass
 		player.draw(world.player);
 
-		chunk_graphics.draw_chunks(world.chunks);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling);
 
 		skybox.draw();
 	}

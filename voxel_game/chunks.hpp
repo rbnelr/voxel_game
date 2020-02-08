@@ -92,6 +92,8 @@ public:
 	bool needs_remesh = true;
 	bool needs_block_brighness_update = true;
 
+	bool frustrum_culled;
+
 	// data block
 	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
 
@@ -126,6 +128,8 @@ class Chunks {
 public:
 	RunningAverage<float> brightness_time = { 64 };
 	RunningAverage<float> meshing_time = { 64 };
+
+	int count_frustrum_culled;
 
 	// load chunks in this radius in order of distance to the player 
 	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
@@ -200,6 +204,10 @@ public:
 	}
 	CIterator end () const {
 		return { chunks.end() };
+	}
+
+	int count () {
+		return (int)chunks.size();
 	}
 
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded

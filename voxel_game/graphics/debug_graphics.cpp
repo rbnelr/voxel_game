@@ -1,6 +1,11 @@
 #include "debug_graphics.hpp"
 #include "../util/geometry.hpp"
 
+void DebugGraphics::push_arrow (float3 pos, float3 dir, lrgba col) {
+	lines.push_back({ pos, col });
+	lines.push_back({ pos + dir, col });
+}
+
 void DebugGraphics::push_wire_cube (float3 center, float3 size, lrgba col) {
 	float3 L = center - size / 2;
 	float3 H = center + size / 2;
@@ -41,8 +46,6 @@ void DebugGraphics::push_wire_cube (float3 center, float3 size, lrgba col) {
 	lines.push_back({ LHH, col });
 	lines.push_back({ LLH, col });
 }
-
-// draw arrow
 
 void DebugGraphics::push_cylinder (float3 center, float radius, float height, lrgba col, int sides) {
 	::push_cylinder<Vertex>(sides, [&] (float3 pos) {

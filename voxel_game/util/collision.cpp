@@ -1,4 +1,5 @@
 #include "collision.hpp"
+#include "../graphics/camera.hpp"
 
 bool circle_square_intersect (float2 circ_origin, float circ_radius) {
 
@@ -21,6 +22,34 @@ float point_square_nearest_dist (float2 square_pos, float2 square_size, float2 p
 	float2 nearest_pos_on_square = clamp(pos_rel, 0,square_size);
 
 	return length(nearest_pos_on_square -pos_rel);
+}
+
+// aabb gets culled when is lies completely on +normal dir side of palne
+// returns true when culled
+bool plane_cull_aabb (Plane const& plane, AABB aabb) {
+	// test if any of the 9 points lie inside the plane => not culled
+	aabb.lo -= plane.pos;
+	aabb.hi -= plane.pos;
+
+	if (dot(plane.normal, float3(aabb.lo.x, aabb.lo.y, aabb.lo.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.hi.x, aabb.lo.y, aabb.lo.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.lo.x, aabb.hi.y, aabb.lo.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.hi.x, aabb.hi.y, aabb.lo.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.lo.x, aabb.lo.y, aabb.hi.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.hi.x, aabb.lo.y, aabb.hi.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.lo.x, aabb.hi.y, aabb.hi.z)) <= 0) return false;
+	if (dot(plane.normal, float3(aabb.hi.x, aabb.hi.y, aabb.hi.z)) <= 0) return false;
+
+	return true;
+}
+
+bool frustrum_cull_aabb (View_Frustrum const& frust, AABB aabb) {
+	// cull if outside of one plane
+	for (int i=0; i<6; ++i) {
+		if (plane_cull_aabb(frust.planes[i], aabb))
+			return true;
+	}
+	return false;
 }
 
 static int find_next_axis (float3 next) {

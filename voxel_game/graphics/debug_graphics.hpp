@@ -23,12 +23,12 @@ struct DebugGraphics {
 	Mesh<Vertex> lines_mesh;
 
 	// draw quad
-	
+
+	void push_arrow (float3 pos, float3 dir, lrgba col);
+
 	void push_wire_cube (float3 center, float3 size, lrgba col);
 
 	void push_wire_frustrum (Camera_View const& view, lrgba col);
-
-	// draw arrow
 
 	void push_cylinder (float3 center, float radius, float height, lrgba col, int sides);
 

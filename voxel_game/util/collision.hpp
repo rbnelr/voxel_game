@@ -9,6 +9,12 @@ struct Plane {
 	float3 pos;
 	float3 normal;
 };
+struct AABB {
+	float3 lo;
+	float3 hi;
+};
+
+struct View_Frustrum;
 
 // intersection test between circle and 1x1 square going from 0,0 to 1,1
 bool circle_square_intersect (float2 circ_origin, float circ_radius);
@@ -19,6 +25,10 @@ bool cylinder_cube_intersect (float3 cyl_origin, float cyl_radius, float cyl_hei
 
 // nearest distance from point to square (square covers [square_pos, square_pos +square_size] on each axis)
 float point_square_nearest_dist (float2 square_pos, float2 square_size, float2 point);
+
+// cull (return true) if AABB is completely outside of one of the view frustrums planes
+// this cull 99% of the AABB that are invisible, but returns a false negative sometimes
+bool frustrum_cull_aabb (View_Frustrum const& frust, AABB aabb);
 
 typedef int voxel_coord_t;
 typedef int3 voxel_coord;

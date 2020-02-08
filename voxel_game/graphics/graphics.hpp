@@ -217,7 +217,7 @@ struct ChunkGraphics {
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling);
 	void draw_chunks_transparent (Chunks const& chunks);
 };
 
@@ -236,15 +236,21 @@ public:
 	CrosshairGraphics		crosshair;
 	SkyboxGraphics			skybox;
 
+	bool debug_frustrum_culling = true;
+
+	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
+
 	void imgui (Chunks& chunks) {
 		if (ImGui::CollapsingHeader("Graphics")) {
 			common_uniforms.imgui();
 
 			chunk_graphics.imgui(chunks);
 
+			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+
 			ImGui::Separator();
 		}
 	}
 
-	void draw (World const& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);
+	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);
 };
