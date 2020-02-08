@@ -72,10 +72,10 @@ DONE:
  
  imgui console log
 
+ view frustrum colling of chunk drawcalls
+
 TODO
 -FEATURES:
-
- view frustrum colling of chunk drawcalls
 
  The epsilon is very finnicky,
  -it needs to be small enough to actually act like an epsilon (we teleport the player slightly above the ground and away from walls by this epsilon)

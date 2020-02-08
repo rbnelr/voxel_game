@@ -204,6 +204,9 @@
     <ClInclude Include="..\..\dear_imgui\imconfig.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
+    <ClInclude Include="audio\audio.hpp">
+      <Filter>audio</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -372,6 +375,9 @@
     <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
+    <ClCompile Include="audio\audio.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -431,6 +437,9 @@
     </Filter>
     <Filter Include="graphics">
       <UniqueIdentifier>{4271f123-16a3-4d5d-812b-f890d4962a09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="audio">
+      <UniqueIdentifier>{8308f250-c772-459a-9e30-8daf4e621711}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
