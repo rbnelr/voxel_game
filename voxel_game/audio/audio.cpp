@@ -1,31 +1,101 @@
 #include "audio.hpp"
 #include "portaudio.h"
 #include "math.h"
+#include "assert.h"
 #include "stdio.h"
+#include "../util/file_io.hpp"
+#include "../kissmath.hpp"
 
-constexpr float TWO_PI = 3.141592653589793238462643383279f;
+struct Samplef {
+	float left;
+	float right;
+};
+
 constexpr float SAMPLE_RATE = 44100;
 
-float t = 0;
-float freq = 261.626f;
-float amp = 0.1f;
+struct AudioFile {
+	typedef int16_t sample_t;
+	struct Sample {
+		sample_t left;
+		sample_t right;
 
-float min_freq = 200;
-float max_freq = 2000;
-float freq_vel = 1000;
+		Samplef tof () {
+			return {
+				(float)left / (float)(1 << 15),
+				(float)right / (float)(1 << 15)
+			};
+		}
+	};
 
-float get_sample () {
-	float val = sinf(t * TWO_PI) * amp;
+	uint64_t count;
+	std::unique_ptr<Sample[]> samples = nullptr;
 
-	t += freq / SAMPLE_RATE;
+	AudioFile (const char* filepath) {
+		uint64_t size;
+		samples = std::unique_ptr<Sample[]>( (Sample*)kiss::read_binary_file(filepath, &size).release() ); // is this safe?
+		assert(samples && size > sizeof(Sample));
 
-	if (freq >= max_freq || freq <= min_freq) {
-		freq_vel = -freq_vel;
+		count = size / sizeof(Sample);
 	}
-	freq += freq_vel / SAMPLE_RATE;
 
-	return val;
+	double playback_speed = 1;
+	double t = 0;
+
+	Samplef get_sample (double t) {
+		t *= SAMPLE_RATE;
+
+		auto ai = (uint64_t)t;
+		auto bi = ai + 1;
+		auto interp = (float)(t - (double)ai);
+
+		auto a = samples[ai].tof();
+		auto b = samples[bi].tof();
+
+		return {
+			lerp(a.left , b.left , interp),
+			lerp(a.right, b.right, interp),
+		};
+	}
+
+	static double max (double a, double b) {
+		return a >= b ? a : b;
+	}
+	static double min (double a, double b) {
+		return a <= b ? a : b;
+	}
+
+	static double clamp (double x, double a, double b) {
+		return min(max(x, a), b);
+	}
+
+	Samplef get_sample () {
+		auto s = get_sample(t);
+
+		t += playback_speed / SAMPLE_RATE;
+		t = clamp(t, 0, count -1);
+
+		return s;
+	}
+};
+
+AudioFile audio1 = { "D:/test_audio2.raw" };
+
+float amp = 0.75f;
+
+Samplef get_sample () {
+	return audio1.get_sample();
 }
+
+//float get_sample () {
+//	float val = get_sample() * amp;
+//
+//	//if (freq >= max_freq || freq <= min_freq) {
+//	//	freq_vel = -freq_vel;
+//	//}
+//	//freq += freq_vel / SAMPLE_RATE;
+//
+//	return val;
+//}
 
 int portaudio_callback (
 		const void *input,
@@ -39,10 +109,13 @@ int portaudio_callback (
 	float *out = (float*)output;
 
 	for(unsigned i=0; i<frameCount; i++) {
-		float sample = get_sample();
+		auto smpl = get_sample();
 
-		*out++ = sample; // left
-		*out++ = sample; // right
+		float left  = smpl.left  * amp;
+		float right = smpl.right * amp;
+
+		*out++ = left; // left
+		*out++ = right; // right
 	}
 	return 0;
 }
@@ -67,7 +140,7 @@ bool test = [] () {
 		2,          /* stereo output */
 		paFloat32,  /* 32 bit floating point output */
 		SAMPLE_RATE,
-		256,        /* frames per buffer, i.e. the number
+		paFramesPerBufferUnspecified,        /* frames per buffer, i.e. the number
 					of sample frames that PortAudio will
 					request from the callback. Many apps
 					may want to use
