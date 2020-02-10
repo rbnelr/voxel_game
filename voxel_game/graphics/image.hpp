@@ -1,7 +1,6 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "../util/file_io.hpp"
-#include "../stb_image.hpp"
 #include "../util/move_only_class.hpp"
 #include "assert.h"
 
@@ -23,6 +22,8 @@ template<> constexpr _Format get_format<float  > () { return { true, 32, 1 }; } 
 template<> constexpr _Format get_format<float2 > () { return { true, 32, 2 }; } // greyscale, alpha as 8 bit uint
 template<> constexpr _Format get_format<float3 > () { return { true, 32, 3 }; } // rgb as 8 bit uint
 template<> constexpr _Format get_format<float4 > () { return { true, 32, 4 }; } // rgb, alpha as 8 bit uint
+
+void* _stbi_load_from_memory (unsigned char* file_data, uint64_t file_size, _Format format, int2* size);
 
 template <typename T>
 class Image {
@@ -89,37 +90,10 @@ public:
 		if (!file_data)
 			return false;
 
-		auto format = get_format<T>();
-
-		T* pixels;
 		int2 size;
-		int n;
-
-		stbi_set_flip_vertically_on_load(true); // OpenGL has textues bottom-up
-
-		if (format.flt) {
-			pixels = (T*)stbi_loadf_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
-			if (!pixels)
-				return false;
-		} else {
-			switch (format.bits) {
-
-				case 8: {
-					pixels = (T*)stbi_load_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
-					if (!pixels)
-						return false;
-				} break;
-
-				case 16: {
-					pixels = (T*)stbi_load_16_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, &n, format.channels);
-					if (!pixels)
-						return false;
-				} break;
-
-				default:
-					assert(false);
-			}
-		}
+		T* pixels = (T*)_stbi_load_from_memory(file_data.get(), file_size, get_format<T>(), &size);
+		if (!pixels)
+			return false;
 
 		out->pixels = pixels;
 		out->size = size;
