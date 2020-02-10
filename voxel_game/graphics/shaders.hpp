@@ -19,12 +19,10 @@ struct ShaderManager {
 	// $if $endif get processed at the same time as the $if $endif, so a $if fragment part in a file only included inside a $if vertex will never be included in the fragment shader
 	// Shaders gets stored into shaders hashmap and never removed until program exit
 	gl::Shader* load_shader (std::string name);
-
-	bool check_file_changes ();
 };
 
 // global ShaderManager
-extern std::unique_ptr<ShaderManager> shader_manager;
+extern std::unique_ptr<ShaderManager> shaders;
 
 // User facing shader
 struct Shader {
@@ -33,7 +31,7 @@ struct Shader {
 
 	Shader () {}
 	Shader (std::string name) {
-		shader = shader_manager->load_shader(std::move(name));
+		shader = shaders->load_shader(std::move(name));
 	}
 
 	void bind () {

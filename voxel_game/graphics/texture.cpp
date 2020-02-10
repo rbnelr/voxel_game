@@ -15,7 +15,7 @@ Texture2D::Texture2D () {
 // Construct by loading from file
 Texture2D::Texture2D (char const* filename, bool srgb, bool gen_mips): Texture2D() {
 	uint64_t file_size;
-	auto file_data = kiss::read_binary_file(filename, &file_size);
+	auto file_data = kiss::load_binary_file(filename, &file_size);
 	if (!file_data) {
 		logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
 		return;

@@ -85,7 +85,7 @@ public:
 	// Loads a image file from disk, potentially converting it to the target pixel type
 	static bool load_from_file (const char* filepath, Image<T>* out) {
 		uint64_t file_size;
-		auto file_data = kiss::read_binary_file(filepath, &file_size);
+		auto file_data = kiss::load_binary_file(filepath, &file_size);
 		if (!file_data)
 			return false;
 

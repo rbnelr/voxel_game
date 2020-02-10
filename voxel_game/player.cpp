@@ -13,6 +13,7 @@ void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock c
 	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
 		if (selected_block) {
 			world.apply_damage(selected_block, damage);
+			hit_sound.play();
 		}
 		anim_triggered = true;
 	}

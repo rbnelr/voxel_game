@@ -2,7 +2,7 @@
 #include "../kissmath.hpp"
 #include "../blocks.hpp"
 #include "common.hpp"
-#include "glshader.hpp"
+#include "shaders.hpp"
 #include "texture.hpp"
 #include "debug_graphics.hpp"
 #include "gl.hpp"
@@ -236,7 +236,7 @@ public:
 	CrosshairGraphics		crosshair;
 	SkyboxGraphics			skybox;
 
-	bool debug_frustrum_culling = true;
+	bool debug_frustrum_culling = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 

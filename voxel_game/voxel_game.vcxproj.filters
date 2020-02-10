@@ -146,9 +146,6 @@
     <ClInclude Include="graphics\common.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\shader_manager.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\image.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
@@ -205,6 +202,12 @@
       <Filter>dear_imgui</Filter>
     </ClInclude>
     <ClInclude Include="audio\audio.hpp">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\shaders.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="audio\read_wav.hpp">
       <Filter>audio</Filter>
     </ClInclude>
   </ItemGroup>
@@ -340,9 +343,6 @@
     <ClCompile Include="graphics\common.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\shader_manager.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="graphics\image.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -376,6 +376,12 @@
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="audio\audio.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\shaders.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="audio\read_wav.cpp">
       <Filter>audio</Filter>
     </ClCompile>
   </ItemGroup>

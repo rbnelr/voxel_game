@@ -178,6 +178,7 @@
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
     <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="audio\audio.hpp" />
+    <ClInclude Include="audio\read_wav.hpp" />
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
@@ -202,7 +203,7 @@
     <ClInclude Include="graphics\gl.hpp" />
     <ClInclude Include="graphics\glshader.hpp" />
     <ClInclude Include="graphics\image.hpp" />
-    <ClInclude Include="graphics\shader_manager.hpp" />
+    <ClInclude Include="graphics\shaders.hpp" />
     <ClInclude Include="graphics\texture.hpp" />
     <ClInclude Include="input.hpp" />
     <ClInclude Include="kissmath.hpp" />
@@ -254,6 +255,7 @@
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="audio\audio.cpp" />
+    <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="world_generator.cpp" />
@@ -271,7 +273,7 @@
     <ClCompile Include="graphics\gl.cpp" />
     <ClCompile Include="graphics\glshader.cpp" />
     <ClCompile Include="graphics\image.cpp" />
-    <ClCompile Include="graphics\shader_manager.cpp" />
+    <ClCompile Include="graphics\shaders.cpp" />
     <ClCompile Include="graphics\texture.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />

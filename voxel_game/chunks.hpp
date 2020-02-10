@@ -132,7 +132,7 @@ public:
 	int count_frustrum_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float chunk_generation_radius =	_use_potatomode ? 20.0f : 140.0f;
+	float chunk_generation_radius =	_use_potatomode ? 150.0f : 200.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)

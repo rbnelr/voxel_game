@@ -3,6 +3,7 @@
 #include "chunks.hpp"
 #include "graphics/camera.hpp"
 #include "physics.hpp"
+#include "audio/audio.hpp"
 
 // Global for now, the world should store this if it is not randomized
 extern float3	player_spawn_point;
@@ -29,6 +30,8 @@ public:
 
 	float anim_t = 0;
 	bool anim_triggered;
+
+	Sound hit_sound = { "dig1" };
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Fists", name)) return;
