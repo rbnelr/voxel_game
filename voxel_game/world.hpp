@@ -3,6 +3,7 @@
 #include "util/random.hpp"
 #include "chunks.hpp"
 #include "player.hpp"
+#include "audio/audio.hpp"
 #include <string>
 
 inline uint64_t get_seed (std::string_view str) {
@@ -25,6 +26,8 @@ public:
 	Player player;
 
 	Chunks chunks;
+
+	Sound break_sound = { "break1" };
 
 	World (): seed_str{""}, seed{get_seed(this->seed_str)} {
 
