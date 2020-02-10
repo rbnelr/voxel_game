@@ -31,7 +31,7 @@ public:
 	float anim_t = 0;
 	bool anim_triggered;
 
-	Sound hit_sound = { "dig1" };
+	Sound hit_sound = Sound( "break1", 0.5f, 1 );
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Fists", name)) return;

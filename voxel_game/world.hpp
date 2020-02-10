@@ -27,7 +27,7 @@ public:
 
 	Chunks chunks;
 
-	Sound break_sound = { "break1" };
+	Sound break_sound = { "dig1", 1.2f, 0.8f };
 
 	World (): seed_str{""}, seed{get_seed(this->seed_str)} {
 

@@ -80,25 +80,27 @@ public:
 	
 	struct Sound {
 		audio::AudioData16 data;
+		float volume;
+		float speed;
 	};
 
 	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
 
-	Sound* load_sound (std::string name) {
+	Sound* load_sound (std::string name, float volume, float speed) {
 		auto it = loaded_sounds.find(name);
 		if (it != loaded_sounds.end()) {
 			return it->second.get();
 		}
 
 		auto filepath = prints("%s%s.wav", sounds_directory.c_str(), name.c_str());
-		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath.c_str()) }));
+		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath.c_str()), volume, speed }));
 
 		auto* s = ptr.get();
 		loaded_sounds.emplace(std::move(name), std::move(ptr));
 		return s;
 	}
 
-	void play_sound (Sound* sound);
+	void play_sound (Sound* sound, float volume, float speed);
 };
 
 // Global audio manager
@@ -108,11 +110,11 @@ struct Sound {
 	AudioManager::Sound* sound = nullptr;
 
 	Sound () {}
-	Sound (std::string name) {
-		sound = audio_manager.load_sound(std::move(name));
+	Sound (std::string name, float volume=1, float speed=1) {
+		sound = audio_manager.load_sound(std::move(name), volume, speed);
 	}
 
-	void play (float playback_speed=1) {
-		audio_manager.play_sound(sound);
+	void play (float volume=1, float speed=1) {
+		audio_manager.play_sound(sound, volume, speed);
 	}
 };

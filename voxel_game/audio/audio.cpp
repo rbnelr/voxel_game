@@ -26,6 +26,9 @@ std::atomic<float> _timescale = 1;
 
 struct PlayingSound {
 	AudioManager::Sound* sound;
+	float volume;
+	float speed;
+
 	double t = 0;
 };
 
@@ -33,12 +36,12 @@ constexpr int MAX_PLAYING_SOUNDS = 128;
 PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
 int playing_sounds_count = 0;
 
-void AudioManager::play_sound (Sound* sound) {
+void AudioManager::play_sound (Sound* sound, float volume, float speed) {
 	while (locked)
 		; // busy wait
 
 	if (playing_sounds_count < MAX_PLAYING_SOUNDS) {
-		playing_sounds[playing_sounds_count] = { sound, 0 };
+		playing_sounds[playing_sounds_count] = { sound, volume * sound->volume, speed * sound->speed, 0 };
 		playing_sounds_count++;
 	}
 	_timescale = input.time_scale;
@@ -52,10 +55,10 @@ audio::AudioSample mix_sounds () {
 
 		auto sampl = sound.sound->data.sample( sound.t );
 
-		sound.t += 1.0f / SAMPLE_RATE * (double)_timescale;
+		sound.t += sound.speed / SAMPLE_RATE * (double)_timescale;
 
-		total.left  += sampl.left ;
-		total.right += sampl.right;
+		total.left  += sampl.left  * sound.volume;
+		total.right += sampl.right * sound.volume;
 
 		if (sound.t > (1.0f / sound.sound->data.sample_rate * (double)sound.sound->data.count)) {
 			playing_sounds[i] = playing_sounds[playing_sounds_count - 1];
