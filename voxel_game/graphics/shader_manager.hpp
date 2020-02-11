@@ -32,8 +32,10 @@ struct Shader {
 	gl::Shader* shader = nullptr;
 
 	Shader () {}
-	Shader (std::string name) {
+	Shader (std::string name, std::initializer_list<SharedUniformsInfo> uniforms={}) {
 		shader = shader_manager->load_shader(std::move(name));
+		for (auto& u : uniforms)
+			shader->bind_uniform_block(u);
 	}
 
 	void bind () {

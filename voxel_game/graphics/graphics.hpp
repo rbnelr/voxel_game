@@ -8,6 +8,8 @@
 #include "gl.hpp"
 #include "../util/animation.hpp"
 
+constexpr SharedUniformsInfo FOG_UNIFORMS = { "Fog", 2 };
+
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
 	// BF_NEG_X  = rotate3_Z(-deg(90)) * rotate3_X(deg(90)),
@@ -46,7 +48,7 @@ struct SkyboxGraphics {
 		}
 	};
 
-	Shader shader = { "skybox" };
+	Shader shader = Shader("skybox", { FOG_UNIFORMS });
 
 	Mesh<Vertex> mesh; // a inward facing cube of size 1
 
@@ -117,7 +119,7 @@ class Player;
 
 struct PlayerGraphics {
 
-	Shader shader = { "generic" };
+	Shader shader = Shader("generic", { FOG_UNIFORMS });
 
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
@@ -207,7 +209,7 @@ class Chunks;
 
 struct ChunkGraphics {
 
-	Shader shader = Shader("blocks");
+	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
 	Sampler2D sampler;
 
@@ -224,6 +226,42 @@ struct ChunkGraphics {
 class World;
 struct SelectedBlock;
 
+struct FogUniforms {
+	float3 sky_col =	srgb(47,189,245);
+	float _pad0;
+	float3 horiz_col =	srgb(224,237,241);
+	float _pad1;
+	float3 down_col =	srgb(41,49,52);
+
+	float coeff =	0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
+
+	static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
+		c.member<decltype(sky_col  )>(offsetof(FogUniforms, sky_col  ));
+		c.member<decltype(horiz_col)>(offsetof(FogUniforms, horiz_col));
+		c.member<decltype(down_col )>(offsetof(FogUniforms, down_col ));
+		c.member<decltype(coeff    )>(offsetof(FogUniforms, coeff    ));
+	}
+};
+struct Fog {
+	FogUniforms f;
+
+	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
+
+	void imgui () {
+		ImGui::ColorEdit3("sky_col", &f.sky_col.x);
+		ImGui::ColorEdit3("horiz_col", &f.horiz_col.x);
+		ImGui::ColorEdit3("down_col", &f.down_col.x);
+
+		ImGui::DragFloat("fog_base_coeff", &f.coeff, 0.05f);
+	}
+
+	void set (float max_view_dist) {
+		FogUniforms u = f;
+		u.coeff /= max_view_dist;
+		fog_uniforms.set(u);
+	}
+};
+
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
@@ -236,14 +274,16 @@ public:
 	CrosshairGraphics		crosshair;
 	SkyboxGraphics			skybox;
 
-	bool debug_frustrum_culling = true;
+	Fog						fog;
+
+	bool debug_frustrum_culling = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
 		if (ImGui::CollapsingHeader("Graphics")) {
 			common_uniforms.imgui();
-
+			fog.imgui();
 			chunk_graphics.imgui(chunks);
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);

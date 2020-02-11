@@ -2,6 +2,7 @@
 
 #define ALLOW_WIREFRAME 1
 $include "common.glsl"
+$include "fog.glsl"
 
 $if vertex
 	layout (location = 0) in vec3	pos_model;
@@ -14,16 +15,18 @@ $if vertex
 
 	const float[] LUT = float[]( 0.02, 0.08, 0.3, 0.6, 1.0 );
 
-	//out vec3	vs_pos_cam;
+	out vec3	vs_pos_cam;
 	out float	vs_brightness;
 	out vec2	vs_uv;
 	out float	vs_tex_indx;
 	out float	vs_hp_ratio;
 
 	void main () {
-		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
+		vec4 pos_cam = world_to_cam * vec4(pos_model + chunk_pos, 1);
+		
+		gl_Position =		cam_to_clip * pos_cam;
 
-		//vs_pos_cam =		pos_cam.xyz;
+		vs_pos_cam =		pos_cam.xyz;
 		vs_brightness =		LUT[brightness];
 		vs_uv =		        uv;
 		vs_tex_indx =		tex_indx;
@@ -34,7 +37,7 @@ $if vertex
 $endif
 
 $if fragment
-	//in vec3		vs_pos_cam;
+	in vec3		vs_pos_cam;
 	in float	vs_brightness;
 	in vec2	    vs_uv;
 	in float	vs_tex_indx;
@@ -50,6 +53,9 @@ $if fragment
 	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
+		float dist_sqr = dot(vs_pos_cam, vs_pos_cam);
+		vec3 dir_world = normalize(cam_to_world * vec4(vs_pos_cam, 0)).xyz / sqrt(dist_sqr);
+		
 		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	
 		if (vs_hp_ratio < 1) {
@@ -68,6 +74,7 @@ $if fragment
 			col.a = 1.0;
 		}
 
+		col.rgb = apply_fog(col.rgb, dist_sqr, dir_world);
 		FRAG_COL(col);
 	}
 $endif

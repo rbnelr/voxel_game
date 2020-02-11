@@ -318,6 +318,7 @@
     <None Include="shaders\generic.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
+    <None Include="shaders\fog.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt" />

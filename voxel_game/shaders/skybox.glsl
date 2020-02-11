@@ -1,6 +1,7 @@
 #version 330 core
 
 $include "common.glsl"
+$include "fog.glsl"
 
 $if vertex
 	layout (location = 0) in vec3 world_dir;
@@ -23,18 +24,6 @@ $if fragment
 	out		vec4	frag_color;
 
 	void main () {
-		vec3 dir = normalize(vs_world_dir);
-	
-		vec3 sky_col =		srgb(190,239,255);
-		vec3 horiz_col =	srgb(204,227,235);
-		vec3 down_col =		srgb(41,49,52);
-		
-		vec3 col;
-		if (dir.z > 0)
-			col = mix(horiz_col, sky_col, dir.z);
-		else
-			col = mix(horiz_col, down_col, -dir.z);
-	
-		frag_color = vec4(col, 1);
+		frag_color = vec4(fog_color(normalize(vs_world_dir)), 1);
 	}
 $endif

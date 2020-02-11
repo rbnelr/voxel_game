@@ -12,12 +12,4 @@ bool ShaderManager::check_file_changes () {
 	return false;
 }
 
-bool gl::Shader::get_uniform (std::string_view name, Uniform* u) {
-	auto ret = uniforms.find(name);
-	if (ret == uniforms.end())
-		return false;
-	*u = ret->second;
-	return true;
-}
-
 std::unique_ptr<ShaderManager> shader_manager = nullptr;

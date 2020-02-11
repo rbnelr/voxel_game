@@ -27,6 +27,8 @@ namespace gl {
 
 		bool get_uniform (std::string_view name, Uniform* type);
 
+		void bind_uniform_block (SharedUniformsInfo const& u);
+
 		~Shader () {
 			glDeleteProgram(shad);
 		}

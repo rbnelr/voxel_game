@@ -68,11 +68,26 @@ namespace gl {
 	}
 
 	void bind_uniform_blocks (Shader* shad) {
-		for (auto u : COMMON_UNIFORMS) {
+		for (auto& u : COMMON_UNIFORMS) {
 			GLuint index = glGetUniformBlockIndex(shad->shad, u.name);   
 			if (index != GL_INVALID_INDEX) {
 				glUniformBlockBinding(shad->shad, index, u.binding_point);
 			}
+		}
+	}
+
+	bool gl::Shader::get_uniform (std::string_view name, Uniform* u) {
+		auto ret = uniforms.find(name);
+		if (ret == uniforms.end())
+			return false;
+		*u = ret->second;
+		return true;
+	}
+
+	void gl::Shader::bind_uniform_block (SharedUniformsInfo const& u) {
+		GLuint index = glGetUniformBlockIndex(shad, u.name);   
+		if (index != GL_INVALID_INDEX) {
+			glUniformBlockBinding(shad, index, u.binding_point);
 		}
 	}
 

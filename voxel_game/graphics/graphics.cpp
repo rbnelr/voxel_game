@@ -424,6 +424,8 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 }
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
+	fog.set(world.chunks.chunk_generation_radius);
+	
 	frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
 	
 	if (activate_flycam && debug_frustrum_culling) {
