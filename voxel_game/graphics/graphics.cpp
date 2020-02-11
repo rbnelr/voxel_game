@@ -348,6 +348,9 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 	tile_textures.breaking_textures.bind();
 	sampler.bind(1);
 
+	static bool draw_lod_debug = false;
+	ImGui::Checkbox("draw_lod_debug", &draw_lod_debug);
+
 	if (shader) {
 		shader.bind();
 
@@ -364,6 +367,16 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 
 			if (debug_frustrum_culling)
 				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.frustrum_culled ? srgba(255,50,50) : srgba(50,255,50));
+
+			static lrgba cols[] = {
+				srgba(255),
+				srgba(255, 0, 0),
+				srgba(0, 255, 0),
+				srgba(0, 0, 255),
+			};
+
+			if (draw_lod_debug)
+				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, cols[chunk.lod]);
 
 			if (!chunk.frustrum_culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());

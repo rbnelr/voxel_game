@@ -54,7 +54,7 @@ $if fragment
 
 	void main () {
 		float dist_sqr = dot(vs_pos_cam, vs_pos_cam);
-		vec3 dir_world = normalize(cam_to_world * vec4(vs_pos_cam, 0)).xyz / sqrt(dist_sqr);
+		vec3 dir_world = (cam_to_world * vec4(vs_pos_cam, 0)).xyz / sqrt(dist_sqr);
 		
 		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	

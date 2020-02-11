@@ -19,7 +19,6 @@ vec3 fog_color (vec3 dir_world) {
 }
 
 vec3 apply_fog (vec3 old_col, float dist_sqr, vec3 dir_world) {
-	//float blend = exp(-dist * fog.coeff);
 	float blend = 1.0 - dist_sqr*dist_sqr * fog.coeff*fog.coeff*fog.coeff*fog.coeff;
 	vec3 fog_col = fog_color(dir_world);
 	

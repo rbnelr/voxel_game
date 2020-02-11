@@ -27,22 +27,22 @@ typedef int2	chunk_coord;
 #define CHUNK_DIM_2D		bpos2(CHUNK_DIM_X, CHUNK_DIM_Y)
 
 // get world chunk coord from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos2 pos) {
+inline chunk_coord get_chunk_from_block_pos (bpos2 pos, int lod=0) {
 
 	chunk_coord chunk_pos;
-	chunk_pos.x = pos.x >> CHUNK_DIM_SHIFT_X; // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
-	chunk_pos.y = pos.y >> CHUNK_DIM_SHIFT_Y;
+	chunk_pos.x = pos.x >> (CHUNK_DIM_SHIFT_X-lod); // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
+	chunk_pos.y = pos.y >> (CHUNK_DIM_SHIFT_Y-lod);
 
 	return chunk_pos;
 }
 // get world chunk coord and block pos in chunk from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr) {
+inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr, int lod=0) {
 
-	chunk_coord chunk_pos = get_chunk_from_block_pos((bpos2)pos_world);
+	chunk_coord chunk_pos = get_chunk_from_block_pos((bpos2)pos_world, lod);
 
 	if (bpos_in_chunk) {
-		bpos_in_chunk->x = pos_world.x & ((1 << CHUNK_DIM_SHIFT_X) -1);
-		bpos_in_chunk->y = pos_world.y & ((1 << CHUNK_DIM_SHIFT_Y) -1);
+		bpos_in_chunk->x = pos_world.x & ((1 << (CHUNK_DIM_SHIFT_X-lod)) -1);
+		bpos_in_chunk->y = pos_world.y & ((1 << (CHUNK_DIM_SHIFT_Y-lod)) -1);
 		bpos_in_chunk->z = pos_world.z;
 	}
 
@@ -74,6 +74,14 @@ class World;
 struct WorldGenerator;
 class Player;
 
+static inline constexpr int _block_count (int lod_levels) {
+	int count = 0;
+	for (int lod=0; lod<lod_levels; ++lod) {
+		count += (CHUNK_DIM_Z >> lod) * (CHUNK_DIM_Y >> lod) * (CHUNK_DIM_X >> lod);
+	}
+	return count;
+};
+
 class Chunk {
 	NO_MOVE_COPY_CLASS(Chunk)
 public:
@@ -95,15 +103,31 @@ public:
 	bool frustrum_culled;
 
 	// data block
-	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
+
+	Block	blocks[_block_count(4)];
+	int lod_offsets[4] = {
+		_block_count(0),
+		_block_count(1),
+		_block_count(2),
+		_block_count(3),
+	};
+
+	// get block ptr
+	Block* get_block (bpos pos, int lod=0) {
+		Block* level = blocks + lod_offsets[lod];
+		return level + pos.z * (CHUNK_DIM_Y >> lod) * (CHUNK_DIM_X >> lod) + pos.y * (CHUNK_DIM_X >> lod) + pos.x;
+	}
+	Block* get_block_flat (int index) {
+		return &blocks[index];
+	}
+
+	int lod = -1;
 
 	// Gpu mesh data
 	ChunkMesh mesh;
 
-	// get block ptr
-	Block* get_block (bpos pos) {
-		return &blocks[pos.z][pos.y][pos.x];
-	}
+	void calc_lod (int level);
+	void calc_lods ();
 
 	void remesh (Chunks& chunks, ChunkGraphics const& graphics);
 

@@ -244,6 +244,7 @@ struct FogUniforms {
 };
 struct Fog {
 	FogUniforms f;
+	bool enable = false;
 
 	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
 
@@ -253,11 +254,16 @@ struct Fog {
 		ImGui::ColorEdit3("down_col", &f.down_col.x);
 
 		ImGui::DragFloat("fog_base_coeff", &f.coeff, 0.05f);
+
+		ImGui::Checkbox("fog_enable", &enable);
 	}
 
 	void set (float max_view_dist) {
 		FogUniforms u = f;
-		u.coeff /= max_view_dist;
+		if (enable)
+			u.coeff /= max_view_dist;
+		else
+			u.coeff = 0;
 		fog_uniforms.set(u);
 	}
 };

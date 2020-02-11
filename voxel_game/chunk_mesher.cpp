@@ -9,20 +9,24 @@ struct Chunk_Mesher {
 	std::vector<ChunkMesh::Vertex>* opaque_vertices;
 	std::vector<ChunkMesh::Vertex>* tranparent_vertices;
 
+	int lod;
+	int3 size;
+	int scale;
+
 #if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	Chunk* neighbour_chunks[3][3];
 
 	Block const* query_block (bpos_t pos_x, bpos_t pos_y, bpos_t pos_z) {
-		if (pos_z < 0 || pos_z >= CHUNK_DIM_Z)
+		if (pos_z < 0 || pos_z >= size.z)
 			return &B_OUT_OF_BOUNDS;
 
 		bpos pos_in_chunk;
-		chunk_coord neighbour = get_chunk_from_block_pos(bpos(pos_x, pos_y, pos_z), &pos_in_chunk); // pass in local block pos as world block pos, get -1,-1 to +1,+1 coords for our neighbour chunks instead of world chunk coords
+		chunk_coord neighbour = get_chunk_from_block_pos(bpos(pos_x, pos_y, pos_z), &pos_in_chunk, lod); // pass in local block pos as world block pos, get -1,-1 to +1,+1 coords for our neighbour chunks instead of world chunk coords
 
 		Chunk* chunk = neighbour_chunks[neighbour.y +1][neighbour.x +1];
 		if (!chunk) return &B_NO_CHUNK;
 
-		return chunk->get_block(pos_in_chunk);
+		return chunk->get_block(pos_in_chunk, lod);
 	}
 	Block const* query_block (bpos p) {
 		return query_block(p.x, p.y, p.z);
@@ -90,6 +94,10 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 	opaque_vertices->clear();
 	tranparent_vertices->clear();
 
+	lod = chunk->lod;
+	size = int3(CHUNK_DIM_X >> chunk->lod, CHUNK_DIM_Y >> chunk->lod, CHUNK_DIM_Z >> chunk->lod);
+	scale = 1 << chunk->lod;
+
 #if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	neighbour_chunks[0][0] = chunks.query_chunk(chunk->coord +chunk_coord(-1,-1));
 	neighbour_chunks[0][1] = chunks.query_chunk(chunk->coord +chunk_coord( 0,-1));
@@ -104,10 +112,10 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 
 	{
 		bpos i;
-		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-					auto* block = chunk->get_block(i);
+		for (i.z=0; i.z<size.z; ++i.z) {
+			for (i.y=0; i.y<size.y; ++i.y) {
+				for (i.x=0; i.x<size.x; ++i.x) {
+					auto* block = chunk->get_block(i, chunk->lod);
 
 					if (block->type != BT_AIR) {
 
@@ -157,7 +165,7 @@ uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 // float	hp_ratio;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
-		{ (uint8v3)bpos(x,y,z), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u,v), calc_texture_index(face), b->hp }
+		{ (uint8v3)(bpos(x,y,z) * scale), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u*scale,v*scale), calc_texture_index(face), b->hp }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \

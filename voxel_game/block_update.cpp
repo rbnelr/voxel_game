@@ -76,7 +76,7 @@ void BlockUpdate::update_blocks (Chunks& chunks) {
 			indx = block_pattern(indx);
 
 			// get block with flat index
-			Block* b = &chunk.blocks[0][0][indx];
+			Block* b = chunk.get_block_flat(indx);
 
 			// reconstruct 3d index from flat index
 			bpos bp;

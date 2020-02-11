@@ -155,6 +155,9 @@ void Chunks::remesh_all () {
 
 void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player) {
 
+	static bool use_lod = true;
+	ImGui::Checkbox("use_lod", &use_lod);
+
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
@@ -165,6 +168,9 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, 
 	};
 	auto chunk_is_out_of_unload_radius = [&] (chunk_coord pos) {
 		return chunk_dist_to_player(pos) > (chunk_generation_radius + chunk_deletion_hysteresis);
+	};
+	auto chunk_lod = [&] (chunk_coord pos) {
+		return clamp(floori(log2f(chunk_dist_to_player(pos) / chunk_generation_radius * 16)), 0,3);
 	};
 
 	{ // chunk unloading
@@ -187,9 +193,18 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, 
 		chunk_coord cp;
 		for (cp.x = start.x; cp.x<end.x; ++cp.x) {
 			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-				if (chunk_is_in_load_radius(cp) && !query_chunk(cp)) {
-					// chunk is within chunk_generation_radius and not yet generated
-					chunks_to_generate.push_back(cp);
+				auto* chunk = query_chunk(cp);
+
+				if (chunk) {
+					auto prev_lod = chunk->lod;
+					chunk->lod = use_lod ? chunk_lod(cp) : 0;
+					if (chunk->lod != prev_lod)
+						chunk->needs_remesh = true;
+				} else {
+					if (chunk_is_in_load_radius(cp)) {
+						// chunk is within chunk_generation_radius and not yet generated
+						chunks_to_generate.push_back(cp);
+					}
 				}
 			}
 		}
@@ -202,12 +217,59 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, 
 		int count = 0;
 		for (auto& cp : chunks_to_generate) {
 			Chunk* new_chunk = load_chunk(world, world_gen, cp);
+			new_chunk->lod = use_lod ? chunk_lod(cp) : 0;
 
 			if (++count == max_chunks_generated_per_frame)
 				break;
 		}
 	}
 
+}
+
+template <typename FUNC>
+Block clac_block_lod (FUNC get_block) {
+	int dark_count = 0;
+	for (int i=0; i<8; ++i) {
+		if (get_block(i)->dark)
+			dark_count++; 
+	}
+	
+	int grass_count = 0;
+	for (int i=0; i<8; ++i) {
+		if (get_block(i)->type == BT_GRASS)
+			if (++grass_count == 4)
+				return { BT_GRASS, dark_count > 4, 255 }; 
+	}
+
+	for (int j=0; j<8; ++j) {
+		auto* b = get_block(j);
+
+		int count = 0;
+		for (int i=0; i<8; ++i) {
+			if (get_block(i)->type == b->type)
+				if (++count == 4) // Dominant block
+					return { b->type, dark_count > 4, 255 }; 
+		}
+	}
+	return { get_block(0)->type, dark_count > 4, 255 }; 
+}
+
+void Chunk::calc_lod (int level) {
+	int3 bp;
+	for (bp.z=0; bp.z<CHUNK_DIM_Z >> level; ++bp.z) {
+		for (bp.y=0; bp.y<CHUNK_DIM_Y >> level; ++bp.y) {
+			for (bp.x=0; bp.x<CHUNK_DIM_X >> level; ++bp.x) {
+				*get_block(bp, level) = clac_block_lod([=] (int i) {
+					return get_block(bp * 2 + int3(i & 1, (i>>1) & 1, (i>>2) & 1), level - 1);
+				});
+			}
+		}
+	}
+}
+void Chunk::calc_lods () {
+	calc_lod(1);
+	calc_lod(2);
+	calc_lod(3);
 }
 
 void Chunks::update_chunks_brightness () {
@@ -225,11 +287,16 @@ void Chunks::update_chunks_brightness () {
 }
 
 void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
+	if (ImGui::Button("trigger_remesh_all"))
+		for (Chunk& chunk : *this)
+			chunk.needs_remesh = true;
+
 	for (Chunk& chunk : *this) {
 
 		if (chunk.needs_remesh) {
 			auto timer = Timer::start();
 
+			chunk.calc_lods();
 			chunk.remesh(*this, graphics);
 
 			auto time = timer.end();
