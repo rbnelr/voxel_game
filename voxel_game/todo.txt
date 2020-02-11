@@ -104,6 +104,9 @@ TODO
 
  npcs
 
+ debug mipmaps, they almost look like they are generated incorrectly, tree leaves look like they should be darker ?
+ -maybe mipmaps can be modified manually to get less better aliasing in the distance, esp. with alpha blending
+
  The epsilon is very finnicky,
  -it needs to be small enough to actually act like an epsilon (we teleport the player slightly above the ground and away from walls by this epsilon)
    if it is too big then gravity will not accelerate the player fast enough with my 144hz framerate too "reach" the ground fast enough so that suddenly the player only "touches" the ground every 3 frames

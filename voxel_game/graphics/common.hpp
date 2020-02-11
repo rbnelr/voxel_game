@@ -1,7 +1,7 @@
 #pragma once
 #include "gl.hpp"
 #include "camera.hpp"
-#include "shader_manager.hpp"
+#include "shaders.hpp"
 #include "../input.hpp"
 
 struct ViewUniforms {

@@ -317,7 +317,7 @@ namespace gl {
 					{
 						std::string filepath = string(path).append(arg);
 						std::string source;
-						if (!kiss::read_text_file(filepath.c_str(), &source)) {
+						if (!kiss::load_text_file(filepath.c_str(), &source)) {
 							logf(ERROR, "Could not find include file \"%s\" for shader \"%s\"!\n", filepath.c_str(), shader_name);
 							return false;
 						}
@@ -407,7 +407,7 @@ namespace gl {
 		// Load shader base source file
 		string filepath = prints("%s%s.glsl", shaders_directory, name.c_str());
 		string source;
-		if (!kiss::read_text_file(filepath.c_str(), &source)) {
+		if (!kiss::load_text_file(filepath.c_str(), &source)) {
 			logf(ERROR, "Could not load base source file for shader \"%s\"!\n", name.c_str());
 			return s;
 		}

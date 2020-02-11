@@ -15,7 +15,7 @@ struct FPS_Display {
 	float update_period = .5f; // sec
 	float update_timer = 0;
 
-	int histogram_height = 40;
+	int histogram_height = 60;
 
 	void display_fps () {
 		dt_avg.push(input.real_dt);
@@ -31,7 +31,7 @@ struct FPS_Display {
 			ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
 
 			ImGui::SetNextItemWidth(-1);
-			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.data(), (int)dt_avg.count(), 0, "frametimes:", 0, 0.033f, ImVec2(0, (float)histogram_height));
+			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.data(), (int)dt_avg.count(), 0, "frametimes:", 0, 1.0f/20, ImVec2(0, (float)histogram_height));
 
 			if (ImGui::BeginPopupContextItem("##frametimes_histogram popup")) {
 				ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);

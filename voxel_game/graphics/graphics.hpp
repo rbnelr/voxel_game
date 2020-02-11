@@ -2,7 +2,7 @@
 #include "../kissmath.hpp"
 #include "../blocks.hpp"
 #include "common.hpp"
-#include "glshader.hpp"
+#include "shaders.hpp"
 #include "texture.hpp"
 #include "debug_graphics.hpp"
 #include "gl.hpp"

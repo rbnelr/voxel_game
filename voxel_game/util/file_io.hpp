@@ -9,16 +9,16 @@ namespace kiss {
 
 	// reads text file into a std::string (overwriting it's previous contents)
 	// returns false on fail (file not found etc.)
-	bool read_text_file (const char* filename, std::string* out);
+	bool load_text_file (const char* filename, std::string* out);
 
 	// reads text file into a std::string
 	// returns "" on fail (file not found etc.)
-	std::string read_text_file (const char* filename);
+	std::string load_text_file (const char* filename);
 
 	typedef unsigned char byte;
 	typedef std::unique_ptr<byte[]> raw_data;
 
-	raw_data read_binary_file (const char* filename, uint64_t* size);
+	raw_data load_binary_file (const char* filename, uint64_t* size);
 
 	// out_filename is optional
 	// "hello/world.txt" => path: "hello/" out_filename: "world.txt"

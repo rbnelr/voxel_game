@@ -146,9 +146,6 @@
     <ClInclude Include="graphics\common.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\shader_manager.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\image.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
@@ -203,6 +200,15 @@
     </ClInclude>
     <ClInclude Include="..\..\dear_imgui\imconfig.h">
       <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="audio\audio.hpp">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\shaders.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="audio\read_wav.hpp">
+      <Filter>audio</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -337,9 +343,6 @@
     <ClCompile Include="graphics\common.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\shader_manager.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="graphics\image.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
@@ -371,6 +374,15 @@
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
       <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="audio\audio.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\shaders.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="audio\read_wav.cpp">
+      <Filter>audio</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -434,6 +446,9 @@
     </Filter>
     <Filter Include="graphics">
       <UniqueIdentifier>{4271f123-16a3-4d5d-812b-f890d4962a09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="audio">
+      <UniqueIdentifier>{8308f250-c772-459a-9e30-8daf4e621711}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

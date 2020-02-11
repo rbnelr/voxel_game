@@ -1,6 +1,6 @@
 #pragma once
 #include "../kissmath.hpp"
-#include "shader_manager.hpp"
+#include "shaders.hpp"
 #include "camera.hpp"
 
 struct DebugGraphics {

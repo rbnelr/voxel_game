@@ -46,6 +46,8 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 		b->type = BT_AIR;
 
 		chunk->block_changed(chunks, block.pos);
+
+		break_sound.play();
 	}
 }
 

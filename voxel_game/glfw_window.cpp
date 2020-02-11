@@ -192,7 +192,7 @@ void glfw_gameloop () {
 	}
 #endif
 
-	shader_manager = std::make_unique<ShaderManager>();
+	shaders = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
 
 	imgui.init();
@@ -239,7 +239,7 @@ void glfw_gameloop () {
 	imgui.destroy();
 
 	debug_graphics = nullptr;
-	shader_manager = nullptr;
+	shaders = nullptr;
 
 #if 0
 	if (VAO_REQUIRED) {
