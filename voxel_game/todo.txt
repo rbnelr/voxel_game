@@ -71,11 +71,38 @@ DONE:
  -player physics should maybe be handled outside player class by a physics manager that later ensures that there are not wierd order dependencies between players and npcs
  
  imgui console log
+ 
+ view frustrum colling of chunk drawcalls
 
 TODO
 -FEATURES:
 
- view frustrum colling of chunk drawcalls
+ merge current sound code
+ 
+ rethink tool animations
+
+ add inventory
+ -inventory gui
+
+ write actual air control
+ -no slowdown in air with wasd not pressed, press s to slow down when going forward
+ -ie. apply accel not based on vel - desired_vel but directly from move dir, but clamped to a max speed
+ -max speed set when starting jump? so that walk->jump->press sprint does not speed you up in the air, but sprint jump also does not slow you down
+ -at least a little air control is needed to get up blocks when jumping while touching a block
+ 
+ make better sprinting code
+  sprinting should have a drawback over walking, or it just gets used all the time
+   -> stamina?
+   -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
+   -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
+ 
+ add headbob?
+
+ implement light level, night and torches
+ 
+ sounds with openAL instead
+
+ npcs
 
  The epsilon is very finnicky,
  -it needs to be small enough to actually act like an epsilon (we teleport the player slightly above the ground and away from walls by this epsilon)
@@ -95,33 +122,11 @@ TODO
    -> at the beginning of the frame a global block pos gets set as origin for that frame, coord->float just substracts that origin and float->coord adds it again,
       now this is almost automatic, you just need to make sure to not store float pos_worlds across frames because they get invalidated by the origin moving, just like an iterator into a vector gets invalidated by the vector expanding
 
- rethink tool animations
-
- sounds!
-
- add inventory
-
- write actual air control
- -no slowdown in air with wasd not pressed, press s to slow down when going forward
- -ie. apply accel not based on vel - desired_vel but directly from move dir, but clamped to a max speed
- -max speed set when starting jump? so that walk->jump->press sprint does not speed you up in the air, but sprint jump also does not slow you down
- -at least a little air control is needed to get up blocks when jumping while touching a block
- 
- make better sprinting code
-  sprinting should have a drawback over walking, or it just gets used all the time
-   -> stamina?
-   -> only allow forward, need to initiate sprint, when turning camera too quickly sprint stops
-   -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
- 
- add headbob?
-
  underwater fog
 
  reflections for water?
  -screenspace reflection
-
- implement light level, night and torches
-
+ 
  look at COLLISION_SEPERATION_EPSILON, and if the raycast physics can live without it, being grounded should leave pos==block_top and vel.z==0
 
  even if getting stuck inside a block (which should be numerically impossible with a timestep of 0.05 as long as the integers are representable as floats (max would be 16,777,217))
