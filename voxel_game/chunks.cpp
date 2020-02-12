@@ -213,11 +213,11 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, 
 
 		int count = 0;
 		for (auto& cp : chunks_to_generate) {
+			if (count++ >= max_chunks_generated_per_frame)
+				break;
+
 			Chunk* new_chunk = load_chunk(world, world_gen, cp);
 			new_chunk->lod = use_lod ? chunk_lod(cp) : 0;
-
-			if (++count == max_chunks_generated_per_frame)
-				break;
 		}
 	}
 
@@ -287,7 +287,10 @@ void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
 	int count = 0;
 
 	for (Chunk& chunk : *this) {
-		if (chunk.needs_remesh && count++ < max_chunks_meshed_per_frame) {
+		if (chunk.needs_remesh) {
+			if (count++ >= max_chunks_meshed_per_frame)
+				break;
+
 			auto timer = Timer::start();
 
 			chunk.calc_lods();

@@ -219,6 +219,12 @@
     <ClInclude Include="stb_rect_pack.hpp">
       <Filter>stb</Filter>
     </ClInclude>
+    <ClInclude Include="util\threadsafe_queue.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\threadpool.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -395,6 +401,9 @@
     </ClCompile>
     <ClCompile Include="stb_rect_pack.cpp">
       <Filter>stb</Filter>
+    </ClCompile>
+    <ClCompile Include="util\threadpool.cpp">
+      <Filter>util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

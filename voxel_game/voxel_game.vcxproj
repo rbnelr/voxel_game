@@ -189,6 +189,8 @@
     <ClInclude Include="util\circular_buffer.hpp" />
     <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />
+    <ClInclude Include="util\threadpool.hpp" />
+    <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />
@@ -262,6 +264,7 @@
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
+    <ClCompile Include="util\threadpool.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />
     <ClCompile Include="dear_imgui.cpp" />
