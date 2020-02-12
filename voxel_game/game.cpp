@@ -1,6 +1,7 @@
 #include "glfw_window.hpp"
 #include "game.hpp"
 #include "graphics/gl.hpp"
+#include "util/threadpool.hpp"
 
 //
 bool FileExists (const char* path) {
@@ -15,6 +16,9 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
+	set_thread_description("gameloop");
+	set_gameloop_thread_priority();
+
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
 

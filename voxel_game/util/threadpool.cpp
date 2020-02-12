@@ -17,6 +17,10 @@
 		return wstr;
 	}
 
+	void set_gameloop_thread_priority () {
+		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+	}
+
 	void set_thread_description (std::string const& description) {
 		SetThreadDescription(GetCurrentThread(), utf8_to_wchar(description).c_str());
 	}

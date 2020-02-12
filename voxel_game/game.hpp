@@ -11,6 +11,7 @@ extern bool _use_potatomode;
 struct FPS_Display {
 	RunningAverage<float> dt_avg = RunningAverage<float>(64);
 	float latest_avg_dt;
+	float latest_min_dt, latest_max_dt, latest_std_dev_dt;
 
 	float update_period = .5f; // sec
 	float update_timer = 0;
@@ -21,14 +22,16 @@ struct FPS_Display {
 		dt_avg.push(input.real_dt);
 
 		if (update_timer <= 0) {
-			latest_avg_dt = dt_avg.calc_avg();
+			latest_avg_dt = dt_avg.calc_avg(&latest_min_dt, &latest_max_dt, &latest_std_dev_dt);
 			update_timer += update_period;
 		}
 		update_timer -= input.real_dt;
 
 		{
 			float avg_fps = 1.0f / latest_avg_dt;
-			ImGui::Text("avg fps: %5.1f (%6.3f ms)  ----  timestep: %6.3f ms", avg_fps, latest_avg_dt * 1000, input.dt * 1000);
+			ImGui::Text("avg fps: %5.1f (%6.3fms  min: %6.3f  max: %6.3f  stddev: %6.3f)",
+				avg_fps, latest_avg_dt * 1000, latest_min_dt * 1000, latest_max_dt * 1000, latest_std_dev_dt * 1000);
+			ImGui::Text("timestep: %6.3fms", input.dt * 1000);
 
 			ImGui::SetNextItemWidth(-1);
 			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.data(), (int)dt_avg.count(), 0, "frametimes:", 0, 1.0f/20, ImVec2(0, (float)histogram_height));

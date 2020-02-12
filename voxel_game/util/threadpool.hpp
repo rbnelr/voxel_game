@@ -6,6 +6,11 @@
 // allows for easy overview of threads in debugger
 void set_thread_description (std::string const& description);
 
+// std::thread::hardware_concurrency() gets the number of cpu threads
+
+// set priority of gameloop thread to be higher than normal threads to hopefully avoid cpu spiked which cause framedrops
+void set_gameloop_thread_priority ();
+
 // threadpool
 // threadpool.push(Job) to queue a job for execution on a thread
 // threads call Job.execute() and push the return value into threadpool.results

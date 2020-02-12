@@ -32,11 +32,35 @@ public:
 		buf.push(val);
 	}
 
-	T calc_avg () {
+	T calc_avg (T* out_min=nullptr, T* out_max=nullptr, T* out_std_dev=nullptr) {
 		T total = 0;
-		for (size_t i=0; i<buf.count(); ++i)
-			total += buf.get_oldest(i);
 
-		return total / (T)buf.count();
+		for (size_t i=0; i<buf.count(); ++i) {
+			auto val = buf.get_oldest(i);
+			total += val;
+		}
+
+		T mean = total / (T)buf.count();
+
+		if (out_min || out_max || out_std_dev) {
+			T min = +INF;
+			T max = -INF;
+			T variance = 0;
+
+			for (size_t i=0; i<buf.count(); ++i) {
+				auto val = buf.get_oldest(i);
+
+				min = std::min(min, val);
+				max = std::max(max, val);
+
+				T tmp = val - mean;
+				variance += tmp*tmp;
+			}
+
+			if (out_min) *out_min = min;
+			if (out_max) *out_max = max;
+			if (out_std_dev) *out_std_dev = std::sqrt(variance / ((T)buf.count() - 1));
+		}
+		return mean;
 	}
 };

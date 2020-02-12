@@ -4,6 +4,7 @@
 #include "util/move_only_class.hpp"
 #include "util/string.hpp"
 #include "util/running_average.hpp"
+#include "util/threadpool.hpp"
 #include "graphics/graphics.hpp" // for ChunkMesh
 using namespace kiss;
 
@@ -138,6 +139,8 @@ public:
 
 	void whole_chunk_changed (Chunks& chunks);
 };
+
+
 
 class Chunks {
 	// avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
