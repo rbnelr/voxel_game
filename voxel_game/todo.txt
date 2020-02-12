@@ -78,8 +78,6 @@ DONE:
 
 TODO
 -FEATURES:
- 
- rethink tool animations
 
  add inventory
  -inventory gui

@@ -17,7 +17,7 @@ Texture2D::Texture2D (char const* filename, bool srgb, bool gen_mips): Texture2D
 	uint64_t file_size;
 	auto file_data = kiss::load_binary_file(filename, &file_size);
 	if (!file_data) {
-		logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
+		logf(ERROR, "Could not load file \"%s\" to load texture!", filename);
 		return;
 	}
 	
@@ -32,7 +32,7 @@ Texture2D::Texture2D (char const* filename, bool srgb, bool gen_mips): Texture2D
 	if (flt) {
 		auto pixels = stbi_loadf_from_memory(file_data.get(), (int)file_size, &size.x, &size.y, NULL, channels);
 		if (!pixels) {
-			logf(ERROR, "Could not read file \"%s\" to load texture!", filename);
+			logf(ERROR, "Could not load file \"%s\" to load texture!", filename);
 			return;
 		}
 

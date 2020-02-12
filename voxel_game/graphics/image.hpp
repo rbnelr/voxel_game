@@ -80,7 +80,7 @@ public:
 		pixels[y * size.x + x] = val;
 	}
 	inline void set (int2 pos, T const& val) {
-		return get(pos.x, pos.y, val);
+		return set(pos.x, pos.y, val);
 	}
 
 	// Loads a image file from disk, potentially converting it to the target pixel type
@@ -104,4 +104,27 @@ public:
 	// rotate by 90 180 deg
 	// resize
 	// etc.
+
+	void clear (T col) {
+		int2 p;
+		for (p.y=0; p.y<size.y; ++p.y) {
+			for (p.x=0; p.x<size.x; ++p.x) {
+				set(p, col);
+			}
+		}
+	}
+
+	static void rect_copy (Image<T> const& src, int2 src_pos, Image<T>& dst, int2 dst_pos, int2 size) {
+		int2 p;
+		for (p.y=0; p.y<size.y; ++p.y) {
+			for (p.x=0; p.x<size.x; ++p.x) {
+				dst.set(p + dst_pos, src.get(p + src_pos));
+			}
+		}
+	}
+	static Image<T> rect_copy (Image<T> const& src, int2 src_pos, int2 size) {
+		Image<T> img = Image<T>(size);
+		rect_copy(src, src_pos, img, 0, size);
+		return img;
+	}
 };

@@ -7,6 +7,7 @@
 #include "debug_graphics.hpp"
 #include "gl.hpp"
 #include "../util/animation.hpp"
+#include "atlas.hpp"
 
 constexpr SharedUniformsInfo FOG_UNIFORMS = { "Fog", 2 };
 
@@ -78,13 +79,13 @@ struct BlockHighlightGraphics {
 	void draw (float3 pos, BlockFace face);
 };
 
-struct CrosshairGraphics {
+class Player;
+
+struct GuiGraphics {
 
 	struct Vertex {
 		float4	pos_clip;
 		float2	uv;
-
-		Vertex (float4 p, float2 uv): pos_clip{p}, uv{uv} {}
 
 		static void bind (Attributes& a) {
 			a.add<decltype(pos_clip)>(0, "pos_clip", sizeof(Vertex), offsetof(Vertex, pos_clip));
@@ -92,17 +93,28 @@ struct CrosshairGraphics {
 		}
 	};
 
-	Shader shader = { "crosshair" };
-	Texture2D texture = { "textures/crosshair.png", false };
+	Shader shader = { "gui" };
+
+	AtlasedTexture crosshair		= { "textures/crosshair.png" };
+	AtlasedTexture hotbar			= { "textures/hotbar.png" };
+	AtlasedTexture hotbar_selected	= { "textures/hotbar_selected.png" };
+
+	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &hotbar, &hotbar_selected }, 64, srgba8(0), 1, false);
 
 	Sampler2D sampler;
 
-	int2 prev_window_size = -1;
+	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
 
-	int crosshair_size = 2;
+	float gui_scale = 2; // pixel multiplier
 
-	void draw ();
+	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px);
+
+	void draw_crosshair ();
+	void draw_toolbar_slot (AtlasedTexture tex, int index);
+	void draw_toolbar (Player const& player);
+
+	void draw (Player const& player);
 };
 
 struct GenericVertex {
@@ -114,8 +126,6 @@ struct GenericVertex {
 		a.add<decltype(color    )>(1, "color"    , sizeof(GenericVertex), offsetof(GenericVertex, color    ));
 	}
 };
-
-class Player;
 
 struct PlayerGraphics {
 
@@ -277,7 +287,7 @@ public:
 
 	BlockHighlightGraphics	block_highlight;
 
-	CrosshairGraphics		crosshair;
+	GuiGraphics				gui;
 	SkyboxGraphics			skybox;
 
 	Fog						fog;

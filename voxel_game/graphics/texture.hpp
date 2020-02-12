@@ -115,10 +115,10 @@ public:
 		constexpr auto format = get_format<T>();
 
 		if (format.flt) {
-			upload(img.data(), img.size, format.channels, gen_mips);
+			upload((float*)img.data(), img.size, format.channels, gen_mips);
 		} else {
 			assert(format.bits == 8);
-			upload(img.data(), img.size, format.channels, srgb, gen_mips);
+			upload((uint8_t*)img.data(), img.size, format.channels, srgb, gen_mips);
 		}
 	}
 

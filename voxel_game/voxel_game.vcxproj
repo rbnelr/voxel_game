@@ -182,6 +182,9 @@
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="graphics\atlas.hpp" />
+    <ClInclude Include="stb\stb_rect_pack.h" />
+    <ClInclude Include="stb_rect_pack.hpp" />
     <ClInclude Include="util\animation.hpp" />
     <ClInclude Include="util\circular_buffer.hpp" />
     <ClInclude Include="util\clean_windows_h.hpp" />
@@ -258,6 +261,7 @@
     <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
+    <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />
     <ClCompile Include="dear_imgui.cpp" />
@@ -318,7 +322,7 @@
     <None Include="shaders\blocks.glsl" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
-    <None Include="shaders\crosshair.glsl" />
+    <None Include="shaders\gui.glsl" />
     <None Include="shaders\generic.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />

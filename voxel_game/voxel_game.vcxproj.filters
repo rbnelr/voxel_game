@@ -210,6 +210,15 @@
     <ClInclude Include="audio\read_wav.hpp">
       <Filter>audio</Filter>
     </ClInclude>
+    <ClInclude Include="graphics\atlas.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="stb\stb_rect_pack.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_rect_pack.hpp">
+      <Filter>stb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -384,6 +393,9 @@
     <ClCompile Include="audio\read_wav.cpp">
       <Filter>audio</Filter>
     </ClCompile>
+    <ClCompile Include="stb_rect_pack.cpp">
+      <Filter>stb</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -404,10 +416,10 @@
     <None Include="shaders\generic.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\crosshair.glsl">
+    <None Include="shaders\fog.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\fog.glsl">
+    <None Include="shaders\gui.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

@@ -8,6 +8,19 @@ using namespace kiss;
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 #define QUAD_INWARD(a,b,c,d) a,d,b, b,d,c // facing inward
 
+template <typename T>
+void push_quad (std::vector<T>* vec, T a, T b, T c, T d) {
+	vec->resize( vec->size() + 6 );
+	T* out = &(*vec)[vec->size() - 6];
+
+	*out++ = b;
+	*out++ = c;
+	*out++ = a;
+	*out++ = a;
+	*out++ = c;
+	*out++ = d;
+}
+
 SkyboxGraphics::SkyboxGraphics () {
 	static constexpr Vertex LLL = { float3(-1,-1,-1) };
 	static constexpr Vertex HLL = { float3(+1,-1,-1) };
@@ -139,6 +152,58 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	}
 }
 
+void GuiGraphics::draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px) {
+	float2 a = (float2)pos_px				/ (float2)input.window_size * 2 - 1;
+	float2 b = (float2)(pos_px + size_px)	/ (float2)input.window_size * 2 - 1;
+
+	push_quad(&vertices,
+		{ float4(a.x, a.y, 0, 1), tex.atlas_pos + float2(0,0) * tex.atlas_size },
+		{ float4(b.x, a.y, 0, 1), tex.atlas_pos + float2(1,0) * tex.atlas_size },
+		{ float4(b.x, b.y, 0, 1), tex.atlas_pos + float2(1,1) * tex.atlas_size },
+		{ float4(a.x, b.y, 0, 1), tex.atlas_pos + float2(0,1) * tex.atlas_size }
+	);
+}
+
+void GuiGraphics::draw_crosshair () {
+	float2 size = (float2)crosshair.size_px * gui_scale;
+	float2 pos = (float2)input.window_size / 2 - (float2)size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
+
+	draw_texture(crosshair, pos, size);
+}
+void GuiGraphics::draw_toolbar_slot (AtlasedTexture tex, int index) {
+
+}
+void GuiGraphics::draw_toolbar (Player const& player) {
+
+}
+
+void GuiGraphics::draw (Player const& player) {
+
+	draw_crosshair();
+	draw_toolbar(player);
+
+	auto draw_toolbar_slot = [&] () {
+
+		float2 size = (float2)crosshair.size_px * gui_scale;
+	};
+
+	if (shader && vertices.size() > 0) {
+		shader.bind();
+
+		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		gui_atlas.bind();
+		sampler.bind(0);
+
+		mesh.upload(vertices);
+		vertices.clear();
+
+		mesh.bind();
+		mesh.draw();
+	}
+}
+#if 0
 void CrosshairGraphics::draw () {
 	if (!equal(input.window_size, prev_window_size)) {
 		prev_window_size = input.window_size;
@@ -163,20 +228,8 @@ void CrosshairGraphics::draw () {
 
 		mesh.upload(vertices, 6);
 	}
-
-	if (shader) {
-		shader.bind();
-
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
-
-		glActiveTexture(GL_TEXTURE0 + 0);
-		texture.bind();
-		sampler.bind(1);
-
-		mesh.bind();
-		mesh.draw();
-	}
 }
+#endif
 
 PlayerGraphics::PlayerGraphics () {
 	std::vector<GenericVertex> verts;
@@ -490,7 +543,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam)
-			crosshair.draw();
+			gui.draw(world.player);
 
 		glEnable(GL_DEPTH_TEST);
 	}
