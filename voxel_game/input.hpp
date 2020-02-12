@@ -32,7 +32,7 @@ public:
 	float2 cursor_pos; // in pixels, float because glfw retuns doubles
 
 	float2 mouse_delta;
-	float mouse_wheel_delta; // in steps, float because glfw retuns doubles
+	int mouse_wheel_delta; // in "clicks"
 
 	Button buttons[GLFW_KEY_LAST +1];
 

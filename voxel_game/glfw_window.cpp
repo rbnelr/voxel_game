@@ -119,7 +119,10 @@ void glfw_mouse_move_event (GLFWwindow* window, double xpos, double ypos) {
 		input.mouse_delta += delta;
 }
 void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
-	input.mouse_wheel_delta += (float)yoffset;
+	// assume int, if glfw_mouse_scroll ever gives us 0.2 for ex. this might break
+	// But the gameplay code wants to assume mousewheel moves in "clicks", for item swapping
+	// I've personally never seen a mousewheel that does not move in "clicks" anyway
+	input.mouse_wheel_delta += (int)ceil(abs(yoffset)) * (int)normalizesafe((float)yoffset); // -1.1f => -2    0 => 0    0.3f => +1
 }
 
 void glfw_register_callbacks (GLFWwindow* window) {

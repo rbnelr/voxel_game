@@ -45,6 +45,25 @@ public:
 	void update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
 };
 
+struct InventorySlot {
+
+};
+
+class Inventory {
+public:
+	bool is_open = false;
+
+	struct Quickbar {
+		InventorySlot slots[10];
+
+		int selected = 0;
+	};
+
+	Quickbar quickbar;
+
+	void update ();
+};
+
 class BlockPlace {
 public:
 
@@ -81,12 +100,15 @@ public:
 	// Player look rotation
 	float2	rot_ae =		float2(deg(0), deg(-10)); // azimuth elevation
 
-	////
-	Tool tool;
-	BlockPlace block_place;
-
 	//// Cameras
 	bool third_person = false;
+
+	////
+	Tool		tool;
+	BlockPlace	block_place;
+	Inventory	inventory;
+
+	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
 
 	// Fps camera pivot for fps mode ie. where your eyes are
 	//  First and third person cameras rotate around this

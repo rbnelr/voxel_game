@@ -55,6 +55,18 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 	}
 }
 
+void Inventory::update () {
+	quickbar.selected -= input.mouse_wheel_delta;
+	quickbar.selected = wrap(quickbar.selected, 0, 10);
+
+	for (int i=0; i<10; ++i) {
+		if (input.buttons[GLFW_KEY_0 + i].went_down) {
+			quickbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
+			break; // lowest key counts
+		}
+	}
+}
+
 bool Player::calc_ground_contact (World& world, bool* stuck) {
 	{ // Check block intersection to see if we are somehow stuck inside a block
 		bpos start =	(bpos)floor(pos -float3(radius, radius, 0));
@@ -230,6 +242,7 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 		*selected_block = calc_selected_block(world);
 		tool.update(world, graphics, *selected_block);
 		block_place.update(world, *this, *selected_block);
+		inventory.update();
 	}
 
 	return view;
