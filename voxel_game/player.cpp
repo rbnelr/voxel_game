@@ -25,15 +25,11 @@ void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock c
 
 void BlockPlace::update (World& world, Player const& player, SelectedBlock const& selected_block) {
 
-	bool trigger = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && anim_t == 0;
-
-	if (trigger || anim_t > 0) {
-		anim_t += anim_speed * input.dt;
-
-		if (anim_t >= 1) {
-			anim_t = 0;
-		}
+	bool inp = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block;
+	if (inp && anim_t >= anim_speed / repeat_speed) {
+		anim_t = 0;
 	}
+	bool trigger = inp && anim_t == 0;
 
 	if (trigger && selected_block) {
 		bpos offs = 0;
@@ -45,6 +41,16 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 
 		if (!block_place_is_inside_player) {
 			world.try_place_block(block_place_pos, BT_EARTH);
+		} else {
+			trigger = false;
+		}
+	}
+	
+	if (trigger || anim_t > 0) {
+		anim_t += anim_speed * input.dt;
+
+		if (anim_t >= 1) {
+			anim_t = 0;
 		}
 	}
 }

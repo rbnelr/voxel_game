@@ -124,7 +124,7 @@ struct PlayerGraphics {
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
 		{  8 / 30.0f, float3(0.624f, 1.30f, -0.94f) / 2, AnimRotation::from_euler(deg(33), deg(-8), deg(16)) },
-		{ 13 / 30.0f, float3(0.397f, 1.92f, -1.16f) / 2, AnimRotation::from_euler(deg(22), deg(1), deg(14)) },
+		{ 13 / 30.0f, float3(0.397f, 1.92f, -1.16f) / 2, AnimRotation::from_euler(deg(22), deg( 1), deg(14)) },
 	}};
 	float anim_hit_t = 8 / 30.0f;
 
@@ -219,7 +219,7 @@ struct ChunkGraphics {
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod);
 	void draw_chunks_transparent (Chunks const& chunks);
 };
 
@@ -283,6 +283,7 @@ public:
 	Fog						fog;
 
 	bool debug_frustrum_culling = false;
+	bool debug_lod = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
@@ -293,6 +294,7 @@ public:
 			chunk_graphics.imgui(chunks);
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+			ImGui::Checkbox("debug_lod", &debug_lod);
 
 			ImGui::Separator();
 		}

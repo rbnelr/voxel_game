@@ -167,11 +167,20 @@ public:
 	// prevent giant lag because chunk gen is in main thread for now
 	int max_chunks_generated_per_frame = 1;
 
+	// prevent giant lag because chunk gen is in main thread for now
+	int max_chunks_meshed_per_frame = 20;
+
+	bool use_lod = false;
+
 	void imgui () {
 		if (!imgui_push("Chunks")) return;
 
 		ImGui::DragFloat("chunk_generation_radius", &chunk_generation_radius, 1);
 		ImGui::DragFloat("chunk_deletion_hysteresis", &chunk_deletion_hysteresis, 1);
+		ImGui::DragInt("max_chunks_generated_per_frame", &max_chunks_generated_per_frame, 0.02f);
+		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
+
+		ImGui::Checkbox("use_lod", &use_lod);
 
 		int chunk_count = (int)chunks.size();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;

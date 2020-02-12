@@ -155,9 +155,6 @@ void Chunks::remesh_all () {
 
 void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player) {
 
-	static bool use_lod = true;
-	ImGui::Checkbox("use_lod", &use_lod);
-
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
@@ -287,13 +284,10 @@ void Chunks::update_chunks_brightness () {
 }
 
 void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
-	if (ImGui::Button("trigger_remesh_all"))
-		for (Chunk& chunk : *this)
-			chunk.needs_remesh = true;
+	int count = 0;
 
 	for (Chunk& chunk : *this) {
-
-		if (chunk.needs_remesh) {
+		if (chunk.needs_remesh && count++ < max_chunks_meshed_per_frame) {
 			auto timer = Timer::start();
 
 			chunk.calc_lods();

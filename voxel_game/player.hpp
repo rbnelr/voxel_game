@@ -48,7 +48,8 @@ public:
 class BlockPlace {
 public:
 
-	float anim_speed = 6;
+	float repeat_speed = 5.5f;
+	float anim_speed = 4;
 	float reach = 4.5f;
 
 	float anim_t = 0;

@@ -191,7 +191,9 @@ void PlayerGraphics::draw (Player const& player) {
 	if (shader) {
 		shader.bind();
 		
-		auto a = animation.calc(player.tool.anim_t);
+		float anim_t = player.tool.anim_t != 0 ? player.tool.anim_t : player.block_place.anim_t;
+
+		auto a = animation.calc(anim_t);
 
 		float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
 
@@ -339,7 +341,7 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -347,9 +349,6 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 	glActiveTexture(GL_TEXTURE0 + 1);
 	tile_textures.breaking_textures.bind();
 	sampler.bind(1);
-
-	static bool draw_lod_debug = false;
-	ImGui::Checkbox("draw_lod_debug", &draw_lod_debug);
 
 	if (shader) {
 		shader.bind();
@@ -375,7 +374,7 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 				srgba(0, 0, 255),
 			};
 
-			if (draw_lod_debug)
+			if (debug_lod)
 				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, cols[chunk.lod]);
 
 			if (!chunk.frustrum_culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
@@ -465,7 +464,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Opaque pass
 		player.draw(world.player);
 
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod);
 
 		skybox.draw();
 	}

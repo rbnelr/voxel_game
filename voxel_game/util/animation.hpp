@@ -15,13 +15,12 @@ struct Animation {
 	};
 
 	std::vector<Keyframe> keyframes;
+	float duration = 1;
+	bool loop_interp = true;
 
-	Animation (std::initializer_list<Keyframe> keyframes): keyframes{keyframes} {
+	Animation (std::initializer_list<Keyframe> keyframes, float duration=1, bool loop_interp=true): keyframes{keyframes}, duration{duration}, loop_interp{loop_interp} {
 		assert(this->keyframes.size() >= 1);
 	}
-
-	float duration = 1;
-	bool loop = true;
 
 	VAL_T calc (float t) {
 		int count = (int)keyframes.size();
@@ -43,7 +42,7 @@ struct Animation {
 
 		bool wrapped = false;
 		if (right_i == count) {
-			if (loop) {
+			if (loop_interp) {
 				right_i = 0;
 				wrapped = true;
 			} else {

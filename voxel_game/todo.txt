@@ -73,11 +73,11 @@ DONE:
  imgui console log
  
  view frustrum colling of chunk drawcalls
+ 
+ merge current sound code
 
 TODO
 -FEATURES:
-
- merge current sound code
  
  rethink tool animations
 
