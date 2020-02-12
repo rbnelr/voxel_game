@@ -60,24 +60,50 @@ void GuiConsole::imgui () {
 	imgui_uncollapse = false;
 
 	ImGui::Begin("Console", &gui_console.shown);
-	
 
-	int size = (int)lines.capacity();
-	if (ImGui::DragInt("buffer size", &size, 0.5f, 1, 10000)) 
-		lines.resize(size);
+	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
+	int size = (int)unimportant_lines.capacity();
+	if (ImGui::DragInt("buffer size", &size, 0.5f, 1, 10000)) {
+		unimportant_lines.resize(size);
+		important_lines.resize(size);
+	}
+
+	ImGui::SameLine();
+	ImGui::Checkbox("INFO", &show_info);
+	ImGui::SameLine();
+	ImGui::Checkbox("WARN", &show_warn);
+	ImGui::SameLine();
+	ImGui::Checkbox("ERR", &show_err);
 
 	ImGui::BeginChild("Console lines", ImVec2(0, 0), true);
 
 	bool autoscroll = ImGui::GetScrollMaxY() == ImGui::GetScrollY();
 
-	for (int i=0; i<(int)lines.count(); ++i) {
-		auto& line = lines.get_oldest(i);
+	int ai=0, bi=0;
+	auto get_line = [&] () -> Line* {
+		auto* a = ai < unimportant_lines.count() ? &unimportant_lines.get_oldest(ai) : nullptr;
+		auto* b = bi <   important_lines.count() ? &  important_lines.get_oldest(bi) : nullptr;
+
+		if (!a && !b) return nullptr;
+
+		if (!a) { ++bi; return b; }
+		if (!b) { ++ai; return a; }
+
+		if (a->counter < b->counter) { ++ai; return a; }
+		else {						   ++bi; return b; }
+	};
+
+	Line* line;
+	while ((line = get_line())) {
+		if (line->level == INFO    && !show_info) continue;
+		if (line->level == WARNING && !show_warn) continue;
+		if (line->level == ERROR   && !show_err ) continue;
 
 		lrgba col = srgba(250);
-		if (line.level == WARNING)		col = srgba(255, 220, 80);
-		else if (line.level == ERROR)	col = srgba(255, 100, 40);
+		if (line->level == WARNING)		col = srgba(255, 220, 80);
+		else if (line->level == ERROR)	col = srgba(255, 100, 40);
 
-		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line.str.c_str());
+		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line->str.c_str());
 	}
 
 	if (autoscroll) // keep scroll set to end of console buffer if it was at the end previously
@@ -94,8 +120,12 @@ void GuiConsole::imgui () {
 
 void GuiConsole::add_line (Line line) {
 
-	lines.push(std::move(line));
+	auto* ls = line.level == INFO ? &unimportant_lines : &important_lines;
+	
+	ls->push(std::move(line));
+
 	added_this_frame++;
+	counter++;
 
 	if (line.level == ERROR) {
 		imgui_uncollapse = true;

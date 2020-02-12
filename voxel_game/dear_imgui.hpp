@@ -58,11 +58,19 @@ public:
 		std::string str;
 		LogLevel level;
 		int frame;
+		int counter;
 	};
 
-	circular_buffer<Line> lines = circular_buffer<Line>(500);
+	circular_buffer<Line> unimportant_lines = circular_buffer<Line>(250);
+	circular_buffer<Line> important_lines = circular_buffer<Line>(250);
 	bool shown = true;
+
+	bool show_info = false;
+	bool show_warn = true;
+	bool show_err = true;
+
 	int added_this_frame = 0;
+	int counter = 0;
 
 	void imgui ();
 

@@ -152,35 +152,71 @@ void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
 	}
 }
 
-void GuiGraphics::draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px) {
+void GuiGraphics::draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px, lrgba col) {
 	float2 a = (float2)pos_px				/ (float2)input.window_size * 2 - 1;
 	float2 b = (float2)(pos_px + size_px)	/ (float2)input.window_size * 2 - 1;
 
 	push_quad(&vertices,
-		{ float4(a.x, a.y, 0, 1), tex.atlas_pos + float2(0,0) * tex.atlas_size },
-		{ float4(b.x, a.y, 0, 1), tex.atlas_pos + float2(1,0) * tex.atlas_size },
-		{ float4(b.x, b.y, 0, 1), tex.atlas_pos + float2(1,1) * tex.atlas_size },
-		{ float4(a.x, b.y, 0, 1), tex.atlas_pos + float2(0,1) * tex.atlas_size }
+		{ float4(a.x, a.y, 0, 1), tex.atlas_pos + float2(0,0) * tex.atlas_size, col },
+		{ float4(b.x, a.y, 0, 1), tex.atlas_pos + float2(1,0) * tex.atlas_size, col },
+		{ float4(b.x, b.y, 0, 1), tex.atlas_pos + float2(1,1) * tex.atlas_size, col },
+		{ float4(a.x, b.y, 0, 1), tex.atlas_pos + float2(0,1) * tex.atlas_size, col }
+	);
+}
+void GuiGraphics::draw_color_quad (float2 pos_px, float2 size_px, lrgba col) {
+	float2 a = (float2)pos_px				/ (float2)input.window_size * 2 - 1;
+	float2 b = (float2)(pos_px + size_px)	/ (float2)input.window_size * 2 - 1;
+
+	push_quad(&vertices,
+		{ float4(a.x, a.y, 0, 1), float2(-1), col },
+		{ float4(b.x, a.y, 0, 1), float2(-1), col },
+		{ float4(b.x, b.y, 0, 1), float2(-1), col },
+		{ float4(a.x, b.y, 0, 1), float2(-1), col }
 	);
 }
 
 void GuiGraphics::draw_crosshair () {
-	float2 size = (float2)crosshair.size_px * gui_scale;
-	float2 pos = (float2)input.window_size / 2 - (float2)size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
+	float2 size = (float2)crosshair.size_px * gui_scale * crosshair_scale;
+	float2 pos = (float2)(input.window_size / 2) - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
 
 	draw_texture(crosshair, pos, size);
 }
-void GuiGraphics::draw_toolbar_slot (AtlasedTexture tex, int index) {
+void GuiGraphics::draw_quickbar_slot (AtlasedTexture tex, int index) {
+	float offset_bottom = 2 * gui_scale;
 
+	float2 slot_size = (float2)quickbar.size_px * gui_scale;
+	float2 size = (float2)tex.size_px * gui_scale;
+
+	float pos_x = (float)input.window_size.x / 2 - (float)slot_size.x * 10.0f / 2;
+	pos_x += index * slot_size.x;
+
+	draw_texture(tex, float2(pos_x, offset_bottom) - (size - slot_size) / 2, size);
 }
-void GuiGraphics::draw_toolbar (Player const& player) {
+void GuiGraphics::draw_quickbar (Player const& player) {
+	{ // border
+		float offset_bottom = 2 * gui_scale;
+		float px = gui_scale;
 
+		float2 slot_size = (float2)quickbar.size_px * gui_scale;
+
+		float2 a = float2( (float)input.window_size.x / 2 - (float)slot_size.x * 10.0f / 2, offset_bottom);
+		float2 b = float2( (float)input.window_size.x / 2 + (float)slot_size.x * 10.0f / 2, offset_bottom + slot_size.y);
+
+		draw_color_quad(float2(a.x,      a.y - px), float2(b.x - a.x, px), lrgba(0,0,0,1));
+		draw_color_quad(float2(a.x,      b.y     ), float2(b.x - a.x, px), lrgba(0,0,0,1));
+		draw_color_quad(float2(a.x - px, a.y     ), float2(px, b.y - a.y), lrgba(0,0,0,1));
+		draw_color_quad(float2(b.x,      a.y     ), float2(px, b.y - a.y), lrgba(0,0,0,1));
+	}
+	for (int i=0; i<10; ++i) {
+		draw_quickbar_slot(quickbar, i);
+	}
+	draw_quickbar_slot(quickbar_selected, player.inventory.quickbar.selected);
 }
 
 void GuiGraphics::draw (Player const& player) {
 
 	draw_crosshair();
-	draw_toolbar(player);
+	draw_quickbar(player);
 
 	auto draw_toolbar_slot = [&] () {
 

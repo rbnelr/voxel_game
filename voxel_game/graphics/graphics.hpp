@@ -86,33 +86,37 @@ struct GuiGraphics {
 	struct Vertex {
 		float4	pos_clip;
 		float2	uv;
+		float4	col;
 
 		static void bind (Attributes& a) {
 			a.add<decltype(pos_clip)>(0, "pos_clip", sizeof(Vertex), offsetof(Vertex, pos_clip));
-			a.add<decltype(uv      )>(1, "",         sizeof(Vertex), offsetof(Vertex, uv      ));
+			a.add<decltype(uv      )>(1, "uv",       sizeof(Vertex), offsetof(Vertex, uv      ));
+			a.add<decltype(col     )>(2, "col",      sizeof(Vertex), offsetof(Vertex, col     ));
 		}
 	};
 
 	Shader shader = { "gui" };
 
-	AtlasedTexture crosshair		= { "textures/crosshair.png" };
-	AtlasedTexture hotbar			= { "textures/hotbar.png" };
-	AtlasedTexture hotbar_selected	= { "textures/hotbar_selected.png" };
+	AtlasedTexture crosshair			= { "textures/crosshair.png" };
+	AtlasedTexture quickbar				= { "textures/quickbar.png" };
+	AtlasedTexture quickbar_selected	= { "textures/quickbar_selected.png" };
 
-	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &hotbar, &hotbar_selected }, 64, srgba8(0), 1, false);
+	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &quickbar, &quickbar_selected }, 64, srgba8(0), 1, false);
 
 	Sampler2D sampler;
 
 	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
 
-	float gui_scale = 2; // pixel multiplier
+	float gui_scale = 4; // pixel multiplier
+	float crosshair_scale = .5f;
 
-	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px);
+	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px, lrgba col=1);
+	void draw_color_quad (float2 pos_px, float2 size_px, lrgba col);
 
 	void draw_crosshair ();
-	void draw_toolbar_slot (AtlasedTexture tex, int index);
-	void draw_toolbar (Player const& player);
+	void draw_quickbar_slot (AtlasedTexture tex, int index);
+	void draw_quickbar (Player const& player);
 
 	void draw (Player const& player);
 };
