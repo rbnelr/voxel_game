@@ -8,7 +8,7 @@
 
 // multiple producer multiple consumer threadsafe queue with T item
 template <typename T>
-class threadsafe_queue {
+class ThreadsafeQueue {
 	mutable std::mutex		m;
 	std::condition_variable	c;
 

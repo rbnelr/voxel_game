@@ -140,7 +140,18 @@ public:
 	void whole_chunk_changed (Chunks& chunks);
 };
 
+struct GenerateChunkJob {
+	// input
+	chunk_coord coord;
+	WorldGenerator const* world_gen;
+	// output
+	Chunk* chunk;
+	float chunk_gen_time;
 
+	GenerateChunkJob execute ();
+};
+
+inline Threadpool<GenerateChunkJob> threadpool = { max(std::thread::hardware_concurrency() - 1, 1), "threadpool" };
 
 class Chunks {
 	// avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
@@ -148,13 +159,11 @@ class Chunks {
 	Chunk* _prev_query_chunk = nullptr;
 
 	// Chunk hashmap
-	std::unordered_map<chunk_coord_hashmap, Chunk> chunks;
+	std::unordered_map<chunk_coord_hashmap, std::unique_ptr<Chunk>> chunks;
 
 	Chunk* _lookup_chunk (chunk_coord coord);
 
 public:
-	RunningAverage<float> brightness_time = { 64 };
-	RunningAverage<float> meshing_time = { 64 };
 
 	int count_frustrum_culled;
 
@@ -174,6 +183,10 @@ public:
 	int max_chunks_meshed_per_frame = 20;
 
 	bool use_lod = false;
+
+	RunningAverage<float> chunk_gen_time = { 64 };
+	RunningAverage<float> brightness_time = { 64 };
+	RunningAverage<float> meshing_time = { 64 };
 
 	void imgui () {
 		if (!imgui_push("Chunks")) return;
@@ -211,7 +224,7 @@ public:
 		bool operator== (Iterator const& r) { return it == r.it; }
 		bool operator!= (Iterator const& r) { return it != r.it; }
 
-		Chunk& operator* () { return it->second; }
+		Chunk& operator* () { return *it->second.get(); }
 
 		Iterator operator++ () { ++it; return *this; }
 		Iterator operator++ (int) { it++; return *this; }
@@ -224,7 +237,7 @@ public:
 		bool operator== (CIterator const& r) { return it == r.it; }
 		bool operator!= (CIterator const& r) { return it != r.it; }
 
-		Chunk const& operator* () { return it->second; }
+		Chunk const& operator* () { return *it->second.get(); }
 
 		CIterator operator++ () { ++it; return *this; }
 		CIterator operator++ (int) { it++; return *this; }
@@ -252,7 +265,7 @@ public:
 	Block* query_block (bpos p, Chunk** out_chunk=nullptr);
 
 	// load chunk at coord (invalidates iterators, so dont call this in a loop)
-	Chunk* load_chunk (World const& world, WorldGenerator& world_gen, chunk_coord chunk_pos);
+	Chunk* load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos);
 	// unload chunk at coord (invalidates iterators, so dont call this in a loop)
 	Iterator unload_chunk (Iterator it);
 
@@ -260,7 +273,7 @@ public:
 
 	void remesh_all ();
 
-	void update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player);
+	void update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player);
 
 	void update_chunks_brightness ();
 

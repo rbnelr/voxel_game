@@ -1,9 +1,19 @@
 #pragma once
 #include "dear_imgui.hpp"
 #include "kissmath.hpp"
-#include "util/running_average.hpp"
+#include "util/random.hpp"
+#include "util/string.hpp"
 #include <vector>
+#include <string>
 
+inline uint64_t get_seed (std::string_view str) {
+	str = kiss::trim(str);
+
+	if (str.size() == 0) // "" -> random seed
+		return std::hash<uint64_t>()(random.uniform_u64());
+
+	return std::hash<std::string_view>()(str);
+}
 template<typename T>
 struct Gradient_KV {
 	float	key;
@@ -39,7 +49,8 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 class Chunk;
 
 struct WorldGenerator {
-	RunningAverage<float> chunk_gen_time = { 64 };
+	std::string seed_str = "test2";
+	uint64_t seed;
 
 	float elev_freq = 400, elev_amp = 25;
 	float rough_freq = 220;
@@ -55,9 +66,17 @@ struct WorldGenerator {
 
 	float tree_desity_period = 200;
 	float tree_density_amp = 1;
+	
+	WorldGenerator (): seed{get_seed(seed_str)} {
+		
+	}
 
 	void imgui () {
 		if (!imgui_push("WorldGenerator")) return;
+
+		ImGui::InputText("seed str", &seed_str, 0, NULL, NULL);
+		seed = get_seed(seed_str);
+		ImGui::Text("seed code: 0x%016p", seed);
 
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.2f);
 
@@ -83,5 +102,5 @@ struct WorldGenerator {
 		imgui_pop();
 	}
 
-	void generate_chunk (Chunk& chunk, uintptr_t world_seed);
+	void generate_chunk (Chunk& chunk, float* chunk_gen_time) const;
 };

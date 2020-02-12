@@ -91,13 +91,20 @@ void Chunks::remesh_neighbours (chunk_coord coord) {
 }
 
 //// Chunks
+GenerateChunkJob GenerateChunkJob::execute () {
+	std::unique_ptr<Chunk> chunk = std::make_unique<Chunk>(coord);
+
+	world_gen->generate_chunk(*chunk, &chunk_gen_time);
+
+	return std::move(*this);
+}
 
 Chunk* Chunks::_lookup_chunk (chunk_coord coord) {
 	auto kv = chunks.find(chunk_coord_hashmap{ coord });
 	if (kv == chunks.end())
 		return nullptr;
 
-	Chunk* chunk = &kv->second;
+	Chunk* chunk = kv->second.get();
 	_prev_query_chunk = chunk;
 	return chunk;
 }
@@ -128,19 +135,23 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 	return chunk->get_block(block_pos_chunk);
 }
 
-Chunk* Chunks::load_chunk (World const& world, WorldGenerator& world_gen, chunk_coord chunk_pos) {
+Chunk* Chunks::load_chunk (World const& world, WorldGenerator const& world_gen, chunk_coord chunk_pos) {
 	assert(!query_chunk(chunk_pos));
 	
-	Chunk* chunk = &chunks.emplace(chunk_coord_hashmap{ chunk_pos }, chunk_pos).first->second;
+	Chunk* chunk = chunks.emplace(chunk_coord_hashmap{ chunk_pos }, std::make_unique<Chunk>(chunk_pos)).first->second.get();
 	
-	world_gen.generate_chunk(*chunk, world.seed);
+	float time;
+	world_gen.generate_chunk(*chunk, &time);
+
+	chunk_gen_time.push(time);
+	logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", chunk->coord.x,chunk->coord.y, time * 1024);
 
 	chunk->whole_chunk_changed(*this);
 	
 	return chunk;
 }
 Chunks::Iterator Chunks::unload_chunk (Iterator it) {
-	remesh_neighbours(it.it->second.coord);
+	remesh_neighbours(it.it->second->coord);
 	// reset this pointer to prevent use after free
 	_prev_query_chunk = nullptr;
 	// delete chunk
@@ -149,11 +160,11 @@ Chunks::Iterator Chunks::unload_chunk (Iterator it) {
 
 void Chunks::remesh_all () {
 	for (auto& kv : chunks) {
-		kv.second.needs_remesh = true;
+		kv.second->needs_remesh = true;
 	}
 }
 
-void Chunks::update_chunks_load (World const& world, WorldGenerator& world_gen, Player const& player) {
+void Chunks::update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player) {
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {

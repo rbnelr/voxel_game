@@ -75,7 +75,7 @@ void Game::frame () {
 		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 			fps_display.display_fps();
 
-			ImGui::Text("Chunk generation : %7.2f ms avg", world_gen.chunk_gen_time.calc_avg() * 1000);
+			ImGui::Text("Chunk generation : %7.2f ms avg", world->chunks.chunk_gen_time.calc_avg() * 1000);
 			ImGui::Text("Chunk brightness : %7.2f ms avg", world->chunks.brightness_time.calc_avg() * 1000);
 			ImGui::Text("Chunk meshing    : %7.2f ms avg", world->chunks.meshing_time.calc_avg() * 1000);
 
@@ -88,14 +88,8 @@ void Game::frame () {
 		{
 			bool open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
 		
-			if (open) {
-				static std::string world_seed = world->seed_str;
-				ImGui::InputText("seed", &world_seed, 0, NULL, NULL);
-
-				ImGui::SameLine();
-				if (ImGui::Button("Recreate")) {
-					world = std::make_unique<World>(world_seed);
-				}
+			if (open && ImGui::Button("Recreate")) {
+				world = std::make_unique<World>(world_gen);
 			}
 
 			world->imgui(open);
@@ -125,7 +119,7 @@ void Game::frame () {
 			if (open) ImGui::Separator();
 		}
 
-		world->update(world_gen);
+		world->update();
 
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);

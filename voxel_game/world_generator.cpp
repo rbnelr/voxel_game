@@ -7,9 +7,8 @@
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 struct Generator {
-	WorldGenerator& worldgen;
+	WorldGenerator const& wg;
 	Chunk& chunk;
-	uintptr_t world_seed;
 
 	float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world) {
 		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs, float range_l, float range_h) {
@@ -30,20 +29,20 @@ struct Generator {
 		{
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			elevation = noise(pos_world, worldgen.elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * worldgen.elev_amp;
+			elevation = noise(pos_world, wg.elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg.elev_amp;
 
 			++i;
 		}
 		{
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			roughness = noise(pos_world, worldgen.rough_freq, deg(37.17f) * (float)i, offs, 0,+1);
+			roughness = noise(pos_world, wg.rough_freq, deg(37.17f) * (float)i, offs, 0,+1);
 
 			++i;
 		}
 
 		detail = 0;
-		for (auto& d : worldgen.detail) {
+		for (auto& d : wg.detail) {
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
 			detail += noise(pos_world, d.freq, deg(37.17f) * (float)i, offs, -1,+1) * d.amp;
@@ -65,7 +64,7 @@ struct Generator {
 			return val;
 		};
 
-		float val = noise(pos_world, worldgen.tree_desity_period, 0,0) * worldgen.tree_density_amp;
+		float val = noise(pos_world, wg.tree_desity_period, 0,0) * wg.tree_density_amp;
 
 		val = gradient<float>(val, {
 			{ 0.00f,  0						},
@@ -111,9 +110,9 @@ struct Generator {
 			}
 		}
 
-		uint64_t chunk_seed = world_seed ^ hash(chunk.coord);
+		uint64_t chunk_seed = wg.seed ^ hash(chunk.coord);
 
-		OSN::Noise<2> noise(world_seed);
+		OSN::Noise<2> noise(wg.seed);
 		Random rand = Random(chunk_seed);
 
 		std::vector<bpos> tree_poss;
@@ -207,14 +206,12 @@ struct Generator {
 	}
 };
 
-void WorldGenerator::generate_chunk (Chunk& chunk, uintptr_t world_seed) {
+void WorldGenerator::generate_chunk (Chunk& chunk, float* chunk_gen_time) const {
 	auto timer = Timer::start();
 
-	Generator gen = { *this, chunk, world_seed };
+	Generator gen = { *this, chunk };
 
 	gen.gen();
 
-	float time = timer.end();
-	chunk_gen_time.push(time);
-	logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", chunk.coord.x,chunk.coord.y, time * 1024);
+	*chunk_gen_time = timer.end();
 }
