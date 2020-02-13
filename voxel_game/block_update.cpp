@@ -70,22 +70,23 @@ void BlockUpdate::update_blocks (Chunks& chunks) {
 	bpos_t blocks_to_update = (bpos_t)ceil((float)CHUNK_BLOCK_COUNT * block_update_frequency * input.dt);
 
 	for (Chunk& chunk : chunks.chunks) {
+		if (chunk.active) {
+			for (bpos_t i=0; i<blocks_to_update; ++i) {
+				uint16_t indx = (uint16_t)((cur_chunk_update_block_i +i) % CHUNK_BLOCK_COUNT);
+				indx = block_pattern(indx);
 
-		for (bpos_t i=0; i<blocks_to_update; ++i) {
-			uint16_t indx = (uint16_t)((cur_chunk_update_block_i +i) % CHUNK_BLOCK_COUNT);
-			indx = block_pattern(indx);
+				// get block with flat index
+				Block* b = chunk.get_block_flat(indx);
 
-			// get block with flat index
-			Block* b = chunk.get_block_flat(indx);
+				// reconstruct 3d index from flat index
+				bpos bp;
+				bp.z =  indx / (CHUNK_DIM.y * CHUNK_DIM.x);
+				bp.y = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
+				bp.x = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
+				bp += chunk.chunk_pos_world();
 
-			// reconstruct 3d index from flat index
-			bpos bp;
-			bp.z =  indx / (CHUNK_DIM.y * CHUNK_DIM.x);
-			bp.y = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
-			bp.x = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
-			bp += chunk.chunk_pos_world();
-
-			update_block(chunks, chunk, b, bp);
+				update_block(chunks, chunk, b, bp);
+			}
 		}
 	}
 

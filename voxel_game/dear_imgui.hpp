@@ -46,6 +46,9 @@ inline void imgui_pop () {
 	tree_depth--;
 }
 
+// Imgui is not srgb correct, ColorEdit3 assume srgb (since color pickers are usually in srgb and should display srgb values as ints because that is more convinient than floats)
+//  but the values its displays are the same as are passed to the shader, which assumes linear values, so it's impossible to both have the color picker be in srgb and the color be correct on screen
+//  solution -> fix the shader to manually convert srgb to linear??
 inline bool imgui_ColorEdit3 (const char* label, float col[3], ImGuiColorEditFlags flags) {
 	float3 srgbf = float3( to_srgb(col[0]), to_srgb(col[1]), to_srgb(col[2]) );
 	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);

@@ -116,6 +116,12 @@ Chunk* ChunkHashmap::query_chunk (chunk_coord coord) {
 		return _lookup_chunk(coord);
 	}
 }
+ChunkHashmap::Iterator ChunkHashmap::erase_chunk (ChunkHashmap::Iterator it) {
+	// reset this pointer to prevent use after free
+	_prev_query_chunk = nullptr;
+	// delete chunk
+	return ChunkHashmap::Iterator( hashmap.erase(it.it) );
+}
 
 Chunk* Chunks::query_chunk (chunk_coord coord) {
 	return chunks.query_chunk(coord);
@@ -141,10 +147,7 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 
 ChunkHashmap::Iterator Chunks::unload_chunk (ChunkHashmap::Iterator it) {
 	remesh_neighbours(it.it->second->coord);
-	// reset this pointer to prevent use after free
-	chunks._prev_query_chunk = nullptr;
-	// delete chunk
-	return ChunkHashmap::Iterator( chunks.hashmap.erase(it.it) );
+	return chunks.erase_chunk(it);
 }
 
 void Chunks::remesh_all () {
@@ -160,29 +163,34 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
 		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
 	};
-	auto chunk_is_in_load_radius = [&] (chunk_coord pos) {
-		return chunk_dist_to_player(pos) <= chunk_generation_radius;
-	};
-	auto chunk_is_out_of_unload_radius = [&] (chunk_coord pos) {
-		return chunk_dist_to_player(pos) > (chunk_generation_radius + chunk_deletion_hysteresis);
-	};
-	auto chunk_lod = [&] (chunk_coord pos) {
-		return clamp(floori(log2f(chunk_dist_to_player(pos) / chunk_generation_radius * 16)), 0,3);
+	auto chunk_lod = [&] (float dist) {
+		return clamp(floori(log2f(dist / generation_radius * 16)), 0,3);
 	};
 
 	{ // chunk unloading
 		for (auto it=chunks.begin(); it!=chunks.end();) {
-			if (chunk_is_out_of_unload_radius((*it).coord)) {
+			float dist = chunk_dist_to_player((*it).coord);
+
+			if (dist > (generation_radius + deletion_hysteresis)) {
 				it = unload_chunk(it);
 			} else {
+				auto& chunk = *it;
+
+				auto prev_lod = chunk.lod;
+				chunk.lod = use_lod ? chunk_lod(dist) : 0;
+				if (chunk.lod != prev_lod)
+					chunk.needs_remesh = true;
+
+				chunk.active = dist <= active_radius;
+				
 				++it;
 			}
 		}
 	}
 
 	{ // chunk loading
-		chunk_coord start =	(chunk_coord)floor(	((float2)player.pos - chunk_generation_radius) / (float2)CHUNK_DIM_2D );
-		chunk_coord end =	(chunk_coord)ceil(	((float2)player.pos + chunk_generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_coord start =	(chunk_coord)floor(	((float2)player.pos - generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_coord end =	(chunk_coord)ceil(	((float2)player.pos + generation_radius) / (float2)CHUNK_DIM_2D );
 
 		// check all chunk positions within a square of chunk_generation_radius
 		std::vector<chunk_coord> chunks_to_generate;
@@ -191,14 +199,10 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 		for (cp.x = start.x; cp.x<end.x; ++cp.x) {
 			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
 				auto* chunk = query_chunk(cp);
+				float dist = chunk_dist_to_player(cp);
 
-				if (chunk) {
-					auto prev_lod = chunk->lod;
-					chunk->lod = use_lod ? chunk_lod(cp) : 0;
-					if (chunk->lod != prev_lod)
-						chunk->needs_remesh = true;
-				} else {
-					if (chunk_is_in_load_radius(cp) && !pending_chunks.query_chunk(cp)) {
+				if (!chunk) {
+					if (dist <= generation_radius && !pending_chunks.query_chunk(cp)) {
 						// chunk is within chunk_generation_radius and not yet generated
 						chunks_to_generate.push_back(cp);
 					}
@@ -213,7 +217,8 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 
 		for (auto& cp : chunks_to_generate) {
 			Chunk* chunk = pending_chunks.alloc_chunk(cp);
-			chunk->lod = use_lod ? chunk_lod(cp) : 0;
+			float dist = chunk_dist_to_player(cp);
+			chunk->lod = use_lod ? chunk_lod(dist) : 0;
 			
 			BackgroundJob job;
 			job.coord = cp;
@@ -227,7 +232,7 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 			{ // move chunk into real hashmap
 				auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.coord});
 				chunks.hashmap.emplace(chunk_coord_hashmap{res.coord}, std::move(it->second));
-				pending_chunks.hashmap.erase(it);
+				pending_chunks.erase_chunk({ it });
 			}
 			
 			chunk_gen_time.push(res.chunk_gen_time);

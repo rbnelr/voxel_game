@@ -102,6 +102,9 @@ public:
 	bool needs_remesh = false;
 	bool needs_block_brighness_update = false;
 
+	// block update etc.
+	bool active;
+
 	// true: invisible to player -> don't draw
 	bool culled;
 
@@ -212,6 +215,8 @@ struct ChunkHashmap {
 	int count () {
 		return (int)hashmap.size();
 	}
+
+	Iterator erase_chunk (Iterator it);
 };
 
 class Chunks {
@@ -222,13 +227,15 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float chunk_generation_radius =	_use_potatomode ? 150.0f : 200.0f;
+	float generation_radius =	_use_potatomode ? 150.0f : 200.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float chunk_deletion_hysteresis = CHUNK_DIM_X*1.5f;
+	float deletion_hysteresis = CHUNK_DIM_X*1.5f;
+
+	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
 
 	// prevent giant lag because chunk gen is in main thread for now
 	//int max_chunks_generated_per_frame = 1;
@@ -246,8 +253,10 @@ public:
 	void imgui () {
 		if (!imgui_push("Chunks")) return;
 
-		ImGui::DragFloat("chunk_generation_radius", &chunk_generation_radius, 1);
-		ImGui::DragFloat("chunk_deletion_hysteresis", &chunk_deletion_hysteresis, 1);
+		ImGui::DragFloat("generation_radius", &generation_radius, 1);
+		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
+		ImGui::DragFloat("active_radius", &active_radius, 1);
+
 		//ImGui::DragInt("max_chunks_generated_per_frame", &max_chunks_generated_per_frame, 0.02f);
 		ImGui::DragInt("max_chunks_brightness_per_frame", &max_chunks_brightness_per_frame, 0.02f);
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);

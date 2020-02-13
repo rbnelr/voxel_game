@@ -167,6 +167,14 @@ IDEAS:
  -but that is fine because the actual memory is virtualized and only the used pages are commited via the extension
  -indirect drawcalls can then be used to draw all the actual filled parts of the giant vbo
 
+ Since the major terrain features are mostly based on the low noise frequencies, 1/2000m for ex.
+  the noise function does not actually change by much from chunk to chunk, and since the amplitudes of these frequencies also dominate the result
+  it should be possible to determine a min and max possible noise value for each chunk
+  -you might be able to modify perlin noise or similar noise to actually return the minmax for a 3d volume, but that might be complicated
+  -a trick i just thought of is to not actually use per block noise samples for the very low freqs but instead do one sample per chunk and then interpolate based on a chunk and it's neighbours
+    this way the minmax should be 100% possible to calculate and fast too.
+  -this might allow for correct 'culling' of chunks before they ever need to be generated in any way, which should allow to bring down the chunk count in a 3d chunk system from view_dist^3 to view_dist^2 (surface area instead of volume)
+
  explore ray marching for rendering:
  -no chunk meshes at all, gpu does ray marching
   -how is the complexity, performance and artifacting
