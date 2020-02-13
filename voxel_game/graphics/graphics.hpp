@@ -168,8 +168,8 @@ struct ChunkMesh {
 		}
 	};
 
-	std::vector<Vertex> opaque_faces;
-	std::vector<Vertex> transparent_faces;
+	//std::vector<Vertex> opaque_faces;
+	//std::vector<Vertex> transparent_faces;
 
 	Mesh<Vertex> opaque_mesh;
 	Mesh<Vertex> transparent_mesh;
@@ -241,9 +241,9 @@ class World;
 struct SelectedBlock;
 
 struct FogUniforms {
-	float3 sky_col =	srgb(47,189,245);
+	float3 sky_col =	srgb(121,192,255);
 	float _pad0;
-	float3 horiz_col =	srgb(224,237,241);
+	float3 horiz_col =	srgb(199,211,219);
 	float _pad1;
 	float3 down_col =	srgb(41,49,52);
 
@@ -263,9 +263,10 @@ struct Fog {
 	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
 
 	void imgui () {
-		ImGui::ColorEdit3("sky_col", &f.sky_col.x);
-		ImGui::ColorEdit3("horiz_col", &f.horiz_col.x);
-		ImGui::ColorEdit3("down_col", &f.down_col.x);
+
+		imgui_ColorEdit3("sky_col", &f.sky_col.x, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit3("horiz_col", &f.horiz_col.x, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit3("down_col", &f.down_col.x, ImGuiColorEditFlags_DisplayHSV);
 
 		ImGui::DragFloat("fog_base_coeff", &f.coeff, 0.05f);
 

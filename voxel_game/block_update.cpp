@@ -69,7 +69,7 @@ uint16_t block_pattern (uint16_t i) {
 void BlockUpdate::update_blocks (Chunks& chunks) {
 	bpos_t blocks_to_update = (bpos_t)ceil((float)CHUNK_BLOCK_COUNT * block_update_frequency * input.dt);
 
-	for (Chunk& chunk : chunks) {
+	for (Chunk& chunk : chunks.chunks) {
 
 		for (bpos_t i=0; i<blocks_to_update; ++i) {
 			uint16_t indx = (uint16_t)((cur_chunk_update_block_i +i) % CHUNK_BLOCK_COUNT);

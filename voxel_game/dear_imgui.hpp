@@ -6,6 +6,7 @@
 #include "dear_imgui/imgui_impl_opengl3.h"
 
 #include "util/circular_buffer.hpp"
+#include "kissmath.hpp"
 
 #include <string>
 
@@ -43,6 +44,15 @@ inline bool imgui_push (const char* class_name, const char* instance_name=nullpt
 inline void imgui_pop () {
 	ImGui::TreePop();
 	tree_depth--;
+}
+
+inline bool imgui_ColorEdit3 (const char* label, float col[3], ImGuiColorEditFlags flags) {
+	float3 srgbf = float3( to_srgb(col[0]), to_srgb(col[1]), to_srgb(col[2]) );
+	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);
+	col[0] = to_linear(srgbf.x);
+	col[1] = to_linear(srgbf.y);
+	col[2] = to_linear(srgbf.z);
+	return ret;
 }
 
 enum LogLevel {

@@ -451,10 +451,10 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all opaque chunk meshes
-		for (Chunk const& chunk : chunks) {
+		for (Chunk const& chunk : chunks.chunks) {
 
 			if (debug_frustrum_culling)
-				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.frustrum_culled ? srgba(255,50,50) : srgba(50,255,50));
+				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
 
 			static lrgba cols[] = {
 				srgba(255),
@@ -466,7 +466,7 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 			if (debug_lod)
 				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, cols[chunk.lod]);
 
-			if (!chunk.frustrum_culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
+			if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.opaque_mesh.bind();
@@ -497,9 +497,9 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
 
 		// Draw all transparent chunk meshes
-		for (Chunk const& chunk : chunks) {
+		for (Chunk const& chunk : chunks.chunks) {
 
-			if (!chunk.frustrum_culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
+			if (!chunk.culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.transparent_mesh.bind();
@@ -511,17 +511,17 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
 
 void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 	int count = 0;
-	for (Chunk& chunk : chunks) {
+	for (Chunk& chunk : chunks.chunks) {
 		AABB aabb;
 		aabb.lo = (float3)chunk.chunk_pos_world();
 		aabb.hi = aabb.lo + (float3)CHUNK_DIM;
 
-		chunk.frustrum_culled = frustrum_cull_aabb(view.frustrum, aabb);
-		if (chunk.frustrum_culled)
+		chunk.culled = frustrum_cull_aabb(view.frustrum, aabb);
+		if (chunk.culled)
 			count++;
 	}
 
-	chunks.count_frustrum_culled = count;
+	chunks.count_culled = count;
 }
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {

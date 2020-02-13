@@ -88,11 +88,14 @@ void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Chunk* chunk) {
 void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Chunk* chunk) {
 	alpha_test = graphics.alpha_test;
 
-	opaque_vertices = &chunk->mesh.opaque_faces;
-	tranparent_vertices = &chunk->mesh.transparent_faces;
+	static std::vector<ChunkMesh::Vertex> _opaque_vertices;
+	static std::vector<ChunkMesh::Vertex> _tranparent_vertices;
 
-	opaque_vertices->clear();
-	tranparent_vertices->clear();
+	_opaque_vertices.clear();
+	_tranparent_vertices.clear();
+
+	opaque_vertices = &_opaque_vertices;
+	tranparent_vertices = &_tranparent_vertices;
 
 	lod = chunk->lod;
 	size = int3(CHUNK_DIM_X >> chunk->lod, CHUNK_DIM_Y >> chunk->lod, CHUNK_DIM_Z >> chunk->lod);
@@ -136,8 +139,10 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 		}
 	}
 
-	chunk->mesh.opaque_mesh.upload(chunk->mesh.opaque_faces);
-	chunk->mesh.transparent_mesh.upload(chunk->mesh.transparent_faces);
+	chunk->mesh.opaque_mesh.upload(_opaque_vertices);
+	chunk->mesh.transparent_mesh.upload(_tranparent_vertices);
+
+	chunk->face_count = (_opaque_vertices.size() + _tranparent_vertices.size()) / 6;
 }
 
 uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {

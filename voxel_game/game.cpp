@@ -16,7 +16,7 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
-	set_thread_description("gameloop");
+	set_thread_description(">> gameloop");
 	set_gameloop_thread_priority();
 
 	{ // GL state
@@ -79,7 +79,7 @@ void Game::frame () {
 			ImGui::Text("Chunk brightness : %7.2f ms avg", world->chunks.brightness_time.calc_avg() * 1000);
 			ImGui::Text("Chunk meshing    : %7.2f ms avg", world->chunks.meshing_time.calc_avg() * 1000);
 
-			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.count() - world->chunks.count_frustrum_culled, world->chunks.count());
+			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 		}
 
 		input.imgui();
