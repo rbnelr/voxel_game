@@ -183,6 +183,18 @@ void GuiGraphics::draw_color_quad (float2 pos_px, float2 size_px, lrgba col) {
 	);
 }
 
+void GuiGraphics::draw_item_tile (item_id id, float2 pos_px, float2 size_px, TileTextures const& tile_textures) {
+	float2 a = pos_px;
+	float2 b = pos_px + size_px;
+	float tex_index = (float)tile_textures.item_tile[id - MAX_BLOCK_ID];
+
+	push_quad(&items_vertices,
+		{ float2(a.x, a.y) * gui_scale, float2(0,0), tex_index },
+		{ float2(b.x, a.y) * gui_scale, float2(1,0), tex_index },
+		{ float2(b.x, b.y) * gui_scale, float2(1,1), tex_index },
+		{ float2(a.x, b.y) * gui_scale, float2(0,1), tex_index }
+	);
+}
 
 void GuiGraphics::draw_crosshair () {
 	float2 size = (float2)crosshair.size_px * gui_scale * crosshair_scale;
@@ -197,10 +209,10 @@ void GuiGraphics::draw_quickbar_slot (AtlasedTexture tex, int index) {
 	draw_texture(tex, pos, size);
 }
 void GuiGraphics::draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures) {
-	float size = 16 * gui_scale;
-	float3 pos = float3(get_quickbar_slot_center(index) * gui_scale, 0);
-	
 	if (id < MAX_BLOCK_ID) {
+		float size = (float)tile_textures.tile_textures.size.x * gui_scale; // assume square
+		float3 pos = float3(get_quickbar_slot_center(index) * gui_scale, 0);
+
 		// draw block
 		auto tile = tile_textures.block_tile_info[id];
 
@@ -209,11 +221,14 @@ void GuiGraphics::draw_quickbar_item (item_id id, int index, TileTextures const&
 
 			for (int i=0; i<6; ++i) {
 				auto& b = gui_block_mesh[face*6+i];
-				items_vertices.push_back(ItemsVertex{ b.pos * size + pos, b.normal, b.uv, tex_index });
+				blocks_vertices.push_back(BlockItemVertex{ b.pos * size + pos, b.normal, b.uv, tex_index });
 			}
 		}
 	} else {
+		float size = (float)tile_textures.tile_textures.size.x; // assume square
+		float2 pos = get_quickbar_slot_center(index);
 
+		draw_item_tile(id, pos - size/2, size, tile_textures);
 	}
 }
 void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_textures) {
@@ -260,12 +275,25 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 		mesh.draw();
 	}
 
-	if (shader_items && items_vertices.size() > 0) {
-		shader_items.bind();
+	tile_textures.tile_textures.bind();
+	
+	if (shader_item_block && blocks_vertices.size() > 0) {
+		shader_item_block.bind();
 
-		glUniform1i(glGetUniformLocation(shader_items.shader->shad, "tile_textures"), 0);
-		tile_textures.tile_textures.bind();
+		glUniform1i(glGetUniformLocation(shader_item_block.shader->shad, "tile_textures"), 0);
+		
+		blocks_mesh.upload(blocks_vertices);
+		blocks_vertices.clear();
 
+		blocks_mesh.bind();
+		blocks_mesh.draw();
+	}
+
+	if (shader_item && items_vertices.size() > 0) {
+		shader_item.bind();
+
+		glUniform1i(glGetUniformLocation(shader_item.shader->shad, "tile_textures"), 0);
+		
 		items_mesh.upload(items_vertices);
 		items_vertices.clear();
 
@@ -275,28 +303,67 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 }
 
 PlayerGraphics::PlayerGraphics () {
-	std::vector<GenericVertex> verts;
-	push_cube<GenericVertex>([&] (float3 pos, int face, float2 face_uv) {
-		verts.push_back({ pos * arm_size, srgba(255) });
-	});
+	{
+		std::vector<GenericVertex> verts;
+		push_cube<GenericVertex>([&] (float3 pos, int face, float3 normal, float2 face_uv) {
+			verts.push_back({ pos * arm_size, normal, srgba(255) });
+		});
 
-	fist_mesh = Mesh<GenericVertex>(verts);
+		fist_mesh.upload(verts);
+	}
 }
 
-void PlayerGraphics::draw (Player const& player) {
-	if (shader) {
-		shader.bind();
-		
-		float anim_t = player.break_block.anim_t != 0 ? player.break_block.anim_t : player.block_place.anim_t;
+void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+	auto qb = player.inventory.quickbar;
+	auto slot = qb.slots[ qb.selected ];
+	item_id item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 
-		auto a = animation.calc(anim_t);
+	float anim_t = player.break_block.anim_t != 0 ? player.break_block.anim_t : player.block_place.anim_t;
+	auto a = animation.calc(anim_t);
 
-		float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
+	if (item != I_NULL) {
+		if (item < MAX_BLOCK_ID) {
+			auto tile = tile_textures.block_tile_info[item];;
 
-		shader.set_uniform("model_to_world", (float4x4)mat);
+			std::vector<BlockVertex> verts;
 
-		fist_mesh.bind();
-		fist_mesh.draw();
+			float3x3 mat = rotate3_X(deg(-39)) * rotate3_Z(deg(-17));
+
+			for (int j=0; j<6; ++j) {
+				auto tex_index = (float)tile.calc_texture_index((BlockFace)j);
+				for (int i=0; i<6; ++i) {
+					auto p = block_data[j*6+i];
+					p.pos *= 0.15f;
+					p.pos = mat * (p.pos + float3(-0.09f, 0.08f, 0.180f));
+					p.normal = mat * p.normal;
+					verts.push_back({ p.pos, p.normal, p.uv, tex_index });
+				}
+			}
+
+			block_mesh.upload(verts);
+
+			if (shader_block) {
+				shader_block.bind();
+
+				float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
+
+				shader_block.set_uniform("model_to_world", (float4x4)mat);
+
+				block_mesh.bind();
+				block_mesh.draw();
+			}
+		}
+	} else {
+		if (shader) {
+			shader.bind();
+
+			float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
+
+			shader.set_uniform("model_to_world", (float4x4)mat);
+
+			fist_mesh.bind();
+			fist_mesh.draw();
+		}
 	}
 }
 
@@ -341,6 +408,11 @@ struct TileLoader {
 				c.set(x,y, C);
 			}
 		}
+	}
+
+	int add_item (item_id id) {
+		auto filename = prints("textures/%s.png", get_item_name(id));
+		return add_texture(Image<srgba8>(filename.c_str()));
 	}
 
 	BlockTileInfo add_block (block_id id) {
@@ -403,14 +475,18 @@ struct TileLoader {
 TileTextures::TileTextures () {
 	{
 		TileLoader tl;
+
 		for (int i=0; i<BLOCK_IDS_COUNT; ++i) {
 			block_tile_info[i] = tl.add_block((block_id)i);
+		}
+
+		for (int i=0; i<ITEM_IDS_COUNT-MAX_BLOCK_ID; ++i) {
+			item_tile[i] = tl.add_item((item_id)(i + MAX_BLOCK_ID));
 		}
 
 		tile_size = tl.size;
 		tile_textures.upload<srgba8, true>(tl.images);
 	}
-
 	{
 		auto breaking = Image<uint8>("textures/breaking.png");
 
@@ -429,14 +505,12 @@ TileTextures::TileTextures () {
 void ChunkGraphics::imgui (Chunks& chunks) {
 	sampler.imgui("sampler");
 
-	tile_textures.imgui("tile_textures");
-
 	if (ImGui::Checkbox("alpha_test", &alpha_test)) {
 		chunks.remesh_all();
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod, TileTextures const& tile_textures) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -482,7 +556,7 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 	}
 }
 
-void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks) {
+void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -557,9 +631,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
 
 	{ //// Opaque pass
-		player.draw(world.player);
+		player.draw(world.player, tile_textures);
 
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod, tile_textures);
 
 		skybox.draw();
 	}
@@ -575,7 +649,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks);
+		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -585,7 +659,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam)
-			gui.draw(world.player, chunk_graphics.tile_textures);
+			gui.draw(world.player, tile_textures);
 
 		glEnable(GL_DEPTH_TEST);
 	}

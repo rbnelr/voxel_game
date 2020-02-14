@@ -95,7 +95,7 @@ struct BlockVertex {
 	b, c, a, \
 	a, c, d
 
-static constexpr BlockVertex block_mesh[6*6] {
+static constexpr BlockVertex block_data[6*6] {
 	QUAD(
 		BlockVertex( float3(-1,+1,-1), float3(-1,0,0), float2(0,0) ),
 		BlockVertex( float3(-1,-1,-1), float3(-1,0,0), float2(1,0) ),
@@ -150,21 +150,33 @@ struct GuiGraphics {
 		}
 	};
 	struct ItemsVertex {
+		float2	pos_px;
+		float2	uv;
+		float	tex_indx;
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_px  )>(0, "pos_px",   sizeof(ItemsVertex), offsetof(ItemsVertex, pos_px  ));
+			a.add<decltype(uv      )>(1, "uv",       sizeof(ItemsVertex), offsetof(ItemsVertex, uv      ));
+			a.add<decltype(tex_indx)>(2, "tex_indx", sizeof(ItemsVertex), offsetof(ItemsVertex, tex_indx));
+		}
+	};
+	struct BlockItemVertex {
 		float3	pos;
 		float3	normal;
 		float2	uv;
 		float	tex_indx;
 
 		static void bind (Attributes& a) {
-			a.add<decltype(pos     )>(0, "pos",      sizeof(ItemsVertex), offsetof(ItemsVertex, pos     ));
-			a.add<decltype(normal  )>(1, "normal",   sizeof(ItemsVertex), offsetof(ItemsVertex, normal  ));
-			a.add<decltype(uv      )>(2, "uv",       sizeof(ItemsVertex), offsetof(ItemsVertex, uv      ));
-			a.add<decltype(tex_indx)>(3, "tex_indx", sizeof(ItemsVertex), offsetof(ItemsVertex, tex_indx));
+			a.add<decltype(pos     )>(0, "pos",      sizeof(BlockItemVertex), offsetof(BlockItemVertex, pos     ));
+			a.add<decltype(normal  )>(1, "normal",   sizeof(BlockItemVertex), offsetof(BlockItemVertex, normal  ));
+			a.add<decltype(uv      )>(2, "uv",       sizeof(BlockItemVertex), offsetof(BlockItemVertex, uv      ));
+			a.add<decltype(tex_indx)>(3, "tex_indx", sizeof(BlockItemVertex), offsetof(BlockItemVertex, tex_indx));
 		}
 	};
 
 	Shader shader = { "gui" };
-	Shader shader_items = { "gui_item_block" };
+	Shader shader_item = { "gui_item" };
+	Shader shader_item_block = { "gui_item_block" };
 
 	AtlasedTexture crosshair			= { "textures/crosshair.png" };
 	AtlasedTexture quickbar				= { "textures/quickbar.png" };
@@ -177,7 +189,7 @@ struct GuiGraphics {
 
 		for (int j=0; j<6; ++j) {
 			for (int i=0; i<6; ++i) {
-				auto p = block_mesh[j*6+i];
+				auto p = block_data[j*6+i];
 				p.pos = (mat * p.pos) * (0.5f / 1.70710671f);
 				p.normal = mat * p.normal;
 				gui_block_mesh[j*6+i] = p;
@@ -195,11 +207,16 @@ struct GuiGraphics {
 	std::vector<ItemsVertex> items_vertices;
 	Mesh<ItemsVertex> items_mesh;
 
+	std::vector<BlockItemVertex> blocks_vertices;
+	Mesh<BlockItemVertex> blocks_mesh;
+
 	float gui_scale = 4; // pixel multiplier
 	float crosshair_scale = .5f;
 
 	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px, lrgba col=1);
 	void draw_color_quad (float2 pos_px, float2 size_px, lrgba col);
+
+	void draw_item_tile (item_id id, float2 pos_px, float2 size_px, TileTextures const& tile_textures);
 
 	float2 get_quickbar_slot_center (int slot_index);
 
@@ -213,17 +230,34 @@ struct GuiGraphics {
 
 struct GenericVertex {
 	float3	pos_model;
+	float3	normal;
 	lrgba	color;
 
 	static void bind (Attributes& a) {
 		a.add<decltype(pos_model)>(0, "pos_model", sizeof(GenericVertex), offsetof(GenericVertex, pos_model));
-		a.add<decltype(color    )>(1, "color"    , sizeof(GenericVertex), offsetof(GenericVertex, color    ));
+		a.add<decltype(normal   )>(1, "normal",    sizeof(GenericVertex), offsetof(GenericVertex, normal   ));
+		a.add<decltype(color    )>(2, "color"    , sizeof(GenericVertex), offsetof(GenericVertex, color    ));
 	}
 };
 
 struct PlayerGraphics {
 
+	struct BlockVertex {
+		float3	pos_model;
+		float3	normal;
+		float2	uv;
+		float	tex_indx;
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_model)>(0, "pos_model", sizeof(BlockVertex), offsetof(BlockVertex, pos_model));
+			a.add<decltype(normal   )>(1, "normal",    sizeof(BlockVertex), offsetof(BlockVertex, normal   ));
+			a.add<decltype(uv       )>(2, "uv",        sizeof(BlockVertex), offsetof(BlockVertex, uv       ));
+			a.add<decltype(tex_indx )>(3, "tex_indx",  sizeof(BlockVertex), offsetof(BlockVertex, tex_indx ));
+		}
+	};
+
 	Shader shader = Shader("generic", { FOG_UNIFORMS });
+	Shader shader_block = Shader("held_block", { FOG_UNIFORMS });
 
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
@@ -235,10 +269,11 @@ struct PlayerGraphics {
 	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
 
 	Mesh<GenericVertex> fist_mesh;
+	Mesh<BlockVertex> block_mesh;
 
 	PlayerGraphics ();
 
-	void draw (Player const& player);
+	void draw (Player const& player, TileTextures const& tile_textures);
 };
 
 struct ChunkMesh {
@@ -294,6 +329,7 @@ struct TileTextures {
 	Texture2DArray breaking_textures;
 
 	BlockTileInfo block_tile_info[BLOCK_IDS_COUNT];
+	int item_tile[ITEM_IDS_COUNT - MAX_BLOCK_ID];
 
 	int2 tile_size;
 
@@ -326,14 +362,12 @@ struct ChunkGraphics {
 
 	Sampler2D sampler;
 
-	TileTextures tile_textures;
-
 	bool alpha_test = !_use_potatomode;
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod);
-	void draw_chunks_transparent (Chunks const& chunks);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod, TileTextures const& tile_textures);
+	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures);
 };
 
 class World;
@@ -386,6 +420,8 @@ class Graphics {
 public:
 	CommonUniforms			common_uniforms;
 
+	TileTextures			tile_textures;
+
 	ChunkGraphics			chunk_graphics;
 	PlayerGraphics			player;
 
@@ -406,6 +442,7 @@ public:
 			common_uniforms.imgui();
 			fog.imgui();
 			chunk_graphics.imgui(chunks);
+			tile_textures.imgui("tile_textures");
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_lod", &debug_lod);

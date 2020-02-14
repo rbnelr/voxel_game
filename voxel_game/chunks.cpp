@@ -14,8 +14,8 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 	
 }
 
-void Chunk::remesh (Chunks& chunks, ChunkGraphics const& graphics) {
-	mesh_chunk(chunks, graphics, this);
+void Chunk::remesh (Chunks& chunks, Graphics const& graphics) {
+	mesh_chunk(chunks, graphics.chunk_graphics, graphics.tile_textures, this);
 
 	needs_remesh = false;
 }
@@ -310,7 +310,7 @@ void Chunks::update_chunks_brightness () {
 	}
 }
 
-void Chunks::update_chunk_graphics (ChunkGraphics const& graphics) {
+void Chunks::update_chunk_graphics (Graphics const& graphics) {
 	int count = 0;
 
 	for (Chunk& chunk : chunks) {

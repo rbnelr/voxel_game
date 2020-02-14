@@ -141,7 +141,7 @@ void Game::frame () {
 		block_update.update_blocks(world->chunks);
 		world->chunks.update_chunks_brightness();
 
-		world->chunks.update_chunk_graphics(graphics.chunk_graphics);
+		world->chunks.update_chunk_graphics(graphics);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);

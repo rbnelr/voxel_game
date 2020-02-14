@@ -135,7 +135,7 @@ public:
 	void calc_lod (int level);
 	void calc_lods ();
 
-	void remesh (Chunks& chunks, ChunkGraphics const& graphics);
+	void remesh (Chunks& chunks, Graphics const& graphics);
 
 	void update_block_brighness ();
 
@@ -297,6 +297,6 @@ public:
 
 	void update_chunks_brightness ();
 
-	void update_chunk_graphics (ChunkGraphics const& graphics);
+	void update_chunk_graphics (Graphics const& graphics);
 };
 

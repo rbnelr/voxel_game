@@ -436,6 +436,12 @@
     <None Include="shaders\gui_item_block.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\gui_item.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\held_block.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="notes.txt">

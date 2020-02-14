@@ -68,15 +68,15 @@ struct Chunk_Mesher {
 	void cube_opaque ();
 	void cube_transperant ();
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Chunk* chunk);
+	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk);
 };
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Chunk* chunk) {
+void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
 	Chunk_Mesher cm;
-	cm.mesh_chunk(chunks, graphics, chunk);
+	cm.mesh_chunk(chunks, graphics, tile_textures, chunk);
 }
 
-void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Chunk* chunk) {
+void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
 	alpha_test = graphics.alpha_test;
 
 	static std::vector<ChunkMesh::Vertex> _opaque_vertices;
@@ -117,7 +117,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 						block_pos_x = i.x;
 						block_pos_y = i.y;
 						block_pos_z = i.z;
-						tile = graphics.tile_textures.block_tile_info[b->id];
+						tile = tile_textures.block_tile_info[b->id];
 
 						if (BLOCK_PROPS[block->id].transparency == TM_TRANSPARENT)
 							cube_transperant();

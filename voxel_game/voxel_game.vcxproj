@@ -329,7 +329,9 @@
     <None Include="shaders\common.glsl" />
     <None Include="shaders\gui.glsl" />
     <None Include="shaders\generic.glsl" />
+    <None Include="shaders\gui_item.glsl" />
     <None Include="shaders\gui_item_block.glsl" />
+    <None Include="shaders\held_block.glsl" />
     <None Include="shaders\overlay.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
