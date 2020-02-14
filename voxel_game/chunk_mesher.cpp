@@ -58,15 +58,6 @@ struct Chunk_Mesher {
 			return BLOCK_PROPS[t].transparency == TM_TRANSPARENT;
 	}
 
-	uint8 calc_texture_index (BlockFace face) {
-		int index = tile.base_index;
-		if (face == BF_POS_Z)
-			index += tile.top;
-		else if (face == BF_NEG_Z)
-			index += tile.bottom;
-		return (uint8)index;
-	}
-
 	void face_nx (std::vector<ChunkMesh::Vertex>* verts);
 	void face_px (std::vector<ChunkMesh::Vertex>* verts);
 	void face_ny (std::vector<ChunkMesh::Vertex>* verts);
@@ -170,7 +161,7 @@ uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 // float	hp_ratio;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
-		{ (uint8v3)(bpos(x,y,z) * scale), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u*scale,v*scale), calc_texture_index(face), b->hp }
+		{ (uint8v3)(bpos(x,y,z) * scale), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u*scale,v*scale), (uint8)tile.calc_texture_index(face), b->hp }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \

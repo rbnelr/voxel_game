@@ -433,7 +433,7 @@
     <None Include="shaders\gui.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\gui_items.glsl">
+    <None Include="shaders\gui_item_block.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

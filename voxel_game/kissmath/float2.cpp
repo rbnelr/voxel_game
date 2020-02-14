@@ -31,30 +31,17 @@ namespace kissmath {
 		
 	}
 	
-	// sets all components to one value
-	// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable
-	// and short initialization like float3 a = 0; works
-	float2::float2 (float all): x{all}, y{all} {
-		
-	}
-	
-	// supply all components
-	float2::float2 (float x, float y): x{x}, y{y} {
-		
-	}
-	
+	//// Truncating cast operators
+
 	// truncate vector
 	float2::float2 (float3 v): x{v.x}, y{v.y} {
-		
+
 	}
-	
+
 	// truncate vector
 	float2::float2 (float4 v): x{v.x}, y{v.y} {
-		
+
 	}
-	
-	//// Truncating cast operators
-	
 	
 	//// Type cast operators
 	

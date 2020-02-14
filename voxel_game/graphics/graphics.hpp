@@ -83,39 +83,107 @@ struct BlockHighlightGraphics {
 class Player;
 struct TileTextures;
 
+struct BlockVertex {
+	float3 pos;
+	float3 normal;
+	float2 uv;
+
+	BlockVertex () {}
+	constexpr BlockVertex (float3 p, float3 norm, float2 uv): pos{p}, normal{norm}, uv{uv} {}
+};
+#define QUAD(a,b,c,d) \
+	b, c, a, \
+	a, c, d
+
+static constexpr BlockVertex block_mesh[6*6] {
+	QUAD(
+		BlockVertex( float3(-1,+1,-1), float3(-1,0,0), float2(0,0) ),
+		BlockVertex( float3(-1,-1,-1), float3(-1,0,0), float2(1,0) ),
+		BlockVertex( float3(-1,-1,+1), float3(-1,0,0), float2(1,1) ),
+		BlockVertex( float3(-1,+1,+1), float3(-1,0,0), float2(0,1) )
+	),								 
+	QUAD(							 
+		BlockVertex( float3(+1,-1,-1), float3(+1,0,0), float2(0,0) ),
+		BlockVertex( float3(+1,+1,-1), float3(+1,0,0), float2(1,0) ),
+		BlockVertex( float3(+1,+1,+1), float3(+1,0,0), float2(1,1) ),
+		BlockVertex( float3(+1,-1,+1), float3(+1,0,0), float2(0,1) )
+	),	
+	QUAD(	
+		BlockVertex( float3(-1,-1,-1), float3(0,-1,0), float2(0,0) ),
+		BlockVertex( float3(+1,-1,-1), float3(0,-1,0), float2(1,0) ),
+		BlockVertex( float3(+1,-1,+1), float3(0,-1,0), float2(1,1) ),
+		BlockVertex( float3(-1,-1,+1), float3(0,-1,0), float2(0,1) )
+	),	
+	QUAD(	
+		BlockVertex( float3(+1,+1,-1), float3(0,+1,0), float2(0,0) ),
+		BlockVertex( float3(-1,+1,-1), float3(0,+1,0), float2(1,0) ),
+		BlockVertex( float3(-1,+1,+1), float3(0,+1,0), float2(1,1) ),
+		BlockVertex( float3(+1,+1,+1), float3(0,+1,0), float2(0,1) )
+	),	
+	QUAD(	
+		BlockVertex( float3(-1,+1,-1), float3(0,0,-1), float2(0,0) ),
+		BlockVertex( float3(+1,+1,-1), float3(0,0,-1), float2(1,0) ),
+		BlockVertex( float3(+1,-1,-1), float3(0,0,-1), float2(1,1) ),
+		BlockVertex( float3(-1,-1,-1), float3(0,0,-1), float2(0,1) )
+	),	
+	QUAD(	
+		BlockVertex( float3(-1,-1,+1), float3(0,0,+1), float2(0,0) ),
+		BlockVertex( float3(+1,-1,+1), float3(0,0,+1), float2(1,0) ),
+		BlockVertex( float3(+1,+1,+1), float3(0,0,+1), float2(1,1) ),
+		BlockVertex( float3(-1,+1,+1), float3(0,0,+1), float2(0,1) )
+	),
+};
+
+#undef QUAD
+
 struct GuiGraphics {
 
 	struct Vertex {
-		float4	pos_clip;
+		float2	pos_px;
 		float2	uv;
 		float4	col;
 
 		static void bind (Attributes& a) {
-			a.add<decltype(pos_clip)>(0, "pos_clip", sizeof(Vertex), offsetof(Vertex, pos_clip));
-			a.add<decltype(uv      )>(1, "uv",       sizeof(Vertex), offsetof(Vertex, uv      ));
-			a.add<decltype(col     )>(2, "col",      sizeof(Vertex), offsetof(Vertex, col     ));
+			a.add<decltype(pos_px)>(0, "pos_px", sizeof(Vertex), offsetof(Vertex, pos_px));
+			a.add<decltype(uv    )>(1, "uv",     sizeof(Vertex), offsetof(Vertex, uv    ));
+			a.add<decltype(col   )>(2, "col",    sizeof(Vertex), offsetof(Vertex, col   ));
 		}
 	};
 	struct ItemsVertex {
-		float4	pos_clip;
+		float3	pos;
+		float3	normal;
 		float2	uv;
 		float	tex_indx;
-		float	brightness;
 
 		static void bind (Attributes& a) {
-			a.add<decltype(pos_clip  )>(0, "pos_clip",   sizeof(ItemsVertex), offsetof(ItemsVertex, pos_clip  ));
-			a.add<decltype(uv        )>(1, "uv",         sizeof(ItemsVertex), offsetof(ItemsVertex, uv        ));
-			a.add<decltype(tex_indx  )>(2, "tex_indx",   sizeof(ItemsVertex), offsetof(ItemsVertex, tex_indx  ));
-			a.add<decltype(brightness)>(3, "brightness", sizeof(ItemsVertex), offsetof(ItemsVertex, brightness));
+			a.add<decltype(pos     )>(0, "pos",      sizeof(ItemsVertex), offsetof(ItemsVertex, pos     ));
+			a.add<decltype(normal  )>(1, "normal",   sizeof(ItemsVertex), offsetof(ItemsVertex, normal  ));
+			a.add<decltype(uv      )>(2, "uv",       sizeof(ItemsVertex), offsetof(ItemsVertex, uv      ));
+			a.add<decltype(tex_indx)>(3, "tex_indx", sizeof(ItemsVertex), offsetof(ItemsVertex, tex_indx));
 		}
 	};
 
 	Shader shader = { "gui" };
-	Shader shader_items = { "gui_items" };
+	Shader shader_items = { "gui_item_block" };
 
 	AtlasedTexture crosshair			= { "textures/crosshair.png" };
 	AtlasedTexture quickbar				= { "textures/quickbar.png" };
 	AtlasedTexture quickbar_selected	= { "textures/quickbar_selected.png" };
+
+	BlockVertex gui_block_mesh[6*6];
+
+	GuiGraphics () {
+		float3x3 mat = rotate3_X(deg(45)) * rotate3_Y(deg(45)) * rotate3_X(deg(-90));
+
+		for (int j=0; j<6; ++j) {
+			for (int i=0; i<6; ++i) {
+				auto p = block_mesh[j*6+i];
+				p.pos = (mat * p.pos) * (0.5f / 1.70710671f);
+				p.normal = mat * p.normal;
+				gui_block_mesh[j*6+i] = p;
+			}
+		}
+	}
 
 	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &quickbar, &quickbar_selected }, 64, srgba8(0), 1, false);
 
@@ -133,9 +201,11 @@ struct GuiGraphics {
 	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px, lrgba col=1);
 	void draw_color_quad (float2 pos_px, float2 size_px, lrgba col);
 
+	float2 get_quickbar_slot_center (int slot_index);
+
 	void draw_crosshair ();
 	void draw_quickbar_slot (AtlasedTexture tex, int index);
-	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures, int2 slot_size);
+	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
 	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
 	void draw (Player const& player, TileTextures const& tile_textures);
@@ -206,6 +276,15 @@ struct BlockTileInfo {
 	int bottom = 0; // base_index + bottom to get block bottom tile
 
 	//bool random_rotation = false;
+
+	int calc_texture_index (BlockFace face) {
+		int index = base_index;
+		if (face == BF_POS_Z)
+			index += top;
+		else if (face == BF_NEG_Z)
+			index += bottom;
+		return index;
+	}
 };
 
 // A single texture object that stores all block tiles

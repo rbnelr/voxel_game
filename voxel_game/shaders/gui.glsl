@@ -1,7 +1,9 @@
 #version 330 core
 
+$include "common.glsl"
+
 $if vertex
-	layout (location = 0) in vec4 pos_clip;
+	layout (location = 0) in vec2 pos_px;
 	layout (location = 1) in vec2 uv;
 	layout (location = 2) in vec4 col;
 
@@ -9,7 +11,7 @@ $if vertex
 	out vec4 vs_col;
 
 	void main () {
-		gl_Position = pos_clip;
+		gl_Position = vec4(pos_px / viewport_size * 2 - 1, 0, 1);
 
 		vs_uv = uv;
 		vs_col = col;
