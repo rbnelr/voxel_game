@@ -225,7 +225,7 @@ struct GuiGraphics {
 	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
 	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
-	void draw (Player const& player, TileTextures const& tile_textures, bool alpha_test);
+	void draw (Player const& player, TileTextures const& tile_textures);
 };
 
 struct GenericVertex {
@@ -256,8 +256,8 @@ struct PlayerGraphics {
 		}
 	};
 
-	Shader shader = Shader("generic", { FOG_UNIFORMS });
-	Shader shader_block = Shader("held_block", { FOG_UNIFORMS });
+	Shader shader = Shader("generic");
+	Shader shader_item = Shader("held_item");
 
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
@@ -273,7 +273,7 @@ struct PlayerGraphics {
 
 	PlayerGraphics ();
 
-	void draw (Player const& player, TileTextures const& tile_textures, bool alpha_test);
+	void draw (Player const& player, TileTextures const& tile_textures);
 };
 
 struct ChunkMesh {
@@ -322,6 +322,34 @@ struct BlockTileInfo {
 	}
 };
 
+struct ItemMeshes {
+
+	struct Vertex {
+		float3	pos_model;
+		float3	normal;
+		float2	uv;
+		float	tex_indx;
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_model)>(0, "pos_model", sizeof(Vertex), offsetof(Vertex, pos_model));
+			a.add<decltype(normal   )>(1, "normal",    sizeof(Vertex), offsetof(Vertex, normal   ));
+			a.add<decltype(uv       )>(2, "uv",        sizeof(Vertex), offsetof(Vertex, uv       ));
+			a.add<decltype(tex_indx )>(3, "tex_indx",  sizeof(Vertex), offsetof(Vertex, tex_indx ));
+		}
+	};
+
+	Mesh<Vertex> meshes;
+
+	struct ItemMesh {
+		unsigned offset;
+		unsigned size;
+	};
+
+	ItemMesh item_meshes[ITEM_IDS_COUNT - MAX_BLOCK_ID];
+
+	void generate (Image<srgba8>* images, int count, int* item_tiles);
+};
+
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
 struct TileTextures {
@@ -332,6 +360,8 @@ struct TileTextures {
 	int item_tile[ITEM_IDS_COUNT - MAX_BLOCK_ID];
 
 	int2 tile_size;
+
+	ItemMeshes item_meshes;
 
 	int breaking_index = 0;
 	int breaking_frames_count = 1;

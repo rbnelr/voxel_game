@@ -439,7 +439,7 @@
     <None Include="shaders\gui_item.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\held_block.glsl">
+    <None Include="shaders\held_item.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
