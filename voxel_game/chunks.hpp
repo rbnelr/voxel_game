@@ -148,16 +148,30 @@ public:
 ////////////// Chunks
 struct BackgroundJob {
 	// input
-	chunk_coord coord;
 	Chunk* chunk;
 	WorldGenerator const* world_gen;
 	// output
-	float chunk_gen_time;
+	float timer;
 
 	BackgroundJob execute ();
 };
 
-inline Threadpool<BackgroundJob> background_threadpool = { max(std::thread::hardware_concurrency() - 1, 1), ">> threadpool" };
+struct ParallelismJob {
+	// input
+	Chunk* chunk;
+	// output
+	float timer;
+
+	ParallelismJob execute ();
+};
+
+static constexpr float background_thread_ratio = 5.0f / 11;
+
+static const int background_threads  = max(floori((float)(std::thread::hardware_concurrency() - 1) *         background_thread_ratio ), 1);
+static const int parallelism_threads = max(ceili ((float)(std::thread::hardware_concurrency() - 1) * (1.0f - background_thread_ratio)), 1);
+
+inline Threadpool<BackgroundJob > background_threadpool  = { background_threads , ">> background threadpool"  };
+inline Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, ">> parallelism threadpool" };
 
 struct ChunkHashmap {
 	typedef std::unordered_map<chunk_coord_hashmap, std::unique_ptr<Chunk>> hashmap_t; 

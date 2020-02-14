@@ -298,7 +298,7 @@ struct ChunkMesh {
 
 		static void bind (Attributes& a) {
 			a.add    <decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
-			a.add_int<decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness));
+			a.add    <decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness), true);
 			a.add    <decltype(uv        )>(2, "uv",         sizeof(Vertex), offsetof(Vertex, uv        ));
 			a.add    <decltype(tex_indx  )>(3, "tex_indx",   sizeof(Vertex), offsetof(Vertex, tex_indx  ));
 			a.add    <decltype(hp_ratio  )>(4, "hp_ratio",   sizeof(Vertex), offsetof(Vertex, hp_ratio  ), true);

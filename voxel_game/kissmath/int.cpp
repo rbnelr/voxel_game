@@ -25,24 +25,24 @@ namespace kissmath {
 		
 		return modulo + a;
 	}
-	
+
 	// clamp x into range [a, b]
 	// equivalent to min(max(x,a), b)
 	int clamp (int x, int a, int b) {
 		return min(max(x, a), b);
 	}
-	
+
 	// clamp x into range [0, 1]
 	// also known as saturate in hlsl
 	int clamp (int x) {
 		return min(max(x, int(0)), int(1));
 	}
-	
+
 	// returns the greater value of a and b
 	int min (int l, int r) {
 		return l <= r ? l : r;
 	}
-	
+
 	// returns the smaller value of a and b
 	int max (int l, int r) {
 		return l >= r ? l : r;

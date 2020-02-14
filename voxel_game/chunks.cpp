@@ -27,20 +27,22 @@ void Chunk::update_block_brighness () {
 
 			i.z = CHUNK_DIM_Z -1;
 
-			for (; i.z > -1; --i.z) {
-				auto* b = get_block(i);
-
-				if (b->id != B_AIR) break;
-
-				b->dark = false;
-			}
+			int light_level = 15;
 
 			for (; i.z > -1; --i.z) {
 				auto* b = get_block(i);
+				auto& props = BLOCK_PROPS[b->id];
 
-				b->dark = true;
+				if (b->id == B_AIR) {
+					
+				} else if (props.collision != CM_SOLID || props.transparency != TM_OPAQUE) {
+					light_level = max(light_level - 4, 0);
+				} else {
+					light_level = 0;
+				}
+
+				b->light_level = light_level;
 			}
-
 		}
 	}
 
@@ -92,8 +94,12 @@ void Chunks::remesh_neighbours (chunk_coord coord) {
 
 //// Chunks
 BackgroundJob BackgroundJob::execute () {
-	world_gen->generate_chunk(*chunk, &chunk_gen_time);
+	world_gen->generate_chunk(*chunk, &timer);
 
+	return std::move(*this);
+}
+
+ParallelismJob ParallelismJob::execute () {
 	return std::move(*this);
 }
 
@@ -221,7 +227,6 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 			chunk->lod = use_lod ? chunk_lod(dist) : 0;
 			
 			BackgroundJob job;
-			job.coord = cp;
 			job.chunk = chunk;
 			job.world_gen = &world_gen;
 			background_threadpool.jobs.push(job);
@@ -230,13 +235,13 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 		BackgroundJob res;
 		while (background_threadpool.results.try_pop(&res)) {
 			{ // move chunk into real hashmap
-				auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.coord});
-				chunks.hashmap.emplace(chunk_coord_hashmap{res.coord}, std::move(it->second));
+				auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
+				chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
 				pending_chunks.erase_chunk({ it });
 			}
 			
-			chunk_gen_time.push(res.chunk_gen_time);
-			logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", res.coord.x, res.coord.y, res.chunk_gen_time * 1024);
+			chunk_gen_time.push(res.timer);
+			logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", res.chunk->coord.x, res.chunk->coord.y, res.timer * 1024);
 
 			res.chunk->whole_chunk_changed(*this);
 		}
@@ -248,10 +253,10 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 template <typename FUNC>
 Block clac_block_lod (FUNC get_block) {
 	int dark_count = 0;
-	for (int i=0; i<8; ++i) {
-		if (get_block(i)->dark)
-			dark_count++; 
-	}
+	//for (int i=0; i<8; ++i) {
+	//	if (get_block(i)->dark)
+	//		dark_count++; 
+	//}
 	
 	int grass_count = 0;
 	for (int i=0; i<8; ++i) {

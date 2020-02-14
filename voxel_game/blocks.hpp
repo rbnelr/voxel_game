@@ -23,7 +23,7 @@ static constexpr unsigned int MAX_BLOCK_ID = 1u << (sizeof(block_id)*8);
 
 static constexpr const char* BLOCK_NAMES[BLOCK_IDS_COUNT] = {
 	/* B_NULL			*/	"null"		,
-	/* B_AIR			*/	nullptr		,
+	/* B_AIR			*/	"null"		,
 	/* B_WATER			*/	"water"		,
 	/* B_EARTH			*/	"earth"		,
 	/* B_GRASS			*/	"grass"		,
@@ -78,7 +78,7 @@ static BlockProperties BLOCK_PROPS[PSEUDO_BLOCK_IDS_COUNT] = {
 
 struct Block {
 	block_id	id;
-	bool		dark; // any air block that only has air above it (is in sunlight)
+	uint8		light_level; // [0,15]
 	uint8		hp;
 };
 

@@ -24,14 +24,14 @@ namespace kissmath {
 	// clamp x into range [a, b]
 	// equivalent to min(max(x,a), b)
 	int clamp (int x, int a, int b);
-	
+
 	// clamp x into range [0, 1]
 	// also known as saturate in hlsl
 	int clamp (int x);
-	
+
 	// returns the greater value of a and b
 	int min (int l, int r);
-	
+
 	// returns the smaller value of a and b
 	int max (int l, int r);
 	

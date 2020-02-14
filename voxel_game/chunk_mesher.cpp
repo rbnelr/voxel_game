@@ -137,14 +137,14 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 }
 
 uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {
-	int brightness = 0;
+	unsigned brightness = 0;
 
-	brightness += query_block(vert_pos +plane -axis_a      +0)->dark ? 0 : 1;
-	brightness += query_block(vert_pos +plane      +0      +0)->dark ? 0 : 1;
-	brightness += query_block(vert_pos +plane -axis_a -axis_b)->dark ? 0 : 1;
-	brightness += query_block(vert_pos +plane      +0 -axis_b)->dark ? 0 : 1;
+	brightness += query_block(vert_pos +plane -axis_a      +0)->light_level;
+	brightness += query_block(vert_pos +plane      +0      +0)->light_level;
+	brightness += query_block(vert_pos +plane -axis_a -axis_b)->light_level;
+	brightness += query_block(vert_pos +plane      +0 -axis_b)->light_level;
 
-	return (uint8)brightness;
+	return (uint8)((brightness << 2) + (brightness >> 2)); // * 5.25 to bring 4*15 to 255
 }
 
 #define XL (block_pos_x)
@@ -153,12 +153,6 @@ uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bp
 #define XH (block_pos_x +1)
 #define YH (block_pos_y +1)
 #define ZH (block_pos_z +1)
-
-// float3	pos_model;
-// float	brightness;
-// float2	uv;
-// float	tex_indx;
-// float	hp_ratio;
 
 #define VERT(x,y,z, u,v, face, axis_a,axis_b, plane) \
 		{ (uint8v3)(bpos(x,y,z) * scale), calc_brightness(bpos(x,y,z), axis_a,axis_b,plane), uint8v2(u*scale,v*scale), (uint8)tile.calc_texture_index(face), b->hp }
