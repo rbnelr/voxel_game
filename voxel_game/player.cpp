@@ -24,14 +24,17 @@ void BreakBlock::update (World& world, PlayerGraphics const& graphics, SelectedB
 }
 
 void BlockPlace::update (World& world, Player const& player, SelectedBlock const& selected_block) {
+	auto& slot = player.inventory.quickbar.get_selected();
+	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
+	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;
 
-	bool inp = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block;
+	bool inp = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block && is_block;
 	if (inp && anim_t >= anim_speed / repeat_speed) {
 		anim_t = 0;
 	}
 	bool trigger = inp && anim_t == 0;
 
-	if (trigger && selected_block) {
+	if (trigger && selected_block && is_block) {
 		bpos offs = 0;
 		offs[selected_block.face / 2] = (selected_block.face % 2) ? +1 : -1;
 
@@ -40,7 +43,7 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
 		if (!block_place_is_inside_player) {
-			world.try_place_block(block_place_pos, B_EARTH);
+			world.try_place_block(block_place_pos, (block_id)item);
 		} else {
 			trigger = false;
 		}

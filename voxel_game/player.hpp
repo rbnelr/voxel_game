@@ -62,6 +62,10 @@ public:
 
 		int selected = 0;
 
+		InventorySlot const& get_selected () const {
+			return slots[selected];
+		}
+
 		Quickbar () {
 			for (int i=0; i<10; ++i) {
 				auto id = I_NULL;

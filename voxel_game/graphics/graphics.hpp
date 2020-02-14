@@ -225,7 +225,7 @@ struct GuiGraphics {
 	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
 	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, bool alpha_test);
 };
 
 struct GenericVertex {
@@ -273,7 +273,7 @@ struct PlayerGraphics {
 
 	PlayerGraphics ();
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, bool alpha_test);
 };
 
 struct ChunkMesh {

@@ -255,7 +255,7 @@ void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_
 	}
 }
 
-void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures, bool alpha_test) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	sampler.bind(0);
 
@@ -279,6 +279,8 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	
 	if (shader_item_block && blocks_vertices.size() > 0) {
 		shader_item_block.bind();
+
+		shader_item_block.set_uniform("alpha_test", alpha_test);
 
 		glUniform1i(glGetUniformLocation(shader_item_block.shader->shad, "tile_textures"), 0);
 		
@@ -313,9 +315,8 @@ PlayerGraphics::PlayerGraphics () {
 	}
 }
 
-void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures) {
-	auto qb = player.inventory.quickbar;
-	auto slot = qb.slots[ qb.selected ];
+void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures, bool alpha_test) {
+	auto slot = player.inventory.quickbar.get_selected();
 	item_id item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 
 	float anim_t = player.break_block.anim_t != 0 ? player.break_block.anim_t : player.block_place.anim_t;
@@ -348,6 +349,7 @@ void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textur
 				float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
 
 				shader_block.set_uniform("model_to_world", (float4x4)mat);
+				shader_block.set_uniform("alpha_test", alpha_test);
 
 				block_mesh.bind();
 				block_mesh.draw();
@@ -631,8 +633,6 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
 
 	{ //// Opaque pass
-		player.draw(world.player, tile_textures);
-
 		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod, tile_textures);
 
 		skybox.draw();
@@ -641,6 +641,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glEnable(GL_BLEND);
 
 	{ //// Transparent pass
+
+		player.draw(world.player, tile_textures, chunk_graphics.alpha_test);
 
 		if (selected_block) {
 			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
@@ -659,7 +661,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam)
-			gui.draw(world.player, tile_textures);
+			gui.draw(world.player, tile_textures, chunk_graphics.alpha_test);
 
 		glEnable(GL_DEPTH_TEST);
 	}

@@ -27,6 +27,8 @@ $if fragment
 	uniform	sampler2D tex;
 
 	void main () {
-		frag_col = mix(texture(tex, vs_uv) * vs_col, vs_col, step(vs_uv.x, 0));
+		vec4 col = texture(tex, vs_uv) * vs_col;
+		col.rgb = mix(col.rgb, vs_col.rgb, step(vs_uv.x, 0));
+		frag_col = col;
 	}
 $endif

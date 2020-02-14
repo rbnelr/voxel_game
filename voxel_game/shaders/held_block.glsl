@@ -32,22 +32,13 @@ $if fragment
 	in float	vs_tex_indx;
 	
 	uniform	sampler2DArray tile_textures;
-	
-	uniform bool alpha_test;
-	#define ALPHA_TEST_THRES 127.0
 
 	const vec3 light_dir_world = normalize(vec3(0.05, 0.5, 3));
 
 	void main () {
 		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 		col.rgb *= max(dot(normalize(vs_normal_world), light_dir_world), 0.0) * 0.7 + 0.3;
-
-		if (alpha_test) {
-			if (col.a <= ALPHA_TEST_THRES / 255.0)
-				discard;
-			col.a = 1.0;
-		}
 		
-		FRAG_COL(col * (max(dot(normalize(vs_normal_world), light_dir_world), 0.0) * 0.7 + 0.3));
+		FRAG_COL(col);
 	}
 $endif

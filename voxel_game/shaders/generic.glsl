@@ -30,6 +30,8 @@ $if fragment
 	const vec3 light_dir_world = normalize(vec3(0.05, 0.5, 3));
 
 	void main () {
-		FRAG_COL(vs_color * max(dot(normalize(vs_normal_world), light_dir_world), 0.0) * 0.7 + 0.3);
+		vec4 col = vs_color;
+		col.rgb *= max(dot(normalize(vs_normal_world), light_dir_world), 0.0) * 0.7 + 0.3;
+		FRAG_COL(col);
 	}
 $endif
