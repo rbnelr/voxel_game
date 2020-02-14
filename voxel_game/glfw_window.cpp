@@ -33,6 +33,8 @@ bool			fullscreen = false;
 GLFWmonitor*	primary_monitor;
 Rect			window_positioning;
 
+Input			_input = {};
+
 void set_cursor_mode (bool enabled) {
 	if (enabled)
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Cursor enabled, can interact with Imgui
@@ -73,9 +75,9 @@ void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int 
 	}
 
 	if ((went_down || went_up) && key >= GLFW_KEY_SPACE && key <= GLFW_KEY_LAST) {
-		input.buttons[key].is_down = went_down;
-		input.buttons[key].went_down = went_down;
-		input.buttons[key].went_up = went_up;
+		_input.buttons[key].is_down = went_down;
+		_input.buttons[key].went_down = went_down;
+		_input.buttons[key].went_up = went_up;
 	}
 }
 void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
@@ -88,9 +90,9 @@ void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mo
 	bool went_up =	 action == GLFW_RELEASE;
 
 	if ((went_down || went_up) && button >= GLFW_MOUSE_BUTTON_1 && button <= GLFW_MOUSE_BUTTON_8) {
-		input.buttons[button].is_down = went_down;
-		input.buttons[button].went_down = went_down;
-		input.buttons[button].went_up = went_up;
+		_input.buttons[button].is_down = went_down;
+		_input.buttons[button].went_down = went_down;
+		_input.buttons[button].went_up = went_up;
 	}
 }
 
@@ -116,13 +118,13 @@ void glfw_mouse_move_event (GLFWwindow* window, double xpos, double ypos) {
 	//logf("glfw_mouse_move_event: %7d: %f %f%s\n", frame_counter, delta.x, delta.y, discard_delta ? " (discarded)":"");
 	
 	if (!discard_delta)
-		input.mouse_delta += delta;
+		_input.mouse_delta += delta;
 }
 void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
 	// assume int, if glfw_mouse_scroll ever gives us 0.2 for ex. this might break
 	// But the gameplay code wants to assume mousewheel moves in "clicks", for item swapping
 	// I've personally never seen a mousewheel that does not move in "clicks" anyway
-	input.mouse_wheel_delta += (int)ceil(abs(yoffset)) * (int)normalizesafe((float)yoffset); // -1.1f => -2    0 => 0    0.3f => +1
+	_input.mouse_wheel_delta += (int)ceil(abs(yoffset)) * (int)normalizesafe((float)yoffset); // -1.1f => -2    0 => 0    0.3f => +1
 }
 
 void glfw_register_callbacks (GLFWwindow* window) {
@@ -134,13 +136,13 @@ void glfw_register_callbacks (GLFWwindow* window) {
 }
 
 void glfw_get_non_callback_input (GLFWwindow* window) {
-	glfwGetFramebufferSize(window, &input.window_size.x, &input.window_size.y);
+	glfwGetFramebufferSize(window, &_input.window_size.x, &_input.window_size.y);
 
 	double x, y;
 	glfwGetCursorPos(window, &x, &y);
 
-	input.cursor_pos = float2((float)x, (float)y);
-	input.cursor_pos.y = input.window_size.y - 1 - input.cursor_pos.y;
+	_input.cursor_pos = float2((float)x, (float)y);
+	_input.cursor_pos.y = _input.window_size.y - 1 - _input.cursor_pos.y;
 
 	//logf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
 }
@@ -202,7 +204,7 @@ void glfw_gameloop () {
 
 	auto game = std::make_unique<Game>();
 
-	input.dt = 0; // dt zero on first frame
+	_input.dt = 0; // dt zero on first frame
 	uint64_t prev = get_timestamp();
 
 	// Get initial mouse position
@@ -212,7 +214,7 @@ void glfw_gameloop () {
 	_prev_cursor_enabled = glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED;
 
 	for (;;) {
-		input.clear_frame_input();
+		_input.clear_frame_input();
 
 		glfwPollEvents();
 
@@ -220,6 +222,8 @@ void glfw_gameloop () {
 			break;
 
 		glfw_get_non_callback_input(window);
+
+		input = _input;
 
 		imgui.frame_start();
 
@@ -231,9 +235,9 @@ void glfw_gameloop () {
 
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
-		input.real_dt = (float)(now - prev) / (float)timestamp_freq;
-		input.dt = min(input.real_dt * (input.pause_time ? 0 : input.time_scale), input.max_dt);
-		input.unscaled_dt = min(input.real_dt, input.max_dt);
+		_input.real_dt = (float)(now - prev) / (float)timestamp_freq;
+		_input.dt = min(_input.real_dt * (_input.pause_time ? 0 : _input.time_scale), _input.max_dt);
+		_input.unscaled_dt = min(_input.real_dt, _input.max_dt);
 		prev = now;
 
 		frame_counter++;

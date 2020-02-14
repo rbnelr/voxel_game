@@ -1,6 +1,7 @@
 #include "dear_imgui.hpp"
 #include "glfw_window.hpp"
 #include "util/string.hpp"
+#include "input.hpp"
 #include "kissmath_colors.hpp"
 using namespace kissmath;
 
@@ -21,6 +22,15 @@ void DearImgui::init () {
 void DearImgui::frame_start () {
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
+
+	{
+		auto& io = ImGui::GetIO();
+		if (io.WantCaptureKeyboard)
+			input.disable_keyboard();
+		if (io.WantCaptureMouse)
+			input.disable_mouse();
+	}
+
 	ImGui::NewFrame();
 }
 void DearImgui::frame_end () {

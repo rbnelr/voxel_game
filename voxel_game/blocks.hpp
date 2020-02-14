@@ -27,7 +27,7 @@ static constexpr const char* BLOCK_NAMES[BLOCK_IDS_COUNT] = {
 	/* B_WATER			*/	"water"		,
 	/* B_EARTH			*/	"earth"		,
 	/* B_GRASS			*/	"grass"		,
-	/* B_STONE			*/	"tree_log"	,
+	/* B_STONE			*/	"stone"		,
 	/* B_TREE_LOG		*/	"tree_log"	,
 	/* B_LEAVES			*/	"leaves"	,
 };

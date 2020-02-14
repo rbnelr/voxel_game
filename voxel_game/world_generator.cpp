@@ -10,7 +10,7 @@ struct Generator {
 	WorldGenerator const& wg;
 	Chunk& chunk;
 
-	float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world) {
+	float heightmap (OSN::Noise<2> const& osn_noise, float2 pos_world, float* earth_layer) {
 		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs, float range_l, float range_h) {
 			pos = rotate2(ang_offs) * pos;
 			pos /= period; // period is inverse frequency
@@ -46,6 +46,14 @@ struct Generator {
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
 			detail += noise(pos_world, d.freq, deg(37.17f) * (float)i, offs, -1,+1) * d.amp;
+
+			++i;
+		}
+
+		{
+			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
+			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
+			*earth_layer = noise(pos_world, 48, deg(37.17f) * (float)i, offs, 3,5.5f);
 
 			++i;
 		}
@@ -129,7 +137,8 @@ struct Generator {
 				
 				float2 pos_world = (float2)((bpos2)i +chunk.coord * CHUNK_DIM_2D);
 
-				float height = heightmap(noise, pos_world);
+				float earth_layer;
+				float height = heightmap(noise, pos_world, &earth_layer);
 				int highest_block = (int)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
 
 				float tree_density = noise_tree_density(noise, pos_world);
@@ -147,10 +156,14 @@ struct Generator {
 				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM_Z-1); ++i.z) {
 					auto* b = chunk.get_block(i);
 
-					if (i.z == highest_block && i.z >= water_level) {
-						b->id = B_GRASS;
+					if (i.z <= highest_block - earth_layer) {
+						b->id = B_STONE;
 					} else {
-						b->id = B_EARTH;
+						if (i.z == highest_block && i.z >= water_level) {
+							b->id = B_GRASS;
+						} else {
+							b->id = B_EARTH;
+						}
 					}
 
 					b->hp = 255;

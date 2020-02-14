@@ -82,12 +82,30 @@ DONE:
 TODO
 -FEATURES:
 
+ completely multithread code
+
+ see if there are any obvious optimizations to be done for remeshing
+
+ rework items to be classes with inheritance?
+ -pro: might simplyfy code a lot
+ -pro: complex state does not take up memory in union for simple items
+ -con: now need pointers everywhere
+ -con: saving now isn't a simple memcpy
+
+ implement inventory gui that you can drag and drop
+
+ implement block stack count, gain on break, lose on place
+
  write actual air control
  -no slowdown in air with wasd not pressed, press s to slow down when going forward
  -ie. apply accel not based on vel - desired_vel but directly from move dir, but clamped to a max speed
  -max speed set when starting jump? so that walk->jump->press sprint does not speed you up in the air, but sprint jump also does not slow you down
  -at least a little air control is needed to get up blocks when jumping while touching a block
  
+ air drag to set max falling speed
+
+ crouch walk to not fall off edges
+
  make better sprinting code
   sprinting should have a drawback over walking, or it just gets used all the time
    -> stamina?
@@ -104,6 +122,8 @@ TODO
 
  debug mipmaps, they almost look like they are generated incorrectly, tree leaves look like they should be darker ?
  -maybe mipmaps can be modified manually to get less better aliasing in the distance, esp. with alpha blending
+
+ -> collision system is still bugged in the current state even close to the origin at 144hz
 
  The epsilon is very finnicky,
  -it needs to be small enough to actually act like an epsilon (we teleport the player slightly above the ground and away from walls by this epsilon)
@@ -122,6 +142,10 @@ TODO
   -> per frame you can simply work with this moving origin being constant, ie. use floats
    -> at the beginning of the frame a global block pos gets set as origin for that frame, coord->float just substracts that origin and float->coord adds it again,
       now this is almost automatic, you just need to make sure to not store float pos_worlds across frames because they get invalidated by the origin moving, just like an iterator into a vector gets invalidated by the vector expanding
+ 
+ movement code in traditional way, ie. check for overlap and depen vector and apply collision response with these (teleport to depen)
+ -can still split timestep based on movement speed to make sure teleporting through blocks does not happen
+ -by enforcing a max movement speed we can be sure that we never infinite loop
 
  underwater fog
 

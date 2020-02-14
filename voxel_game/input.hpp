@@ -61,6 +61,17 @@ public:
 		}
 	}
 
+	inline void disable_keyboard () {
+		for (int i=GLFW_MOUSE_BUTTON_LAST+1; i<GLFW_KEY_LAST; ++i)
+			buttons[i] = {};
+	}
+	inline void disable_mouse () {
+		mouse_delta = 0;
+		mouse_wheel_delta = 0;
+		for (int i=GLFW_MOUSE_BUTTON_1; i<GLFW_MOUSE_BUTTON_LAST; ++i)
+			buttons[i] = {};
+	}
+
 	// Not sure where to put this, return mouselook_delta
 	//  if cursor is disabled (fps mode)
 	//  if cursor is enabled and rmb down
