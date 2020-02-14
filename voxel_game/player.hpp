@@ -3,6 +3,7 @@
 #include "chunks.hpp"
 #include "graphics/camera.hpp"
 #include "physics.hpp"
+#include "items.hpp"
 #include "audio/audio.hpp"
 
 // Global for now, the world should store this if it is not randomized
@@ -21,7 +22,7 @@ struct SelectedBlock {
 	}
 };
 
-class Tool {
+class BreakBlock {
 public:
 
 	float anim_speed = 4;
@@ -46,7 +47,10 @@ public:
 };
 
 struct InventorySlot {
-
+	// InventorySlot stores _one_ instance of an Item and a stack size which artifically 'duplicates' the item
+	//  this means that only stateless Items should have a stack size above 1, or else the entire stack would share the state
+	int stack_size = 0;
+	Item item = {};
 };
 
 class Inventory {
@@ -57,6 +61,18 @@ public:
 		InventorySlot slots[10];
 
 		int selected = 0;
+
+		Quickbar () {
+			for (int i=0; i<10; ++i) {
+				auto id = I_NULL;
+				if (i < (BLOCK_IDS_COUNT - 1))
+					id = (item_id)(i + 1);
+				else if (i - BLOCK_IDS_COUNT < ITEM_IDS_COUNT - MAX_BLOCK_ID)
+					id = (item_id)(i - BLOCK_IDS_COUNT + MAX_BLOCK_ID);
+
+				slots[i] = { id != I_NULL ? 1 : 0, { id } };
+			}
+		}
 	};
 
 	Quickbar quickbar;
@@ -104,7 +120,7 @@ public:
 	bool third_person = false;
 
 	////
-	Tool		tool;
+	BreakBlock	break_block;
 	BlockPlace	block_place;
 	Inventory	inventory;
 
@@ -149,7 +165,7 @@ public:
 		if (ImGui::DragFloat2("rot_ae", &rot_ae_deg.x, 0.05f))
 			rot_ae = to_radians(rot_ae_deg);
 
-		tool.imgui("tool");
+		break_block.imgui("break_block");
 		block_place.imgui("block_place");
 
 		ImGui::Checkbox("third_person", &third_person);

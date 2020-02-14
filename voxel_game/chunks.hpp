@@ -242,7 +242,7 @@ public:
 
 	// prevent giant lag because chunk gen is in main thread for now
 	int max_chunks_brightness_per_frame = 32;
-	int max_chunks_meshed_per_frame = 1;
+	int max_chunks_meshed_per_frame = 4;
 
 	bool use_lod = false;
 

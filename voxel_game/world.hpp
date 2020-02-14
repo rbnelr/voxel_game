@@ -31,5 +31,5 @@ public:
 	SelectedBlock raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);
 
 	void apply_damage (SelectedBlock const& block, float damage);
-	bool try_place_block (bpos pos, block_type bt);
+	bool try_place_block (bpos pos, block_id bt);
 };

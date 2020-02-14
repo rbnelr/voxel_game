@@ -3,7 +3,7 @@
 
 float3	player_spawn_point = float3(0,0,34);
 
-void Tool::update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
+void BreakBlock::update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];
 	bool inp = selected_block ? button.is_down : button.went_down;
 
@@ -40,7 +40,7 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
 		if (!block_place_is_inside_player) {
-			world.try_place_block(block_place_pos, BT_EARTH);
+			world.try_place_block(block_place_pos, B_EARTH);
 		} else {
 			trigger = false;
 		}
@@ -80,7 +80,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
 					auto* b = world.chunks.query_block(bp);
-					bool block_solid = block_props[b->type].collision == CM_SOLID;
+					bool block_solid = BLOCK_PROPS[b->id].collision == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
 
@@ -123,7 +123,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 
 					auto* b = world.chunks.query_block(bp);
 
-					bool block_solid = block_props[b->type].collision == CM_SOLID;
+					bool block_solid = BLOCK_PROPS[b->id].collision == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)(bpos2)bp, radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}
@@ -240,7 +240,7 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 
 	if (active) {
 		*selected_block = calc_selected_block(world);
-		tool.update(world, graphics, *selected_block);
+		break_block.update(world, graphics, *selected_block);
 		block_place.update(world, *this, *selected_block);
 		inventory.update();
 	}
@@ -253,5 +253,5 @@ SelectedBlock Player::calc_selected_block (World& world) {
 	ray.dir = (float3x3)head_to_world * float3(0,+1,0);
 	ray.pos = head_to_world * float3(0,0,0);
 
-	return world.raycast_solid_blocks(ray, tool.reach);
+	return world.raycast_solid_blocks(ray, break_block.reach);
 }

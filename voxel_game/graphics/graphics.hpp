@@ -3,6 +3,7 @@
 #include "../blocks.hpp"
 #include "common.hpp"
 #include "shaders.hpp"
+#include "../items.hpp"
 #include "texture.hpp"
 #include "debug_graphics.hpp"
 #include "gl.hpp"
@@ -80,6 +81,7 @@ struct BlockHighlightGraphics {
 };
 
 class Player;
+struct TileTextures;
 
 struct GuiGraphics {
 
@@ -94,8 +96,22 @@ struct GuiGraphics {
 			a.add<decltype(col     )>(2, "col",      sizeof(Vertex), offsetof(Vertex, col     ));
 		}
 	};
+	struct ItemsVertex {
+		float4	pos_clip;
+		float2	uv;
+		float	tex_indx;
+		float	brightness;
+
+		static void bind (Attributes& a) {
+			a.add<decltype(pos_clip  )>(0, "pos_clip",   sizeof(ItemsVertex), offsetof(ItemsVertex, pos_clip  ));
+			a.add<decltype(uv        )>(1, "uv",         sizeof(ItemsVertex), offsetof(ItemsVertex, uv        ));
+			a.add<decltype(tex_indx  )>(2, "tex_indx",   sizeof(ItemsVertex), offsetof(ItemsVertex, tex_indx  ));
+			a.add<decltype(brightness)>(3, "brightness", sizeof(ItemsVertex), offsetof(ItemsVertex, brightness));
+		}
+	};
 
 	Shader shader = { "gui" };
+	Shader shader_items = { "gui_items" };
 
 	AtlasedTexture crosshair			= { "textures/crosshair.png" };
 	AtlasedTexture quickbar				= { "textures/quickbar.png" };
@@ -108,6 +124,9 @@ struct GuiGraphics {
 	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
 
+	std::vector<ItemsVertex> items_vertices;
+	Mesh<ItemsVertex> items_mesh;
+
 	float gui_scale = 4; // pixel multiplier
 	float crosshair_scale = .5f;
 
@@ -116,9 +135,10 @@ struct GuiGraphics {
 
 	void draw_crosshair ();
 	void draw_quickbar_slot (AtlasedTexture tex, int index);
-	void draw_quickbar (Player const& player);
+	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures, int2 slot_size);
+	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
-	void draw (Player const& player);
+	void draw (Player const& player, TileTextures const& tile_textures);
 };
 
 struct GenericVertex {
@@ -194,7 +214,7 @@ struct TileTextures {
 	Texture2DArray tile_textures;
 	Texture2DArray breaking_textures;
 
-	BlockTileInfo block_tile_info[BLOCK_TYPES_COUNT];
+	BlockTileInfo block_tile_info[BLOCK_IDS_COUNT];
 
 	int2 tile_size;
 
@@ -205,8 +225,8 @@ struct TileTextures {
 
 	TileTextures ();
 
-	inline int get_tile_base_index (block_type bt) {
-		return block_tile_info[bt].base_index;
+	inline int get_tile_base_index (block_id id) {
+		return block_tile_info[id].base_index;
 	}
 
 	void imgui (const char* name) {

@@ -225,6 +225,7 @@
     <ClInclude Include="util\threadpool.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="items.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -405,6 +406,7 @@
     <ClCompile Include="util\threadpool.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="items.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -429,6 +431,9 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\gui.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\gui_items.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

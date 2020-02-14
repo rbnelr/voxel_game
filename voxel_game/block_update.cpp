@@ -10,14 +10,14 @@ void BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block* b, bpos pos
 
 		chunk.block_only_texture_changed(pos_world);
 	}
-	if (b->type == BT_GRASS && !(above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
+	if (b->id == B_GRASS && !(above->id == B_AIR || above->id == B_OUT_OF_BOUNDS)) {
 		if (grass_die_prob > random.uniform()) {
-			b->type = BT_EARTH;
+			b->id = B_EARTH;
 			b->hp = 255;
 			chunk.block_only_texture_changed(pos_world);
 		}
 	}
-	if (b->type == BT_EARTH && (above->type == BT_AIR || above->type == BT_OUT_OF_BOUNDS)) {
+	if (b->id == B_EARTH && (above->id == B_AIR || above->id == B_OUT_OF_BOUNDS)) {
 		float prob = 0;
 
 		bpos2 sides[4] = {
@@ -34,19 +34,19 @@ void BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block* b, bpos pos
 		};
 
 		for (bpos2 v : sides) {
-			if (	 chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
-			else if (chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_side_prob;
-			else if (chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
+			if (	 chunks.query_block(pos_world +bpos(v,+1))->id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
+			else if (chunks.query_block(pos_world +bpos(v, 0))->id == B_GRASS) prob += grass_grow_side_prob;
+			else if (chunks.query_block(pos_world +bpos(v,-1))->id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
 		}
 
 		for (bpos2 v : diagonals) {
-			if (	 chunks.query_block(pos_world +bpos(v,+1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
-			else if (chunks.query_block(pos_world +bpos(v, 0))->type == BT_GRASS) prob += grass_grow_diagonal_prob;
-			else if (chunks.query_block(pos_world +bpos(v,-1))->type == BT_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
+			if (	 chunks.query_block(pos_world +bpos(v,+1))->id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
+			else if (chunks.query_block(pos_world +bpos(v, 0))->id == B_GRASS) prob += grass_grow_diagonal_prob;
+			else if (chunks.query_block(pos_world +bpos(v,-1))->id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
 		}
 
 		if (prob > random.uniform()) {
-			b->type = BT_GRASS;
+			b->id = B_GRASS;
 			b->hp = 255;
 			chunk.block_only_texture_changed(pos_world);
 		}

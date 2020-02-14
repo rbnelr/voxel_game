@@ -18,13 +18,13 @@ struct Chunk_Mesher {
 
 	Block const* query_block (bpos_t pos_x, bpos_t pos_y, bpos_t pos_z) {
 		if (pos_z < 0 || pos_z >= size.z)
-			return &B_OUT_OF_BOUNDS;
+			return &_OUT_OF_BOUNDS;
 
 		bpos pos_in_chunk;
 		chunk_coord neighbour = get_chunk_from_block_pos(bpos(pos_x, pos_y, pos_z), &pos_in_chunk, lod); // pass in local block pos as world block pos, get -1,-1 to +1,+1 coords for our neighbour chunks instead of world chunk coords
 
 		Chunk* chunk = neighbour_chunks[neighbour.y +1][neighbour.x +1];
-		if (!chunk) return &B_NO_CHUNK;
+		if (!chunk) return &_NO_CHUNK;
 
 		return chunk->get_block(pos_in_chunk, lod);
 	}
@@ -51,11 +51,11 @@ struct Chunk_Mesher {
 
 	uint8 calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane);
 
-	bool bt_is_non_opaque (block_type t) {
+	bool bt_is_non_opaque (block_id t) {
 		if (alpha_test)
-			return block_props[t].transparency != TM_OPAQUE;
+			return BLOCK_PROPS[t].transparency != TM_OPAQUE;
 		else
-			return block_props[t].transparency == TM_TRANSPARENT;
+			return BLOCK_PROPS[t].transparency == TM_TRANSPARENT;
 	}
 
 	uint8 calc_texture_index (BlockFace face) {
@@ -120,15 +120,15 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ch
 				for (i.x=0; i.x<size.x; ++i.x) {
 					auto* block = chunk->get_block(i, chunk->lod);
 
-					if (block->type != BT_AIR) {
+					if (block->id != B_AIR) {
 
 						b = block;
 						block_pos_x = i.x;
 						block_pos_y = i.y;
 						block_pos_z = i.z;
-						tile = graphics.tile_textures.block_tile_info[b->type];
+						tile = graphics.tile_textures.block_tile_info[b->id];
 
-						if (block_props[block->type].transparency == TM_TRANSPARENT)
+						if (BLOCK_PROPS[block->id].transparency == TM_TRANSPARENT)
 							cube_transperant();
 						else
 							cube_opaque();
@@ -261,31 +261,31 @@ void Chunk_Mesher::face_pz (std::vector<ChunkMesh::Vertex>* verts) {
 }
 
 void Chunk_Mesher::cube_opaque () {
-	if (bt_is_non_opaque(query_block(block_pos_x -1, block_pos_y, block_pos_z)->type)) face_nx(opaque_vertices);
-	if (bt_is_non_opaque(query_block(block_pos_x +1, block_pos_y, block_pos_z)->type)) face_px(opaque_vertices);
-	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y -1, block_pos_z)->type)) face_ny(opaque_vertices);
-	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y +1, block_pos_z)->type)) face_py(opaque_vertices);
-	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y, block_pos_z -1)->type)) face_nz(opaque_vertices);
-	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y, block_pos_z +1)->type)) face_pz(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x -1, block_pos_y, block_pos_z)->id)) face_nx(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x +1, block_pos_y, block_pos_z)->id)) face_px(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y -1, block_pos_z)->id)) face_ny(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y +1, block_pos_z)->id)) face_py(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y, block_pos_z -1)->id)) face_nz(opaque_vertices);
+	if (bt_is_non_opaque(query_block(block_pos_x, block_pos_y, block_pos_z +1)->id)) face_pz(opaque_vertices);
 };
 void Chunk_Mesher::cube_transperant () {
-	block_type bt;
+	block_id bt;
 
-	bt = query_block(block_pos_x -1, block_pos_y, block_pos_z)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_nx(tranparent_vertices);
+	bt = query_block(block_pos_x -1, block_pos_y, block_pos_z)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_nx(tranparent_vertices);
 
-	bt = query_block(block_pos_x +1, block_pos_y, block_pos_z)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_px(tranparent_vertices);
+	bt = query_block(block_pos_x +1, block_pos_y, block_pos_z)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_px(tranparent_vertices);
 
-	bt = query_block(block_pos_x, block_pos_y -1, block_pos_z)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_ny(tranparent_vertices);
+	bt = query_block(block_pos_x, block_pos_y -1, block_pos_z)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_ny(tranparent_vertices);
 
-	bt = query_block(block_pos_x, block_pos_y +1, block_pos_z)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_py(tranparent_vertices);
+	bt = query_block(block_pos_x, block_pos_y +1, block_pos_z)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_py(tranparent_vertices);
 
-	bt = query_block(block_pos_x, block_pos_y, block_pos_z -1)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_nz(tranparent_vertices);
+	bt = query_block(block_pos_x, block_pos_y, block_pos_z -1)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_nz(tranparent_vertices);
 
-	bt = query_block(block_pos_x, block_pos_y, block_pos_z +1)->type;
-	if (bt_is_non_opaque(bt) && bt != b->type) face_pz(tranparent_vertices);
+	bt = query_block(block_pos_x, block_pos_y, block_pos_z +1)->id;
+	if (bt_is_non_opaque(bt) && bt != b->id) face_pz(tranparent_vertices);
 };

@@ -159,7 +159,7 @@ public:
 		upload(data, size, gen_mips, internal_format, format, GL_FLOAT);
 	}
 
-	void bind ();
+	void bind () const;
 };
 
 class Texture2DArray {
@@ -228,5 +228,5 @@ public:
 			gen_mipmaps();
 	}
 
-	void bind ();
+	void bind () const;
 };

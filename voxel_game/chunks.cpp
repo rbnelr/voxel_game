@@ -30,7 +30,7 @@ void Chunk::update_block_brighness () {
 			for (; i.z > -1; --i.z) {
 				auto* b = get_block(i);
 
-				if (b->type != BT_AIR) break;
+				if (b->id != B_AIR) break;
 
 				b->dark = false;
 			}
@@ -131,14 +131,14 @@ Block* Chunks::query_block (bpos p, Chunk** out_chunk) {
 		*out_chunk = nullptr;
 
 	if (p.z < 0 || p.z >= CHUNK_DIM_Z)
-		return (Block*)&B_OUT_OF_BOUNDS; // cast const away, check before you write into the returned block for this special case
+		return (Block*)&_OUT_OF_BOUNDS; // cast const away, check before you write into the returned block for this special case
 
 	bpos block_pos_chunk;
 	chunk_coord chunk_pos = get_chunk_from_block_pos(p, &block_pos_chunk);
 
 	Chunk* chunk = query_chunk(chunk_pos);
 	if (!chunk)
-		return (Block*)&B_NO_CHUNK; // cast const away, check before you write into the returned block for this special case
+		return (Block*)&_NO_CHUNK; // cast const away, check before you write into the returned block for this special case
 
 	if (out_chunk)
 		*out_chunk = chunk;
@@ -255,9 +255,9 @@ Block clac_block_lod (FUNC get_block) {
 	
 	int grass_count = 0;
 	for (int i=0; i<8; ++i) {
-		if (get_block(i)->type == BT_GRASS)
+		if (get_block(i)->id == B_GRASS)
 			if (++grass_count == 4)
-				return { BT_GRASS, dark_count > 4, 255 }; 
+				return { B_GRASS, dark_count > 4, 255 }; 
 	}
 
 	for (int j=0; j<8; ++j) {
@@ -265,12 +265,12 @@ Block clac_block_lod (FUNC get_block) {
 
 		int count = 0;
 		for (int i=0; i<8; ++i) {
-			if (get_block(i)->type == b->type)
+			if (get_block(i)->id == b->id)
 				if (++count == 4) // Dominant block
-					return { b->type, dark_count > 4, 255 }; 
+					return { b->id, dark_count > 4, 255 }; 
 		}
 	}
-	return { get_block(0)->type, dark_count > 4, 255 }; 
+	return { get_block(0)->id, dark_count > 4, 255 }; 
 }
 
 void Chunk::calc_lod (int level) {

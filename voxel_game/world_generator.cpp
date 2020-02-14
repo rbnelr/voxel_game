@@ -100,10 +100,10 @@ struct Generator {
 					auto* b = chunk.get_block(i);
 
 					if (i.z <= water_level) {
-						b->type = BT_WATER;
+						b->id = B_WATER;
 						b->hp = 255;
 					} else {
-						b->type = BT_AIR;
+						b->id = B_AIR;
 						b->hp = 255;
 					}
 				}
@@ -148,9 +148,9 @@ struct Generator {
 					auto* b = chunk.get_block(i);
 
 					if (i.z == highest_block && i.z >= water_level) {
-						b->type = BT_GRASS;
+						b->id = B_GRASS;
 					} else {
-						b->type = BT_EARTH;
+						b->id = B_EARTH;
 					}
 
 					b->hp = 255;
@@ -159,7 +159,7 @@ struct Generator {
 				float tree_chance = rand.uniform();
 				if (	tree_chance < effective_tree_prob &&
 						highest_block >= 0 && highest_block < CHUNK_DIM_Z &&
-						chunk.get_block(bpos(i.x, i.y, i.z))->type != BT_WATER)
+						chunk.get_block(bpos(i.x, i.y, i.z))->id != B_WATER)
 					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
 
 			}
@@ -167,18 +167,18 @@ struct Generator {
 
 		auto place_tree = [&] (bpos pos_chunk) {
 			auto* ground_block = chunk.get_block(pos_chunk - bpos(0,0,1));
-			if (ground_block && ground_block->type == BT_GRASS)
-				ground_block->type = BT_EARTH;
+			if (ground_block && ground_block->id == B_GRASS)
+				ground_block->id = B_EARTH;
 
-			auto place_block = [&] (bpos pos_chunk, block_type bt) {
+			auto place_block = [&] (bpos pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
 				Block* b = chunk.get_block(pos_chunk);
-				if (b->type == BT_AIR || b->type == BT_WATER || (bt == BT_TREE_LOG && b->type == BT_LEAVES)) {
-					b->type = bt;
+				if (b->id == B_AIR || b->id == B_WATER || (bt == B_TREE_LOG && b->id == B_LEAVES)) {
+					b->id = bt;
 					b->hp = 255;
 				}
 			};
-			auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_type bt) {
+			auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_id bt) {
 				bpos start = (bpos)floor((float3)pos_chunk +0.5f -r);
 				bpos end = (bpos)ceil((float3)pos_chunk +0.5f +r);
 
@@ -195,9 +195,9 @@ struct Generator {
 			bpos_t tree_height = 6;
 
 			for (bpos_t i=0; i<tree_height; ++i)
-				place_block(pos_chunk +bpos(0,0,i), BT_TREE_LOG);
+				place_block(pos_chunk +bpos(0,0,i), B_TREE_LOG);
 
-			place_block_sphere(pos_chunk +bpos(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), BT_LEAVES);
+			place_block_sphere(pos_chunk +bpos(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
 		};
 
 		for (bpos p : tree_poss)

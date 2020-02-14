@@ -70,7 +70,7 @@ void Texture2D::upload (void const* data, int2 size, bool gen_mips, GLenum inter
 	}
 }
 
-void Texture2D::bind () {
+void Texture2D::bind () const {
 	glBindTexture(GL_TEXTURE_2D, tex);
 }
 
@@ -119,6 +119,6 @@ void Texture2DArray::gen_mipmaps () {
 	}
 }
 
-void Texture2DArray::bind () {
+void Texture2DArray::bind () const {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
 }

@@ -192,7 +192,101 @@ void GuiGraphics::draw_quickbar_slot (AtlasedTexture tex, int index) {
 
 	draw_texture(tex, float2(pos_x, offset_bottom) - (size - slot_size) / 2, size);
 }
-void GuiGraphics::draw_quickbar (Player const& player) {
+void GuiGraphics::draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures, int2 slot_size) {
+	float offset_bottom = 2 * gui_scale;
+
+	float2 size_px = (float2)(16) * gui_scale;
+	float2 slot_size_px = (float2)slot_size * gui_scale;
+
+	float pos_x = (float)input.window_size.x / 2 - (float)slot_size_px.x * 10.0f / 2;
+	pos_x += index * slot_size_px.x;
+
+	float2 pos_px = float2(pos_x, offset_bottom) + slot_size_px/2;
+
+	float2 pos_clip	 = (float2)pos_px	/ (float2)input.window_size * 2 - 1;
+	float2 size_clip = (float2)size_px	/ (float2)input.window_size * 2;
+	
+	if (id < MAX_BLOCK_ID) {
+		// draw block
+
+		auto tile = tile_textures.block_tile_info[id];
+
+		auto calc_texture_index = [&] (BlockFace face) {
+			int index = tile.base_index;
+			if (face == BF_POS_Z)
+				index += tile.top;
+			else if (face == BF_NEG_Z)
+				index += tile.bottom;
+			return (float)index;
+		};
+
+		auto quad = [&] (BlockFace face,
+					float2 ap, float2 auv, float ab,
+					float2 bp, float2 buv, float bb,
+					float2 cp, float2 cuv, float cb,
+					float2 dp, float2 duv, float db
+				) {
+			auto index = calc_texture_index(face);
+
+			ap = ap / 2 * size_clip + pos_clip;
+			bp = bp / 2 * size_clip + pos_clip;
+			cp = cp / 2 * size_clip + pos_clip;
+			dp = dp / 2 * size_clip + pos_clip;
+
+			items_vertices.push_back({ {bp,0,1}, buv, index, bb });
+			items_vertices.push_back({ {cp,0,1}, cuv, index, cb });
+			items_vertices.push_back({ {ap,0,1}, auv, index, ab });
+			items_vertices.push_back({ {ap,0,1}, auv, index, ab });
+			items_vertices.push_back({ {cp,0,1}, cuv, index, cb });
+			items_vertices.push_back({ {dp,0,1}, duv, index, db });
+		};
+
+		// draw cube like this
+		/*
+			        AA       
+			       AAAA      
+			      AAAAAA      
+			     AAAAAAAA
+			    AAAAAAAAAA   
+			    ##AAAAAA**    
+			    ####AA****
+			    #####*****
+				#####*****
+				 ####**** 
+				  ###*** 
+				   ##**  
+		*/
+		float2 D = float2(       0,    -1); // down vector
+		float2 L = float2(-0.8660f, +0.5f); // up left
+		float2 R = float2(+0.8660f, +0.5f); // up right
+
+		float A = 0.6f; // left side of block brightness
+		float B = 0.3f; // bottom side of block brightness
+
+		quad(BF_TOP,
+			0,		float2(1,0), 1,
+			R,		float2(1,1), 1,
+			R+L,	float2(0,1), A,
+			L,		float2(0,0), A
+		);
+		quad(BF_NEG_Y,
+			D+L,	float2(0,0), A*B,
+			D,		float2(1,0), B,
+			0,		float2(1,1), 1,
+			L,		float2(0,1), A
+		);
+		quad(BF_POS_X,
+			D,		float2(0,0), B,
+			D+R,	float2(1,0), B,
+			R,		float2(1,1), 1,
+			0,		float2(0,1), 1
+		);
+
+	} else {
+
+	}
+}
+void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_textures) {
 	{ // border
 		float offset_bottom = 2 * gui_scale;
 		float px = gui_scale;
@@ -211,26 +305,26 @@ void GuiGraphics::draw_quickbar (Player const& player) {
 		draw_quickbar_slot(quickbar, i);
 	}
 	draw_quickbar_slot(quickbar_selected, player.inventory.quickbar.selected);
+
+	for (int i=0; i<10; ++i) {
+		auto& slot = player.inventory.quickbar.slots[i];
+		if (slot.stack_size > 0)
+			draw_quickbar_item(slot.item.id, i, tile_textures, quickbar.size_px);
+	}
 }
 
-void GuiGraphics::draw (Player const& player) {
+void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+	glActiveTexture(GL_TEXTURE0 + 0);
+	sampler.bind(0);
 
 	draw_crosshair();
-	draw_quickbar(player);
-
-	auto draw_toolbar_slot = [&] () {
-
-		float2 size = (float2)crosshair.size_px * gui_scale;
-	};
+	draw_quickbar(player, tile_textures);
 
 	if (shader && vertices.size() > 0) {
 		shader.bind();
 
 		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
-
-		glActiveTexture(GL_TEXTURE0 + 0);
 		gui_atlas.bind();
-		sampler.bind(0);
 
 		mesh.upload(vertices);
 		vertices.clear();
@@ -238,34 +332,20 @@ void GuiGraphics::draw (Player const& player) {
 		mesh.bind();
 		mesh.draw();
 	}
-}
-#if 0
-void CrosshairGraphics::draw () {
-	if (!equal(input.window_size, prev_window_size)) {
-		prev_window_size = input.window_size;
 
-		int2 size = texture.size * crosshair_size;
+	if (shader_items && items_vertices.size() > 0) {
+		shader_items.bind();
 
-		int2 a_px = input.window_size / 2 - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
-		int2 b_px = a_px + size;
+		glUniform1i(glGetUniformLocation(shader_items.shader->shad, "tile_textures"), 0);
+		tile_textures.tile_textures.bind();
 
-		// * 2 - 1 to convert to clip
-		float2 a = (float2)a_px / (float2)input.window_size * 2 - 1;
-		float2 b = (float2)b_px / (float2)input.window_size * 2 - 1;
+		items_mesh.upload(items_vertices);
+		items_vertices.clear();
 
-		Vertex vertices[6] = {
-			QUAD(
-				Vertex( float4(a.x, a.y, 0, 1), float2(0,0) ),
-				Vertex( float4(b.x, a.y, 0, 1), float2(1,0) ),
-				Vertex( float4(b.x, b.y, 0, 1), float2(1,1) ),
-				Vertex( float4(a.x, b.y, 0, 1), float2(0,1) )
-			)
-		};
-
-		mesh.upload(vertices, 6);
+		items_mesh.bind();
+		items_mesh.draw();
 	}
 }
-#endif
 
 PlayerGraphics::PlayerGraphics () {
 	std::vector<GenericVertex> verts;
@@ -280,7 +360,7 @@ void PlayerGraphics::draw (Player const& player) {
 	if (shader) {
 		shader.bind();
 		
-		float anim_t = player.tool.anim_t != 0 ? player.tool.anim_t : player.block_place.anim_t;
+		float anim_t = player.break_block.anim_t != 0 ? player.break_block.anim_t : player.block_place.anim_t;
 
 		auto a = animation.calc(anim_t);
 
@@ -314,7 +394,7 @@ struct TileLoader {
 			size = img.size;
 		} else {
 			if (!equal(size, img.size)) {
-				logf(ERROR, "Texture size does not match textures/missing.png, all textures must be of the same size!");
+				logf(ERROR, "Texture size does not match textures/null.png, all textures must be of the same size!");
 				assert(false);
 				return 0;
 			}
@@ -336,9 +416,9 @@ struct TileLoader {
 		}
 	}
 
-	BlockTileInfo add_block (block_type bt) {
-		auto name = BLOCK_NAMES[bt];
-		
+	BlockTileInfo add_block (block_id id) {
+		auto name = BLOCK_NAMES[id];
+
 		if (!name)
 			return {0};
 
@@ -362,6 +442,9 @@ struct TileLoader {
 		if (has_alpha)
 			set_alpha(color, alpha);
 		
+		if (id == B_NULL)
+			size = color.size;
+
 		BlockTileInfo info;
 		info.base_index = (int)images.size();
 
@@ -393,15 +476,11 @@ struct TileLoader {
 TileTextures::TileTextures () {
 	{
 		TileLoader tl;
-
-		tl.add_texture(Image<srgba8>("textures/missing.png"));
-
-		for (int i=0; i<BLOCK_TYPES_COUNT; ++i) {
-			block_tile_info[i] = tl.add_block((block_type)i);
+		for (int i=0; i<BLOCK_IDS_COUNT; ++i) {
+			block_tile_info[i] = tl.add_block((block_id)i);
 		}
 
 		tile_size = tl.size;
-
 		tile_textures.upload<srgba8, true>(tl.images);
 	}
 
@@ -579,7 +658,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam)
-			gui.draw(world.player);
+			gui.draw(world.player, chunk_graphics.tile_textures);
 
 		glEnable(GL_DEPTH_TEST);
 	}

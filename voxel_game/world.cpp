@@ -6,7 +6,7 @@ SelectedBlock World::raycast_solid_blocks (Ray ray, float max_dist, float* hit_d
 	auto hit_block = [&] (bpos bp, int face, float dist) {
 		Chunk* chunk;
 		b.block = chunks.query_block(bp, &chunk);
-		if (chunk && b.block && block_props[b.block->type].collision == CM_SOLID) {
+		if (chunk && b.block && BLOCK_PROPS[b.block->id].collision == CM_SOLID) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			b.pos = bp;
 			b.face = (BlockFace)face;
@@ -34,7 +34,7 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 	assert(block);
 	Chunk* chunk;
 	Block* b = chunks.query_block(block.pos, &chunk);
-	assert(chunk && block_props[b->type].collision == CM_SOLID);
+	assert(chunk && BLOCK_PROPS[b->id].collision == CM_SOLID);
 
 	b->hp -= min((uint8)ceili(damage * 255), b->hp);
 
@@ -43,7 +43,7 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 	} else {
 
 		b->hp = 0;
-		b->type = BT_AIR;
+		b->id = B_AIR;
 
 		chunk->block_changed(chunks, block.pos);
 
@@ -51,12 +51,12 @@ void World::apply_damage (SelectedBlock const& block, float damage) {
 	}
 }
 
-bool World::try_place_block (bpos pos, block_type bt) {
+bool World::try_place_block (bpos pos, block_id bt) {
 	Chunk* chunk;
 	Block* b = chunks.query_block(pos, &chunk);
 
-	if (chunk && b && block_props[b->type].collision != CM_SOLID) { // can replace liquid and gas blocks
-		b->type = bt;
+	if (chunk && b && BLOCK_PROPS[b->id].collision != CM_SOLID) { // can replace liquid and gas blocks
+		b->id = bt;
 		b->hp = 255;
 
 		chunk->block_changed(chunks, pos);
