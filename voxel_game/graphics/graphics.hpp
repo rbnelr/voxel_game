@@ -259,6 +259,18 @@ struct PlayerGraphics {
 	Shader shader = Shader("generic");
 	Shader shader_item = Shader("held_item");
 
+	float3 tool_euler_angles = float3(deg(103), deg(9), deg(-110));
+	float3 tool_offset = float3(-0.485f, -0.095f, -0.2f);
+	float tool_scale = 0.8f;
+
+	void imgui () {
+		ImGui::SliderAngle("tool_euler_X", &tool_euler_angles.x, -180, +180);
+		ImGui::SliderAngle("tool_euler_Y", &tool_euler_angles.y, -180, +180);
+		ImGui::SliderAngle("tool_euler_Z", &tool_euler_angles.z, -180, +180);
+		ImGui::DragFloat3("tool_offset", &tool_offset.x, 0.005f);
+		ImGui::DragFloat("tool_scale", &tool_scale, 0.005f);
+	}
+
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
 		{  8 / 30.0f, float3(0.624f, 1.30f, -0.94f) / 2, AnimRotation::from_euler(deg(33), deg(-8), deg(16)) },
@@ -471,6 +483,7 @@ public:
 		if (ImGui::CollapsingHeader("Graphics")) {
 			common_uniforms.imgui();
 			fog.imgui();
+			player.imgui();
 			chunk_graphics.imgui(chunks);
 			tile_textures.imgui("tile_textures");
 

@@ -75,12 +75,12 @@ DONE:
  view frustrum colling of chunk drawcalls
  
  merge current sound code
+ 
+ add inventory
+ -inventory gui
 
 TODO
 -FEATURES:
-
- add inventory
- -inventory gui
 
  write actual air control
  -no slowdown in air with wasd not pressed, press s to slow down when going forward

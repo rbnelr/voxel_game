@@ -8,13 +8,17 @@ enum item_id : uint16_t {
 
 	// All block ids
 
-	I_WOOD_SHOVEL	=MAX_BLOCK_ID, // Allocate item ids after entire possible block id space, so adding blocks does not shift all item ids
+	I_WOOD_PICKAXE	=MAX_BLOCK_ID, // Allocate item ids after entire possible block id space, so adding blocks does not shift all item ids
+	I_WOOD_SWORD	,
+	I_WOOD_SHOVEL	,
 
 	ITEM_IDS_COUNT	,
 };
 
 // Only store names for the actual items even though the item id range include the block ids
 static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
+	/* I_WOOD_PICKAXE	*/	"wood_pickaxe",
+	/* I_WOOD_SWORD		*/	"wood_sword",
 	/* I_WOOD_SHOVEL	*/	"wood_shovel",
 };
 
@@ -35,6 +39,8 @@ static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 64, 0 };
 static constexpr ItemProperties BLOCK_ITEM_PROPS = { BLOCK, 64, 0 };
 
 static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
+	/* I_WOOD_PICKAXE	*/	{ TOOL, 64, 5 },
+	/* I_WOOD_SWORD		*/	{ TOOL, 64, 5 },
 	/* I_WOOD_SHOVEL	*/	{ TOOL, 64, 5 },
 };
 

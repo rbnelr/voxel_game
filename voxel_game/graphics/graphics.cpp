@@ -355,7 +355,7 @@ void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textur
 			} else {
 				auto mesh = tile_textures.item_meshes.item_meshes[item - MAX_BLOCK_ID];
 
-				float3x4 init_rot = rotate3_Z(deg(-116)) * rotate3_Y(deg(-69)) * rotate3_X(deg(97)) * translate(float3(-0.1f, 0.34f, -0.07f)) * scale(float3(0.75f));
+				float3x4 init_rot = rotate3_Z(tool_euler_angles.z) * rotate3_Y(tool_euler_angles.y) * rotate3_X(tool_euler_angles.x) * translate(tool_offset) * scale(float3(tool_scale));
 
 				float3x4 mat = player.head_to_world * translate(a.pos) * a.rot * init_rot;
 
@@ -703,7 +703,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Transparent pass
 
-		player.draw(world.player, tile_textures);
+		if (activate_flycam || world.player.third_person)
+			player.draw(world.player, tile_textures);
 
 		if (selected_block) {
 			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
@@ -716,6 +717,13 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
+	}
+
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	{ //// First person overlay pass
+		if (!activate_flycam && !world.player.third_person) 
+			player.draw(world.player, tile_textures);
 	}
 
 	{ //// Overlay pass
