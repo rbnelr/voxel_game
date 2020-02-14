@@ -20,16 +20,12 @@ public:
 
 	}
 
-	void imgui (bool open) {
-
-	}
-
 	void update ();
 
 	//// Raycasting into the world
 
 	SelectedBlock raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);
 
-	void apply_damage (SelectedBlock const& block, float damage);
+	void apply_damage (SelectedBlock const& block, Item& item);
 	bool try_place_block (bpos pos, block_id bt);
 };

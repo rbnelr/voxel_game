@@ -7,6 +7,7 @@ enum block_id : uint8_t {
 	B_WATER				,
 	B_EARTH				,
 	B_GRASS				,
+	B_STONE				,
 	B_TREE_LOG			,
 	B_LEAVES			,
 
@@ -26,6 +27,7 @@ static constexpr const char* BLOCK_NAMES[BLOCK_IDS_COUNT] = {
 	/* B_WATER			*/	"water"		,
 	/* B_EARTH			*/	"earth"		,
 	/* B_GRASS			*/	"grass"		,
+	/* B_STONE			*/	"tree_log"	,
 	/* B_TREE_LOG		*/	"tree_log"	,
 	/* B_LEAVES			*/	"leaves"	,
 };
@@ -41,22 +43,37 @@ enum transparency_mode : uint8_t {
 	TM_ALPHA_TEST	,   // all faces facing non-opaque blocks of these blocks are rendered (like leaves)
 };
 
+enum tool_type : uint8_t {
+	NONE,
+	FISTS,
+	SWORD,
+	PICKAXE,
+	AXE,
+	SHOVEL,
+};
+
+static constexpr inline float TOOL_MATCH_BONUS_DAMAGE = 2;
+static constexpr inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
+
 struct BlockProperties {
 	collision_mode		collision;
 	transparency_mode	transparency;
+	tool_type			tool = NONE;
+	uint8_t				hardness = 255;
 };
 
 static BlockProperties BLOCK_PROPS[PSEUDO_BLOCK_IDS_COUNT] = {
-	/* B_NULL				*/	{ CM_SOLID	, TM_OPAQUE			 },
-	/* B_AIR				*/	{ CM_GAS	, TM_TRANSPARENT	 },
-	/* B_WATER				*/	{ CM_LIQUID	, TM_TRANSPARENT	 },
-	/* B_EARTH				*/	{ CM_SOLID	, TM_OPAQUE			 },
-	/* B_GRASS				*/	{ CM_SOLID	, TM_OPAQUE			 },
-	/* B_TREE_LOG			*/	{ CM_SOLID	, TM_OPAQUE			 },
-	/* B_LEAVES				*/	{ CM_SOLID	, TM_ALPHA_TEST		 },
-							
-	/* B_OUT_OF_BOUNDS		*/	{ CM_GAS	, TM_TRANSPARENT	 },
-	/* B_NO_CHUNK			*/	{ CM_SOLID	, TM_TRANSPARENT	 },
+	/* B_NULL				*/	{ CM_SOLID	, TM_OPAQUE },
+	/* B_AIR				*/	{ CM_GAS	, TM_TRANSPARENT },
+	/* B_WATER				*/	{ CM_LIQUID	, TM_TRANSPARENT },
+	/* B_EARTH				*/	{ CM_SOLID	, TM_OPAQUE			, SHOVEL	, 3 },
+	/* B_GRASS				*/	{ CM_SOLID	, TM_OPAQUE			, SHOVEL	, 3 },
+	/* B_STONE				*/	{ CM_SOLID	, TM_OPAQUE			, PICKAXE	, 20 },
+	/* B_TREE_LOG			*/	{ CM_SOLID	, TM_OPAQUE			, AXE		, 7 },
+	/* B_LEAVES				*/	{ CM_SOLID	, TM_ALPHA_TEST		, NONE		, 2 },
+	
+	/* B_OUT_OF_BOUNDS		*/	{ CM_GAS	, TM_TRANSPARENT },
+	/* B_NO_CHUNK			*/	{ CM_SOLID	, TM_TRANSPARENT },
 };
 
 struct Block {

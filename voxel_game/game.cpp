@@ -85,14 +85,11 @@ void Game::frame () {
 		input.imgui();
 		graphics.imgui(world->chunks);
 
-		{
-			bool open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
+		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 		
-			if (open && ImGui::Button("Recreate")) {
+			if (ImGui::Button("Recreate")) {
 				world = std::make_unique<World>(world_gen);
 			}
-
-			world->imgui(open);
 
 			world_gen.imgui();
 			world->chunks.imgui();

@@ -8,8 +8,8 @@ enum item_id : uint16_t {
 
 	// All block ids
 
-	I_WOOD_PICKAXE	=MAX_BLOCK_ID, // Allocate item ids after entire possible block id space, so adding blocks does not shift all item ids
-	I_WOOD_SWORD	,
+	I_WOOD_SWORD	=MAX_BLOCK_ID, // Allocate item ids after entire possible block id space, so adding blocks does not shift all item ids
+	I_WOOD_PICKAXE	,
 	I_WOOD_SHOVEL	,
 
 	ITEM_IDS_COUNT	,
@@ -17,31 +17,23 @@ enum item_id : uint16_t {
 
 // Only store names for the actual items even though the item id range include the block ids
 static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_PICKAXE	*/	"wood_pickaxe",
 	/* I_WOOD_SWORD		*/	"wood_sword",
+	/* I_WOOD_PICKAXE	*/	"wood_pickaxe",
 	/* I_WOOD_SHOVEL	*/	"wood_shovel",
 };
 
-enum item_type : uint8_t {
-	FISTS, // has no item id, is just what the player holds when the quickbar slot is empty
-	BLOCK,
-	TOOL,
-
-};
-
 struct ItemProperties {
-	item_type	type;
+	tool_type	tool : 4;
 	uint8_t		damage;
 	uint8_t		hardness;
 };
 
-static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 64, 0 };
-static constexpr ItemProperties BLOCK_ITEM_PROPS = { BLOCK, 64, 0 };
+static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 32, 4 };
 
 static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_PICKAXE	*/	{ TOOL, 64, 5 },
-	/* I_WOOD_SWORD		*/	{ TOOL, 64, 5 },
-	/* I_WOOD_SHOVEL	*/	{ TOOL, 64, 5 },
+	/* I_WOOD_SWORD		*/	{ SWORD		, 32, 4 },
+	/* I_WOOD_PICKAXE	*/	{ PICKAXE	, 32, 4 },
+	/* I_WOOD_SHOVEL	*/	{ SHOVEL	, 32, 4 },
 };
 
 static inline constexpr const char* get_item_name (item_id id) {
@@ -49,7 +41,7 @@ static inline constexpr const char* get_item_name (item_id id) {
 	else					return ITEM_NAMES[id - MAX_BLOCK_ID];
 }
 static inline constexpr ItemProperties get_item_props (item_id id) {
-	if (id < MAX_BLOCK_ID)	return BLOCK_ITEM_PROPS;
+	if (id < MAX_BLOCK_ID)	return FISTS_PROPS;
 	else					return ITEM_PROPS[id - MAX_BLOCK_ID];
 }
 
@@ -58,12 +50,16 @@ struct Tool {
 };
 
 struct Item {
-	item_id	id;
+	item_id	id = I_NULL;
 
 	// Item state
 	union {
 		Tool tool;
 	};
+
+	ItemProperties get_props () const {
+		return get_item_props(id);
+	}
 
 	Item () {
 		memset(this, 0, sizeof(Item));
@@ -75,13 +71,7 @@ struct Item {
 		this->id = id;
 		// init correct part of union
 		if (id >= MAX_BLOCK_ID) {
-			switch (get_item_props(id).type) {
-				case TOOL:
-					tool = Tool();
-					break;
-				default:
-					break;
-			}
+			tool = Tool();
 		}
 	}
 

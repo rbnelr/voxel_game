@@ -30,13 +30,21 @@ void World::update () {
 
 }
 
-void World::apply_damage (SelectedBlock const& block, float damage) {
+void World::apply_damage (SelectedBlock const& block, Item& item) {
 	assert(block);
+	auto tool_props = item.get_props();
+
 	Chunk* chunk;
 	Block* b = chunks.query_block(block.pos, &chunk);
+	auto bprops = BLOCK_PROPS[b->id];
+
 	assert(chunk && BLOCK_PROPS[b->id].collision == CM_SOLID);
 
-	b->hp -= min((uint8)ceili(damage * 255), b->hp);
+	float damage_multiplier = (float)tool_props.hardness / (float)bprops.hardness;
+	if (tool_props.tool == bprops.tool)
+		damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
+
+	b->hp -= min((uint8)ceili(tool_props.damage * damage_multiplier), b->hp);
 
 	if (b->hp > 0) {
 		chunk->block_only_texture_changed(block.pos);

@@ -43,7 +43,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
+	void update (World& world, Player& player, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
 };
 
 struct InventorySlot {
@@ -62,20 +62,23 @@ public:
 
 		int selected = 0;
 
+		InventorySlot& get_selected () {
+			return slots[selected];
+		}
 		InventorySlot const& get_selected () const {
 			return slots[selected];
 		}
 
 		Quickbar () {
-			for (int i=0; i<10; ++i) {
-				auto id = I_NULL;
-				if (i < (BLOCK_IDS_COUNT - 1))
-					id = (item_id)(i + 1);
-				else if (i - BLOCK_IDS_COUNT < ITEM_IDS_COUNT - MAX_BLOCK_ID)
-					id = (item_id)(i - BLOCK_IDS_COUNT + MAX_BLOCK_ID);
-
-				slots[i] = { id != I_NULL ? 1 : 0, { id } };
-			}
+			slots[0] = { 1, { I_WOOD_SWORD } };
+			slots[1] = { 1, { I_WOOD_PICKAXE } };
+			slots[2] = { 1, { I_WOOD_SHOVEL } };
+			slots[3] = { 1, { (item_id)B_EARTH } };
+			slots[4] = { 1, { (item_id)B_GRASS } };
+			slots[5] = { 1, { (item_id)B_STONE } };
+			slots[6] = { 1, { (item_id)B_TREE_LOG } };
+			slots[7] = { 1, { (item_id)B_LEAVES } };
+			slots[8] = { 1, { (item_id)B_WATER } };
 		}
 	};
 
