@@ -265,7 +265,8 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader && vertices.size() > 0) {
 		shader.bind();
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
+		shader.set_texture_unit("tex", 0);
+
 		gui_atlas.bind();
 
 		mesh.upload(vertices);
@@ -280,7 +281,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item_block && blocks_vertices.size() > 0) {
 		shader_item_block.bind();
 
-		glUniform1i(glGetUniformLocation(shader_item_block.shader->shad, "tile_textures"), 0);
+		shader.set_texture_unit("tile_textures", 0);
 		
 		blocks_mesh.upload(blocks_vertices);
 		blocks_vertices.clear();
@@ -292,7 +293,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item && items_vertices.size() > 0) {
 		shader_item.bind();
 
-		glUniform1i(glGetUniformLocation(shader_item.shader->shad, "tile_textures"), 0);
+		shader.set_texture_unit("tile_textures", 0);
 		
 		items_mesh.upload(items_vertices);
 		items_vertices.clear();
@@ -590,8 +591,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 
 		shader.set_uniform("alpha_test", alpha_test);
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+		shader.set_texture_unit("tile_textures", 0);
+		shader.set_texture_unit("breaking_textures", 1);
 
 		// Draw all opaque chunk meshes
 		for (Chunk const& chunk : chunks.chunks) {
@@ -636,8 +637,8 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures 
 
 		shader.set_uniform("alpha_test", false);
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+		shader.set_texture_unit("tile_textures", 0);
+		shader.set_texture_unit("breaking_textures", 1);
 
 		// Draw all transparent chunk meshes
 		for (Chunk const& chunk : chunks.chunks) {

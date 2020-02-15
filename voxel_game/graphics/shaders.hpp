@@ -120,4 +120,12 @@ struct Shader {
 			glUniform1i(u.loc, (int)b);
 		}
 	}
+
+	void set_texture_unit (std::string_view name, int unit) {
+		gl::Uniform u;
+		if (shader->get_uniform(name, &u)) {
+			assert(gl::is_sampler_type(u.type));
+			glUniform1i(u.loc, unit);
+		}
+	}
 };
