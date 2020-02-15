@@ -102,5 +102,5 @@ struct WorldGenerator {
 		imgui_pop();
 	}
 
-	void generate_chunk (Chunk& chunk, float* chunk_gen_time) const;
+	void generate_chunk (Chunk& chunk) const;
 };

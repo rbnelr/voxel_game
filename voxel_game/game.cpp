@@ -17,7 +17,7 @@ bool _use_potatomode = _need_potatomode();
 //
 Game::Game () {
 	set_thread_description(">> gameloop");
-	set_gameloop_thread_priority();
+	set_high_thread_priority();
 
 	{ // GL state
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -116,7 +116,7 @@ void Game::frame () {
 			if (open) ImGui::Separator();
 		}
 
-		world->update();
+		world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);
@@ -136,9 +136,8 @@ void Game::frame () {
 		}
 
 		block_update.update_blocks(world->chunks);
-		world->chunks.update_chunks_brightness();
 
-		world->chunks.update_chunk_graphics(graphics);
+		world->chunks.update_chunks(graphics, world->player);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);

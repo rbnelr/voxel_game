@@ -17,7 +17,7 @@
 		return wstr;
 	}
 
-	void set_gameloop_thread_priority () {
+	void set_high_thread_priority () {
 		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 	}
 

@@ -84,6 +84,12 @@ static inline constexpr int _block_count (int lod_levels) {
 };
 
 ////////////// Chunk
+
+struct MeshingResult {
+	std::vector<ChunkMesh::Vertex> opaque_vertices;
+	std::vector<ChunkMesh::Vertex> tranparent_vertices;
+};
+
 class Chunk {
 	NO_MOVE_COPY_CLASS(Chunk)
 public:
@@ -135,43 +141,52 @@ public:
 	void calc_lod (int level);
 	void calc_lods ();
 
-	void remesh (Chunks& chunks, Graphics const& graphics);
-
 	void update_block_brighness ();
 
 	void block_only_texture_changed (bpos block_pos_world);
 	void block_changed (Chunks& chunks, bpos block_pos_world);
 
 	void whole_chunk_changed (Chunks& chunks);
+
+	void reupload (MeshingResult const& result);
 };
 
 ////////////// Chunks
-struct BackgroundJob {
+struct BackgroundJob { // Chunk gen
 	// input
 	Chunk* chunk;
 	WorldGenerator const* world_gen;
 	// output
-	float timer;
+	float time;
 
 	BackgroundJob execute ();
 };
 
-struct ParallelismJob {
+struct ParallelismJob { // CHunk remesh
 	// input
 	Chunk* chunk;
+	Chunks* chunks; // not modfied
+	Graphics const* graphics;
 	// output
-	float timer;
+	MeshingResult remesh_result;
+	float time;
 
 	ParallelismJob execute ();
 };
 
-static constexpr float background_thread_ratio = 5.0f / 11;
+static const int logical_cores = std::thread::hardware_concurrency();
 
-static const int background_threads  = max(floori((float)(std::thread::hardware_concurrency() - 1) *         background_thread_ratio ), 1);
-static const int parallelism_threads = max(ceili ((float)(std::thread::hardware_concurrency() - 1) * (1.0f - background_thread_ratio)), 1);
+// as many background threads as there are logical cores to allow background threads to use even the main threats time when we are gpu bottlenecked or at an fps cap
+static const int background_threads  = max(logical_cores, 1);
 
-inline Threadpool<BackgroundJob > background_threadpool  = { background_threads , ">> background threadpool"  };
-inline Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, ">> parallelism threadpool" };
+// main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
+static const int parallelism_threads = max(logical_cores - 1, 1);
+
+static constexpr bool NORMAL_PRIO = false;
+static constexpr bool HIGH_PRIO = true;
+
+inline Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
+inline Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, HIGH_PRIO,   ">> parallelism threadpool" };
 
 struct ChunkHashmap {
 	typedef std::unordered_map<chunk_coord_hashmap, std::unique_ptr<Chunk>> hashmap_t; 
@@ -251,12 +266,8 @@ public:
 
 	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
 
-	// prevent giant lag because chunk gen is in main thread for now
-	//int max_chunks_generated_per_frame = 1;
-
-	// prevent giant lag because chunk gen is in main thread for now
-	int max_chunks_brightness_per_frame = 32;
-	int max_chunks_meshed_per_frame = 4;
+	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
+	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
 
 	bool use_lod = false;
 
@@ -271,8 +282,6 @@ public:
 		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
 		ImGui::DragFloat("active_radius", &active_radius, 1);
 
-		//ImGui::DragInt("max_chunks_generated_per_frame", &max_chunks_generated_per_frame, 0.02f);
-		ImGui::DragInt("max_chunks_brightness_per_frame", &max_chunks_brightness_per_frame, 0.02f);
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
 
 		ImGui::Checkbox("use_lod", &use_lod);
@@ -307,10 +316,11 @@ public:
 
 	void remesh_all ();
 
-	void update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player);
+	// queue and finialize chunks that should be generated
+	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
 
-	void update_chunks_brightness ();
-
-	void update_chunk_graphics (Graphics const& graphics);
+	// block brightness update
+	// chunk meshing to prepare for drawing
+	void update_chunks (Graphics const& graphics, Player const& player);
 };
 
