@@ -26,10 +26,16 @@ void Game::frame () {
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
 	{
-		bool fullscreen = get_fullscreen();
-		if (ImGui::Checkbox("fullscreen", &fullscreen)) {
-			toggle_fullscreen();
-		}
+		bool borderless_fullscreen;
+		bool fullscreen = get_fullscreen(&borderless_fullscreen);
+		bool changed = false;
+
+		changed = ImGui::Checkbox("fullscreen", &fullscreen);
+		ImGui::SameLine();
+		changed = ImGui::Checkbox("borderless", &borderless_fullscreen) || changed;
+		
+		if (changed)
+			switch_fullscreen(fullscreen, borderless_fullscreen);
 
 		ImGui::SameLine();
 		bool vsync = get_vsync();
