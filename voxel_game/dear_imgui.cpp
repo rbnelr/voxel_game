@@ -11,7 +11,8 @@ void DearImgui::init () {
 	ImGui::CreateContext();
 
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	// imgui steals keyboard by default, do not like
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	// Setup Platform/Renderer bindings
@@ -25,6 +26,7 @@ void DearImgui::frame_start () {
 
 	{
 		auto& io = ImGui::GetIO();
+		// imgui steals keyboard by default, do not like
 		if (io.WantCaptureKeyboard)
 			input.disable_keyboard();
 		if (io.WantCaptureMouse)

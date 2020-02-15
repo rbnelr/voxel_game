@@ -18,25 +18,6 @@ bool _use_potatomode = _need_potatomode();
 Game::Game () {
 	set_thread_description(">> gameloop");
 	set_high_thread_priority();
-
-	{ // GL state
-		glEnable(GL_FRAMEBUFFER_SRGB);
-
-		glEnable(GL_DEPTH_TEST);
-		glClearDepth(1.0f);
-		glDepthFunc(GL_LEQUAL);
-		glDepthRange(0.0f, 1.0f);
-		glDepthMask(GL_TRUE);
-
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
-
-		glDisable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	}
 }
 
 void Game::frame () {

@@ -688,11 +688,37 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_view_uniforms(view);
 	common_uniforms.set_debug_uniforms();
 
+	{ // GL state defaults
+	  // 
+		glEnable(GL_FRAMEBUFFER_SRGB);
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		// scissor
+		glDisable(GL_SCISSOR_TEST);
+		// depth
+		glEnable(GL_DEPTH_TEST);
+		glClearDepth(1.0f);
+		glDepthFunc(GL_LEQUAL);
+		glDepthRange(0.0f, 1.0f);
+		glDepthMask(GL_TRUE);
+		// culling
+		gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
+		// blending
+		glDisable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		//
+	#ifdef GL_POLYGON_MODE
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	#endif
+	}
+
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
 		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod, tile_textures);
