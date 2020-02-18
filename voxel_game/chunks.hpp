@@ -109,31 +109,19 @@ public:
 	bool culled;
 
 	// block data
-	Block	blocks[_block_count(4)];
-	int lod_offsets[4] = {
-		_block_count(0),
-		_block_count(1),
-		_block_count(2),
-		_block_count(3),
-	};
+	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
 
 	// get block ptr
-	Block* get_block (bpos pos, int lod=0) {
-		Block* level = blocks + lod_offsets[lod];
-		return level + pos.z * (CHUNK_DIM_Y >> lod) * (CHUNK_DIM_X >> lod) + pos.y * (CHUNK_DIM_X >> lod) + pos.x;
+	Block* get_block (bpos pos) {
+		return &blocks[pos.z][pos.y][pos.x];
 	}
-	Block* get_block_flat (int index) {
-		return &blocks[index];
+	Block* get_block_flat (unsigned index) {
+		return &blocks[0][0][index];
 	}
-
-	int lod = -1;
 
 	// Gpu mesh data
 	ChunkMesh mesh;
 	uint64_t face_count;
-
-	void calc_lod (int level);
-	void calc_lods ();
 
 	void remesh (Chunks& chunks, Graphics const& graphics);
 
@@ -258,8 +246,6 @@ public:
 	int max_chunks_brightness_per_frame = 32;
 	int max_chunks_meshed_per_frame = 4;
 
-	bool use_lod = false;
-
 	RunningAverage<float> chunk_gen_time = { 64 };
 	RunningAverage<float> brightness_time = { 64 };
 	RunningAverage<float> meshing_time = { 64 };
@@ -274,8 +260,6 @@ public:
 		//ImGui::DragInt("max_chunks_generated_per_frame", &max_chunks_generated_per_frame, 0.02f);
 		ImGui::DragInt("max_chunks_brightness_per_frame", &max_chunks_brightness_per_frame, 0.02f);
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
-
-		ImGui::Checkbox("use_lod", &use_lod);
 
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;

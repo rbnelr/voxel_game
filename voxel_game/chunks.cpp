@@ -182,11 +182,6 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 			} else {
 				auto& chunk = *it;
 
-				auto prev_lod = chunk.lod;
-				chunk.lod = use_lod ? chunk_lod(dist) : 0;
-				if (chunk.lod != prev_lod)
-					chunk.needs_remesh = true;
-
 				chunk.active = dist <= active_radius;
 				
 				++it;
@@ -224,7 +219,6 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 		for (auto& cp : chunks_to_generate) {
 			Chunk* chunk = pending_chunks.alloc_chunk(cp);
 			float dist = chunk_dist_to_player(cp);
-			chunk->lod = use_lod ? chunk_lod(dist) : 0;
 			
 			BackgroundJob job;
 			job.chunk = chunk;
@@ -278,24 +272,6 @@ Block clac_block_lod (FUNC get_block) {
 	return { get_block(0)->id, dark_count > 4, 255 }; 
 }
 
-void Chunk::calc_lod (int level) {
-	int3 bp;
-	for (bp.z=0; bp.z<CHUNK_DIM_Z >> level; ++bp.z) {
-		for (bp.y=0; bp.y<CHUNK_DIM_Y >> level; ++bp.y) {
-			for (bp.x=0; bp.x<CHUNK_DIM_X >> level; ++bp.x) {
-				*get_block(bp, level) = clac_block_lod([=] (int i) {
-					return get_block(bp * 2 + int3(i & 1, (i>>1) & 1, (i>>2) & 1), level - 1);
-				});
-			}
-		}
-	}
-}
-void Chunk::calc_lods () {
-	calc_lod(1);
-	calc_lod(2);
-	calc_lod(3);
-}
-
 void Chunks::update_chunks_brightness () {
 	int count = 0;
 	
@@ -325,7 +301,6 @@ void Chunks::update_chunk_graphics (Graphics const& graphics) {
 
 			auto timer = Timer::start();
 
-			chunk.calc_lods();
 			chunk.remesh(*this, graphics);
 
 			auto time = timer.end();
