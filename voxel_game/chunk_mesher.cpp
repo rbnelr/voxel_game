@@ -64,25 +64,21 @@ struct Chunk_Mesher {
 	void cube_opaque ();
 	void cube_transperant ();
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk);
+	MeshingResult mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk);
 };
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
+MeshingResult mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
 	Chunk_Mesher cm;
-	cm.mesh_chunk(chunks, graphics, tile_textures, chunk);
+	return cm.mesh_chunk(chunks, graphics, tile_textures, chunk);
 }
 
-void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
+MeshingResult Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk) {
+	MeshingResult res;
+
 	alpha_test = graphics.alpha_test;
 
-	static std::vector<ChunkMesh::Vertex> _opaque_vertices;
-	static std::vector<ChunkMesh::Vertex> _tranparent_vertices;
-
-	_opaque_vertices.clear();
-	_tranparent_vertices.clear();
-
-	opaque_vertices = &_opaque_vertices;
-	tranparent_vertices = &_tranparent_vertices;
+	opaque_vertices = &res.opaque_vertices;
+	tranparent_vertices = &res.tranparent_vertices;
 
 #if AVOID_QUERY_CHUNK_HASH_LOOKUP
 	neighbour_chunks[0][0] = chunks.query_chunk(chunk->coord +chunk_coord(-1,-1));
@@ -122,10 +118,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 		}
 	}
 
-	chunk->mesh.opaque_mesh.upload(_opaque_vertices);
-	chunk->mesh.transparent_mesh.upload(_tranparent_vertices);
-
-	chunk->face_count = (_opaque_vertices.size() + _tranparent_vertices.size()) / 6;
+	return res;
 }
 
 uint8 Chunk_Mesher::calc_brightness (bpos vert_pos, bpos axis_a, bpos axis_b, bpos plane) {

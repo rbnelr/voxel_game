@@ -17,26 +17,7 @@ bool _use_potatomode = _need_potatomode();
 //
 Game::Game () {
 	set_thread_description(">> gameloop");
-	set_gameloop_thread_priority();
-
-	{ // GL state
-		glEnable(GL_FRAMEBUFFER_SRGB);
-
-		glEnable(GL_DEPTH_TEST);
-		glClearDepth(1.0f);
-		glDepthFunc(GL_LEQUAL);
-		glDepthRange(0.0f, 1.0f);
-		glDepthMask(GL_TRUE);
-
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
-
-		glDisable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	}
+	set_high_thread_priority();
 }
 
 void Game::frame () {
@@ -45,10 +26,16 @@ void Game::frame () {
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
 	{
-		bool fullscreen = get_fullscreen();
-		if (ImGui::Checkbox("fullscreen", &fullscreen)) {
-			toggle_fullscreen();
-		}
+		bool borderless_fullscreen;
+		bool fullscreen = get_fullscreen(&borderless_fullscreen);
+		bool changed = false;
+
+		changed = ImGui::Checkbox("fullscreen", &fullscreen);
+		ImGui::SameLine();
+		changed = ImGui::Checkbox("borderless", &borderless_fullscreen) || changed;
+		
+		if (changed)
+			switch_fullscreen(fullscreen, borderless_fullscreen);
 
 		ImGui::SameLine();
 		bool vsync = get_vsync();
@@ -116,7 +103,7 @@ void Game::frame () {
 			if (open) ImGui::Separator();
 		}
 
-		world->update();
+		world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);
@@ -136,9 +123,8 @@ void Game::frame () {
 		}
 
 		block_update.update_blocks(world->chunks);
-		world->chunks.update_block_light();
 
-		world->chunks.update_chunk_graphics(graphics);
+		world->chunks.update_chunks(graphics, world->player);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);

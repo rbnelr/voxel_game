@@ -20,8 +20,6 @@ public:
 
 	}
 
-	void update ();
-
 	//// Raycasting into the world
 
 	SelectedBlock raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);

@@ -87,7 +87,11 @@ TODO
  light propagation code
 
  see if there are any obvious optimizations to be done for remeshing
-
+ -remesh 'core' blocks first, then remesh outter shell (that touches neighbour chunks)
+  -this way the shell can be remeshed if a neighbour changed without needing to remesh the core because we can save the offset of the shell meshes and overwrite those
+  -core does not need to access neighbours so the whole query_block can go away and turn into a simple 3d array offset
+  -4 chunk remeshes when changing a block touching 4 chunks are now 1 full remesh and 3 shell remeshes
+ 
  rework items to be classes with inheritance?
  -pro: might simplyfy code a lot
  -pro: complex state does not take up memory in union for simple items

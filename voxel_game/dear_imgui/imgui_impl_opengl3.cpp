@@ -135,6 +135,11 @@ using namespace gl;
 #define IMGUI_IMPL_OPENGL_MAY_HAVE_VTX_OFFSET   1
 #endif
 
+// Disable glGet* since on my desktop (only in fullscreen) glGet was causing really high (22% on 12 core cpu) cpu usage (wierd driver mal-optimization?)
+#define IMGUI_NO_GL_STATE_BACKUP 1
+// Also disable glGen and glDelete of VAO each frame just in case the driver pulls another stunt like with the glGet calls
+#define IMGUI_DONT_RECREATE_VAO 1
+
 // OpenGL Data
 static GLuint       g_GlVersion = 0;                // Extracted at runtime using GL_MAJOR_VERSION, GL_MINOR_VERSION queries.
 static char         g_GlslVersionString[32] = "";   // Specified by user or detected based on compile time GL settings.
@@ -143,6 +148,10 @@ static GLuint       g_ShaderHandle = 0, g_VertHandle = 0, g_FragHandle = 0;
 static int          g_AttribLocationTex = 0, g_AttribLocationProjMtx = 0;                                // Uniforms location
 static int          g_AttribLocationVtxPos = 0, g_AttribLocationVtxUV = 0, g_AttribLocationVtxColor = 0; // Vertex attributes location
 static unsigned int g_VboHandle = 0, g_ElementsHandle = 0;
+
+#ifdef IMGUI_DONT_RECREATE_VAO
+static GLuint		g_vertex_array_object = 0;
+#endif
 
 // Functions
 bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
@@ -198,6 +207,10 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
     gl_loader = "glbinding";
 #else // IMGUI_IMPL_OPENGL_LOADER_CUSTOM
     gl_loader = "Custom";
+#endif
+
+#ifdef IMGUI_DONT_RECREATE_VAO
+	glGenVertexArrays(1, &g_vertex_array_object);
 #endif
 
     // Make a dummy GL call (we don't actually need the result)
@@ -281,6 +294,8 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     if (fb_width <= 0 || fb_height <= 0)
         return;
 
+	bool clip_origin_lower_left = true;
+#ifndef IMGUI_NO_GL_STATE_BACKUP
     // Backup GL state
     GLenum last_active_texture; glGetIntegerv(GL_ACTIVE_TEXTURE, (GLint*)&last_active_texture);
     glActiveTexture(GL_TEXTURE0);
@@ -308,20 +323,25 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     GLboolean last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
     GLboolean last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
     GLboolean last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
-    bool clip_origin_lower_left = true;
 #if defined(GL_CLIP_ORIGIN) && !defined(__APPLE__)
     GLenum last_clip_origin = 0; glGetIntegerv(GL_CLIP_ORIGIN, (GLint*)&last_clip_origin); // Support for GL 4.5's glClipControl(GL_UPPER_LEFT)
     if (last_clip_origin == GL_UPPER_LEFT)
         clip_origin_lower_left = false;
 #endif
+#endif
 
     // Setup desired GL state
+#ifndef IMGUI_DONT_RECREATE_VAO
     // Recreate the VAO every time (this is to easily allow multiple GL contexts to be rendered to. VAO are not shared among GL contexts)
     // The renderer would actually work without any VAO bound, but then our VertexAttrib calls would overwrite the default one currently bound.
     GLuint vertex_array_object = 0;
 #ifndef IMGUI_IMPL_OPENGL_ES2
     glGenVertexArrays(1, &vertex_array_object);
 #endif
+#else
+	GLuint vertex_array_object = g_vertex_array_object;
+#endif
+
     ImGui_ImplOpenGL3_SetupRenderState(draw_data, fb_width, fb_height, vertex_array_object);
 
     // Will project scissor/clipping rectangles into framebuffer space
@@ -379,11 +399,14 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
         }
     }
 
+#ifndef IMGUI_DONT_RECREATE_VAO
     // Destroy the temporary VAO
 #ifndef IMGUI_IMPL_OPENGL_ES2
     glDeleteVertexArrays(1, &vertex_array_object);
 #endif
+#endif
 
+#ifndef IMGUI_NO_GL_STATE_BACKUP
     // Restore modified GL state
     glUseProgram(last_program);
     glBindTexture(GL_TEXTURE_2D, last_texture);
@@ -406,6 +429,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
 #endif
     glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
     glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+#endif
 }
 
 bool ImGui_ImplOpenGL3_CreateFontsTexture()
@@ -673,6 +697,10 @@ void    ImGui_ImplOpenGL3_DestroyDeviceObjects()
     if (g_VertHandle)       { glDeleteShader(g_VertHandle); g_VertHandle = 0; }
     if (g_FragHandle)       { glDeleteShader(g_FragHandle); g_FragHandle = 0; }
     if (g_ShaderHandle)     { glDeleteProgram(g_ShaderHandle); g_ShaderHandle = 0; }
+
+#ifdef IMGUI_DONT_RECREATE_VAO
+	if (g_vertex_array_object)     { glGenVertexArrays(1, &g_vertex_array_object); g_vertex_array_object = 0; }
+#endif
 
     ImGui_ImplOpenGL3_DestroyFontsTexture();
 }

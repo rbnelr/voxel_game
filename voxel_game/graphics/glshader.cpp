@@ -167,6 +167,14 @@ namespace gl {
 			{ "mat3",  gl::MAT3		},
 			{ "mat4",  gl::MAT4		},
 			{ "bool",  gl::BOOL		},
+
+			{ "sampler1D",			gl::SAMPLER_1D			},
+			{ "sampler2D",			gl::SAMPLER_2D			},
+			{ "sampler3D",			gl::SAMPLER_3D			},
+			{ "samplerCube",		gl::SAMPLER_Cube		},
+			{ "sampler1DArray",		gl::SAMPLER_1D_Array	},
+			{ "sampler2DArray",		gl::SAMPLER_2D_Array	},
+			{ "samplerCubeArray",	gl::SAMPLER_Cube_Array	},
 		};
 		bool get_type (string_view glsl_type, gl::type* type) {
 			for (auto& tm : _type_map) {

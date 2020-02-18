@@ -11,5 +11,6 @@ extern int frame_counter;
 bool get_vsync ();
 void set_vsync (bool on);
 
-bool get_fullscreen ();
-void toggle_fullscreen ();
+bool get_fullscreen (bool* borderless_fullscreen=nullptr);
+bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
+bool toggle_fullscreen ();

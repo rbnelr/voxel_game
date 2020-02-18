@@ -14,12 +14,6 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 	
 }
 
-void Chunk::remesh (Chunks& chunks, Graphics const& graphics) {
-	mesh_chunk(chunks, graphics.chunk_graphics, graphics.tile_textures, this);
-
-	needs_remesh = false;
-}
-
 void Chunk::update_block_light () {
 
 	bpos p; // position in chunk
@@ -95,14 +89,29 @@ void Chunks::remesh_neighbours (chunk_coord coord) {
 	if ((chunk = query_chunk(coord + chunk_coord(-1, 0)))) chunk->needs_remesh = true;
 }
 
+void Chunk::reupload (MeshingResult const& result) {
+	mesh.opaque_mesh.upload(result.opaque_vertices);
+	mesh.transparent_mesh.upload(result.tranparent_vertices);
+
+	face_count = (result.opaque_vertices.size() + result.tranparent_vertices.size()) / 6;
+}
+
 //// Chunks
 BackgroundJob BackgroundJob::execute () {
-	world_gen->generate_chunk(*chunk, &timer);
+	auto timer = Timer::start();
 
+	world_gen->generate_chunk(*chunk);
+
+	time = timer.end();
 	return std::move(*this);
 }
 
 ParallelismJob ParallelismJob::execute () {
+	auto timer = Timer::start();
+
+	remesh_result = mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk);
+
+	time = timer.end();
 	return std::move(*this);
 }
 
@@ -165,7 +174,7 @@ void Chunks::remesh_all () {
 	}
 }
 
-void Chunks::update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player) {
+void Chunks::update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player) {
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
@@ -237,8 +246,8 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 				pending_chunks.erase_chunk({ it });
 			}
 			
-			chunk_gen_time.push(res.timer);
-			logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", res.chunk->coord.x, res.chunk->coord.y, res.timer * 1024);
+			chunk_gen_time.push(res.time);
+			logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", res.chunk->coord.x, res.chunk->coord.y, res.time * 1024);
 
 			res.chunk->whole_chunk_changed(*this);
 		}
@@ -247,40 +256,62 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 
 }
 
-void Chunks::update_block_light () {
-	int count = 0;
-	
-	for (Chunk& chunk : chunks) {
-		if (chunk.needs_block_light_update) {
-			if (count++ >= max_chunks_brightness_per_frame)
-				break;
 
+void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
+	auto chunk_dist_to_player = [&] (chunk_coord pos) {
+		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
+		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
+	};
+
+	std::vector<Chunk*> chunks_to_remesh;
+
+	for (Chunk& chunk : chunks) {
+		if (chunk.needs_remesh)
+			chunks_to_remesh.push_back(&chunk);
+	}
+
+	// update chunks nearest to player first
+	std::sort(chunks_to_remesh.begin(), chunks_to_remesh.end(),
+		[&] (Chunk* l, Chunk* r) { return chunk_dist_to_player(l->coord) < chunk_dist_to_player(r->coord); }
+	);
+
+	// update _all chunks_ data required for remesh (remesh accesses neighbours)
+	for (int i=0; i<(int)chunks_to_remesh.size(); ++i) {
+		auto* chunk = chunks_to_remesh[i];
+
+		if (chunk->needs_block_light_update) {
 			auto timer = Timer::start();
 
-			chunk.update_block_light();
+			chunk->update_block_light();
 
 			auto time = timer.end();
 			light_time.push(time);
-			logf("Chunk (%3d,%3d) light update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
+			logf("Chunk (%3d,%3d) light update took %7.3f ms", chunk->coord.x, chunk->coord.y, time * 1000);
 		}
 	}
-}
 
-void Chunks::update_chunk_graphics (Graphics const& graphics) {
-	int count = 0;
+	{ // remesh all chunks in parallel
+		int count = min((int)chunks_to_remesh.size(), max_chunks_meshed_per_frame);
 
-	for (Chunk& chunk : chunks) {
-		if (chunk.needs_remesh) {
-			if (count++ >= max_chunks_meshed_per_frame)
-				break;
+		for (int i=0; i<count; ++i) {
+			auto* chunk = chunks_to_remesh[i];
 
-			auto timer = Timer::start();
+			ParallelismJob job = {
+				chunk, this, &graphics
+			};
+			parallelism_threadpool.jobs.push(job);
+		}
 
-			chunk.remesh(*this, graphics);
+		parallelism_threadpool.contribute_work();
 
-			auto time = timer.end();
-			meshing_time.push(time);
-			logf("Chunk (%3d,%3d) meshing update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
+		for (int i=0; i<count; ++i) {
+			auto result = parallelism_threadpool.results.pop();
+
+			result.chunk->reupload(result.remesh_result);
+			result.chunk->needs_remesh = false;
+
+			meshing_time.push(result.time);
+			logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
 		}
 	}
 }

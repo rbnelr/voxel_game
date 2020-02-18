@@ -265,7 +265,8 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader && vertices.size() > 0) {
 		shader.bind();
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tex"), 0);
+		shader.set_texture_unit("tex", 0);
+
 		gui_atlas.bind();
 
 		mesh.upload(vertices);
@@ -280,7 +281,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item_block && blocks_vertices.size() > 0) {
 		shader_item_block.bind();
 
-		glUniform1i(glGetUniformLocation(shader_item_block.shader->shad, "tile_textures"), 0);
+		shader.set_texture_unit("tile_textures", 0);
 		
 		blocks_mesh.upload(blocks_vertices);
 		blocks_vertices.clear();
@@ -292,7 +293,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item && items_vertices.size() > 0) {
 		shader_item.bind();
 
-		glUniform1i(glGetUniformLocation(shader_item.shader->shad, "tile_textures"), 0);
+		shader.set_texture_unit("tile_textures", 0);
 		
 		items_mesh.upload(items_vertices);
 		items_vertices.clear();
@@ -590,8 +591,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 
 		shader.set_uniform("alpha_test", alpha_test);
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+		shader.set_texture_unit("tile_textures", 0);
+		shader.set_texture_unit("breaking_textures", 1);
 
 		// Draw all opaque chunk meshes
 		for (Chunk const& chunk : chunks.chunks) {
@@ -626,8 +627,8 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures 
 
 		shader.set_uniform("alpha_test", false);
 
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "tile_textures"), 0);
-		glUniform1i(glGetUniformLocation(shader.shader->shad, "breaking_textures"), 1);
+		shader.set_texture_unit("tile_textures", 0);
+		shader.set_texture_unit("breaking_textures", 1);
 
 		// Draw all transparent chunk meshes
 		for (Chunk const& chunk : chunks.chunks) {
@@ -677,11 +678,37 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_view_uniforms(view);
 	common_uniforms.set_debug_uniforms();
 
+	{ // GL state defaults
+	  // 
+		glEnable(GL_FRAMEBUFFER_SRGB);
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		// scissor
+		glDisable(GL_SCISSOR_TEST);
+		// depth
+		glEnable(GL_DEPTH_TEST);
+		glClearDepth(1.0f);
+		glDepthFunc(GL_LEQUAL);
+		glDepthRange(0.0f, 1.0f);
+		glDepthMask(GL_TRUE);
+		// culling
+		gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+		glCullFace(GL_BACK);
+		glFrontFace(GL_CCW);
+		// blending
+		glDisable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		//
+	#ifdef GL_POLYGON_MODE
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	#endif
+	}
+
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
 		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod, tile_textures);

@@ -219,12 +219,8 @@ struct Generator {
 	}
 };
 
-void WorldGenerator::generate_chunk (Chunk& chunk, float* chunk_gen_time) const {
-	auto timer = Timer::start();
-
+void WorldGenerator::generate_chunk (Chunk& chunk) const {
 	Generator gen = { *this, chunk };
 
 	gen.gen();
-
-	*chunk_gen_time = timer.end();
 }

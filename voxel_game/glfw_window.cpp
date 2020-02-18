@@ -29,8 +29,7 @@ struct Rect {
 GLFWwindow*		window;
 
 bool			fullscreen = false;
-
-GLFWmonitor*	primary_monitor;
+bool			borderless_fullscreen = false;
 Rect			window_positioning;
 
 Input			_input = {};
@@ -162,29 +161,95 @@ void set_vsync (bool on) {
 	vsync = on;
 }
 
-bool get_fullscreen () {
+struct Monitor {
+	GLFWmonitor* monitor;
+	GLFWvidmode const* vidmode;
+	int2 pos;
+	int2 size;
+};
+
+bool select_monitor_from_window_pos (Rect window_positioning, Monitor* selected_monior) {
+	int count;
+	auto** glfw_monitors = glfwGetMonitors(&count);
+
+	std::vector<Monitor> monitors;
+	monitors.resize(count);
+
+	auto window_monitor_overlap = [=] (Monitor const& mon) {
+		int2 a = clamp(window_positioning.pos, mon.pos, mon.pos + mon.size);
+		int2 b = clamp(window_positioning.pos + window_positioning.dim, mon.pos, mon.pos + mon.size);
+
+		int2 size = b - a;
+		float overlap_area = (float)(size.x * size.y);
+		return overlap_area;
+	};
+
+	float max_overlap = -INF;
+	Monitor* max_overlap_monitor = nullptr;
+
+	for (int i=0; i<count; ++i) {
+		auto& m = monitors[i];
+
+		m.monitor = glfw_monitors[i];
+		m.vidmode = glfwGetVideoMode(m.monitor);
+		glfwGetMonitorPos(m.monitor, &m.pos.x, &m.pos.y);
+
+		m.size.x = m.vidmode->width;
+		m.size.y = m.vidmode->height;
+
+		float overlap = window_monitor_overlap(m);
+		if (overlap > max_overlap) {
+			max_overlap = overlap;
+			max_overlap_monitor = &m;
+		}
+	}
+
+	if (!max_overlap_monitor)
+		return false; // fail, glfw returned no monitors
+
+	*selected_monior = *max_overlap_monitor;
+	return true;
+}
+
+bool get_fullscreen (bool* borderless_fullscreen) {
+	if (borderless_fullscreen) *borderless_fullscreen = ::borderless_fullscreen;
 	return fullscreen;
 }
-void toggle_fullscreen () {
-	if (!fullscreen) {
+bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
+	if (!::fullscreen) {
 		// store windowed window placement
 		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
 		glfwGetWindowSize(window, &window_positioning.dim.x, &window_positioning.dim.y);
 	}
 
-	fullscreen = !fullscreen;
-
 	if (fullscreen) {
-		// set window fullscreenon primary monitor
-		auto* vm = glfwGetVideoMode(primary_monitor);
-		glfwSetWindowMonitor(window, primary_monitor, 0,0, vm->width,vm->height, vm->refreshRate);
+		Monitor monitor;
+		if (!select_monitor_from_window_pos(window_positioning, &monitor))
+			return false; // fail
+
+		if (borderless_fullscreen) {
+			glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+			glfwSetWindowMonitor(window, NULL, monitor.pos.x, monitor.pos.y, monitor.size.x, monitor.size.y, GLFW_DONT_CARE);
+		} else {
+			glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
+			glfwSetWindowMonitor(window, monitor.monitor, 0,0, monitor.vidmode->width, monitor.vidmode->height, monitor.vidmode->refreshRate);
+		}
 	} else {
 		// restore windowed window placement
+		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
 		glfwSetWindowMonitor(window, NULL, window_positioning.pos.x, window_positioning.pos.y, window_positioning.dim.x, window_positioning.dim.y, GLFW_DONT_CARE);
 	}
 
 	// reset vsync to make sure 
 	set_vsync(vsync);
+
+	::fullscreen = fullscreen;
+	::borderless_fullscreen = borderless_fullscreen;
+	return true;
+}
+
+bool toggle_fullscreen () {
+	return switch_fullscreen(!fullscreen, borderless_fullscreen);
 }
 
 //// gameloop
@@ -358,8 +423,7 @@ int main () {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
-
-	primary_monitor = glfwGetPrimaryMonitor();
+	glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
 
 	window = glfwCreateWindow(1280, 720, "Voxel Game", NULL, NULL);
 	if (!window) {

@@ -13,7 +13,7 @@
 namespace gl {
 	// OpenGL glsl types
 	enum type {
-		FLOAT			,
+		FLOAT			=0,
 		FLOAT2			,
 		FLOAT3			,
 		FLOAT4			,
@@ -25,7 +25,19 @@ namespace gl {
 		MAT3			,
 		MAT4			,
 		BOOL			,
+
+		SAMPLER_1D			,
+		SAMPLER_2D			,
+		SAMPLER_3D			,
+		SAMPLER_Cube		,
+		SAMPLER_1D_Array	,
+		SAMPLER_2D_Array	,
+		SAMPLER_Cube_Array	,
 	};
+
+	static constexpr inline bool is_sampler_type (type t) {
+		return t >= SAMPLER_1D && t <= SAMPLER_Cube_Array;
+	}
 
 	// GLenum that i can actually make sense of in the debugger (raw GLenum's just show up like 0x2186)
 	enum class Enum : GLenum {
