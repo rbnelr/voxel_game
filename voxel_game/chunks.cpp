@@ -20,33 +20,36 @@ void Chunk::remesh (Chunks& chunks, Graphics const& graphics) {
 	needs_remesh = false;
 }
 
-void Chunk::update_block_brighness () {
-	bpos i; // position in chunk
-	for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-		for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
+void Chunk::update_block_light () {
 
-			i.z = CHUNK_DIM_Z -1;
+	bpos p; // position in chunk
+	for (p.z=0; p.z<CHUNK_DIM_Z; ++p.z) {
+		for (p.y=0; p.y<CHUNK_DIM_Y; ++p.y) {
+			for (p.x=0; p.x<CHUNK_DIM_X; ++p.x) {
+				if (any(p == 0 || p == CHUNK_DIM-1))
+					continue;
+				auto* blk = get_block(p);
 
-			int light_level = 15;
+				auto* A = get_block(p - int3(1,0,0));
+				auto* B = get_block(p + int3(1,0,0));
+				auto* C = get_block(p - int3(0,1,0));
+				auto* D = get_block(p + int3(0,1,0));
+				auto* E = get_block(p - int3(0,0,1));
+				auto* F = get_block(p + int3(0,0,1));
 
-			for (; i.z > -1; --i.z) {
-				auto* b = get_block(i);
-				auto& props = BLOCK_PROPS[b->id];
+				int8_t li = 0;
+				li = max(li, min((int8_t)A->light_level, (int8_t)B->light_level));
+				li = max(li, min((int8_t)C->light_level, (int8_t)D->light_level));
+				li = max(li, min((int8_t)E->light_level, (int8_t)F->light_level));
 
-				if (b->id == B_AIR) {
-					
-				} else if (props.collision != CM_SOLID || props.transparency != TM_OPAQUE) {
-					light_level = max(light_level - 4, 0);
-				} else {
-					light_level = 0;
-				}
+				li = max(li - 1, (int8_t)BLOCK_PROPS[blk->id].glow_level);
 
-				b->light_level = light_level;
+				blk->light_level = (uint8_t)li;
 			}
 		}
 	}
 
-	needs_block_brighness_update = false;
+	needs_block_light_update = false;
 }
 
 void Chunk::block_only_texture_changed (bpos block_pos_world) { // only breaking animation of block changed -> do not need to update block brightness -> do not need to remesh surrounding chunks (only this chunk needs remesh)
@@ -54,7 +57,7 @@ void Chunk::block_only_texture_changed (bpos block_pos_world) { // only breaking
 }
 void Chunk::block_changed (Chunks& chunks, bpos block_pos_world) { // block was placed or broken -> need to update our block brightness -> need to remesh ourselves and surrounding chunks
 	needs_remesh = true;
-	needs_block_brighness_update = true;
+	needs_block_light_update = true;
 
 	Chunk* chunk;
 
@@ -73,7 +76,7 @@ void Chunk::block_changed (Chunks& chunks, bpos block_pos_world) { // block was 
 
 void Chunk::whole_chunk_changed (Chunks& chunks) { // whole chunk could have changed -> update our block brightness -> remesh all surrounding chunks
 	needs_remesh = true;
-	needs_block_brighness_update = true;
+	needs_block_light_update = true;
 
 	// update surrounding chunks to update lighting properly
 	chunks.remesh_neighbours(coord);
@@ -244,49 +247,21 @@ void Chunks::update_chunks_load (World const& world, WorldGenerator const& world
 
 }
 
-template <typename FUNC>
-Block clac_block_lod (FUNC get_block) {
-	int dark_count = 0;
-	//for (int i=0; i<8; ++i) {
-	//	if (get_block(i)->dark)
-	//		dark_count++; 
-	//}
-	
-	int grass_count = 0;
-	for (int i=0; i<8; ++i) {
-		if (get_block(i)->id == B_GRASS)
-			if (++grass_count == 4)
-				return { B_GRASS, dark_count > 4, 255 }; 
-	}
-
-	for (int j=0; j<8; ++j) {
-		auto* b = get_block(j);
-
-		int count = 0;
-		for (int i=0; i<8; ++i) {
-			if (get_block(i)->id == b->id)
-				if (++count == 4) // Dominant block
-					return { b->id, dark_count > 4, 255 }; 
-		}
-	}
-	return { get_block(0)->id, dark_count > 4, 255 }; 
-}
-
-void Chunks::update_chunks_brightness () {
+void Chunks::update_block_light () {
 	int count = 0;
 	
 	for (Chunk& chunk : chunks) {
-		if (chunk.needs_block_brighness_update) {
+		if (chunk.needs_block_light_update) {
 			if (count++ >= max_chunks_brightness_per_frame)
 				break;
 
 			auto timer = Timer::start();
 
-			chunk.update_block_brighness();
+			chunk.update_block_light();
 
 			auto time = timer.end();
-			brightness_time.push(time);
-			logf("Chunk (%3d,%3d) brightness update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
+			light_time.push(time);
+			logf("Chunk (%3d,%3d) light update took %7.3f ms", chunk.coord.x,chunk.coord.y, time * 1000);
 		}
 	}
 }

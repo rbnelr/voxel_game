@@ -76,7 +76,7 @@ void Game::frame () {
 			fps_display.display_fps();
 
 			ImGui::Text("Chunk generation : %7.2f ms avg", world->chunks.chunk_gen_time.calc_avg() * 1000);
-			ImGui::Text("Chunk brightness : %7.2f ms avg", world->chunks.brightness_time.calc_avg() * 1000);
+			ImGui::Text("Chunk light      : %7.2f ms avg", world->chunks.light_time.calc_avg() * 1000);
 			ImGui::Text("Chunk meshing    : %7.2f ms avg", world->chunks.meshing_time.calc_avg() * 1000);
 
 			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
@@ -136,7 +136,7 @@ void Game::frame () {
 		}
 
 		block_update.update_blocks(world->chunks);
-		world->chunks.update_chunks_brightness();
+		world->chunks.update_block_light();
 
 		world->chunks.update_chunk_graphics(graphics);
 

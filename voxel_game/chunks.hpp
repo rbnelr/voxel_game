@@ -100,7 +100,7 @@ public:
 
 	// update flags
 	bool needs_remesh = false;
-	bool needs_block_brighness_update = false;
+	bool needs_block_light_update = false;
 
 	// block update etc.
 	bool active;
@@ -125,7 +125,7 @@ public:
 
 	void remesh (Chunks& chunks, Graphics const& graphics);
 
-	void update_block_brighness ();
+	void update_block_light ();
 
 	void block_only_texture_changed (bpos block_pos_world);
 	void block_changed (Chunks& chunks, bpos block_pos_world);
@@ -247,7 +247,7 @@ public:
 	int max_chunks_meshed_per_frame = 4;
 
 	RunningAverage<float> chunk_gen_time = { 64 };
-	RunningAverage<float> brightness_time = { 64 };
+	RunningAverage<float> light_time = { 64 };
 	RunningAverage<float> meshing_time = { 64 };
 
 	void imgui () {
@@ -293,7 +293,7 @@ public:
 
 	void update_chunks_load (World const& world, WorldGenerator const& world_gen, Player const& player);
 
-	void update_chunks_brightness ();
+	void update_block_light ();
 
 	void update_chunk_graphics (Graphics const& graphics);
 };
