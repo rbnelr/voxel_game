@@ -10,6 +10,7 @@ enum block_id : uint8_t {
 	B_STONE				,
 	B_TREE_LOG			,
 	B_LEAVES			,
+	B_TORCH				,
 
 	BLOCK_IDS_COUNT		,
 
@@ -30,6 +31,7 @@ static constexpr const char* BLOCK_NAMES[BLOCK_IDS_COUNT] = {
 	/* B_STONE			*/	"stone"		,
 	/* B_TREE_LOG		*/	"tree_log"	,
 	/* B_LEAVES			*/	"leaves"	,
+	/* B_TORCH			*/	"null"		,
 };
 
 enum collision_mode : uint8_t {
@@ -60,6 +62,7 @@ struct BlockProperties {
 	transparency_mode	transparency;
 	tool_type			tool = NONE;
 	uint8_t				hardness = 255;
+	uint8_t				glow_level = 0;
 };
 
 static BlockProperties BLOCK_PROPS[PSEUDO_BLOCK_IDS_COUNT] = {
@@ -71,6 +74,7 @@ static BlockProperties BLOCK_PROPS[PSEUDO_BLOCK_IDS_COUNT] = {
 	/* B_STONE				*/	{ CM_SOLID	, TM_OPAQUE			, PICKAXE	, 20 },
 	/* B_TREE_LOG			*/	{ CM_SOLID	, TM_OPAQUE			, AXE		, 7 },
 	/* B_LEAVES				*/	{ CM_SOLID	, TM_ALPHA_TEST		, NONE		, 2 },
+	/* B_TORCH				*/	{ CM_GAS	, TM_TRANSPARENT	, NONE		, 0, 15 },
 	
 	/* B_OUT_OF_BOUNDS		*/	{ CM_GAS	, TM_TRANSPARENT },
 	/* B_NO_CHUNK			*/	{ CM_SOLID	, TM_TRANSPARENT },
