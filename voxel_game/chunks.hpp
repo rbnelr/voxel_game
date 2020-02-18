@@ -115,31 +115,19 @@ public:
 	bool culled;
 
 	// block data
-	Block	blocks[_block_count(4)];
-	int lod_offsets[4] = {
-		_block_count(0),
-		_block_count(1),
-		_block_count(2),
-		_block_count(3),
-	};
+	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
 
 	// get block ptr
-	Block* get_block (bpos pos, int lod=0) {
-		Block* level = blocks + lod_offsets[lod];
-		return level + pos.z * (CHUNK_DIM_Y >> lod) * (CHUNK_DIM_X >> lod) + pos.y * (CHUNK_DIM_X >> lod) + pos.x;
+	Block* get_block (bpos pos) {
+		return &blocks[pos.z][pos.y][pos.x];
 	}
-	Block* get_block_flat (int index) {
-		return &blocks[index];
+	Block* get_block_flat (unsigned index) {
+		return &blocks[0][0][index];
 	}
-
-	int lod = -1;
 
 	// Gpu mesh data
 	ChunkMesh mesh;
 	uint64_t face_count;
-
-	void calc_lod (int level);
-	void calc_lods ();
 
 	void update_block_brighness ();
 
@@ -269,8 +257,6 @@ public:
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
 
-	bool use_lod = false;
-
 	RunningAverage<float> chunk_gen_time = { 64 };
 	RunningAverage<float> brightness_time = { 64 };
 	RunningAverage<float> meshing_time = { 64 };
@@ -283,8 +269,6 @@ public:
 		ImGui::DragFloat("active_radius", &active_radius, 1);
 
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
-
-		ImGui::Checkbox("use_lod", &use_lod);
 
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
@@ -319,7 +303,6 @@ public:
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
 
-	// block brightness update
 	// chunk meshing to prepare for drawing
 	void update_chunks (Graphics const& graphics, Player const& player);
 };

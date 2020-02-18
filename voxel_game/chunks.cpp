@@ -189,11 +189,6 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 			} else {
 				auto& chunk = *it;
 
-				auto prev_lod = chunk.lod;
-				chunk.lod = use_lod ? chunk_lod(dist) : 0;
-				if (chunk.lod != prev_lod)
-					chunk.needs_remesh = true;
-
 				chunk.active = dist <= active_radius;
 				
 				++it;
@@ -231,7 +226,6 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 		for (auto& cp : chunks_to_generate) {
 			Chunk* chunk = pending_chunks.alloc_chunk(cp);
 			float dist = chunk_dist_to_player(cp);
-			chunk->lod = use_lod ? chunk_lod(dist) : 0;
 			
 			BackgroundJob job;
 			job.chunk = chunk;
@@ -285,32 +279,15 @@ Block clac_block_lod (FUNC get_block) {
 	return { get_block(0)->id, dark_count > 4, 255 }; 
 }
 
-void Chunk::calc_lod (int level) {
-	int3 bp;
-	for (bp.z=0; bp.z<CHUNK_DIM_Z >> level; ++bp.z) {
-		for (bp.y=0; bp.y<CHUNK_DIM_Y >> level; ++bp.y) {
-			for (bp.x=0; bp.x<CHUNK_DIM_X >> level; ++bp.x) {
-				*get_block(bp, level) = clac_block_lod([=] (int i) {
-					return get_block(bp * 2 + int3(i & 1, (i>>1) & 1, (i>>2) & 1), level - 1);
-				});
-			}
-		}
-	}
-}
-void Chunk::calc_lods () {
-	calc_lod(1);
-	calc_lod(2);
-	calc_lod(3);
-}
 
 void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
 		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
 	};
-	
+
 	std::vector<Chunk*> chunks_to_remesh;
-	
+
 	for (Chunk& chunk : chunks) {
 		if (chunk.needs_remesh)
 			chunks_to_remesh.push_back(&chunk);
@@ -334,15 +311,6 @@ void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 			auto time = timer.end();
 			brightness_time.push(time);
 			logf("Chunk (%3d,%3d) brightness update took %7.3f ms", chunk->coord.x, chunk->coord.y, time * 1000);
-		}
-
-		if (0) {
-			auto timer = Timer::start();
-
-			chunk->calc_lods();
-
-			auto time = timer.end();
-			logf("Chunk (%3d,%3d) lod filtering update took %7.3f ms", chunk->coord.x,chunk->coord.y, time * 1000);
 		}
 	}
 

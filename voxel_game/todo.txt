@@ -78,11 +78,13 @@ DONE:
  
  add inventory
  -inventory gui
+ 
+ completely multithread code
 
 TODO
 -FEATURES:
 
- completely multithread code
+ light propagation code
 
  see if there are any obvious optimizations to be done for remeshing
  -remesh 'core' blocks first, then remesh outter shell (that touches neighbour chunks)
