@@ -289,19 +289,22 @@ struct PlayerGraphics {
 };
 
 struct ChunkMesh {
+	// block_id		id;
+	// uint8		light_level; // [0,15]
+	// uint8		hp; // [0,255]
 	struct Vertex {
 		uint8v3	pos_model;
-		uint8	brightness;
 		uint8v2	uv;
 		uint8	tex_indx;
-		uint8	hp_ratio;
+		uint8	light_level;
+		uint8	hp;
 
 		static void bind (Attributes& a) {
-			a.add    <decltype(pos_model )>(0, "pos_model" , sizeof(Vertex), offsetof(Vertex, pos_model ));
-			a.add    <decltype(brightness)>(1, "brightness", sizeof(Vertex), offsetof(Vertex, brightness), true);
-			a.add    <decltype(uv        )>(2, "uv",         sizeof(Vertex), offsetof(Vertex, uv        ));
-			a.add    <decltype(tex_indx  )>(3, "tex_indx",   sizeof(Vertex), offsetof(Vertex, tex_indx  ));
-			a.add    <decltype(hp_ratio  )>(4, "hp_ratio",   sizeof(Vertex), offsetof(Vertex, hp_ratio  ), true);
+			a.add    <decltype(pos_model  )>(0, "pos_model" ,  sizeof(Vertex), offsetof(Vertex, pos_model  ));
+			a.add    <decltype(uv         )>(1, "uv",          sizeof(Vertex), offsetof(Vertex, uv         ));
+			a.add_int<decltype(tex_indx   )>(2, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
+			a.add_int<decltype(light_level)>(3, "light_level", sizeof(Vertex), offsetof(Vertex, light_level));
+			a.add_int<decltype(hp         )>(4, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ));
 		}
 	};
 

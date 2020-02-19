@@ -476,7 +476,7 @@ struct TileLoader {
 	}
 
 	BlockTileInfo add_block (block_id id) {
-		auto name = BLOCK_NAMES[id];
+		auto name = BLOCK_PROPS[id].name;
 
 		if (!name)
 			return {0};

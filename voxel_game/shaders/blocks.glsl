@@ -6,17 +6,17 @@ $include "fog.glsl"
 
 $if vertex
 	layout (location = 0) in vec3	pos_model;
-	layout (location = 1) in float	brightness;
-	layout (location = 2) in vec2	uv;
-	layout (location = 3) in float	tex_indx;
-	layout (location = 4) in float	hp_ratio;
+	layout (location = 1) in vec2	uv;
+	layout (location = 2) in int	tex_indx;
+	layout (location = 3) in int	light_level;
+	layout (location = 4) in int	hp;
 
 	uniform vec3 chunk_pos;
 
 	out vec3	vs_pos_cam;
-	out float	vs_brightness;
 	out vec2	vs_uv;
 	out float	vs_tex_indx;
+	out float	vs_brightness;
 	out float	vs_hp_ratio;
 
 	void main () {
@@ -25,10 +25,10 @@ $if vertex
 		gl_Position =		cam_to_clip * pos_cam;
 
 		vs_pos_cam =		pos_cam.xyz;
-		vs_brightness =		brightness * 0.96 + 0.04;
 		vs_uv =		        uv;
-		vs_tex_indx =		tex_indx;
-		vs_hp_ratio =		hp_ratio;
+		vs_tex_indx =		float(tex_indx);
+		vs_brightness =		float(light_level) / 15.0 * 0.96 + 0.04;
+		vs_hp_ratio =		float(hp) / 255.0;
 
 		WIREFRAME_MACRO;
 	}
@@ -36,9 +36,9 @@ $endif
 
 $if fragment
 	in vec3		vs_pos_cam;
-	in float	vs_brightness;
 	in vec2	    vs_uv;
 	in float	vs_tex_indx;
+	in float	vs_brightness;
 	in float	vs_hp_ratio;
 
 	uniform	sampler2DArray tile_textures;

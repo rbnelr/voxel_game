@@ -18,9 +18,9 @@ CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
 		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-					auto* b = world.chunks.query_block(bp);
+					auto b = world.chunks.query_block(bp);
 
-					if (BLOCK_PROPS[b->id].collision == CM_SOLID) {
+					if (BLOCK_PROPS[b.id].collision == CM_SOLID) {
 
 						float3 local_origin = (float3)bp;
 

@@ -24,26 +24,32 @@ typedef int2	chunk_coord;
 #define CHUNK_DIM_SHIFT_X	5 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_SHIFT_Y	5 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_SHIFT_Z	6 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM_MASK_X	((1 << CHUNK_DIM_SHIFT_X) -1)
+#define CHUNK_DIM_MASK_Y	((1 << CHUNK_DIM_SHIFT_Y) -1)
+#define CHUNK_DIM_MASK_Z	((1 << CHUNK_DIM_SHIFT_Z) -1)
+
 #define CHUNK_DIM			bpos(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z)
 #define CHUNK_DIM_2D		bpos2(CHUNK_DIM_X, CHUNK_DIM_Y)
 
+#define CHUNK_BLOCK_COUNT	(CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z)
+
 // get world chunk coord from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos2 pos, int lod=0) {
+inline chunk_coord get_chunk_from_block_pos (bpos2 pos) {
 
 	chunk_coord chunk_pos;
-	chunk_pos.x = pos.x >> (CHUNK_DIM_SHIFT_X-lod); // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
-	chunk_pos.y = pos.y >> (CHUNK_DIM_SHIFT_Y-lod);
+	chunk_pos.x = pos.x >> CHUNK_DIM_SHIFT_X; // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
+	chunk_pos.y = pos.y >> CHUNK_DIM_SHIFT_Y;
 
 	return chunk_pos;
 }
 // get world chunk coord and block pos in chunk from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr, int lod=0) {
+inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr) {
 
-	chunk_coord chunk_pos = get_chunk_from_block_pos((bpos2)pos_world, lod);
+	chunk_coord chunk_pos = get_chunk_from_block_pos((bpos2)pos_world);
 
 	if (bpos_in_chunk) {
-		bpos_in_chunk->x = pos_world.x & ((1 << (CHUNK_DIM_SHIFT_X-lod)) -1);
-		bpos_in_chunk->y = pos_world.y & ((1 << (CHUNK_DIM_SHIFT_Y-lod)) -1);
+		bpos_in_chunk->x = pos_world.x & CHUNK_DIM_MASK_X;
+		bpos_in_chunk->y = pos_world.y & CHUNK_DIM_MASK_Y;
 		bpos_in_chunk->z = pos_world.z;
 	}
 
@@ -96,6 +102,7 @@ public:
 	const chunk_coord coord;
 
 	Chunk (chunk_coord coord);
+	void init_blocks ();
 
 	static bpos chunk_pos_world (chunk_coord coord) {
 		return bpos(coord * CHUNK_DIM_2D, 0);
@@ -104,9 +111,23 @@ public:
 		return chunk_pos_world(coord);
 	}
 
+	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
+	Block* get_block_unchecked (bpos pos);
+	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
+	void set_block_unchecked (bpos pos, Block b); // only use in World Generator
+
+	// get block
+	Block const& get_block (bpos pos) const;
+	// get block
+	Block const& get_block (bpos_t x, bpos_t y, bpos_t z) const;
+	// set block (potentially updates the block copy stored in neighbours if the block is at the border)
+	void set_block (Chunks& chunks, bpos pos, Block b);
+
+	void update_neighbour_blocks(Chunks& chunks);
+
 	// update flags
-	bool needs_remesh = false;
-	bool needs_block_light_update = false;
+	bool needs_remesh = true;
+	bool needs_block_light_update = true;
 
 	// block update etc.
 	bool active;
@@ -114,27 +135,18 @@ public:
 	// true: invisible to player -> don't draw
 	bool culled;
 
+private:
 	// block data
-	Block	blocks[CHUNK_DIM_Z][CHUNK_DIM_Y][CHUNK_DIM_X];
-
-	// get block ptr
-	Block* get_block (bpos pos) {
-		return &blocks[pos.z][pos.y][pos.x];
-	}
-	Block* get_block_flat (unsigned index) {
-		return &blocks[0][0][index];
-	}
+	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
+	//  border gets automatically kept in sync if only set_block() is used to update blocks
+	Block	blocks[CHUNK_DIM_Z+2][CHUNK_DIM_Y+2][CHUNK_DIM_X+2];
+public:
 
 	// Gpu mesh data
 	ChunkMesh mesh;
 	uint64_t face_count;
 
-	void update_block_light ();
-
-	void block_only_texture_changed (bpos block_pos_world);
-	void block_changed (Chunks& chunks, bpos block_pos_world);
-
-	void whole_chunk_changed (Chunks& chunks);
+	void update_block_light (Chunks& chunks);
 
 	void reupload (MeshingResult const& result);
 };
@@ -272,7 +284,7 @@ public:
 
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
-		uint64_t block_mem = block_count * sizeof(Block);
+		uint64_t block_mem = (uint64_t)(CHUNK_DIM_X+2)*(CHUNK_DIM_Y+2)*(CHUNK_DIM_Z+2) * sizeof(Block);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 
@@ -291,12 +303,10 @@ public:
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
 	Chunk* query_chunk (chunk_coord coord);
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
-	Block* query_block (bpos p, Chunk** out_chunk=nullptr);
+	Block const& query_block (bpos p, Chunk** out_chunk=nullptr, bpos* out_block_pos_chunk=nullptr);
 
 	// unload chunk at coord (invalidates iterators, so dont call this in a loop)
 	ChunkHashmap::Iterator unload_chunk (ChunkHashmap::Iterator it);
-
-	void remesh_neighbours (chunk_coord coord);
 
 	void remesh_all ();
 

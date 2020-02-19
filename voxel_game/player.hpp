@@ -13,12 +13,13 @@ struct Block;
 class World;
 
 struct SelectedBlock {
-	Block*		block = nullptr;
+	bool		valid = false;
+	Block		block;
 	bpos		pos;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
 
 	operator bool () const {
-		return block;
+		return valid;
 	}
 };
 

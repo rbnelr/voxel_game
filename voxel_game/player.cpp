@@ -82,8 +82,8 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto* b = world.chunks.query_block(bp);
-					bool block_solid = BLOCK_PROPS[b->id].collision == CM_SOLID;
+					auto b = world.chunks.query_block(bp);
+					bool block_solid = BLOCK_PROPS[b.id].collision == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
 
@@ -124,9 +124,9 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto* b = world.chunks.query_block(bp);
+					auto b = world.chunks.query_block(bp);
 
-					bool block_solid = BLOCK_PROPS[b->id].collision == CM_SOLID;
+					bool block_solid = BLOCK_PROPS[b.id].collision == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)(bpos2)bp, radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}
@@ -212,7 +212,7 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	
 	{
 		float hit_dist;
-		if (world.raycast_solid_blocks(ray, dist, &hit_dist))
+		if (world.raycast_breakable_blocks(ray, dist, &hit_dist))
 			dist = max(hit_dist - 0.05f, 0.0f);
 	}
 
@@ -256,5 +256,5 @@ SelectedBlock Player::calc_selected_block (World& world) {
 	ray.dir = (float3x3)head_to_world * float3(0,+1,0);
 	ray.pos = head_to_world * float3(0,0,0);
 
-	return world.raycast_solid_blocks(ray, break_block.reach);
+	return world.raycast_breakable_blocks(ray, break_block.reach);
 }

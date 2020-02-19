@@ -1,13 +1,14 @@
 #include "world.hpp"
 
-SelectedBlock World::raycast_solid_blocks (Ray ray, float max_dist, float* hit_dist) {
+SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* hit_dist) {
 	SelectedBlock b;
 	float _dist;
 	auto hit_block = [&] (bpos bp, int face, float dist) {
 		Chunk* chunk;
 		b.block = chunks.query_block(bp, &chunk);
-		if (chunk && b.block && BLOCK_PROPS[b.block->id].collision == CM_SOLID) {
+		if (chunk && breakable(b.block.id)) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
+			b.valid = true;
 			b.pos = bp;
 			b.face = (BlockFace)face;
 			_dist = dist;
@@ -17,7 +18,7 @@ SelectedBlock World::raycast_solid_blocks (Ray ray, float max_dist, float* hit_d
 	};
 
 	if (!raycast_voxels(ray, max_dist, hit_block)) {
-		return { nullptr };
+		return {};
 	}
 
 	if (hit_dist) *hit_dist = _dist;
@@ -29,39 +30,39 @@ void World::apply_damage (SelectedBlock const& block, Item& item) {
 	auto tool_props = item.get_props();
 
 	Chunk* chunk;
-	Block* b = chunks.query_block(block.pos, &chunk);
-	auto bprops = BLOCK_PROPS[b->id];
+	bpos bpos_in_chunk;
+	Block b = chunks.query_block(block.pos, &chunk, &bpos_in_chunk);
+	auto bprops = BLOCK_PROPS[b.id];
 
-	assert(chunk && BLOCK_PROPS[b->id].collision == CM_SOLID);
+	if (!chunk || !breakable(b.id))
+		return;
 
-	float damage_multiplier = (float)tool_props.hardness / (float)bprops.hardness;
-	if (tool_props.tool == bprops.tool)
-		damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
-
-	b->hp -= min((uint8)ceili(tool_props.damage * damage_multiplier), b->hp);
-
-	if (b->hp > 0) {
-		chunk->block_only_texture_changed(block.pos);
+	if (bprops.hardness == 0) {
+		b.hp = 0;
 	} else {
+		float damage_multiplier = (float)tool_props.hardness / (float)bprops.hardness;
+		if (tool_props.tool == bprops.tool)
+			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
 
-		b->hp = 0;
-		b->id = B_AIR;
+		b.hp -= (uint8)min(ceili(tool_props.damage * damage_multiplier), (int)b.hp);
+	}
 
-		chunk->block_changed(chunks, block.pos);
+	if (b.hp <= 0) {
+		b = { B_AIR };
 
 		break_sound.play();
 	}
+
+	chunk->set_block(chunks, bpos_in_chunk, b);
 }
 
 bool World::try_place_block (bpos pos, block_id bt) {
 	Chunk* chunk;
-	Block* b = chunks.query_block(pos, &chunk);
+	bpos bpos_in_chunk;
+	Block b = chunks.query_block(pos, &chunk, &bpos_in_chunk);
 
-	if (chunk && b && BLOCK_PROPS[b->id].collision != CM_SOLID) { // can replace liquid and gas blocks
-		b->id = bt;
-		b->hp = 255;
-
-		chunk->block_changed(chunks, pos);
+	if (chunk && !breakable(b.id)) { // non-breakable blocks are solids and gasses
+		chunk->set_block(chunks, bpos_in_chunk, { bt });
 		return true;
 	}
 	return false;

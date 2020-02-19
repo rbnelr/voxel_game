@@ -81,6 +81,15 @@ DONE:
  
  completely multithread code
 
+ now storing a border of one voxel around each chunks voxel data to completely remove any need to do neighbour chunk lookups when needing neighbour voxels (one block far only obviously)
+ -this requires keeping track of these copied blocks since the border blocks now are duplicated.
+ -but doing so required about the same amount of code as the neighbour lookups were requiring before and this should allow way batter performance
+   since a lot of conditionals now just go away in the bulk voxel operations like remeshing and light propagation
+   which speed up the code, since only changed blocks need to be updated in neighbours and only if they are border blocks, this overhead is minimal and constant time.
+ -this already sped up the remeshing from ~2.5ms to 1.5ms, and the constant offsets might give another boost
+
+light propagation and even meshing might even be simd-ized now since we can work with constant offsets for block neighbours and even compute shaders are not easier
+
 TODO
 -FEATURES:
 

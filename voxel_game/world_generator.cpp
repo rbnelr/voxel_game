@@ -6,7 +6,7 @@
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
-struct Generator {
+struct ChunkGenerator {
 	WorldGenerator const& wg;
 	Chunk& chunk;
 
@@ -105,15 +105,15 @@ struct Generator {
 		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
 			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
 				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-					auto* b = chunk.get_block(i);
+					Block b;
 
 					if (i.z <= water_level) {
-						b->id = B_WATER;
-						b->hp = 255;
+						b.id = B_WATER;
 					} else {
-						b->id = B_AIR;
-						b->hp = 255;
+						b.id = B_AIR;
 					}
+
+					chunk.set_block_unchecked(i, b);
 				}
 			}
 		}
@@ -154,7 +154,7 @@ struct Generator {
 				//float effective_tree_prob = tree_density;
 
 				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM_Z-1); ++i.z) {
-					auto* b = chunk.get_block(i);
+					auto* b = chunk.get_block_unchecked(i);
 
 					if (i.z <= highest_block - earth_layer) {
 						b->id = B_STONE;
@@ -172,23 +172,23 @@ struct Generator {
 				float tree_chance = rand.uniform();
 				if (	tree_chance < effective_tree_prob &&
 						highest_block >= 0 && highest_block < CHUNK_DIM_Z &&
-						chunk.get_block(bpos(i.x, i.y, i.z))->id != B_WATER)
+						chunk.get_block(bpos(i.x, i.y, i.z)).id != B_WATER)
 					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
 
 			}
 		}
 
 		auto place_tree = [&] (bpos pos_chunk) {
-			auto* ground_block = chunk.get_block(pos_chunk - bpos(0,0,1));
-			if (ground_block && ground_block->id == B_GRASS)
+			auto* ground_block = chunk.get_block_unchecked(pos_chunk - bpos(0,0,1));
+			if (ground_block->id == B_GRASS) {
 				ground_block->id = B_EARTH;
+			}
 
 			auto place_block = [&] (bpos pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
-				Block* b = chunk.get_block(pos_chunk);
+				auto* b = chunk.get_block_unchecked(pos_chunk);
 				if (b->id == B_AIR || b->id == B_WATER || (bt == B_TREE_LOG && b->id == B_LEAVES)) {
 					b->id = bt;
-					b->hp = 255;
 				}
 			};
 			auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_id bt) {
@@ -220,7 +220,8 @@ struct Generator {
 };
 
 void WorldGenerator::generate_chunk (Chunk& chunk) const {
-	Generator gen = { *this, chunk };
+	ChunkGenerator gen = { *this, chunk };
 
+	chunk.init_blocks();
 	gen.gen();
 }
