@@ -27,6 +27,8 @@ typedef int2	chunk_coord;
 #define CHUNK_DIM_MASK_X	((1 << CHUNK_DIM_SHIFT_X) -1)
 #define CHUNK_DIM_MASK_Y	((1 << CHUNK_DIM_SHIFT_Y) -1)
 #define CHUNK_DIM_MASK_Z	((1 << CHUNK_DIM_SHIFT_Z) -1)
+#define CHUNK_ROW_OFFS		(CHUNK_DIM_X+2)
+#define CHUNK_LAYER_OFFS	((CHUNK_DIM_Y+2)*(CHUNK_DIM_X+2))
 
 #define CHUNK_DIM			bpos(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z)
 #define CHUNK_DIM_2D		bpos2(CHUNK_DIM_X, CHUNK_DIM_Y)
@@ -91,9 +93,35 @@ static inline constexpr int _block_count (int lod_levels) {
 
 ////////////// Chunk
 
+// Raw malloced array to avoid unique_ptr<T[]> clearing the data with really bad performance
+template <typename T>
+struct RawArray {
+	T* ptr = nullptr;
+
+	RawArray () {}
+
+	RawArray (uint64_t size) {
+		ptr = (T*)malloc(size * sizeof(T));
+	}
+	~RawArray () {
+		if (ptr)
+			free(ptr);
+	}
+
+	RawArray (RawArray const& r) {				std::swap(ptr, r.ptr); }
+	RawArray (RawArray&& r) {					std::swap(ptr, r.ptr); }
+	RawArray& operator= (RawArray const& r) {	std::swap(ptr, r.ptr); return *this; }
+	RawArray& operator= (RawArray&& r) {		std::swap(ptr, r.ptr); return *this; }
+};
+
 struct MeshingResult {
-	std::vector<ChunkMesh::Vertex> opaque_vertices;
-	std::vector<ChunkMesh::Vertex> tranparent_vertices;
+
+	//std::vector<ChunkMesh::Vertex> opaque_vertices;
+	//std::vector<ChunkMesh::Vertex> tranparent_vertices;
+	RawArray<ChunkMesh::Vertex> opaque_vertices;
+	RawArray<ChunkMesh::Vertex> tranparent_vertices;
+	unsigned opaque_count;
+	unsigned tranparent_count;
 };
 
 class Chunk {
@@ -136,6 +164,7 @@ public:
 	bool culled;
 
 private:
+	friend struct Chunk_Mesher;
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
@@ -284,7 +313,7 @@ public:
 
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
-		uint64_t block_mem = (uint64_t)(CHUNK_DIM_X+2)*(CHUNK_DIM_Y+2)*(CHUNK_DIM_Z+2) * sizeof(Block);
+		uint64_t block_mem = chunk_count * (uint64_t)(CHUNK_DIM_X+2)*(CHUNK_DIM_Y+2)*(CHUNK_DIM_Z+2) * sizeof(Block);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 

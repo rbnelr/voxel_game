@@ -62,9 +62,9 @@ void Game::frame () {
 		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 			fps_display.display_fps();
 
-			ImGui::Text("Chunk generation : %7.2f ms avg", world->chunks.chunk_gen_time.calc_avg() * 1000);
-			ImGui::Text("Chunk light      : %7.2f ms avg", world->chunks.light_time.calc_avg() * 1000);
-			ImGui::Text("Chunk meshing    : %7.2f ms avg", world->chunks.meshing_time.calc_avg() * 1000);
+			ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
+			ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.light_time.calc_avg() * 1000 * 1000);
+			ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
 
 			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 		}

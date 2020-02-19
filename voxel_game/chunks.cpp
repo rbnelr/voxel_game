@@ -234,10 +234,10 @@ void Chunk::update_block_light (Chunks& chunks) {
 }
 
 void Chunk::reupload (MeshingResult const& result) {
-	mesh.opaque_mesh.upload(result.opaque_vertices);
-	mesh.transparent_mesh.upload(result.tranparent_vertices);
+	mesh.opaque_mesh.upload(result.opaque_vertices.ptr, result.opaque_count);
+	mesh.transparent_mesh.upload(result.tranparent_vertices.ptr, result.tranparent_count);
 
-	face_count = (result.opaque_vertices.size() + result.tranparent_vertices.size()) / 6;
+	face_count = (result.opaque_count + result.tranparent_count) / 6;
 }
 
 //// Chunks
@@ -251,9 +251,12 @@ BackgroundJob BackgroundJob::execute () {
 }
 
 ParallelismJob ParallelismJob::execute () {
+	remesh_result.opaque_vertices     = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
+	remesh_result.tranparent_vertices = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
+
 	auto timer = Timer::start();
 
-	remesh_result = mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk);
+	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk, &remesh_result);
 
 	time = timer.end();
 	return std::move(*this);
@@ -444,7 +447,7 @@ void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 			ParallelismJob job = {
 				chunk, this, &graphics
 			};
-			parallelism_threadpool.jobs.push(job);
+			parallelism_threadpool.jobs.push(std::move(job));
 		}
 
 		parallelism_threadpool.contribute_work();

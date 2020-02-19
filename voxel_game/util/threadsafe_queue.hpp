@@ -36,7 +36,7 @@ public:
 			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
 		}
 
-		T val = q.front();
+		T val = std::move(q.front());
 		q.pop_front();
 		return val;
 	}
