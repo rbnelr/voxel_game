@@ -176,55 +176,6 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 }
 
 void Chunk::update_block_light (Chunks& chunks) {
-	bpos p; // position in chunk
-
-	// get light transported from this block to neighbouring blocks
-	// light gets 'emitted' by glowing blocks or transmitted by non-opaque blocks (air, water, glass, leaves etc.)
-	auto get_light = [=] (Block* b) -> int8_t {
-		//if (!all(bp >= 0 && bp < CHUNK_DIM))
-		//	return 0;
-		if (BLOCK_PROPS[b->id].transparency == TM_OPAQUE)
-			return 0;
-
-		return (int8_t)b->light_level;
-	};
-
-	for (p.z=0; p.z<CHUNK_DIM_Z; ++p.z) {
-		for (p.y=0; p.y<CHUNK_DIM_Y; ++p.y) {
-			for (p.x=0; p.x<CHUNK_DIM_X; ++p.x) {
-				auto* blk = get_block_unchecked(p);
-				blk->light_level = BLOCK_PROPS[blk->id].glow_level;
-			}
-		}
-	}
-
-	for (int i=0; i<15; ++i) {
-		for (p.z=0; p.z<CHUNK_DIM_Z; ++p.z) {
-			for (p.y=0; p.y<CHUNK_DIM_Y; ++p.y) {
-				for (p.x=0; p.x<CHUNK_DIM_X; ++p.x) {
-					auto* blk = get_block_unchecked(p);
-					
-					auto A = get_light(blk - 1);
-					auto B = get_light(blk + 1);
-					auto C = get_light(blk - CHUNK_ROW_OFFS);
-					auto D = get_light(blk + CHUNK_ROW_OFFS);
-					auto E = get_light(blk - CHUNK_LAYER_OFFS);
-					auto F = get_light(blk + CHUNK_LAYER_OFFS);
-					
-					int8_t li = max(
-						max(max(A, B), max(C, D)),
-						max(E, F)
-					);
-	
-					li -= 1;
-					li = max(li, (int8_t)blk->light_level);
-	
-					blk->light_level = (uint8_t)li;
-				}
-			}
-		}
-	}
-
 	needs_block_light_update = false;
 }
 
