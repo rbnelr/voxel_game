@@ -19,6 +19,20 @@ $if vertex
 	out float	vs_brightness;
 	out float	vs_hp_ratio;
 
+	/* generate.py
+		amount = 1.0
+		values = []
+		for i in range(0,16):
+		  values = [amount] + values
+		  amount = amount * 0.8
+
+		for v in values:
+		  print('{:.4f}'.format(v), end=', ')
+	*/
+	const float[] light_level_LUT = float[16] (
+		0.0352, 0.0440, 0.0550, 0.0687, 0.0859, 0.1074, 0.1342, 0.1678, 0.2097, 0.2621, 0.3277, 0.4096, 0.5120, 0.6400, 0.8000, 1.0000
+	);
+
 	void main () {
 		vec4 pos_cam = world_to_cam * vec4(pos_model + chunk_pos, 1);
 		
@@ -27,7 +41,7 @@ $if vertex
 		vs_pos_cam =		pos_cam.xyz;
 		vs_uv =		        uv;
 		vs_tex_indx =		float(tex_indx);
-		vs_brightness =		float(light_level) / 15.0 * 0.96 + 0.04;
+		vs_brightness =		light_level_LUT[light_level];
 		vs_hp_ratio =		float(hp) / 255.0;
 
 		WIREFRAME_MACRO;
