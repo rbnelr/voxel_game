@@ -176,25 +176,24 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 }
 
 void Chunk::update_block_light (Chunks& chunks) {
-	needs_block_light_update = false;
-	return;
+	bpos p; // position in chunk
 
 	// get light transported from this block to neighbouring blocks
 	// light gets 'emitted' by glowing blocks or transmitted by non-opaque blocks (air, water, glass, leaves etc.)
-	auto get_light = [=] (bpos bp) -> int8_t {
+	auto get_light = [=] (Block* b) -> int8_t {
 		//if (!all(bp >= 0 && bp < CHUNK_DIM))
 		//	return 0;
-		auto b = get_block(bp);
-		return (int8_t)b.light_level;
-	};
+		if (BLOCK_PROPS[b->id].transparency == TM_OPAQUE)
+			return 0;
 
-	bpos p; // position in chunk
+		return (int8_t)b->light_level;
+	};
 
 	for (p.z=0; p.z<CHUNK_DIM_Z; ++p.z) {
 		for (p.y=0; p.y<CHUNK_DIM_Y; ++p.y) {
 			for (p.x=0; p.x<CHUNK_DIM_X; ++p.x) {
-				auto blk = get_block(p);
-				blk.light_level = BLOCK_PROPS[blk.id].glow_level;
+				auto* blk = get_block_unchecked(p);
+				blk->light_level = BLOCK_PROPS[blk->id].glow_level;
 			}
 		}
 	}
@@ -203,28 +202,24 @@ void Chunk::update_block_light (Chunks& chunks) {
 		for (p.z=0; p.z<CHUNK_DIM_Z; ++p.z) {
 			for (p.y=0; p.y<CHUNK_DIM_Y; ++p.y) {
 				for (p.x=0; p.x<CHUNK_DIM_X; ++p.x) {
-					if (any(p == 0 || p == CHUNK_DIM-1))
-						continue;
+					auto* blk = get_block_unchecked(p);
 					
-					auto blk = get_block(p);
-
-					auto A = get_light(p - bpos(1,0,0));
-					auto B = get_light(p + bpos(1,0,0));
-					auto C = get_light(p - bpos(0,1,0));
-					auto D = get_light(p + bpos(0,1,0));
-					auto E = get_light(p - bpos(0,0,1));
-					auto F = get_light(p + bpos(0,0,1));
-
+					auto A = get_light(blk - 1);
+					auto B = get_light(blk + 1);
+					auto C = get_light(blk - CHUNK_ROW_OFFS);
+					auto D = get_light(blk + CHUNK_ROW_OFFS);
+					auto E = get_light(blk - CHUNK_LAYER_OFFS);
+					auto F = get_light(blk + CHUNK_LAYER_OFFS);
+					
 					int8_t li = max(
 						max(max(A, B), max(C, D)),
 						max(E, F)
 					);
-
+	
 					li -= 1;
-					li = max(li, (int8_t)blk.light_level);
-
-					blk.light_level = (uint8_t)li;
-					set_block(chunks, p, blk);
+					li = max(li, (int8_t)blk->light_level);
+	
+					blk->light_level = (uint8_t)li;
 				}
 			}
 		}
