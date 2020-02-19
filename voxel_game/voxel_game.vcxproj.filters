@@ -226,6 +226,7 @@
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="items.hpp" />
+    <ClInclude Include="voxel_light.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -407,6 +408,7 @@
       <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="items.cpp" />
+    <ClCompile Include="voxel_light.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
