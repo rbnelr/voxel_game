@@ -24,8 +24,8 @@ static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 
 struct ItemProperties {
 	tool_type	tool : 4;
-	uint8_t		damage;
-	uint8_t		hardness;
+	uint8		damage;
+	uint8		hardness;
 };
 
 static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 32, 4 };
@@ -46,7 +46,7 @@ static inline constexpr ItemProperties get_item_props (item_id id) {
 }
 
 struct Tool {
-	uint8_t hp = 255;
+	uint8 hp = 255;
 };
 
 struct Item {

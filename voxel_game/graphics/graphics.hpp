@@ -411,7 +411,7 @@ struct ChunkGraphics {
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod, TileTextures const& tile_textures);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, TileTextures const& tile_textures);
 	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures);
 };
 
@@ -478,7 +478,7 @@ public:
 	Fog						fog;
 
 	bool debug_frustrum_culling = false;
-	bool debug_lod = false;
+	bool debug_block_light = true;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
@@ -491,7 +491,7 @@ public:
 			tile_textures.imgui("tile_textures");
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
-			ImGui::Checkbox("debug_lod", &debug_lod);
+			ImGui::Checkbox("debug_block_light", &debug_block_light);
 
 			ImGui::Separator();
 		}

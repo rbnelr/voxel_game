@@ -17,6 +17,8 @@ using namespace kiss;
 #include "stdio.h"
 #include "assert.h"
 
+#define WINDOW_RES int2(1920, 1080)
+
 constexpr int GL_VERSION_MAJOR = 3;
 constexpr int GL_VERSION_MINOR = 3;
 constexpr bool VAO_REQUIRED = (GL_VERSION_MAJOR * 100 + GL_VERSION_MINOR) >= 303;
@@ -425,7 +427,7 @@ int main () {
 	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 	glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
 
-	window = glfwCreateWindow(1280, 720, "Voxel Game", NULL, NULL);
+	window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
 	if (!window) {
 		logf(ERROR, "glfwCreateWindow failed!\n");
 		glfwTerminate();

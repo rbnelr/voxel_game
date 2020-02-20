@@ -24,6 +24,16 @@ struct Chunk_Mesher {
 		return false;
 	}
 
+	uint8 find_light_level (BlockFace face) {
+		static constexpr int offsets[] = {
+			-1, +1,
+			-CHUNK_ROW_OFFS, +CHUNK_ROW_OFFS,
+			-CHUNK_LAYER_OFFS, +CHUNK_LAYER_OFFS
+		};
+		
+		return (cur + offsets[face])->light_level;
+	}
+
 	ChunkMesh::Vertex* face_nx (ChunkMesh::Vertex* verts);
 	ChunkMesh::Vertex* face_px (ChunkMesh::Vertex* verts);
 	ChunkMesh::Vertex* face_ny (ChunkMesh::Vertex* verts);
@@ -86,7 +96,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 // uint8	hp;
 
 #define VERT(x,y,z, u,v, face) \
-		{ uint8v3(x,y,z), uint8v2(u,v), (uint8)tile.calc_texture_index(face), cur->light_level, cur->hp }
+		{ uint8v3(x,y,z), uint8v2(u,v), (uint8)tile.calc_texture_index(face), find_light_level(face), cur->hp }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \
