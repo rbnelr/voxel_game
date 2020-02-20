@@ -19,7 +19,7 @@ void light_propagate (Chunks& chunks, std::priority_queue<LitBlock>& q) {
 		Chunk* chunk;
 		bpos pos_in_chunk;
 		auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
-		uint8 l = (uint8)max((int)n.light_level - (int)BLOCK_PROPS[blk.id].absorb_light_level - 1, 0);
+		uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
 
 		if (l > blk.light_level) {
 			blk.light_level = l;
@@ -65,7 +65,7 @@ void update_block_light_remove (Chunks& chunks, bpos bp, uint8 old_light_level) 
 		auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
 	
 		if (blk.light_level > 0) {
-			uint8 l = (uint8)max((int)n.light_level - (int)BLOCK_PROPS[blk.id].absorb_light_level - 1, 0);
+			uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
 			if (blk.light_level == l) {
 				// block was lit by our source block, zero it and repropagate light into it from other light sources
 				remove_q.push({ pos, blk.light_level });
@@ -118,7 +118,7 @@ uint8 calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_block) 
 		max(e,f)
 	);
 	
-	return (uint8)max((int)l, (int)(neighbour_light - BLOCK_PROPS[new_block.id].absorb_light_level - 1));
+	return (uint8)max((int)l, (int)(neighbour_light - blocks.absorb[new_block.id] - 1));
 }
 void update_block_light (Chunks& chunks, bpos pos, uint8 old_light_level, uint8 new_light_level) {
 	dbg_block_light_add_list.clear();

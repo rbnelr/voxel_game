@@ -8,13 +8,13 @@ Block BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block b, bpos pos
 	if (/*block_props[b->type].does_autoheal &&*/ b.hp < 255) {
 		b.hp += min((uint8)ceili(1.0f/25 / block_update_frequency * 255), 255u - b.hp);
 	}
-	if (b.id == B_GRASS && !grass_can_live_below(above.id)) {
+	if (b.id == B_GRASS && !blocks.grass_can_live_below(above.id)) {
 		if (grass_die_prob > random.uniform()) {
 			b.id = B_EARTH;
 			b.hp = 255;
 		}
 	}
-	if (b.id == B_EARTH && grass_can_live_below(above.id)) {
+	if (b.id == B_EARTH && blocks.grass_can_live_below(above.id)) {
 		float prob = 0;
 
 		bpos2 sides[4] = {

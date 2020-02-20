@@ -37,7 +37,7 @@ static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 };
 
 static inline constexpr const char* get_item_name (item_id id) {
-	if (id < MAX_BLOCK_ID)	return BLOCK_PROPS[(block_id)id].name;
+	if (id < MAX_BLOCK_ID)	return blocks.name[(block_id)id];
 	else					return ITEM_NAMES[id - MAX_BLOCK_ID];
 }
 static inline constexpr ItemProperties get_item_props (item_id id) {

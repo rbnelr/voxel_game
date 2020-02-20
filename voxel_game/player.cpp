@@ -83,7 +83,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
 					auto b = world.chunks.query_block(bp);
-					bool block_solid = BLOCK_PROPS[b.id].collision == CM_SOLID;
+					bool block_solid = blocks.collision[b.id] == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
 
@@ -126,7 +126,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 
 					auto b = world.chunks.query_block(bp);
 
-					bool block_solid = BLOCK_PROPS[b.id].collision == CM_SOLID;
+					bool block_solid = blocks.collision[b.id] == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)(bpos2)bp, radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}

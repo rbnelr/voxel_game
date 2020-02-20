@@ -352,7 +352,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 			res.chunk->update_neighbour_blocks(*this);
 
 			chunk_gen_time.push(res.time);
-			logf("Chunk (%3d,%3d) generated in %7.2f ms  frame %d", res.chunk->coord.x, res.chunk->coord.y, res.time * 1024);
+			logf("Chunk (%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.time * 1024);
 		}
 
 	}

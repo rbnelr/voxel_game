@@ -14,7 +14,7 @@ struct Chunk_Mesher {
 	BlockTileInfo tile;
 
 	bool bt_is_opaque (block_id id) {
-		auto t = BLOCK_PROPS[id].transparency;
+		auto t = blocks.transparency[id];
 		if (t == TM_OPAQUE)
 			return true;
 
@@ -67,7 +67,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 				if (cur->id != B_AIR) {
 					tile = tile_textures.block_tile_info[cur->id];
 
-					if (BLOCK_PROPS[cur->id].transparency == TM_TRANSPARENT)
+					if (blocks.transparency[cur->id] == TM_TRANSPARENT)
 						cube_transperant();
 					else
 						cube_opaque();

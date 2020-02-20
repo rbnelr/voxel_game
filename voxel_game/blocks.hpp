@@ -5,7 +5,7 @@ enum collision_mode : uint8 {
 	CM_GAS			=0, // fall/walk through
 	CM_SOLID		,   // cannot enter
 	CM_LIQUID		,   // swim in (water, etc.)
-	CM_BREAKABLE	,	// fall/walk through, but breakable (torches etc.)
+	CM_BREAKABLE	,	// fall/walk through like gas, but breakable by interaction (breaking torches etc.)
 };
 enum transparency_mode : uint8 {
 	TM_OPAQUE		=0, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
@@ -21,19 +21,6 @@ enum tool_type : uint8 {
 	PICKAXE,
 	AXE,
 	SHOVEL,
-};
-
-static inline float TOOL_MATCH_BONUS_DAMAGE = 2;
-static inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
-
-struct BlockProperties {
-	const char*			name;
-	collision_mode		collision;
-	transparency_mode	transparency;
-	tool_type			tool = NONE;
-	uint8				hardness = 255;
-	uint8				glow_level = 0;
-	uint8				absorb_light_level = 15;
 };
 
 enum block_id : uint8 {
@@ -56,28 +43,76 @@ enum block_id : uint8 {
 
 	PSEUDO_BLOCK_IDS_COUNT,
 };
-static BlockProperties BLOCK_PROPS[PSEUDO_BLOCK_IDS_COUNT] = {
-	/* B_NULL				*/	{ "null"		, CM_SOLID		, TM_OPAQUE			, NONE		, 1, 0 },
-	/* B_AIR				*/	{ "null"		, CM_GAS		, TM_TRANSPARENT	, NONE		, 0, 0, 0 },
-	/* B_WATER				*/	{ "water"		, CM_LIQUID		, TM_TRANSPARENT	, NONE		, 0, 0, 1 },
-	/* B_EARTH				*/	{ "earth"		, CM_SOLID		, TM_OPAQUE			, SHOVEL	, 3 },
-	/* B_GRASS				*/	{ "grass"		, CM_SOLID		, TM_OPAQUE			, SHOVEL	, 3 },
-	/* B_STONE				*/	{ "stone"		, CM_SOLID		, TM_OPAQUE			, PICKAXE	, 20 },
-	/* B_TREE_LOG			*/	{ "tree_log"	, CM_SOLID		, TM_OPAQUE			, AXE		, 7 },
-	/* B_LEAVES				*/	{ "leaves"		, CM_SOLID		, TM_ALPHA_TEST		, NONE		, 2, 0, 1 },
-	/* B_TORCH				*/	{ "null"		, CM_BREAKABLE	, TM_PARTIAL		, NONE		, 0, 15, 0 },
-	
-	/* B_OUT_OF_BOUNDS		*/	{ "null"		, CM_GAS		, TM_TRANSPARENT	, NONE		, 0, 0, 0 },
-	/* B_NO_CHUNK			*/	{ "null"		, CM_SOLID		, TM_TRANSPARENT	, NONE		, 0, 0, 0 },
+
+static inline float TOOL_MATCH_BONUS_DAMAGE = 2;
+static inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
+#define MAX_LIGHT_LEVEL 15
+
+struct BlockTypes {
+	const char*			name			[PSEUDO_BLOCK_IDS_COUNT]; // name for texture and ui
+	collision_mode		collision		[PSEUDO_BLOCK_IDS_COUNT]; // collision mode to determine 
+	transparency_mode	transparency	[PSEUDO_BLOCK_IDS_COUNT]; // transparency mode for meshing
+	tool_type			tool			[PSEUDO_BLOCK_IDS_COUNT]; // tool type to determine which tool should be used for mining
+	uint8				hardness		[PSEUDO_BLOCK_IDS_COUNT]; // hardness value to determine damage resistance
+	uint8				glow			[PSEUDO_BLOCK_IDS_COUNT]; // with what light level to glow with
+	uint8				absorb			[PSEUDO_BLOCK_IDS_COUNT]; // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
+
+	inline bool breakable (block_id id) {
+		auto& c = collision[id];
+		return c == CM_SOLID || c == CM_BREAKABLE;
+	}
+	inline bool grass_can_live_below (block_id id) {
+		return id == B_AIR || id == B_OUT_OF_BOUNDS || transparency[id] == TM_PARTIAL;
+	}
 };
 
-static inline bool grass_can_live_below (block_id id) {
-	return id == B_AIR || id == B_OUT_OF_BOUNDS || BLOCK_PROPS[id].transparency == TM_PARTIAL;
+static inline BlockTypes load_block_types () {
+	BlockTypes bt;
+	int cur = 0;
+
+	auto block = [&] (const char* name, collision_mode cm, transparency_mode tm, tool_type tool, uint8 hard, uint8 glow, uint8 absorb) {
+		bt.name[cur] = name;
+		bt.collision[cur] = cm;
+		bt.transparency[cur] = tm;
+		bt.tool[cur] = tool;
+		bt.hardness[cur] = hard;
+		bt.glow[cur] = glow;
+		bt.absorb[cur] = absorb;
+		cur++;
+	};
+	auto gas = [&] (const char* name="null") {
+		block(name, CM_GAS, TM_TRANSPARENT, NONE, 0, 0, 0);
+	};
+	auto liquid = [&] (const char* name, transparency_mode transparency=TM_TRANSPARENT, uint8 glow_level=0) {
+		block(name, CM_LIQUID, transparency, NONE, 0, glow_level, transparency == TM_TRANSPARENT ? 1 : MAX_LIGHT_LEVEL);
+	};
+	auto solid = [&] (const char* name, uint8 hardness, tool_type tool=NONE, uint8 glow_level=0) {
+		block(name, CM_SOLID, TM_OPAQUE, tool, hardness, glow_level, MAX_LIGHT_LEVEL);
+	};
+	auto solid_alpha_test = [&] (const char* name, uint8 hardness, uint8 absorb_light_level=1, tool_type tool=NONE, uint8 glow_level=0) {
+		block(name, CM_SOLID, TM_ALPHA_TEST, tool, hardness, glow_level, absorb_light_level);
+	};
+	auto torch = [&] (const char* name, uint8 glow_level) {
+		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, glow_level, 0);
+	};
+
+	/* B_NULL				*/ solid("null", 1);
+	/* B_AIR				*/ gas();
+	/* B_WATER				*/ liquid("water");
+	/* B_EARTH				*/ solid(			"earth"	,    3, SHOVEL );
+	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
+	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
+	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
+	/* B_LEAVES				*/ solid_alpha_test("leaves",    2);
+	/* B_TORCH				*/ torch("null", 15);
+
+	/* B_OUT_OF_BOUNDS		*/ gas();
+	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
+
+	return bt;
 }
-static inline bool breakable (block_id id) {
-	auto& props = BLOCK_PROPS[id];
-	return props.collision == CM_SOLID || props.collision == CM_BREAKABLE;
-}
+
+static inline BlockTypes blocks = load_block_types();
 
 // Block instance
 struct Block {
@@ -88,7 +123,7 @@ struct Block {
 	Block () {}
 
 	Block (block_id id): id{id} {
-		light_level = BLOCK_PROPS[id].glow_level;
+		light_level = blocks.glow[id];
 	}
 };
 
