@@ -90,6 +90,10 @@ DONE:
 
 light propagation and even meshing might even be simd-ized now since we can work with constant offsets for block neighbours and even compute shaders are not easier
 
+light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-fast-flood-fill-lighting-in-a-blocky-voxel-game-pt-1
+-fixed wierd bugs that seem to have come from the fact that the queue in the algo was assuming the light level always reduces by 1 for each step, leaves and water reduce it by 2 in my case tho, which broke that assumption
+-turning the queue into a priority queue seems to have fixed the problem completely (did thin on gut feeling, instead of rigorous analysis, will be ashamed if It turns out this is bugged too -_-)
+
 TODO
 -FEATURES:
 

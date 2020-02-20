@@ -3,6 +3,7 @@
 #include "../util/geometry.hpp"
 #include "../chunks.hpp"
 #include "../world.hpp"
+#include "../voxel_light.hpp"
 using namespace kiss;
 
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
@@ -574,7 +575,7 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, bool debug_lod, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, TileTextures const& tile_textures) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -673,6 +674,12 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	if (activate_flycam || world.player.third_person) {
 		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
 	}
+	if (debug_block_light) {
+		for (auto bp : dbg_block_light_add_list)
+			debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.97f, srgba(40,40,250));
+		for (auto bp : dbg_block_light_remove_list)
+			debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
+	}
 
 	//// OpenGL drawcalls
 	common_uniforms.set_view_uniforms(view);
@@ -711,7 +718,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, debug_lod, tile_textures);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, tile_textures);
 
 		skybox.draw();
 	}

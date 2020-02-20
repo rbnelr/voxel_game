@@ -5,8 +5,8 @@
 #include "util/timer.hpp"
 #include "util/collision.hpp"
 #include "world_generator.hpp"
+#include "voxel_light.hpp"
 #include <algorithm> // std::sort
-
 
 //// Chunk
 
@@ -81,8 +81,8 @@ Block const& Chunk::get_block (bpos_t x, bpos_t y, bpos_t z) const {
 void Chunk::set_block_unchecked (bpos pos, Block b) {
 	blocks[pos.z + 1][pos.y + 1][pos.x + 1] = b;
 }
-void Chunk::set_block (Chunks& chunks, bpos pos, Block b) {
-	Block* blk = &blocks[pos.z + 1][pos.y + 1][pos.x + 1];
+void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
+	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
 	
 	bool only_texture_changed = blk->id == b.id && blk->light_level == b.light_level;
 
@@ -92,8 +92,8 @@ void Chunk::set_block (Chunks& chunks, bpos pos, Block b) {
 	if (!only_texture_changed) {
 		needs_block_light_update = true;
 
-		bool2 lo = (bpos2)pos == 0;
-		bool2 hi = (bpos2)pos == (bpos2)CHUNK_DIM-1;
+		bool2 lo = (bpos2)pos_in_chunk == 0;
+		bool2 hi = (bpos2)pos_in_chunk == (bpos2)CHUNK_DIM-1;
 		if (any(lo || hi)) {
 			// block at border
 
@@ -108,17 +108,30 @@ void Chunk::set_block (Chunks& chunks, bpos pos, Block b) {
 			};
 
 			if (lo.x) {
-				update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos.y, pos.z));
+				update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos_in_chunk.y, pos_in_chunk.z));
 			} else {
-				update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos.y, pos.z));
+				update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos_in_chunk.y, pos_in_chunk.z));
 			}
 			if (lo.y) {
-				update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos.x, CHUNK_DIM_Y, pos.z));
+				update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos_in_chunk.x, CHUNK_DIM_Y, pos_in_chunk.z));
 			} else {
-				update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos.x,          -1, pos.z));
+				update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos_in_chunk.x,          -1, pos_in_chunk.z));
 			}
 		}
 	}
+}
+void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
+	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
+
+	uint8 old_light_level = blk->light_level;
+	uint8 new_light_level = calc_block_light_level(this, pos_in_chunk, b);
+	bpos pos = pos_in_chunk + chunk_pos_world();
+
+	b.light_level = new_light_level;
+
+	_set_block_no_light_update(chunks, pos_in_chunk, b);
+
+	update_block_light(chunks, pos, old_light_level, new_light_level);
 }
 
 void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
@@ -173,10 +186,6 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 		set_neighbour_blocks_ny(*chunk, *this);
 		chunk->needs_remesh = true;
 	}
-}
-
-void Chunk::update_block_light (Chunks& chunks) {
-	needs_block_light_update = false;
 }
 
 void Chunk::reupload (MeshingResult const& result) {
@@ -368,21 +377,6 @@ void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 	std::sort(chunks_to_remesh.begin(), chunks_to_remesh.end(),
 		[&] (Chunk* l, Chunk* r) { return chunk_dist_to_player(l->coord) < chunk_dist_to_player(r->coord); }
 	);
-
-	// update _all chunks_ data required for remesh (remesh accesses neighbours)
-	for (int i=0; i<(int)chunks_to_remesh.size(); ++i) {
-		auto* chunk = chunks_to_remesh[i];
-
-		if (chunk->needs_block_light_update) {
-			auto timer = Timer::start();
-
-			chunk->update_block_light(*this);
-
-			auto time = timer.end();
-			light_time.push(time);
-			logf("Chunk (%3d,%3d) light update took %7.3f ms", chunk->coord.x, chunk->coord.y, time * 1000);
-		}
-	}
 
 	{ // remesh all chunks in parallel
 		int count = min((int)chunks_to_remesh.size(), max_chunks_meshed_per_frame);

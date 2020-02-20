@@ -148,7 +148,9 @@ public:
 	Block const& get_block (bpos pos) const;
 	// get block
 	Block const& get_block (bpos_t x, bpos_t y, bpos_t z) const;
-	// set block (potentially updates the block copy stored in neighbours if the block is at the border)
+	// set block (used in light updater)
+	void _set_block_no_light_update (Chunks& chunks, bpos pos, Block b);
+	// set block (expensive, -> potentially updates light and copies block data to neighbours if block is at the border of a chunk)
 	void set_block (Chunks& chunks, bpos pos, Block b);
 
 	void update_neighbour_blocks(Chunks& chunks);
@@ -174,8 +176,6 @@ public:
 	// Gpu mesh data
 	ChunkMesh mesh;
 	uint64_t face_count;
-
-	void update_block_light (Chunks& chunks);
 
 	void reupload (MeshingResult const& result);
 };
@@ -299,7 +299,7 @@ public:
 	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
 
 	RunningAverage<float> chunk_gen_time = { 64 };
-	RunningAverage<float> light_time = { 64 };
+	RunningAverage<float> block_light_time = { 64 };
 	RunningAverage<float> meshing_time = { 64 };
 
 	void imgui () {
