@@ -478,7 +478,7 @@ public:
 	Fog						fog;
 
 	bool debug_frustrum_culling = false;
-	bool debug_block_light = true;
+	bool debug_block_light = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
