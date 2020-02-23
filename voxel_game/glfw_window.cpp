@@ -31,7 +31,7 @@ struct Rect {
 GLFWwindow*		window;
 
 bool			fullscreen = false;
-bool			borderless_fullscreen = false;
+bool			borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
 Rect			window_positioning;
 
 Input			_input = {};

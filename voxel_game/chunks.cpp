@@ -109,12 +109,12 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 
 			if (lo.x) {
 				update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos_in_chunk.y, pos_in_chunk.z));
-			} else {
+			} else if (hi.x) {
 				update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos_in_chunk.y, pos_in_chunk.z));
 			}
 			if (lo.y) {
 				update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos_in_chunk.x, CHUNK_DIM_Y, pos_in_chunk.z));
-			} else {
+			} else if (hi.y) {
 				update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos_in_chunk.x,          -1, pos_in_chunk.z));
 			}
 		}

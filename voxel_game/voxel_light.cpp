@@ -15,33 +15,34 @@ std::vector<bpos> dbg_block_light_add_list;
 std::vector<bpos> dbg_block_light_remove_list;
 
 void light_propagate (Chunks& chunks, std::priority_queue<LitBlock>& q) {
-	auto neighbour = [&] (LitBlock const& n, int3 pos) {
-		Chunk* chunk;
-		bpos pos_in_chunk;
-		auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
-		uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
-
-		if (l > blk.light_level) {
-			blk.light_level = l;
-
-			q.push({ pos, blk.light_level });
-
-			if (chunk)
-				chunk->_set_block_no_light_update(chunks, pos_in_chunk, blk);
-		}
-	};
-
 	while (!q.empty()) {
 		auto n = q.top();
 		q.pop();
 		dbg_block_light_add_list.push_back(n.bp);
 
-		neighbour(n, n.bp - int3(1,0,0));
-		neighbour(n, n.bp + int3(1,0,0));
-		neighbour(n, n.bp - int3(0,1,0));
-		neighbour(n, n.bp + int3(0,1,0));
-		neighbour(n, n.bp - int3(0,0,1));
-		neighbour(n, n.bp + int3(0,0,1));
+		static constexpr int3 dirs[] = {
+			int3(-1,0,0), int3(+1,0,0),
+			int3(0,-1,0), int3(0,+1,0),
+			int3(0,0,-1), int3(0,0,+1),
+		};
+
+		for (auto dir : dirs) {
+			int3 pos = n.bp + dir;
+
+			Chunk* chunk;
+			bpos pos_in_chunk;
+			auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
+			uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
+
+			if (l > blk.light_level) {
+				blk.light_level = l;
+
+				q.push({ pos, blk.light_level });
+
+				if (chunk)
+					chunk->_set_block_no_light_update(chunks, pos_in_chunk, blk);
+			}
+		}
 	}
 }
 
@@ -59,40 +60,41 @@ void update_block_light_remove (Chunks& chunks, bpos bp, uint8 old_light_level) 
 	
 	remove_q.push({ bp, old_light_level });
 	
-	auto neighbour = [&] (LitBlock const& n, int3 pos) {
-		Chunk* chunk;
-		bpos pos_in_chunk;
-		auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
-	
-		if (blk.light_level > 0) {
-			uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
-			if (blk.light_level == l) {
-				// block was lit by our source block, zero it and repropagate light into it from other light sources
-				remove_q.push({ pos, blk.light_level });
-
-				blk.light_level = 0;
-
-				if (chunk)
-					chunk->_set_block_no_light_update(chunks, pos_in_chunk, blk);
-			} else {
-				// block is too bright to be lit by us -> this is a source that can light up the blocks we are zeroing
-				// add to a seperate queue and repropagate light in a second pass
-				add_q.push({ pos, blk.light_level });
-			}
-		}
-	};
-
 	while (!remove_q.empty()) {
 		auto n = remove_q.top();
 		remove_q.pop();
 		dbg_block_light_remove_list.push_back(n.bp);
-	
-		neighbour(n, n.bp - int3(1,0,0));
-		neighbour(n, n.bp + int3(1,0,0));
-		neighbour(n, n.bp - int3(0,1,0));
-		neighbour(n, n.bp + int3(0,1,0));
-		neighbour(n, n.bp - int3(0,0,1));
-		neighbour(n, n.bp + int3(0,0,1));
+
+		static constexpr int3 dirs[] = {
+			int3(-1,0,0), int3(+1,0,0),
+			int3(0,-1,0), int3(0,+1,0),
+			int3(0,0,-1), int3(0,0,+1),
+		};
+
+		for (auto dir : dirs) {
+			int3 pos = n.bp + dir;
+
+			Chunk* chunk;
+			bpos pos_in_chunk;
+			auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
+
+			if (blk.light_level > 0) {
+				uint8 l = (uint8)max((int)n.light_level - (int)blocks.absorb[blk.id] - 1, 0);
+				if (blk.light_level == l) {
+					// block was lit by our source block, zero it and repropagate light into it from other light sources
+					remove_q.push({ pos, blk.light_level });
+
+					blk.light_level = 0;
+
+					if (chunk)
+						chunk->_set_block_no_light_update(chunks, pos_in_chunk, blk);
+				} else {
+					// block is too bright to be lit by us -> this is a source that can light up the blocks we are zeroing
+					// add to a seperate queue and repropagate light in a second pass
+					add_q.push({ pos, blk.light_level });
+				}
+			}
+		}
 	}
 
 	light_propagate(chunks, add_q);
