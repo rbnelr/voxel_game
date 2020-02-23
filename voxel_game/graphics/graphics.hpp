@@ -289,22 +289,21 @@ struct PlayerGraphics {
 };
 
 struct ChunkMesh {
-	// block_id		id;
-	// uint8		light_level; // [0,15]
-	// uint8		hp; // [0,255]
 	struct Vertex {
 		uint8v3	pos_model;
 		uint8v2	uv;
 		uint8	tex_indx;
-		uint8	light_level;
+		uint8	block_light;
+		uint8	sky_light;
 		uint8	hp;
 
 		static void bind (Attributes& a) {
 			a.add    <decltype(pos_model  )>(0, "pos_model" ,  sizeof(Vertex), offsetof(Vertex, pos_model  ));
 			a.add    <decltype(uv         )>(1, "uv",          sizeof(Vertex), offsetof(Vertex, uv         ));
 			a.add_int<decltype(tex_indx   )>(2, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
-			a.add_int<decltype(light_level)>(3, "light_level", sizeof(Vertex), offsetof(Vertex, light_level));
-			a.add_int<decltype(hp         )>(4, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ));
+			a.add_int<decltype(block_light)>(3, "block_light", sizeof(Vertex), offsetof(Vertex, block_light));
+			a.add_int<decltype(sky_light  )>(4, "sky_light",   sizeof(Vertex), offsetof(Vertex, sky_light  ));
+			a.add_int<decltype(hp         )>(5, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ));
 		}
 	};
 
@@ -419,11 +418,16 @@ class World;
 struct SelectedBlock;
 
 struct FogUniforms {
-	float3 sky_col =	srgb(121,192,255);
+	//float3 sky_col =	srgb(121,192,255);
+	//float _pad0;
+	//float3 horiz_col =	srgb(199,211,219);
+	//float _pad1;
+	//float3 down_col =	srgb(41,49,52);
+	float3 sky_col =	srgb(0,0,0);
 	float _pad0;
-	float3 horiz_col =	srgb(199,211,219);
+	float3 horiz_col =	srgb(0,0,0);
 	float _pad1;
-	float3 down_col =	srgb(41,49,52);
+	float3 down_col =	srgb(0,0,0);
 
 	float coeff =	0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
 

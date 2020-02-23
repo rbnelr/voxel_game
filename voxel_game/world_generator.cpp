@@ -105,12 +105,12 @@ struct ChunkGenerator {
 		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
 			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
 				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
-					Block b;
+					block_id b;
 
 					if (i.z <= water_level) {
-						b.id = B_WATER;
+						b = B_WATER;
 					} else {
-						b.id = B_AIR;
+						b = B_AIR;
 					}
 
 					chunk.set_block_unchecked(i, b);
@@ -165,8 +165,6 @@ struct ChunkGenerator {
 							b->id = B_EARTH;
 						}
 					}
-
-					b->hp = 255;
 				}
 
 				float tree_chance = rand.uniform();

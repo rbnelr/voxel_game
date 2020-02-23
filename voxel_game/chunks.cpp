@@ -8,6 +8,20 @@
 #include "voxel_light.hpp"
 #include <algorithm> // std::sort
 
+const int logical_cores = std::thread::hardware_concurrency();
+
+// as many background threads as there are logical cores to allow background threads to use even the main threats time when we are gpu bottlenecked or at an fps cap
+const int background_threads  = max(logical_cores, 1);
+
+// main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
+const int parallelism_threads = max(logical_cores - 1, 1);
+
+static constexpr bool NORMAL_PRIO = false;
+static constexpr bool HIGH_PRIO = true;
+
+Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
+Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, HIGH_PRIO,   ">> parallelism threadpool" };
+
 //// Chunk
 
 Chunk::Chunk (chunk_coord coord): coord{coord} {
@@ -34,6 +48,13 @@ void Chunk::init_blocks () {
 		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
 			blocks[z][0][x] = _NO_CHUNK;
 		}
+
+		for (int y=1; y<CHUNK_DIM_Y+1; ++y) {
+			for (int x=1; x<CHUNK_DIM_X+1; ++x) {
+				blocks[z][y][x] = Block(B_NULL);
+			}
+		}
+
 		// forward
 		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
 			blocks[z][CHUNK_DIM_Y+1][x] = _NO_CHUNK;
@@ -84,54 +105,60 @@ void Chunk::set_block_unchecked (bpos pos, Block b) {
 void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
 	
-	bool only_texture_changed = blk->id == b.id && blk->light_level == b.light_level;
-
 	*blk = b;
 	needs_remesh = true;
 
-	if (!only_texture_changed) {
-		needs_block_light_update = true;
+	needs_block_light_update = true;
 
-		bool2 lo = (bpos2)pos_in_chunk == 0;
-		bool2 hi = (bpos2)pos_in_chunk == (bpos2)CHUNK_DIM-1;
-		if (any(lo || hi)) {
-			// block at border
+	bool2 lo = (bpos2)pos_in_chunk == 0;
+	bool2 hi = (bpos2)pos_in_chunk == (bpos2)CHUNK_DIM-1;
+	if (any(lo || hi)) {
+		// block at border
 
-			auto update_neighbour_block_copy = [=, &chunks] (chunk_coord chunk_offset, bpos block) {
-				auto chunk = chunks.query_chunk(coord + chunk_offset);
-				if (chunk) {
-					chunk->set_block_unchecked(block, b);
+		auto update_neighbour_block_copy = [=, &chunks] (chunk_coord chunk_offset, bpos block) {
+			auto chunk = chunks.query_chunk(coord + chunk_offset);
+			if (chunk) {
+				chunk->set_block_unchecked(block, b);
 
-					chunk->needs_remesh = true;
-					chunk->needs_block_light_update = true;
-				}
-			};
-
-			if (lo.x) {
-				update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos_in_chunk.y, pos_in_chunk.z));
-			} else if (hi.x) {
-				update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos_in_chunk.y, pos_in_chunk.z));
+				chunk->needs_remesh = true;
+				chunk->needs_block_light_update = true;
 			}
-			if (lo.y) {
-				update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos_in_chunk.x, CHUNK_DIM_Y, pos_in_chunk.z));
-			} else if (hi.y) {
-				update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos_in_chunk.x,          -1, pos_in_chunk.z));
-			}
+		};
+
+		if (lo.x) {
+			update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos_in_chunk.y, pos_in_chunk.z));
+		} else if (hi.x) {
+			update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos_in_chunk.y, pos_in_chunk.z));
+		}
+		if (lo.y) {
+			update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos_in_chunk.x, CHUNK_DIM_Y, pos_in_chunk.z));
+		} else if (hi.y) {
+			update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos_in_chunk.x,          -1, pos_in_chunk.z));
 		}
 	}
 }
 void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
 
-	uint8 old_light_level = blk->light_level;
-	uint8 new_light_level = calc_block_light_level(this, pos_in_chunk, b);
-	bpos pos = pos_in_chunk + chunk_pos_world();
+	bool only_texture_changed = blk->id == b.id && blk->block_light == b.block_light;
+	if (only_texture_changed) {
+		*blk = b;
+		needs_remesh = true;
+	} else {
+		uint8 old_sky_light = blk->sky_light;
+		uint8 old_block_light = blk->block_light;
 
-	b.light_level = new_light_level;
+		uint8 new_block_light = calc_block_light_level(this, pos_in_chunk, b);
+		bpos pos = pos_in_chunk + chunk_pos_world();
 
-	_set_block_no_light_update(chunks, pos_in_chunk, b);
+		b.block_light = new_block_light;
 
-	update_block_light(chunks, pos, old_light_level, new_light_level);
+		_set_block_no_light_update(chunks, pos_in_chunk, b);
+
+		update_block_light(chunks, pos, old_block_light, new_block_light);
+
+		update_sky_light_column(this, pos_in_chunk, old_sky_light);
+	}
 }
 
 void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
@@ -202,6 +229,8 @@ BackgroundJob BackgroundJob::execute () {
 	world_gen->generate_chunk(*chunk);
 
 	time = timer.end();
+
+	update_sky_light_chunk(chunk);
 	return std::move(*this);
 }
 

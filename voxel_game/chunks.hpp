@@ -203,19 +203,11 @@ struct ParallelismJob { // CHunk remesh
 	ParallelismJob execute ();
 };
 
-static const int logical_cores = std::thread::hardware_concurrency();
+extern const int background_threads;
+extern const int parallelism_threads;
 
-// as many background threads as there are logical cores to allow background threads to use even the main threats time when we are gpu bottlenecked or at an fps cap
-static const int background_threads  = max(logical_cores, 1);
-
-// main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
-static const int parallelism_threads = max(logical_cores - 1, 1);
-
-static constexpr bool NORMAL_PRIO = false;
-static constexpr bool HIGH_PRIO = true;
-
-inline Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
-inline Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, HIGH_PRIO,   ">> parallelism threadpool" };
+extern Threadpool<BackgroundJob > background_threadpool ;
+extern Threadpool<ParallelismJob> parallelism_threadpool;
 
 struct ChunkHashmap {
 	typedef std::unordered_map<chunk_coord_hashmap, std::unique_ptr<Chunk>> hashmap_t; 

@@ -3,7 +3,7 @@
 #include "stdint.h"
 #include "assert.h"
 
-enum item_id : uint16_t {
+enum item_id : uint32_t {
 	I_NULL			=0, // No item
 
 	// All block ids

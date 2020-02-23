@@ -23,7 +23,7 @@ enum tool_type : uint8 {
 	SHOVEL,
 };
 
-enum block_id : uint8 {
+enum block_id : uint16_t {
 #define MAX_BLOCK_ID (1u << (sizeof(block_id)*8))
 
 	B_NULL				=0,
@@ -46,7 +46,7 @@ enum block_id : uint8 {
 
 static inline float TOOL_MATCH_BONUS_DAMAGE = 2;
 static inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
-#define MAX_LIGHT_LEVEL 15
+#define MAX_LIGHT_LEVEL 18
 
 struct BlockTypes {
 	const char*			name			[PSEUDO_BLOCK_IDS_COUNT]; // name for texture and ui
@@ -104,7 +104,7 @@ static inline BlockTypes load_block_types () {
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
 	/* B_LEAVES				*/ solid_alpha_test("leaves",    2);
-	/* B_TORCH				*/ torch("null", 15);
+	/* B_TORCH				*/ torch("null", MAX_LIGHT_LEVEL - 1);
 
 	/* B_OUT_OF_BOUNDS		*/ gas();
 	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
@@ -117,13 +117,16 @@ static inline BlockTypes blocks = load_block_types();
 // Block instance
 struct Block {
 	block_id	id;
-	uint8		light_level = 0; // [0,15]
-	uint8		hp = 255;
+	unsigned	block_light : 8; // [0,15]
+	unsigned	sky_light : 8; // [0,15]
+	uint8		hp;
 
 	Block () {}
 
 	Block (block_id id): id{id} {
-		light_level = blocks.glow[id];
+		block_light = blocks.glow[id];
+		sky_light = 0;
+		hp = 255;
 	}
 };
 
