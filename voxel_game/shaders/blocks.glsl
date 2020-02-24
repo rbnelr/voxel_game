@@ -8,10 +8,9 @@ $if vertex
 	layout (location = 0) in vec3	pos_model;
 	layout (location = 1) in vec2	uv;
 	layout (location = 2) in int	tex_indx;
-	layout (location = 3) in int	block_light;
-	layout (location = 4) in int	sky_light;
-	layout (location = 5) in float	vertex_AO;
-	layout (location = 6) in float	hp;
+	layout (location = 3) in float	block_light;
+	layout (location = 4) in float	sky_light;
+	layout (location = 5) in float	hp;
 
 	uniform vec3 chunk_pos;
 
@@ -21,24 +20,9 @@ $if vertex
 	out float	vs_brightness;
 	out float	vs_hp_ratio;
 
-	/* generate.py
-		amount = 1.0
-		values = []
-		for i in range(0,15):
-			values = [amount] + values
-			amount = amount * 0.8
-
-		for v in [0] + values:
-			print('{:.4f}'.format(v), end=', ')
-
-		##############
-		a = 1.2
-		for i in range(0,19):
-			print('{:.4f}'.format( ((i/18) / (18 - i + 1)) ** a ), end=', ')
-	*/
-	const float[] light_level_LUT = float[] (
-		0.0000, 0.0010, 0.0024, 0.0042, 0.0064, 0.0091, 0.0123, 0.0163, 0.0213, 0.0275, 0.0354, 0.0457, 0.0595, 0.0788, 0.1072, 0.1522, 0.2323, 0.4064, 1.0000
-	);
+	float brightness_function (float light) {
+		return light * pow(1.0 / (2.0 - light), 4.0); 
+	}
 
 	void main () {
 		vec4 pos_cam = world_to_cam * vec4(pos_model + chunk_pos, 1);
@@ -48,7 +32,7 @@ $if vertex
 		vs_pos_cam =		pos_cam.xyz;
 		vs_uv =		        uv;
 		vs_tex_indx =		float(tex_indx);
-		vs_brightness =		light_level_LUT[max(block_light, sky_light)] * vertex_AO;
+		vs_brightness =		brightness_function( max(block_light, sky_light) );
 		vs_hp_ratio =		hp;
 
 		WIREFRAME_MACRO;

@@ -84,7 +84,7 @@ static inline BlockTypes load_block_types () {
 		block(name, CM_GAS, TM_TRANSPARENT, NONE, 0, 0, 0);
 	};
 	auto liquid = [&] (const char* name, transparency_mode transparency=TM_TRANSPARENT, uint8 glow_level=0) {
-		block(name, CM_LIQUID, transparency, NONE, 0, glow_level, transparency == TM_TRANSPARENT ? 1 : MAX_LIGHT_LEVEL);
+		block(name, CM_LIQUID, transparency, NONE, 0, glow_level, transparency == TM_TRANSPARENT ? 3 : MAX_LIGHT_LEVEL);
 	};
 	auto solid = [&] (const char* name, uint8 hardness, tool_type tool=NONE, uint8 glow_level=0) {
 		block(name, CM_SOLID, TM_OPAQUE, tool, hardness, glow_level, MAX_LIGHT_LEVEL);
@@ -103,7 +103,7 @@ static inline BlockTypes load_block_types () {
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
-	/* B_LEAVES				*/ solid_alpha_test("leaves",    2);
+	/* B_LEAVES				*/ solid_alpha_test("leaves",    4);
 	/* B_TORCH				*/ torch("null", MAX_LIGHT_LEVEL - 1);
 
 	/* B_OUT_OF_BOUNDS		*/ gas();

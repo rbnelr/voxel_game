@@ -28,45 +28,36 @@ struct Chunk_Mesher {
 		return false;
 	}
 
-	static constexpr int offsets[8] = {
-		offs(int3( 0, 0, 0)),
-		offs(int3(-1, 0, 0)),
-		offs(int3( 0,-1, 0)),
-		offs(int3(-1,-1, 0)),
-		offs(int3( 0, 0,-1)),
-		offs(int3(-1, 0,-1)),
-		offs(int3( 0,-1,-1)),
-		offs(int3(-1,-1,-1)),
+	static constexpr int face_offsets[6][4] = {
+		{ offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3(-1, 0,-1)) },
+		{ offs(int3( 0, 0, 0)), offs(int3( 0,-1, 0)), offs(int3( 0,-1,-1)), offs(int3( 0, 0,-1)) },
+		{ offs(int3( 0,-1, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
+		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1, 0,-1)), offs(int3( 0, 0,-1)) },
+		{ offs(int3( 0, 0,-1)), offs(int3(-1, 0,-1)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
+		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3( 0,-1, 0)) },
 	};
 
-	inline uint8 calc_vertex_AO (BlockFace face, int3 vert_pos) {
+	inline uint8 calc_block_light (BlockFace face, int3 vert_pos) {
 		auto* ptr = cur + offs(vert_pos);
 		
 		int total = 0;
 
-		for (int i=0; i<8; ++i) {
-			total += blocks.collision[ (ptr + offsets[i])->id ] != CM_SOLID ? 1 : 0;
+		for (auto offset : face_offsets[face]) {
+			total += (ptr + offset)->block_light;
 		}
 		
-		return (total * 255) / 8;
+		return (total * 255) / 4;
 	}
-	uint8 calc_block_light (BlockFace face) {
-		static constexpr int offsets[] = {
-			-1, +1,
-			-CHUNK_ROW_OFFS, +CHUNK_ROW_OFFS,
-			-CHUNK_LAYER_OFFS, +CHUNK_LAYER_OFFS
-		};
+	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
+		auto* ptr = cur + offs(vert_pos);
 
-		return (uint8)(cur + offsets[face])->block_light;
-	}
-	uint8 calc_sky_light (BlockFace face) {
-		static constexpr int offsets[] = {
-			-1, +1,
-			-CHUNK_ROW_OFFS, +CHUNK_ROW_OFFS,
-			-CHUNK_LAYER_OFFS, +CHUNK_LAYER_OFFS
-		};
+		int total = 0;
 
-		return (uint8)(cur + offsets[face])->sky_light;
+		for (auto offset : face_offsets[face]) {
+			total += (ptr + offset)->sky_light;
+		}
+
+		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 
 	ChunkMesh::Vertex* face_nx (ChunkMesh::Vertex* verts);
@@ -126,7 +117,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 
 #define VERT(x,y,z, u,v, face) \
 		{ block_pos + uint8v3(x,y,z), uint8v2(u,v), (uint8)tile.calc_texture_index(face), \
-		  calc_block_light(face), calc_sky_light(face), calc_vertex_AO(face, int3(x,y,z)), cur->hp }
+		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
 
 #define QUAD(a,b,c,d)	do { \
 			*out++ = a; *out++ = b; *out++ = d; \
@@ -138,7 +129,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 		} while (0)
 
 #define FACE \
-		if (vert[0].vertex_AO +vert[2].vertex_AO < vert[1].vertex_AO +vert[3].vertex_AO) \
+		if (vert[0].sky_light +vert[2].sky_light < vert[1].sky_light +vert[3].sky_light) \
 			QUAD(vert[0], vert[1], vert[2], vert[3]); \
 		else \
 			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]);

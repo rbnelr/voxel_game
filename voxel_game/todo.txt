@@ -94,17 +94,16 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 -fixed wierd bugs that seem to have come from the fact that the queue in the algo was assuming the light level always reduces by 1 for each step, leaves and water reduce it by 2 in my case tho, which broke that assumption
 -turning the queue into a priority queue seems to have fixed the problem completely (did thin on gut feeling, instead of rigorous analysis, will be ashamed if It turns out this is bugged too -_-)
 
+ basic sunlight code
+
 TODO
 -FEATURES:
+ 
+ fix crosshair not appearing
 
- light propagation code
- -sunlight
-
- see if there are any obvious optimizations to be done for remeshing
- -remesh 'core' blocks first, then remesh outter shell (that touches neighbour chunks)
-  -this way the shell can be remeshed if a neighbour changed without needing to remesh the core because we can save the offset of the shell meshes and overwrite those
-  -core does not need to access neighbours so the whole query_block can go away and turn into a simple 3d array offset
-  -4 chunk remeshes when changing a block touching 4 chunks are now 1 full remesh and 3 shell remeshes
+ implement time of day change
+ -vary sunlight multiplier with time of day
+ -vary skybox colors with time of day
  
  rework items to be classes with inheritance?
  -pro: might simplyfy code a lot
@@ -192,6 +191,13 @@ TODO
  make a shader inspector in imgui that can edit shader code
 
  add shader directory change notify to reload all shaders that contain a changed file
+ 
+ ---> outdated: chunks currently keep a border of blocks that are duplicated from neighbouring chunks
+ see if there are any obvious optimizations to be done for remeshing
+ -remesh 'core' blocks first, then remesh outter shell (that touches neighbour chunks)
+  -this way the shell can be remeshed if a neighbour changed without needing to remesh the core because we can save the offset of the shell meshes and overwrite those
+  -core does not need to access neighbours so the whole query_block can go away and turn into a simple 3d array offset
+  -4 chunk remeshes when changing a block touching 4 chunks are now 1 full remesh and 3 shell remeshes
 
 IDEAS:
  voxel cone tracing for indirect lighting?
