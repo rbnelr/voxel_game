@@ -147,7 +147,8 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
 		auto* b = chunk->get_block_unchecked(pos);
-		sky_light -= blocks.absorb[b->id];
+		sky_light = max(sky_light - blocks.absorb[b->id], 0);
+
 		b->sky_light = sky_light;
 	}
 

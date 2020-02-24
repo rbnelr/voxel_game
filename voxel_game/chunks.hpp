@@ -157,7 +157,6 @@ public:
 
 	// update flags
 	bool needs_remesh = true;
-	bool needs_block_light_update = true;
 
 	// block update etc.
 	bool active;

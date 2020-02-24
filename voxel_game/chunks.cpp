@@ -108,8 +108,6 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 	*blk = b;
 	needs_remesh = true;
 
-	needs_block_light_update = true;
-
 	bool2 lo = (bpos2)pos_in_chunk == 0;
 	bool2 hi = (bpos2)pos_in_chunk == (bpos2)CHUNK_DIM-1;
 	if (any(lo || hi)) {
@@ -121,7 +119,6 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 				chunk->set_block_unchecked(block, b);
 
 				chunk->needs_remesh = true;
-				chunk->needs_block_light_update = true;
 			}
 		};
 
