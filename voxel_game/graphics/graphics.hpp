@@ -295,6 +295,7 @@ struct ChunkMesh {
 		uint8	tex_indx;
 		uint8	block_light;
 		uint8	sky_light;
+		uint8	vertex_AO;
 		uint8	hp;
 
 		static void bind (Attributes& a) {
@@ -303,7 +304,8 @@ struct ChunkMesh {
 			a.add_int<decltype(tex_indx   )>(2, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
 			a.add_int<decltype(block_light)>(3, "block_light", sizeof(Vertex), offsetof(Vertex, block_light));
 			a.add_int<decltype(sky_light  )>(4, "sky_light",   sizeof(Vertex), offsetof(Vertex, sky_light  ));
-			a.add_int<decltype(hp         )>(5, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ));
+			a.add    <decltype(vertex_AO  )>(5, "vertex_AO",   sizeof(Vertex), offsetof(Vertex, vertex_AO  ), true);
+			a.add    <decltype(hp         )>(6, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ), true);
 		}
 	};
 

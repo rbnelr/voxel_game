@@ -141,15 +141,14 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 	}
 }
 
-void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk, uint8 blk_sky_light) {
-	int sky_light = blk_sky_light;
+void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
+	int sky_light = pos_in_chunk.z >= CHUNK_DIM_Z-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
 	bpos pos = pos_in_chunk;
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
 		auto* b = chunk->get_block_unchecked(pos);
-		b->sky_light = sky_light;
-
 		sky_light -= blocks.absorb[b->id];
+		b->sky_light = sky_light;
 	}
 
 	for (; pos.z>=0; --pos.z) {
@@ -166,7 +165,7 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk, uint8 blk_sky_lig
 void update_sky_light_chunk (Chunk* chunk) {
 	for (int y=0; y<CHUNK_DIM_Y; ++y) {
 		for (int x=0; x<CHUNK_DIM_X; ++x) {
-			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM_Z-1), MAX_LIGHT_LEVEL);
+			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM_Z-1));
 		}
 	}
 }

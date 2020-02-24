@@ -10,7 +10,8 @@ $if vertex
 	layout (location = 2) in int	tex_indx;
 	layout (location = 3) in int	block_light;
 	layout (location = 4) in int	sky_light;
-	layout (location = 5) in int	hp;
+	layout (location = 5) in float	vertex_AO;
+	layout (location = 6) in float	hp;
 
 	uniform vec3 chunk_pos;
 
@@ -47,8 +48,8 @@ $if vertex
 		vs_pos_cam =		pos_cam.xyz;
 		vs_uv =		        uv;
 		vs_tex_indx =		float(tex_indx);
-		vs_brightness =		light_level_LUT[max(block_light, sky_light)];
-		vs_hp_ratio =		float(hp) / 255.0;
+		vs_brightness =		light_level_LUT[max(block_light, sky_light)] * vertex_AO;
+		vs_hp_ratio =		hp;
 
 		WIREFRAME_MACRO;
 	}

@@ -145,7 +145,6 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 		*blk = b;
 		needs_remesh = true;
 	} else {
-		uint8 old_sky_light = blk->sky_light;
 		uint8 old_block_light = blk->block_light;
 
 		uint8 new_block_light = calc_block_light_level(this, pos_in_chunk, b);
@@ -157,7 +156,7 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 
 		update_block_light(chunks, pos, old_block_light, new_block_light);
 
-		update_sky_light_column(this, pos_in_chunk, old_sky_light);
+		update_sky_light_column(this, pos_in_chunk);
 	}
 }
 

@@ -42,7 +42,7 @@ void BlockPlace::update (World& world, Player const& player, SelectedBlock const
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
-		if (!block_place_is_inside_player) {
+		if (!block_place_is_inside_player || blocks.collision[(block_id)item] != CM_SOLID) {
 			world.try_place_block(block_place_pos, (block_id)item);
 		} else {
 			trigger = false;
