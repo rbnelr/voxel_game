@@ -22,8 +22,6 @@ $if fragment
 	in vec2	vs_uv;
 	in float vs_tex_indx;
 
-	out vec4 frag_col;
-
 	uniform	sampler2DArray tile_textures;
 
 	void main () {

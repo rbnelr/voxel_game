@@ -27,8 +27,6 @@ $if fragment
 	in float	vs_tex_indx;
 
 	uniform	sampler2DArray tile_textures;
-
-	out vec4 frag_col;
 	
 	const vec3 light_dir = normalize(vec3(0.1,0.4,1));
 

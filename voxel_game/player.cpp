@@ -239,6 +239,8 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
 	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
 	view.cam_to_clip = cam.calc_cam_to_clip(&view.frustrum, &view.clip_to_cam);
+	view.clip_near = cam.clip_near;
+	view.clip_far = cam.clip_far;
 	view.calc_frustrum();
 
 	if (active) {

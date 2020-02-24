@@ -3,15 +3,16 @@
 #include "image.hpp"
 #include "../dear_imgui.hpp"
 
-class Sampler2D {
+class Sampler {
 	gl::Sampler sampler;
 
 public:
 	gl::Enum mag_filter = gl::Enum::NEAREST;
 	gl::Enum min_filter = gl::Enum::LINEAR_MIPMAP_LINEAR;
 
-	gl::Enum wrap_s = gl::Enum::REPEAT;
-	gl::Enum wrap_t = gl::Enum::REPEAT;
+	gl::Enum wrap_x = gl::Enum::REPEAT;
+	gl::Enum wrap_y = gl::Enum::REPEAT;
+	gl::Enum wrap_z = gl::Enum::REPEAT;
 
 	int mipmap_levels = 1000;
 
@@ -19,7 +20,10 @@ public:
 
 	float anisotropy = 16;
 
-	Sampler2D () {
+	Sampler () {
+		set();
+	}
+	Sampler (gl::Enum mag_filter, gl::Enum min_filter, gl::Enum wrap): mag_filter{mag_filter}, min_filter{min_filter}, wrap_x{wrap}, wrap_y{wrap}, wrap_z{wrap} {
 		set();
 	}
 
@@ -27,8 +31,9 @@ public:
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, (GLint)mag_filter);
 		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, (GLint)min_filter);
 
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, (GLint)wrap_s);
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, (GLint)wrap_t);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, (GLint)wrap_x);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, (GLint)wrap_y);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, (GLint)wrap_z);
 
 		glSamplerParameteri(sampler, GL_TEXTURE_MAX_LOD, mipmap_levels);
 		glSamplerParameterf(sampler, GL_TEXTURE_LOD_BIAS, lod_bias);
@@ -75,13 +80,17 @@ public:
 		changed = ImGui::Combo("min_filter", &cur, min_filters_str) || changed;
 		min_filter = min_filters[cur];
 
-		cur = _indexof(wraps, wrap_s);
-		changed = ImGui::Combo("wrap_s", &cur, wraps_str) || changed;
-		wrap_s = wraps[cur];
+		cur = _indexof(wraps, wrap_x);
+		changed = ImGui::Combo("wrap_x", &cur, wraps_str) || changed;
+		wrap_x = wraps[cur];
 
-		cur = _indexof(wraps, wrap_t);
-		changed = ImGui::Combo("wrap_t", &cur, wraps_str) || changed;
-		wrap_t = wraps[cur];
+		cur = _indexof(wraps, wrap_y);
+		changed = ImGui::Combo("wrap_y", &cur, wraps_str) || changed;
+		wrap_y = wraps[cur];
+
+		cur = _indexof(wraps, wrap_z);
+		changed = ImGui::Combo("wrap_z", &cur, wraps_str) || changed;
+		wrap_z = wraps[cur];
 
 		cur = mipmap_levels == 1000 ? 0 : mipmap_levels;
 		changed = ImGui::SliderInt("mipmap_levels", &cur, 0, 20) || changed;
@@ -145,6 +154,55 @@ public:
 	}
 
 	inline void upload (float const* data, int2 size, int channels, bool gen_mips) {
+		GLenum internal_format, format;
+		switch (channels) {
+			case 1:	internal_format = GL_R32F;		format = GL_RED;	break;
+			case 2:	internal_format = GL_RG32F;		format = GL_RG;		break;
+			case 3:	internal_format = GL_RGB32F;	format = GL_RGB;	break;
+			case 4:	internal_format = GL_RGBA32F;	format = GL_RGBA;	break;
+			default:
+				assert(false);
+				return;
+		}
+
+		upload(data, size, gen_mips, internal_format, format, GL_FLOAT);
+	}
+
+	void bind () const;
+};
+
+
+class Texture3D {
+	//std::string name;
+	gl::Texture tex;
+public:
+	int3 size; // size in pixels
+
+	Texture3D ();
+
+	// Manual uploading of mipmaps might require
+	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
+
+	void upload_mip (int mip, void const* data, int3 size, GLenum internal_format, GLenum format, GLenum type);
+
+	void upload (void const* data, int3 size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type);
+
+	inline void upload (uint8_t const* data, int3 size, int channels, bool srgb, bool gen_mips) {
+		GLenum internal_format, format;
+		switch (channels) {
+			case 1:	internal_format = GL_R8;								format = GL_RED;	break;
+			case 2:	internal_format = GL_RG8;								format = GL_RG;		break;
+			case 3:	internal_format = srgb ? GL_SRGB8        : GL_RGB8;		format = GL_RGB;	break;
+			case 4:	internal_format = srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8;	format = GL_RGBA;	break;
+			default:
+				assert(false);
+				return;
+		}
+
+		upload(data, size, gen_mips, internal_format, format, GL_UNSIGNED_BYTE);
+	}
+
+	inline void upload (float const* data, int3 size, int channels, bool gen_mips) {
 		GLenum internal_format, format;
 		switch (channels) {
 			case 1:	internal_format = GL_R32F;		format = GL_RED;	break;

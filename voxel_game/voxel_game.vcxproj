@@ -189,6 +189,8 @@
     <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="graphics\atlas.hpp" />
+    <ClInclude Include="graphics\graphics_common.hpp" />
+    <ClInclude Include="graphics\raytracer.hpp" />
     <ClInclude Include="items.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
@@ -272,6 +274,7 @@
     <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
+    <ClCompile Include="graphics\raytracer.cpp" />
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
@@ -343,6 +346,7 @@
     <None Include="shaders\gui_item_block.glsl" />
     <None Include="shaders\held_item.glsl" />
     <None Include="shaders\overlay.glsl" />
+    <None Include="shaders\raytrace.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
   </ItemGroup>

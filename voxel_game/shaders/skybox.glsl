@@ -21,9 +21,7 @@ $if fragment
 		return pow( vec3(r,g,b) / 255.0, vec3(2.2) );
 	}
 
-	out		vec4	frag_color;
-
 	void main () {
-		frag_color = vec4(fog_color(normalize(vs_world_dir)), 1);
+		frag_col = vec4(fog_color(normalize(vs_world_dir)), 1);
 	}
 $endif

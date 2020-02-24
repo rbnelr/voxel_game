@@ -67,8 +67,8 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 
 	float x = frust_scale_inv.x;
 	float y = frust_scale_inv.y;
-	float a = (clip_far +clip_near) / (clip_near -clip_far);
-	float b = (2.0f * clip_far * clip_near) / (clip_near -clip_far);
+	float a = (clip_far + clip_near) / (clip_near - clip_far);
+	float b = (2.0f * clip_far * clip_near) / (clip_near - clip_far);
 
 	if (frust) {
 		frust->corners[0] = float3(-frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
@@ -84,8 +84,8 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 		*clip_to_cam = float4x4(
 			1.0f/x,      0,      0,       0,
 			     0, 1.0f/y,      0,       0,
-			     0,      0, 1.0f/a,      -1,
-			     0,      0, 1.0f/b,  1.0f/b
+			     0,      0,      0,      -1,
+			     0,      0, 1.0f/b,     a/b
 		);
 	}
 	return float4x4(
@@ -216,6 +216,8 @@ Camera_View Flycam::update () {
 	v.world_to_cam = world_to_cam_rot * translate(-pos);
 	v.cam_to_world = translate(pos) * cam_to_world_rot;
 	v.cam_to_clip = calc_cam_to_clip(&v.frustrum, &v.clip_to_cam);
+	v.clip_near = clip_near;
+	v.clip_far = clip_far;
 	v.calc_frustrum();
 	return v;
 }

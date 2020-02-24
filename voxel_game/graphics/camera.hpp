@@ -33,6 +33,11 @@ struct Camera_View {
 	// Clip space to camera space transform
 	float4x4	clip_to_cam;
 
+	// near clip plane distance (positive)
+	float		clip_near;
+	// far clip plane distance (positive)
+	float		clip_far;
+
 	View_Frustrum frustrum;
 
 	void calc_frustrum();

@@ -1,17 +1,12 @@
 #pragma once
 #include "../kissmath.hpp"
 #include "../blocks.hpp"
-#include "common.hpp"
-#include "shaders.hpp"
 #include "../items.hpp"
-#include "texture.hpp"
-#include "debug_graphics.hpp"
-#include "gl.hpp"
 #include "../util/animation.hpp"
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
-
-constexpr SharedUniformsInfo FOG_UNIFORMS = { "Fog", 2 };
+#include "raytracer.hpp"
+#include "graphics_common.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -200,7 +195,7 @@ struct GuiGraphics {
 
 	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &quickbar, &quickbar_selected }, 64, srgba8(0), 1, false);
 
-	Sampler2D sampler;
+	Sampler sampler;
 
 	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
@@ -406,7 +401,7 @@ struct ChunkGraphics {
 
 	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
-	Sampler2D sampler;
+	Sampler sampler;
 
 	bool alpha_test = !_use_potatomode;
 
@@ -478,6 +473,8 @@ public:
 	SkyboxGraphics			skybox;
 
 	Fog						fog;
+
+	Raytracer				raytracer;
 
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;

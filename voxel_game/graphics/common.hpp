@@ -8,14 +8,20 @@ struct ViewUniforms {
 	float4x4 world_to_cam;
 	float4x4 cam_to_world;
 	float4x4 cam_to_clip;
+	float4x4 clip_to_cam;
 	float4x4 world_to_clip;
-	float2 viewport_size;
+	float    clip_near;
+	float    clip_far;
+	float2   viewport_size;
 
 	static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
 		c.member<decltype(world_to_cam )>(offsetof(ViewUniforms, world_to_cam ));
 		c.member<decltype(cam_to_world )>(offsetof(ViewUniforms, cam_to_world ));
 		c.member<decltype(cam_to_clip  )>(offsetof(ViewUniforms, cam_to_clip  ));
+		c.member<decltype(clip_to_cam  )>(offsetof(ViewUniforms, clip_to_cam  ));
 		c.member<decltype(world_to_clip)>(offsetof(ViewUniforms, world_to_clip));
+		c.member<decltype(clip_near    )>(offsetof(ViewUniforms, clip_near    ));
+		c.member<decltype(clip_far     )>(offsetof(ViewUniforms, clip_far     ));
 		c.member<decltype(viewport_size)>(offsetof(ViewUniforms, viewport_size));
 	}
 };
@@ -60,7 +66,10 @@ struct CommonUniforms {
 		u.world_to_cam = (float4x4)view.world_to_cam;
 		u.cam_to_world = (float4x4)view.cam_to_world;
 		u.cam_to_clip = view.cam_to_clip;
+		u.clip_to_cam = view.clip_to_cam;
 		u.world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
+		u.clip_near = view.clip_near;
+		u.clip_far = view.clip_far;
 		u.viewport_size = (float2)input.window_size;
 		view_uniforms.set(u);
 	}
