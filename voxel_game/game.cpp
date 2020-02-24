@@ -79,7 +79,7 @@ void Game::frame () {
 			}
 
 			world_gen.imgui();
-			world->chunks.imgui();
+			world->imgui();
 			block_update.imgui();
 		}
 

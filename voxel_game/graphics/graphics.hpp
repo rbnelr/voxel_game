@@ -9,6 +9,7 @@
 #include "gl.hpp"
 #include "../util/animation.hpp"
 #include "atlas.hpp"
+#include "../time_of_day.hpp"
 
 constexpr SharedUniformsInfo FOG_UNIFORMS = { "Fog", 2 };
 
@@ -411,7 +412,7 @@ struct ChunkGraphics {
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, TileTextures const& tile_textures);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures);
 	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures);
 };
 
@@ -419,50 +420,46 @@ class World;
 struct SelectedBlock;
 
 struct FogUniforms {
-	//float3 sky_col =	srgb(121,192,255);
-	//float _pad0;
-	//float3 horiz_col =	srgb(199,211,219);
-	//float _pad1;
-	//float3 down_col =	srgb(41,49,52);
-	float3 sky_col =	srgb(0,0,0);
+	float3 sky_col;
 	float _pad0;
-	float3 horiz_col =	srgb(0,0,0);
+	float3 horiz_col;
 	float _pad1;
-	float3 down_col =	srgb(0,0,0);
+	float3 ambient_col;
 
-	float coeff =	0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
+	float coeff;
 
 	static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
-		c.member<decltype(sky_col  )>(offsetof(FogUniforms, sky_col  ));
-		c.member<decltype(horiz_col)>(offsetof(FogUniforms, horiz_col));
-		c.member<decltype(down_col )>(offsetof(FogUniforms, down_col ));
-		c.member<decltype(coeff    )>(offsetof(FogUniforms, coeff    ));
+		c.member<decltype(sky_col    )>(offsetof(FogUniforms, sky_col    ));
+		c.member<decltype(horiz_col  )>(offsetof(FogUniforms, horiz_col  ));
+		c.member<decltype(ambient_col)>(offsetof(FogUniforms, ambient_col));
+		c.member<decltype(coeff      )>(offsetof(FogUniforms, coeff      ));
 	}
 };
 struct Fog {
-	FogUniforms f;
+	float fog_base_coeff = 0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
 	bool enable = false;
 
 	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
 
 	void imgui () {
 
-		imgui_ColorEdit3("sky_col", &f.sky_col.x, ImGuiColorEditFlags_DisplayHSV);
-		imgui_ColorEdit3("horiz_col", &f.horiz_col.x, ImGuiColorEditFlags_DisplayHSV);
-		imgui_ColorEdit3("down_col", &f.down_col.x, ImGuiColorEditFlags_DisplayHSV);
-
-		ImGui::DragFloat("fog_base_coeff", &f.coeff, 0.05f);
+		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
 
 		ImGui::Checkbox("fog_enable", &enable);
 	}
 
-	void set (float max_view_dist) {
-		FogUniforms u = f;
+	void set (float max_view_dist, SkyColors colors) {
+		FogUniforms f;
+		f.sky_col = colors.sky_col;
+		f.horiz_col = colors.horiz_col;
+		f.ambient_col = colors.ambient_col;
+		f.coeff = fog_base_coeff;
+
 		if (enable)
-			u.coeff /= max_view_dist;
+			f.coeff /= max_view_dist;
 		else
-			u.coeff = 0;
-		fog_uniforms.set(u);
+			f.coeff = 0;
+		fog_uniforms.set(f);
 	}
 };
 

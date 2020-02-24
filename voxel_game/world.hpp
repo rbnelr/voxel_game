@@ -4,6 +4,7 @@
 #include "player.hpp"
 #include "audio/audio.hpp"
 #include "world_generator.hpp"
+#include "time_of_day.hpp"
 
 class World {
 
@@ -14,10 +15,17 @@ public:
 
 	Chunks chunks;
 
+	TimeOfDay time_of_day;
+
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
 
 	World (WorldGenerator const gen): world_gen{gen} {
 
+	}
+
+	void imgui () {
+		chunks.imgui();
+		time_of_day.imgui();
 	}
 
 	//// Raycasting into the world

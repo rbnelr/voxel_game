@@ -575,7 +575,7 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -591,6 +591,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
 
 		shader.set_uniform("alpha_test", alpha_test);
+
+		shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
 
 		shader.set_texture_unit("tile_textures", 0);
 		shader.set_texture_unit("breaking_textures", 1);
@@ -660,7 +662,8 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 }
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
-	fog.set(world.chunks.generation_radius);
+	uint8 sky_light_reduce;
+	fog.set(world.chunks.generation_radius, world.time_of_day.calc_sky_colors(&sky_light_reduce));
 	
 	frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
 	
@@ -718,7 +721,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, tile_textures);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
 
 		skybox.draw();
 	}

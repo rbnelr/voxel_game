@@ -46,7 +46,7 @@ struct Chunk_Mesher {
 			total += (ptr + offset)->block_light;
 		}
 		
-		return (total * 255) / 4;
+		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
 		auto* ptr = cur + offs(vert_pos);
@@ -129,7 +129,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 		} while (0)
 
 #define FACE \
-		if (vert[0].sky_light +vert[2].sky_light < vert[1].sky_light +vert[3].sky_light) \
+		if (vert[0].sky_light + vert[2].sky_light < vert[1].sky_light + vert[3].sky_light) \
 			QUAD(vert[0], vert[1], vert[2], vert[3]); \
 		else \
 			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]);

@@ -101,6 +101,8 @@ TODO
  
  fix crosshair not appearing
 
+ fix block updates
+
  implement time of day change
  -vary sunlight multiplier with time of day
  -vary skybox colors with time of day

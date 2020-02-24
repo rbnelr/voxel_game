@@ -2,7 +2,7 @@
 layout(std140) uniform Fog {
 	vec3 sky_col;
 	vec3 horiz_col;
-	vec3 down_col;
+	vec3 ambient_col;
 
 	float coeff;
 } fog;
@@ -13,7 +13,7 @@ vec3 fog_color (vec3 dir_world) {
 	if (dir_world.z > 0)
 		col = mix(fog.horiz_col, fog.sky_col, dir_world.z);
 	else
-		col = mix(fog.horiz_col, fog.down_col, -dir_world.z);
+		col = mix(fog.horiz_col, fog.ambient_col, -dir_world.z);
 
 	return col;
 }
