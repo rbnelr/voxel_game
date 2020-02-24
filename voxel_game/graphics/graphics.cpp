@@ -759,7 +759,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		Chunk* chunk;
 		world.chunks.query_block(floori(world.player.pos), &chunk);
 		if (chunk)
-			raytracer.draw(chunk);
+			raytracer.draw(chunk, *this);
 
 		if (!activate_flycam)
 			gui.draw(world.player, tile_textures);

@@ -19,6 +19,11 @@ $endif
 
 $if fragment
 	uniform sampler3D chunk_tex;
+	#define CHUNK_DIM vec3(32,32,64)
+
+	uniform	sampler2DArray tile_textures;
+
+	uniform vec3 chunk_pos;
 
 	const float inf = 1.0 / 0.0;
 
@@ -32,8 +37,26 @@ $if fragment
 		else												return 2;
 	}
 
-	bool hit_block (vec3 voxel_pos, out vec4 hit_col) {
-		return false;
+	bool hit_block (vec3 voxel_pos, vec3 pos_world, int axis, float axis_dir, out vec4 hit_col) {
+		voxel_pos -= chunk_pos;
+
+		int id = int(round(texture(chunk_tex, (voxel_pos + 0.5) / CHUNK_DIM).r * 255));
+		if (id == 1) { // B_AIR == 1
+			return false;
+		}
+
+		float tex_indx = float(id); // TODO: this is wrong, need to look into tile info lut
+
+		vec3 pos_fract = pos_world - voxel_pos;
+		pos_fract.x *= axis_dir;
+		pos_fract.y *= -axis_dir;
+
+		vec2 uv;
+		uv.x = pos_fract[axis != 0 ? 0 : 1];
+		uv.y = pos_fract[axis == 2 ? 1 : 2];
+
+		hit_col = texture(tile_textures, vec3(uv, tex_indx));
+		return true;
 	}
 
 	bool raycast (vec3 pos, vec3 dir, float max_dist, out vec4 hit_col) {
@@ -65,12 +88,8 @@ $if fragment
 		int cur_axis = find_next_axis(next);
 		float cur_dist = next[cur_axis];
 
-		DEBUG(cur_dist);
-
-		float count = 0;
-
-		//if (hit_block(cur_voxel, hit_col)) // ray started inside block, -1 as no face was hit
-		//	return true;
+		if (hit_block(cur_voxel, pos + dir * cur_dist, cur_axis, step_delta[cur_axis], hit_col)) // ray started inside block, -1 as no face was hit
+			return true;
 
 		while (cur_dist <= max_dist) {
 			{
@@ -83,11 +102,9 @@ $if fragment
 				// step into the next voxel
 				cur_voxel[cur_axis] += step_delta[cur_axis];
 			}
-			
-			//if (hit_block(cur_voxel, hit_col))
-			//	return true;
 
-			count += 1;
+			if (hit_block(cur_voxel, pos + dir * cur_dist, cur_axis, step_delta[cur_axis], hit_col))
+				return true;
 		}
 
 		return false; // stop stepping because max_dist is reached
@@ -109,9 +126,9 @@ $if fragment
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
 		vec4 col;
-		if (raycast(ray_pos_world, ray_dir_world, 128.0, col))
+		if (raycast(ray_pos_world, ray_dir_world, 128, col))
 			FRAG_COL(col);
 		else
-			FRAG_COL(vec4(ray_dir_world, 1.0));
+			DISCARD();
 	}
 $endif

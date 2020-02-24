@@ -2,6 +2,7 @@
 #include "graphics_common.hpp"
 
 class Chunk;
+class Graphics;
 
 class Raytracer {
 public:
@@ -12,5 +13,5 @@ public:
 
 	Texture3D chunk_tex;
 
-	void draw (Chunk* chunk);
+	void draw (Chunk* chunk, Graphics& graphics);
 };
