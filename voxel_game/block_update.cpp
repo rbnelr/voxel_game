@@ -51,6 +51,7 @@ Block BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block b, bpos pos
 	return b;
 };
 
+#if 0
 static_assert(CHUNK_BLOCK_COUNT == (1 << 16), "");
 
 uint16_t block_pattern (uint16_t i) {
@@ -61,6 +62,11 @@ uint16_t block_pattern (uint16_t i) {
 	i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1);
 	return i;
 }
+#else
+uint16_t block_pattern (uint16_t i) {
+	return i;
+}
+#endif
 
 void BlockUpdate::update_blocks (Chunks& chunks) {
 	bpos_t blocks_to_update = (bpos_t)ceil((float)CHUNK_BLOCK_COUNT * block_update_frequency * input.dt);

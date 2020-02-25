@@ -18,11 +18,11 @@ typedef int3	bpos;
 typedef int		chunk_pos_t;
 typedef int2	chunk_coord;
 
-#define CHUNK_DIM_X			32
-#define CHUNK_DIM_Y			32
+#define CHUNK_DIM_X			64
+#define CHUNK_DIM_Y			64
 #define CHUNK_DIM_Z			64
-#define CHUNK_DIM_SHIFT_X	5 // for coord >> CHUNK_DIM_SHIFT
-#define CHUNK_DIM_SHIFT_Y	5 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM_SHIFT_X	6 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM_SHIFT_Y	6 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_SHIFT_Z	6 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_MASK_X	((1 << CHUNK_DIM_SHIFT_X) -1)
 #define CHUNK_DIM_MASK_Y	((1 << CHUNK_DIM_SHIFT_Y) -1)

@@ -19,7 +19,7 @@ $endif
 
 $if fragment
 	uniform sampler3D chunk_tex;
-	#define CHUNK_DIM vec3(32,32,64)
+	#define CHUNK_DIM vec3(64,64,64)
 
 	uniform	sampler2DArray tile_textures;
 
