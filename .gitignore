@@ -1,5 +1,7 @@
 ._*.txt # for ._need_potatomode.txt
 */stb/
+imgui.ini
+*.ini
 
 *.exe
 *.bin
