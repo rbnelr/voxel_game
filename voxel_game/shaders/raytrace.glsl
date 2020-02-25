@@ -34,12 +34,6 @@ $if fragment
 		return x / abs(x);
 	}
 
-	int find_next_axis (vec3 next) {
-		if (		next.x < next.y && next.x < next.z )	return 0;
-		else if (	next.y < next.z )						return 1;
-		else												return 2;
-	}
-
 	bool hit_block (vec3 voxel_pos, vec3 pos_world, int axis, float axis_dir, out vec4 hit_col) {
 		
 		if (pos_world.z <= 0 || pos_world.z >= CHUNK_DIM)
@@ -106,26 +100,71 @@ $if fragment
 		// NaN -> Inf
 		next = mix(next, vec3(inf), equal(dir, vec3(0.0)));
 
-		// find the axis of the next voxel step
-		int cur_axis = find_next_axis(next);
-		float cur_dist = next[cur_axis];
+		float dist;
+		float delta;
+		int axis;
 
-		if (hit_block(cur_voxel, pos + dir * cur_dist, cur_axis, step_delta[cur_axis], hit_col)) // ray started inside block, -1 as no face was hit
+		if (next.x <= next.y) {
+			if (next.x <= next.z) {
+				axis = 0;
+				dist = next.x;
+				delta = step_delta.x;
+			} else {
+				axis = 2;
+				dist = next.z;
+				delta = step_delta.z;
+			}
+		} else {
+			if (next.y <= next.z) {
+				axis = 1;
+				dist = next.y;
+				delta = step_delta.y;
+			} else {
+				axis = 2;
+				dist = next.z;
+				delta = step_delta.z;
+			}
+		}
+
+		if (hit_block(cur_voxel, pos + dir * dist, axis, delta, hit_col))
 			return true;
 
-		while (cur_dist <= max_dist) {
-			{
-				// find the axis of the cur step
-				cur_axis = find_next_axis(next);
-				cur_dist = next[cur_axis];
+		while (dist <= max_dist) {
+			if (next.x <= next.y) {
+				if (next.x <= next.z) {
+					axis = 0;
+					dist = next.x;
+					delta = step_delta.x;
+					
+					next.x += step_dist.x;
+					cur_voxel.x += delta;
+				} else {
+					axis = 2;
+					dist = next.z;
+					delta = step_delta.z;
 
-				// clac the distance at which the next voxel step for this axis happens
-				next[cur_axis] += step_dist[cur_axis];
-				// step into the next voxel
-				cur_voxel[cur_axis] += step_delta[cur_axis];
+					next.z += step_dist.z;
+					cur_voxel.z += delta;
+				}
+			} else {
+				if (next.y <= next.z) {
+					axis = 1;
+					dist = next.y;
+					delta = step_delta.y;
+
+					next.y += step_dist.y;
+					cur_voxel.y += delta;
+				} else {
+					axis = 2;
+					dist = next.z;
+					delta = step_delta.z;
+
+					next.z += step_dist.z;
+					cur_voxel.z += delta;
+				}
 			}
 
-			if (hit_block(cur_voxel, pos + dir * cur_dist, cur_axis, step_delta[cur_axis], hit_col))
+			if (hit_block(cur_voxel, pos + dir * dist, axis, delta, hit_col))
 				return true;
 		}
 
