@@ -5,6 +5,7 @@
 #include "util/string.hpp"
 #include "util/running_average.hpp"
 #include "util/threadpool.hpp"
+#include "util/raw_array.hpp"
 #include "graphics/graphics.hpp" // for ChunkMesh
 using namespace kiss;
 
@@ -92,27 +93,6 @@ static inline constexpr int _block_count (int lod_levels) {
 };
 
 ////////////// Chunk
-
-// Raw malloced array to avoid unique_ptr<T[]> clearing the data with really bad performance
-template <typename T>
-struct RawArray {
-	T* ptr = nullptr;
-
-	RawArray () {}
-
-	RawArray (uint64_t size) {
-		ptr = (T*)malloc(size * sizeof(T));
-	}
-	~RawArray () {
-		if (ptr)
-			free(ptr);
-	}
-
-	RawArray (RawArray const& r) {				std::swap(ptr, r.ptr); }
-	RawArray (RawArray&& r) {					std::swap(ptr, r.ptr); }
-	RawArray& operator= (RawArray const& r) {	std::swap(ptr, r.ptr); return *this; }
-	RawArray& operator= (RawArray&& r) {		std::swap(ptr, r.ptr); return *this; }
-};
 
 struct MeshingResult {
 
@@ -276,7 +256,7 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius =	_use_potatomode ? 150.0f : 200.0f;
+	float generation_radius =	80.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
