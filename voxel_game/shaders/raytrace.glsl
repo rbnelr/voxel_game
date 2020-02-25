@@ -18,12 +18,15 @@ $if vertex
 $endif
 
 $if fragment
-	uniform sampler3D chunk_tex;
-	#define CHUNK_DIM vec3(64,64,64)
+	uniform sampler2D chunks_lut;
+	uniform sampler3D voxels_tex;
+	#define CHUNK_DIM 64
 
 	uniform	sampler2DArray tile_textures;
 
-	uniform vec3 chunk_pos;
+	uniform vec2 min_chunk;
+	uniform vec2 chunks_lut_size;
+	uniform float voxels_chunks_count;
 
 	const float inf = 1.0 / 0.0;
 
@@ -38,23 +41,42 @@ $if fragment
 	}
 
 	bool hit_block (vec3 voxel_pos, vec3 pos_world, int axis, float axis_dir, out vec4 hit_col) {
-		voxel_pos -= chunk_pos;
-
-		int id = int(round(texture(chunk_tex, (voxel_pos + 0.5) / CHUNK_DIM).r * 255));
-		if (id == 1) { // B_AIR == 1
+		
+		if (pos_world.z <= 0 || pos_world.z >= CHUNK_DIM)
+			return false;
+		
+		vec2 chunk_pos = floor(voxel_pos.xy / CHUNK_DIM);
+		vec2 chunk_index2d = chunk_pos - min_chunk;
+		
+		if (chunk_index2d.x < 0 || chunk_index2d.y < 0 ||
+			chunk_index2d.x >= chunks_lut_size.x || chunk_index2d.y >= chunks_lut_size.y)
+			return false;
+		
+		float chunk_index = texture(chunks_lut, (chunk_index2d + 0.5) / chunks_lut_size).r;
+		if (chunk_index < 0)
+			return false;
+		
+		voxel_pos.xy -= chunk_pos * CHUNK_DIM;
+		
+		vec3 vox_uv = (voxel_pos + 0.5);
+		vox_uv.z += chunk_index * CHUNK_DIM;
+		vox_uv /= vec3(CHUNK_DIM, CHUNK_DIM, CHUNK_DIM * voxels_chunks_count);
+		
+		float id = round(texture(voxels_tex, vox_uv).r * 255);
+		if (id == 1.0) { // B_AIR == 1
 			return false;
 		}
-
-		float tex_indx = float(id); // TODO: this is wrong, need to look into tile info lut
-
+		
+		float tex_indx = id; // TODO: this is wrong, need to look into tile info lut
+		
 		vec3 pos_fract = pos_world - voxel_pos;
 		pos_fract.x *= axis_dir;
 		pos_fract.y *= -axis_dir;
-
+		
 		vec2 uv;
 		uv.x = pos_fract[axis != 0 ? 0 : 1];
 		uv.y = pos_fract[axis == 2 ? 1 : 2];
-
+		
 		hit_col = texture(tile_textures, vec3(uv, tex_indx));
 		return true;
 	}
@@ -126,7 +148,7 @@ $if fragment
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
 		vec4 col;
-		if (raycast(ray_pos_world, ray_dir_world, 128, col))
+		if (raycast(ray_pos_world, ray_dir_world, 200, col))
 			FRAG_COL(col);
 		else
 			DISCARD();

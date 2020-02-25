@@ -234,6 +234,9 @@
     <ClInclude Include="graphics\graphics_common.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="util\raw_array.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

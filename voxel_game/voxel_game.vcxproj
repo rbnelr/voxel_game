@@ -199,6 +199,7 @@
     <ClInclude Include="util\circular_buffer.hpp" />
     <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />
+    <ClInclude Include="util\raw_array.hpp" />
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="voxel_light.hpp" />

@@ -1,7 +1,7 @@
 #pragma once
 #include "graphics_common.hpp"
 
-class Chunk;
+class Chunks;
 class Graphics;
 
 class Raytracer {
@@ -11,7 +11,8 @@ public:
 
 	Sampler voxel_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 
-	Texture3D chunk_tex;
+	Texture2D chunks_lut;
+	Texture3D voxels_tex;
 
-	void draw (Chunk* chunk, Graphics& graphics);
+	void draw (Chunks& chunks, Graphics& graphics);
 };
