@@ -34,9 +34,9 @@ $if fragment
 		return x / abs(x);
 	}
 
-	bool hit_block (vec3 voxel_pos, vec3 pos_world, int axis, float axis_dir, out vec4 hit_col) {
+	bool hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, vec3 step_delta, vec3 step_dist, bvec3 mask, out vec4 hit_col) {
 		
-		if (pos_world.z <= 0 || pos_world.z >= CHUNK_DIM)
+		if (voxel_pos.z <= 0 || voxel_pos.z >= CHUNK_DIM)
 			return false;
 		
 		vec2 chunk_pos = floor(voxel_pos.xy / CHUNK_DIM);
@@ -61,6 +61,19 @@ $if fragment
 			return false;
 		}
 		
+		int axis;
+		if (mask.x)
+			axis = 0;
+		else if (mask.y)
+			axis = 1;
+		else
+			axis = 2;
+
+		float dist = next[axis] - step_dist[axis];
+		float axis_dir = step_delta[axis];
+
+		vec3 pos_world = ray_dir * dist + ray_pos;
+
 		float tex_indx = id; // TODO: this is wrong, need to look into tile info lut
 		
 		vec3 pos_fract = pos_world - voxel_pos;
@@ -100,71 +113,19 @@ $if fragment
 		// NaN -> Inf
 		next = mix(next, vec3(inf), equal(dir, vec3(0.0)));
 
-		float dist;
-		float delta;
-		int axis;
+		bvec3 mask = lessThanEqual(next.xyz, min(next.yzx, next.zxy));
 
-		if (next.x <= next.y) {
-			if (next.x <= next.z) {
-				axis = 0;
-				dist = next.x;
-				delta = step_delta.x;
-			} else {
-				axis = 2;
-				dist = next.z;
-				delta = step_delta.z;
-			}
-		} else {
-			if (next.y <= next.z) {
-				axis = 1;
-				dist = next.y;
-				delta = step_delta.y;
-			} else {
-				axis = 2;
-				dist = next.z;
-				delta = step_delta.z;
-			}
-		}
-
-		if (hit_block(cur_voxel, pos + dir * dist, axis, delta, hit_col))
+		if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask, hit_col))
 			return true;
 
-		while (dist <= max_dist) {
-			if (next.x <= next.y) {
-				if (next.x <= next.z) {
-					axis = 0;
-					dist = next.x;
-					delta = step_delta.x;
-					
-					next.x += step_dist.x;
-					cur_voxel.x += delta;
-				} else {
-					axis = 2;
-					dist = next.z;
-					delta = step_delta.z;
+		while (any(lessThanEqual(next, vec3(max_dist)))) {
 
-					next.z += step_dist.z;
-					cur_voxel.z += delta;
-				}
-			} else {
-				if (next.y <= next.z) {
-					axis = 1;
-					dist = next.y;
-					delta = step_delta.y;
+			mask = lessThanEqual(next.xyz, min(next.yzx, next.zxy));
 
-					next.y += step_dist.y;
-					cur_voxel.y += delta;
-				} else {
-					axis = 2;
-					dist = next.z;
-					delta = step_delta.z;
+			next      += vec3(mask) * step_dist;
+			cur_voxel += vec3(mask) * step_delta;
 
-					next.z += step_dist.z;
-					cur_voxel.z += delta;
-				}
-			}
-
-			if (hit_block(cur_voxel, pos + dir * dist, axis, delta, hit_col))
+			if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask, hit_col))
 				return true;
 		}
 
@@ -187,7 +148,7 @@ $if fragment
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
 		vec4 col;
-		if (raycast(ray_pos_world, ray_dir_world, 200, col))
+		if (raycast(ray_pos_world, ray_dir_world, 250, col))
 			FRAG_COL(col);
 		else
 			DISCARD();
