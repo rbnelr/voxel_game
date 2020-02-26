@@ -721,14 +721,14 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		if (!draw_raytraced || overlay_raytraced) {
+		if (!raytracer.raytracer_draw || raytracer.overlay) {
 			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
 
 			skybox.draw();
 		}
 
-		if (draw_raytraced)
-			raytracer.draw(world.chunks, *this, raytrace_view_dist, overlay_raytraced ? slider_raytraced : 1.0f);
+		if (raytracer.raytracer_draw)
+			raytracer.draw(world.chunks, *this);
 	}
 
 	glEnable(GL_BLEND);
@@ -745,7 +745,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		if (!draw_raytraced || overlay_raytraced)
+		if (!raytracer.raytracer_draw || raytracer.overlay)
 			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
 
 		glEnable(GL_CULL_FACE);

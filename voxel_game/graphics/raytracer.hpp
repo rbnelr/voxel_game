@@ -29,6 +29,28 @@ public:
 
 	UploadedChunks uploaded_chunks;
 
+	bool raytracer_draw = true;
+	bool overlay = false;
+	float slider = 1.0f;
+	float view_dist = 200.0f;
+	float iterations_visualize_max = 200.0f;
+
+	void imgui (Chunks& chunks) {
+		if (!imgui_push("Raytracer")) return;
+
+		ImGui::Checkbox("draw", &raytracer_draw);
+		ImGui::Checkbox("overlay", &overlay);
+		ImGui::SliderFloat("slider", &slider, 0,1);
+		ImGui::SliderFloat("view_dist", &view_dist, 0, 1000, "%.2f", 2);
+		ImGui::SliderFloat("iterations_visualize_max", &iterations_visualize_max, 0, 1500, "%.2f", 2);
+
+		if (ImGui::Button("regen_data")) {
+			regen_data(chunks);
+		}
+
+		imgui_pop();
+	}
+
 	void regen_data (Chunks& chunks);
-	void draw (Chunks& chunks, Graphics& graphics, float view_dist, float slider=1.0f);
+	void draw (Chunks& chunks, Graphics& graphics);
 };

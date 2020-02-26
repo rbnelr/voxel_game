@@ -30,12 +30,15 @@ $if fragment
 	uniform vec2 chunks_lut_size;
 	uniform float voxels_chunks_count;
 	uniform float view_dist;
+	uniform float iterations_visualize_max;
 
 	const float inf = 3.4028235e38 + 1.0; // infinity, my laptop shader compiler did not like 1.0 / 0.0
 
 	vec4 hit_col = vec4(0.0, 0.0, 0.0, 0.0);
 	vec4 hit_pos_cam = vec4(0.0, 0.0, -inf, 1.0);
 	float hit_dist = inf;
+
+	float iterations = 0;
 
 	float scalar_normalize (float x) {
 		return x / abs(x);
@@ -131,6 +134,8 @@ $if fragment
 
 		while (any(lessThanEqual(next, vec3(max_dist)))) {
 
+			iterations += 1.0;
+
 			mask = lessThanEqual(next.xyz, min(next.yzx, next.zxy));
 
 			next      += vec3(mask) * step_dist;
@@ -159,6 +164,8 @@ $if fragment
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
 		raycast(ray_pos_world, ray_dir_world, view_dist);
+
+		DEBUG(vec3(iterations / iterations_visualize_max, 0, 0));
 
 		{ // Write depth
 			vec4 clip = cam_to_clip * hit_pos_cam;

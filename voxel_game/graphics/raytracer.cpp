@@ -60,7 +60,7 @@ void Raytracer::regen_data (Chunks& chunks) {
 	uploaded_chunks.upload(chunks, chunks_lut, voxels_tex);
 }
 
-void Raytracer::draw (Chunks& chunks, Graphics& graphics, float view_dist, float slider) {
+void Raytracer::draw (Chunks& chunks, Graphics& graphics) {
 	if (shader) {
 		shader.bind();
 
@@ -69,6 +69,7 @@ void Raytracer::draw (Chunks& chunks, Graphics& graphics, float view_dist, float
 		shader.set_uniform("chunks_lut_size", (float2)uploaded_chunks.chunks_lut_size);
 		shader.set_uniform("voxels_chunks_count", (float)uploaded_chunks.chunks_count);
 		shader.set_uniform("view_dist", view_dist);
+		shader.set_uniform("iterations_visualize_max", iterations_visualize_max);
 
 		glActiveTexture(GL_TEXTURE0 + 0);
 		shader.set_texture_unit("chunks_lut", 0);
