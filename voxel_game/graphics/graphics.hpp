@@ -458,6 +458,8 @@ struct Fog {
 	}
 };
 
+extern int frame_counter;
+
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
@@ -479,9 +481,19 @@ public:
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
+	bool draw_raytraced = true;
+	bool overlay_raytraced = false;
+	float slider_raytraced = 1.0f;
+	bool regen_raytrace_data = false;
+	float raytrace_view_dist = 200.0f;
+
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
+		if (frame_counter == 30) {
+			raytracer.regen_data(chunks);
+		}
+
 		if (ImGui::CollapsingHeader("Graphics")) {
 			common_uniforms.imgui();
 			fog.imgui();
@@ -491,6 +503,15 @@ public:
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_block_light", &debug_block_light);
+
+			ImGui::Checkbox("draw_raytraced", &draw_raytraced);
+			ImGui::Checkbox("overlay_raytraced", &overlay_raytraced);
+			ImGui::SliderFloat("slider_raytraced", &slider_raytraced, 0,1);
+			ImGui::SliderFloat("raytrace_view_dist", &raytrace_view_dist, 0, 1000, "%.2f", 2);
+
+			if (ImGui::Button("regen_raytrace_data")) {
+				raytracer.regen_data(chunks);
+			}
 
 			ImGui::Separator();
 		}

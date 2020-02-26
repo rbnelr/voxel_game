@@ -1,9 +1,10 @@
 #version 330 core
 
 $include "common.glsl"
+$include "fog.glsl"
 
 $if vertex
-	uniform const vec4[] pos_clip = vec4[] (
+	const vec4[] pos_clip = vec4[] (
 		vec4(+1,-1, 0, 1),
 		vec4(+1,+1, 0, 1),
 		vec4(-1,-1, 0, 1),
@@ -24,17 +25,23 @@ $if fragment
 
 	uniform	sampler2DArray tile_textures;
 
+	uniform float slider;
 	uniform vec2 min_chunk;
 	uniform vec2 chunks_lut_size;
 	uniform float voxels_chunks_count;
+	uniform float view_dist;
 
-	const float inf = 1.0 / 0.0;
+	const float inf = 3.4028235e38 + 1.0; // infinity, my laptop shader compiler did not like 1.0 / 0.0
+
+	vec4 hit_col = vec4(0.0, 0.0, 0.0, 0.0);
+	vec4 hit_pos_cam = vec4(0.0, 0.0, -inf, 1.0);
+	float hit_dist = inf;
 
 	float scalar_normalize (float x) {
 		return x / abs(x);
 	}
 
-	bool hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, vec3 step_delta, vec3 step_dist, bvec3 mask, out vec4 hit_col) {
+	bool hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, vec3 step_delta, vec3 step_dist, bvec3 mask) {
 		
 		if (voxel_pos.z <= 0 || voxel_pos.z >= CHUNK_DIM)
 			return false;
@@ -49,9 +56,9 @@ $if fragment
 		float chunk_index = texture(chunks_lut, (chunk_index2d + 0.5) / chunks_lut_size).r;
 		if (chunk_index < 0)
 			return false;
-		
+
 		voxel_pos.xy -= chunk_pos * CHUNK_DIM;
-		
+
 		vec3 vox_uv = (voxel_pos + 0.5);
 		vox_uv.z += chunk_index * CHUNK_DIM;
 		vox_uv /= vec3(CHUNK_DIM, CHUNK_DIM, CHUNK_DIM * voxels_chunks_count);
@@ -60,6 +67,8 @@ $if fragment
 		if (id == 1.0) { // B_AIR == 1
 			return false;
 		}
+
+		//DEBUG(voxel_pos / 64);
 		
 		int axis;
 		if (mask.x)
@@ -85,10 +94,12 @@ $if fragment
 		uv.y = pos_fract[axis == 2 ? 1 : 2];
 		
 		hit_col = texture(tile_textures, vec3(uv, tex_indx));
+		hit_pos_cam = world_to_cam * vec4(pos_world, 1.0);
+		hit_dist = dist;
 		return true;
 	}
 
-	bool raycast (vec3 pos, vec3 dir, float max_dist, out vec4 hit_col) {
+	bool raycast (vec3 pos, vec3 dir, float max_dist) {
 		// get direction of each axis of ray_dir (-1, 0, +1)
 		vec3 step_delta = vec3(	scalar_normalize(dir.x),
 								scalar_normalize(dir.y),
@@ -115,7 +126,7 @@ $if fragment
 
 		bvec3 mask = lessThanEqual(next.xyz, min(next.yzx, next.zxy));
 
-		if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask, hit_col))
+		if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
 			return true;
 
 		while (any(lessThanEqual(next, vec3(max_dist)))) {
@@ -125,7 +136,7 @@ $if fragment
 			next      += vec3(mask) * step_dist;
 			cur_voxel += vec3(mask) * step_delta;
 
-			if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask, hit_col))
+			if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
 				return true;
 		}
 
@@ -134,7 +145,7 @@ $if fragment
 
 	void main () {
 		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
-		if (ndc.x < -0.3)
+		if (ndc.x > (slider * 2 - 1))
 			DISCARD();
 
 		vec4 near_plane_clip = cam_to_clip * vec4(0.0, 0.0, -clip_near, 1.0);
@@ -147,10 +158,16 @@ $if fragment
 		vec3 ray_pos_world = ( cam_to_world * vec4(pos_cam, 1) ).xyz;
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
-		vec4 col;
-		if (raycast(ray_pos_world, ray_dir_world, 250, col))
-			FRAG_COL(col);
-		else
-			DISCARD();
+		raycast(ray_pos_world, ray_dir_world, view_dist);
+
+		{ // Write depth
+			vec4 clip = cam_to_clip * hit_pos_cam;
+			float ndc_depth = clip.z / clip.w;
+			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
+		}
+
+		hit_col.rgb = apply_fog(hit_col.rgb, hit_dist, ray_dir_world);
+
+		FRAG_COL(hit_col);
 	}
 $endif
