@@ -3,7 +3,7 @@
 $include "common.glsl"
 
 $if vertex
-	uniform const vec4[] pos_clip = vec4[] (
+	const vec4[] pos_clip = vec4[] (
 		vec4(+1,-1, 0, 1),
 		vec4(+1,+1, 0, 1),
 		vec4(-1,-1, 0, 1),
@@ -28,7 +28,7 @@ $if fragment
 	uniform vec2 chunks_lut_size;
 	uniform float voxels_chunks_count;
 
-	const float inf = 1.0 / 0.0;
+	const float inf = 3.4028235E38 + 1.0;
 
 	float scalar_normalize (float x) {
 		return x / abs(x);
@@ -148,7 +148,7 @@ $if fragment
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
 		vec4 col;
-		if (raycast(ray_pos_world, ray_dir_world, 250, col))
+		if (raycast(ray_pos_world, ray_dir_world, 50, col))
 			FRAG_COL(col);
 		else
 			DISCARD();
