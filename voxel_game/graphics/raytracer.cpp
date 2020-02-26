@@ -70,6 +70,9 @@ void Raytracer::draw (Chunks& chunks, Graphics& graphics) {
 		shader.set_uniform("voxels_chunks_count", (float)uploaded_chunks.chunks_count);
 		shader.set_uniform("view_dist", view_dist);
 		shader.set_uniform("iterations_visualize_max", iterations_visualize_max);
+		shader.set_uniform("iterations_visualize", iterations_visualize);
+
+		glBindVertexArray(vao);
 
 		glActiveTexture(GL_TEXTURE0 + 0);
 		shader.set_texture_unit("chunks_lut", 0);

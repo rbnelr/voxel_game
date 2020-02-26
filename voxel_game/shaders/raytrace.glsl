@@ -31,6 +31,7 @@ $if fragment
 	uniform float voxels_chunks_count;
 	uniform float view_dist;
 	uniform float iterations_visualize_max;
+	uniform bool iterations_visualize;
 
 	const float inf = 3.4028235e38 + 1.0; // infinity, my laptop shader compiler did not like 1.0 / 0.0
 
@@ -165,11 +166,12 @@ $if fragment
 
 		raycast(ray_pos_world, ray_dir_world, view_dist);
 
-		DEBUG(vec3(iterations / iterations_visualize_max, 0, 0));
+		if (iterations_visualize)
+			DEBUG(vec3(iterations / iterations_visualize_max, 0, 0));
 
 		{ // Write depth
 			vec4 clip = cam_to_clip * hit_pos_cam;
-			float ndc_depth = clip.z / clip.w;
+			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
 			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
 		}
 

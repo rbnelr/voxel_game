@@ -22,6 +22,8 @@ public:
 
 	Shader shader = Shader("raytrace", { FOG_UNIFORMS });
 
+	gl::Vao vao; // empty vao even though I generate the mesh in the vertex shader, no vao works but generates an error on my machine
+
 	Sampler voxel_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 
 	Texture2D chunks_lut;
@@ -34,6 +36,7 @@ public:
 	float slider = 1.0f;
 	float view_dist = 200.0f;
 	float iterations_visualize_max = 200.0f;
+	bool iterations_visualize = false;
 
 	void imgui (Chunks& chunks) {
 		if (!imgui_push("Raytracer")) return;
@@ -43,6 +46,7 @@ public:
 		ImGui::SliderFloat("slider", &slider, 0,1);
 		ImGui::SliderFloat("view_dist", &view_dist, 0, 1000, "%.2f", 2);
 		ImGui::SliderFloat("iterations_visualize_max", &iterations_visualize_max, 0, 1500, "%.2f", 2);
+		ImGui::Checkbox("iterations_visualize", &iterations_visualize);
 
 		if (ImGui::Button("regen_data")) {
 			regen_data(chunks);
