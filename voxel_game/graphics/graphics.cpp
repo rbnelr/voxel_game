@@ -688,6 +688,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_view_uniforms(view);
 	common_uniforms.set_debug_uniforms();
 
+	octreeDevTest.draw(world.chunks);
+
 	{ // GL state defaults
 	  // 
 		glEnable(GL_FRAMEBUFFER_SRGB);

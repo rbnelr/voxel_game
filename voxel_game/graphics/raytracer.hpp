@@ -1,5 +1,7 @@
 #pragma once
 #include "graphics_common.hpp"
+#include "../blocks.hpp"
+#include "../util/raw_array.hpp"
 
 class Chunks;
 class Graphics;
@@ -31,7 +33,7 @@ public:
 
 	UploadedChunks uploaded_chunks;
 
-	bool raytracer_draw = true;
+	bool raytracer_draw = false;//true;
 	bool overlay = false;
 	float slider = 1.0f;
 	float view_dist = 200.0f;
@@ -57,4 +59,20 @@ public:
 
 	void regen_data (Chunks& chunks);
 	void draw (Chunks& chunks, Graphics& graphics);
+};
+
+struct Octree {
+	std::vector<RawArray<block_id>> octree_levels;
+
+	void recurs_draw (int3 index, int level, float3 offset);
+};
+
+struct OctreeDevTest {
+
+	float2 ray_ang = float2(-50, 30);
+	Ray ray = { float3(5,5,40) };
+
+	Octree octree;
+
+	void draw (Chunks& chunks);
 };
