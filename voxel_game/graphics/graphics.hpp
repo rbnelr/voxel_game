@@ -5,7 +5,6 @@
 #include "../util/animation.hpp"
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
-#include "raytracer.hpp"
 #include "graphics_common.hpp"
 
 // rotate from facing up to facing in a block face direction
@@ -473,8 +472,6 @@ public:
 	SkyboxGraphics			skybox;
 
 	Fog						fog;
-
-	Raytracer				raytracer;
 
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;

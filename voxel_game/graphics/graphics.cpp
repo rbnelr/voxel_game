@@ -756,8 +756,6 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		raytracer.draw(world.chunks, *this);
-
 		if (!activate_flycam)
 			gui.draw(world.player, tile_textures);
 
