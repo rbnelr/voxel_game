@@ -63,8 +63,11 @@ public:
 
 struct Octree {
 	std::vector<RawArray<block_id>> octree_levels;
+	float3 pos;
 
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
+
+	void raycast (Ray ray);
 };
 
 struct OctreeDevTest {

@@ -96,12 +96,12 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 
  basic sunlight code
 
-TODO
--FEATURES:
- 
  raytracing test:
  -implement octree code from here: http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
 
+TODO
+-FEATURES:
+ 
  fix crosshair not appearing
 
  fix block updates
