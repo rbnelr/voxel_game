@@ -64,7 +64,7 @@ public:
 struct Octree {
 	std::vector<RawArray<block_id>> octree_levels;
 
-	void recurs_draw (int3 index, int level, float3 offset);
+	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 };
 
 struct OctreeDevTest {

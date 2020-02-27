@@ -96,7 +96,7 @@ void Raytracer::draw (Chunks& chunks, Graphics& graphics) {
 RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev_level) {
 	RawArray<block_id> ret = RawArray<block_id>(size * size * size);
 
-	auto get = [&] (int3 xyz) {
+	auto get = [&] (bpos xyz) {
 		return prev_level[xyz.z * size*2*size*2 + xyz.y * size*2 + xyz.x];
 	};
 
@@ -107,7 +107,7 @@ RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev
 				block_id blocks[8];
 				static int3 lut[] = { int3(0,0,0), int3(1,0,0), int3(0,1,0), int3(1,1,0), int3(0,0,1), int3(1,0,1), int3(0,1,1), int3(1,1,1) };
 				for (int i=0; i<8; ++i)
-					blocks[i] = get(x*2 + lut[i]);
+					blocks[i] = get(bpos(x,y,z)*2 + lut[i]);
 
 				bool all_equal = true;
 				for (int i=1; i<8; ++i) {
@@ -167,23 +167,25 @@ lrgba cols[] = {
 	srgba(255,127,255),
 };
 
-void Octree::recurs_draw (int3 index, int level, float3 offset) { // level 0 == full res
+void Octree::recurs_draw (int3 index, int level, float3 offset, int& cell_count) { // level 0 == full res
 	int voxel_count = CHUNK_DIM_X >> level;
 	int voxel_size = 1 << level;
+	
+	auto get = [&] (int3 xyz) {
+		return octree_levels[level][xyz.z * voxel_count*voxel_count + xyz.y * voxel_count + xyz.x];
+	};
 
-	debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
-
-	if (level > 0) {
-		auto get = [&] (int3 xyz) {
-			return octree_levels[level - 1][xyz.z * voxel_count*2*voxel_count*2 + xyz.y * voxel_count*2 + xyz.x];
-		};
-		for (int z=0; z<2; ++z) {
-			for (int y=0; y<2; ++y) {
-				for (int x=0; x<2; ++x) {
-					int3 rec_index = index * 2 + int3(x,y,z);
-					auto b = get(rec_index);
-					if (b == B_NULL) {
-						recurs_draw(rec_index, level - 1, offset);
+	auto b = get(index);
+	if (b != B_NULL) {
+		debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
+		cell_count++;
+	} else {
+		if (level > 0) {
+			for (int z=0; z<2; ++z) {
+				for (int y=0; y<2; ++y) {
+					for (int x=0; x<2; ++x) {
+						int3 rec_index = index * 2 + int3(x,y,z);
+						recurs_draw(rec_index, level - 1, offset, cell_count);
 					}
 				}
 			}
@@ -206,5 +208,8 @@ void OctreeDevTest::draw (Chunks& chunks) {
 
 	octree = build_octree(chunk);
 
-	octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world());
+	int cell_count = 0;
+	octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world(), cell_count);
+
+	ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
 }
