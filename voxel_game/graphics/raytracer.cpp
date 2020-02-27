@@ -201,12 +201,6 @@ struct ParametricOctreeTraverser {
 	// J. Revelles, C.Ure ̃na, M.Lastra
 	// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
 
-	static float3 select_with_bitmask (float3 a, float3 b, int bitmask) { // = bitmask[i] ? b[i] : a[i]; // ie. select a or b based on 3 least significant bits in bitmask (0->a 1->b)
-		bool3 sel = bool3(bitmask & 1, (bitmask >> 1) & 1, (bitmask >> 2) & 1);
-
-		return select(sel, b, a);
-	}
-
 	static constexpr int3 child_offset_lut[8] = {
 		int3(0,0,0),
 		int3(1,0,0),
@@ -224,31 +218,35 @@ struct ParametricOctreeTraverser {
 		float3 mid;
 		float3 max;
 
-		OctreeNode get_child (int index) {
+		OctreeNode get_child (int index, bool3 mask) {
 			OctreeNode ret;
 
 			ret.level = level - 1;
 			ret.pos = pos * 2 + child_offset_lut[index];
-			ret.min = select_with_bitmask(min, mid, index);
-			ret.max = select_with_bitmask(mid, max, index);
+			ret.min = select(mask, mid, min);
+			ret.max = select(mask, max, mid);
 			ret.mid = 0.5f * (ret.max + ret.min);
 
 			return ret;
 		}
 	};
 
-	unsigned char mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+	int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+	bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+	
 	Ray ray;
 	
 	void traverse_octree (OctreeNode root, Ray ray) {
 		this->ray = ray;
-		mirror_mask = 0;
+		mirror_mask_int = 0;
+		mirror_mask = false;
 
 		for (int i=0; i<3; ++i) {
 			if (ray.dir[i] < 0) {
 				ray.pos[i] = root.mid[i] * 2 - ray.pos[i];
 				ray.dir[i] = -ray.dir[i];
-				mirror_mask |= 1 << i;
+				mirror_mask_int |= 1 << i;
+				mirror_mask[i] = true;
 			}
 		}
 
@@ -319,11 +317,13 @@ struct ParametricOctreeTraverser {
 			int cur_node = first_node(t0, tm);
 
 			do {
-				stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask), select_with_bitmask(t0, tm, cur_node), select_with_bitmask(tm, t1, cur_node));
+				bool3 mask = bool3(cur_node & 1, (cur_node >> 1) & 1, (cur_node >> 2) & 1);
+
+				stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask_int, mask != mirror_mask), select(mask, tm, t0), select(mask, t1, tm));
 				if (stop)
 					return true;
 
-				cur_node = next_node(select_with_bitmask(tm, t1, cur_node), node_seq_lut[cur_node]);
+				cur_node = next_node(select(mask, t1, tm), node_seq_lut[cur_node]);
 			} while (cur_node < 8);
 		}
 

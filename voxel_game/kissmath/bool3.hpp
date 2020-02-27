@@ -84,7 +84,6 @@ namespace kissmath {
 	
 	bool3 operator|| (bool3 l, bool3 r);
 	
-	
 	//// comparison ops
 	
 	// componentwise comparison returns a bool vector
