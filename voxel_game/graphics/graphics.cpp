@@ -688,6 +688,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_view_uniforms(view);
 	common_uniforms.set_debug_uniforms();
 
+	octreeDevTest.draw(world.chunks);
+
 	{ // GL state defaults
 	  // 
 		glEnable(GL_FRAMEBUFFER_SRGB);
@@ -715,15 +717,20 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	glViewport(0,0, input.window_size.x, input.window_size.y);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glClear(GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
+		if (!raytracer.raytracer_draw || raytracer.overlay) {
+			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
 
-		skybox.draw();
+			skybox.draw();
+		}
+
+		if (raytracer.raytracer_draw)
+			raytracer.draw(world.chunks, *this);
 	}
 
 	glEnable(GL_BLEND);
@@ -740,7 +747,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
+		if (!raytracer.raytracer_draw || raytracer.overlay)
+			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -755,8 +763,6 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
-
-		raytracer.draw(world.chunks, *this);
 
 		if (!activate_flycam)
 			gui.draw(world.player, tile_textures);

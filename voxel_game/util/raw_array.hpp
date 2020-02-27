@@ -28,8 +28,10 @@ struct RawArray {
 		return ptr[index];
 	}
 
-	RawArray (RawArray const& r) {				std::swap(ptr, r.ptr); std::swap(size, r.size); }
+	// copy
+	RawArray (RawArray const& r) = delete;
+	RawArray& operator= (RawArray const& r) = delete;
+	// move
 	RawArray (RawArray&& r) {					std::swap(ptr, r.ptr); std::swap(size, r.size); }
-	RawArray& operator= (RawArray const& r) {	std::swap(ptr, r.ptr); std::swap(size, r.size); return *this; }
 	RawArray& operator= (RawArray&& r) {		std::swap(ptr, r.ptr); std::swap(size, r.size); return *this; }
 };

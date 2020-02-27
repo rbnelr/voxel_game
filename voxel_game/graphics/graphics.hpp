@@ -458,6 +458,8 @@ struct Fog {
 	}
 };
 
+extern int frame_counter;
+
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
@@ -476,12 +478,18 @@ public:
 
 	Raytracer				raytracer;
 
+	OctreeDevTest octreeDevTest;
+
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
+		if (frame_counter == 30) {
+			raytracer.regen_data(chunks);
+		}
+
 		if (ImGui::CollapsingHeader("Graphics")) {
 			common_uniforms.imgui();
 			fog.imgui();
@@ -491,6 +499,8 @@ public:
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_block_light", &debug_block_light);
+
+			raytracer.imgui(chunks);
 
 			ImGui::Separator();
 		}
