@@ -98,6 +98,10 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 
  raytracing test:
  -implement octree code from here: http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
+ -optimized octree code be be branchless where possible (recursion itself is a banch and also the loop over the children cells and the final hit might even branch based on texture alpha)
+   but the branching is just what is inherent to the octree traversal, all the branching which was just handeling logic were converted to calculations and look up tabels
+   the current code might be one of the most optimal ways of traversing an octree on a gpu, the amount of calculations amounts to a few compares to mask, and mix'es and (a+b)*0.5 calculations, and the cells visited should be optimal, ie. the voxel lookups and interation count should be optimal
+ -raytracer actually looks at octree now and stops at solid cells (can also stop at non size 1 cells, which could be changed if undesirable)
 
 TODO
 -FEATURES:
