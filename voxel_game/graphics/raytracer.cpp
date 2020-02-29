@@ -269,6 +269,13 @@ struct ParametricOctreeTraverser {
 		return ret;
 	}
 
+	enum StatemachineOp {
+		PRE_LOOP,
+		LOOP_PRE_RECURSE,
+		LOOP_CHILD_POST_RECURSE,
+		RETURN
+	};
+
 	void traverse_octree (Stackframe _stk, Ray ray) {
 		Stackframe stack[MAX_DEPTH+1];
 		int depth = 0;
@@ -297,17 +304,27 @@ struct ParametricOctreeTraverser {
 
 		bool stop = false;
 		bool3 ray_mask = ray.dir != 0;
-		
-	recurse:
-		stk->tm = select(ray_mask, 0.5f * (stk->t0 + stk->t1), select(ray.pos < stk->mid, float3(+INF), float3(-INF)));
 
-		if (all(stk->t1 >= 0) && eval_octree_cell(depth, *stk, &stop)) {
-			assert(!stop);
+		StatemachineOp op = PRE_LOOP;
 
-			stk->cur_node = first_node(stk->t0, stk->tm);
+		for (;;) {
+			switch (op) {
 
-			do {
-				{
+				case PRE_LOOP: {
+					stk->tm = select(ray_mask, 0.5f * (stk->t0 + stk->t1), select(ray.pos < stk->mid, float3(+INF), float3(-INF)));
+
+					if (all(stk->t1 >= 0) && eval_octree_cell(depth, *stk, &stop)) {
+						assert(!stop);
+
+						stk->cur_node = first_node(stk->t0, stk->tm);
+					
+						op = LOOP_PRE_RECURSE;
+					} else {
+						op = RETURN;
+					}
+				} break;
+
+				case LOOP_PRE_RECURSE: {
 					bool3 mask = bool3(stk->cur_node & 1, (stk->cur_node >> 1) & 1, (stk->cur_node >> 2) & 1);
 					stk->lo = select(mask, stk->tm, stk->t0);
 					stk->hi = select(mask, stk->t1, stk->tm);
@@ -321,22 +338,31 @@ struct ParametricOctreeTraverser {
 
 					stk = new_stk;
 
-					goto recurse;
-				}
+					op = PRE_LOOP; // recursive call
+				} break;
 
-			recurse_return:
-				if (stop)
-					break;
+				case LOOP_CHILD_POST_RECURSE: {
+					if (!stop)
+						stk->cur_node = next_node(stk->hi, node_seq_lut[stk->cur_node]);
 
-				stk->cur_node = next_node(stk->hi, node_seq_lut[stk->cur_node]);
-			} while (stk->cur_node < 8);
-		}
+					if (stk->cur_node >= 8) {
+						op = RETURN;
+					} else {
+						op = LOOP_PRE_RECURSE;
+					}
+				} break;
 
-		// Return from recursive call
-		--depth;
-		if (depth >= 0) {
-			stk = &stack[depth];
-			goto recurse_return;
+				case RETURN: {
+					// Return from recursive call
+					--depth;
+					if (depth >= 0) {
+						stk = &stack[depth];
+						op = LOOP_CHILD_POST_RECURSE; // return from recusive call
+					} else {
+						return; // finish
+					}
+				} break;
+			}
 		}
 	}
 
