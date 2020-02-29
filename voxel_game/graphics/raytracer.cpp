@@ -65,6 +65,7 @@ void Raytracer::draw (Chunks& chunks, Graphics& graphics) {
 		shader.bind();
 
 		shader.set_uniform("slider", slider);
+		shader.set_uniform("octree_slider", octree_slider);
 		shader.set_uniform("min_chunk", (float2)uploaded_chunks.min_chunk);
 		shader.set_uniform("chunks_lut_size", (float2)uploaded_chunks.chunks_lut_size);
 		shader.set_uniform("voxels_chunks_count", (float)uploaded_chunks.chunks_count);
@@ -345,7 +346,7 @@ struct ParametricOctreeTraverser {
 					if (!stop)
 						stk->cur_node = next_node(stk->hi, node_seq_lut[stk->cur_node]);
 
-					if (stk->cur_node >= 8) {
+					if (stop || stk->cur_node >= 8) {
 						op = RETURN;
 					} else {
 						op = LOOP_PRE_RECURSE;

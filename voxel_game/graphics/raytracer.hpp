@@ -33,9 +33,10 @@ public:
 
 	UploadedChunks uploaded_chunks;
 
-	bool raytracer_draw = false;//true;
+	bool raytracer_draw = true;
 	bool overlay = false;
 	float slider = 1.0f;
+	float octree_slider = 0.5f;
 	float view_dist = 200.0f;
 	float iterations_visualize_max = 200.0f;
 	bool iterations_visualize = false;
@@ -46,6 +47,7 @@ public:
 		ImGui::Checkbox("draw", &raytracer_draw);
 		ImGui::Checkbox("overlay", &overlay);
 		ImGui::SliderFloat("slider", &slider, 0,1);
+		ImGui::SliderFloat("octree_slider", &octree_slider, 0,1);
 		ImGui::SliderFloat("view_dist", &view_dist, 0, 1000, "%.2f", 2);
 		ImGui::SliderFloat("iterations_visualize_max", &iterations_visualize_max, 0, 1500, "%.2f", 2);
 		ImGui::Checkbox("iterations_visualize", &iterations_visualize);
