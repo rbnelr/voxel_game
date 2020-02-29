@@ -2,6 +2,42 @@
 #include "graphics.hpp"
 #include "../chunks.hpp"
 
+RawArray<block_id> filter_octree_level (int size, int chunks_count, RawArray<block_id> const& prev_level) {
+	RawArray<block_id> ret = RawArray<block_id>(chunks_count * size * size * size);
+
+	int src_size = size * 2;
+
+	auto get = [&] (bpos xyz, int chunk) {
+		return prev_level[chunk * src_size*src_size*src_size + xyz.z * src_size*src_size + xyz.y * src_size + xyz.x];
+	};
+
+	int out = 0;
+	for (int chunk=0; chunk<chunks_count; ++chunk) {
+		for (int z=0; z<size; ++z) {
+			for (int y=0; y<size; ++y) {
+				for (int x=0; x<size; ++x) {
+					block_id blocks[8];
+					static int3 lut[] = { int3(0,0,0), int3(1,0,0), int3(0,1,0), int3(1,1,0), int3(0,0,1), int3(1,0,1), int3(0,1,1), int3(1,1,1) };
+					for (int i=0; i<8; ++i)
+						blocks[i] = get(bpos(x,y,z)*2 + lut[i], chunk);
+
+					bool all_equal = true;
+					for (int i=1; i<8; ++i) {
+						if (blocks[i] != blocks[0]) {
+							all_equal = false;
+							break;
+						}
+					}
+
+					ret[out++] = all_equal ? blocks[0] : B_NULL; // B_NULL == not leaf node
+				}
+			}
+		}
+	}
+
+	return ret;
+}
+
 void UploadedChunks::upload (Chunks& chunks, Texture2D& chunks_lut, Texture3D& voxels_tex) {
 	chunks_count = chunks.chunks.count();
 
@@ -16,7 +52,7 @@ void UploadedChunks::upload (Chunks& chunks, Texture2D& chunks_lut, Texture3D& v
 	chunks_lut_count = chunks_lut_size.x * chunks_lut_size.y;
 
 	RawArray<float> chunks_lut_data = RawArray<float>(chunks_lut_count);
-	RawArray<uint8> voxels = RawArray<uint8>((uint64_t)chunks_count * CHUNK_DIM_Z * CHUNK_DIM_Y * CHUNK_DIM_X);
+	RawArray<block_id> voxels = RawArray<block_id>((uint64_t)chunks_count * CHUNK_DIM_Z * CHUNK_DIM_Y * CHUNK_DIM_X);
 
 	for (int y=0; y<chunks_lut_size.y; ++y) {
 		for (int x=0; x<chunks_lut_size.x; ++x) {
@@ -28,22 +64,22 @@ void UploadedChunks::upload (Chunks& chunks, Texture2D& chunks_lut, Texture3D& v
 	for (auto& chunk : chunks.chunks) {
 		int2 pos = chunk.coord - min_chunk;
 		chunks_lut_data[pos.y * chunks_lut_size.x + pos.x] = (float)i;
-		
+
 		for (int z=0; z<CHUNK_DIM_Z; ++z) {
 			for (int y=0; y<CHUNK_DIM_Y; ++y) {
 				for (int x=0; x<CHUNK_DIM_X; ++x) {
-					uint8 id = (uint8)chunk.get_block(bpos(x,y,z)).id;
-		
+					block_id id = chunk.get_block(bpos(x,y,z)).id;
+
 					voxels[
 						i * CHUNK_DIM_Z*CHUNK_DIM_Y*CHUNK_DIM_X +
-						z * CHUNK_DIM_Y*CHUNK_DIM_X +
-						y * CHUNK_DIM_X +
-						x
+							z * CHUNK_DIM_Y*CHUNK_DIM_X +
+							y * CHUNK_DIM_X +
+							x
 					] = id;
 				}
 			}
 		}
-		
+
 		i++;
 	}
 
@@ -53,7 +89,22 @@ void UploadedChunks::upload (Chunks& chunks, Texture2D& chunks_lut, Texture3D& v
 	// arrange chunk data in a 2d grid or just use a different data structure, or use compute shaders
 
 	chunks_lut.upload(chunks_lut_data.ptr, chunks_lut_size, 1, false);
-	voxels_tex.upload(voxels.ptr, int3(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z * chunks_count), 1, false, false);
+	voxels_tex.upload_mip(0, voxels.ptr, int3(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z * chunks_count), GL_R16, GL_RED, GL_UNSIGNED_SHORT);
+
+	RawArray<block_id> prev = std::move(voxels);
+	int size = CHUNK_DIM_X;
+	int mip = 1;
+	while (size >= 2) {
+		size /= 2;
+	
+		auto cur = filter_octree_level(size, chunks_count, prev);
+	
+		voxels_tex.upload_mip(mip++, cur.ptr, int3(size, size, size * chunks_count), GL_R16, GL_RED, GL_UNSIGNED_SHORT);
+	
+		prev = std::move(cur);
+	}
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mip-1);
 };
 
 void Raytracer::regen_data (Chunks& chunks) {
@@ -94,38 +145,6 @@ void Raytracer::draw (Chunks& chunks, Graphics& graphics) {
 	}
 }
 
-RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev_level) {
-	RawArray<block_id> ret = RawArray<block_id>(size * size * size);
-
-	auto get = [&] (bpos xyz) {
-		return prev_level[xyz.z * size*2*size*2 + xyz.y * size*2 + xyz.x];
-	};
-
-	int out = 0;
-	for (int z=0; z<size; ++z) {
-		for (int y=0; y<size; ++y) {
-			for (int x=0; x<size; ++x) {
-				block_id blocks[8];
-				static int3 lut[] = { int3(0,0,0), int3(1,0,0), int3(0,1,0), int3(1,1,0), int3(0,0,1), int3(1,0,1), int3(0,1,1), int3(1,1,1) };
-				for (int i=0; i<8; ++i)
-					blocks[i] = get(bpos(x,y,z)*2 + lut[i]);
-
-				bool all_equal = true;
-				for (int i=1; i<8; ++i) {
-					if (blocks[i] != blocks[0]) {
-						all_equal = false;
-						break;
-					}
-				}
-
-				ret[out++] = all_equal ? blocks[0] : B_NULL; // B_NULL == not leaf node
-			}
-		}
-	}
-
-	return ret;
-}
-
 Octree build_octree (Chunk* chunk) {
 	static_assert(CHUNK_DIM_X == CHUNK_DIM_Y && CHUNK_DIM_X == CHUNK_DIM_Z);
 
@@ -148,7 +167,7 @@ Octree build_octree (Chunk* chunk) {
 	while (size >= 2) {
 		size /= 2;
 
-		auto l = filter_octree_level(size, o.octree_levels.back());
+		auto l = filter_octree_level(size, 1, o.octree_levels.back());
 
 		o.octree_levels.push_back(std::move(l));
 	}

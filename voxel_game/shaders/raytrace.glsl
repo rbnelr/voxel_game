@@ -102,7 +102,7 @@ bool uniform_hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, v
 	vox_uv.z += chunk_index * CHUNK_DIM;
 	vox_uv /= vec3(CHUNK_DIM, CHUNK_DIM, CHUNK_DIM * voxels_chunks_count);
 
-	float id = round(texture(voxels_tex, vox_uv).r * 255);
+	float id = round(textureLod(voxels_tex, vox_uv, 0).r * 65535);
 	if (id == 1.0) { // B_AIR == 1
 		return false;
 	}
@@ -265,18 +265,23 @@ Stackframe get_child (in Stackframe stk, int index, bvec3 mask) {
 bool eval_octree_cell (int depth, in Stackframe stk, out bool hit) {
 	vec3 size = stk.max - stk.min;
 	
+	depth = 6;
+
 	int level = MAX_DEPTH - depth;
 	int voxel_count = 1 << depth;
 	int voxel_size = CHUNK_DIM >> depth;
 
 	ivec3 voxel_pos = stk.pos;
-	voxel_pos.z += chunk_index * CHUNK_DIM;
 
-	int id = int(round(texelFetch(voxels_tex, voxel_pos, level).r * 255));
+	voxel_pos.z += chunk_index * voxel_count;
 
-	DEBUG(id == B_NULL ? 0.5 : 0);
 
-	//hit = id != B_NULL && id != B_AIR;
+	int id = int(round(texelFetch(voxels_tex, voxel_pos, level).r * 65535));
+
+	hit = id != B_NULL && id != B_AIR;
+	if (hit)
+		DEBUG(float(id) / 8);
+
 	return id == B_NULL; // true == need to drill further down into octree
 }
 
@@ -354,8 +359,6 @@ bool traverse_octree (in Stackframe _stk) {
 				} else {
 					op = RETURN;
 				}
-
-				//DEBUG(hit ? 0.5 : 0);
 			} break;
 
 			case LOOP_PRE_RECURSE: {
