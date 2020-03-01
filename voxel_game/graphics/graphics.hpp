@@ -390,6 +390,9 @@ struct TileTextures {
 
 		ImGui::SliderFloat("breaking_mutliplier", &breaking_mutliplier, 0, 3);
 
+		imgui_texture_debug("tile_textures", tile_textures);
+		imgui_texture_debug("breaking_textures", breaking_textures);
+
 		imgui_pop();
 	}
 };

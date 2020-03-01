@@ -41,23 +41,7 @@ public:
 	float iterations_visualize_max = 200.0f;
 	bool iterations_visualize = false;
 
-	void imgui (Chunks& chunks) {
-		if (!imgui_push("Raytracer")) return;
-
-		ImGui::Checkbox("draw", &raytracer_draw);
-		ImGui::Checkbox("overlay", &overlay);
-		ImGui::SliderFloat("slider", &slider, 0,1);
-		ImGui::SliderFloat("octree_slider", &octree_slider, 0,1);
-		ImGui::SliderFloat("view_dist", &view_dist, 0, 1000, "%.2f", 2);
-		ImGui::SliderFloat("iterations_visualize_max", &iterations_visualize_max, 0, 1500, "%.2f", 2);
-		ImGui::Checkbox("iterations_visualize", &iterations_visualize);
-
-		if (ImGui::Button("regen_data")) {
-			regen_data(chunks);
-		}
-
-		imgui_pop();
-	}
+	void imgui (Chunks& chunks);
 
 	void regen_data (Chunks& chunks);
 	void draw (Chunks& chunks, Graphics& graphics);

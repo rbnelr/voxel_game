@@ -102,7 +102,7 @@ bool uniform_hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, v
 	vox_uv.z += chunk_index * CHUNK_DIM;
 	vox_uv /= vec3(CHUNK_DIM, CHUNK_DIM, CHUNK_DIM * voxels_chunks_count);
 
-	float id = round(textureLod(voxels_tex, vox_uv, 0).r * 65535);
+	float id = round(textureLod(voxels_tex, vox_uv, 2).r * 65535);
 	if (id == 1.0) { // B_AIR == 1
 		return false;
 	}

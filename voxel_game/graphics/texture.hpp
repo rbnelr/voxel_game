@@ -115,6 +115,8 @@ class Texture2D {
 public:
 	int2 size; // size in pixels
 
+	gl::Texture const& get_tex () const { return tex; };
+
 	Texture2D ();
 
 	Texture2D (char const* filename, bool srgb=true, bool gen_mips=true);
@@ -178,6 +180,8 @@ class Texture3D {
 public:
 	int3 size; // size in pixels
 
+	gl::Texture const& get_tex () const { return tex; };
+
 	Texture3D ();
 
 	// Manual uploading of mipmaps might require
@@ -226,6 +230,8 @@ class Texture2DArray {
 public:
 	int2 size; // size in pixels
 	int count; // number of slots in array
+
+	gl::Texture const& get_tex () const { return tex; };
 
 	Texture2DArray ();
 
@@ -288,3 +294,17 @@ public:
 
 	void bind () const;
 };
+
+struct ImguiTextureWindow {
+	bool open;
+	GLuint tex;
+	int4 size;
+	bool tex_array = false;
+
+	Sampler sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
+};
+
+void imgui_texture_debug (const char* name, Texture2D const& tex);
+void imgui_texture_debug (const char* name, Texture2DArray const& tex);
+void imgui_texture_debug (const char* name, Texture3D const& tex);
+void imgui_texture_debug_4d (const char* name, Texture3D const& tex, int4 size);

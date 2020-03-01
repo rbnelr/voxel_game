@@ -149,9 +149,45 @@ static int          g_AttribLocationTex = 0, g_AttribLocationProjMtx = 0;       
 static int          g_AttribLocationVtxPos = 0, g_AttribLocationVtxUV = 0, g_AttribLocationVtxColor = 0; // Vertex attributes location
 static unsigned int g_VboHandle = 0, g_ElementsHandle = 0;
 
+float ortho_projection[4][4];
+
 #ifdef IMGUI_DONT_RECREATE_VAO
 static GLuint		g_vertex_array_object = 0;
 #endif
+
+#include "../graphics/texture.hpp"
+#include "../graphics/shaders.hpp"
+
+void begin_texture_window (const ImDrawList* parent_list, const ImDrawCmd* cmd) {
+	static Shader texture_window_shad = { "imgui_texture_window" };
+
+	auto* t = (ImguiTextureWindow*)(cmd->UserCallbackData);
+	
+	texture_window_shad.bind();
+	texture_window_shad.set_uniform("ProjMtx", *(float4x4*)&ortho_projection[0][0]);
+
+	if (t->tex_array) {
+		assert(t->size.w == 0);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, t->tex);
+	} else {
+		if (t->size.y == 0 && t->size.z == 0 && t->size.w == 0) {
+			glBindTexture(GL_TEXTURE_1D, t->tex);
+		} else if (t->size.z == 0 && t->size.w == 0) {
+			glBindTexture(GL_TEXTURE_2D, t->tex);
+		} else {
+			glBindTexture(GL_TEXTURE_3D, t->tex);
+		}
+	}
+
+	t->sampler.bind(0);
+}
+void end_texture_window (const ImDrawList* parent_list, const ImDrawCmd* cmd) {
+
+	glBindTexture(GL_TEXTURE_2D, g_FontTexture);
+	glBindSampler(0, 0); // We use combined texture/sampler state. Applications using GL 3.3 may set that otherwise.
+
+	glUseProgram(g_ShaderHandle);
+}
 
 // Functions
 bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
@@ -253,16 +289,18 @@ static void ImGui_ImplOpenGL3_SetupRenderState(ImDrawData* draw_data, int fb_wid
     float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
     float T = draw_data->DisplayPos.y;
     float B = draw_data->DisplayPos.y + draw_data->DisplaySize.y;
-    const float ortho_projection[4][4] =
-    {
-        { 2.0f/(R-L),   0.0f,         0.0f,   0.0f },
-        { 0.0f,         2.0f/(T-B),   0.0f,   0.0f },
-        { 0.0f,         0.0f,        -1.0f,   0.0f },
-        { (R+L)/(L-R),  (T+B)/(B-T),  0.0f,   1.0f },
-    };
+	const float _ortho_projection[4][4] = {
+		{ 2.0f/(R-L),   0.0f,         0.0f,   0.0f },
+		{ 0.0f,         2.0f/(T-B),   0.0f,   0.0f },
+		{ 0.0f,         0.0f,        -1.0f,   0.0f },
+		{ (R+L)/(L-R),  (T+B)/(B-T),  0.0f,   1.0f },
+	};
+	memcpy(ortho_projection, _ortho_projection, 4*4*sizeof(float));
+
     glUseProgram(g_ShaderHandle);
     glUniform1i(g_AttribLocationTex, 0);
     glUniformMatrix4fv(g_AttribLocationProjMtx, 1, GL_FALSE, &ortho_projection[0][0]);
+
 #ifdef GL_SAMPLER_BINDING
     glBindSampler(0, 0); // We use combined texture/sampler state. Applications using GL 3.3 may set that otherwise.
 #endif
@@ -350,6 +388,8 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
     ImVec2 clip_off = draw_data->DisplayPos;         // (0,0) unless using multi-viewports
     ImVec2 clip_scale = draw_data->FramebufferScale; // (1,1) unless using retina display which are often (2,2)
 
+	glBindTexture(GL_TEXTURE_2D, g_FontTexture);
+
     // Render command lists
     for (int n = 0; n < draw_data->CmdListsCount; n++)
     {
@@ -388,8 +428,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
                     else
                         glScissor((int)clip_rect.x, (int)clip_rect.y, (int)clip_rect.z, (int)clip_rect.w); // Support for GL 4.5 rarely used glClipControl(GL_UPPER_LEFT)
 
-                    // Bind texture, Draw
-                    glBindTexture(GL_TEXTURE_2D, (GLuint)(intptr_t)pcmd->TextureId);
+                    // Draw
 #if IMGUI_IMPL_OPENGL_MAY_HAVE_VTX_OFFSET
                     if (g_GlVersion >= 3200)
                         glDrawElementsBaseVertex(GL_TRIANGLES, (GLsizei)pcmd->ElemCount, sizeof(ImDrawIdx) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, (void*)(intptr_t)(pcmd->IdxOffset * sizeof(ImDrawIdx)), (GLint)pcmd->VtxOffset);

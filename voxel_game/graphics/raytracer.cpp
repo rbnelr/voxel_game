@@ -104,8 +104,29 @@ void UploadedChunks::upload (Chunks& chunks, Texture2D& chunks_lut, Texture3D& v
 		prev = std::move(cur);
 	}
 	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mip-1);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAX_LEVEL, mip-1);
 };
+
+void Raytracer::imgui (Chunks& chunks) {
+	if (!imgui_push("Raytracer")) return;
+
+	ImGui::Checkbox("draw", &raytracer_draw);
+	ImGui::Checkbox("overlay", &overlay);
+	ImGui::SliderFloat("slider", &slider, 0,1);
+	ImGui::SliderFloat("octree_slider", &octree_slider, 0,1);
+	ImGui::SliderFloat("view_dist", &view_dist, 0, 1000, "%.2f", 2);
+	ImGui::SliderFloat("iterations_visualize_max", &iterations_visualize_max, 0, 1500, "%.2f", 2);
+	ImGui::Checkbox("iterations_visualize", &iterations_visualize);
+
+	if (ImGui::Button("regen_data")) {
+		regen_data(chunks);
+	}
+
+	imgui_texture_debug("chunks_lut", chunks_lut);
+	imgui_texture_debug_4d("voxels_tex", voxels_tex, int4(CHUNK_DIM, uploaded_chunks.chunks_count));
+
+	imgui_pop();
+}
 
 void Raytracer::regen_data (Chunks& chunks) {
 	uploaded_chunks.upload(chunks, chunks_lut, voxels_tex);

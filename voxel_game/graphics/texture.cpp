@@ -159,3 +159,43 @@ void Texture2DArray::gen_mipmaps () {
 void Texture2DArray::bind () const {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
 }
+
+#include <string>
+#include <unordered_map>
+std::unordered_map<std::string, std::unique_ptr<ImguiTextureWindow>> textures;
+
+void begin_texture_window (const ImDrawList* parent_list, const ImDrawCmd* cmd);
+void end_texture_window (const ImDrawList* parent_list, const ImDrawCmd* cmd);
+
+void imgui_texture_debug (const char* name, Texture2D const& tex) {
+	
+}
+void imgui_texture_debug (const char* name, Texture2DArray const& tex) {
+	auto& t = textures[name];
+	if (!t) {
+		t = std::make_unique<ImguiTextureWindow>();
+		t->tex = tex.get_tex();
+		t->size = int4(tex.size, tex.count, 0);
+		t->tex_array = true;
+	}
+
+	ImGui::Checkbox(name, &t->open);
+	if (t->open && ImGui::Begin(name, &t->open)) {
+
+		ImGui::GetWindowDrawList()->AddCallback(begin_texture_window, t.get());
+
+		float w = ImGui::GetContentRegionAvail().x;
+
+		ImGui::Image((ImTextureID)&tex, ImVec2(w, w * (float)tex.size.y / (float)tex.size.x));
+
+		ImGui::GetWindowDrawList()->AddCallback(end_texture_window, nullptr);
+
+		ImGui::End();
+	}
+}
+void imgui_texture_debug (const char* name, Texture3D const& tex) {
+	
+}
+void imgui_texture_debug_4d (const char* name, Texture3D const& tex, int4 size) {
+	
+}
