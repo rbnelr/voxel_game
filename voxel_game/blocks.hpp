@@ -38,8 +38,7 @@ enum block_id : uint16_t {
 
 	BLOCK_IDS_COUNT		,
 
-	B_OUT_OF_BOUNDS		=BLOCK_IDS_COUNT,
-	B_NO_CHUNK			,
+	B_NO_CHUNK			=BLOCK_IDS_COUNT,
 
 	PSEUDO_BLOCK_IDS_COUNT,
 };
@@ -62,7 +61,7 @@ struct BlockTypes {
 		return c == CM_SOLID || c == CM_BREAKABLE;
 	}
 	inline bool grass_can_live_below (block_id id) {
-		return id == B_AIR || id == B_OUT_OF_BOUNDS || transparency[id] == TM_PARTIAL;
+		return id == B_AIR || transparency[id] == TM_PARTIAL;
 	}
 };
 
@@ -106,7 +105,6 @@ static inline BlockTypes load_block_types () {
 	/* B_LEAVES				*/ solid_alpha_test("leaves",    4);
 	/* B_TORCH				*/ torch("null", MAX_LIGHT_LEVEL - 1);
 
-	/* B_OUT_OF_BOUNDS		*/ gas();
 	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
 
 	return bt;
@@ -131,7 +129,6 @@ struct Block {
 };
 
 // global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
-static inline Block _OUT_OF_BOUNDS = B_OUT_OF_BOUNDS;
 static inline Block _NO_CHUNK      = B_NO_CHUNK     ;
 
 enum BlockFace {

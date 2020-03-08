@@ -79,9 +79,9 @@ void BlockUpdate::update_blocks (Chunks& chunks) {
 
 				// reconstruct 3d index from flat index
 				bpos bp;
-				bp.z =  indx / (CHUNK_DIM.y * CHUNK_DIM.x);
-				bp.y = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) / CHUNK_DIM.y;
-				bp.x = (indx % (CHUNK_DIM.y * CHUNK_DIM.x)) % CHUNK_DIM.y;
+				bp.z =  indx / (CHUNK_DIM * CHUNK_DIM);
+				bp.y = (indx % (CHUNK_DIM * CHUNK_DIM)) / CHUNK_DIM;
+				bp.x = (indx % (CHUNK_DIM * CHUNK_DIM)) % CHUNK_DIM;
 
 				// get block with flat index
 				Block b = chunk.get_block(bp);

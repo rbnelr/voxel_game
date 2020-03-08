@@ -300,6 +300,8 @@ void glfw_gameloop () {
 
 		glfwSwapBuffers(window);
 
+		_input = input;
+
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
 		_input.real_dt = (float)(now - prev) / (float)timestamp_freq;

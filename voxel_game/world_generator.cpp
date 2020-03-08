@@ -99,15 +99,17 @@ struct ChunkGenerator {
 	}
 
 	void gen () {
+		bpos chunk_origin = chunk.coord * CHUNK_DIM;
+
 		bpos_t water_level = 21;
 
 		bpos i; // position in chunk
-		for (i.z=0; i.z<CHUNK_DIM_Z; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
+		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
+			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
+				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
 					block_id b;
 
-					if (i.z <= water_level) {
+					if (i.z + chunk_origin.z <= water_level) {
 						b = B_WATER;
 					} else {
 						b = B_AIR;
@@ -132,16 +134,16 @@ struct ChunkGenerator {
 			return min_dist;
 		};
 
-		for (i.y=0; i.y<CHUNK_DIM_Y; ++i.y) {
-			for (i.x=0; i.x<CHUNK_DIM_X; ++i.x) {
+		for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
+			for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
 				
-				float2 pos_world = (float2)((bpos2)i +chunk.coord * CHUNK_DIM_2D);
+				bpos pos_world = bpos(i,0) + chunk_origin;
 
 				float earth_layer;
-				float height = heightmap(noise, pos_world, &earth_layer);
-				int highest_block = (int)floor(height -1 +0.5f); // -1 because height 1 means the highest block is z=0
+				float height = heightmap(noise, (float2)(int2)pos_world, &earth_layer);
+				int highest_block = (int)floor(height -1 +0.5f) - pos_world.z; // -1 because height 1 means the highest block is z=0
 
-				float tree_density = noise_tree_density(noise, pos_world);
+				float tree_density = noise_tree_density(noise, (float2)(int2)pos_world);
 
 				float tree_prox_prob = gradient<float>( find_min_tree_dist((bpos2)i), {
 					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
@@ -153,7 +155,7 @@ struct ChunkGenerator {
 				float effective_tree_prob = tree_density * tree_prox_prob;
 				//float effective_tree_prob = tree_density;
 
-				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM_Z-1); ++i.z) {
+				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM-1); ++i.z) {
 					auto* b = chunk.get_block_unchecked(i);
 
 					if (i.z <= highest_block - earth_layer) {
@@ -169,7 +171,7 @@ struct ChunkGenerator {
 
 				float tree_chance = rand.uniform();
 				if (	tree_chance < effective_tree_prob &&
-						highest_block >= 0 && highest_block < CHUNK_DIM_Z &&
+						highest_block >= 0 && highest_block < CHUNK_DIM &&
 						chunk.get_block(bpos(i.x, i.y, i.z)).id != B_WATER)
 					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
 

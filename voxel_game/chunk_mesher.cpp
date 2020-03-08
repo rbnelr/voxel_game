@@ -83,12 +83,12 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 	opaque_vertices = res->opaque_vertices.ptr;
 	tranparent_vertices = res->tranparent_vertices.ptr;
 
-	for (block_pos.z=0; block_pos.z<CHUNK_DIM_Z; ++block_pos.z) {
-		for (block_pos.y=0; block_pos.y<CHUNK_DIM_Y; ++block_pos.y) {
+	for (block_pos.z=0; block_pos.z<CHUNK_DIM; ++block_pos.z) {
+		for (block_pos.y=0; block_pos.y<CHUNK_DIM; ++block_pos.y) {
 
 			cur = &chunk->blocks[block_pos.z + 1][block_pos.y + 1][1];
 
-			for (block_pos.x=0; block_pos.x<CHUNK_DIM_X; ++block_pos.x) {
+			for (block_pos.x=0; block_pos.x<CHUNK_DIM; ++block_pos.x) {
 
 				if (cur->id != B_AIR) {
 					tile = tile_textures.block_tile_info[cur->id];
