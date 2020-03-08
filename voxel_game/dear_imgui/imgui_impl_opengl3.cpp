@@ -158,25 +158,80 @@ static GLuint		g_vertex_array_object = 0;
 #include "../graphics/texture.hpp"
 #include "../graphics/shaders.hpp"
 
+
+bool open;
+bool nearest = true;
+GLuint tex;
+int4 size;
+bool tex_array = false;
+float2 zw = 0;
+bool2 zw_flt = false;
+
 void begin_texture_window (const ImDrawList* parent_list, const ImDrawCmd* cmd) {
 	static Shader texture_window_shad = { "imgui_texture_window" };
 
 	auto* t = (ImguiTextureWindow*)(cmd->UserCallbackData);
+
+	int type = (t->dim - 1) + (t->tex_array ? 2 : 0);
+	
+	t->sampler.mag_filter = t->nearest ? gl::Enum::NEAREST : gl::Enum::LINEAR;
+	t->sampler.min_filter = t->nearest ? gl::Enum::NEAREST : gl::Enum::LINEAR_MIPMAP_LINEAR;
+
+	float4 index = t->offs * (float4)t->size;
+	float z = 0.0f;
+
+	switch (t->dim) {
+		case 2:
+			if (t->tex_array)
+				z = index.y;
+			break;
+		case 3:
+			if (t->tex_array)
+				z = index.z;
+			else
+				z = t->offs.z;
+			break;
+		case 4:
+			//int zw_size = t->size.z * t->size.w;
+			//int zw_size = t->size.z * t->size.w;
+			//
+			//if (t->tex_array)
+			//	z = index.;
+			//else
+			//	z = t->offs.z;
+			//
+			//z =  t->zw.x * (float)t->size.z;
+			//z += t->zw.y * (float)t->size.w;
+			//z /= (float)zw_size;
+			break;
+	}
 	
 	texture_window_shad.bind();
+
+	texture_window_shad.set_texture_unit("Texture1", 0);
+	texture_window_shad.set_texture_unit("Texture2", 0);
+	texture_window_shad.set_texture_unit("Texture3", 0);
+	texture_window_shad.set_texture_unit("Texture1A", 0);
+	texture_window_shad.set_texture_unit("Texture2A", 0);
+
 	texture_window_shad.set_uniform("ProjMtx", *(float4x4*)&ortho_projection[0][0]);
+	texture_window_shad.set_uniform("type", type);
+	texture_window_shad.set_uniform("z", z);
+
+	glActiveTexture(GL_TEXTURE0);
 
 	if (t->tex_array) {
-		assert(t->size.w == 0);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, t->tex);
+		if (t->dim == 2)
+			glBindTexture(GL_TEXTURE_1D_ARRAY, t->tex);
+		else if (t->dim == 3)
+			glBindTexture(GL_TEXTURE_2D_ARRAY, t->tex);
 	} else {
-		if (t->size.y == 0 && t->size.z == 0 && t->size.w == 0) {
+		if (t->dim == 1)
 			glBindTexture(GL_TEXTURE_1D, t->tex);
-		} else if (t->size.z == 0 && t->size.w == 0) {
+		else if (t->dim == 2)
 			glBindTexture(GL_TEXTURE_2D, t->tex);
-		} else {
+		else if (t->dim == 3 || t->dim == 4)
 			glBindTexture(GL_TEXTURE_3D, t->tex);
-		}
 	}
 
 	t->sampler.bind(0);

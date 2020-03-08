@@ -426,19 +426,29 @@ bool octree_raycast (vec3 ray_pos_, vec3 ray_dir_) {
 
 /////
 void main () {
+	//// Get a world space ray from a pixel coord for raytracing using inverse matricies
+	//// the ray starts on the near plane and goes in the direction away from the camera origin 
+
+	// gl_FragCoord.xy are pixel coords
 	vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
+
 	if (ndc.x > (slider * 2 - 1))
 		DISCARD();
-
+	
+	// get the correct clip.w for points on the near plane (Could be optimized to a constant)
 	vec4 near_plane_clip = cam_to_clip * vec4(0.0, 0.0, -clip_near, 1.0);
 
-	vec4 clip = vec4(ndc, -1.0, 1.0) * near_plane_clip.w; // ndc = clip / clip.w;
+	// undo perspective divide (ndc = clip / clip.w)
+	vec4 clip = vec4(ndc, -1.0, 1.0) * near_plane_clip.w;
 
+	// undo perspective transform
 	vec3 pos_cam = (clip_to_cam * clip).xyz;
-	vec3 dir_cam = normalize(pos_cam);
+	// ray dir is just the vector from the camera origin (0,0,0) to our point on the near plane
+	vec3 dir_cam = pos_cam;
 
-	vec3 ray_pos_world = ( cam_to_world * vec4(pos_cam, 1) ).xyz;
-	vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
+	// finally get the ray in world space
+	vec3 ray_pos_world =           ( cam_to_world * vec4(pos_cam, 1) ).xyz;
+	vec3 ray_dir_world = normalize(( cam_to_world * vec4(dir_cam, 0) ).xyz);
 
 	if (ndc.x > (octree_slider * 2 - 1))
 		uniform_raycast(ray_pos_world, ray_dir_world, view_dist);

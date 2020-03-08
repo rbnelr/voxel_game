@@ -177,10 +177,58 @@ void imgui_texture_debug (const char* name, Texture2DArray const& tex) {
 		t->tex = tex.get_tex();
 		t->size = int4(tex.size, tex.count, 0);
 		t->tex_array = true;
+		t->dim = 3;
 	}
+
+	auto slider_flt = [] (char const* name, float val) {
+		ImGui::SliderFloat(name, &val, 0, 1);
+		return val;
+	};
+	auto slider_int = [] (char const* name, float val, int size) {
+		int i = floori(val * (float)(size - 1));
+		ImGui::SliderInt(name, &i, 0, size - 1);
+		return ((float)i + 0.5f) / (size - 1);
+	};
+	auto slider = [&] (char const* name, float val, int size, bool* flt) {
+		if (*flt) {
+			val = slider_flt(name, val);
+		} else {
+			val = slider_int(name, val, size);
+		}
+
+		ImGui::PushID(name);
+
+		ImGui::SameLine();
+		ImGui::Checkbox("flt", flt);
+
+		ImGui::PopID();
+
+		return val;
+	};
 
 	ImGui::Checkbox(name, &t->open);
 	if (t->open && ImGui::Begin(name, &t->open)) {
+
+		ImGui::Checkbox("nearest", &t->nearest);
+
+		switch (t->dim) {
+			case 2:
+				if (t->tex_array)
+					t->offs.y = slider_int("index", t->offs.y, t->size.y);
+				break;
+			case 3:
+				if (t->tex_array)
+					t->offs.z = slider_int("index", t->offs.z, t->size.z);
+				else
+					t->offs.z = slider("z", t->offs.z, t->size.z, &t->zw_flt.x);
+				break;
+			case 4:
+				if (t->tex_array)
+					t->offs.w = slider_int("index", t->offs.w, t->size.w);
+				else
+					t->offs.w = slider("z", t->offs.w, t->size.w, &t->zw_flt.y);
+				break;
+		}
 
 		ImGui::GetWindowDrawList()->AddCallback(begin_texture_window, t.get());
 

@@ -299,7 +299,12 @@ struct ImguiTextureWindow {
 	bool open;
 	GLuint tex;
 	int4 size;
+	bool nearest = true;
 	bool tex_array = false;
+	int dim;
+
+	float4 offs = 0;
+	bool2 zw_flt = false;
 
 	Sampler sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 };
