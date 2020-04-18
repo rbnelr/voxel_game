@@ -49,7 +49,7 @@ public:
 		imgui_pop();
 	}
 
-	Block update_block (Chunks& chunks, Chunk& chunk, Block b, bpos pos_world);
+	bool update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world);
 	void update_blocks (Chunks& chunks);
 };
 
