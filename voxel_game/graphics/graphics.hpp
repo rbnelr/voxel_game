@@ -487,7 +487,7 @@ public:
 
 	void imgui (Chunks& chunks) {
 		if (frame_counter == 30) {
-			raytracer.regen_data(chunks);
+			//raytracer.regen_data(chunks);
 		}
 
 		if (ImGui::CollapsingHeader("Graphics")) {

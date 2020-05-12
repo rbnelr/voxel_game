@@ -121,6 +121,18 @@ public:
 
 	template <typename T>
 	inline Texture2D (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
+		upload(img, srgb, gen_mips);
+	}
+
+	// Manual uploading of mipmaps might require
+	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
+
+	void upload_mip (int mip, void const* data, int2 size, GLenum internal_format, GLenum format, GLenum type);
+
+	void upload (void const* data, int2 size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type);
+	
+	template <typename T>
+	inline void upload (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
 		constexpr auto format = get_format<T>();
 
 		if (format.flt) {
@@ -130,13 +142,6 @@ public:
 			upload((uint8_t*)img.data(), img.size, format.channels, srgb, gen_mips);
 		}
 	}
-
-	// Manual uploading of mipmaps might require
-	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
-
-	void upload_mip (int mip, void const* data, int2 size, GLenum internal_format, GLenum format, GLenum type);
-
-	void upload (void const* data, int2 size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type);
 
 	inline void upload (uint8_t const* data, int2 size, int channels, bool srgb, bool gen_mips) {
 		GLenum internal_format, format;
