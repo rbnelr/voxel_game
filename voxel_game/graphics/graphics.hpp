@@ -490,7 +490,7 @@ public:
 			//raytracer.regen_data(chunks);
 		}
 
-		if (ImGui::CollapsingHeader("Graphics")) {
+		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
 			common_uniforms.imgui();
 			fog.imgui();
 			player.imgui();

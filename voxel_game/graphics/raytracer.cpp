@@ -1,46 +1,7 @@
 ﻿#include "raytracer.hpp"
 #include "graphics.hpp"
 #include "../chunks.hpp"
-
-void Raytracer::raytrace (Chunks const& chunks) {
-
-	float aspect = (float)input.window_size.x / (float)input.window_size.y;
-
-	int2 res;
-	res.y = resolution;
-	res.x = roundi(aspect * (float)resolution);
-	res = max(res, 1);
-
-	if (!equal(renderimage.size, res)) {
-		renderimage = Image<lrgba>(res);
-	}
-
-	for (int y=0; y<res.y; ++y) {
-		for (int x=0; x<res.x; ++x) {
-			float2 col = (float2)int2(x,y) / (float2)res;
-			renderimage.set(x,y, lrgba(col, 0, 1));
-		}
-	}
-
-	rendertexture.upload(renderimage, false, false);
-}
-
-void Raytracer::draw () {
-	if (shader) {
-		shader.bind();
-	
-		glBindVertexArray(vao);
-
-		shader.set_uniform("slider", slider);
-
-		glActiveTexture(GL_TEXTURE0 + 0);
-		shader.set_texture_unit("rendertexture", 0);
-		voxel_sampler.bind(0);
-		rendertexture.bind();
-	
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-	}
-}
+#include "../util/timer.hpp"
 
 RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev_level) {
 	RawArray<block_id> ret = RawArray<block_id>(size * size * size);
@@ -127,7 +88,7 @@ void Octree::recurs_draw (int3 index, int level, float3 offset, int& cell_count)
 
 	auto b = get(index);
 	if (b != B_NULL) {
-		//debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
+		debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
 		cell_count++;
 	} else {
 		if (level > 0) {
@@ -344,4 +305,85 @@ void OctreeDevTest::draw (Chunks& chunks) {
 	ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
 
 	octree.raycast(ray);
+}
+
+#define TIME_START(name) auto __##name = Timer::start()
+#define TIME_END(name) auto __##name##_time = __##name.end()
+
+Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
+	float2 ndc = (float2)pixel / (float2)resolution * 2 - 1;
+
+	float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
+	//float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
+
+	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
+
+	float3 pos_cam = (float3)(view.clip_to_cam * clip);
+	float3 dir_cam = normalize(pos_cam);
+
+	Ray ray;
+	ray.pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
+	ray.dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
+
+	return ray;
+}
+
+lrgba raytrace_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
+	auto ray = ray_for_pixel(pixel, resolution, view);
+
+	return lrgba(ray.dir, 1);
+}
+
+////
+void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
+
+	Chunk* chunk;
+	chunks.query_block(floori(view.cam_to_world * float3(0)), &chunk);
+	if (!chunk) return;
+
+	TIME_START(build);
+	octree = build_octree(chunk);
+	TIME_END(build);
+
+	TIME_START(raytrace);
+	float aspect = (float)input.window_size.x / (float)input.window_size.y;
+
+	int2 res;
+	res.y = resolution;
+	res.x = roundi(aspect * (float)resolution);
+	res = max(res, 1);
+
+	if (!equal(renderimage.size, res)) {
+		renderimage = Image<lrgba>(res);
+	}
+
+	for (int y=0; y<res.y; ++y) {
+		for (int x=0; x<res.x; ++x) {
+			float4 col = raytrace_pixel(int2(x,y), res, view);
+			renderimage.set(x,y, col);
+		}
+	}
+	TIME_END(raytrace);
+
+	rendertexture.upload(renderimage, false, false);
+
+	ImGui::Text("Raytrace performance:  build_octree %7.3f ms  raytrace %7.3f ms", __build_time, __raytrace_time);
+
+}
+
+void Raytracer::draw () {
+	if (shader) {
+		shader.bind();
+
+		glBindVertexArray(vao);
+
+		shader.set_uniform("slider", slider);
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		shader.set_texture_unit("rendertexture", 0);
+		voxel_sampler.bind(0);
+		rendertexture.bind();
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
 }

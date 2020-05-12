@@ -759,7 +759,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		raytracer.raytrace(world.chunks);
+		raytracer.raytrace(world.chunks, view);
 		raytracer.draw();
 
 		if (!activate_flycam)

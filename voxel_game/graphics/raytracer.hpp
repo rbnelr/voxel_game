@@ -28,6 +28,8 @@ struct OctreeDevTest {
 class Raytracer {
 public:
 
+	Octree octree;
+
 	Shader shader = Shader("raytrace_display", { FOG_UNIFORMS });
 
 	gl::Vao vao; // empty vao even though I generate the mesh in the vertex shader, no vao works but generates an error on my machine
@@ -54,6 +56,6 @@ public:
 		imgui_pop();
 	}
 
-	void raytrace (Chunks const& chunks);
+	void raytrace (Chunks& chunks, Camera_View const& view);
 	void draw ();
 };
