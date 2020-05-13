@@ -3,6 +3,7 @@
 #include "../blocks.hpp"
 #include "../util/raw_array.hpp"
 
+class Chunk;
 class Chunks;
 class Graphics;
 
@@ -17,13 +18,43 @@ struct RaytraceHit {
 	operator bool () { return did_hit; }
 };
 
+// non-sparse (2 B per node)
+// ~3584 KB
+// ~13 ms
+
+// sparse (36 B per node)
+// ~762 KB
+// ~10.5 ms
+
+#define SPARSE_OCTREE 1
+
 struct Octree {
-	std::vector<RawArray<block_id>> octree_levels;
-	float3 pos;
+	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
+
+#if SPARSE_OCTREE
+	struct Node {
+		block_id bid; // == B_NULL -> this has child nodes   != B_NULL -> this is a leaf node
+
+		int children[8]; // chilren indicies into nodes, only valid if bid == B_NULL
+	};
+
+	std::vector<Node> nodes;
+	int root; // root index
+
+	int node_count;
+	int node_size = sizeof(Node);
+	int total_size;
+
+#else
 
 	int node_count;
 	int node_size = sizeof(block_id);
 	int total_size;
+#endif
+
+	float3 pos;
+
+	void build_non_sparse_octree (Chunk* chunk);
 
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 
