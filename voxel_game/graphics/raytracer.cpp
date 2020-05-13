@@ -112,6 +112,8 @@ struct ParametricOctreeTraverser {
 	Octree& octree;
 	RaytraceHit hit;
 
+	int iterations = 0;
+
 	int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
 	bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
 
@@ -215,6 +217,8 @@ struct ParametricOctreeTraverser {
 
 	bool traverse_subtree (OctreeNode node, float3 t0, float3 t1) {
 
+		iterations++;
+
 		if (any(t1 < 0))
 			return false;
 
@@ -249,22 +253,23 @@ struct ParametricOctreeTraverser {
 
 			//debug_graphics->push_wire_cube((float3)node.pos*(float)voxel_size + (float)voxel_size/2, (float)voxel_size, cols[node.level]);
 
-			auto get = [&] (int3 xyz) {
-				return octree.octree_levels[node.level][xyz.z * voxel_count*voxel_count + xyz.y * voxel_count + xyz.x];
-			};
+			auto b = octree.octree_levels[node.level][node.pos.z * voxel_count*voxel_count + node.pos.y * voxel_count + node.pos.x];
 
-			auto b = get(node.pos);
+			*stop_traversal = false;
 
-			bool did_hit = b != B_AIR;
-			if (did_hit) {
-				hit.did_hit = did_hit;
+			if (b == B_NULL)
+				return true; // need to decend further down into octree to find actual voxels
+
+			bool stop = b != B_AIR;
+			if (stop) {
+				hit.did_hit = true;
 				hit.id = b;
 				hit.dist = max_component(t0);
 				hit.pos_world = ray.pos + ray.dir * hit.dist;
 			}
 
-			*stop_traversal = did_hit;
-			return b == B_NULL; // true == need to drill further down into octree
+			*stop_traversal = stop;
+			return false;
 		}
 		
 	#if 0
@@ -281,7 +286,7 @@ struct ParametricOctreeTraverser {
 	}
 };
 
-RaytraceHit Octree::raycast (Ray ray) {
+RaytraceHit Octree::raycast (Ray ray, int* iterations) {
 
 	ParametricOctreeTraverser::OctreeNode o;
 	o.level = (int)octree_levels.size()-1;
@@ -292,30 +297,32 @@ RaytraceHit Octree::raycast (Ray ray) {
 
 	ParametricOctreeTraverser t = { *this };
 	t.traverse_octree(o, ray);
+
+	*iterations = t.iterations;
 	return t.hit;
 }
 
 void OctreeDevTest::draw (Chunks& chunks) {
-
-	ImGui::DragFloat3("ray.pos", &ray.pos.x, 0.05f);
-
-	ImGui::DragFloat2("ray_ang", &ray_ang.x, 1);
-	ray.dir = normalize( rotate3_Z(to_radians(ray_ang.x)) * rotate3_X(to_radians(ray_ang.y)) * float3(0,1,0) );
-
-	debug_graphics->push_arrow(ray.pos, ray.dir * 100, srgba(255,255,0));
-
-	Chunk* chunk;
-	chunks.query_block(floori(ray.pos), &chunk);
-	if (!chunk) return;
-
-	octree = build_octree(chunk);
-
-	int cell_count = 0;
-	octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world(), cell_count);
-
-	ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
-
-	octree.raycast(ray);
+	//
+	//ImGui::DragFloat3("ray.pos", &ray.pos.x, 0.05f);
+	//
+	//ImGui::DragFloat2("ray_ang", &ray_ang.x, 1);
+	//ray.dir = normalize( rotate3_Z(to_radians(ray_ang.x)) * rotate3_X(to_radians(ray_ang.y)) * float3(0,1,0) );
+	//
+	//debug_graphics->push_arrow(ray.pos, ray.dir * 100, srgba(255,255,0));
+	//
+	//Chunk* chunk;
+	//chunks.query_block(floori(ray.pos), &chunk);
+	//if (!chunk) return;
+	//
+	//octree = build_octree(chunk);
+	//
+	//int cell_count = 0;
+	//octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world(), cell_count);
+	//
+	//ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
+	//
+	//octree.raycast(ray);
 }
 
 #define TIME_START(name) auto __##name = Timer::start()
@@ -343,12 +350,37 @@ Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
 lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
 	auto ray = ray_for_pixel(pixel, renderimage.size, view);
 
-	auto hit = octree.raycast(ray);
+	int iterations;
+	auto hit = octree.raycast(ray, &iterations);
+
+	if (visualize_iterations) {
+		if (visualize_iterations_compare) {
+			int iterations_b;
+			raycast_voxels(ray, 9999, [&] (int3 voxel, int face, float dist) {
+				if (any(voxel < 0 || voxel > CHUNK_DIM)) return true;
+				return octree.octree_levels[0][voxel.z * CHUNK_DIM_Y*CHUNK_DIM_X + voxel.y * CHUNK_DIM_X + voxel.x] != B_AIR;
+			}, &iterations_b);
+
+			if (visualize_iterations_compare_diff) {
+				iterations = iterations - iterations_b;
+			} else {
+				if (pixel.x > (int)(renderimage.size.x * visualize_iterations_slider))
+					iterations = iterations_b;
+			}
+		}
+
+		float diff_mag = (float)abs(iterations) / (float)visualize_max_iter;
+
+		if (iterations > 0)
+			return lrgba(diff_mag, 0, 0, 1);
+		else
+			return lrgba(0, diff_mag, 0, 1);
+	}
 
 	if (!hit)
 		return lrgba(0,0,0,0);
 
-	return lrgba((float3)hit.dist / visualize_dist, 1);
+	return lrgba((float3)hit.dist / 100, 1);
 }
 
 ////

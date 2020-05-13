@@ -23,7 +23,7 @@ struct Octree {
 
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 
-	RaytraceHit raycast (Ray ray);
+	RaytraceHit raycast (Ray ray, int* iterations);
 };
 
 struct OctreeDevTest {
@@ -53,7 +53,13 @@ public:
 	bool raytracer_draw = true;
 	bool overlay = false;
 	float slider = 0.7f;
-	float visualize_dist = 32;
+
+	bool visualize_iterations = true;
+	int visualize_max_iter = 64;
+
+	bool visualize_iterations_compare = true;
+	bool visualize_iterations_compare_diff = true;
+	float visualize_iterations_slider = 0.5f;
 
 	int resolution = 100; // vertical
 
@@ -63,7 +69,13 @@ public:
 		ImGui::Checkbox("draw", &raytracer_draw);
 		ImGui::Checkbox("overlay", &overlay);
 		ImGui::SliderFloat("slider", &slider, 0,1);
-		ImGui::DragFloat("visualize_dist", &visualize_dist, .05f);
+
+		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
+		ImGui::DragInt("visualize_max_iter", &visualize_max_iter, .05f);
+
+		ImGui::Checkbox("visualize_iterations_compare", &visualize_iterations_compare);
+		ImGui::Checkbox("visualize_iterations_compare_diff", &visualize_iterations_compare);
+		ImGui::SliderFloat("visualize_iterations_slider", &visualize_iterations_slider, 0,1);
 
 		ImGui::SliderInt("resolution", &resolution, 1, 1440);
 
