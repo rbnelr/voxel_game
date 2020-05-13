@@ -77,12 +77,12 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 	int voxel_count = CHUNK_DIM_X >> level;
 
+	octree->nodes[idx]._children = 0; // clears has_children
 	octree->nodes[idx].bid = octree->levels[level][pos.z * voxel_count*voxel_count + pos.y * voxel_count + pos.x];
-	octree->nodes[idx].children = 0;
 
 	if (level > 0 && octree->nodes[idx].bid == B_NULL) {
-		int children_idx = (int)octree->nodes.size();
-		octree->nodes[idx].children = children_idx;
+		uint32_t children_idx = (uint32_t)octree->nodes.size();
+		octree->nodes[idx].set_children_indx(children_idx);
 		
 		octree->nodes.resize(children_idx + 8); // push 8 consecutive children nodes
 		
@@ -188,7 +188,7 @@ struct ParametricOctreeTraverser {
 			OctreeNode ret;
 
 		#if SPARSE_OCTREE
-			ret.oct_idx = octree.nodes[oct_idx].children + index;
+			ret.oct_idx = octree.nodes[oct_idx].children_indx() + index;
 		#else
 			ret.pos = pos * 2 + child_offset_lut[index];
 		#endif
@@ -298,21 +298,20 @@ struct ParametricOctreeTraverser {
 	}
 
 	bool eval_octree_cell (OctreeNode node, float3 t0, float3 t1, bool* stop_traversal) {
-		float3 size = node.max - node.min;
+		//float3 size = node.max - node.min;
 		{
-			int voxel_count = CHUNK_DIM_X >> node.level;
-			int voxel_size = 1 << node.level;
+			//int voxel_count = CHUNK_DIM_X >> node.level;
+			//int voxel_size = 1 << node.level;
+
+			*stop_traversal = false;
+			if (octree.nodes[node.oct_idx].has_children())
+				return true; // need to decend further down into octree to find actual voxels
 
 		#if SPARSE_OCTREE
 			auto b = octree.nodes[node.oct_idx].bid;
 		#else
 			auto b = octree.levels[node.level][node.pos.z * voxel_count*voxel_count + node.pos.y * voxel_count + node.pos.x];
 		#endif
-
-			*stop_traversal = false;
-
-			if (b == B_NULL)
-				return true; // need to decend further down into octree to find actual voxels
 
 			bool stop = b != B_AIR;
 			if (stop) {

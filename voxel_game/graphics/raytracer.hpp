@@ -36,11 +36,25 @@ struct Octree {
 	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
 
 #if SPARSE_OCTREE
-	struct Node {
-		block_id bid; // == B_NULL -> this has child nodes   != B_NULL -> this is a leaf node
+	union Node {
+		// MSB set if has children, mask MSB to zero to get actual children index
+		// after masking MSB to 0 -> index of 8 consecutive chilren nodes in nodes array, only valid if bid == B_NULL
+		uint32_t _children;
+		
+		struct { // payload if leaf node, ie. when !has_children
+			block_id bid; // == B_NULL -> this has child nodes   != B_NULL -> this is a leaf node
+			uint16_t _padding;
+		};
 
-		// 16 bit won't be garantueed to be enough in practice
-		uint16_t children; // index of 8 consecutive chilren nodes in nodes array, only valid if bid == B_NULL
+		bool has_children () {
+			return _children & 0x80000000u;
+		}
+		uint32_t children_indx () {
+			return _children & 0x7fffffffu;
+		}
+		void set_children_indx (uint32_t childen_indx) {
+			_children = childen_indx | 0x80000000u;
+		}
 	};
 
 	std::vector<Node> nodes;
