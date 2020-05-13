@@ -23,7 +23,7 @@ struct Octree {
 
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 
-	RaytraceHit raycast (Ray ray, int* iterations);
+	RaytraceHit raycast (Ray ray, int* iterations=nullptr);
 };
 
 struct OctreeDevTest {
@@ -54,12 +54,12 @@ public:
 	bool overlay = false;
 	float slider = 0.7f;
 
-	bool visualize_iterations = true;
-	int visualize_max_iter = 64;
+	bool visualize_time = true;
+	int visualize_max_time = 250;
 
-	bool visualize_iterations_compare = true;
-	bool visualize_iterations_compare_diff = true;
-	float visualize_iterations_slider = 0.5f;
+	bool visualize_time_compare = true;
+	bool visualize_time_compare_diff = true;
+	float visualize_time_slider = 0.5f;
 
 	int resolution = 100; // vertical
 
@@ -70,12 +70,12 @@ public:
 		ImGui::Checkbox("overlay", &overlay);
 		ImGui::SliderFloat("slider", &slider, 0,1);
 
-		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
-		ImGui::DragInt("visualize_max_iter", &visualize_max_iter, .05f);
+		ImGui::Checkbox("visualize_time", &visualize_time);
+		ImGui::DragInt("visualize_max_time", &visualize_max_time, 1);
 
-		ImGui::Checkbox("visualize_iterations_compare", &visualize_iterations_compare);
-		ImGui::Checkbox("visualize_iterations_compare_diff", &visualize_iterations_compare);
-		ImGui::SliderFloat("visualize_iterations_slider", &visualize_iterations_slider, 0,1);
+		ImGui::Checkbox("visualize_time_compare", &visualize_time_compare);
+		ImGui::Checkbox("visualize_time_compare_diff", &visualize_time_compare_diff);
+		ImGui::SliderFloat("visualize_time_slider", &visualize_time_slider, 0,1);
 
 		ImGui::SliderInt("resolution", &resolution, 1, 1440);
 

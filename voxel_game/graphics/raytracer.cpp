@@ -298,7 +298,7 @@ RaytraceHit Octree::raycast (Ray ray, int* iterations) {
 	ParametricOctreeTraverser t = { *this };
 	t.traverse_octree(o, ray);
 
-	*iterations = t.iterations;
+	if (iterations) *iterations = t.iterations;
 	return t.hit;
 }
 
@@ -350,28 +350,30 @@ Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
 lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
 	auto ray = ray_for_pixel(pixel, renderimage.size, view);
 
-	int iterations;
-	auto hit = octree.raycast(ray, &iterations);
+auto time0 = get_timestamp();
+	auto hit = octree.raycast(ray);
+auto time = (int)(get_timestamp() - time0);
 
-	if (visualize_iterations) {
-		if (visualize_iterations_compare) {
-			int iterations_b;
+	if (visualize_time) {
+		if (visualize_time_compare) {
+		auto time1 = get_timestamp();
 			raycast_voxels(ray, 9999, [&] (int3 voxel, int face, float dist) {
 				if (any(voxel < 0 || voxel > CHUNK_DIM)) return true;
 				return octree.octree_levels[0][voxel.z * CHUNK_DIM_Y*CHUNK_DIM_X + voxel.y * CHUNK_DIM_X + voxel.x] != B_AIR;
-			}, &iterations_b);
+			});
+		auto time_b = (int)(get_timestamp() - time1);
 
-			if (visualize_iterations_compare_diff) {
-				iterations = iterations - iterations_b;
+			if (visualize_time_compare_diff) {
+				time = time - time_b;
 			} else {
-				if (pixel.x > (int)(renderimage.size.x * visualize_iterations_slider))
-					iterations = iterations_b;
+				if (pixel.x > (int)(renderimage.size.x * visualize_time_slider))
+					time = time_b;
 			}
 		}
 
-		float diff_mag = (float)abs(iterations) / (float)visualize_max_iter;
+		float diff_mag = (float)abs(time) / (float)visualize_max_time;
 
-		if (iterations > 0)
+		if (time > 0)
 			return lrgba(diff_mag, 0, 0, 1);
 		else
 			return lrgba(0, diff_mag, 0, 1);
