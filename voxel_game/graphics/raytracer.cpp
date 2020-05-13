@@ -105,11 +105,17 @@ void Octree::recurs_draw (int3 index, int level, float3 offset, int& cell_count)
 }
 
 struct ParametricOctreeTraverser {
-	Octree& octree;
-	
 	// An Efficient Parametric Algorithm for Octree Traversal
 	// J. Revelles, C.Ure ̃na, M.Lastra
 	// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
+
+	Octree& octree;
+	RaytraceHit hit;
+
+	int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+	bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+
+	Ray ray;
 
 	static constexpr int3 child_offset_lut[8] = {
 		int3(0,0,0),
@@ -141,11 +147,17 @@ struct ParametricOctreeTraverser {
 		}
 	};
 
-	int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-	bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-	
-	Ray ray;
-	
+	static constexpr int node_seq_lut[8][3] = {
+		{ 1, 2, 4 }, // 001 010 100
+		{ 8, 3, 5 }, //   - 011 101
+		{ 3, 8, 6 }, // 011   - 110
+		{ 8, 8, 7 }, //   -   - 111
+		{ 5, 6, 8 }, // 101 110   -
+		{ 8, 7, 8 }, //   - 111   -
+		{ 7, 8, 8 }, // 111   -   -
+		{ 8, 8, 8 }, //   -   -   -
+	};
+
 	void traverse_octree (OctreeNode root, Ray ray) {
 		this->ray = ray;
 		mirror_mask_int = 0;
@@ -168,13 +180,13 @@ struct ParametricOctreeTraverser {
 		if (max_component(t0) < min_component(t1))
 			traverse_subtree(root, t0, t1);
 
-		debug_graphics->push_point(t0.x * ray.dir + ray.pos, 0.2f, lrgba(1,0,0,1));
-		debug_graphics->push_point(t0.y * ray.dir + ray.pos, 0.2f, lrgba(0,1,0,1));
-		debug_graphics->push_point(t0.z * ray.dir + ray.pos, 0.2f, lrgba(0,0,1,1));
-
-		debug_graphics->push_point(t1.x * ray.dir + ray.pos, 0.2f, lrgba(1,0,0,1));
-		debug_graphics->push_point(t1.y * ray.dir + ray.pos, 0.2f, lrgba(0,1,0,1));
-		debug_graphics->push_point(t1.z * ray.dir + ray.pos, 0.2f, lrgba(0,0,1,1));
+		//debug_graphics->push_point(t0.x * ray.dir + ray.pos, 0.2f, lrgba(1,0,0,1));
+		//debug_graphics->push_point(t0.y * ray.dir + ray.pos, 0.2f, lrgba(0,1,0,1));
+		//debug_graphics->push_point(t0.z * ray.dir + ray.pos, 0.2f, lrgba(0,0,1,1));
+		//
+		//debug_graphics->push_point(t1.x * ray.dir + ray.pos, 0.2f, lrgba(1,0,0,1));
+		//debug_graphics->push_point(t1.y * ray.dir + ray.pos, 0.2f, lrgba(0,1,0,1));
+		//debug_graphics->push_point(t1.z * ray.dir + ray.pos, 0.2f, lrgba(0,0,1,1));
 	}
 
 	int first_node (float3 t0, float3 tm) {
@@ -200,17 +212,6 @@ struct ParametricOctreeTraverser {
 
 		return indices[min_comp];
 	}
-
-	static constexpr int node_seq_lut[8][3] = {
-		{ 1, 2, 4 }, // 001 010 100
-		{ 8, 3, 5 }, //   - 011 101
-		{ 3, 8, 6 }, // 011   - 110
-		{ 8, 8, 7 }, //   -   - 111
-		{ 5, 6, 8 }, // 101 110   -
-		{ 8, 7, 8 }, //   - 111   -
-		{ 7, 8, 8 }, // 111   -   -
-		{ 8, 8, 8 }, //   -   -   -
-	};
 
 	bool traverse_subtree (OctreeNode node, float3 t0, float3 t1) {
 
@@ -246,14 +247,23 @@ struct ParametricOctreeTraverser {
 			int voxel_count = CHUNK_DIM_X >> node.level;
 			int voxel_size = 1 << node.level;
 
-			debug_graphics->push_wire_cube((float3)node.pos*(float)voxel_size + (float)voxel_size/2, (float)voxel_size, cols[node.level]);
+			//debug_graphics->push_wire_cube((float3)node.pos*(float)voxel_size + (float)voxel_size/2, (float)voxel_size, cols[node.level]);
 
 			auto get = [&] (int3 xyz) {
 				return octree.octree_levels[node.level][xyz.z * voxel_count*voxel_count + xyz.y * voxel_count + xyz.x];
 			};
 
 			auto b = get(node.pos);
-			*stop_traversal = b != B_AIR;
+
+			bool did_hit = b != B_AIR;
+			if (did_hit) {
+				hit.did_hit = did_hit;
+				hit.id = b;
+				hit.dist = max_component(t0);
+				hit.pos_world = ray.pos + ray.dir * hit.dist;
+			}
+
+			*stop_traversal = did_hit;
 			return b == B_NULL; // true == need to drill further down into octree
 		}
 		
@@ -271,7 +281,7 @@ struct ParametricOctreeTraverser {
 	}
 };
 
-void Octree::raycast (Ray ray) {
+RaytraceHit Octree::raycast (Ray ray) {
 
 	ParametricOctreeTraverser::OctreeNode o;
 	o.level = (int)octree_levels.size()-1;
@@ -282,6 +292,7 @@ void Octree::raycast (Ray ray) {
 
 	ParametricOctreeTraverser t = { *this };
 	t.traverse_octree(o, ray);
+	return t.hit;
 }
 
 void OctreeDevTest::draw (Chunks& chunks) {
@@ -311,27 +322,33 @@ void OctreeDevTest::draw (Chunks& chunks) {
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
 Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
-	float2 ndc = (float2)pixel / (float2)resolution * 2 - 1;
+	float2 ndc = ((float2)pixel + 0.5f) / (float2)resolution * 2 - 1;
 
-	float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
-	//float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
+	//float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
+	float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
 
 	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
 
 	float3 pos_cam = (float3)(view.clip_to_cam * clip);
-	float3 dir_cam = normalize(pos_cam);
+	float3 dir_cam = pos_cam;
 
 	Ray ray;
 	ray.pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
 	ray.dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
+	ray.dir = normalize(ray.dir);
 
 	return ray;
 }
 
-lrgba raytrace_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
-	auto ray = ray_for_pixel(pixel, resolution, view);
+lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
+	auto ray = ray_for_pixel(pixel, renderimage.size, view);
 
-	return lrgba(ray.dir, 1);
+	auto hit = octree.raycast(ray);
+
+	if (!hit)
+		return lrgba(0,0,0,0);
+
+	return lrgba((float3)hit.dist / visualize_dist, 1);
 }
 
 ////
@@ -359,7 +376,7 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 
 	for (int y=0; y<res.y; ++y) {
 		for (int x=0; x<res.x; ++x) {
-			float4 col = raytrace_pixel(int2(x,y), res, view);
+			float4 col = raytrace_pixel(int2(x,y), view);
 			renderimage.set(x,y, col);
 		}
 	}
@@ -367,7 +384,7 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 
 	rendertexture.upload(renderimage, false, false);
 
-	ImGui::Text("Raytrace performance:  build_octree %7.3f ms  raytrace %7.3f ms", __build_time, __raytrace_time);
+	ImGui::Text("Raytrace performance:  build_octree %7.3f ms  raytrace %7.3f ms", __build_time * 1000, __raytrace_time * 1000);
 
 }
 
