@@ -26,6 +26,10 @@ struct RaytraceHit {
 // ~762 KB
 // ~10.5 ms
 
+// sparse, memory optimized (4 B per node)
+// ~84.7 KB
+// ~10 ms
+
 #define SPARSE_OCTREE 1
 
 struct Octree {
@@ -35,7 +39,8 @@ struct Octree {
 	struct Node {
 		block_id bid; // == B_NULL -> this has child nodes   != B_NULL -> this is a leaf node
 
-		int children[8]; // chilren indicies into nodes, only valid if bid == B_NULL
+		// 16 bit won't be garantueed to be enough in practice
+		uint16_t children; // index of 8 consecutive chilren nodes in nodes array, only valid if bid == B_NULL
 	};
 
 	std::vector<Node> nodes;

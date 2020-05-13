@@ -74,23 +74,22 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 
 #if SPARSE_OCTREE
 // build sparse octree depth-first
-int recurse_build_sparse_octree(int level, int3 pos, Octree* octree) {
-	int idx = (int)octree->nodes.size();
-	octree->nodes.emplace_back();
-
+int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 	int voxel_count = CHUNK_DIM_X >> level;
 
 	octree->nodes[idx].bid = octree->levels[level][pos.z * voxel_count*voxel_count + pos.y * voxel_count + pos.x];
-	for (int i=0; i<8; ++i)
-		octree->nodes[idx].children[i] = 0;
+	octree->nodes[idx].children = 0;
 
 	if (level > 0 && octree->nodes[idx].bid == B_NULL) {
+		int children_idx = (int)octree->nodes.size();
+		octree->nodes[idx].children = children_idx;
+		
+		octree->nodes.resize(children_idx + 8); // push 8 consecutive children nodes
+		
 		for (int i=0; i<8; ++i) {
 			int3 child_pos = pos * 2 + child_offset_lut[i];
 
-			int child_idx = recurse_build_sparse_octree(level - 1, child_pos, octree);
-
-			octree->nodes[idx].children[i] = child_idx;
+			int child_idx = recurse_build_sparse_octree(children_idx + i, level - 1, child_pos, octree);
 		}
 	}
 
@@ -106,7 +105,9 @@ Octree build_octree (Chunk* chunk) {
 	o.build_non_sparse_octree(chunk);
 
 #if SPARSE_OCTREE
-	o.root = recurse_build_sparse_octree((int)o.levels.size() - 1, 0, &o);
+	o.nodes.emplace_back(); // push root
+	o.root = 0;
+	recurse_build_sparse_octree(0, (int)o.levels.size() - 1, 0, &o);
 
 	o.node_count = (int)o.nodes.size();
 	o.total_size = o.node_count * o.node_size;
@@ -187,7 +188,7 @@ struct ParametricOctreeTraverser {
 			OctreeNode ret;
 
 		#if SPARSE_OCTREE
-			ret.oct_idx = octree.nodes[oct_idx].children[index];
+			ret.oct_idx = octree.nodes[oct_idx].children + index;
 		#else
 			ret.pos = pos * 2 + child_offset_lut[index];
 		#endif
