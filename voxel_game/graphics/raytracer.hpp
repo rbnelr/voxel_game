@@ -21,6 +21,10 @@ struct Octree {
 	std::vector<RawArray<block_id>> octree_levels;
 	float3 pos;
 
+	int node_count;
+	int node_size = sizeof(block_id);
+	int total_size;
+
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 
 	RaytraceHit raycast (Ray ray, int* iterations=nullptr);

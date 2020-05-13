@@ -63,6 +63,8 @@ Octree build_octree (Chunk* chunk) {
 	}
 
 	o.pos = (float3)chunk->chunk_pos_world();
+	o.node_count = (int)(o.octree_levels.size() * CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z);
+	o.total_size = o.node_count * o.node_size;
 	return o;
 }
 
@@ -395,6 +397,8 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 	TIME_START(build);
 	octree = build_octree(chunk);
 	TIME_END(build);
+
+	ImGui::Text("Octree stats:  node_count %d  node_size %d B  total_size %.3f KB", octree.node_count, octree.node_size, octree.total_size / 1024.0f);
 
 	TIME_START(raytrace);
 	float aspect = (float)input.window_size.x / (float)input.window_size.y;
