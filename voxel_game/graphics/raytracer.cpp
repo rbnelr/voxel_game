@@ -3,6 +3,12 @@
 #include "../util/timer.hpp"
 #include "../chunks.hpp"
 
+#include "../util/simd.hpp"
+
+//#define DECL 
+#define DECL _declspec(noinline)
+#define CALL _vectorcall
+
 static constexpr int3 child_offset_lut[8] = {
 	int3(0,0,0),
 	int3(1,0,0),
@@ -14,6 +20,247 @@ static constexpr int3 child_offset_lut[8] = {
 	int3(1,1,1),
 };
 
+struct sse_RaytraceHit {
+	sse_bool did_hit = false;
+
+	sse_float dist;
+	sse_float3 pos_world;
+
+	sse_int bid;
+};
+
+struct SIMD_Raytracer {
+
+	Octree& octree;
+	Image<lrgba>& renderimage;
+	Camera_View const& view;
+	Raytracer& r;
+
+	//
+	sse_RaytraceHit hit;
+
+	//
+	#define PIXEL_PATTERN sse_int2{ SETi(0,1,0,1,0,1,0,1), SETi(0,0,1,1,2,2,3,3) }
+
+	sse_int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
+	sse_bool3 mirror_mask;
+
+	sse_float3 ray_pos;
+	sse_float3 ray_dir;
+
+	// An Efficient Parametric Algorithm for Octree Traversal
+	// J. Revelles, C.Ure ̃na, M.Lastra
+	// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
+		
+	struct sse_OctreeNode {
+		sse_int node_data;
+		int level;
+		sse_float3 min;
+		sse_float3 mid;
+		sse_float3 max;
+
+		DECL sse_OctreeNode CALL get_child (sse_int index, sse_bool3 mask, Octree const& octree, sse_bool active) const {
+			sse_OctreeNode ret;
+
+			sse_int child_indicies = (node_data & sse_int(0x7fffffffu)) + index;
+
+			ret.node_data = gather(&octree.nodes[0], child_indicies, active, 0);
+			ret.level = level - 1;
+			ret.min = select(mask, mid, min);
+			ret.max = select(mask, max, mid);
+			ret.mid = 0.5f * (ret.max + ret.min);
+
+			return ret;
+		}
+	};
+
+	static constexpr int node_seq_lut[8*4] = {
+		1, 2, 4,  -1, // 001 010 100
+		8, 3, 5,  -1, //   - 011 101
+		3, 8, 6,  -1, // 011   - 110
+		8, 8, 7,  -1, //   -   - 111
+		5, 6, 8,  -1, // 101 110   -
+		8, 7, 8,  -1, //   - 111   -
+		7, 8, 8,  -1, // 111   -   -
+		8, 8, 8,  -1, //   -   -   -
+	};
+
+	DECL void CALL traverse_octree (sse_OctreeNode const& root) {
+		mirror_mask_int = 0;
+
+		for (int i=0; i<3; ++i) {
+			sse_bool mask = ray_dir[i] < 0;
+			ray_pos[i] = select(mask, fmsub(root.mid[i], 2, ray_pos[i]), ray_pos[i]);
+			ray_dir[i] = select(mask, -ray_dir[i], ray_dir[i]);
+			mirror_mask[i] = mask;
+			mirror_mask_int = mirror_mask_int | (sse_int(1 << i) & (sse_int)mask);
+		}
+
+		sse_float3 rdir_inv = 1.0f / ray_dir;
+
+		sse_float3 t0 = (root.min - ray_pos) * rdir_inv;
+		sse_float3 t1 = (root.max - ray_pos) * rdir_inv;
+
+		sse_bool active = max_component(t0) < min_component(t1);
+		if (any(active))
+			traverse_subtree(root, t0, t1, active);
+	}
+
+	DECL sse_int CALL first_node (sse_float3 t0, sse_float3 tm) {
+		sse_float cond = max_component(t0);
+
+		sse_int ret;
+		ret =        (sse_int)(tm.x < cond) & 1;
+		ret = ret | ((sse_int)(tm.y < cond) & 2);
+		ret = ret | ((sse_int)(tm.z < cond) & 4);
+		return ret;
+	}
+	DECL sse_int CALL next_node (sse_float3 t1, sse_int indices_offset, sse_bool active) {
+		sse_int min_comp = min_component_indx(t1);
+
+		return gather(node_seq_lut, min_comp + indices_offset, active, sse_int(8));
+	}
+
+	DECL sse_bool CALL traverse_subtree (sse_OctreeNode const& node, sse_float3 t0, sse_float3 t1, sse_bool active=true) {
+
+		active = active & (min_component(t1) >= 0); // if (min_component(t1) < 0) return false;
+		
+		sse_bool stop;
+		sse_bool decend = eval_octree_cell(node, t0, t1, active, &stop);
+		active = decend;
+
+		if (any(decend)) {
+
+			sse_float3 tm = select(ray_dir != 0.0f, 0.5f * (t0 + t1), select(ray_pos < node.mid, float3(+INF), float3(-INF)));
+
+			sse_int cur_node = first_node(t0, tm);
+			
+			do {
+				sse_bool3 mask;
+				mask.x = (cur_node & sse_int(1)) == 1;
+				mask.y = (cur_node & sse_int(2)) == 2;
+				mask.z = (cur_node & sse_int(4)) == 4;
+
+				auto inner_stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask_int, mask ^ mirror_mask, octree, active),
+					select(mask, tm, t0), select(mask, t1, tm), active);
+
+				active = active & !stop;
+				stop = stop | (inner_stop);
+
+				//if (all(!active))
+				//	break;
+
+				cur_node = next_node(select(mask, t1, tm), cur_node << 2, active); // * 4 to get right offset for row in node_seq_lut
+
+				active = active & cur_node < 8;
+			} while (any(active));
+		}
+
+		return stop;
+	}
+
+	DECL sse_bool CALL eval_octree_cell (sse_OctreeNode const& node, sse_float3 t0, sse_float3 t1, sse_bool active, sse_bool* stop_traversal) {
+		
+		sse_bool has_children = (node.node_data & sse_int(0x80000000u)) == sse_int(0x80000000u);
+
+		sse_bool decend = has_children; // need to decend further down into octree to find actual voxels
+		{ // if (has_children) return true; // need to decend further down into octree to find actual voxels
+			sse_int bid = node.node_data; // octree.nodes[node.oct_idx].bid;
+
+			sse_bool did_hit = !(decend | (bid == (sse_int)B_AIR)) & active;
+			{ // if (did_hit)
+				sse_float hit_dist = max_component(t0);
+				sse_float3 pos_world = fmadd(ray_dir, hit_dist, ray_pos);
+
+				hit.did_hit		= select(did_hit, sse_bool(true),	hit.did_hit);
+				hit.bid			= select(did_hit, bid,				hit.bid);
+				hit.dist		= select(did_hit, hit_dist,			hit.dist);
+				hit.pos_world	= select(did_hit, pos_world,		hit.pos_world);
+			}
+
+			*stop_traversal = did_hit | !active;
+		}
+		return decend & active;
+	}
+
+	DECL void CALL raycast () {
+
+		sse_OctreeNode o;
+		o.node_data = octree.root | 0x80000000;
+		o.level = (int)octree.levels.size() - 1;
+		o.min = octree.pos;
+		o.max = octree.pos + (float3)(float)(1 << o.level);
+		o.mid = 0.5f * (o.min + o.max);
+
+		traverse_octree(o);
+	}
+
+	#define TIME_START(name) auto __##name = Timer::start()
+	#define TIME_END(name) auto __##name##_time = __##name.end()
+	
+	DECL void CALL ray_for_pixel (sse_int2 pixel, sse_float2 ndc_scale, sse_float2 ndc_offs) {
+		sse_float2 ndc = fmadd((sse_float2)pixel, ndc_scale, ndc_offs);
+
+		sse_float4 clip = sse_float4(ndc * sse_float2(view.clip_near), SET1(-view.clip_near), SET1(view.clip_near)); // ndc = clip / clip.w;
+
+		sse_float3 pos_cam = matmul(view.clip_to_cam, clip);
+		sse_float3 dir_cam = pos_cam;
+
+		ray_pos = matmul_transl(view.cam_to_world, pos_cam);
+		ray_dir = matmul       (view.cam_to_world, dir_cam);
+		ray_dir = normalize(ray_dir);
+	}
+
+	DECL void CALL raytrace_pixel (sse_int2 pixel) {
+
+		hit = {};
+
+	auto time0 = get_timestamp();
+		raycast();
+	auto time = (int)(get_timestamp() - time0);
+		
+		sse_float4 col;
+
+		if (r.visualize_time) {
+
+			float diff_mag = (float)abs(time) / (float)r.visualize_max_time;
+
+			float4 _col;
+			if (time > 0)
+				_col = float4(diff_mag, 0, 0, 1);
+			else
+				_col = float4(0, diff_mag, 0, 1);
+
+			col = sse_float4(_col);
+		} else {
+			col = select(hit.did_hit, sse_float4(hit.dist / 32, 1), sse_float4(0));
+		}
+
+		for (int i=0; i<8; ++i) {
+			renderimage.set(pixel.x.m256i_i32[i], pixel.y.m256i_i32[i], col[i]);
+		}
+	}
+
+	void execute () {
+		float2 _ndc_scale = 1.0f / (float2)renderimage.size;
+		sse_float2 ndc_offs = _ndc_scale - float2(1.0f);
+		sse_float2 ndc_scale = _ndc_scale * float2(2);
+
+		for (int y=0; y+3 < renderimage.size.y; y += 4) {
+			int x = 0;
+			for (; x+1 < renderimage.size.x; x += 2) {
+
+				sse_int2 pixel = sse_int2(SET1i(x), SET1i(y)) + PIXEL_PATTERN;
+
+				ray_for_pixel(pixel, ndc_scale, ndc_offs);
+
+				raytrace_pixel(pixel);
+			}
+		}
+	}
+};
+
+////
 RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev_level) {
 	RawArray<block_id> ret = RawArray<block_id>(size * size * size);
 
@@ -72,7 +319,6 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 	pos = (::float3)chunk->chunk_pos_world();
 }
 
-#if SPARSE_OCTREE
 // build sparse octree depth-first
 int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 	int voxel_count = CHUNK_DIM_X >> level;
@@ -95,7 +341,6 @@ int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 
 	return idx;
 }
-#endif
 
 Octree build_octree (Chunk* chunk) {
 	static_assert(CHUNK_DIM_X == CHUNK_DIM_Y && CHUNK_DIM_X == CHUNK_DIM_Z);
@@ -104,313 +349,13 @@ Octree build_octree (Chunk* chunk) {
 
 	o.build_non_sparse_octree(chunk);
 
-#if SPARSE_OCTREE
 	o.nodes.emplace_back(); // push root
 	o.root = 0;
 	recurse_build_sparse_octree(0, (int)o.levels.size() - 1, 0, &o);
 
 	o.node_count = (int)o.nodes.size();
 	o.total_size = o.node_count * o.node_size;
-#else
-	o.node_count = (int)(o.levels.size() * CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z);
-	o.total_size = o.node_count * o.node_size;
-#endif
 	return o;
-}
-
-#if 0
-lrgba cols[] = {
-	srgba(255,0,0),
-	srgba(0,255,0),
-	srgba(0,0,255),
-	srgba(255,255,0),
-	srgba(255,0,255),
-	srgba(0,255,255),
-	srgba(127,0,255),
-	srgba(255,0,127),
-	srgba(255,127,255),
-};
-
-void Octree::recurs_draw (int3 index, int level, float3 offset, int& cell_count) { // level 0 == full res
-	int voxel_count = CHUNK_DIM_X >> level;
-	int voxel_size = 1 << level;
-
-	auto get = [&] (int3 xyz) {
-		return octree_levels[level][xyz.z * voxel_count*voxel_count + xyz.y * voxel_count + xyz.x];
-	};
-
-	auto b = get(index);
-	if (b != B_NULL) {
-		debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
-		cell_count++;
-	} else {
-		if (level > 0) {
-			for (int z=0; z<2; ++z) {
-				for (int y=0; y<2; ++y) {
-					for (int x=0; x<2; ++x) {
-						int3 rec_index = index * 2 + int3(x,y,z);
-						recurs_draw(rec_index, level - 1, offset, cell_count);
-					}
-				}
-			}
-		}
-	}
-}
-#endif
-
-namespace otr {
-
-	struct ParametricOctreeTraverser {
-		// An Efficient Parametric Algorithm for Octree Traversal
-		// J. Revelles, C.Ure ̃na, M.Lastra
-		// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
-
-		Octree& octree;
-		RaytraceHit hit;
-
-		int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-		bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-
-		Ray ray;
-
-		struct OctreeNode {
-		#if SPARSE_OCTREE
-			int oct_idx; // in sparse octree nodes
-		#else
-			int3 pos; // 3d index (scaled to octree level cell size so that one increment is always as step to the next cell on that level)
-		#endif
-			int level;
-			float3 min;
-			float3 mid;
-			float3 max;
-
-			OctreeNode get_child (int index, bool3 mask, Octree& octree) {
-				OctreeNode ret;
-
-			#if SPARSE_OCTREE
-				ret.oct_idx = octree.nodes[oct_idx].children_indx() + index;
-			#else
-				ret.pos = pos * 2 + child_offset_lut[index];
-			#endif
-				ret.level = level - 1;
-				ret.min = select(mask, mid, min);
-				ret.max = select(mask, max, mid);
-				ret.mid = 0.5f * (ret.max + ret.min);
-
-				return ret;
-			}
-		};
-
-		static constexpr int node_seq_lut[8][3] = {
-			{ 1, 2, 4 }, // 001 010 100
-			{ 8, 3, 5 }, //   - 011 101
-			{ 3, 8, 6 }, // 011   - 110
-			{ 8, 8, 7 }, //   -   - 111
-			{ 5, 6, 8 }, // 101 110   -
-			{ 8, 7, 8 }, //   - 111   -
-			{ 7, 8, 8 }, // 111   -   -
-			{ 8, 8, 8 }, //   -   -   -
-		};
-
-		void traverse_octree (OctreeNode root, Ray ray) {
-			this->ray = ray;
-			mirror_mask_int = 0;
-			mirror_mask = false;
-
-			for (int i=0; i<3; ++i) {
-				if (ray.dir[i] < 0) {
-					ray.pos[i] = root.mid[i] * 2 - ray.pos[i];
-					ray.dir[i] = -ray.dir[i];
-					mirror_mask_int |= 1 << i;
-					//mirror_mask[i] = true;
-					mirror_mask.v.m128_u32[i] = 0xffffffffu;
-				}
-			}
-
-			float3 rdir_inv = 1.0f / ray.dir;
-
-			float3 t0 = (root.min - ray.pos) * rdir_inv;
-			float3 t1 = (root.max - ray.pos) * rdir_inv;
-
-			if (max_component(t0) < min_component(t1))
-				traverse_subtree(root, t0, t1);
-		}
-
-		int first_node (float3 t0, float3 tm) {
-			float cond = max_component(t0);
-
-			int ret = 0;
-			ret |= (tm[0] < cond) ? 1 : 0;
-			ret |= (tm[1] < cond) ? 2 : 0;
-			ret |= (tm[2] < cond) ? 4 : 0;
-			return ret;
-		}
-		int next_node (float3 t1, const int indices[3]) {
-			int min_comp = min_component_indx(t1);
-
-			return indices[min_comp];
-		}
-
-		bool traverse_subtree (OctreeNode node, float3 t0, float3 t1) {
-
-			if (min_component(t1) < 0)
-				return false;
-
-			bool stop;
-			bool decend = eval_octree_cell(node, t0, t1, &stop);
-			if (decend) {
-				assert(!stop);
-
-				float3 tm = select(ray.dir != 0.0f, 0.5f * (t0 + t1), select(ray.pos < node.mid, float3(+INF), float3(-INF)));
-
-				int cur_node = first_node(t0, tm);
-
-				do {
-					bool3 mask = bool3(cur_node & 1, (cur_node >> 1) & 1, (cur_node >> 2) & 1);
-
-					stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask_int, mask ^ mirror_mask, octree), select(mask, tm, t0), select(mask, t1, tm));
-					if (stop)
-						return true;
-
-					cur_node = next_node(select(mask, t1, tm), node_seq_lut[cur_node]);
-				} while (cur_node < 8);
-			}
-
-			return stop;
-		}
-
-		bool eval_octree_cell (OctreeNode node, float3 t0, float3 t1, bool* stop_traversal) {
-			//float3 size = node.max - node.min;
-			{
-				//int voxel_count = CHUNK_DIM_X >> node.level;
-				//int voxel_size = 1 << node.level;
-
-				*stop_traversal = false;
-				if (octree.nodes[node.oct_idx].has_children())
-					return true; // need to decend further down into octree to find actual voxels
-
-			#if SPARSE_OCTREE
-				auto b = octree.nodes[node.oct_idx].bid;
-			#else
-				auto b = octree.levels[node.level][node.pos.z * voxel_count*voxel_count + node.pos.y * voxel_count + node.pos.x];
-			#endif
-
-				bool stop = b != B_AIR;
-				if (stop) {
-					hit.did_hit = true;
-					hit.id = b;
-					hit.dist = max_component(t0);
-					hit.pos_world = (::float3)(ray.pos + ray.dir * hit.dist);
-				}
-
-				*stop_traversal = stop;
-				return false;
-			}
-		}
-	};
-
-	RaytraceHit Octree::raycast (Ray ray) {
-
-		ParametricOctreeTraverser::OctreeNode o;
-	#if SPARSE_OCTREE
-		o.oct_idx = root;
-	#else
-		o.pos = 0;
-	#endif
-		o.level = (int)levels.size() - 1;
-		o.min = pos;
-		o.max = pos + (float3)(float)(1 << o.level);
-		o.mid = 0.5f * (o.min + o.max);
-
-		ParametricOctreeTraverser t = { *this };
-		t.traverse_octree(o, ray);
-
-		return t.hit;
-	}
-}
-
-void OctreeDevTest::draw (Chunks& chunks) {
-	//
-	//ImGui::DragFloat3("ray.pos", &ray.pos.x, 0.05f);
-	//
-	//ImGui::DragFloat2("ray_ang", &ray_ang.x, 1);
-	//ray.dir = normalize( rotate3_Z(to_radians(ray_ang.x)) * rotate3_X(to_radians(ray_ang.y)) * float3(0,1,0) );
-	//
-	//debug_graphics->push_arrow(ray.pos, ray.dir * 100, srgba(255,255,0));
-	//
-	//Chunk* chunk;
-	//chunks.query_block(floori(ray.pos), &chunk);
-	//if (!chunk) return;
-	//
-	//octree = build_octree(chunk);
-	//
-	//int cell_count = 0;
-	//octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world(), cell_count);
-	//
-	//ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
-	//
-	//octree.raycast(ray);
-}
-
-#define TIME_START(name) auto __##name = Timer::start()
-#define TIME_END(name) auto __##name##_time = __##name.end()
-
-Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
-	float2 ndc = ((float2)pixel + 0.5f) / (float2)resolution * 2 - 1;
-
-	//float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
-	float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
-
-	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
-
-	float3 pos_cam = (float3)(view.clip_to_cam * clip);
-	float3 dir_cam = pos_cam;
-
-	Ray ray;
-	ray.pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
-	ray.dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
-	ray.dir = normalize(ray.dir);
-
-	return ray;
-}
-
-lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
-	auto ray = ray_for_pixel(pixel, renderimage.size, view);
-
-	auto time0 = get_timestamp();
-	auto hit = octree.raycast({ ray.pos, ray.dir });
-	auto time = (int)(get_timestamp() - time0);
-
-	if (visualize_time) {
-		if (visualize_time_compare) {
-			auto time1 = get_timestamp();
-			raycast_voxels(ray, 9999, [&] (int3 voxel, int face, float dist) {
-				if (any(voxel < 0 || voxel >= CHUNK_DIM)) return true;
-				return octree.levels[0][voxel.z * CHUNK_DIM_Y*CHUNK_DIM_X + voxel.y * CHUNK_DIM_X + voxel.x] != B_AIR;
-				});
-			auto time_b = (int)(get_timestamp() - time1);
-
-			if (visualize_time_compare_diff) {
-				time = time - time_b;
-			} else {
-				if (pixel.x > (int)(renderimage.size.x * visualize_time_slider))
-					time = time_b;
-			}
-		}
-
-		float diff_mag = (float)abs(time) / (float)visualize_max_time;
-		//float diff_mag = (float)iterations / (float)20;
-
-		if (time > 0)
-			return lrgba(diff_mag, 0, 0, 1);
-		else
-			return lrgba(0, diff_mag, 0, 1);
-	}
-
-	if (!hit)
-		return lrgba(0,0,0,0);
-
-	return lrgba((float3)hit.dist / 100, 1);
 }
 
 ////
@@ -437,13 +382,9 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 	if (!equal(renderimage.size, res)) {
 		renderimage = Image<lrgba>(res);
 	}
-
-	for (int y=0; y<res.y; ++y) {
-		for (int x=0; x<res.x; ++x) {
-			float4 col = raytrace_pixel(int2(x,y), view);
-			renderimage.set(x,y, col);
-		}
-	}
+	
+	SIMD_Raytracer r = { octree, renderimage, view, *this };
+	r.execute();
 	TIME_END(raytrace);
 
 	rendertexture.upload(renderimage, false, false);
