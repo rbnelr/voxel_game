@@ -3,6 +3,8 @@
 #include "../blocks.hpp"
 #include "../util/raw_array.hpp"
 
+#include <CL/cl.hpp>
+
 class Chunk;
 class Chunks;
 class Graphics;
@@ -30,12 +32,9 @@ struct RaytraceHit {
 // ~84.7 KB
 // ~10 ms
 
-#define SPARSE_OCTREE 1
-
 struct Octree {
 	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
 
-#if SPARSE_OCTREE
 	union Node {
 		// MSB set if has children, mask MSB to zero to get actual children index
 		// after masking MSB to 0 -> index of 8 consecutive chilren nodes in nodes array, only valid if bid == B_NULL
@@ -64,30 +63,11 @@ struct Octree {
 	int node_size = sizeof(Node);
 	int total_size;
 
-#else
-
-	int node_count;
-	int node_size = sizeof(block_id);
-	int total_size;
-#endif
-
 	float3 pos;
 
 	void build_non_sparse_octree (Chunk* chunk);
 
-	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
-
-	RaytraceHit raycast (Ray ray, int* iterations=nullptr);
-};
-
-struct OctreeDevTest {
-
-	float2 ray_ang = float2(-50, 30);
-	Ray ray = { float3(5,5,40) };
-
-	Octree octree;
-
-	void draw (Chunks& chunks);
+	RaytraceHit raycast (Ray ray);
 };
 
 class Raytracer {
@@ -101,18 +81,26 @@ public:
 
 	Sampler voxel_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 
+	bool init_cl = false;
+
+	cl::Platform platform;
+	cl::Device device;
+	cl::Context context;
+	cl::Program program;
+	cl::CommandQueue queue;
+
 	Image<lrgba> renderimage;
 	Texture2D rendertexture;
 
 	bool raytracer_draw = true;
 	bool overlay = false;
-	float slider = 0.7f;
+	float slider = 0.85f;
 
 	bool visualize_time = true;
 	int visualize_max_time = 250;
 
-	bool visualize_time_compare = true;
-	bool visualize_time_compare_diff = true;
+	bool visualize_time_compare = false;
+	bool visualize_time_compare_diff = false;
 	float visualize_time_slider = 0.5f;
 
 	int resolution = 100; // vertical
