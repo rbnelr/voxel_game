@@ -1,4 +1,10 @@
-﻿#include "raytracer.hpp"
+﻿#include "../glad/glad_wgl.h"
+
+#undef ERROR
+#undef BF_BOTTOM
+#undef BF_TOP
+
+#include "raytracer.hpp"
 #include "graphics.hpp"
 #include "../util/timer.hpp"
 #include "../chunks.hpp"
@@ -318,6 +324,17 @@ void Raytracer::opencl () {
 		device = all_devices[0];
 		printf("OpenCL: Using device: %s\n", device.getInfo<CL_DEVICE_NAME>().c_str());
 
+
+		cl_context_properties context_properties[] =
+		{
+			CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
+			CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
+			CL_CONTEXT_PLATFORM, (cl_context_properties)platform()
+		};
+
+		cl_int err = CL_SUCCESS;
+		cl::Context context(device, context_properties, NULL, NULL, &err);
+
 		context = cl::Context({ device });
 
 		cl::Program::Sources sources;
@@ -344,7 +361,7 @@ void Raytracer::opencl () {
 		image_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, image_size);
 
 		// write SVO
-		auto err = queue.enqueueWriteBuffer(SVO_buffer, CL_FALSE, 0, SVO_size, &octree.nodes[0]);
+		err = queue.enqueueWriteBuffer(SVO_buffer, CL_FALSE, 0, SVO_size, &octree.nodes[0]);
 		if (err != CL_SUCCESS) {
 			printf("OpenCL error: %d", err);
 			return;
