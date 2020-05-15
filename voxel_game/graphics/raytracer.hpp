@@ -109,6 +109,8 @@ public:
 
 	int resolution = 100; // vertical
 
+	void opencl ();
+
 	void imgui (Chunks& chunks) {
 		if (!imgui_push("Raytracer")) return;
 

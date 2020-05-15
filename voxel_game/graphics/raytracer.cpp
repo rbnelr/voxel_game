@@ -282,8 +282,7 @@ auto time = (int)(get_timestamp() - time0);
 
 std::string raytrace_cl = kiss::load_text_file("shaders/raytrace.cl");
 
-////
-void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
+void Raytracer::opencl () {
 
 	if (!init_cl) {
 		std::vector<cl::Platform> all_platforms;
@@ -294,12 +293,22 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 			return;
 		}
 
+		printf("OpenCL Platforms:\n");
+		for (auto pl : all_platforms) {
+			printf("%s\n", pl.getInfo<CL_PLATFORM_NAME>().c_str());
+		}
+
 		platform = all_platforms[0];
 		printf("OpenCL: Using platform: %s\n", platform.getInfo<CL_PLATFORM_NAME>().c_str());
 
 		// get default device of the default platform
 		std::vector<cl::Device> all_devices;
 		platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
+
+		printf("OpenCL Devices:\n");
+		for (auto dev : all_devices) {
+			printf("%s\n", dev.getInfo<CL_DEVICE_NAME>().c_str());
+		}
 
 		if (all_devices.size() == 0) {
 			printf("OpenCL: No devices found. Check OpenCL installation!\n");
@@ -328,28 +337,43 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 		queue = cl::CommandQueue(context, device);
 
 		// create buffers on the device
-		SVO_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, sizeof(uint32_t) * octree.nodes.size());
-		image_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, sizeof(float)*4 * renderimage.size.x * renderimage.size.y);
+		size_t SVO_size = sizeof(uint32_t) * octree.nodes.size();
+		size_t image_size = sizeof(float)*4 * renderimage.size.x * renderimage.size.y;
 
-		//// write SVO
-		//queue.enqueueWriteBuffer(SVO_buffer, CL_FALSE, 0, sizeof(uint32_t) * octree.nodes.size(), &octree.nodes[0]);
-		//
-		//auto simple_add = cl::Kernel(program, "simple_add");
-		//simple_add.setArg(0, buffer_A);
-		//simple_add.setArg(1, buffer_B);
-		//simple_add.setArg(2, renderimage.size.x);
-		//queue.enqueueNDRangeKernel(simple_add, cl::NullRange, cl::NDRange(10), cl::NullRange);
-		//
-		////int C[10];
-		////// read result C from the device to array C
-		////queue.enqueueReadBuffer(buffer_C, CL_TRUE, 0, sizeof(int)*10, C);
-		//
-		//queue.finish();
+		SVO_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, SVO_size);
+		image_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, image_size);
+
+		// write SVO
+		auto err = queue.enqueueWriteBuffer(SVO_buffer, CL_FALSE, 0, SVO_size, &octree.nodes[0]);
+		if (err != CL_SUCCESS) {
+			printf("OpenCL error: %d", err);
+			return;
+		}
+
+		auto raycast = cl::Kernel(program, "raycast");
+		raycast.setArg(0, SVO_buffer);
+		raycast.setArg(1, image_buffer);
+		raycast.setArg(2, renderimage.size.x);
+		raycast.setArg(3, renderimage.size.y);
+		err = queue.enqueueNDRangeKernel(raycast,
+			cl::NullRange, cl::NDRange(renderimage.size.x, renderimage.size.y), cl::NullRange);
+		if (err != CL_SUCCESS) {
+			printf("OpenCL error: %d", err);
+			return;
+		}
+
+		// read result C from the device to array C
+		queue.enqueueReadBuffer(image_buffer, CL_TRUE, 0, image_size, renderimage.data());
+
+		queue.finish();
 
 		init_cl = true;
 	}
+}
 
-	//return;
+////
+void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
+
 
 	Chunk* chunk;
 	chunks.query_block(floori(view.cam_to_world * float3(0)), &chunk);
@@ -358,6 +382,8 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 	TIME_START(build);
 	octree = build_octree(chunk);
 	TIME_END(build);
+
+	opencl();
 
 	ImGui::Text("Octree stats:  node_count %d  node_size %d B  total_size %.3f KB", octree.node_count, octree.node_size, octree.total_size / 1024.0f);
 
