@@ -83,11 +83,15 @@ public:
 
 	bool init_cl = false;
 
+	// https://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html
 	cl::Platform platform;
 	cl::Device device;
 	cl::Context context;
 	cl::Program program;
 	cl::CommandQueue queue;
+
+	cl::Buffer SVO_buffer;
+	cl::Buffer image_buffer;
 
 	Image<lrgba> renderimage;
 	Texture2D rendertexture;
