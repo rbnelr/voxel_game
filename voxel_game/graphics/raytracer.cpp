@@ -237,19 +237,12 @@ namespace otr {
 		}
 
 		int first_node (float3 t0, float3 tm) {
-			int max_comp = max_component_indx(t0);
-
-			static constexpr int lut_a[] = { 1, 0, 0 };
-			static constexpr int lut_b[] = { 2, 2, 1 };
-
-			int a = lut_a[max_comp];
-			int b = lut_b[max_comp];
-
-			float cond = t0[max_comp];
+			float cond = max_component(t0);
 
 			int ret = 0;
-			ret |= (tm[a] < cond) ? (1 << a) : 0;
-			ret |= (tm[b] < cond) ? (1 << b) : 0;
+			ret |= (tm[0] < cond) ? 1 : 0;
+			ret |= (tm[1] < cond) ? 2 : 0;
+			ret |= (tm[2] < cond) ? 4 : 0;
 			return ret;
 		}
 		int next_node (float3 t1, const int indices[3]) {
@@ -275,7 +268,7 @@ namespace otr {
 				do {
 					bool3 mask = bool3(cur_node & 1, (cur_node >> 1) & 1, (cur_node >> 2) & 1);
 
-					stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask_int, mask != mirror_mask, octree), select(mask, tm, t0), select(mask, t1, tm));
+					stop = traverse_subtree(node.get_child(cur_node ^ mirror_mask_int, mask ^ mirror_mask, octree), select(mask, tm, t0), select(mask, t1, tm));
 					if (stop)
 						return true;
 

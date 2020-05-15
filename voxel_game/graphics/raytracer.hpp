@@ -36,6 +36,9 @@ struct RaytraceHit {
 // vector-wise sse (float3 becomes sse _m128 register) -> not how simd is supposed to be used but works a bit
 // ~7 ms
 
+// first_node() simplification
+// <7 ms ?
+
 #define SPARSE_OCTREE 1
 
 #include <xmmintrin.h>
@@ -109,6 +112,10 @@ namespace otr {
 	}
 	inline bool3 operator< (float3 l, float3 r) {
 		return { _mm_cmplt_ps(l.v, r.v) };
+	}
+
+	inline bool3 operator^ (bool3 l, bool3 r) {
+		return { _mm_xor_ps(l.v, r.v) };
 	}
 
 	inline float min_component (float3 v) {
