@@ -205,14 +205,30 @@ bool traverse_subtree (Data& d, uint32_t node_data, float3 min, float3 max, floa
 	return false; // no hit in this node, step into next node
 }
 
-RaytraceHit Octree::raycast (Ray ray) {
+void ray_for_pixel (Data* d, int2 pixel, int2 resolution, Camera_View const& view) {
+	float2 ndc = ((float2)pixel + 0.5f) / (float2)resolution * 2 - 1;
+
+	//float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
+	float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
+
+	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
+
+	float3 pos_cam = (float3)(view.clip_to_cam * clip);
+	float3 dir_cam = pos_cam;
+
+	d->ray_pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
+	d->ray_dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
+	d->ray_dir = normalize(d->ray_dir);
+}
+
+RaytraceHit Octree::raycast (int2 pixel, Camera_View const& view, Image<lrgba>* image) {
 
 	Data d;
 	d.hit.did_hit = false;
 	d.octree = this;
 
-	d.ray_pos = ray.pos;
-	d.ray_dir = ray.dir;
+	ray_for_pixel(&d, pixel, image->size, view);
+
 	d.mirror_mask_int = 0;
 
 	uint32_t node_data = nodes[root]._children;
@@ -243,49 +259,13 @@ RaytraceHit Octree::raycast (Ray ray) {
 #define TIME_START(name) auto __##name = Timer::start()
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
-Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
-	float2 ndc = ((float2)pixel + 0.5f) / (float2)resolution * 2 - 1;
-
-	//float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
-	float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
-
-	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
-
-	float3 pos_cam = (float3)(view.clip_to_cam * clip);
-	float3 dir_cam = pos_cam;
-
-	Ray ray;
-	ray.pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
-	ray.dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
-	ray.dir = normalize(ray.dir);
-
-	return ray;
-}
-
 lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
-	auto ray = ray_for_pixel(pixel, renderimage.size, view);
 
 auto time0 = get_timestamp();
-	auto hit = octree.raycast(ray);
+	auto hit = octree.raycast(pixel, view, &renderimage);
 auto time = (int)(get_timestamp() - time0);
 
 	if (visualize_time) {
-		if (visualize_time_compare) {
-		auto time1 = get_timestamp();
-			raycast_voxels(ray, 9999, [&] (int3 voxel, int face, float dist) {
-				if (any(voxel < 0 || voxel >= CHUNK_DIM)) return true;
-				return octree.levels[0][voxel.z * CHUNK_DIM_Y*CHUNK_DIM_X + voxel.y * CHUNK_DIM_X + voxel.x] != B_AIR;
-			});
-		auto time_b = (int)(get_timestamp() - time1);
-
-			if (visualize_time_compare_diff) {
-				time = time - time_b;
-			} else {
-				if (pixel.x > (int)(renderimage.size.x * visualize_time_slider))
-					time = time_b;
-			}
-		}
-
 		float diff_mag = (float)abs(time) / (float)visualize_max_time;
 
 		if (time > 0)

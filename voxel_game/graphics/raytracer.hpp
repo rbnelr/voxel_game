@@ -67,7 +67,7 @@ struct Octree {
 
 	void build_non_sparse_octree (Chunk* chunk);
 
-	RaytraceHit raycast (Ray ray);
+	RaytraceHit raycast (int2 pixel, Camera_View const& view, Image<lrgba>* image);
 };
 
 class Raytracer {
