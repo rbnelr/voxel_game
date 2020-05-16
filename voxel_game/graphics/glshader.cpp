@@ -91,6 +91,20 @@ namespace gl {
 		}
 	}
 
+	kiss::raw_data gl::Shader::get_program_binary (uint64_t* size) {
+		
+		int _size;
+		glGetProgramiv(shad, GL_PROGRAM_BINARY_LENGTH, &_size);
+
+		auto data = std::make_unique<unsigned char[]>(_size);
+
+		GLenum format;
+		glGetProgramBinary(shad, _size, &_size, &format, data.get());
+
+		*size = _size;
+		return std::move(data);
+	}
+
 	// recursive $if not supported, but $if inside a $include'd file that is included within an if is supported (since $if state is per recursive call and each include gets a call)
 	struct ShaderPreprocessor {
 		const char*		shader_name;

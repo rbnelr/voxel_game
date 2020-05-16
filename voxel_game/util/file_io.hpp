@@ -20,6 +20,8 @@ namespace kiss {
 
 	raw_data load_binary_file (const char* filename, uint64_t* size);
 
+	void save_binary_file (const char* filename, void* data, uint64_t size);
+
 	// out_filename is optional
 	// "hello/world.txt" => path: "hello/" out_filename: "world.txt"
 	// "world.txt"       => path:  ""      out_filename: "world.txt"
