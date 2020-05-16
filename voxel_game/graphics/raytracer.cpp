@@ -1,10 +1,4 @@
-﻿#include "../glad/glad_wgl.h"
-
-#undef ERROR
-#undef BF_BOTTOM
-#undef BF_TOP
-
-#include "raytracer.hpp"
+﻿#include "raytracer.hpp"
 #include "graphics.hpp"
 #include "../util/timer.hpp"
 #include "../chunks.hpp"
@@ -117,332 +111,47 @@ Octree build_octree (Chunk* chunk) {
 	return o;
 }
 
-// An Efficient Parametric Algorithm for Octree Traversal
-// J. Revelles, C.Ure ̃na, M.Lastra
-// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
-
-struct Data {
-	int mirror_mask_int; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-	bool3 mirror_mask; // algo assumes ray.dir x,y,z >= 0, x,y,z < 0 cause the ray to be mirrored, to make all components positive, this mask is used to also mirror the octree nodes to make iteration work
-
-	float3 ray_pos;
-	float3 ray_dir;
-
-	Octree* octree;
-	RaytraceHit hit;
-};
-
-static constexpr int node_seq_lut[8][3] = {
-	{ 1, 2, 4 }, // 001 010 100
-	{ 8, 3, 5 }, //   - 011 101
-	{ 3, 8, 6 }, // 011   - 110
-	{ 8, 8, 7 }, //   -   - 111
-	{ 5, 6, 8 }, // 101 110   -
-	{ 8, 7, 8 }, //   - 111   -
-	{ 7, 8, 8 }, // 111   -   -
-	{ 8, 8, 8 }, //   -   -   -
-};
-
-bool hit_octree_leaf (Data& d, uint32_t node_data, float3 t0) {
-	auto b = (block_id)node_data;
-
-	bool did_hit = b != B_AIR;
-	if (did_hit) {
-		d.hit.did_hit = true;
-		d.hit.id = b;
-		d.hit.dist = max_component(t0);
-		d.hit.pos_world = d.ray_pos + d.ray_dir * d.hit.dist;
-	}
-
-	return did_hit;
-}
-
-int first_node (float3 t0, float3 tm) {
-	float cond = max_component(t0);
-
-	int ret = 0;
-	ret |= (tm[0] < cond) ? 1 : 0;
-	ret |= (tm[1] < cond) ? 2 : 0;
-	ret |= (tm[2] < cond) ? 4 : 0;
-	return ret;
-}
-int next_node (float3 t1, const int indices[3]) {
-	int min_comp;
-	min_component(t1, &min_comp);
-
-	return indices[min_comp];
-}
-
-bool traverse_subtree (Data& d, uint32_t node_data, float3 min, float3 max, float3 t0, float3 t1) {
-
-	if (any(t1 < 0))
-		return false;
-
-	bool has_children = node_data & 0x80000000u;
-	if (!has_children)
-		return hit_octree_leaf(d, node_data, t0);
-
-	// need to decend further down into octree to find actual voxels
-		
-	float3 mid = 0.5f * (min + max);
-	float3 tm = select(d.ray_dir != 0, 0.5f * (t0 + t1), select(d.ray_pos < mid, float3(+INF), float3(-INF)));
-
-	int cur_node = first_node(t0, tm);
-
-	do {
-		bool3 mask = bool3(cur_node & 1, cur_node & 2, cur_node & 4);
-
-		//
-		int node_index = cur_node ^ d.mirror_mask_int;
-		bool3 node_mask = mask != d.mirror_mask;
-
-		int children_index = (node_data & 0x7fffffffu) + node_index;
-
-		uint32_t _node_data = d.octree->nodes[children_index]._children;
-		float3 _min = select(node_mask, mid, min);
-		float3 _max = select(node_mask, max, mid);
-
-		if (traverse_subtree(d, _node_data, _min, _max, select(mask, tm, t0), select(mask, t1, tm)))
-			return true; // hit in subtree
-
-		cur_node = next_node(select(mask, t1, tm), node_seq_lut[cur_node]);
-	} while (cur_node < 8);
-
-	return false; // no hit in this node, step into next node
-}
-
-void ray_for_pixel (Data* d, int2 pixel, int2 resolution, Camera_View const& view) {
-	float2 ndc = ((float2)pixel + 0.5f) / (float2)resolution * 2 - 1;
-
-	//float4 near_plane_clip = view.cam_to_clip * float4(0, 0, -view.clip_near, 1);
-	float4 near_plane_clip = float4(0, 0, -view.clip_near, view.clip_near);
-
-	float4 clip = float4(ndc, -1, 1) * near_plane_clip.w; // ndc = clip / clip.w;
-
-	float3 pos_cam = (float3)(view.clip_to_cam * clip);
-	float3 dir_cam = pos_cam;
-
-	d->ray_pos = (float3)( view.cam_to_world * float4(pos_cam, 1) );
-	d->ray_dir = (float3)( view.cam_to_world * float4(dir_cam, 0) );
-	d->ray_dir = normalize(d->ray_dir);
-}
-
-RaytraceHit Octree::raycast (int2 pixel, Camera_View const& view, Image<lrgba>* image) {
-
-	Data d;
-	d.hit.did_hit = false;
-	d.octree = this;
-
-	ray_for_pixel(&d, pixel, image->size, view);
-
-	d.mirror_mask_int = 0;
-
-	uint32_t node_data = nodes[root]._children;
-	float3 min = pos;
-	float3 max = pos + (float3)(float)CHUNK_DIM_X;
-	float3 mid = 0.5f * (min + max);
-
-	for (int i=0; i<3; ++i) {
-		bool mirror = d.ray_dir[i] < 0;
-
-		d.ray_dir[i] = abs(d.ray_dir[i]);
-		d.mirror_mask[i] = mirror;
-		if (mirror) d.ray_pos[i] = mid[i] * 2 - d.ray_pos[i];
-		if (mirror) d.mirror_mask_int |= 1 << i;
-	}
-
-	float3 rdir_inv = 1.0f / d.ray_dir;
-
-	float3 t0 = (min - d.ray_pos) * rdir_inv;
-	float3 t1 = (max - d.ray_pos) * rdir_inv;
-
-	if (max_component(t0) < min_component(t1))
-		traverse_subtree(d, node_data, min, max, t0, t1);
-
-	return d.hit;
-}
-
 #define TIME_START(name) auto __##name = Timer::start()
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
-lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
-
-auto time0 = get_timestamp();
-	auto hit = octree.raycast(pixel, view, &renderimage);
-auto time = (int)(get_timestamp() - time0);
-
-	if (visualize_time) {
-		float diff_mag = (float)abs(time) / (float)visualize_max_time;
-
-		if (time > 0)
-			return lrgba(diff_mag, 0, 0, 1);
-		else
-			return lrgba(0, diff_mag, 0, 1);
-	}
-
-	if (!hit)
-		return lrgba(0,0,0,0);
-
-	return lrgba((float3)hit.dist / 100, 1);
-}
-
-std::string raytrace_cl = kiss::load_text_file("shaders/raytrace.cl");
-
-void Raytracer::opencl () {
-
-	if (!init_cl) {
-		std::vector<cl::Platform> all_platforms;
-		cl::Platform::get(&all_platforms);
-
-		if (all_platforms.size() == 0) {
-			printf("OpenCL: No platforms found. Check OpenCL installation!\n");
-			return;
-		}
-
-		printf("OpenCL Platforms:\n");
-		for (auto pl : all_platforms) {
-			printf("%s\n", pl.getInfo<CL_PLATFORM_NAME>().c_str());
-		}
-
-		platform = all_platforms[0];
-		printf("OpenCL: Using platform: %s\n", platform.getInfo<CL_PLATFORM_NAME>().c_str());
-
-		// get default device of the default platform
-		std::vector<cl::Device> all_devices;
-		platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
-
-		printf("OpenCL Devices:\n");
-		for (auto dev : all_devices) {
-			printf("%s\n", dev.getInfo<CL_DEVICE_NAME>().c_str());
-		}
-
-		if (all_devices.size() == 0) {
-			printf("OpenCL: No devices found. Check OpenCL installation!\n");
-			return;
-		}
-
-		device = all_devices[0];
-		printf("OpenCL: Using device: %s\n", device.getInfo<CL_DEVICE_NAME>().c_str());
-
-
-		cl_context_properties context_properties[] =
-		{
-			CL_GL_CONTEXT_KHR, (cl_context_properties)wglGetCurrentContext(),
-			CL_WGL_HDC_KHR, (cl_context_properties)wglGetCurrentDC(),
-			CL_CONTEXT_PLATFORM, (cl_context_properties)platform()
-		};
-
-		cl_int err = CL_SUCCESS;
-		cl::Context context(device, context_properties, NULL, NULL, &err);
-
-		context = cl::Context({ device });
-
-		cl::Program::Sources sources;
-
-		std::string kernel_code = raytrace_cl;
-
-		sources.push_back({ raytrace_cl.c_str(), raytrace_cl.size() });
-
-		program = cl::Program(context, sources);
-
-		if (program.build({ device }) != CL_SUCCESS) {
-			printf("OpenCL: Error building: %s\n", program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device).c_str());
-			return;
-		}
-
-		//create queue to which we will push commands for the device.
-		queue = cl::CommandQueue(context, device);
-
-		// create buffers on the device
-		size_t SVO_size = sizeof(uint32_t) * octree.nodes.size();
-		size_t image_size = sizeof(float)*4 * renderimage.size.x * renderimage.size.y;
-
-		SVO_buffer = cl::Buffer(context, CL_MEM_READ_ONLY, SVO_size);
-		image_buffer = cl::Buffer(context, CL_MEM_READ_WRITE, image_size);
-
-		// write SVO
-		err = queue.enqueueWriteBuffer(SVO_buffer, CL_FALSE, 0, SVO_size, &octree.nodes[0]);
-		if (err != CL_SUCCESS) {
-			printf("OpenCL error: %d", err);
-			return;
-		}
-
-		auto raycast = cl::Kernel(program, "raycast");
-		raycast.setArg(0, SVO_buffer);
-		raycast.setArg(1, image_buffer);
-		raycast.setArg(2, renderimage.size.x);
-		raycast.setArg(3, renderimage.size.y);
-		err = queue.enqueueNDRangeKernel(raycast,
-			cl::NullRange, cl::NDRange(renderimage.size.x, renderimage.size.y), cl::NullRange);
-		if (err != CL_SUCCESS) {
-			printf("OpenCL error: %d", err);
-			return;
-		}
-
-		// read result C from the device to array C
-		queue.enqueueReadBuffer(image_buffer, CL_TRUE, 0, image_size, renderimage.data());
-
-		queue.finish();
-
-		init_cl = true;
-	}
-}
-
-////
-void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
-
+void Raytracer::draw (Chunks& chunks, Camera_View const& view) {
+	if (!raytracer_draw) return;
 
 	Chunk* chunk;
 	chunks.query_block(floori(view.cam_to_world * float3(0)), &chunk);
 	if (!chunk) return;
 
-	TIME_START(build);
+TIME_START(build);
 	octree = build_octree(chunk);
-	TIME_END(build);
+TIME_END(build);
 
-	opencl();
+	build_octree(chunk);
 
-	ImGui::Text("Octree stats:  node_count %d  node_size %d B  total_size %.3f KB", octree.node_count, octree.node_size, octree.total_size / 1024.0f);
-
-	TIME_START(raytrace);
-	float aspect = (float)input.window_size.x / (float)input.window_size.y;
-
-	int2 res;
-	res.y = resolution;
-	res.x = roundi(aspect * (float)resolution);
-	res = max(res, 1);
-
-	if (!equal(renderimage.size, res)) {
-		renderimage = Image<lrgba>(res);
-	}
-
-	for (int y=0; y<res.y; ++y) {
-		for (int x=0; x<res.x; ++x) {
-			float4 col = raytrace_pixel(int2(x,y), view);
-			renderimage.set(x,y, col);
-		}
-	}
-	TIME_END(raytrace);
-
-	rendertexture.upload(renderimage, false, false);
-
-	ImGui::Text("Raytrace performance:  build_octree %7.3f ms  raytrace %7.3f ms", __build_time * 1000, __raytrace_time * 1000);
-
-}
-
-void Raytracer::draw () {
 	if (shader) {
 		shader.bind();
 
 		glBindVertexArray(vao);
 
+		shader.set_uniform("svo_root_pos", octree.pos);
+
 		shader.set_uniform("slider", slider);
 
+		shader.set_uniform("max_iterations", max_iterations);
+		shader.set_uniform("visualize_iterations", visualize_iterations);
+
+		svo_texture.upload(&octree.nodes[0], (int)octree.nodes.size(), false, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
+
 		glActiveTexture(GL_TEXTURE0 + 0);
-		shader.set_texture_unit("rendertexture", 0);
-		voxel_sampler.bind(0);
-		rendertexture.bind();
+		shader.set_texture_unit("svo_texture", 0);
+		svo_sampler.bind(0);
+		svo_texture.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 1);
+		shader.set_texture_unit("heat_gradient", 1);
+		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
+
+	ImGui::Text("Raytrace performance:  build_octree %7.3f ms", __build_time * 1000);
 }

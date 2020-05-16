@@ -458,10 +458,7 @@
     <None Include="shaders\held_item.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\raytrace_display.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\raytrace.cl">
+    <None Include="shaders\raytrace.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

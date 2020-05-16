@@ -3,34 +3,9 @@
 #include "../blocks.hpp"
 #include "../util/raw_array.hpp"
 
-#include <CL/cl.hpp>
-
 class Chunk;
 class Chunks;
 class Graphics;
-
-struct RaytraceHit {
-	bool did_hit = false;
-
-	float dist;
-	float3 pos_world;
-
-	block_id id;
-
-	operator bool () { return did_hit; }
-};
-
-// non-sparse (2 B per node)
-// ~3584 KB
-// ~13 ms
-
-// sparse (36 B per node)
-// ~762 KB
-// ~10.5 ms
-
-// sparse, memory optimized (4 B per node)
-// ~84.7 KB
-// ~10 ms
 
 struct Octree {
 	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
@@ -66,8 +41,6 @@ struct Octree {
 	float3 pos;
 
 	void build_non_sparse_octree (Chunk* chunk);
-
-	RaytraceHit raycast (int2 pixel, Camera_View const& view, Image<lrgba>* image);
 };
 
 class Raytracer {
@@ -75,63 +48,34 @@ public:
 
 	Octree octree;
 
-	Shader shader = Shader("raytrace_display", { FOG_UNIFORMS });
+	Shader shader = Shader("raytrace", { FOG_UNIFORMS });
 
-	gl::Vao vao; // empty vao even though I generate the mesh in the vertex shader, no vao works but generates an error on my machine
+	gl::Vao vao; // empty vao even though I generate a screen-filling quad in the vertex shader, no vao works but generates an error on my machine
 
-	Sampler voxel_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
+	Texture1D svo_texture;
+	Sampler svo_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 
-	bool init_cl = false;
-
-	// https://simpleopencl.blogspot.com/2013/06/tutorial-simple-start-with-opencl-and-c.html
-	cl::Platform platform;
-	cl::Device device;
-	cl::Context context;
-	cl::Program program;
-	cl::CommandQueue queue;
-
-	cl::Buffer SVO_buffer;
-	cl::Buffer image_buffer;
-
-	Image<lrgba> renderimage;
-	Texture2D rendertexture;
+	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 
 	bool raytracer_draw = true;
-	bool overlay = false;
 	float slider = 0.85f;
 
-	bool visualize_time = true;
-	int visualize_max_time = 250;
-
-	bool visualize_time_compare = false;
-	bool visualize_time_compare_diff = false;
-	float visualize_time_slider = 0.5f;
-
-	int resolution = 100; // vertical
-
-	void opencl ();
+	int max_iterations = 256;
+	bool visualize_iterations = false;
 
 	void imgui (Chunks& chunks) {
 		if (!imgui_push("Raytracer")) return;
 
 		ImGui::Checkbox("draw", &raytracer_draw);
-		ImGui::Checkbox("overlay", &overlay);
 		ImGui::SliderFloat("slider", &slider, 0,1);
 
-		ImGui::Checkbox("visualize_time", &visualize_time);
-		ImGui::DragInt("visualize_max_time", &visualize_max_time, 1);
-
-		ImGui::Checkbox("visualize_time_compare", &visualize_time_compare);
-		ImGui::Checkbox("visualize_time_compare_diff", &visualize_time_compare_diff);
-		ImGui::SliderFloat("visualize_time_slider", &visualize_time_slider, 0,1);
-
-		ImGui::SliderInt("resolution", &resolution, 1, 1440);
+		ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
+		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
 
 		imgui_pop();
 	}
 
-	lrgba raytrace_pixel (int2 pixel, Camera_View const& view);
+	//lrgba raytrace_pixel (int2 pixel, Camera_View const& view);
 
-	void raytrace (Chunks& chunks, Camera_View const& view);
-	void draw ();
+	void draw (Chunks& chunks, Camera_View const& view);
 };
