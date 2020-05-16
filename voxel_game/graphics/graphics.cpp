@@ -715,8 +715,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	glViewport(0,0, input.window_size.x, input.window_size.y);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glClear(GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_BLEND);
 
@@ -755,6 +755,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
+
+		raytracer.draw(world.chunks, view);
 
 		if (!activate_flycam)
 			gui.draw(world.player, tile_textures);

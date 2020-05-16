@@ -375,6 +375,8 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	}
 
 	logf(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
+	
+	__debugbreak();
 }
 
 #if _DEBUG || 1

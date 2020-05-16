@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "assert.h"
 #include "gl.hpp"
+#include "../util/file_io.hpp"
 
 namespace gl {
 	struct Uniform {
@@ -28,6 +29,8 @@ namespace gl {
 		bool get_uniform (std::string_view name, Uniform* type);
 
 		void bind_uniform_block (SharedUniformsInfo const& u);
+
+		kiss::raw_data get_program_binary (uint64_t* size);
 
 		~Shader () {
 			glDeleteProgram(shad);

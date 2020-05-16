@@ -6,6 +6,7 @@
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
 #include "graphics_common.hpp"
+#include "raytracer.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -457,6 +458,8 @@ struct Fog {
 	}
 };
 
+extern int frame_counter;
+
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
@@ -473,13 +476,19 @@ public:
 
 	Fog						fog;
 
+	Raytracer				raytracer;
+
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
-		if (ImGui::CollapsingHeader("Graphics")) {
+		if (frame_counter == 30) {
+			//raytracer.regen_data(chunks);
+		}
+
+		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
 			common_uniforms.imgui();
 			fog.imgui();
 			player.imgui();
@@ -488,6 +497,8 @@ public:
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_block_light", &debug_block_light);
+
+			raytracer.imgui(chunks);
 
 			ImGui::Separator();
 		}
