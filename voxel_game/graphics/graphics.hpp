@@ -486,6 +486,8 @@ public:
 		}
 
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+			shaders->imgui();
+
 			common_uniforms.imgui();
 			sampler.imgui("sampler");
 

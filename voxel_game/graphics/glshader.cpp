@@ -507,7 +507,7 @@ namespace gl {
 		return str;
 	}
 
-	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view filename, Shader* shader, std::string const& name, bool* error) {
+	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view filename, Shader* shader, std::string const& name, bool* error, std::vector<std::string>* preprocessed_sources) {
 
 		std::string preprocessed = "";
 		{
@@ -555,6 +555,8 @@ namespace gl {
 			}
 		}
 
+		preprocessed_sources->push_back(std::move(preprocessed));
+
 		return shad;
 	}
 
@@ -573,9 +575,9 @@ namespace gl {
 
 		// Load, proprocess and compile shader parts
 		bool error = false;
-		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, filename, s.get(), name, &error);
-		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, filename, s.get(), name, &error);
-		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, filename, s.get(), name, &error);
+		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
 
 		// Insert source file into sources set
 		if (std::find(s->sources.begin(), s->sources.end(), filename) == s->sources.end())
