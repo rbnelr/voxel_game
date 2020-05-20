@@ -96,8 +96,56 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 
  basic sunlight code
 
+ raytracing test:
+ -implement octree code from here: http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
+ -optimized octree code be be branchless where possible (recursion itself is a banch and also the loop over the children cells and the final hit might even branch based on texture alpha)
+   but the branching is just what is inherent to the octree traversal, all the branching which was just handeling logic were converted to calculations and look up tabels
+   the current code might be one of the most optimal ways of traversing an octree on a gpu, the amount of calculations amounts to a few compares to mask, and mix'es and (a+b)*0.5 calculations, and the cells visited should be optimal, ie. the voxel lookups and interation count should be optimal
+ -raytracer actually looks at octree now and stops at solid cells (can also stop at non size 1 cells, which could be changed if undesirable)
+ 
+ implement light level, night and torches
+
+ implement time of day change
+ -vary sunlight multiplier with time of day
+ -vary skybox colors with time of day
+
+ fix block updates
+ -> wrote into copy of block instead of using set_block
+
+ explore ray marching for rendering:
+ -no chunk meshes at all, gpu does ray marching
+  -how is the complexity, performance and artifacting
+  -> code is kind of simple but requires pseudo-recursion in glsl, stable 144 fps when drawing a single chunk using an octree traversal algo, no artefacts I noticed
+ -feasable without octree?
+  -> indors maybe, but looking into the sky results in hundreds of iterations, which could quickly destroy performance (i don't remember if i tested a gpu version without octree)
+  -performance difference with octree?
+  -> on cpu version the octree overall reduced the iterations greatly (worst case is equal iterations) but the non-octree algo is so simple that even 10x the iterations beat the octree version
+    -> ground: octree a bit slower, horizon: octree _can_ be a lot slower in some places, sky: octree way faster, this is the worst case for the non-octree algo
+	-> in general the octree algo is faster drawing a single chunk, and drawing multiple chunks was not tested, but i presume the sky would clearly favor the octree version
+ -options: pixel shader, compute shader, opencl, cuda
+  -> compute shader probably makes the most sense, but pixel shader might also be finde since i am basicly trying to display the image anyway
+   -> OpenCL did not work at all (a call called QueueXXX hung, wtf?) which I think might have been because OpenCL cannot work on the same thread as OpenGL?? I abandoned OpenCL, since it seems to have a supid driver and SDK concept and figured that GLSL would be easier for me (it was)
+   -> used a pixel shader with textures for the SVO octree array, works like a charm but I have doubts that it is running at the performance that it should run at, might investigate and even compare with compute shader later
+ -automatic order independent transparency!
+  -> works!
+ -reflections on water / glass
+  -> TODO
+
 TODO
 -FEATURES:
+ 
+ try implement the meshing based on a SVO instead of an 3d array, if an octree actually speeds up the meshing too, then that tells me I should just always work with octrees everywhere
+ 
+ fix lag from chunk meshing
+ -> always do meshing async, ie. potentially delayed visual update updated and potential split second visible seams ugh
+ -> always finish meshing before rendering, How do I get it fast enough no not cause lags?
+ 
+ try out single-block-change patch-up where small changes are implemented by patching into the data to get a temporary correct result fast and then build the more compact result later
+ -> When deleting parts of the mesh it is possible to overwrite triangles with degenerate triangles to 'delete' them and just append the new ones at the end
+ -> using a dirty rect for ex. with small dirty rects a patch up is performed instead
+
+ chunk memory NEEDS to be optimized for big view distances, currently with 3d chunks and > 600 block view dist, I run out of memory (16 Gig)
+ ->octree or rle compression
  
  fix crosshair not appearing
 
