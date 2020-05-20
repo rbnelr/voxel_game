@@ -133,6 +133,8 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 
 TODO
 -FEATURES:
+
+ try implement the meshing based on a SVO instead of an 3d array, if an octree actually speeds up the meshing too, then that tells me I should just always work with octrees everywhere
  
  fix crosshair not appearing
 
@@ -140,6 +142,8 @@ TODO
  -program sometimes seems to take >10x as long as normal to start up (ie. render the first frame), only noticed this with the 3d chunks branch
  -chunk generation/meshing not respecting work-per-frame cap somehow?
  
+ placing light near to unloaded chunk hangs the program
+
  rework items to be classes with inheritance?
  -pro: might simplyfy code a lot
  -pro: complex state does not take up memory in union for simple items

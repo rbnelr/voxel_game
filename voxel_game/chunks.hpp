@@ -95,13 +95,8 @@ static inline constexpr int _block_count (int lod_levels) {
 ////////////// Chunk
 
 struct MeshingResult {
-
-	//std::vector<ChunkMesh::Vertex> opaque_vertices;
-	//std::vector<ChunkMesh::Vertex> tranparent_vertices;
-	RawArray<ChunkMesh::Vertex> opaque_vertices;
-	RawArray<ChunkMesh::Vertex> tranparent_vertices;
-	unsigned opaque_count;
-	unsigned tranparent_count;
+	std::vector<ChunkMesh::Vertex> opaque_vertices;
+	std::vector<ChunkMesh::Vertex> tranparent_vertices;
 };
 
 class Chunk {

@@ -6,6 +6,11 @@
 #include "../voxel_light.hpp"
 using namespace kiss;
 
+#include "assimp/cimport.h"        // Plain-C interface
+#include "assimp/scene.h"          // Output data structure
+#include "assimp/postprocess.h"    // Post processing flags
+#include "assimp/importer.hpp"
+
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 #define QUAD_INWARD(a,b,c,d) a,d,b, b,d,c // facing inward
 
@@ -475,6 +480,21 @@ struct TileLoader {
 			}
 		}
 	}
+	Image<srgba8> extend_image (Image<srgba8> const& c, int2 offset, int2 size) {
+		auto ret = Image<srgba8>(size);
+		
+		for (int y=0; y<size.y; ++y) {
+			for (int x=0; x<size.x; ++x) {
+				int2 src_pos = int2(x,y) - offset;
+				if (all(src_pos >= 0 && src_pos < c.size))
+					ret.set(x, y, c.get(src_pos.x,src_pos.y));
+				else
+					ret.set(x, y, srgba8(0,0,0,0));
+			}
+		}
+
+		return ret;
+	}
 
 	int add_item (item_id id) {
 		auto filename = prints("textures/%s.png", get_item_name(id));
@@ -512,8 +532,21 @@ struct TileLoader {
 
 		BlockTileInfo info;
 		info.base_index = (int)images.size();
+		info.uv_pos = 0;
+		info.uv_size = 1;
 
 		if (color.size.y == size.x) {
+
+			add_texture(std::move(color));
+
+		} else if (color.size.x < size.x || color.size.y < size.y) {
+			int2 offset;
+			offset.x = size.x / 2 - color.size.x / 2;
+			offset.y = 0;
+
+			info.uv_pos = (float2)offset / (float2)size;
+			info.uv_size = (float2)color.size / (float2)size;
+			color = extend_image(color, offset, size);
 
 			add_texture(std::move(color));
 
@@ -570,6 +603,51 @@ TileTextures::TileTextures () {
 
 		breaking_textures.upload<uint8, false>(imgs);
 	}
+
+	load_block_meshes();
+}
+
+void TileTextures::load_block_meshes () {
+
+	auto* scene = aiImportFile("meshes/meshes.fbx", aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+
+	for (int bid=0; bid<BLOCK_IDS_COUNT; ++bid) {
+		auto name = blocks.name[bid];
+
+		block_meshes_info[bid] = { -1, -1 };
+
+		for (unsigned i=0; i<scene->mNumMeshes; ++i) {
+			auto* mesh = scene->mMeshes[i];
+
+			if (strcmp(mesh->mName.C_Str(), name) == 0) {
+
+				printf("%s:\n", mesh->mName.C_Str());
+
+				int offset = (int)block_meshes.size();
+				block_meshes.reserve(offset + mesh->mNumFaces * 3);
+
+				for (unsigned j=0; j<mesh->mNumFaces; ++j) {
+					auto& f = mesh->mFaces[j];
+					assert(f.mNumIndices == 3);
+
+					for (unsigned k=0; k<3; ++k) {
+						unsigned index = f.mIndices[k];
+
+						auto pos = mesh->mVertices[index];
+						auto uv = mesh->mTextureCoords[0][index];
+
+						printf("  %7.3f %7.3f %7.3f     %7.3f %7.3f\n", pos.x, pos.y, pos.z, uv.x, uv.y);
+
+						block_meshes.push_back({ float3(pos.x, pos.y, pos.z), float2(uv.x, uv.y) });
+					}
+				}
+
+				block_meshes_info[bid] = { offset, (int)block_meshes.size() - offset };
+			}
+		}
+	}
+
+	aiReleaseImport(scene);
 }
 
 void ChunkGraphics::imgui (Chunks& chunks) {
@@ -725,8 +803,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		if (!raytracer.raytracer_draw || raytracer.overlay)
-			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
 		skybox.draw();
 	}
@@ -745,8 +822,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		if (!raytracer.raytracer_draw || raytracer.overlay)
-			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
+		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -761,8 +837,6 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
-
-		raytracer.draw(world.chunks, view, tile_textures, sampler);
 
 		if (!activate_flycam)
 			gui.draw(world.player, tile_textures, sampler);

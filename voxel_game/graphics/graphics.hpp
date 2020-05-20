@@ -6,7 +6,6 @@
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
 #include "graphics_common.hpp"
-#include "raytracer.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -284,8 +283,8 @@ struct PlayerGraphics {
 
 struct ChunkMesh {
 	struct Vertex {
-		uint8v3	pos_model;
-		uint8v2	uv;
+		float3	pos_model;
+		float2	uv;
 		uint8	tex_indx;
 		uint8	block_light;
 		uint8	sky_light;
@@ -318,6 +317,9 @@ struct BlockTileInfo {
 	// side is always at base_index
 	int top = 0; // base_index + top to get block top tile
 	int bottom = 0; // base_index + bottom to get block bottom tile
+	
+	float2 uv_pos;
+	float2 uv_size;
 
 	//bool random_rotation = false;
 
@@ -359,6 +361,15 @@ struct ItemMeshes {
 	void generate (Image<srgba8>* images, int count, int* item_tiles);
 };
 
+struct BlockMeshInfo {
+	int	offset;
+	int	size;
+};
+struct BlockMeshVertex {
+	float3	pos_model;
+	float2	uv;
+};
+
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
 struct TileTextures {
@@ -370,6 +381,9 @@ struct TileTextures {
 
 	int2 tile_size;
 
+	std::vector<BlockMeshVertex> block_meshes;
+	BlockMeshInfo block_meshes_info[BLOCK_IDS_COUNT];
+
 	ItemMeshes item_meshes;
 
 	int breaking_index = 0;
@@ -378,6 +392,7 @@ struct TileTextures {
 	float breaking_mutliplier = 1.15f;
 
 	TileTextures ();
+	void load_block_meshes ();
 
 	inline int get_tile_base_index (block_id id) {
 		return block_tile_info[id].base_index;
@@ -473,8 +488,6 @@ public:
 
 	Fog						fog;
 
-	Raytracer				raytracer;
-
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
@@ -498,8 +511,6 @@ public:
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_block_light", &debug_block_light);
-
-			raytracer.imgui(chunks);
 
 			ImGui::Separator();
 		}

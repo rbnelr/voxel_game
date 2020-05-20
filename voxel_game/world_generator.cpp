@@ -98,6 +98,22 @@ struct ChunkGenerator {
 		return val;
 	}
 
+	float noise_grass_density (OSN::Noise<2> const& osn_noise, float2 pos_world) {
+		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
+			pos = rotate2(ang_offs) * pos;
+			pos /= period; // period is inverse frequency
+			pos += offs;
+
+			float val = osn_noise.eval<float>(pos.x, pos.y);
+			val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
+			return val;
+		};
+
+		float val = noise(pos_world, wg.grass_desity_period, 0,0) * wg.grass_density_amp;
+
+		return val;
+	}
+
 	void gen () {
 		bpos chunk_origin = chunk.coord * CHUNK_DIM;
 
@@ -145,6 +161,8 @@ struct ChunkGenerator {
 
 				float tree_density = noise_tree_density(noise, (float2)(int2)pos_world);
 
+				float grass_density = noise_grass_density(noise, (float2)(int2)pos_world);
+
 				float tree_prox_prob = gradient<float>( find_min_tree_dist((bpos2)i), {
 					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
 					{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
@@ -169,12 +187,24 @@ struct ChunkGenerator {
 					}
 				}
 
-				float tree_chance = rand.uniform();
-				if (	tree_chance < effective_tree_prob &&
-						highest_block >= 0 && highest_block < CHUNK_DIM &&
-						chunk.get_block(bpos(i.x, i.y, i.z)).id != B_WATER)
-					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
+				bool block_free = highest_block >= 0 && highest_block < CHUNK_DIM &&
+					chunk.get_block(bpos(i.x, i.y, i.z)).id != B_WATER;
 
+				if (block_free) {
+					float tree_chance = rand.uniform();
+					float grass_chance = rand.uniform();
+
+					if (rand.uniform() < effective_tree_prob) {
+						tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
+					} else if (rand.uniform() < grass_density) {
+						auto* b = chunk.get_block_unchecked(bpos(i.x, i.y, i.z));
+						b->id = B_TALLGRASS;
+					} else if (rand.uniform() < 0.0005f) {
+						auto* b = chunk.get_block_unchecked(bpos(i.x, i.y, i.z));
+						b->id = B_TORCH;
+						b->block_light = blocks.glow[B_TORCH];
+					}
+				}
 			}
 		}
 

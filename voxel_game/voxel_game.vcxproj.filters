@@ -234,9 +234,6 @@
     <ClInclude Include="util\raw_array.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\raytracer.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -420,9 +417,6 @@
     <ClCompile Include="items.cpp" />
     <ClCompile Include="voxel_light.cpp" />
     <ClCompile Include="time_of_day.cpp" />
-    <ClCompile Include="graphics\raytracer.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -456,9 +450,6 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\held_item.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="shaders\raytrace.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

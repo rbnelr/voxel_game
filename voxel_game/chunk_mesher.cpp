@@ -7,15 +7,16 @@ static constexpr int offs (int3 offset) {
 struct Chunk_Mesher {
 	bool alpha_test;
 
-	ChunkMesh::Vertex* opaque_vertices;
-	ChunkMesh::Vertex* tranparent_vertices;
+	std::vector<ChunkMesh::Vertex>* opaque_vertices;
+	std::vector<ChunkMesh::Vertex>* tranparent_vertices;
 
 	Block* cur;
 
 	// per block
-	uint8v3 block_pos;
+	float3 block_pos;
 
 	BlockTileInfo tile;
+	std::vector<BlockMeshVertex> const* block_meshes;
 
 	bool bt_is_opaque (block_id id) {
 		auto t = blocks.transparency[id];
@@ -60,15 +61,16 @@ struct Chunk_Mesher {
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 
-	ChunkMesh::Vertex* face_nx (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_px (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_ny (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_py (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_nz (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_pz (ChunkMesh::Vertex* verts);
+	void face_nx (std::vector<ChunkMesh::Vertex>* out);
+	void face_px (std::vector<ChunkMesh::Vertex>* out);
+	void face_ny (std::vector<ChunkMesh::Vertex>* out);
+	void face_py (std::vector<ChunkMesh::Vertex>* out);
+	void face_nz (std::vector<ChunkMesh::Vertex>* out);
+	void face_pz (std::vector<ChunkMesh::Vertex>* out);
 
 	void cube_opaque ();
 	void cube_transperant ();
+	void block_mesh (BlockMeshInfo info);
 
 	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res);
 };
@@ -80,62 +82,69 @@ void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures con
 void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res) {
 	alpha_test = graphics.alpha_test;
 
-	opaque_vertices = res->opaque_vertices.ptr;
-	tranparent_vertices = res->tranparent_vertices.ptr;
+	opaque_vertices = &res->opaque_vertices;
+	tranparent_vertices = &res->tranparent_vertices;
+	block_meshes = &tile_textures.block_meshes;
 
-	for (block_pos.z=0; block_pos.z<CHUNK_DIM; ++block_pos.z) {
-		for (block_pos.y=0; block_pos.y<CHUNK_DIM; ++block_pos.y) {
+	int3 i = 0;
+	for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
+		for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
 
-			cur = &chunk->blocks[block_pos.z + 1][block_pos.y + 1][1];
+			cur = &chunk->blocks[i.z + 1][i.y + 1][1];
 
-			for (block_pos.x=0; block_pos.x<CHUNK_DIM; ++block_pos.x) {
+			for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
+
+				block_pos = (float3)i;
 
 				if (cur->id != B_AIR) {
 					tile = tile_textures.block_tile_info[cur->id];
 
-					if (blocks.transparency[cur->id] == TM_TRANSPARENT)
-						cube_transperant();
-					else
-						cube_opaque();
+					if (tile_textures.block_meshes_info[cur->id].offset >= 0) {
+						block_mesh(tile_textures.block_meshes_info[cur->id]);
+					} else {
+						if (blocks.transparency[cur->id] == TM_TRANSPARENT)
+							cube_transperant();
+						else
+							cube_opaque();
+					}
 				}
 
 				cur++;
 			}
 		}
 	}
-
-	res->opaque_count = (unsigned)(opaque_vertices - res->opaque_vertices.ptr);
-	res->tranparent_count = (unsigned)(tranparent_vertices - res->tranparent_vertices.ptr);
 }
 
-// uint8v3	pos_model;
-// uint8v2	uv;
+// float3	pos_model;
+// float2	uv;
 // uint8	tex_indx;
 // uint8	block_light;
 // uint8	sky_light;
 // uint8	hp;
 
 #define VERT(x,y,z, u,v, face) \
-		{ block_pos + uint8v3(x,y,z), uint8v2(u,v), (uint8)tile.calc_texture_index(face), \
+		{ block_pos + float3(x,y,z), float2(u,v), (uint8)tile.calc_texture_index(face), \
 		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
 
-#define QUAD(a,b,c,d)	do { \
-			*out++ = a; *out++ = b; *out++ = d; \
-			*out++ = d; *out++ = b; *out++ = c; \
-		} while (0)
-#define QUAD_ALTERNATE(a,b,c,d)	do { \
-			*out++ = b; *out++ = c; *out++ = a; \
-			*out++ = a; *out++ = c; *out++ = d; \
-		} while (0)
+#define QUAD(a,b,c,d) \
+			*ptr++ = a; *ptr++ = b; *ptr++ = d; \
+			*ptr++ = d; *ptr++ = b; *ptr++ = c;
+#define QUAD_ALTERNATE(a,b,c,d) \
+			*ptr++ = b; *ptr++ = c; *ptr++ = a; \
+			*ptr++ = a; *ptr++ = c; *ptr++ = d; 
 
 #define FACE \
-		if (vert[0].sky_light + vert[2].sky_light < vert[1].sky_light + vert[3].sky_light) \
+		size_t offs = out->size(); \
+		out->resize(offs + 6); \
+		auto* ptr = &(*out)[offs]; \
+		if (vert[0].sky_light + vert[2].sky_light < vert[1].sky_light + vert[3].sky_light) { \
 			QUAD(vert[0], vert[1], vert[2], vert[3]); \
-		else \
-			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]);
+		} else { \
+			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]); \
+		}
 //#define FACE QUAD(vert[0], vert[1], vert[2], vert[3]);
 
-ChunkMesh::Vertex* Chunk_Mesher::face_nx (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_nx (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_X),
 		VERT(0,0,0, 1,0, BF_NEG_X),
@@ -143,9 +152,8 @@ ChunkMesh::Vertex* Chunk_Mesher::face_nx (ChunkMesh::Vertex* out) {
 		VERT(0,1,1, 0,1, BF_NEG_X),
 	};
  	FACE
-	return out;
 }
-ChunkMesh::Vertex* Chunk_Mesher::face_px (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_px (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,0,0, 0,0, BF_POS_X),
 		VERT(1,1,0, 1,0, BF_POS_X),
@@ -153,9 +161,8 @@ ChunkMesh::Vertex* Chunk_Mesher::face_px (ChunkMesh::Vertex* out) {
 		VERT(1,0,1, 0,1, BF_POS_X),
 	};
 	FACE
-	return out;
 }
-ChunkMesh::Vertex* Chunk_Mesher::face_ny (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_ny (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,0, 0,0, BF_NEG_Y),
 		VERT(1,0,0, 1,0, BF_NEG_Y),
@@ -163,9 +170,8 @@ ChunkMesh::Vertex* Chunk_Mesher::face_ny (ChunkMesh::Vertex* out) {
 		VERT(0,0,1, 0,1, BF_NEG_Y),
 	};
 	FACE
-	return out;
 }
-ChunkMesh::Vertex* Chunk_Mesher::face_py (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_py (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,1,0, 0,0, BF_POS_Y),
 		VERT(0,1,0, 1,0, BF_POS_Y),
@@ -173,9 +179,8 @@ ChunkMesh::Vertex* Chunk_Mesher::face_py (ChunkMesh::Vertex* out) {
 		VERT(1,1,1, 0,1, BF_POS_Y),
 	};
 	FACE
-	return out;
 }
-ChunkMesh::Vertex* Chunk_Mesher::face_nz (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_nz (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_Z),
 		VERT(1,1,0, 1,0, BF_NEG_Z),
@@ -183,9 +188,8 @@ ChunkMesh::Vertex* Chunk_Mesher::face_nz (ChunkMesh::Vertex* out) {
 		VERT(0,0,0, 0,1, BF_NEG_Z),
 	};
 	FACE
-	return out;
 }
-ChunkMesh::Vertex* Chunk_Mesher::face_pz (ChunkMesh::Vertex* out) {
+void Chunk_Mesher::face_pz (std::vector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,1, 0,0, BF_POS_Z),
 		VERT(1,0,1, 1,0, BF_POS_Z),
@@ -193,35 +197,53 @@ ChunkMesh::Vertex* Chunk_Mesher::face_pz (ChunkMesh::Vertex* out) {
 		VERT(0,1,1, 0,1, BF_POS_Z),
 	};
 	FACE
-	return out;
 }
 
 void Chunk_Mesher::cube_opaque () {
-	if (!bt_is_opaque((cur -                1)->id)) opaque_vertices = face_nx(opaque_vertices);
-	if (!bt_is_opaque((cur +                1)->id)) opaque_vertices = face_px(opaque_vertices);
-	if (!bt_is_opaque((cur -   CHUNK_ROW_OFFS)->id)) opaque_vertices = face_ny(opaque_vertices);
-	if (!bt_is_opaque((cur +   CHUNK_ROW_OFFS)->id)) opaque_vertices = face_py(opaque_vertices);
-	if (!bt_is_opaque((cur - CHUNK_LAYER_OFFS)->id)) opaque_vertices = face_nz(opaque_vertices);
-	if (!bt_is_opaque((cur + CHUNK_LAYER_OFFS)->id)) opaque_vertices = face_pz(opaque_vertices);
-};
+	if (!bt_is_opaque((cur -                1)->id)) face_nx(opaque_vertices);
+	if (!bt_is_opaque((cur +                1)->id)) face_px(opaque_vertices);
+	if (!bt_is_opaque((cur -   CHUNK_ROW_OFFS)->id)) face_ny(opaque_vertices);
+	if (!bt_is_opaque((cur +   CHUNK_ROW_OFFS)->id)) face_py(opaque_vertices);
+	if (!bt_is_opaque((cur - CHUNK_LAYER_OFFS)->id)) face_nz(opaque_vertices);
+	if (!bt_is_opaque((cur + CHUNK_LAYER_OFFS)->id)) face_pz(opaque_vertices);
+}
 void Chunk_Mesher::cube_transperant () {
 	block_id bt;
 
 	bt = (cur -                1)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_nx(tranparent_vertices);
+	if (!bt_is_opaque(bt) && bt != cur->id) face_nx(tranparent_vertices);
 
 	bt = (cur +                1)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_px(tranparent_vertices);
+	if (!bt_is_opaque(bt) && bt != cur->id) face_px(tranparent_vertices);
 
 	bt = (cur -   CHUNK_ROW_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_ny(tranparent_vertices);
+	if (!bt_is_opaque(bt) && bt != cur->id) face_ny(tranparent_vertices);
 
 	bt = (cur +   CHUNK_ROW_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_py(tranparent_vertices);
+	if (!bt_is_opaque(bt) && bt != cur->id) face_py(tranparent_vertices);
 
 	bt = (cur - CHUNK_LAYER_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_nz(tranparent_vertices);
+	if (!bt_is_opaque(bt) && bt != cur->id) face_nz(tranparent_vertices);
 
 	bt = (cur + CHUNK_LAYER_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_pz(tranparent_vertices);
-};
+	if (!bt_is_opaque(bt) && bt != cur->id) face_pz(tranparent_vertices);
+}
+void Chunk_Mesher::block_mesh (BlockMeshInfo info) {
+	size_t offs = opaque_vertices->size();
+	opaque_vertices->resize(offs + info.size);
+	auto* ptr = &(*opaque_vertices)[offs];
+
+	for (int i=0; i<info.size; ++i) {
+		auto v = (*block_meshes)[info.offset + i];
+
+		ptr->pos_model = v.pos_model + block_pos + 0.5f;
+		ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
+
+		ptr->tex_indx = tile.base_index;
+		ptr->block_light = cur->block_light * 255 / MAX_LIGHT_LEVEL;
+		ptr->sky_light = cur->sky_light * 255 / MAX_LIGHT_LEVEL;
+		ptr->hp = cur->hp;
+
+		ptr++;
+	}
+}

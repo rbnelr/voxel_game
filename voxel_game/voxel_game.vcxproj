@@ -87,7 +87,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -96,8 +96,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
@@ -107,7 +107,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -116,8 +116,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
@@ -129,7 +129,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -143,8 +143,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -156,7 +156,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -170,8 +170,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
@@ -190,7 +190,6 @@
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="graphics\atlas.hpp" />
     <ClInclude Include="graphics\graphics_common.hpp" />
-    <ClInclude Include="graphics\raytracer.hpp" />
     <ClInclude Include="items.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
@@ -275,7 +274,6 @@
     <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
-    <ClCompile Include="graphics\raytracer.cpp" />
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
@@ -347,7 +345,6 @@
     <None Include="shaders\gui_item_block.glsl" />
     <None Include="shaders\held_item.glsl" />
     <None Include="shaders\overlay.glsl" />
-    <None Include="shaders\raytrace.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
   </ItemGroup>

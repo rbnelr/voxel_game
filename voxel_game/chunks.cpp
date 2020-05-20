@@ -242,10 +242,10 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 }
 
 void Chunk::reupload (MeshingResult const& result) {
-	mesh.opaque_mesh.upload(result.opaque_vertices.ptr, result.opaque_count);
-	mesh.transparent_mesh.upload(result.tranparent_vertices.ptr, result.tranparent_count);
+	mesh.opaque_mesh.upload(result.opaque_vertices.data(), result.opaque_vertices.size());
+	mesh.transparent_mesh.upload(result.tranparent_vertices.data(), result.tranparent_vertices.size());
 
-	face_count = (result.opaque_count + result.tranparent_count) / 6;
+	face_count = (result.opaque_vertices.size() + result.tranparent_vertices.size()) / 6;
 }
 
 //// Chunks
@@ -261,9 +261,6 @@ BackgroundJob BackgroundJob::execute () {
 }
 
 ParallelismJob ParallelismJob::execute () {
-	remesh_result.opaque_vertices     = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
-	remesh_result.tranparent_vertices = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
-
 	auto timer = Timer::start();
 
 	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk, &remesh_result);
