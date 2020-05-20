@@ -112,18 +112,28 @@ Octree build_octree (Chunk* chunk) {
 #define TIME_START(name) auto __##name = Timer::start()
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
-void Raytracer::draw (Chunks& chunks, Camera_View const& view) {
+void Raytracer::draw (Chunks& chunks, Camera_View const& view, TileTextures const& tile_textures, Sampler const& sampler) {
 	if (!raytracer_draw) return;
 
 	Chunk* chunk;
 	chunks.query_block(floori(view.cam_to_world * float3(0)), &chunk);
 	if (!chunk) return;
 
+	if (BlockTileInfo_texture.size <= 0) {
+		int* data = (int*)&tile_textures.block_tile_info[0];
+		int size = sizeof(tile_textures.block_tile_info) / sizeof(tile_textures.block_tile_info[0]) * 3;
+		
+		BlockTileInfo_texture.upload(data, size, false, GL_RGB32I, GL_RGB_INTEGER, GL_INT);
+	}
+
 TIME_START(build);
 	octree = build_octree(chunk);
 TIME_END(build);
 
 	build_octree(chunk);
+
+	// raytracer outputs premultiplied alpha because it needs to alpha blend front to back internally
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 	if (shader) {
 		shader.bind();
@@ -140,16 +150,28 @@ TIME_END(build);
 		svo_texture.upload(&octree.nodes[0], (int)octree.nodes.size(), false, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
 
 		glActiveTexture(GL_TEXTURE0 + 0);
-		shader.set_texture_unit("svo_texture", 0);
-		svo_sampler.bind(0);
+		shader.set_texture_unit("tile_textures", 0);
+		sampler.bind(0);
+		tile_textures.tile_textures.bind();
+		
+		glActiveTexture(GL_TEXTURE0 + 1);
+		shader.set_texture_unit("BlockTileInfo_texture", 1);
+		lut_sampler.bind(1);
+		BlockTileInfo_texture.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 2);
+		shader.set_texture_unit("svo_texture", 2);
+		lut_sampler.bind(2);
 		svo_texture.bind();
 
-		glActiveTexture(GL_TEXTURE0 + 1);
-		shader.set_texture_unit("heat_gradient", 1);
+		glActiveTexture(GL_TEXTURE0 + 3);
+		shader.set_texture_unit("heat_gradient", 3);
 		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 	}
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	ImGui::Text("Raytrace performance:  build_octree %7.3f ms", __build_time * 1000);
 }

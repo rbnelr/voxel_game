@@ -7,12 +7,12 @@ class Sampler {
 	gl::Sampler sampler;
 
 public:
-	gl::Enum mag_filter = gl::Enum::NEAREST;
+	gl::Enum mag_filter = gl::Enum::LINEAR;
 	gl::Enum min_filter = gl::Enum::LINEAR_MIPMAP_LINEAR;
 
-	gl::Enum wrap_x = gl::Enum::REPEAT;
-	gl::Enum wrap_y = gl::Enum::REPEAT;
-	gl::Enum wrap_z = gl::Enum::REPEAT;
+	gl::Enum wrap_x = gl::Enum::CLAMP_TO_EDGE;
+	gl::Enum wrap_y = gl::Enum::CLAMP_TO_EDGE;
+	gl::Enum wrap_z = gl::Enum::CLAMP_TO_EDGE;
 
 	int mipmap_levels = 1000;
 
@@ -44,7 +44,7 @@ public:
 			glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
 	}
 
-	void bind (int texture_unit) {
+	void bind (int texture_unit) const {
 		glBindSampler(texture_unit, sampler);
 	}
 
@@ -114,7 +114,7 @@ class Texture1D {
 	//std::string name;
 	gl::Texture tex;
 public:
-	int size; // size in pixels
+	int size = -1; // size in pixels
 
 	Texture1D ();
 
@@ -174,7 +174,7 @@ class Texture2D {
 	//std::string name;
 	gl::Texture tex;
 public:
-	int2 size; // size in pixels
+	int2 size = -1; // size in pixels
 
 	Texture2D ();
 
@@ -242,7 +242,7 @@ class Texture3D {
 	//std::string name;
 	gl::Texture tex;
 public:
-	int3 size; // size in pixels
+	int3 size = -1; // size in pixels
 
 	Texture3D ();
 
@@ -290,8 +290,8 @@ class Texture2DArray {
 	gl::Texture tex;
 
 public:
-	int2 size; // size in pixels
-	int count; // number of slots in array
+	int2 size = -1; // size in pixels
+	int count = -1; // number of slots in array
 
 	Texture2DArray ();
 

@@ -1,5 +1,6 @@
 #pragma once
 #include "glshader.hpp"
+#include "../dear_imgui.hpp"
 
 struct ShaderManager {
 
@@ -124,8 +125,11 @@ struct Shader {
 	void set_texture_unit (std::string_view name, int unit) {
 		gl::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(gl::is_sampler_type(u.type));
+			if (!gl::is_sampler_type(u.type))
+				logf(WARNING, "Uniform \"%s\" is not a sampler type!", name.data());
 			glUniform1i(u.loc, unit);
+		} else {
+			//logf(WARNING, "Texture \"%s\" does not exist in shader!", name.data());
 		}
 	}
 };

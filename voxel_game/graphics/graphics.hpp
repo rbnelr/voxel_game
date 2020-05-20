@@ -195,8 +195,6 @@ struct GuiGraphics {
 
 	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &quickbar, &quickbar_selected }, 64, srgba8(0), 1, false);
 
-	Sampler sampler;
-
 	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
 
@@ -221,7 +219,7 @@ struct GuiGraphics {
 	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
 	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 struct GenericVertex {
@@ -281,7 +279,7 @@ struct PlayerGraphics {
 
 	PlayerGraphics ();
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 struct ChunkMesh {
@@ -401,14 +399,12 @@ struct ChunkGraphics {
 
 	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
-	Sampler sampler;
-
 	bool alpha_test = !_use_potatomode;
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures);
-	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler);
+	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 class World;
@@ -463,6 +459,7 @@ extern int frame_counter;
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
+	Sampler					sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 
 	TileTextures			tile_textures;
 
@@ -490,6 +487,8 @@ public:
 
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
 			common_uniforms.imgui();
+			sampler.imgui("sampler");
+
 			fog.imgui();
 			player.imgui();
 			chunk_graphics.imgui(chunks);

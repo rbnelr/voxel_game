@@ -6,6 +6,7 @@
 class Chunk;
 class Chunks;
 class Graphics;
+struct TileTextures;
 
 struct Octree {
 	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
@@ -53,12 +54,15 @@ public:
 	gl::Vao vao; // empty vao even though I generate a screen-filling quad in the vertex shader, no vao works but generates an error on my machine
 
 	Texture1D svo_texture;
-	Sampler svo_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
+	Texture1D BlockTileInfo_texture;
+
+	Sampler lut_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 
-	bool raytracer_draw = true;
-	float slider = 0.85f;
+	bool raytracer_draw = false;
+	bool overlay = true;
+	float slider = 1.0f;
 
 	int max_iterations = 256;
 	bool visualize_iterations = false;
@@ -67,6 +71,8 @@ public:
 		if (!imgui_push("Raytracer")) return;
 
 		ImGui::Checkbox("draw", &raytracer_draw);
+		ImGui::Checkbox("overlay", &overlay);
+
 		ImGui::SliderFloat("slider", &slider, 0,1);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
@@ -75,7 +81,5 @@ public:
 		imgui_pop();
 	}
 
-	//lrgba raytrace_pixel (int2 pixel, Camera_View const& view);
-
-	void draw (Chunks& chunks, Camera_View const& view);
+	void draw (Chunks& chunks, Camera_View const& view, TileTextures const& tile_textures, Sampler const& sampler);
 };

@@ -256,7 +256,7 @@ void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_
 	}
 }
 
-void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	sampler.bind(0);
 
@@ -282,7 +282,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item_block && blocks_vertices.size() > 0) {
 		shader_item_block.bind();
 
-		shader.set_texture_unit("tile_textures", 0);
+		shader_item_block.set_texture_unit("tile_textures", 0);
 		
 		blocks_mesh.upload(blocks_vertices);
 		blocks_vertices.clear();
@@ -294,7 +294,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item && items_vertices.size() > 0) {
 		shader_item.bind();
 
-		shader.set_texture_unit("tile_textures", 0);
+		shader_item.set_texture_unit("tile_textures", 0);
 		
 		items_mesh.upload(items_vertices);
 		items_vertices.clear();
@@ -315,7 +315,7 @@ PlayerGraphics::PlayerGraphics () {
 	}
 }
 
-void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler) {
 	auto slot = player.inventory.quickbar.get_selected();
 	item_id item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 
@@ -325,6 +325,11 @@ void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textur
 	if (item != I_NULL) {
 		if (shader_item) {
 			shader_item.bind();
+
+			glActiveTexture(GL_TEXTURE0 + 0);
+			shader.set_texture_unit("tile_textures", 0);
+			sampler.bind(0);
+			tile_textures.tile_textures.bind();
 
 			if (item < MAX_BLOCK_ID) {
 				{
@@ -568,14 +573,13 @@ TileTextures::TileTextures () {
 }
 
 void ChunkGraphics::imgui (Chunks& chunks) {
-	sampler.imgui("sampler");
 
 	if (ImGui::Checkbox("alpha_test", &alpha_test)) {
 		chunks.remesh_all();
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -613,7 +617,7 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 	}
 }
 
-void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -721,7 +725,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
+		if (!raytracer.raytracer_draw || raytracer.overlay)
+			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
 		skybox.draw();
 	}
@@ -731,7 +736,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Transparent pass
 
 		if (activate_flycam || world.player.third_person)
-			player.draw(world.player, tile_textures);
+			player.draw(world.player, tile_textures, sampler);
 
 		if (selected_block) {
 			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
@@ -740,7 +745,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
+		if (!raytracer.raytracer_draw || raytracer.overlay)
+			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -750,16 +756,16 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// First person overlay pass
 		if (!activate_flycam && !world.player.third_person) 
-			player.draw(world.player, tile_textures);
+			player.draw(world.player, tile_textures, sampler);
 	}
 
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		raytracer.draw(world.chunks, view);
+		raytracer.draw(world.chunks, view, tile_textures, sampler);
 
 		if (!activate_flycam)
-			gui.draw(world.player, tile_textures);
+			gui.draw(world.player, tile_textures, sampler);
 
 		glEnable(GL_DEPTH_TEST);
 	}
