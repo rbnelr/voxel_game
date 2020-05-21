@@ -146,6 +146,7 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -173,6 +174,7 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -199,6 +201,7 @@
     <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />
     <ClInclude Include="util\raw_array.hpp" />
+    <ClInclude Include="util\read_directory.hpp" />
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="voxel_light.hpp" />
@@ -277,6 +280,7 @@
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
+    <ClCompile Include="util\read_directory.cpp" />
     <ClCompile Include="util\threadpool.cpp" />
     <ClCompile Include="voxel_light.cpp" />
     <ClCompile Include="world_generator.cpp" />
