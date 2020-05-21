@@ -165,11 +165,12 @@ struct BackgroundJob { // Chunk gen
 	BackgroundJob execute ();
 };
 
-struct ParallelismJob { // CHunk remesh
+struct ParallelismJob { // Chunk remesh
 	// input
 	Chunk* chunk;
 	Chunks* chunks; // not modfied
 	Graphics const* graphics;
+	WorldGenerator const* wg; 
 	// output
 	MeshingResult remesh_result;
 	float time;
@@ -309,6 +310,6 @@ public:
 	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
 
 	// chunk meshing to prepare for drawing
-	void update_chunks (Graphics const& graphics, Player const& player);
+	void update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player);
 };
 

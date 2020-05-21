@@ -318,6 +318,8 @@ struct BlockTileInfo {
 	int top = 0; // base_index + top to get block top tile
 	int bottom = 0; // base_index + bottom to get block bottom tile
 	
+	int variants = 1;
+
 	float2 uv_pos;
 	float2 uv_size;
 

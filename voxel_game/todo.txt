@@ -133,6 +133,9 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
 
 TODO
 -FEATURES:
+ 
+ chunk memory NEEDS to be optimized for big view distances, currently with 3d chunks and > 600 block view dist, I run out of memory (16 Gig)
+ ->octree or rle compression
 
  try implement the meshing based on a SVO instead of an 3d array, if an octree actually speeds up the meshing too, then that tells me I should just always work with octrees everywhere
  

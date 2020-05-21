@@ -535,7 +535,7 @@ struct TileLoader {
 		info.uv_pos = 0;
 		info.uv_size = 1;
 
-		if (color.size.y == size.x) {
+		if (equal(color.size, size)) {
 
 			add_texture(std::move(color));
 
@@ -564,6 +564,12 @@ struct TileLoader {
 			add_texture(get_sub_tile(color, int2(0,1), size));
 			add_texture(get_sub_tile(color, int2(0,2), size));
 			add_texture(get_sub_tile(color, int2(0,0), size));
+
+		} else if (color.size.x > size.x) {
+
+			info.variants = color.size.x / size.x;
+			for (int i=0; i<info.variants; ++i)
+				add_texture(get_sub_tile(color, int2(i,0), size));
 
 		}
 		

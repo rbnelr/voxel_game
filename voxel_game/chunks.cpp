@@ -263,7 +263,7 @@ BackgroundJob BackgroundJob::execute () {
 ParallelismJob ParallelismJob::execute () {
 	auto timer = Timer::start();
 
-	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk, &remesh_result);
+	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, *wg, chunk, &remesh_result);
 
 	time = timer.end();
 	return std::move(*this);
@@ -411,7 +411,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 }
 
 
-void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
+void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player) {
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos chunk_origin = pos * CHUNK_DIM;
 		return point_box_nearest_dist((float3)chunk_origin, CHUNK_DIM, player.pos);
@@ -436,7 +436,7 @@ void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 			auto* chunk = chunks_to_remesh[i];
 
 			ParallelismJob job = {
-				chunk, this, &graphics
+				chunk, this, &graphics, &wg
 			};
 			parallelism_threadpool.jobs.push(std::move(job));
 		}

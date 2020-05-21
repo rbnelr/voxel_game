@@ -1,4 +1,5 @@
 #include "chunk_mesher.hpp"
+#include "world_generator.hpp"
 
 static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
@@ -70,21 +71,23 @@ struct Chunk_Mesher {
 
 	void cube_opaque ();
 	void cube_transperant ();
-	void block_mesh (BlockMeshInfo info);
+	void block_mesh (BlockMeshInfo info, int variant, float2 rand_offs);
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res);
+	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res);
 };
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res) {
+void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
 	Chunk_Mesher cm;
-	return cm.mesh_chunk(chunks, graphics, tile_textures, chunk, res);
+	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
 }
 
-void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res) {
+void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
 	alpha_test = graphics.alpha_test;
 
 	opaque_vertices = &res->opaque_vertices;
 	tranparent_vertices = &res->tranparent_vertices;
 	block_meshes = &tile_textures.block_meshes;
+
+	bpos chunk_pos_world = chunk->chunk_pos_world();
 
 	int3 i = 0;
 	for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
@@ -99,8 +102,21 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 				if (cur->id != B_AIR) {
 					tile = tile_textures.block_tile_info[cur->id];
 
+					// get a 'random' but deterministic value based on block position
+					uint64_t h = hash(i + chunk_pos_world) ^ wg.seed;
+
+					// get a random determinisitc 2d offset
+					float2 rand_offs;
+					rand_offs.x = (float)((h >>  0) & 0xffffffffull) / (float)((1ull << 32) - 1); // [0, 1]
+					rand_offs.y = (float)((h >> 32) & 0xffffffffull) / (float)((1ull << 32) - 1); // [0, 1]
+					rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
+
+												   // get a random deterministic variant
+					float rand_val = (float)(h & 0xffffffffull) / (float)(1ull << 32); // [0, 1)
+					int variant = tile.variants > 1 ? floori(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
+
 					if (tile_textures.block_meshes_info[cur->id].offset >= 0) {
-						block_mesh(tile_textures.block_meshes_info[cur->id]);
+						block_mesh(tile_textures.block_meshes_info[cur->id], variant, rand_offs);
 					} else {
 						if (blocks.transparency[cur->id] == TM_TRANSPARENT)
 							cube_transperant();
@@ -228,7 +244,8 @@ void Chunk_Mesher::cube_transperant () {
 	bt = (cur + CHUNK_LAYER_OFFS)->id;
 	if (!bt_is_opaque(bt) && bt != cur->id) face_pz(tranparent_vertices);
 }
-void Chunk_Mesher::block_mesh (BlockMeshInfo info) {
+void Chunk_Mesher::block_mesh (BlockMeshInfo info, int variant, float2 rand_offs) {
+
 	size_t offs = opaque_vertices->size();
 	opaque_vertices->resize(offs + info.size);
 	auto* ptr = &(*opaque_vertices)[offs];
@@ -236,10 +253,10 @@ void Chunk_Mesher::block_mesh (BlockMeshInfo info) {
 	for (int i=0; i<info.size; ++i) {
 		auto v = (*block_meshes)[info.offset + i];
 
-		ptr->pos_model = v.pos_model + block_pos + 0.5f;
+		ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.2f, 0);
 		ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
 
-		ptr->tex_indx = tile.base_index;
+		ptr->tex_indx = tile.base_index + variant;
 		ptr->block_light = cur->block_light * 255 / MAX_LIGHT_LEVEL;
 		ptr->sky_light = cur->sky_light * 255 / MAX_LIGHT_LEVEL;
 		ptr->hp = cur->hp;
