@@ -106,7 +106,7 @@ static inline BlockTypes load_block_types () {
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
-	/* B_LEAVES				*/ solid_alpha_test("leaves",    4);
+	/* B_LEAVES				*/ solid_alpha_test("leaves",    12);
 	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
 	/* B_TALLGRASS			*/ plant("tallgrass");
 

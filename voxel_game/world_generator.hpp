@@ -68,7 +68,7 @@ struct WorldGenerator {
 	float tree_density_amp = 1;
 
 	float grass_desity_period = 40;
-	float grass_density_amp = .4f;
+	float grass_density_amp = .5f;
 	
 	WorldGenerator (): seed{get_seed(seed_str)} {
 		

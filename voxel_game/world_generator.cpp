@@ -109,9 +109,10 @@ struct ChunkGenerator {
 			return val;
 		};
 
+		float valb = noise(pos_world, 4, 0,0) * wg.grass_density_amp / 2;
 		float val = noise(pos_world, wg.grass_desity_period, 0,0) * wg.grass_density_amp;
 
-		return val;
+		return smoothstep( smoothstep(val + valb) );
 	}
 
 	void gen () {

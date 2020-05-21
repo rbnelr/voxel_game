@@ -253,7 +253,7 @@ void Chunk_Mesher::block_mesh (BlockMeshInfo info, int variant, float2 rand_offs
 	for (int i=0; i<info.size; ++i) {
 		auto v = (*block_meshes)[info.offset + i];
 
-		ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.2f, 0);
+		ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
 		ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
 
 		ptr->tex_indx = tile.base_index + variant;
