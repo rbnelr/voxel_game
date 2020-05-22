@@ -8,8 +8,8 @@ static constexpr int offs (int3 offset) {
 struct Chunk_Mesher {
 	bool alpha_test;
 
-	std::vector<ChunkMesh::Vertex>* opaque_vertices;
-	std::vector<ChunkMesh::Vertex>* tranparent_vertices;
+	UnsafeVector<ChunkMesh::Vertex>* opaque_vertices;
+	UnsafeVector<ChunkMesh::Vertex>* tranparent_vertices;
 
 	Block* cur;
 
@@ -62,12 +62,12 @@ struct Chunk_Mesher {
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 
-	void face_nx (std::vector<ChunkMesh::Vertex>* out);
-	void face_px (std::vector<ChunkMesh::Vertex>* out);
-	void face_ny (std::vector<ChunkMesh::Vertex>* out);
-	void face_py (std::vector<ChunkMesh::Vertex>* out);
-	void face_nz (std::vector<ChunkMesh::Vertex>* out);
-	void face_pz (std::vector<ChunkMesh::Vertex>* out);
+	void face_nx (UnsafeVector<ChunkMesh::Vertex>* out);
+	void face_px (UnsafeVector<ChunkMesh::Vertex>* out);
+	void face_ny (UnsafeVector<ChunkMesh::Vertex>* out);
+	void face_py (UnsafeVector<ChunkMesh::Vertex>* out);
+	void face_nz (UnsafeVector<ChunkMesh::Vertex>* out);
+	void face_pz (UnsafeVector<ChunkMesh::Vertex>* out);
 
 	void cube_opaque ();
 	void cube_transperant ();
@@ -76,6 +76,8 @@ struct Chunk_Mesher {
 	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res);
 };
 void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+	OPTICK_EVENT();
+
 	Chunk_Mesher cm;
 	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
 }
@@ -87,10 +89,20 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 	tranparent_vertices = &res->tranparent_vertices;
 	block_meshes = &tile_textures.block_meshes;
 
+	// reserve enough mesh memory for the average chunk to avoid reallocation
+	int reserve = CHUNK_DIM * CHUNK_DIM * 6 * 6 * 4; // 64*64 blocks * 6 faces * 6 vertices * 4 
+	float grow_fac = 4;
+
+	*opaque_vertices	 = UnsafeVector<ChunkMesh::Vertex>(reserve, grow_fac);
+	*tranparent_vertices = UnsafeVector<ChunkMesh::Vertex>(reserve, grow_fac);
+
 	bpos chunk_pos_world = chunk->chunk_pos_world();
 
 	int3 i = 0;
 	for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
+		OPTICK_EVENT("z layer");
+		OPTICK_TAG("z", i.z);
+
 		for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
 
 			cur = &chunk->blocks[i.z + 1][i.y + 1][1];
@@ -111,7 +123,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 					rand_offs.y = (float)((h >> 32) & 0xffffffffull) / (float)((1ull << 32) - 1); // [0, 1]
 					rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
 
-												   // get a random deterministic variant
+					// get a random deterministic variant
 					float rand_val = (float)(h & 0xffffffffull) / (float)(1ull << 32); // [0, 1)
 					int variant = tile.variants > 1 ? floori(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
 
@@ -150,7 +162,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 			*ptr++ = a; *ptr++ = c; *ptr++ = d; 
 
 #define FACE \
-		size_t offs = out->size(); \
+		size_t offs = out->size; \
 		out->resize(offs + 6); \
 		auto* ptr = &(*out)[offs]; \
 		if (vert[0].sky_light + vert[2].sky_light < vert[1].sky_light + vert[3].sky_light) { \
@@ -160,7 +172,7 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 		}
 //#define FACE QUAD(vert[0], vert[1], vert[2], vert[3]);
 
-void Chunk_Mesher::face_nx (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_nx (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_X),
 		VERT(0,0,0, 1,0, BF_NEG_X),
@@ -169,7 +181,7 @@ void Chunk_Mesher::face_nx (std::vector<ChunkMesh::Vertex>* out) {
 	};
  	FACE
 }
-void Chunk_Mesher::face_px (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_px (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,0,0, 0,0, BF_POS_X),
 		VERT(1,1,0, 1,0, BF_POS_X),
@@ -178,7 +190,7 @@ void Chunk_Mesher::face_px (std::vector<ChunkMesh::Vertex>* out) {
 	};
 	FACE
 }
-void Chunk_Mesher::face_ny (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_ny (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,0, 0,0, BF_NEG_Y),
 		VERT(1,0,0, 1,0, BF_NEG_Y),
@@ -187,7 +199,7 @@ void Chunk_Mesher::face_ny (std::vector<ChunkMesh::Vertex>* out) {
 	};
 	FACE
 }
-void Chunk_Mesher::face_py (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_py (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,1,0, 0,0, BF_POS_Y),
 		VERT(0,1,0, 1,0, BF_POS_Y),
@@ -196,7 +208,7 @@ void Chunk_Mesher::face_py (std::vector<ChunkMesh::Vertex>* out) {
 	};
 	FACE
 }
-void Chunk_Mesher::face_nz (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_nz (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_Z),
 		VERT(1,1,0, 1,0, BF_NEG_Z),
@@ -205,7 +217,7 @@ void Chunk_Mesher::face_nz (std::vector<ChunkMesh::Vertex>* out) {
 	};
 	FACE
 }
-void Chunk_Mesher::face_pz (std::vector<ChunkMesh::Vertex>* out) {
+void Chunk_Mesher::face_pz (UnsafeVector<ChunkMesh::Vertex>* out) {
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,1, 0,0, BF_POS_Z),
 		VERT(1,0,1, 1,0, BF_POS_Z),
@@ -245,8 +257,9 @@ void Chunk_Mesher::cube_transperant () {
 	if (!bt_is_opaque(bt) && bt != cur->id) face_pz(tranparent_vertices);
 }
 void Chunk_Mesher::block_mesh (BlockMeshInfo info, int variant, float2 rand_offs) {
+	OPTICK_EVENT();
 
-	size_t offs = opaque_vertices->size();
+	size_t offs = opaque_vertices->size;
 	opaque_vertices->resize(offs + info.size);
 	auto* ptr = &(*opaque_vertices)[offs];
 

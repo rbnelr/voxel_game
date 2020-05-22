@@ -251,6 +251,8 @@ struct ChunkGenerator {
 };
 
 void WorldGenerator::generate_chunk (Chunk& chunk) const {
+	OPTICK_EVENT();
+
 	ChunkGenerator gen = { *this, chunk };
 
 	chunk.init_blocks();

@@ -13,6 +13,8 @@ using namespace kissmath;
 #include "dear_imgui.hpp"
 using namespace kiss;
 
+#include "optick.h"
+
 #include <memory>
 #include "stdio.h"
 #include "assert.h"
@@ -159,6 +161,8 @@ bool get_vsync () {
 	return vsync;
 }
 void set_vsync (bool on) {
+	OPTICK_EVENT();
+
 	glfwSwapInterval(on ? _vsync_on_interval : 0);
 	vsync = on;
 }
@@ -218,6 +222,8 @@ bool get_fullscreen (bool* borderless_fullscreen) {
 	return fullscreen;
 }
 bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
+	OPTICK_EVENT();
+
 	if (!::fullscreen) {
 		// store windowed window placement
 		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
@@ -267,7 +273,10 @@ void glfw_gameloop () {
 	shaders = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
 
-	imgui.init();
+	{
+		OPTICK_FRAME("imgui.init");
+		imgui.init();
+	}
 
 	auto game = std::make_unique<Game>();
 
@@ -281,24 +290,35 @@ void glfw_gameloop () {
 	_prev_cursor_enabled = glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED;
 
 	for (;;) {
-		_input.clear_frame_input();
+		OPTICK_FRAME("MainThread");
 
-		glfwPollEvents();
+		{
+			OPTICK_EVENT("get input");
 
-		if (glfwWindowShouldClose(window))
-			break;
+			_input.clear_frame_input();
+			glfwPollEvents();
 
-		glfw_get_non_callback_input(window);
+			if (glfwWindowShouldClose(window))
+				break;
 
-		input = _input;
+			glfw_get_non_callback_input(window);
 
-		imgui.frame_start();
+			input = _input;
+		}
 
-		game->frame();
+		{
+			OPTICK_EVENT("frame");
+			imgui.frame_start();
 
-		imgui.frame_end();
+			game->frame();
 
-		glfwSwapBuffers(window);
+			imgui.frame_end();
+		}
+
+		{
+			OPTICK_EVENT("glfwSwapBuffers");
+			glfwSwapBuffers(window);
+		}
 
 		_input = input;
 
@@ -385,9 +405,14 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 #endif
 
 void glfw_init_gl () {
+	OPTICK_EVENT();
+
 	glfwMakeContextCurrent(window);
 
-	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	{
+		OPTICK_EVENT("gladLoadGLLoader");
+		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	}
 
 #ifdef OPENGL_DEBUG
 	if (glfwExtensionSupported("GL_ARB_debug_output")) {
@@ -412,36 +437,41 @@ void glfw_init_gl () {
 }
 
 int main () {
+	OPTICK_START_CAPTURE();
 
-#ifdef GLFW_DEBUG
-	glfwSetErrorCallback(glfw_error);
-#endif
+	{
+		OPTICK_EVENT("glfw init");
 
-	if (!glfwInit()) {
-		logf(ERROR, "glfwInit failed!\n");
-		return 1;
-	}
+	#ifdef GLFW_DEBUG
+		glfwSetErrorCallback(glfw_error);
+	#endif
 
-#ifdef OPENGL_DEBUG
-	glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-#endif
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
-	glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
+		if (!glfwInit()) {
+			logf(ERROR, "glfwInit failed!\n");
+			return 1;
+		}
 
-	window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
-	if (!window) {
-		logf(ERROR, "glfwCreateWindow failed!\n");
-		glfwTerminate();
-		return 1;
-	}
+	#ifdef OPENGL_DEBUG
+		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+	#endif
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+		glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
+
+		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
+		if (!window) {
+			logf(ERROR, "glfwCreateWindow failed!\n");
+			glfwTerminate();
+			return 1;
+		}
 	
-	if (glfwRawMouseMotionSupported())
-		glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+		if (glfwRawMouseMotionSupported())
+			glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
-	glfw_register_callbacks(window);
+		glfw_register_callbacks(window);
+	}
 
 	glfw_init_gl();
 
@@ -449,5 +479,9 @@ int main () {
 
 	glfwDestroyWindow(window);
 	glfwTerminate();
+
+	OPTICK_STOP_CAPTURE();
+	OPTICK_SAVE_CAPTURE("capture.opt");
+	OPTICK_SHUTDOWN();
 	return 0;
 }

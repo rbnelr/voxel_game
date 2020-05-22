@@ -220,6 +220,8 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 }
 
 Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* selected_block) {
+	OPTICK_EVENT();
+	
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 

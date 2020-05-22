@@ -29,6 +29,8 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 }
 
 void Chunk::init_blocks () {
+	OPTICK_EVENT();
+
 #if 1
 	// bottom
 	for (int y=0; y<CHUNK_DIM+2; ++y) {
@@ -103,6 +105,8 @@ void Chunk::set_block_unchecked (bpos pos, Block b) {
 	blocks[pos.z + 1][pos.y + 1][pos.x + 1] = b;
 }
 void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
+	OPTICK_EVENT();
+
 	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
 	
 	*blk = b;
@@ -140,6 +144,8 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 	}
 }
 void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
+	OPTICK_EVENT();
+
 	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
 
 	bool only_texture_changed = blk->id == b.id && blk->block_light == b.block_light;
@@ -206,6 +212,8 @@ void set_neighbour_blocks_pz (Chunk const& src, Chunk& dst) {
 }
 
 void Chunk::update_neighbour_blocks (Chunks& chunks) {
+	OPTICK_EVENT();
+
 	Chunk* chunk;
 	if ((chunk = chunks.query_chunk(coord + chunk_coord(-1, 0, 0)))) {
 		set_neighbour_blocks_nx(*this, *chunk);
@@ -242,14 +250,18 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 }
 
 void Chunk::reupload (MeshingResult const& result) {
-	mesh.opaque_mesh.upload(result.opaque_vertices.data(), result.opaque_vertices.size());
-	mesh.transparent_mesh.upload(result.tranparent_vertices.data(), result.tranparent_vertices.size());
+	OPTICK_EVENT();
 
-	face_count = (result.opaque_vertices.size() + result.tranparent_vertices.size()) / 6;
+	mesh.opaque_mesh.upload(result.opaque_vertices.ptr, result.opaque_vertices.size);
+	mesh.transparent_mesh.upload(result.tranparent_vertices.ptr, result.tranparent_vertices.size);
+
+	face_count = (result.opaque_vertices.size + result.tranparent_vertices.size) / 6;
 }
 
 //// Chunks
 BackgroundJob BackgroundJob::execute () {
+	OPTICK_EVENT();
+
 	auto timer = Timer::start();
 
 	world_gen->generate_chunk(*chunk);
@@ -261,6 +273,8 @@ BackgroundJob BackgroundJob::execute () {
 }
 
 ParallelismJob ParallelismJob::execute () {
+	OPTICK_EVENT();
+
 	auto timer = Timer::start();
 
 	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, *wg, chunk, &remesh_result);
@@ -270,6 +284,7 @@ ParallelismJob ParallelismJob::execute () {
 }
 
 Chunk* ChunkHashmap::alloc_chunk (chunk_coord coord) {
+	OPTICK_EVENT();
 	return hashmap.emplace(chunk_coord_hashmap{ coord }, std::make_unique<Chunk>(coord)).first->second.get();
 }
 Chunk* ChunkHashmap::_lookup_chunk (chunk_coord coord) {
@@ -289,6 +304,7 @@ Chunk* ChunkHashmap::query_chunk (chunk_coord coord) {
 	}
 }
 ChunkHashmap::Iterator ChunkHashmap::erase_chunk (ChunkHashmap::Iterator it) {
+	OPTICK_EVENT();
 	// reset this pointer to prevent use after free
 	_prev_query_chunk = nullptr;
 	// delete chunk
@@ -328,6 +344,7 @@ void Chunks::remesh_all () {
 }
 
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player) {
+	OPTICK_EVENT();
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
@@ -361,49 +378,61 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 		// check all chunk positions within a square of chunk_generation_radius
 		std::vector<chunk_coord> chunks_to_generate;
 
-		chunk_coord cp;
-		for (cp.z = start.z; cp.z<end.z; ++cp.z) {
-			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-				for (cp.x = start.x; cp.x<end.x; ++cp.x) {
-					auto* chunk = query_chunk(cp);
-					float dist = chunk_dist_to_player(cp);
+		{
+			OPTICK_EVENT("chunks_to_generate iterate all chunks");
+			chunk_coord cp;
+			for (cp.z = start.z; cp.z<end.z; ++cp.z) {
+				for (cp.y = start.y; cp.y<end.y; ++cp.y) {
+					for (cp.x = start.x; cp.x<end.x; ++cp.x) {
+						auto* chunk = query_chunk(cp);
+						float dist = chunk_dist_to_player(cp);
 
-					if (!chunk) {
-						if (dist <= generation_radius && !pending_chunks.query_chunk(cp)) {
-							// chunk is within chunk_generation_radius and not yet generated
-							chunks_to_generate.push_back(cp);
+						if (!chunk) {
+							if (dist <= generation_radius && !pending_chunks.query_chunk(cp)) {
+								// chunk is within chunk_generation_radius and not yet generated
+								chunks_to_generate.push_back(cp);
+							}
 						}
 					}
 				}
 			}
 		}
 
-		// load chunks nearest to player first
-		std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
-			[&] (chunk_coord l, chunk_coord r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
-		);
-
-		for (auto& cp : chunks_to_generate) {
-			Chunk* chunk = pending_chunks.alloc_chunk(cp);
-			float dist = chunk_dist_to_player(cp);
-			
-			BackgroundJob job;
-			job.chunk = chunk;
-			job.world_gen = &world_gen;
-			background_threadpool.jobs.push(job);
+		{
+			OPTICK_EVENT("std::sort(chunks_to_generate)");
+			// load chunks nearest to player first
+			std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
+				[&] (chunk_coord l, chunk_coord r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
+			);
 		}
 
-		BackgroundJob res;
-		while (background_threadpool.results.try_pop(&res)) {
-			{ // move chunk into real hashmap
-				auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
-				chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
-				pending_chunks.erase_chunk({ it });
+		{
+			OPTICK_EVENT("chunks_to_generate push jobs");
+			for (auto& cp : chunks_to_generate) {
+				Chunk* chunk = pending_chunks.alloc_chunk(cp);
+				float dist = chunk_dist_to_player(cp);
+			
+				BackgroundJob job;
+				job.chunk = chunk;
+				job.world_gen = &world_gen;
+				background_threadpool.jobs.push(job);
 			}
-			res.chunk->update_neighbour_blocks(*this);
+		}
 
-			chunk_gen_time.push(res.time);
-			logf("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
+		{
+			OPTICK_EVENT("chunks_to_generate finish jobs");
+			BackgroundJob res;
+			while (background_threadpool.results.try_pop(&res)) {
+				{ // move chunk into real hashmap
+					auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
+					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
+					pending_chunks.erase_chunk({ it });
+				}
+				res.chunk->update_neighbour_blocks(*this);
+
+				chunk_gen_time.push(res.time);
+				logf("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
+			}
 		}
 
 	}
@@ -412,6 +441,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 
 void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player) {
+	OPTICK_EVENT();
+
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos chunk_origin = pos * CHUNK_DIM;
 		return point_box_nearest_dist((float3)chunk_origin, CHUNK_DIM, player.pos);
@@ -419,17 +450,25 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 
 	std::vector<Chunk*> chunks_to_remesh;
 
-	for (Chunk& chunk : chunks) {
-		if (chunk.needs_remesh)
-			chunks_to_remesh.push_back(&chunk);
+	{
+		OPTICK_EVENT("chunks_to_remesh iterate all chunks");
+		for (Chunk& chunk : chunks) {
+			if (chunk.needs_remesh)
+				chunks_to_remesh.push_back(&chunk);
+		}
 	}
 
-	// update chunks nearest to player first
-	std::sort(chunks_to_remesh.begin(), chunks_to_remesh.end(),
-		[&] (Chunk* l, Chunk* r) { return chunk_dist_to_player(l->coord) < chunk_dist_to_player(r->coord); }
-	);
+	{
+		OPTICK_EVENT("std::sort(chunks_to_remesh)");
+		// update chunks nearest to player first
+		std::sort(chunks_to_remesh.begin(), chunks_to_remesh.end(),
+			[&] (Chunk* l, Chunk* r) { return chunk_dist_to_player(l->coord) < chunk_dist_to_player(r->coord); }
+		);
+	}
 
 	{ // remesh all chunks in parallel
+		OPTICK_EVENT("remesh all chunks with threadpool");
+
 		int count = min((int)chunks_to_remesh.size(), max_chunks_meshed_per_frame);
 
 		for (int i=0; i<count; ++i) {

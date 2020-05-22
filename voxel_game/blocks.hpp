@@ -120,8 +120,8 @@ static inline BlockTypes blocks = load_block_types();
 // Block instance
 struct Block {
 	block_id	id;
-	uint8		block_light; // [0,15]
-	uint8		sky_light; // [0,15]
+	uint8		block_light;
+	uint8		sky_light;
 	uint8		hp;
 
 	Block () {}

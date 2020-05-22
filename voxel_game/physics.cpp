@@ -6,6 +6,8 @@
 Physics physics;
 
 CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
+	OPTICK_EVENT();
+
 	CollisionHit closest_hit;
 	closest_hit.dist = +INF;
 
@@ -95,6 +97,7 @@ void handle_collison (PhysicsObject& obj, CollisionHit const& hit) {
 extern int frame_counter;
 
 void Physics::update_object (World& world, PhysicsObject& obj) {
+	OPTICK_EVENT();
 
 	//// gravity
 	obj.vel += physics.grav_accel * input.dt;
@@ -134,6 +137,8 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 }
 
 void Physics::update_player (World& world, Player& player) {
+	OPTICK_EVENT();
+
 	PhysicsObject obj;
 	
 	obj.pos = player.pos;

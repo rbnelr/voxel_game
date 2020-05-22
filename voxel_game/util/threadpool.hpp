@@ -2,6 +2,7 @@
 #include <thread>
 #include "threadsafe_queue.hpp"
 #include "string.hpp"
+#include "optick.h"
 
 // Set description of current thread (mainly for debugging)
 // allows for easy overview of threads in debugger
@@ -23,6 +24,8 @@ class Threadpool {
 	std::vector< std::thread >	threads;
 
 	void thread_main (std::string thread_name, bool high_prio) { // thread_name mainly for debugging
+		OPTICK_THREAD(thread_name.c_str()); // save since, OPTICK_THREAD copies the thread name
+
 		set_thread_description(thread_name);
 		if (high_prio)
 			set_high_thread_priority();
@@ -30,6 +33,8 @@ class Threadpool {
 		// Wait for one job to pop and execute or until shutdown signal is sent via jobs.shutdown()
 		Job job;
 		while (jobs.pop_or_shutdown(&job) != decltype(jobs)::SHUTDOWN) {
+			OPTICK_EVENT("Threadpool execute job");
+
 			results.push(job.execute());
 		}
 	}
@@ -71,6 +76,7 @@ public:
 				res = threadpool.results.pop()
 	*/
 	void contribute_work () {
+		OPTICK_EVENT("Threadpool contribute_work");
 		
 		// Wait for one job to pop and execute or until shutdown signal is sent via jobs.shutdown()
 		Job job;

@@ -1,6 +1,8 @@
 #include "world.hpp"
 
 SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* hit_dist) {
+	OPTICK_EVENT();
+
 	SelectedBlock b;
 	float _dist;
 	auto hit_block = [&] (bpos bp, int face, float dist) {
@@ -26,6 +28,8 @@ SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* h
 }
 
 void World::apply_damage (SelectedBlock const& block, Item& item) {
+	OPTICK_EVENT();
+
 	assert(block);
 	auto tool_props = item.get_props();
 
@@ -57,6 +61,8 @@ void World::apply_damage (SelectedBlock const& block, Item& item) {
 }
 
 bool World::try_place_block (bpos pos, block_id id) {
+	OPTICK_EVENT();
+
 	Chunk* chunk;
 	bpos bpos_in_chunk;
 	Block b = chunks.query_block(pos, &chunk, &bpos_in_chunk);

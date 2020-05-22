@@ -89,10 +89,14 @@ __declspec(noinline) uint32_t block_pattern (uint32_t i) {
 #endif
 
 void BlockUpdate::update_blocks (Chunks& chunks) {
+	OPTICK_EVENT();
+
 	bpos_t blocks_to_update = (bpos_t)ceil((float)CHUNK_BLOCK_COUNT * block_update_frequency * input.dt);
 
 	for (Chunk& chunk : chunks.chunks) {
 		if (chunk.active) {
+			OPTICK_EVENT("update_blocks chunk");
+
 			for (bpos_t i=0; i<blocks_to_update; ++i) {
 				uint32_t indx = (uint32_t)((cur_chunk_update_block_i +i) % CHUNK_BLOCK_COUNT);
 				indx = block_pattern(indx);
