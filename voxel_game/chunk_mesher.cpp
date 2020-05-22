@@ -100,8 +100,6 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 
 	int3 i = 0;
 	for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-		OPTICK_EVENT("z layer");
-		OPTICK_TAG("z", i.z);
 
 		for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
 
@@ -114,20 +112,21 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 				if (cur->id != B_AIR) {
 					tile = tile_textures.block_tile_info[cur->id];
 
-					// get a 'random' but deterministic value based on block position
-					uint64_t h = hash(i + chunk_pos_world) ^ wg.seed;
-
-					// get a random determinisitc 2d offset
-					float2 rand_offs;
-					rand_offs.x = (float)((h >>  0) & 0xffffffffull) / (float)((1ull << 32) - 1); // [0, 1]
-					rand_offs.y = (float)((h >> 32) & 0xffffffffull) / (float)((1ull << 32) - 1); // [0, 1]
-					rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
-
-					// get a random deterministic variant
-					float rand_val = (float)(h & 0xffffffffull) / (float)(1ull << 32); // [0, 1)
-					int variant = tile.variants > 1 ? floori(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
-
 					if (tile_textures.block_meshes_info[cur->id].offset >= 0) {
+						// get a 'random' but deterministic value based on block position
+						uint64_t h = hash(i + chunk_pos_world) ^ wg.seed;
+
+						// get a random determinisitc 2d offset
+						float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+						
+						float2 rand_offs;
+						rand_offs.x = rand_val;
+						rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+						rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
+
+						// get a random deterministic variant
+						int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
+
 						block_mesh(tile_textures.block_meshes_info[cur->id], variant, rand_offs);
 					} else {
 						if (blocks.transparency[cur->id] == TM_TRANSPARENT)
@@ -173,6 +172,8 @@ void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, Ti
 //#define FACE QUAD(vert[0], vert[1], vert[2], vert[3]);
 
 void Chunk_Mesher::face_nx (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_X),
 		VERT(0,0,0, 1,0, BF_NEG_X),
@@ -182,6 +183,8 @@ void Chunk_Mesher::face_nx (UnsafeVector<ChunkMesh::Vertex>* out) {
  	FACE
 }
 void Chunk_Mesher::face_px (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,0,0, 0,0, BF_POS_X),
 		VERT(1,1,0, 1,0, BF_POS_X),
@@ -191,6 +194,8 @@ void Chunk_Mesher::face_px (UnsafeVector<ChunkMesh::Vertex>* out) {
 	FACE
 }
 void Chunk_Mesher::face_ny (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,0, 0,0, BF_NEG_Y),
 		VERT(1,0,0, 1,0, BF_NEG_Y),
@@ -200,6 +205,8 @@ void Chunk_Mesher::face_ny (UnsafeVector<ChunkMesh::Vertex>* out) {
 	FACE
 }
 void Chunk_Mesher::face_py (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(1,1,0, 0,0, BF_POS_Y),
 		VERT(0,1,0, 1,0, BF_POS_Y),
@@ -209,6 +216,8 @@ void Chunk_Mesher::face_py (UnsafeVector<ChunkMesh::Vertex>* out) {
 	FACE
 }
 void Chunk_Mesher::face_nz (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,1,0, 0,0, BF_NEG_Z),
 		VERT(1,1,0, 1,0, BF_NEG_Z),
@@ -218,6 +227,8 @@ void Chunk_Mesher::face_nz (UnsafeVector<ChunkMesh::Vertex>* out) {
 	FACE
 }
 void Chunk_Mesher::face_pz (UnsafeVector<ChunkMesh::Vertex>* out) {
+	OPTICK_EVENT();
+
 	ChunkMesh::Vertex vert[4] = {
 		VERT(0,0,1, 0,0, BF_POS_Z),
 		VERT(1,0,1, 1,0, BF_POS_Z),

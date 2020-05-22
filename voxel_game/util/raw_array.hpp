@@ -86,7 +86,7 @@ struct UnsafeVector {
 
 	// empty vector, with initial allocation
 	inline UnsafeVector (size_t capacity, float grow_fac=DEFAULT_GROW_FAC) {
-		OPTICK_EVENT();
+		OPTICK_EVENT("alloc UnsafeVector::ctor");
 
 		capacity = _max(capacity, MIN_CAP);
 
@@ -111,8 +111,6 @@ private:
 	inline void _change_capacity (size_t new_cap) {
 		if (new_cap == capacity)
 			return;
-
-		OPTICK_EVENT();
 		
 		// get old
 		T* old_ptr = ptr;
@@ -142,14 +140,14 @@ public:
 		this->size = new_size;
 
 		if (new_size > capacity) {
-			OPTICK_EVENT();
+			OPTICK_EVENT("alloc UnsafeVector::resize");
 
 			_grow_capacity(new_size);
 			_change_capacity(capacity);
 		}
 	}
 	inline void shrink_to_fit () {
-		OPTICK_EVENT();
+		OPTICK_EVENT("alloc UnsafeVector::shrink_to_fit");
 
 		_change_capacity(size);
 	}
