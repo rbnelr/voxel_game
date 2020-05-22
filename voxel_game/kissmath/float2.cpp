@@ -25,12 +25,6 @@ namespace kissmath {
 		return arr[i];
 	}
 	
-	
-	// uninitialized constructor
-	float2::float2 () {
-		
-	}
-	
 	//// Truncating cast operators
 
 	// truncate vector

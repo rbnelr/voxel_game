@@ -124,7 +124,9 @@ struct Block {
 	uint8		sky_light;
 	uint8		hp;
 
-	Block () {}
+	Block () {
+		
+	}
 
 	Block (block_id id): id{id} {
 		block_light = blocks.glow[id];
