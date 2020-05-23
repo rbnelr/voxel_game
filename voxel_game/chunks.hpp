@@ -94,6 +94,42 @@ static inline constexpr int _block_count (int lod_levels) {
 
 ////////////// Chunk
 
+struct ChunkData {
+	static constexpr uint64_t COUNT = (CHUNK_DIM+2) * (CHUNK_DIM+2) * (CHUNK_DIM+2);
+
+	block_id	id[COUNT];
+	uint8		block_light[COUNT];
+	uint8		sky_light[COUNT];
+	uint8		hp[COUNT];
+
+	static constexpr uint64_t pos_to_index (bpos pos) {
+		return (pos.z + 1) * (CHUNK_DIM+2) * (CHUNK_DIM+2) + (pos.y + 1) * (CHUNK_DIM+2) + (pos.x + 1);
+	}
+
+	Block get (bpos pos) {
+		Block b;
+
+		auto indx = pos_to_index(pos);
+
+		b.id			= id[indx];
+		b.block_light	= block_light[indx];
+		b.sky_light		= sky_light[indx];
+		b.hp			= hp[indx];
+
+		return b;
+	}
+	void set (bpos pos, Block b) {
+		auto indx = pos_to_index(pos);
+
+		id[indx]			= b.id;
+		block_light[indx]	= b.block_light;
+		sky_light[indx]		= b.sky_light;
+		hp[indx]			= b.hp;
+	}
+
+	void init_border ();
+};
+
 struct MeshingResult {
 	UnsafeVector<ChunkMesh::Vertex> opaque_vertices;
 	UnsafeVector<ChunkMesh::Vertex> tranparent_vertices;
@@ -115,14 +151,10 @@ public:
 	}
 
 	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
-	Block* get_block_unchecked (bpos pos);
-	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
 	void set_block_unchecked (bpos pos, Block b); // only use in World Generator
 
 	// get block
-	Block const& get_block (bpos pos) const;
-	// get block
-	Block const& get_block (bpos_t x, bpos_t y, bpos_t z) const;
+	Block get_block (bpos pos) const;
 	// set block (used in light updater)
 	void _set_block_no_light_update (Chunks& chunks, bpos pos, Block b);
 	// set block (expensive, -> potentially updates light and copies block data to neighbours if block is at the border of a chunk)
@@ -141,10 +173,12 @@ public:
 
 private:
 	friend struct Chunk_Mesher;
+	friend struct ChunkGenerator;
+	friend void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk);
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
-	Block	blocks[CHUNK_DIM+2][CHUNK_DIM+2][CHUNK_DIM+2];
+	std::unique_ptr<ChunkData> blocks = nullptr;
 public:
 
 	// Gpu mesh data
@@ -280,7 +314,7 @@ public:
 
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM * CHUNK_DIM * CHUNK_DIM;
-		uint64_t block_mem = chunk_count * (uint64_t)(CHUNK_DIM+2)*(CHUNK_DIM+2)*(CHUNK_DIM+2) * sizeof(Block);
+		uint64_t block_mem = chunk_count * sizeof(ChunkData);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 
@@ -299,7 +333,7 @@ public:
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
 	Chunk* query_chunk (chunk_coord coord);
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
-	Block const& query_block (bpos p, Chunk** out_chunk=nullptr, bpos* out_block_pos_chunk=nullptr);
+	Block query_block (bpos p, Chunk** out_chunk=nullptr, bpos* out_block_pos_chunk=nullptr);
 
 	// unload chunk at coord (invalidates iterators, so dont call this in a loop)
 	ChunkHashmap::Iterator unload_chunk (ChunkHashmap::Iterator it);

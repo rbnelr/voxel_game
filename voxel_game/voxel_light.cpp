@@ -150,19 +150,21 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
 	bpos pos = pos_in_chunk;
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		sky_light = max(sky_light - blocks.absorb[b->id], 0);
+		auto indx = ChunkData::pos_to_index(pos);
+		auto* sl = &chunk->blocks->sky_light[ indx ];
+		auto id = chunk->blocks->id[ indx ];
 
-		b->sky_light = sky_light;
+		sky_light = max(sky_light - blocks.absorb[id], 0);
+		*sl = sky_light;
 	}
 
 	for (; pos.z>=0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		
-		if (b->sky_light == 0)
+		auto* sl = &chunk->blocks->sky_light[ ChunkData::pos_to_index(pos) ];
+
+		if (*sl == 0)
 			break;
 
-		b->sky_light = 0;
+		*sl = 0;
 	}
 
 	chunk->needs_remesh = true;

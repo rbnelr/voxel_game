@@ -3,7 +3,7 @@
 #include "util/random.hpp"
 
 bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world) {
-	auto& above = chunks.query_block(pos_world +bpos(0,0,+1));
+	auto above = chunks.query_block(pos_world +bpos(0,0,+1));
 
 	bool changed = false;
 

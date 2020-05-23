@@ -28,88 +28,35 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 
 }
 
+void ChunkData::init_border () {
+
+	for (int i=0; i<COUNT; ++i)
+		id[i] = B_NO_CHUNK;
+
+	memset(block_light, 0, sizeof(block_light));
+	//memset(sky_light, 0, sizeof(sky_light)); // always inited by update sky light after chunk gen
+	memset(hp, 255, sizeof(hp));
+}
+
 void Chunk::init_blocks () {
 	OPTICK_EVENT();
 
-#if 1
-	// bottom
-	for (int y=0; y<CHUNK_DIM+2; ++y) {
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[0][y][x] = _NO_CHUNK;
-		}
-	}
-	// top
-	for (int y=0; y<CHUNK_DIM+2; ++y) {
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[CHUNK_DIM+1][y][x] = _NO_CHUNK;
-		}
-	}
-
-	for (int z=1; z<CHUNK_DIM+1; ++z) {
-		// backward
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[z][0][x] = _NO_CHUNK;
-		}
-
-		for (int y=1; y<CHUNK_DIM+1; ++y) {
-			for (int x=1; x<CHUNK_DIM+1; ++x) {
-				blocks[z][y][x] = Block(B_NULL);
-			}
-		}
-
-		// forward
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[z][CHUNK_DIM+1][x] = _NO_CHUNK;
-		}
-	}
-
-	for (int z=1; z<CHUNK_DIM+1; ++z) {
-		for (int y=1; y<CHUNK_DIM+1; ++y) {
-			blocks[z][y][0] = _NO_CHUNK; // left
-			blocks[z][y][CHUNK_DIM+1] = _NO_CHUNK; // right
-		}
-	}
-#else
-	// bottom
-	for (int y=0; y<CHUNK_DIM+2; ++y) {
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[0][y][x] = _OUT_OF_BOUNDS;
-		}
-	}
-	for (int z=1; z<CHUNK_DIM+1; ++z) {
-		for (int y=0; y<CHUNK_DIM+2; ++y) {
-			for (int x=0; x<CHUNK_DIM+2; ++x) {
-				blocks[z][y][x] = _NO_CHUNK;
-			}
-		}
-	}
-	// top
-	for (int y=0; y<CHUNK_DIM+2; ++y) {
-		for (int x=0; x<CHUNK_DIM+2; ++x) {
-			blocks[CHUNK_DIM+1][y][x] = _OUT_OF_BOUNDS;
-		}
-	}
-#endif
+	blocks = std::make_unique<ChunkData>();
+	blocks->init_border();
 }
 
-Block* Chunk::get_block_unchecked (bpos pos) {
-	return &blocks[pos.z + 1][pos.y + 1][pos.x + 1];
-}
-Block const& Chunk::get_block (bpos pos) const {
-	return blocks[pos.z + 1][pos.y + 1][pos.x + 1];
-}
-Block const& Chunk::get_block (bpos_t x, bpos_t y, bpos_t z) const {
-	return blocks[z + 1][y + 1][x + 1];
+Block Chunk::get_block (bpos pos) const {
+	return blocks->get(pos);
 }
 void Chunk::set_block_unchecked (bpos pos, Block b) {
-	blocks[pos.z + 1][pos.y + 1][pos.x + 1] = b;
+	blocks->set(pos, b);
 }
 void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	OPTICK_EVENT();
 
-	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
+	Block blk = blocks->get(pos_in_chunk);
 	
-	*blk = b;
+	blocks->set(pos_in_chunk, b);
 	needs_remesh = true;
 
 	bool3 lo = (bpos)pos_in_chunk == 0;
@@ -120,7 +67,7 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 		auto update_neighbour_block_copy = [=, &chunks] (chunk_coord chunk_offset, bpos block) {
 			auto chunk = chunks.query_chunk(coord + chunk_offset);
 			if (chunk) {
-				chunk->set_block_unchecked(block, b);
+				chunk->blocks->set(block, b);
 
 				chunk->needs_remesh = true;
 			}
@@ -146,14 +93,14 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	OPTICK_EVENT();
 
-	Block* blk = &blocks[pos_in_chunk.z + 1][pos_in_chunk.y + 1][pos_in_chunk.x + 1];
+	Block blk = blocks->get(pos_in_chunk);
 
-	bool only_texture_changed = blk->id == b.id && blk->block_light == b.block_light;
+	bool only_texture_changed = blk.id == b.id && blk.block_light == b.block_light;
 	if (only_texture_changed) {
-		*blk = b;
+		blocks->set(pos_in_chunk, b);
 		needs_remesh = true;
 	} else {
-		uint8 old_block_light = blk->block_light;
+		uint8 old_block_light = blk.block_light;
 
 		uint8 new_block_light = calc_block_light_level(this, pos_in_chunk, b);
 		bpos pos = pos_in_chunk + chunk_pos_world();
@@ -171,42 +118,42 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.set_block_unchecked(bpos(CHUNK_DIM, y,z), src.get_block(0,y,z));
+			dst.set_block_unchecked(bpos(CHUNK_DIM, y,z), src.get_block(int3(0,y,z)));
 		}
 	}
 }
 void set_neighbour_blocks_px (Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.set_block_unchecked(bpos(-1, y,z), src.get_block(CHUNK_DIM-1, y,z));
+			dst.set_block_unchecked(bpos(-1, y,z), src.get_block(int3(CHUNK_DIM-1, y,z)));
 		}
 	}
 }
 void set_neighbour_blocks_ny (Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, CHUNK_DIM, z), src.get_block(x,0,z));
+			dst.set_block_unchecked(bpos(x, CHUNK_DIM, z), src.get_block(int3(x,0,z)));
 		}
 	}
 }
 void set_neighbour_blocks_py (Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, -1, z), src.get_block(x, CHUNK_DIM-1, z));
+			dst.set_block_unchecked(bpos(x, -1, z), src.get_block(int3(x, CHUNK_DIM-1, z)));
 		}
 	}
 }
 void set_neighbour_blocks_nz (Chunk const& src, Chunk& dst) {
 	for (int y=0; y<CHUNK_DIM; ++y) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, y, CHUNK_DIM), src.get_block(x,y,0));
+			dst.set_block_unchecked(bpos(x, y, CHUNK_DIM), src.get_block(int3(x,y,0)));
 		}
 	}
 }
 void set_neighbour_blocks_pz (Chunk const& src, Chunk& dst) {
 	for (int y=0; y<CHUNK_DIM; ++y) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, y, -1), src.get_block(x, y, CHUNK_DIM-1));
+			dst.set_block_unchecked(bpos(x, y, -1), src.get_block(int3(x, y, CHUNK_DIM-1)));
 		}
 	}
 }
@@ -314,7 +261,7 @@ ChunkHashmap::Iterator ChunkHashmap::erase_chunk (ChunkHashmap::Iterator it) {
 Chunk* Chunks::query_chunk (chunk_coord coord) {
 	return chunks.query_chunk(coord);
 }
-Block const& Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos_chunk) {
+Block Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos_chunk) {
 	if (out_chunk)
 		*out_chunk = nullptr;
 

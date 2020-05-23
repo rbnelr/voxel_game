@@ -175,21 +175,25 @@ struct ChunkGenerator {
 				//float effective_tree_prob = tree_density;
 
 				for (i.z=0; i.z <= min(highest_block, CHUNK_DIM-1); ++i.z) {
-					auto* b = chunk.get_block_unchecked(i);
+					auto indx = ChunkData::pos_to_index(i);
+					auto* bid = &chunk.blocks->id[ indx ];
 
 					if (i.z <= highest_block - earth_layer) {
-						b->id = B_STONE;
+						*bid = B_STONE;
 					} else {
 						if (i.z == highest_block && i.z >= water_level) {
-							b->id = B_GRASS;
+							*bid = B_GRASS;
 						} else {
-							b->id = B_EARTH;
+							*bid = B_EARTH;
 						}
 					}
 				}
 
-				bool block_free = highest_block >= 0 && highest_block < CHUNK_DIM &&
-					chunk.get_block(bpos(i.x, i.y, i.z)).id != B_WATER;
+				auto indx = ChunkData::pos_to_index(i);
+				auto* bid			= &chunk.blocks->id[ indx ];
+				auto* block_light	= &chunk.blocks->block_light[ indx ];
+
+				bool block_free = highest_block >= 0 && highest_block < CHUNK_DIM && *bid != B_WATER;
 
 				if (block_free) {
 					float tree_chance = rand.uniform();
@@ -198,28 +202,30 @@ struct ChunkGenerator {
 					if (rand.uniform() < effective_tree_prob) {
 						tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
 					} else if (rand.uniform() < grass_density) {
-						auto* b = chunk.get_block_unchecked(bpos(i.x, i.y, i.z));
-						b->id = B_TALLGRASS;
+						*bid = B_TALLGRASS;
 					} else if (rand.uniform() < 0.0005f) {
-						auto* b = chunk.get_block_unchecked(bpos(i.x, i.y, i.z));
-						b->id = B_TORCH;
-						b->block_light = blocks.glow[B_TORCH];
+						*bid = B_TORCH;
+						*block_light = blocks.glow[B_TORCH];
 					}
 				}
 			}
 		}
 
 		auto place_tree = [&] (bpos pos_chunk) {
-			auto* ground_block = chunk.get_block_unchecked(pos_chunk - bpos(0,0,1));
-			if (ground_block->id == B_GRASS) {
-				ground_block->id = B_EARTH;
+			auto indx = ChunkData::pos_to_index(pos_chunk - bpos(0,0,1));
+			auto* bid = &chunk.blocks->id[ indx ];
+
+			if (*bid == B_GRASS) {
+				*bid = B_EARTH;
 			}
 
 			auto place_block = [&] (bpos pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
-				auto* b = chunk.get_block_unchecked(pos_chunk);
-				if (b->id == B_AIR || b->id == B_WATER || (bt == B_TREE_LOG && b->id == B_LEAVES)) {
-					b->id = bt;
+				auto indx = ChunkData::pos_to_index(pos_chunk);
+				auto* bid = &chunk.blocks->id[ indx ];
+
+				if (*bid == B_AIR || *bid == B_WATER || (bt == B_TREE_LOG && *bid == B_LEAVES)) {
+					*bid = bt;
 				}
 			};
 			auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_id bt) {

@@ -13,7 +13,9 @@ struct Chunk_Mesher {
 	UnsafeVector<ChunkMesh::Vertex>* opaque_vertices;
 	UnsafeVector<ChunkMesh::Vertex>* tranparent_vertices;
 
-	Block* cur;
+	ChunkData* chunk_data;
+
+	uint64_t cur;
 
 	// per block
 	float3 block_pos;
@@ -42,23 +44,23 @@ struct Chunk_Mesher {
 	};
 
 	inline uint8 calc_block_light (BlockFace face, int3 vert_pos) {
-		auto* ptr = cur + offs(vert_pos);
+		auto* block_light = &chunk_data->block_light[cur + offs(vert_pos)];
 		
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += (ptr + offset)->block_light;
+			total += block_light[offset];
 		}
 		
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
-		auto* ptr = cur + offs(vert_pos);
+		auto* sky_light = &chunk_data->sky_light[cur + offs(vert_pos)];
 
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += (ptr + offset)->sky_light;
+			total += sky_light[offset];
 		}
 
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
@@ -113,6 +115,8 @@ struct Chunk_Mesher {
 		float3 const* pf = posf[facei];
 		int3 const* p = pos[facei];
 
+		auto hp = chunk_data->hp[cur];
+
 		for (int i=0; i<4; ++i)
 			vert[i].pos_model	= block_pos + pf[i];
 		for (int i=0; i<4; ++i)
@@ -124,7 +128,7 @@ struct Chunk_Mesher {
 		for (int i=0; i<4; ++i)
 			vert[i].sky_light	= calc_sky_light(facei, p[i]);
 		for (int i=0; i<4; ++i)
-			vert[i].hp			= cur->hp;
+			vert[i].hp			= hp;
 
 		bool b = vert[0].sky_light + vert[2].sky_light >= vert[1].sky_light + vert[3].sky_light;
 
@@ -136,14 +140,16 @@ struct Chunk_Mesher {
 
 	void cube_opaque () {
 		for (int i=0; i<6; ++i) {
-			if (!bt_is_opaque((cur + offsets[i])->id))
+			block_id n = chunk_data->id[cur + offsets[i]];
+			if (!bt_is_opaque(n))
 				face(opaque_vertices, (BlockFace)i);
 		}
 	}
 	void cube_transperant () {
 		for (int i=0; i<6; ++i) {
-			block_id bt = (cur + offsets[i])->id;
-			if (!bt_is_opaque(bt) && bt != cur->id)
+			block_id n = chunk_data->id[cur + offsets[i]];
+			block_id b = chunk_data->id[cur];
+			if (!bt_is_opaque(n) && n != b)
 				face(tranparent_vertices, (BlockFace)i);
 		}
 	}
@@ -175,9 +181,9 @@ struct Chunk_Mesher {
 			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
 
 			ptr->tex_indx = tile.base_index + variant;
-			ptr->block_light = cur->block_light * 255 / MAX_LIGHT_LEVEL;
-			ptr->sky_light = cur->sky_light * 255 / MAX_LIGHT_LEVEL;
-			ptr->hp = cur->hp;
+			ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
+			ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
+			ptr->hp = chunk_data->hp[cur];
 
 			ptr++;
 		}
@@ -189,6 +195,8 @@ struct Chunk_Mesher {
 		opaque_vertices = &res->opaque_vertices;
 		tranparent_vertices = &res->tranparent_vertices;
 		block_meshes = &tile_textures.block_meshes;
+
+		chunk_data = chunk->blocks.get();
 
 		// reserve enough mesh memory for the average chunk to avoid reallocation
 		int reserve = CHUNK_DIM * CHUNK_DIM * 6 * 6 * 4; // 64*64 blocks * 6 faces * 6 vertices * 4 
@@ -207,20 +215,22 @@ struct Chunk_Mesher {
 
 			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
 
-				cur = &chunk->blocks[i.z + 1][i.y + 1][1];
+				cur = ChunkData::pos_to_index(int3(0, i.y, i.z));
 
 				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
 
-					if (cur->id != B_AIR) {
+					auto id = chunk_data->id[cur];
+
+					if (id != B_AIR) {
 						//auto _b = get_timestamp();
 
 						block_pos = (float3)i;
 
-						tile = tile_textures.block_tile_info[cur->id];
-						auto mesh_info = tile_textures.block_meshes_info[cur->id];
+						tile = tile_textures.block_tile_info[id];
+						auto mesh_info = tile_textures.block_meshes_info[id];
 
 						if (mesh_info.offset < 0) {
-							if (blocks.transparency[cur->id] == TM_TRANSPARENT)
+							if (blocks.transparency[id] == TM_TRANSPARENT)
 								cube_transperant();
 							else
 								cube_opaque();
