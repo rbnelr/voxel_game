@@ -212,12 +212,12 @@ struct Chunk_Mesher {
 
 		int3 i = 0;
 		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-
 			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
 
-				cur = ChunkData::pos_to_index(int3(0, i.y, i.z));
+				i.x = 0;
+				cur = ChunkData::pos_to_index(i);
 
-				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
+				for (; i.x<CHUNK_DIM; ++i.x) {
 
 					auto id = chunk_data->id[cur];
 

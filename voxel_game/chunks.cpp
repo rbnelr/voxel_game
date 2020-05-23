@@ -429,14 +429,29 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 
 		parallelism_threadpool.contribute_work();
 
-		for (int i=0; i<count; ++i) {
-			auto result = parallelism_threadpool.results.pop();
+		if (count > 0) {
+			auto _total = Timer::start();
 
-			result.chunk->reupload(result.remesh_result);
-			result.chunk->needs_remesh = false;
+			for (int i=0; i<count; ++i) {
 
-			meshing_time.push(result.time);
-			logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
+				OPTICK_EVENT("for loop");
+
+				ParallelismJob result = parallelism_threadpool.results.pop();
+
+				result.chunk->reupload(result.remesh_result);
+				result.chunk->needs_remesh = false;
+
+				{
+					OPTICK_EVENT("timing");
+
+					meshing_time.push(result.time);
+					logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
+				}
+			}
+
+			auto total = _total.end();
+
+			logf("Meshing update for frame took %7.3f ms", total * 1000);
 		}
 	}
 }

@@ -19,8 +19,8 @@ typedef int3	bpos;
 typedef int		chunk_pos_t;
 typedef int3	chunk_coord;
 
-#define CHUNK_DIM			64
-#define CHUNK_DIM_SHIFT		6 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM			32
+#define CHUNK_DIM_SHIFT		5 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_MASK		((1 << CHUNK_DIM_SHIFT) -1)
 #define CHUNK_ROW_OFFS		(CHUNK_DIM+2)
 #define CHUNK_LAYER_OFFS	((CHUNK_DIM+2)*(CHUNK_DIM+2))
@@ -107,6 +107,8 @@ struct ChunkData {
 	}
 
 	Block get (bpos pos) {
+		assert(all(pos >= -1 && pos <= CHUNK_DIM+1));
+
 		Block b;
 
 		auto indx = pos_to_index(pos);
@@ -119,6 +121,8 @@ struct ChunkData {
 		return b;
 	}
 	void set (bpos pos, Block b) {
+		assert(all(pos >= -1 && pos <= CHUNK_DIM+1));
+
 		auto indx = pos_to_index(pos);
 
 		id[indx]			= b.id;

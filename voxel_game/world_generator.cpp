@@ -118,7 +118,7 @@ struct ChunkGenerator {
 	void gen () {
 		bpos chunk_origin = chunk.coord * CHUNK_DIM;
 
-		bpos_t water_level = 21;
+		bpos_t water_level = 21 - chunk_origin.z;
 
 		bpos i; // position in chunk
 		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
@@ -126,7 +126,7 @@ struct ChunkGenerator {
 				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
 					block_id b;
 
-					if (i.z + chunk_origin.z <= water_level) {
+					if (i.z <= water_level) {
 						b = B_WATER;
 					} else {
 						b = B_AIR;

@@ -82,11 +82,11 @@ struct UnsafeVector {
 	float grow_fac = DEFAULT_GROW_FAC;
 
 	// empty vector, with no memory allocated
-	inline UnsafeVector () {}
+	__forceinline UnsafeVector () {}
 
 	// empty vector, with initial allocation
 	inline UnsafeVector (size_t capacity, float grow_fac=DEFAULT_GROW_FAC) {
-		OPTICK_EVENT("alloc UnsafeVector::ctor");
+		OPTICK_EVENT("alloc UnsafeVector::malloc");
 
 		capacity = _max(capacity, MIN_CAP);
 
@@ -97,6 +97,8 @@ struct UnsafeVector {
 		this->grow_fac = grow_fac;
 	}
 	inline ~UnsafeVector () {
+		OPTICK_EVENT("alloc UnsafeVector::free");
+
 		if (ptr)
 			free(ptr);
 	}
@@ -120,15 +122,19 @@ private:
 		if (new_cap == 0) {
 			ptr = nullptr;
 		} else {
+			OPTICK_EVENT("alloc UnsafeVector::_change_capacity.malloc");
 			ptr = (T*)malloc(new_cap * sizeof(T));
 		}
 
 		capacity = new_cap;
 
 		if (old_ptr) {
-			// copy old elements into new
-			memcpy(ptr, old_ptr, _min(capacity, old_cap) * sizeof(T));
-
+			{
+				OPTICK_EVENT("alloc UnsafeVector::_change_capacity.memcpy");
+				// copy old elements into new
+				memcpy(ptr, old_ptr, _min(capacity, old_cap) * sizeof(T));
+			}
+			OPTICK_EVENT("alloc UnsafeVector::_change_capacity.free");
 			// free old
 			free(old_ptr);
 		}

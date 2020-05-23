@@ -376,8 +376,8 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
 		// assume GL_STATIC_DRAW
-		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), NULL, GL_STATIC_DRAW); // buffer orphan is supposed to be better for streaming
-		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), data, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), NULL, GL_STREAM_DRAW); // buffer orphan is supposed to be better for streaming
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), data, GL_STREAM_DRAW);
 		vertex_count = count;
 
 		// dont unbind
