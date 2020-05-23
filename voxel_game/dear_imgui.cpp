@@ -5,6 +5,8 @@
 #include "kissmath_colors.hpp"
 using namespace kissmath;
 
+#include "optick.h"
+
 void DearImgui::init () {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -131,6 +133,7 @@ void GuiConsole::imgui () {
 }
 
 void GuiConsole::add_line (Line line) {
+	OPTICK_EVENT();
 
 	auto* ls = line.level == INFO ? &unimportant_lines : &important_lines;
 	
@@ -148,12 +151,18 @@ void GuiConsole::add_line (Line line) {
 extern int frame_counter;
 
 void vlogf (LogLevel level, char const* format, va_list vl) {
+	OPTICK_EVENT();
+
 	std::string new_format = kiss::prints("[%5d] %s\n", frame_counter, format);
 	
 	std::string line;
 	kiss::vprints(&line, new_format.c_str(), vl);
 
-	fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
+	/* puts is too slow to use in a game!!, often taking >1.5ms to execute
+	{
+		OPTICK_EVENT("vlogf fputs");
+		fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
+	}*/
 
 	gui_console.add_line({ std::move(line), level, frame_counter });
 }
