@@ -6,6 +6,7 @@
 #include "util/running_average.hpp"
 #include "util/threadpool.hpp"
 #include "util/raw_array.hpp"
+#include "util/block_allocator.hpp"
 #include "graphics/graphics.hpp" // for ChunkMesh
 using namespace kiss;
 
@@ -134,9 +135,84 @@ struct ChunkData {
 	void init_border ();
 };
 
+static constexpr uint64_t MESHING_BLOCK_BYTESIZE = (1024 * 1024);
+static constexpr uint64_t MESHING_BLOCK_COUNT = MESHING_BLOCK_BYTESIZE / sizeof(ChunkMesh::Vertex);
+
+union MeshingBlock {
+	ChunkMesh::Vertex verts[MESHING_BLOCK_COUNT];
+
+	// for padding to make size be exactly MESHING_BLOCK_BYTESIZE, to maybe get faster allocation when allocating POT sized
+	char _padding[MESHING_BLOCK_BYTESIZE];
+};
+
+extern BlockAllocator<MeshingBlock> meshing_allocator;
+
+// To avoid allocation and memcpy when the meshing data grows larger than predicted,
+//  we output the mesh data into blocks, which can be allocated by BlockAllocator, which reuses freed blocks
+//  instead a list of 
+struct MeshingData {
+	static constexpr uint64_t BLOCK_COUNT = 64;
+
+	MeshingBlock* blocks[BLOCK_COUNT]; // large enough
+	uint64_t vertex_count;
+	uint64_t block_count;
+
+	ChunkMesh::Vertex* cur;
+	ChunkMesh::Vertex* end;
+
+	void add_block () {
+		blocks[block_count] = meshing_allocator.alloc_threadsafe();
+
+		cur = &blocks[block_count]->verts[0];
+		end = &blocks[block_count]->verts[MESHING_BLOCK_COUNT];
+
+		block_count++;
+	}
+
+	void init () {
+		blocks[0] = meshing_allocator.alloc_threadsafe();
+		vertex_count = 0;
+
+		block_count = 0;
+		add_block();
+	}
+
+	ChunkMesh::Vertex* push () {
+		if (cur == end) {
+			if (block_count >= BLOCK_COUNT)
+				return nullptr; // whoops
+			add_block();
+		}
+		vertex_count++;
+		return cur++;
+	}
+
+	// upload (and free data in this structure)
+	void upload (Mesh<ChunkMesh::Vertex>& mesh) {
+		mesh._alloc(vertex_count);
+		mesh.vertex_count = vertex_count;
+
+		uint64_t offset = 0;
+		uint64_t remain = vertex_count;
+		int cur_block = 0;
+
+		while (remain > 0 && cur_block < block_count) {
+
+			mesh._sub_upload(&blocks[cur_block++]->verts[0], offset, std::min(remain, MESHING_BLOCK_COUNT));
+
+			offset += MESHING_BLOCK_COUNT;
+			remain -= MESHING_BLOCK_COUNT;
+		}
+
+		for (int i=0; i<block_count; ++i) {
+			meshing_allocator.free_threadsafe(blocks[i]); // technically this does not need to be threadsafe since all the threads are done by the time the main thread starts uploading, but just to be sure
+		}
+	}
+};
+
 struct MeshingResult {
-	UnsafeVector<ChunkMesh::Vertex> opaque_vertices;
-	UnsafeVector<ChunkMesh::Vertex> tranparent_vertices;
+	MeshingData opaque_vertices;
+	MeshingData tranparent_vertices;
 };
 
 class Chunk {
@@ -189,7 +265,7 @@ public:
 	ChunkMesh mesh;
 	uint64_t face_count;
 
-	void reupload (MeshingResult const& result);
+	void reupload (MeshingResult& result);
 };
 
 ////////////// Chunks
@@ -210,7 +286,7 @@ struct ParallelismJob { // Chunk remesh
 	Graphics const* graphics;
 	WorldGenerator const* wg; 
 	// output
-	MeshingResult remesh_result;
+	MeshingResult meshing_result;
 	float time;
 
 	ParallelismJob execute ();

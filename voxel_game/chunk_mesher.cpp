@@ -10,8 +10,8 @@ static constexpr int offs (int3 offset) {
 struct Chunk_Mesher {
 	bool alpha_test;
 
-	UnsafeVector<ChunkMesh::Vertex>* opaque_vertices;
-	UnsafeVector<ChunkMesh::Vertex>* tranparent_vertices;
+	MeshingData* opaque_vertices;
+	MeshingData* tranparent_vertices;
 
 	ChunkData* chunk_data;
 
@@ -104,11 +104,7 @@ struct Chunk_Mesher {
 		+CHUNK_LAYER_OFFS,
 	};
 
-	void face (UnsafeVector<ChunkMesh::Vertex>* out, BlockFace facei) {
-
-		size_t offs = out->size;
-		out->resize(offs + 6);
-		auto* ptr = &(*out)[offs];
+	void face (MeshingData* out, BlockFace facei) {
 
 		ChunkMesh::Vertex vert[4];
 
@@ -134,7 +130,7 @@ struct Chunk_Mesher {
 
 		int const* order = tri_oder[(int)b];
 		for (int i=0; i<6; ++i) {
-			*ptr++ = vert[order[i]];
+			*out->push() = vert[order[i]];
 		}
 	}
 
@@ -170,12 +166,10 @@ struct Chunk_Mesher {
 									   // get a random deterministic variant
 		int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
 
-		size_t offs = opaque_vertices->size;
-		opaque_vertices->resize(offs + info.size);
-		auto* ptr = &(*opaque_vertices)[offs];
-
 		for (int i=0; i<info.size; ++i) {
 			auto v = (*block_meshes)[info.offset + i];
+
+			auto ptr = opaque_vertices->push();
 
 			ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
 			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
@@ -184,26 +178,21 @@ struct Chunk_Mesher {
 			ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
 			ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
 			ptr->hp = chunk_data->hp[cur];
-
-			ptr++;
 		}
 	}
 
 	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
 		alpha_test = graphics.alpha_test;
 
-		opaque_vertices = &res->opaque_vertices;
-		tranparent_vertices = &res->tranparent_vertices;
 		block_meshes = &tile_textures.block_meshes;
 
 		chunk_data = chunk->blocks.get();
 
-		// reserve enough mesh memory for the average chunk to avoid reallocation
-		int reserve = CHUNK_DIM * CHUNK_DIM * 6 * 6 * 4; // 64*64 blocks * 6 faces * 6 vertices * 4 
-		float grow_fac = 4;
+		opaque_vertices		= &res->opaque_vertices;
+		tranparent_vertices	= &res->tranparent_vertices;
 
-		*opaque_vertices	 = UnsafeVector<ChunkMesh::Vertex>(reserve, grow_fac);
-		*tranparent_vertices = UnsafeVector<ChunkMesh::Vertex>(reserve, grow_fac);
+		opaque_vertices->init();
+		tranparent_vertices->init();
 
 		bpos chunk_pos_world = chunk->chunk_pos_world();
 
@@ -252,6 +241,7 @@ struct Chunk_Mesher {
 		//logf("mesh_chunk total: %7.3f vs %7.3f = %7.3f", (float)total, (float)sum, (float)sum / (float)total);
 	}
 };
+
 void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
 	OPTICK_EVENT();
 

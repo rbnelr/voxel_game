@@ -22,6 +22,8 @@ static constexpr bool HIGH_PRIO = true;
 Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
 Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, HIGH_PRIO,   ">> parallelism threadpool" };
 
+BlockAllocator<MeshingBlock> meshing_allocator;
+
 //// Chunk
 
 Chunk::Chunk (chunk_coord coord): coord{coord} {
@@ -196,13 +198,13 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 	}
 }
 
-void Chunk::reupload (MeshingResult const& result) {
+void Chunk::reupload (MeshingResult& result) {
 	OPTICK_EVENT();
 
-	mesh.opaque_mesh.upload(result.opaque_vertices.ptr, result.opaque_vertices.size);
-	mesh.transparent_mesh.upload(result.tranparent_vertices.ptr, result.tranparent_vertices.size);
+	result.opaque_vertices.upload(mesh.opaque_mesh);
+	result.tranparent_vertices.upload(mesh.transparent_mesh);
 
-	face_count = (result.opaque_vertices.size + result.tranparent_vertices.size) / 6;
+	face_count = (result.opaque_vertices.vertex_count + result.tranparent_vertices.vertex_count) / 6;
 }
 
 //// Chunks
@@ -224,7 +226,7 @@ ParallelismJob ParallelismJob::execute () {
 
 	auto timer = Timer::start();
 
-	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, *wg, chunk, &remesh_result);
+	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, *wg, chunk, &meshing_result);
 
 	time = timer.end();
 	return std::move(*this);
@@ -446,7 +448,7 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 
 				ParallelismJob result = parallelism_threadpool.results.pop();
 
-				result.chunk->reupload(result.remesh_result);
+				result.chunk->reupload(result.meshing_result);
 				result.chunk->needs_remesh = false;
 
 				meshing_time.push(result.time);
