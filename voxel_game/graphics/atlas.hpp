@@ -22,7 +22,7 @@ Texture2D load_texture_atlas (std::initializer_list<AtlasedTexture*> textures, i
 	for (auto& tex : textures) {
 		Image<T> img;
 		if (!Image<T>::load_from_file(tex->filepath.c_str(), &img))
-			logf(ERROR, "Could not load file \"%s\" to load texture for atlas!", tex->filepath.c_str());
+			clog(ERROR, "Could not load file \"%s\" to load texture for atlas!", tex->filepath.c_str());
 		else
 			images.push_back(std::move(img));
 	}
@@ -39,7 +39,7 @@ Texture2D load_texture_atlas (std::initializer_list<AtlasedTexture*> textures, i
 
 	stbrp_init_target(&context, atlas_size.x, atlas_size.y, nodes.data(), (int)nodes.size());
 	if (!stbrp_pack_rects(&context, rects.data(), (int)rects.size()))
-		logf(ERROR, "Could not pack some textures into texture atlas!");
+		clog(ERROR, "Could not pack some textures into texture atlas!");
 
 	Image<T> atlas_img = Image<T>(atlas_size);
 	atlas_img.clear(clear_col);

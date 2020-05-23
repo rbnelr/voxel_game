@@ -169,7 +169,7 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 	l.frame = frame_counter;
 	gui_console.add_line(std::move(l));
 }
-void logf (char const* format, ...) {
+void clog (char const* format, ...) {
 	va_list vl;
 	va_start(vl, format);
 
@@ -177,7 +177,7 @@ void logf (char const* format, ...) {
 
 	va_end(vl);
 }
-void logf (LogLevel level, char const* format, ...) {
+void clog (LogLevel level, char const* format, ...) {
 	va_list vl;
 	va_start(vl, format);
 

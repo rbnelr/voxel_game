@@ -139,7 +139,7 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 
 		auto time = timer.end();
 		chunks.block_light_time.push(time);
-		logf("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
+		clog("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
 	}
 }
 

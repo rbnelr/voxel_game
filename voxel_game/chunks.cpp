@@ -379,7 +379,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 			int count = 0;
 
 			BackgroundJob res;
-			while (background_threadpool.results.try_pop(&res) && count++ < max_chunk_gens_processed_per_frame) {
+			while (count++ < max_chunk_gens_processed_per_frame && background_threadpool.results.try_pop(&res)) {
 				{ // move chunk into real hashmap
 					auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
 					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
@@ -388,7 +388,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 				res.chunk->update_neighbour_blocks(*this);
 
 				chunk_gen_time.push(res.time);
-				logf("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
+				clog("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
 			}
 		}
 
@@ -450,12 +450,12 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 				result.chunk->needs_remesh = false;
 
 				meshing_time.push(result.time);
-				logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
+				clog("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
 			}
 
 			auto total = _total.end();
 
-			logf("Meshing update for frame took %7.3f ms", total * 1000);
+			clog("Meshing update for frame took %7.3f ms", total * 1000);
 		}
 	}
 }

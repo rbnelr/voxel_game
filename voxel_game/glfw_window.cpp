@@ -345,7 +345,7 @@ void glfw_gameloop () {
 }
 
 void glfw_error (int err, const char* msg) {
-	logf(ERROR, "GLFW Error! [0x%x] '%s'\n", err, msg);
+	clog(ERROR, "GLFW Error! [0x%x] '%s'\n", err, msg);
 }
 
 void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
@@ -394,7 +394,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 		case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "GL_DEBUG_SEVERITY_LOW_ARB";			break;
 	}
 
-	logf(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
+	clog(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 	
 	//__debugbreak();
 }
@@ -433,7 +433,7 @@ void glfw_init_gl () {
 	if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
 		glEnable(GL_FRAMEBUFFER_SRGB);
 	else
-		logf(ERROR, "No sRGB supported! Shading will be non-linear!\n");
+		clog(ERROR, "No sRGB supported! Shading will be non-linear!\n");
 }
 
 int main () {
@@ -447,7 +447,7 @@ int main () {
 	#endif
 
 		if (!glfwInit()) {
-			logf(ERROR, "glfwInit failed!\n");
+			clog(ERROR, "glfwInit failed!\n");
 			return 1;
 		}
 
@@ -462,7 +462,7 @@ int main () {
 
 		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
 		if (!window) {
-			logf(ERROR, "glfwCreateWindow failed!\n");
+			clog(ERROR, "glfwCreateWindow failed!\n");
 			glfwTerminate();
 			return 1;
 		}
