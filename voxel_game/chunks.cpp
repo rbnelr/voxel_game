@@ -353,23 +353,33 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 			);
 		}
 
+		int count = min((int)chunks_to_generate.size(), max_chunk_gens_processed_per_frame);
+
 		{
 			OPTICK_EVENT("chunks_to_generate push jobs");
-			for (auto& cp : chunks_to_generate) {
+			for (int i=0; i<count; ++i) {
+				auto cp = chunks_to_generate[i];
+
 				Chunk* chunk = pending_chunks.alloc_chunk(cp);
 				float dist = chunk_dist_to_player(cp);
 			
 				BackgroundJob job;
 				job.chunk = chunk;
 				job.world_gen = &world_gen;
-				background_threadpool.jobs.push(job);
+
+				{
+					OPTICK_EVENT("push threadpool");
+					background_threadpool.jobs.push(job);
+				}
 			}
 		}
 
 		{
 			OPTICK_EVENT("chunks_to_generate finish jobs");
+			int count = 0;
+
 			BackgroundJob res;
-			while (background_threadpool.results.try_pop(&res)) {
+			while (background_threadpool.results.try_pop(&res) && count++ < max_chunk_gens_processed_per_frame) {
 				{ // move chunk into real hashmap
 					auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
 					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
@@ -434,19 +444,13 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 
 			for (int i=0; i<count; ++i) {
 
-				OPTICK_EVENT("for loop");
-
 				ParallelismJob result = parallelism_threadpool.results.pop();
 
 				result.chunk->reupload(result.remesh_result);
 				result.chunk->needs_remesh = false;
 
-				{
-					OPTICK_EVENT("timing");
-
-					meshing_time.push(result.time);
-					logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
-				}
+				meshing_time.push(result.time);
+				logf("Chunk (%3d,%3d) meshing update took %7.3f ms", result.chunk->coord.x, result.chunk->coord.y, result.time * 1000);
 			}
 
 			auto total = _total.end();

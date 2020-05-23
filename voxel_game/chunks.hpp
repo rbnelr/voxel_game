@@ -301,6 +301,7 @@ public:
 	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
 
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
+	int max_chunk_gens_processed_per_frame = 16; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)
 	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
 
 	RunningAverage<float> chunk_gen_time = { 64 };
