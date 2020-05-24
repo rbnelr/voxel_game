@@ -16,8 +16,6 @@ void set_thread_description (std::string_view description);
 void set_high_thread_priority ();
 
 // Set a desired cpu core for the current thread to run on
-// > SetThreadIdealProcessor does not seem to make any difference, according to Optick the threads still run on random cores even when all the cores are available
-// TODO: Is this commonly done for threadpools, why does it not work?
 void set_thread_preferred_core (int core_index);
 
 // threadpool
@@ -68,7 +66,7 @@ public:
 		int cpu_core = high_prio ? 1 : 0;
 
 		for (int i=0; i<thread_count; ++i) {
-			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), high_prio, cpu_core);
+			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), high_prio, cpu_core++);
 		}
 	}
 
