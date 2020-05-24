@@ -1,10 +1,17 @@
 #include "threadpool.hpp"
+#include "assert.h"
 
 #if defined(_WIN32)
 	#include "windows.h"
 
 	void set_high_thread_priority () {
-		SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+		auto ret = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+		assert(ret != 0);
+	}
+
+	void set_thread_preferred_core (int preferred_core) {
+		auto ret = SetThreadIdealProcessor(GetCurrentThread(), preferred_core);
+		assert(ret >= 0);
 	}
 
 	void set_thread_description (std::string_view description) {

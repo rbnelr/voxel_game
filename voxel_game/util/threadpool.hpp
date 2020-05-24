@@ -15,6 +15,11 @@ void set_thread_description (std::string_view description);
 //  preempting the background threadpool and hopefully being done in time
 void set_high_thread_priority ();
 
+// Set a desired cpu core for the current thread to run on
+// > SetThreadIdealProcessor does not seem to make any difference, according to Optick the threads still run on random cores even when all the cores are available
+// TODO: Is this commonly done for threadpools, why does it not work?
+void set_thread_preferred_core (int core_index);
+
 // threadpool
 // threadpool.push(Job) to queue a job for execution on a thread
 // threads call Job.execute() and push the return value into threadpool.results
@@ -23,12 +28,13 @@ template <typename Job>
 class Threadpool {
 	std::vector< std::thread >	threads;
 
-	void thread_main (std::string thread_name, bool high_prio) { // thread_name mainly for debugging
+	void thread_main (std::string thread_name, bool high_prio, int preferred_core) { // thread_name mainly for debugging
 		OPTICK_THREAD(thread_name.c_str()); // save since, OPTICK_THREAD copies the thread name
 
-		set_thread_description(thread_name);
 		if (high_prio)
 			set_high_thread_priority();
+		set_thread_preferred_core(preferred_core);
+		set_thread_description(thread_name);
 
 		// Wait for one job to pop and execute or until shutdown signal is sent via jobs.shutdown()
 		Job job;
@@ -56,8 +62,13 @@ public:
 
 	// start thread_count threads
 	void start_threads (int thread_count, bool high_prio=false, std::string thread_base_name="<threadpool>") {
+		// Threadpools are ideally used with  thread_count <= cpu_core_count  to make use of the cpu without the threads preempting each other (although I don't check the thread count)
+		// I'm just assuming for now that with  high_prio==false -> thread_count==cpu_core_count -> ie. set each threads affinity to one of the cores
+		//  and with high_prio==true you leave at least one core free for the main thread, so we assign the cores 1-n to the threads so that the main thread can be on core 0
+		int cpu_core = high_prio ? 1 : 0;
+
 		for (int i=0; i<thread_count; ++i) {
-			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), high_prio );
+			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), high_prio, cpu_core);
 		}
 	}
 
