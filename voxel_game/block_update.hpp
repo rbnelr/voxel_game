@@ -42,7 +42,7 @@ public:
 	void imgui () {
 		if (!imgui_push("BlockUpdate")) return;
 
-		ImGui::DragFloat("block_update_fraction", &block_update_fraction, 0.00005f, 0.00000001, 1);
+		ImGui::DragFloat("block_update_fraction", &block_update_fraction, 0.00005f, 0.00000001f, 1);
 
 		ImGui::DragFloat("grass_die_mtth", &grass_die_mtth, 0.05f);
 

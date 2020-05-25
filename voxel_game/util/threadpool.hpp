@@ -8,8 +8,6 @@
 
 // Is is probaby reasonable to set a game process priority to high, so that background apps don't interfere with the games performance too much,
 // As long as we don't use 100% of the cpu the background apps should run fine, and we might have less random framedrops from being preempted
-// > I do not see high priorities actually preventing preemption, maybe to some extent, but according to all sources online a low priority thread should never preempt a high prio one, yet i get preempted regularily by firefox, discord, explorer.exe, etc. even with realtime prio settings, all all the app show up as normal prio in the task manager
-//    according to a discord user windows 10 might have changed how priority worked, TODO: get confirmation on this from someone at least, keep high prio setting, since the common opinion is that they should not hurt on games
 void set_process_high_priority ();
 
 // used to set priority of gameloop thread to be higher than normal threads to hopefully avoid cpu spiked which cause framedrops and so that background worker threads are sheduled like they should be

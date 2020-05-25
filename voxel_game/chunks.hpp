@@ -145,6 +145,7 @@ union MeshingBlock {
 	char _padding[MESHING_BLOCK_BYTESIZE];
 };
 
+// one for each thread (also gets initialized for the threads that don't need it I think, but thats ok, does not do anything reall on construction)
 extern BlockAllocator<MeshingBlock> meshing_allocator;
 
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
@@ -170,9 +171,7 @@ struct MeshingData {
 	}
 
 	void init () {
-		blocks[0] = meshing_allocator.alloc_threadsafe();
 		vertex_count = 0;
-
 		block_count = 0;
 		add_block();
 	}
@@ -377,8 +376,8 @@ public:
 	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
 
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
-	int max_chunk_gens_processed_per_frame = 16; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)
-	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
+	int max_chunk_gens_processed_per_frame = 64; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)
+	int max_chunks_meshed_per_frame = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
 
 	RunningAverage<float> chunk_gen_time = { 64 };
 	RunningAverage<float> block_light_time = { 64 };

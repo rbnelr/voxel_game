@@ -14,13 +14,13 @@ const int logical_cores = std::thread::hardware_concurrency();
 const int background_threads  = max(logical_cores, 1);
 
 // main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
-const int parallelism_threads = max(logical_cores - 1, 1);
+const int parallelism_threads = max(logical_cores >= 4 ? logical_cores - 1 : logical_cores, 1); // leave one thread for system and background apps, but not on dual core systems
 
 static constexpr bool NORMAL_PRIO = false;
 static constexpr bool HIGH_PRIO = true;
 
 Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
-Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads, HIGH_PRIO,   ">> parallelism threadpool" };
+Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads - 1, HIGH_PRIO,   ">> parallelism threadpool" }; // parallelism_threads - 1 to let main thread contribute work too
 
 BlockAllocator<MeshingBlock> meshing_allocator;
 
@@ -456,6 +456,8 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 			}
 
 			auto total = _total.end();
+
+			clog(">>> %d", meshing_allocator.count());
 
 			clog("Meshing update for frame took %7.3f ms", total * 1000);
 		}

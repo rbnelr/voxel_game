@@ -84,4 +84,16 @@ public:
 			::free(block);
 		}
 	}
+
+	int count () {
+		int count = 0;
+
+		Block* block = freelist;
+		while (block) {
+			block = block->next;
+			count++;
+		}
+
+		return count;
+	}
 };
