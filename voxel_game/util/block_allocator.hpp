@@ -17,19 +17,24 @@ class BlockAllocator {
 
 public:
 	// allocate a T (not threadsafe)
-	T* alloc () {
-		if (!freelist) {
-			OPTICK_EVENT();
-
-			// allocate new blocks as needed
-			freelist = (Block*)malloc(sizeof(Block));
-			freelist->next = nullptr;
-		}
+	Block* _alloc () {
+		if (!freelist)
+			return nullptr;
 
 		// remove first Block of freelist
 		Block* block = freelist;
 		freelist = block->next;
 
+		return block;
+	}
+
+	T* alloc () {
+		Block* block = _alloc();
+		if (!block) {
+			OPTICK_EVENT("malloc BlockAllocator::alloc");
+			// allocate new blocks as needed
+			block = (Block*)malloc(sizeof(Block));
+		}
 		return &block->data;
 	}
 
@@ -45,12 +50,38 @@ public:
 	}
 
 	T* alloc_threadsafe () {
-		std::lock_guard<std::mutex> lock(m);
-		return alloc();
+		Block* block;
+		{
+			OPTICK_EVENT("mutex BlockAllocator::alloc_threadsafe");
+
+			std::lock_guard<std::mutex> lock(m);
+			block = _alloc();
+		}
+		// Do the malloc outside the block because malloc can take a long time, which can catastrophically block an entire threadpool
+		if (!block) {
+			OPTICK_EVENT("malloc BlockAllocator::alloc_threadsafe");
+
+			// allocate new blocks as needed
+			block = (Block*)malloc(sizeof(Block)); // NOTE: malloc itself mutexes, so there is little point to putting this outside of the lock
+		}
+		return &block->data;
 	}
 
 	void free_threadsafe (T* ptr) {
+		OPTICK_EVENT("mutex BlockAllocator::free_threadsafe");
+
 		std::lock_guard<std::mutex> lock(m);
 		free(ptr);
+	}
+
+	~BlockAllocator () {
+		while (freelist) {
+			OPTICK_EVENT("free() ~BlockAllocator");
+
+			Block* block = freelist;
+			freelist = block->next;
+
+			::free(block);
+		}
 	}
 };
