@@ -17,7 +17,8 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
-	set_high_thread_priority();
+	set_process_high_priority();
+	set_thread_high_priority();
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
 }

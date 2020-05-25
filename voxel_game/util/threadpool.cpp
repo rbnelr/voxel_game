@@ -3,8 +3,12 @@
 
 #if defined(_WIN32)
 	#include "windows.h"
+	void set_process_high_priority () {
+		auto ret = SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+		assert(ret != 0);
+	}
 
-	void set_high_thread_priority () {
+	void set_thread_high_priority () {
 		auto ret = SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 		assert(ret != 0);
 	}

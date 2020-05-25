@@ -4,19 +4,25 @@
 #include "string.hpp"
 #include "optick.h"
 
-// Set description of current thread (mainly for debugging)
-// allows for easy overview of threads in debugger
-void set_thread_description (std::string_view description);
-
 // std::thread::hardware_concurrency() gets the number of cpu threads
+
+// Is is probaby reasonable to set a game process priority to high, so that background apps don't interfere with the games performance too much,
+// As long as we don't use 100% of the cpu the background apps should run fine, and we might have less random framedrops from being preempted
+// > I do not see high priorities actually preventing preemption, maybe to some extent, but according to all sources online a low priority thread should never preempt a high prio one, yet i get preempted regularily by firefox, discord, explorer.exe, etc. even with realtime prio settings, all all the app show up as normal prio in the task manager
+//    according to a discord user windows 10 might have changed how priority worked, TODO: get confirmation on this from someone at least, keep high prio setting, since the common opinion is that they should not hurt on games
+void set_process_high_priority ();
 
 // used to set priority of gameloop thread to be higher than normal threads to hopefully avoid cpu spiked which cause framedrops and so that background worker threads are sheduled like they should be
 // also used in threadpool threads when 'high_prio' is true to allow non-background 'parallellism', ie. starting work that needs to be done this frame and having the render thread and the threadpool work on it at the same time
 //  preempting the background threadpool and hopefully being done in time
-void set_high_thread_priority ();
+void set_thread_high_priority ();
 
 // Set a desired cpu core for the current thread to run on
 void set_thread_preferred_core (int core_index);
+
+// Set description of current thread (mainly for debugging)
+// allows for easy overview of threads in debugger
+void set_thread_description (std::string_view description);
 
 // threadpool
 // threadpool.push(Job) to queue a job for execution on a thread
@@ -30,7 +36,7 @@ class Threadpool {
 		OPTICK_THREAD(thread_name.c_str()); // save since, OPTICK_THREAD copies the thread name
 
 		if (high_prio)
-			set_high_thread_priority();
+			set_thread_high_priority();
 		set_thread_preferred_core(preferred_core);
 		set_thread_description(thread_name);
 
