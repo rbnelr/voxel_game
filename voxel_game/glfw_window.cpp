@@ -36,120 +36,6 @@ bool			fullscreen = false;
 bool			borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
 Rect			window_positioning;
 
-Input			_input = {};
-
-void set_cursor_mode (bool enabled) {
-	if (enabled)
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Cursor enabled, can interact with Imgui
-	else
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Cursor disabled & Imgui interaction disabled, all controls go to game
-}
-void toggle_cursor_mode () {
-	bool cursor_enabled = glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED;
-	cursor_enabled = !cursor_enabled;
-	set_cursor_mode(cursor_enabled);
-}
-
-//// input
-void glfw_key_event (GLFWwindow* window, int key, int scancode, int action, int mods) {
-	assert(action == GLFW_PRESS || action == GLFW_RELEASE || action == GLFW_REPEAT);
-
-	bool went_down =	action == GLFW_PRESS;
-	bool went_up =		action == GLFW_RELEASE;
-
-	bool alt =			(mods & GLFW_MOD_ALT) != 0;
-
-	// Toggle fullscreen with F11 or CTRL-ENTER
-	if (key == GLFW_KEY_F11 || (alt && key == GLFW_KEY_ENTER)) {
-		if (went_down) toggle_fullscreen();
-		return;
-	}
-
-	// Toggle Imgui visibility with F1
-	if (key == GLFW_KEY_F1) {
-		if (went_down) imgui.enabled = !imgui.enabled;
-		return;
-	}
-
-	// Toggle between Imgui interaction and game control
-	if (key == GLFW_KEY_F2) {
-		if (went_down) toggle_cursor_mode();
-		return;
-	}
-
-	if ((went_down || went_up) && key >= GLFW_KEY_SPACE && key <= GLFW_KEY_LAST) {
-		_input.buttons[key].is_down = went_down;
-		_input.buttons[key].went_down = went_down;
-		_input.buttons[key].went_up = went_up;
-	}
-}
-void glfw_char_event (GLFWwindow* window, unsigned int codepoint, int mods) {
-	// for typing input
-}
-void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mods) {
-	assert(action == GLFW_PRESS || action == GLFW_RELEASE);
-
-	bool went_down = action == GLFW_PRESS;
-	bool went_up =	 action == GLFW_RELEASE;
-
-	if ((went_down || went_up) && button >= GLFW_MOUSE_BUTTON_1 && button <= GLFW_MOUSE_BUTTON_8) {
-		_input.buttons[button].is_down = went_down;
-		_input.buttons[button].went_down = went_down;
-		_input.buttons[button].went_up = went_up;
-	}
-}
-
-int frame_counter = 0;
-double _prev_mouse_pos_x, _prev_mouse_pos_y;
-bool _prev_cursor_enabled;
-
-// The initial event seems to report the same position as our initial glfwGetCursorPos, so that delta is fine
-// But when toggling the cursor from disabled to visible cursor jumps back to the prev position, and an event reports this as delta so we need to discard this 
-void glfw_mouse_move_event (GLFWwindow* window, double xpos, double ypos) {
-	float2 delta = float2((float)(xpos - _prev_mouse_pos_x), (float)(ypos - _prev_mouse_pos_y));
-	delta.y = -delta.y; // convert to bottom up
-
-	_prev_mouse_pos_x = xpos;
-	_prev_mouse_pos_y = ypos;
-
-	bool cursor_enabled = glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED;
-	bool cursor_toggled = cursor_enabled != _prev_cursor_enabled;
-	_prev_cursor_enabled = cursor_enabled;
-
-	bool discard_delta = cursor_toggled;
-
-	//logf("glfw_mouse_move_event: %7d: %f %f%s\n", frame_counter, delta.x, delta.y, discard_delta ? " (discarded)":"");
-	
-	if (!discard_delta)
-		_input.mouse_delta += delta;
-}
-void glfw_mouse_scroll (GLFWwindow* window, double xoffset, double yoffset) {
-	// assume int, if glfw_mouse_scroll ever gives us 0.2 for ex. this might break
-	// But the gameplay code wants to assume mousewheel moves in "clicks", for item swapping
-	// I've personally never seen a mousewheel that does not move in "clicks" anyway
-	_input.mouse_wheel_delta += (int)ceil(abs(yoffset)) * (int)normalizesafe((float)yoffset); // -1.1f => -2    0 => 0    0.3f => +1
-}
-
-void glfw_register_callbacks (GLFWwindow* window) {
-	glfwSetKeyCallback(window,			glfw_key_event);
-	glfwSetCharModsCallback(window,		glfw_char_event);
-	glfwSetCursorPosCallback(window,	glfw_mouse_move_event);
-	glfwSetMouseButtonCallback(window,	glfw_mouse_button_event);
-	glfwSetScrollCallback(window,		glfw_mouse_scroll);
-}
-
-void glfw_get_non_callback_input (GLFWwindow* window) {
-	glfwGetFramebufferSize(window, &_input.window_size.x, &_input.window_size.y);
-
-	double x, y;
-	glfwGetCursorPos(window, &x, &y);
-
-	_input.cursor_pos = float2((float)x, (float)y);
-	_input.cursor_pos.y = _input.window_size.y - 1 - _input.cursor_pos.y;
-
-	//logf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
-}
-
 //// vsync and fullscreen mode
 
 // handle vsync interval allowing -1 or not depending on extension
@@ -280,14 +166,10 @@ void glfw_gameloop () {
 
 	auto game = std::make_unique<Game>();
 
-	_input.dt = 0; // dt zero on first frame
+	input.dt = 0; // dt zero on first frame
 	uint64_t prev = get_timestamp();
 
-	// Get initial mouse position
-	glfwGetCursorPos(window, &_prev_mouse_pos_x, &_prev_mouse_pos_y);
-
-	// Get initial cursor mode
-	_prev_cursor_enabled = glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED;
+	glfw_input_pre_gameloop(window);
 
 	for (;;) {
 		OPTICK_FRAME("MainThread");
@@ -295,15 +177,15 @@ void glfw_gameloop () {
 		{
 			OPTICK_EVENT("get input");
 
-			_input.clear_frame_input();
+			input.clear_frame_input();
 			glfwPollEvents();
 
 			if (glfwWindowShouldClose(window))
 				break;
 
-			glfw_get_non_callback_input(window);
+			glfw_sample_non_callback_input(window);
 
-			input = _input;
+			input = input;
 		}
 
 		{
@@ -320,13 +202,13 @@ void glfw_gameloop () {
 			glfwSwapBuffers(window);
 		}
 
-		_input = input;
+		input = input;
 
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
-		_input.real_dt = (float)(now - prev) / (float)timestamp_freq;
-		_input.dt = min(_input.real_dt * (_input.pause_time ? 0 : _input.time_scale), _input.max_dt);
-		_input.unscaled_dt = min(_input.real_dt, _input.max_dt);
+		input.real_dt = (float)(now - prev) / (float)timestamp_freq;
+		input.dt = min(input.real_dt * (input.pause_time ? 0 : input.time_scale), input.max_dt);
+		input.unscaled_dt = min(input.real_dt, input.max_dt);
 		prev = now;
 
 		frame_counter++;
@@ -470,7 +352,7 @@ int main () {
 		if (glfwRawMouseMotionSupported())
 			glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
-		glfw_register_callbacks(window);
+		glfw_register_input_callbacks(window);
 	}
 
 	glfw_init_gl();
