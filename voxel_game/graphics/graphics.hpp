@@ -45,7 +45,7 @@ struct SkyboxGraphics {
 		}
 	};
 
-	Shader shader = Shader("skybox", { FOG_UNIFORMS });
+	Shader shader = Shader("skybox"); // , { FOG_UNIFORMS }
 
 	Mesh<Vertex> mesh; // a inward facing cube of size 1
 
@@ -409,14 +409,13 @@ struct TileTextures {
 	}
 };
 
-extern bool _use_potatomode;
 class Chunks;
 
 struct ChunkGraphics {
 
-	Shader shader = Shader("blocks", { FOG_UNIFORMS });
+	Shader shader = Shader("blocks"); // { FOG_UNIFORMS }
 
-	bool alpha_test = !_use_potatomode;
+	bool alpha_test = true;
 
 	void imgui (Chunks& chunks);
 
@@ -436,24 +435,24 @@ struct FogUniforms {
 
 	float coeff;
 
-	static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
-		c.member<decltype(sky_col    )>(offsetof(FogUniforms, sky_col    ));
-		c.member<decltype(horiz_col  )>(offsetof(FogUniforms, horiz_col  ));
-		c.member<decltype(ambient_col)>(offsetof(FogUniforms, ambient_col));
-		c.member<decltype(coeff      )>(offsetof(FogUniforms, coeff      ));
-	}
+	//static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
+	//	c.member<decltype(sky_col    )>(offsetof(FogUniforms, sky_col    ));
+	//	c.member<decltype(horiz_col  )>(offsetof(FogUniforms, horiz_col  ));
+	//	c.member<decltype(ambient_col)>(offsetof(FogUniforms, ambient_col));
+	//	c.member<decltype(coeff      )>(offsetof(FogUniforms, coeff      ));
+	//}
 };
 struct Fog {
 	float fog_base_coeff = 0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
 	bool enable = false;
 
-	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
+	//SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
 
 	void imgui () {
 
-		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
-
-		ImGui::Checkbox("fog_enable", &enable);
+		//ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
+		//
+		//ImGui::Checkbox("fog_enable", &enable);
 	}
 
 	void set (float max_view_dist, SkyColors colors) {
@@ -467,7 +466,7 @@ struct Fog {
 			f.coeff /= max_view_dist;
 		else
 			f.coeff = 0;
-		fog_uniforms.set(f);
+		//fog_uniforms.set(f);
 	}
 };
 
@@ -476,7 +475,7 @@ extern int frame_counter;
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
-	Sampler					sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
+	Sampler					sampler;// = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 
 	TileTextures			tile_textures;
 
@@ -496,26 +495,26 @@ public:
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
-		if (frame_counter == 30) {
-			//raytracer.regen_data(chunks);
-		}
-
-		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
-			shaders->imgui();
-
-			common_uniforms.imgui();
-			sampler.imgui("sampler");
-
-			fog.imgui();
-			player.imgui();
-			chunk_graphics.imgui(chunks);
-			tile_textures.imgui("tile_textures");
-
-			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
-			ImGui::Checkbox("debug_block_light", &debug_block_light);
-
-			ImGui::Separator();
-		}
+		//if (frame_counter == 30) {
+		//	//raytracer.regen_data(chunks);
+		//}
+		//
+		//if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+		//	//shaders->imgui();
+		//
+		//	common_uniforms.imgui();
+		//	//sampler.imgui("sampler");
+		//
+		//	fog.imgui();
+		//	player.imgui();
+		//	chunk_graphics.imgui(chunks);
+		//	tile_textures.imgui("tile_textures");
+		//
+		//	ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+		//	ImGui::Checkbox("debug_block_light", &debug_block_light);
+		//
+		//	ImGui::Separator();
+		//}
 	}
 
 	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);

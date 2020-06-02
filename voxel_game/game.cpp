@@ -1,21 +1,8 @@
 #include "glfw_window.hpp"
 #include "game.hpp"
-#include "graphics/gl.hpp"
 #include "util/threadpool.hpp"
 #include "optick.h"
 
-//
-bool FileExists (const char* path) {
-	DWORD dwAttrib = GetFileAttributes(path);
-
-	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-bool _need_potatomode () {
-	return FileExists("../../._need_potatomode.txt");
-}
-bool _use_potatomode = _need_potatomode();
-
-//
 Game::Game () {
 	set_process_high_priority();
 	set_thread_high_priority();
@@ -24,6 +11,7 @@ Game::Game () {
 }
 
 void Game::frame () {
+	return;
 
 	ImGui::Begin("Debug");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);

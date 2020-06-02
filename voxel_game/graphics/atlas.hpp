@@ -1,8 +1,9 @@
 #pragma 
 #include "../kissmath.hpp"
-#include "texture.hpp"
-#include "image.hpp"
+#include "vulkan.hpp"
+#include "util/image.hpp"
 #include "../stb_rect_pack.hpp"
+#include "dear_imgui.hpp"
 #include <string>
 
 struct AtlasedTexture {
@@ -63,5 +64,6 @@ Texture2D load_texture_atlas (std::initializer_list<AtlasedTexture*> textures, i
 		}
 	}
 
-	return Texture2D(atlas_img, srgb, gen_mips);
+	return Texture2D();
+	//return Texture2D(atlas_img, srgb, gen_mips);
 }

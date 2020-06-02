@@ -9,53 +9,53 @@ using namespace kissmath;
 
 void DearImgui::init () {
 	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
+	//IMGUI_CHECKVERSION();
+	//ImGui::CreateContext();
 
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	//ImGuiIO& io = ImGui::GetIO(); (void)io;
 	// imgui steals keyboard by default, do not like
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	// Setup Platform/Renderer bindings
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
-	ImGui_ImplOpenGL3_Init();
+	//ImGui_ImplGlfw_InitForOpenGL(window, true);
+	//ImGui_ImplOpenGL3_Init();
 }
 
 void DearImgui::frame_start () {
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
-
-	{
-		auto& io = ImGui::GetIO();
-		// imgui steals keyboard by default, do not like
-		if (io.WantCaptureKeyboard)
-			input.disable_keyboard();
-		if (io.WantCaptureMouse)
-			input.disable_mouse();
-	}
-
-	ImGui::NewFrame();
+	//ImGui_ImplOpenGL3_NewFrame();
+	//ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
+	//
+	//{
+	//	auto& io = ImGui::GetIO();
+	//	// imgui steals keyboard by default, do not like
+	//	if (io.WantCaptureKeyboard)
+	//		input.disable_keyboard();
+	//	if (io.WantCaptureMouse)
+	//		input.disable_mouse();
+	//}
+	
+	//ImGui::NewFrame();
 }
 void DearImgui::frame_end () {
-	if (show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);
-
-	if (enabled) {
-		ImGui::Render();
-
-		int display_w, display_h;
-		glfwGetFramebufferSize(window, &display_w, &display_h);
-		glViewport(0, 0, display_w, display_h);
-
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	}
+	//if (show_demo_window)
+	//	ImGui::ShowDemoWindow(&show_demo_window);
+	
+	//if (enabled) {
+	//	ImGui::Render();
+	//
+	//	//int display_w, display_h;
+	//	//glfwGetFramebufferSize(window, &display_w, &display_h);
+	//	//glViewport(0, 0, display_w, display_h);
+	//
+	//	//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	//}
 }
 
 void DearImgui::destroy () {
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+	//ImGui_ImplOpenGL3_Shutdown();
+	//ImGui_ImplGlfw_Shutdown();
+	//ImGui::DestroyContext();
 }
 
 DearImgui imgui;

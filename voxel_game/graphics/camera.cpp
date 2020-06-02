@@ -1,5 +1,5 @@
 #include "camera.hpp"
-#include "../input.hpp"
+#include "input.hpp"
 
 #include "assert.h"
 
@@ -66,9 +66,9 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 	float2 frust_scale_inv = 1.0f / frust_scale;
 
 	float x = frust_scale_inv.x;
-	float y = frust_scale_inv.y;
-	float a = (clip_far + clip_near) / (clip_near - clip_far);
-	float b = (2.0f * clip_far * clip_near) / (clip_near - clip_far);
+	float y = -frust_scale_inv.y;
+	float a = (clip_far + clip_near) / (clip_near - clip_far) * 0.5f - 0.5f;
+	float b = (clip_far * clip_near) / (clip_near - clip_far);
 
 	if (frust) {
 		frust->corners[0] = float3(-frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
@@ -100,10 +100,10 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 	float hsize = vsize * aspect;
 
 	float x = 2.0f / hsize;
-	float y = 2.0f / vsize;
+	float y = -2.0f / vsize;
 
-	float a = -2.0f / (clip_far - clip_near);
-	float b = clip_near * a - 1;
+	float a = -1.0f / (clip_far - clip_near);
+	float b = clip_near * a * 0.5f;
 
 	if (frust) {
 		frust->corners[0] = float3(1.0f / -x, 1.0f / -y, -clip_near);

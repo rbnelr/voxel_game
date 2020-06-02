@@ -69,22 +69,22 @@ SkyboxGraphics::SkyboxGraphics () {
 						LHH )
 	};
 
-	mesh.upload(arr, 6*6);
+	//mesh.upload(arr, 6*6);
 }
 
 void SkyboxGraphics::draw () {
-	if (shader) {
-		shader.bind();
-
-		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
-		glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
-
-		mesh.bind();
-		mesh.draw();
-
-		glDepthRange(0, 1);
-		glDisable(GL_DEPTH_CLAMP);
-	}
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
+	//	glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
+	//
+	//	mesh.bind();
+	//	mesh.draw();
+	//
+	//	glDepthRange(0, 1);
+	//	glDisable(GL_DEPTH_CLAMP);
+	//}
 }
 
 BlockHighlightGraphics::BlockHighlightGraphics () {
@@ -143,19 +143,19 @@ BlockHighlightGraphics::BlockHighlightGraphics () {
 		}
 	}
 
-	mesh.upload(vertices);
+	//mesh.upload(vertices);
 }
 
 void BlockHighlightGraphics::draw (float3 pos, BlockFace face) {
-	if (shader) {
-		shader.bind();
-
-		shader.set_uniform("block_pos", pos);
-		shader.set_uniform("face_rotation", face_rotation[face]);
-
-		mesh.bind();
-		mesh.draw();
-	}
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	shader.set_uniform("block_pos", pos);
+	//	shader.set_uniform("face_rotation", face_rotation[face]);
+	//
+	//	mesh.bind();
+	//	mesh.draw();
+	//}
 }
 
 float2 GuiGraphics::get_quickbar_slot_center (int slot_index) {
@@ -215,27 +215,27 @@ void GuiGraphics::draw_quickbar_slot (AtlasedTexture tex, int index) {
 	draw_texture(tex, pos, size);
 }
 void GuiGraphics::draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures) {
-	if (id < MAX_BLOCK_ID) {
-		float size = (float)tile_textures.tile_textures.size.x * gui_scale; // assume square
-		float3 pos = float3(get_quickbar_slot_center(index) * gui_scale, 0);
-
-		// draw block
-		auto tile = tile_textures.block_tile_info[id];
-
-		for (int face=0; face<6; ++face) {
-			float tex_index = (float)tile.calc_texture_index((BlockFace)face);
-
-			for (int i=0; i<6; ++i) {
-				auto& b = gui_block_mesh[face*6+i];
-				blocks_vertices.push_back(BlockItemVertex{ b.pos * size + pos, b.normal, b.uv, tex_index });
-			}
-		}
-	} else {
-		float size = (float)tile_textures.tile_textures.size.x; // assume square
-		float2 pos = get_quickbar_slot_center(index);
-
-		draw_item_tile(id, pos - size/2, size, tile_textures);
-	}
+	//if (id < MAX_BLOCK_ID) {
+	//	float size = (float)tile_textures.tile_textures.size.x * gui_scale; // assume square
+	//	float3 pos = float3(get_quickbar_slot_center(index) * gui_scale, 0);
+	//
+	//	// draw block
+	//	auto tile = tile_textures.block_tile_info[id];
+	//
+	//	for (int face=0; face<6; ++face) {
+	//		float tex_index = (float)tile.calc_texture_index((BlockFace)face);
+	//
+	//		for (int i=0; i<6; ++i) {
+	//			auto& b = gui_block_mesh[face*6+i];
+	//			blocks_vertices.push_back(BlockItemVertex{ b.pos * size + pos, b.normal, b.uv, tex_index });
+	//		}
+	//	}
+	//} else {
+	//	float size = (float)tile_textures.tile_textures.size.x; // assume square
+	//	float2 pos = get_quickbar_slot_center(index);
+	//
+	//	draw_item_tile(id, pos - size/2, size, tile_textures);
+	//}
 }
 void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_textures) {
 	{ // border
@@ -262,51 +262,51 @@ void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_
 }
 
 void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler) {
-	glActiveTexture(GL_TEXTURE0 + 0);
-	sampler.bind(0);
-
-	draw_crosshair();
-	draw_quickbar(player, tile_textures);
-
-	if (shader && vertices.size() > 0) {
-		shader.bind();
-
-		shader.set_texture_unit("tex", 0);
-
-		gui_atlas.bind();
-
-		mesh.upload(vertices);
-		vertices.clear();
-
-		mesh.bind();
-		mesh.draw();
-	}
-
-	tile_textures.tile_textures.bind();
-	
-	if (shader_item_block && blocks_vertices.size() > 0) {
-		shader_item_block.bind();
-
-		shader_item_block.set_texture_unit("tile_textures", 0);
-		
-		blocks_mesh.upload(blocks_vertices);
-		blocks_vertices.clear();
-
-		blocks_mesh.bind();
-		blocks_mesh.draw();
-	}
-
-	if (shader_item && items_vertices.size() > 0) {
-		shader_item.bind();
-
-		shader_item.set_texture_unit("tile_textures", 0);
-		
-		items_mesh.upload(items_vertices);
-		items_vertices.clear();
-
-		items_mesh.bind();
-		items_mesh.draw();
-	}
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//sampler.bind(0);
+	//
+	//draw_crosshair();
+	//draw_quickbar(player, tile_textures);
+	//
+	//if (shader && vertices.size() > 0) {
+	//	shader.bind();
+	//
+	//	shader.set_texture_unit("tex", 0);
+	//
+	//	gui_atlas.bind();
+	//
+	//	mesh.upload(vertices);
+	//	vertices.clear();
+	//
+	//	mesh.bind();
+	//	mesh.draw();
+	//}
+	//
+	//tile_textures.tile_textures.bind();
+	//
+	//if (shader_item_block && blocks_vertices.size() > 0) {
+	//	shader_item_block.bind();
+	//
+	//	shader_item_block.set_texture_unit("tile_textures", 0);
+	//	
+	//	blocks_mesh.upload(blocks_vertices);
+	//	blocks_vertices.clear();
+	//
+	//	blocks_mesh.bind();
+	//	blocks_mesh.draw();
+	//}
+	//
+	//if (shader_item && items_vertices.size() > 0) {
+	//	shader_item.bind();
+	//
+	//	shader_item.set_texture_unit("tile_textures", 0);
+	//	
+	//	items_mesh.upload(items_vertices);
+	//	items_vertices.clear();
+	//
+	//	items_mesh.bind();
+	//	items_mesh.draw();
+	//}
 }
 
 PlayerGraphics::PlayerGraphics () {
@@ -316,7 +316,7 @@ PlayerGraphics::PlayerGraphics () {
 			verts.push_back({ pos * arm_size, normal, srgba(255) });
 		});
 
-		fist_mesh.upload(verts);
+		//fist_mesh.upload(verts);
 	}
 }
 
@@ -327,68 +327,68 @@ void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textur
 	float anim_t = player.break_block.anim_t != 0 ? player.break_block.anim_t : player.block_place.anim_t;
 	auto a = animation.calc(anim_t);
 
-	if (item != I_NULL) {
-		if (shader_item) {
-			shader_item.bind();
-
-			glActiveTexture(GL_TEXTURE0 + 0);
-			shader.set_texture_unit("tile_textures", 0);
-			sampler.bind(0);
-			tile_textures.tile_textures.bind();
-
-			if (item < MAX_BLOCK_ID) {
-				{
-					auto tile = tile_textures.block_tile_info[item];;
-
-					std::vector<BlockVertex> verts;
-
-					float3x3 mat = rotate3_X(deg(-39)) * rotate3_Z(deg(-17));
-
-					for (int j=0; j<6; ++j) {
-						auto tex_index = (float)tile.calc_texture_index((BlockFace)j);
-						for (int i=0; i<6; ++i) {
-							auto p = block_data[j*6+i];
-							p.pos *= 0.15f;
-							p.pos = mat * (p.pos + float3(-0.09f, 0.08f, 0.180f));
-							p.normal = mat * p.normal;
-							verts.push_back({ p.pos, p.normal, p.uv, tex_index });
-						}
-					}
-
-					block_mesh.upload(verts);
-				}
-
-				float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
-
-				shader_item.set_uniform("model_to_world", (float4x4)mat);
-
-				block_mesh.bind();
-				block_mesh.draw();
-			} else {
-				auto mesh = tile_textures.item_meshes.item_meshes[item - MAX_BLOCK_ID];
-
-				float3x4 init_rot = rotate3_Z(tool_euler_angles.z) * rotate3_Y(tool_euler_angles.y) * rotate3_X(tool_euler_angles.x) * translate(tool_offset) * scale(float3(tool_scale));
-
-				float3x4 mat = player.head_to_world * translate(a.pos) * a.rot * init_rot;
-
-				shader_item.set_uniform("model_to_world", (float4x4)mat);
-
-				tile_textures.item_meshes.meshes.bind();
-				tile_textures.item_meshes.meshes.draw(mesh.offset, mesh.size);
-			}
-		}
-	} else {
-		if (shader) {
-			shader.bind();
-
-			float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
-
-			shader.set_uniform("model_to_world", (float4x4)mat);
-
-			fist_mesh.bind();
-			fist_mesh.draw();
-		}
-	}
+	//if (item != I_NULL) {
+	//	if (shader_item) {
+	//		shader_item.bind();
+	//
+	//		glActiveTexture(GL_TEXTURE0 + 0);
+	//		shader.set_texture_unit("tile_textures", 0);
+	//		sampler.bind(0);
+	//		tile_textures.tile_textures.bind();
+	//
+	//		if (item < MAX_BLOCK_ID) {
+	//			{
+	//				auto tile = tile_textures.block_tile_info[item];;
+	//
+	//				std::vector<BlockVertex> verts;
+	//
+	//				float3x3 mat = rotate3_X(deg(-39)) * rotate3_Z(deg(-17));
+	//
+	//				for (int j=0; j<6; ++j) {
+	//					auto tex_index = (float)tile.calc_texture_index((BlockFace)j);
+	//					for (int i=0; i<6; ++i) {
+	//						auto p = block_data[j*6+i];
+	//						p.pos *= 0.15f;
+	//						p.pos = mat * (p.pos + float3(-0.09f, 0.08f, 0.180f));
+	//						p.normal = mat * p.normal;
+	//						verts.push_back({ p.pos, p.normal, p.uv, tex_index });
+	//					}
+	//				}
+	//
+	//				block_mesh.upload(verts);
+	//			}
+	//
+	//			float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
+	//
+	//			shader_item.set_uniform("model_to_world", (float4x4)mat);
+	//
+	//			block_mesh.bind();
+	//			block_mesh.draw();
+	//		} else {
+	//			auto mesh = tile_textures.item_meshes.item_meshes[item - MAX_BLOCK_ID];
+	//
+	//			float3x4 init_rot = rotate3_Z(tool_euler_angles.z) * rotate3_Y(tool_euler_angles.y) * rotate3_X(tool_euler_angles.x) * translate(tool_offset) * scale(float3(tool_scale));
+	//
+	//			float3x4 mat = player.head_to_world * translate(a.pos) * a.rot * init_rot;
+	//
+	//			shader_item.set_uniform("model_to_world", (float4x4)mat);
+	//
+	//			tile_textures.item_meshes.meshes.bind();
+	//			tile_textures.item_meshes.meshes.draw(mesh.offset, mesh.size);
+	//		}
+	//	}
+	//} else {
+	//	if (shader) {
+	//		shader.bind();
+	//
+	//		float3x4 mat = player.head_to_world * translate(a.pos) * a.rot;
+	//
+	//		shader.set_uniform("model_to_world", (float4x4)mat);
+	//
+	//		fist_mesh.bind();
+	//		fist_mesh.draw();
+	//	}
+	//}
 }
 
 void ItemMeshes::generate (Image<srgba8>* images, int count, int* item_tiles) {
@@ -435,7 +435,7 @@ void ItemMeshes::generate (Image<srgba8>* images, int count, int* item_tiles) {
 		mesh_info.size = (unsigned)vertices.size() - mesh_info.offset;
 	}
 
-	meshes.upload(vertices);
+	//meshes.upload(vertices);
 }
 
 template <typename T>
@@ -578,38 +578,38 @@ struct TileLoader {
 };
 
 TileTextures::TileTextures () {
-	{
-		TileLoader tl;
-
-		for (int i=0; i<BLOCK_IDS_COUNT; ++i) {
-			block_tile_info[i] = tl.add_block((block_id)i);
-		}
-
-		int items_offset = (int)tl.images.size();
-		for (int i=0; i<ITEM_IDS_COUNT-MAX_BLOCK_ID; ++i) {
-			item_tile[i] = tl.add_item((item_id)(i + MAX_BLOCK_ID));
-		}
-		int items_count = (int)tl.images.size() - items_offset;
-
-		item_meshes.generate(&tl.images[items_offset], items_count, item_tile);
-
-		tile_size = tl.size;
-		tile_textures.upload<srgba8, true>(tl.images);
-	}
-	{
-		auto breaking = Image<uint8>("textures/breaking.png");
-
-		breaking_frames_count = breaking.size.y / tile_size.x;
-
-		std::vector< Image<uint8> > imgs;
-
-		for (int i=0; i<breaking_frames_count; ++i) {
-			imgs.push_back(get_sub_tile(breaking, int2(0,i), tile_size));
-		}
-
-		breaking_textures.upload<uint8, false>(imgs);
-	}
-
+	//{
+	//	TileLoader tl;
+	//
+	//	for (int i=0; i<BLOCK_IDS_COUNT; ++i) {
+	//		block_tile_info[i] = tl.add_block((block_id)i);
+	//	}
+	//
+	//	int items_offset = (int)tl.images.size();
+	//	for (int i=0; i<ITEM_IDS_COUNT-MAX_BLOCK_ID; ++i) {
+	//		item_tile[i] = tl.add_item((item_id)(i + MAX_BLOCK_ID));
+	//	}
+	//	int items_count = (int)tl.images.size() - items_offset;
+	//
+	//	item_meshes.generate(&tl.images[items_offset], items_count, item_tile);
+	//
+	//	tile_size = tl.size;
+	//	tile_textures.upload<srgba8, true>(tl.images);
+	//}
+	//{
+	//	auto breaking = Image<uint8>("textures/breaking.png");
+	//
+	//	breaking_frames_count = breaking.size.y / tile_size.x;
+	//
+	//	std::vector< Image<uint8> > imgs;
+	//
+	//	for (int i=0; i<breaking_frames_count; ++i) {
+	//		imgs.push_back(get_sub_tile(breaking, int2(0,i), tile_size));
+	//	}
+	//
+	//	breaking_textures.upload<uint8, false>(imgs);
+	//}
+	
 	load_block_meshes();
 }
 
@@ -664,74 +664,74 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 }
 
 void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
-	glActiveTexture(GL_TEXTURE0 + 0);
-	tile_textures.tile_textures.bind();
-	sampler.bind(0);
-
-	glActiveTexture(GL_TEXTURE0 + 1);
-	tile_textures.breaking_textures.bind();
-	sampler.bind(1);
-
-	if (shader) {
-		shader.bind();
-
-		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-
-		shader.set_uniform("alpha_test", alpha_test);
-
-		shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
-
-		shader.set_texture_unit("tile_textures", 0);
-		shader.set_texture_unit("breaking_textures", 1);
-
-		// Draw all opaque chunk meshes
-		for (Chunk const& chunk : chunks.chunks) {
-
-			if (debug_frustrum_culling)
-				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
-
-			if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
-				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
-
-				chunk.mesh.opaque_mesh.bind();
-				chunk.mesh.opaque_mesh.draw();
-			}
-		}
-	}
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//tile_textures.tile_textures.bind();
+	//sampler.bind(0);
+	//
+	//glActiveTexture(GL_TEXTURE0 + 1);
+	//tile_textures.breaking_textures.bind();
+	//sampler.bind(1);
+	//
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+	//	shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+	//
+	//	shader.set_uniform("alpha_test", alpha_test);
+	//
+	//	shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
+	//
+	//	shader.set_texture_unit("tile_textures", 0);
+	//	shader.set_texture_unit("breaking_textures", 1);
+	//
+	//	// Draw all opaque chunk meshes
+	//	for (Chunk const& chunk : chunks.chunks) {
+	//
+	//		if (debug_frustrum_culling)
+	//			debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
+	//
+	//		if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
+	//			shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
+	//
+	//			chunk.mesh.opaque_mesh.bind();
+	//			chunk.mesh.opaque_mesh.draw();
+	//		}
+	//	}
+	//}
 }
 
 void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler) {
-	glActiveTexture(GL_TEXTURE0 + 0);
-	tile_textures.tile_textures.bind();
-	sampler.bind(0);
-
-	glActiveTexture(GL_TEXTURE0 + 1);
-	tile_textures.breaking_textures.bind();
-	sampler.bind(1);
-
-	if (shader) {
-		shader.bind();
-
-		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-
-		shader.set_uniform("alpha_test", false);
-
-		shader.set_texture_unit("tile_textures", 0);
-		shader.set_texture_unit("breaking_textures", 1);
-
-		// Draw all transparent chunk meshes
-		for (Chunk const& chunk : chunks.chunks) {
-
-			if (!chunk.culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
-				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
-
-				chunk.mesh.transparent_mesh.bind();
-				chunk.mesh.transparent_mesh.draw();
-			}
-		}
-	}
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//tile_textures.tile_textures.bind();
+	//sampler.bind(0);
+	//
+	//glActiveTexture(GL_TEXTURE0 + 1);
+	//tile_textures.breaking_textures.bind();
+	//sampler.bind(1);
+	//
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+	//	shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+	//
+	//	shader.set_uniform("alpha_test", false);
+	//
+	//	shader.set_texture_unit("tile_textures", 0);
+	//	shader.set_texture_unit("breaking_textures", 1);
+	//
+	//	// Draw all transparent chunk meshes
+	//	for (Chunk const& chunk : chunks.chunks) {
+	//
+	//		if (!chunk.culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
+	//			shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
+	//
+	//			chunk.mesh.transparent_mesh.bind();
+	//			chunk.mesh.transparent_mesh.draw();
+	//		}
+	//	}
+	//}
 }
 
 void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
@@ -776,79 +776,79 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_view_uniforms(view);
 	common_uniforms.set_debug_uniforms();
 
-	{ // GL state defaults
-	  // 
-		glEnable(GL_FRAMEBUFFER_SRGB);
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-		// scissor
-		glDisable(GL_SCISSOR_TEST);
-		// depth
-		glEnable(GL_DEPTH_TEST);
-		glClearDepth(1.0f);
-		glDepthFunc(GL_LEQUAL);
-		glDepthRange(0.0f, 1.0f);
-		glDepthMask(GL_TRUE);
-		// culling
-		gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
-		// blending
-		glDisable(GL_BLEND);
-		glBlendEquation(GL_FUNC_ADD);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		//
-	#ifdef GL_POLYGON_MODE
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	#endif
-	}
+	//{ // GL state defaults
+	//  // 
+	//	glEnable(GL_FRAMEBUFFER_SRGB);
+	//	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	//	// scissor
+	//	glDisable(GL_SCISSOR_TEST);
+	//	// depth
+	//	glEnable(GL_DEPTH_TEST);
+	//	glClearDepth(1.0f);
+	//	glDepthFunc(GL_LEQUAL);
+	//	glDepthRange(0.0f, 1.0f);
+	//	glDepthMask(GL_TRUE);
+	//	// culling
+	//	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+	//	glCullFace(GL_BACK);
+	//	glFrontFace(GL_CCW);
+	//	// blending
+	//	glDisable(GL_BLEND);
+	//	glBlendEquation(GL_FUNC_ADD);
+	//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	//	//
+	//#ifdef GL_POLYGON_MODE
+	//	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	//#endif
+	//}
 
-	glViewport(0,0, input.window_size.x, input.window_size.y);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glViewport(0,0, input.window_size.x, input.window_size.y);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	////glClear(GL_DEPTH_BUFFER_BIT);
+	//
+	//glDisable(GL_BLEND);
+	//
+	//{ //// Opaque pass
+	//	chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
+	//
+	//	skybox.draw();
+	//}
+	//
+	//glEnable(GL_BLEND);
+	//
+	//{ //// Transparent pass
+	//
+	//	if (activate_flycam || world.player.third_person)
+	//		player.draw(world.player, tile_textures, sampler);
+	//
+	//	if (selected_block) {
+	//		block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
+	//	}
+	//
+	//	//glCullFace(GL_FRONT);
+	//	//chunk_graphics.draw_chunks_transparent(chunks);
+	//	//glCullFace(GL_BACK);
+	//	chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
+	//
+	//	glEnable(GL_CULL_FACE);
+	//	debug_graphics->draw();
+	//}
+	//
 	//glClear(GL_DEPTH_BUFFER_BIT);
-
-	glDisable(GL_BLEND);
-
-	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
-
-		skybox.draw();
-	}
-
-	glEnable(GL_BLEND);
-
-	{ //// Transparent pass
-
-		if (activate_flycam || world.player.third_person)
-			player.draw(world.player, tile_textures, sampler);
-
-		if (selected_block) {
-			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
-		}
-
-		//glCullFace(GL_FRONT);
-		//chunk_graphics.draw_chunks_transparent(chunks);
-		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
-
-		glEnable(GL_CULL_FACE);
-		debug_graphics->draw();
-	}
-
-	glClear(GL_DEPTH_BUFFER_BIT);
-
-	{ //// First person overlay pass
-		if (!activate_flycam && !world.player.third_person) 
-			player.draw(world.player, tile_textures, sampler);
-	}
-
-	{ //// Overlay pass
-		glDisable(GL_DEPTH_TEST);
-
-		if (!activate_flycam)
-			gui.draw(world.player, tile_textures, sampler);
-
-		glEnable(GL_DEPTH_TEST);
-	}
-
-	glDisable(GL_BLEND);
+	//
+	//{ //// First person overlay pass
+	//	if (!activate_flycam && !world.player.third_person) 
+	//		player.draw(world.player, tile_textures, sampler);
+	//}
+	//
+	//{ //// Overlay pass
+	//	glDisable(GL_DEPTH_TEST);
+	//
+	//	if (!activate_flycam)
+	//		gui.draw(world.player, tile_textures, sampler);
+	//
+	//	glEnable(GL_DEPTH_TEST);
+	//}
+	//
+	//glDisable(GL_BLEND);
 }

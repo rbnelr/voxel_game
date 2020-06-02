@@ -3,12 +3,6 @@
   <ItemGroup>
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="chunks.hpp" />
-    <ClInclude Include="glad\glad.h">
-      <Filter>glad</Filter>
-    </ClInclude>
-    <ClInclude Include="glad\khrplatform.h">
-      <Filter>glad</Filter>
-    </ClInclude>
     <ClInclude Include="stb\stb_image.h">
       <Filter>stb</Filter>
     </ClInclude>
@@ -16,9 +10,6 @@
       <Filter>open_simplex_noise</Filter>
     </ClInclude>
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
     <ClInclude Include="..\..\dear_imgui\imgui.h">
@@ -117,9 +108,6 @@
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="game.hpp" />
     <ClInclude Include="input.hpp" />
-    <ClInclude Include="glad\glad_wgl.h">
-      <Filter>glad</Filter>
-    </ClInclude>
     <ClInclude Include="stb_image.hpp">
       <Filter>stb</Filter>
     </ClInclude>
@@ -131,25 +119,13 @@
     </ClInclude>
     <ClInclude Include="player.hpp" />
     <ClInclude Include="physics.hpp" />
-    <ClInclude Include="graphics\glshader.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="graphics\debug_graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\gl.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\common.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\image.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\texture.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="util\file_io.hpp">
@@ -204,9 +180,6 @@
     <ClInclude Include="audio\audio.hpp">
       <Filter>audio</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\shaders.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="audio\read_wav.hpp">
       <Filter>audio</Filter>
     </ClInclude>
@@ -243,15 +216,13 @@
     <ClInclude Include="util\block_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="vulkan.hpp" />
+    <ClInclude Include="util\image.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="glad\glad.c">
-      <Filter>glad</Filter>
-    </ClCompile>
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -343,9 +314,6 @@
     </ClCompile>
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="input.cpp" />
-    <ClCompile Include="glad\glad_wgl.c">
-      <Filter>glad</Filter>
-    </ClCompile>
     <ClCompile Include="stb_image.cpp">
       <Filter>stb</Filter>
     </ClCompile>
@@ -361,25 +329,13 @@
     </ClCompile>
     <ClCompile Include="player.cpp" />
     <ClCompile Include="physics.cpp" />
-    <ClCompile Include="graphics\glshader.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="graphics\graphics.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="graphics\debug_graphics.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\gl.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="graphics\common.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\image.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\texture.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="game.cpp" />
@@ -411,9 +367,6 @@
     <ClCompile Include="audio\audio.cpp">
       <Filter>audio</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\shaders.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="audio\read_wav.cpp">
       <Filter>audio</Filter>
     </ClCompile>
@@ -429,6 +382,10 @@
     <ClCompile Include="util\read_directory.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="util\image.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="vulkan.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -476,9 +433,6 @@
   <ItemGroup>
     <Filter Include="shaders">
       <UniqueIdentifier>{0eaa38e6-83d2-4302-a2a0-7a58a3caab29}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="glad">
-      <UniqueIdentifier>{1847271f-a9df-43e4-9628-48a6e79317e5}</UniqueIdentifier>
     </Filter>
     <Filter Include="docs">
       <UniqueIdentifier>{1b11874a-b140-448b-801e-122cdf7ac8f4}</UniqueIdentifier>

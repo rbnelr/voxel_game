@@ -1,7 +1,7 @@
 #pragma once
-#include "../kissmath.hpp"
-#include "../dear_imgui.hpp"
-#include "../util/collision.hpp"
+#include "kissmath.hpp"
+#include "dear_imgui.hpp"
+#include "util/collision.hpp"
 
 enum perspective_mode {
 	PERSPECTIVE,
@@ -76,22 +76,22 @@ public:
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Camera", name, false)) return;
-
+	
 		int cur_mode = (int)mode;
 		ImGui::Combo("mode", &cur_mode, "PERSPECTIVE\0ORTHOGRAPHIC\0");
 		mode = (perspective_mode)cur_mode;
-
+	
 		ImGui::DragFloat3("pos", &pos.x, 0.05f);
-
+	
 		float3 rot_aer_deg = to_degrees(rot_aer);
 		if (ImGui::DragFloat3("rot_aer", &rot_aer_deg.x, 0.05f))
 			rot_aer = to_radians(rot_aer_deg);
-
+	
 		ImGui::DragFloat("clip_near", &clip_near, 0.05f);
 		ImGui::DragFloat("clip_far", &clip_far, 0.05f);
 		ImGui::SliderAngle("vfov", &vfov, 0, 180.0f);
 		ImGui::DragFloat("ortho_vsize", &ortho_vsize, 0.05f);
-
+	
 		imgui_pop();
 	}
 
@@ -125,19 +125,19 @@ public:
 
 	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): Camera(pos, rot_aer), base_speed{base_speed} {}
 
-	void imgui (const char* name=nullptr) {
-		if (!imgui_push("Flycam", name)) return;
-
-		Camera::imgui(name);
-
-		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
-		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
-		ImGui::DragFloat("speedup_factor", &speedup_factor, 0.001f);
-		ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
-		ImGui::Text("cur_speed: %.3f", cur_speed);
-
-		imgui_pop();
-	}
+	//void imgui (const char* name=nullptr) {
+	//	if (!imgui_push("Flycam", name)) return;
+	//
+	//	Camera::imgui(name);
+	//
+	//	ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
+	//	ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
+	//	ImGui::DragFloat("speedup_factor", &speedup_factor, 0.001f);
+	//	ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
+	//	ImGui::Text("cur_speed: %.3f", cur_speed);
+	//
+	//	imgui_pop();
+	//}
 
 	Camera_View update ();
 };

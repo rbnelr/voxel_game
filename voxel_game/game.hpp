@@ -6,8 +6,6 @@
 #include "graphics/graphics.hpp"
 #include "util/running_average.hpp"
 
-extern bool _use_potatomode;
-
 struct FPS_Display {
 	RunningAverage<float> dt_avg = RunningAverage<float>(64);
 	float latest_avg_dt;

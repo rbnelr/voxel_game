@@ -188,8 +188,8 @@ struct MeshingData {
 
 	// upload (and free data in this structure)
 	void upload (Mesh<ChunkMesh::Vertex>& mesh) {
-		mesh._alloc(vertex_count);
-		mesh.vertex_count = vertex_count;
+		//mesh._alloc(vertex_count);
+		//mesh.vertex_count = vertex_count;
 
 		uint64_t offset = 0;
 		uint64_t remain = vertex_count;
@@ -197,7 +197,7 @@ struct MeshingData {
 
 		while (remain > 0 && cur_block < block_count) {
 
-			mesh._sub_upload(&blocks[cur_block++]->verts[0], offset, std::min(remain, MESHING_BLOCK_COUNT));
+			//mesh._sub_upload(&blocks[cur_block++]->verts[0], offset, std::min(remain, MESHING_BLOCK_COUNT));
 
 			offset += MESHING_BLOCK_COUNT;
 			remain -= MESHING_BLOCK_COUNT;
@@ -365,7 +365,7 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius =	_use_potatomode ? 30.0f : 250.0f;
+	float generation_radius = 250.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
@@ -373,7 +373,7 @@ public:
 	// This way walking back and forth might not even need to load any chunks at all
 	float deletion_hysteresis = CHUNK_DIM*1.5f;
 
-	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
+	float active_radius = 200.0f;
 
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int max_chunk_gens_processed_per_frame = 64; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)

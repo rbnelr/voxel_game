@@ -1,6 +1,11 @@
 #pragma once
-#include "util/clean_windows_h.hpp"
-#include "glad/glad.h"
+//#include "util/clean_windows_h.hpp" // TODO why was this included
+
+#if _DEBUG || 1
+	#define VULKAN_VALIDATION
+	#define GLFW_DEBUG
+#endif
+
 #include "GLFW/glfw3.h"
 
 // Global window

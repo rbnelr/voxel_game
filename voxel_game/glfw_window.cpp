@@ -1,16 +1,13 @@
-//#include "glad/glad_wgl.h"
-
 #include "glfw_window.hpp"
+#include "vulkan.hpp"
 #include "kissmath/int2.hpp"
 #include "kissmath/float2.hpp"
-#include "graphics/glshader.hpp"
 #include "graphics/debug_graphics.hpp"
-using namespace kissmath;
-
 #include "util/timer.hpp"
 #include "input.hpp"
 #include "game.hpp"
 #include "dear_imgui.hpp"
+using namespace kissmath;
 using namespace kiss;
 
 #include "optick.h"
@@ -49,7 +46,7 @@ bool get_vsync () {
 void set_vsync (bool on) {
 	OPTICK_EVENT();
 
-	glfwSwapInterval(on ? _vsync_on_interval : 0);
+	//glfwSwapInterval(on ? _vsync_on_interval : 0);
 	vsync = on;
 }
 
@@ -148,15 +145,7 @@ bool toggle_fullscreen () {
 
 //// gameloop
 void glfw_gameloop () {
-#if 0 // actually using VAOs now
-	GLuint vao;
-	if (VAO_REQUIRED) {
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-	}
-#endif
 
-	shaders = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
 
 	{
@@ -217,7 +206,6 @@ void glfw_gameloop () {
 	imgui.destroy();
 
 	debug_graphics = nullptr;
-	shaders = nullptr;
 
 #if 0
 	if (VAO_REQUIRED) {
@@ -228,94 +216,6 @@ void glfw_gameloop () {
 
 void glfw_error (int err, const char* msg) {
 	clog(ERROR, "GLFW Error! [0x%x] '%s'\n", err, msg);
-}
-
-void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
-	//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;
-
-	// hiding irrelevant infos/warnings
-	switch (id) {
-	case 131185: // Buffer detailed info (where the memory lives which is supposed to depend on the usage hint)
-	//case 1282: // using shader that was not compiled successfully
-	//
-	//case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
-	case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
-	
-	//			 //case 131154: // Pixel transfer sync with rendering warning
-	//
-	//			 //case 1282: // Wierd error on notebook when trying to do texture streaming
-	//			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
-	//			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
-		return;
-	}
-
-	const char* src_str = "<unknown>";
-	switch (source) {
-		case GL_DEBUG_SOURCE_API_ARB:				src_str = "GL_DEBUG_SOURCE_API_ARB";				break;
-		case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:		src_str = "GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB";		break;
-		case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:	src_str = "GL_DEBUG_SOURCE_SHADER_COMPILER_ARB";	break;
-		case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:		src_str = "GL_DEBUG_SOURCE_THIRD_PARTY_ARB";		break;
-		case GL_DEBUG_SOURCE_APPLICATION_ARB:		src_str = "GL_DEBUG_SOURCE_APPLICATION_ARB";		break;
-		case GL_DEBUG_SOURCE_OTHER_ARB:				src_str = "GL_DEBUG_SOURCE_OTHER_ARB";				break;
-	}
-
-	const char* type_str = "<unknown>";
-	switch (source) {
-		case GL_DEBUG_TYPE_ERROR_ARB:				type_str = "GL_DEBUG_TYPE_ERROR_ARB";				break;
-		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB";	break;
-		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB";	break;
-		case GL_DEBUG_TYPE_PORTABILITY_ARB:			type_str = "GL_DEBUG_TYPE_PORTABILITY_ARB";			break;
-		case GL_DEBUG_TYPE_PERFORMANCE_ARB:			type_str = "GL_DEBUG_TYPE_PERFORMANCE_ARB";			break;
-		case GL_DEBUG_TYPE_OTHER_ARB:				type_str = "GL_DEBUG_TYPE_OTHER_ARB";				break;
-	}
-
-	const char* severity_str = "<unknown>";
-	switch (severity) {
-		case GL_DEBUG_SEVERITY_HIGH_ARB:			severity_str = "GL_DEBUG_SEVERITY_HIGH_ARB";		break;
-		case GL_DEBUG_SEVERITY_MEDIUM_ARB:			severity_str = "GL_DEBUG_SEVERITY_MEDIUM_ARB";		break;
-		case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "GL_DEBUG_SEVERITY_LOW_ARB";			break;
-	}
-
-	clog(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
-	
-	//__debugbreak();
-}
-
-#if _DEBUG || 1
-	#define OPENGL_DEBUG
-	#define GLFW_DEBUG
-#endif
-
-void glfw_init_gl () {
-	OPTICK_EVENT();
-
-	glfwMakeContextCurrent(window);
-
-	{
-		OPTICK_EVENT("gladLoadGLLoader");
-		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-	}
-
-#ifdef OPENGL_DEBUG
-	if (glfwExtensionSupported("GL_ARB_debug_output")) {
-		glDebugMessageCallbackARB(ogl_debug, 0);
-#if _DEBUG // when displaying opengl debug output in release mode, don't do it syncronously as to (theoretically) not hurt performance
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB); // this exists -> if ogl_debuproc needs to be thread safe
-#endif
-	}
-#endif
-
-	if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
-		_vsync_on_interval = -1;
-
-	set_vsync(true);
-
-	// srgb enabled by default if supported
-	// TODO: should I use glfwExtensionSupported or GLAD_GL_ARB_framebuffer_sRGB? does it make a difference?
-	if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
-		glEnable(GL_FRAMEBUFFER_SRGB);
-	else
-		clog(ERROR, "No sRGB supported! Shading will be non-linear!\n");
 }
 
 int main () {
@@ -329,22 +229,16 @@ int main () {
 	#endif
 
 		if (!glfwInit()) {
-			clog(ERROR, "glfwInit failed!\n");
+			fprintf(stderr, "glfwInit failed!\n");
 			return 1;
 		}
 
-	#ifdef OPENGL_DEBUG
-		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-	#endif
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-		glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
 
 		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
 		if (!window) {
-			clog(ERROR, "glfwCreateWindow failed!\n");
+			fprintf(stderr, "glfwCreateWindow failed!\n");
 			glfwTerminate();
 			return 1;
 		}
@@ -355,9 +249,11 @@ int main () {
 		glfw_register_input_callbacks(window);
 	}
 
-	glfw_init_gl();
+	vulkan = std::make_unique<Vulkan>();
 
 	glfw_gameloop();
+
+	vulkan = nullptr;
 
 	glfwDestroyWindow(window);
 	glfwTerminate();

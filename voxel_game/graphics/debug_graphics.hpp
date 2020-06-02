@@ -1,26 +1,27 @@
 #pragma once
 #include "../kissmath.hpp"
-#include "shaders.hpp"
 #include "camera.hpp"
+#include <vector>
+#include <memory>
 
 struct DebugGraphics {
 	struct Vertex {
 		float3	pos_world;
 		lrgba	color;
 
-		static void bind (Attributes& a) {
-			a.add<decltype(pos_world)>(0, "pos_world", sizeof(Vertex), offsetof(Vertex, pos_world));
-			a.add<decltype(color    )>(1, "color"    , sizeof(Vertex), offsetof(Vertex, color    ));
-		}
+		//static void bind (Attributes& a) {
+		//	a.add<decltype(pos_world)>(0, "pos_world", sizeof(Vertex), offsetof(Vertex, pos_world));
+		//	a.add<decltype(color    )>(1, "color"    , sizeof(Vertex), offsetof(Vertex, color    ));
+		//}
 	};
 
-	Shader shader = { "overlay" };
+	//Shader shader = { "overlay" };
 
 	std::vector<Vertex> faces;
 	std::vector<Vertex> lines;
 
-	Mesh<Vertex> faces_mesh;
-	Mesh<Vertex> lines_mesh;
+	//Mesh<Vertex> faces_mesh;
+	//Mesh<Vertex> lines_mesh;
 
 	// draw quad
 

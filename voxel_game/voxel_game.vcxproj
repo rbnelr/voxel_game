@@ -107,7 +107,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(SolutionDir)..\vulkan_sdk\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -116,8 +116,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);$(SolutionDir)..\vulkan_sdk\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
@@ -157,7 +157,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(SolutionDir)..\vulkan_sdk\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -171,8 +171,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);$(SolutionDir)..\vulkan_sdk\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
@@ -203,30 +203,23 @@
     <ClInclude Include="util\circular_buffer.hpp" />
     <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />
+    <ClInclude Include="util\image.hpp" />
     <ClInclude Include="util\raw_array.hpp" />
     <ClInclude Include="util\read_directory.hpp" />
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="voxel_light.hpp" />
+    <ClInclude Include="vulkan.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="game.hpp" />
-    <ClInclude Include="glad\glad.h" />
-    <ClInclude Include="glad\glad_wgl.h" />
-    <ClInclude Include="glad\khrplatform.h" />
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="graphics\camera.hpp" />
     <ClInclude Include="graphics\common.hpp" />
     <ClInclude Include="graphics\debug_graphics.hpp" />
     <ClInclude Include="graphics\graphics.hpp" />
-    <ClInclude Include="graphics\gl.hpp" />
-    <ClInclude Include="graphics\glshader.hpp" />
-    <ClInclude Include="graphics\image.hpp" />
-    <ClInclude Include="graphics\shaders.hpp" />
-    <ClInclude Include="graphics\texture.hpp" />
     <ClInclude Include="input.hpp" />
     <ClInclude Include="kissmath.hpp" />
     <ClInclude Include="kissmath\bool.hpp" />
@@ -283,26 +276,20 @@
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
+    <ClCompile Include="util\image.cpp" />
     <ClCompile Include="util\read_directory.cpp" />
     <ClCompile Include="util\threadpool.cpp" />
     <ClCompile Include="voxel_light.cpp" />
+    <ClCompile Include="vulkan.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="glad\glad.c" />
-    <ClCompile Include="glad\glad_wgl.c" />
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
     <ClCompile Include="graphics\common.cpp" />
     <ClCompile Include="graphics\debug_graphics.cpp" />
     <ClCompile Include="graphics\graphics.cpp" />
-    <ClCompile Include="graphics\gl.cpp" />
-    <ClCompile Include="graphics\glshader.cpp" />
-    <ClCompile Include="graphics\image.cpp" />
-    <ClCompile Include="graphics\shaders.cpp" />
-    <ClCompile Include="graphics\texture.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="kissmath\bool.cpp" />
     <ClCompile Include="kissmath\bool2.cpp" />
