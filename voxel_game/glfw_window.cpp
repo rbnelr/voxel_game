@@ -177,19 +177,21 @@ void glfw_gameloop () {
 			input = input;
 		}
 
-		{
-			OPTICK_EVENT("frame");
+		if (vulkan->frame_start()) {
+
 			imgui.frame_start();
 
 			game->frame();
 
 			imgui.frame_end();
+
+			vulkan->frame_end();
 		}
 
-		{
-			OPTICK_EVENT("glfwSwapBuffers");
-			glfwSwapBuffers(window);
-		}
+		//{
+		//	OPTICK_EVENT("glfwSwapBuffers");
+		//	glfwSwapBuffers(window);
+		//}
 
 		input = input;
 
@@ -218,8 +220,10 @@ void glfw_error (int err, const char* msg) {
 	clog(ERROR, "GLFW Error! [0x%x] '%s'\n", err, msg);
 }
 
+static constexpr char const* APP_NAME = "Voxel Game";
+
 int main () {
-	OPTICK_START_CAPTURE();
+	//OPTICK_START_CAPTURE();
 
 	{
 		OPTICK_EVENT("glfw init");
@@ -236,7 +240,7 @@ int main () {
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
 
-		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
+		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, APP_NAME, NULL, NULL);
 		if (!window) {
 			fprintf(stderr, "glfwCreateWindow failed!\n");
 			glfwTerminate();
@@ -249,7 +253,7 @@ int main () {
 		glfw_register_input_callbacks(window);
 	}
 
-	vulkan = std::make_unique<Vulkan>();
+	vulkan = std::make_unique<Vulkan>(window, APP_NAME);
 
 	glfw_gameloop();
 
@@ -258,8 +262,8 @@ int main () {
 	glfwDestroyWindow(window);
 	glfwTerminate();
 
-	OPTICK_STOP_CAPTURE();
-	OPTICK_SAVE_CAPTURE("capture.opt");
+	//OPTICK_STOP_CAPTURE();
+	//OPTICK_SAVE_CAPTURE("capture.opt");
 	OPTICK_SHUTDOWN();
 	return 0;
 }

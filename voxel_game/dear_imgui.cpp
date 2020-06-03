@@ -3,59 +3,82 @@
 #include "util/string.hpp"
 #include "input.hpp"
 #include "kissmath_colors.hpp"
+#include "vulkan.hpp"
 using namespace kissmath;
 
 #include "optick.h"
 
 void DearImgui::init () {
 	// Setup Dear ImGui context
-	//IMGUI_CHECKVERSION();
-	//ImGui::CreateContext();
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
 
-	//ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
 	// imgui steals keyboard by default, do not like
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 	// Setup Platform/Renderer bindings
-	//ImGui_ImplGlfw_InitForOpenGL(window, true);
-	//ImGui_ImplOpenGL3_Init();
+	ImGui_ImplGlfw_InitForVulkan(window, true);
+
+	ImGui_ImplVulkan_InitInfo info = {};
+	info.Instance			= vulkan->instance;
+	info.PhysicalDevice		= vulkan->physical_device;
+	info.Device				= vulkan->device;
+	info.QueueFamily		= vulkan->queues.families.graphics_family;
+	info.Queue				= vulkan->queues.graphics_queue;
+	info.PipelineCache		= VK_NULL_HANDLE;
+	info.DescriptorPool		= vulkan->descriptor_pool;
+	info.MinImageCount		= vk::SWAP_CHAIN_SIZE;
+	info.ImageCount			= vk::SWAP_CHAIN_SIZE;
+	info.MSAASamples		= vulkan->max_msaa_samples;
+	info.Allocator			= nullptr;
+	info.CheckVkResultFn	= nullptr;
+	ImGui_ImplVulkan_Init(&info, vulkan->render_pass);
+
+	auto cmd_buf = vulkan->begin_one_time_commands();
+
+	ImGui_ImplVulkan_CreateFontsTexture(cmd_buf);
+
+	vulkan->end_one_time_commands(cmd_buf);
 }
 
 void DearImgui::frame_start () {
-	//ImGui_ImplOpenGL3_NewFrame();
-	//ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
-	//
-	//{
-	//	auto& io = ImGui::GetIO();
-	//	// imgui steals keyboard by default, do not like
-	//	if (io.WantCaptureKeyboard)
-	//		input.disable_keyboard();
-	//	if (io.WantCaptureMouse)
-	//		input.disable_mouse();
-	//}
+	ImGui_ImplVulkan_NewFrame();
+	ImGui_ImplGlfw_NewFrame(enabled && glfwGetInputMode(window, GLFW_CURSOR) != GLFW_CURSOR_DISABLED);
 	
-	//ImGui::NewFrame();
+	{
+		auto& io = ImGui::GetIO();
+		// imgui steals keyboard by default, do not like
+		if (io.WantCaptureKeyboard)
+			input.disable_keyboard();
+		if (io.WantCaptureMouse)
+			input.disable_mouse();
+	}
+	
+	ImGui::NewFrame();
 }
 void DearImgui::frame_end () {
-	//if (show_demo_window)
-	//	ImGui::ShowDemoWindow(&show_demo_window);
+	if (show_demo_window)
+		ImGui::ShowDemoWindow(&show_demo_window);
 	
-	//if (enabled) {
-	//	ImGui::Render();
-	//
-	//	//int display_w, display_h;
-	//	//glfwGetFramebufferSize(window, &display_w, &display_h);
-	//	//glViewport(0, 0, display_w, display_h);
-	//
-	//	//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-	//}
+	if (enabled) {
+		ImGui::Render();
+	
+		//int display_w, display_h;
+		//glfwGetFramebufferSize(window, &display_w, &display_h);
+		//glViewport(0, 0, display_w, display_h);
+	
+		//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	}
 }
 
 void DearImgui::destroy () {
-	//ImGui_ImplOpenGL3_Shutdown();
-	//ImGui_ImplGlfw_Shutdown();
-	//ImGui::DestroyContext();
+	vkQueueWaitIdle(vulkan->queues.graphics_queue);
+
+	ImGui_ImplVulkan_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 }
 
 DearImgui imgui;

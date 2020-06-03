@@ -750,6 +750,8 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 }
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
+	vulkan->render_begin();
+	
 	uint8 sky_light_reduce;
 	fog.set(world.chunks.generation_radius, world.time_of_day.calc_sky_colors(&sky_light_reduce));
 	
@@ -851,4 +853,6 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	//}
 	//
 	//glDisable(GL_BLEND);
+
+	vulkan->render_end();
 }

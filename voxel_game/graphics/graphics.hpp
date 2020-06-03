@@ -450,9 +450,9 @@ struct Fog {
 
 	void imgui () {
 
-		//ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
-		//
-		//ImGui::Checkbox("fog_enable", &enable);
+		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
+		
+		ImGui::Checkbox("fog_enable", &enable);
 	}
 
 	void set (float max_view_dist, SkyColors colors) {
@@ -495,26 +495,26 @@ public:
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
-		//if (frame_counter == 30) {
-		//	//raytracer.regen_data(chunks);
-		//}
-		//
-		//if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
-		//	//shaders->imgui();
-		//
-		//	common_uniforms.imgui();
-		//	//sampler.imgui("sampler");
-		//
-		//	fog.imgui();
-		//	player.imgui();
-		//	chunk_graphics.imgui(chunks);
-		//	tile_textures.imgui("tile_textures");
-		//
-		//	ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
-		//	ImGui::Checkbox("debug_block_light", &debug_block_light);
-		//
-		//	ImGui::Separator();
-		//}
+		if (frame_counter == 30) {
+			//raytracer.regen_data(chunks);
+		}
+		
+		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+			//shaders->imgui();
+		
+			common_uniforms.imgui();
+			//sampler.imgui("sampler");
+		
+			fog.imgui();
+			player.imgui();
+			chunk_graphics.imgui(chunks);
+			tile_textures.imgui("tile_textures");
+		
+			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+			ImGui::Checkbox("debug_block_light", &debug_block_light);
+		
+			ImGui::Separator();
+		}
 	}
 
 	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);

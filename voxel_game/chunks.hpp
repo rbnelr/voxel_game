@@ -198,6 +198,7 @@ struct MeshingData {
 		while (remain > 0 && cur_block < block_count) {
 
 			//mesh._sub_upload(&blocks[cur_block++]->verts[0], offset, std::min(remain, MESHING_BLOCK_COUNT));
+			cur_block++;
 
 			offset += MESHING_BLOCK_COUNT;
 			remain -= MESHING_BLOCK_COUNT;

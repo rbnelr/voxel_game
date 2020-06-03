@@ -11,7 +11,6 @@ Game::Game () {
 }
 
 void Game::frame () {
-	return;
 
 	ImGui::Begin("Debug");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
@@ -41,16 +40,13 @@ void Game::frame () {
 			glfwSetWindowShouldClose(window, 1);
 		}
 
-		ImGui::Checkbox("Debug Pause", &dbg_pause);
-
-		ImGui::SameLine();
 		ImGui::Checkbox("Console", &gui_console.shown);
 
 		ImGui::SameLine();
 		ImGui::Checkbox("ImGui Demo", &imgui.show_demo_window);
 	}
 
-	if (!dbg_pause) {
+	{
 		{
 			OPTICK_EVENT("imgui2");
 

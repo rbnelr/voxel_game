@@ -191,6 +191,7 @@
     <ClInclude Include="blocks.hpp" />
     <ClInclude Include="block_update.hpp" />
     <ClInclude Include="chunks.hpp" />
+    <ClInclude Include="dear_imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="graphics\atlas.hpp" />
     <ClInclude Include="graphics\graphics_common.hpp" />
     <ClInclude Include="items.hpp" />
@@ -273,6 +274,7 @@
     <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
+    <ClCompile Include="dear_imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />

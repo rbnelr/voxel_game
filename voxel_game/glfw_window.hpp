@@ -1,8 +1,7 @@
 #pragma once
-//#include "util/clean_windows_h.hpp" // TODO why was this included
+//#include "util/clean_windows_h.hpp"
 
 #if _DEBUG || 1
-	#define VULKAN_VALIDATION
 	#define GLFW_DEBUG
 #endif
 

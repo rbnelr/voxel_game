@@ -125,19 +125,19 @@ public:
 
 	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): Camera(pos, rot_aer), base_speed{base_speed} {}
 
-	//void imgui (const char* name=nullptr) {
-	//	if (!imgui_push("Flycam", name)) return;
-	//
-	//	Camera::imgui(name);
-	//
-	//	ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
-	//	ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
-	//	ImGui::DragFloat("speedup_factor", &speedup_factor, 0.001f);
-	//	ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
-	//	ImGui::Text("cur_speed: %.3f", cur_speed);
-	//
-	//	imgui_pop();
-	//}
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("Flycam", name)) return;
+	
+		Camera::imgui(name);
+	
+		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
+		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
+		ImGui::DragFloat("speedup_factor", &speedup_factor, 0.001f);
+		ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
+		ImGui::Text("cur_speed: %.3f", cur_speed);
+	
+		imgui_pop();
+	}
 
 	Camera_View update ();
 };
