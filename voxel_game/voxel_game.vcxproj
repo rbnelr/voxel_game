@@ -193,7 +193,8 @@
     <ClInclude Include="chunks.hpp" />
     <ClInclude Include="dear_imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="graphics\atlas.hpp" />
-    <ClInclude Include="graphics\graphics_common.hpp" />
+    <ClInclude Include="graphics\renderer.hpp" />
+    <ClInclude Include="graphics\vulkan_lib.hpp" />
     <ClInclude Include="items.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
@@ -210,7 +211,6 @@
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="voxel_light.hpp" />
-    <ClInclude Include="vulkan.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />
@@ -218,7 +218,6 @@
     <ClInclude Include="game.hpp" />
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="graphics\camera.hpp" />
-    <ClInclude Include="graphics\common.hpp" />
     <ClInclude Include="graphics\debug_graphics.hpp" />
     <ClInclude Include="graphics\graphics.hpp" />
     <ClInclude Include="input.hpp" />
@@ -275,6 +274,7 @@
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="graphics\renderer.cpp" />
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
@@ -282,14 +282,12 @@
     <ClCompile Include="util\read_directory.cpp" />
     <ClCompile Include="util\threadpool.cpp" />
     <ClCompile Include="voxel_light.cpp" />
-    <ClCompile Include="vulkan.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />
     <ClCompile Include="dear_imgui.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
-    <ClCompile Include="graphics\common.cpp" />
     <ClCompile Include="graphics\debug_graphics.cpp" />
     <ClCompile Include="graphics\graphics.cpp" />
     <ClCompile Include="input.cpp" />

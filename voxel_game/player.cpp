@@ -1,5 +1,6 @@
 #include "player.hpp"
 #include "world.hpp"
+#include "graphics/debug_graphics.hpp"
 
 float3	player_spawn_point = float3(0,0,34);
 

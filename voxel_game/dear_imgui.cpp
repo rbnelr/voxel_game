@@ -3,7 +3,7 @@
 #include "util/string.hpp"
 #include "input.hpp"
 #include "kissmath_colors.hpp"
-#include "vulkan.hpp"
+#include "graphics/vulkan_lib.hpp"
 using namespace kissmath;
 
 #include "optick.h"

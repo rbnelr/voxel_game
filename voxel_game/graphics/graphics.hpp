@@ -5,7 +5,108 @@
 #include "../util/animation.hpp"
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
-#include "graphics_common.hpp"
+#include "renderer.hpp"
+#include "camera.hpp"
+#include "input.hpp"
+
+//// Frame uniforms
+struct ViewUniforms {
+	struct Uniforms {
+		float4x4 world_to_cam;
+		float4x4 cam_to_world;
+		float4x4 cam_to_clip;
+		float4x4 clip_to_cam;
+		float4x4 world_to_clip;
+		float    clip_near;
+		float    clip_far;
+		float2   viewport_size;
+
+		static constexpr void check_layout (vk::UBOLayoutCheck& c) {
+			c.member<decltype(world_to_cam )>(offsetof(Uniforms, world_to_cam ));
+			c.member<decltype(cam_to_world )>(offsetof(Uniforms, cam_to_world ));
+			c.member<decltype(cam_to_clip  )>(offsetof(Uniforms, cam_to_clip  ));
+			c.member<decltype(clip_to_cam  )>(offsetof(Uniforms, clip_to_cam  ));
+			c.member<decltype(world_to_clip)>(offsetof(Uniforms, world_to_clip));
+			c.member<decltype(clip_near    )>(offsetof(Uniforms, clip_near    ));
+			c.member<decltype(clip_far     )>(offsetof(Uniforms, clip_far     ));
+			c.member<decltype(viewport_size)>(offsetof(Uniforms, viewport_size));
+		}
+	};
+	
+	void set (Camera_View const& view) {
+		Uniforms u = {}; // zero padding
+		u.world_to_cam = (float4x4)view.world_to_cam;
+		u.cam_to_world = (float4x4)view.cam_to_world;
+		u.cam_to_clip = view.cam_to_clip;
+		u.clip_to_cam = view.clip_to_cam;
+		u.world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
+		u.clip_near = view.clip_near;
+		u.clip_far = view.clip_far;
+		u.viewport_size = (float2)input.window_size;
+		//uniform_buffer.set(u);
+	}
+};
+
+struct DebugUniforms {
+	struct Uniforms {
+		float2 cursor_pos;
+		static constexpr void check_layout (vk::UBOLayoutCheck& c) {
+			c.member<decltype(cursor_pos)>(offsetof(Uniforms, cursor_pos));
+		}
+	};
+
+	void set () {
+		Uniforms u = {}; // zero padding
+		u.cursor_pos = input.cursor_pos;
+		//u.wireframe = dbg_wireframe ? 1 | (wireframe_shaded ? 2:0) | (wireframe_colored ? 4:0) : 0;
+		//uniform_buffer.set(u);
+	}
+};
+
+struct FogUniforms {
+
+	float fog_base_coeff = 0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
+	bool enable = false;
+
+	//SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
+
+	void imgui () {
+
+		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
+
+		ImGui::Checkbox("fog_enable", &enable);
+	}
+
+	struct Uniforms {
+		float3 sky_col;
+		float _pad0;
+		float3 horiz_col;
+		float _pad1;
+		float3 ambient_col;
+
+		float coeff;
+
+		static constexpr void check_layout (vk::UBOLayoutCheck& c) {
+			c.member<decltype(sky_col    )>(offsetof(Uniforms, sky_col    ));
+			c.member<decltype(horiz_col  )>(offsetof(Uniforms, horiz_col  ));
+			c.member<decltype(ambient_col)>(offsetof(Uniforms, ambient_col));
+			c.member<decltype(coeff      )>(offsetof(Uniforms, coeff      ));
+		}
+	};
+	void set (float max_view_dist, SkyColors colors) {
+		Uniforms u;
+		u.sky_col = colors.sky_col;
+		u.horiz_col = colors.horiz_col;
+		u.ambient_col = colors.ambient_col;
+		u.coeff = fog_base_coeff;
+
+		if (enable)
+			u.coeff /= max_view_dist;
+		else
+			u.coeff = 0;
+		//uniform_buffer.set(u);
+	}
+};
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -33,25 +134,6 @@ static inline constexpr float3x3 face_rotation[] = {
 	float3x3( 1, 0, 0,
 		      0, 1, 0,
 		      0, 0, 1),
-};
-
-struct SkyboxGraphics {
-
-	struct Vertex {
-		float3 world_dir;
-
-		static void bind (Attributes& a) {
-			a.add<decltype(world_dir)>(0, "world_dir", sizeof(Vertex), offsetof(Vertex, world_dir));
-		}
-	};
-
-	Shader shader = Shader("skybox"); // , { FOG_UNIFORMS }
-
-	Mesh<Vertex> mesh; // a inward facing cube of size 1
-
-	SkyboxGraphics ();
-
-	void draw ();
 };
 
 struct BlockHighlightGraphics {
@@ -426,55 +508,20 @@ struct ChunkGraphics {
 class World;
 struct SelectedBlock;
 
-struct FogUniforms {
-	float3 sky_col;
-	float _pad0;
-	float3 horiz_col;
-	float _pad1;
-	float3 ambient_col;
-
-	float coeff;
-
-	//static constexpr void check_layout (SharedUniformsLayoutChecker& c) {
-	//	c.member<decltype(sky_col    )>(offsetof(FogUniforms, sky_col    ));
-	//	c.member<decltype(horiz_col  )>(offsetof(FogUniforms, horiz_col  ));
-	//	c.member<decltype(ambient_col)>(offsetof(FogUniforms, ambient_col));
-	//	c.member<decltype(coeff      )>(offsetof(FogUniforms, coeff      ));
-	//}
-};
-struct Fog {
-	float fog_base_coeff = 0.85f; // div by max view dist defined somewhere else maybe dependent on chunk rendering distance
-	bool enable = false;
-
-	//SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
-
-	void imgui () {
-
-		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
-		
-		ImGui::Checkbox("fog_enable", &enable);
-	}
-
-	void set (float max_view_dist, SkyColors colors) {
-		FogUniforms f;
-		f.sky_col = colors.sky_col;
-		f.horiz_col = colors.horiz_col;
-		f.ambient_col = colors.ambient_col;
-		f.coeff = fog_base_coeff;
-
-		if (enable)
-			f.coeff /= max_view_dist;
-		else
-			f.coeff = 0;
-		//fog_uniforms.set(f);
-	}
-};
-
 extern int frame_counter;
+
+#define PIPELINE_SKYBOX { OS_DEPTH_CLAMP, true }, { OS_DEPTH_RANGE, 1.0f, 1.0f }
 
 class Graphics {
 public:
-	CommonUniforms			common_uniforms;
+	ViewUniforms			view;
+	DebugUniforms			debug;
+	FogUniforms				fog;
+
+	Graphics () {
+
+	}
+
 	Sampler					sampler;// = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 
 	TileTextures			tile_textures;
@@ -485,24 +532,19 @@ public:
 	BlockHighlightGraphics	block_highlight;
 
 	GuiGraphics				gui;
-	SkyboxGraphics			skybox;
 
-	Fog						fog;
-
+	//Pipeline				skybox_pipeline		= Pipeline("skybox", { common_uniforms_layout }, { PIPELINE_SKYBOX });
+	
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
 	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui (Chunks& chunks) {
-		if (frame_counter == 30) {
-			//raytracer.regen_data(chunks);
-		}
 		
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
 			//shaders->imgui();
-		
-			common_uniforms.imgui();
+			
 			//sampler.imgui("sampler");
 		
 			fog.imgui();

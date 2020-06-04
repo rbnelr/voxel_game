@@ -4,6 +4,7 @@
 #include "../chunks.hpp"
 #include "../world.hpp"
 #include "../voxel_light.hpp"
+#include "debug_graphics.hpp"
 using namespace kiss;
 
 #include "assimp/cimport.h"        // Plain-C interface
@@ -25,66 +26,6 @@ void push_quad (std::vector<T>* vec, T a, T b, T c, T d) {
 	*out++ = a;
 	*out++ = c;
 	*out++ = d;
-}
-
-SkyboxGraphics::SkyboxGraphics () {
-	static constexpr Vertex LLL = { float3(-1,-1,-1) };
-	static constexpr Vertex HLL = { float3(+1,-1,-1) };
-	static constexpr Vertex LHL = { float3(-1,+1,-1) };
-	static constexpr Vertex HHL = { float3(+1,+1,-1) };
-	static constexpr Vertex LLH = { float3(-1,-1,+1) };
-	static constexpr Vertex HLH = { float3(+1,-1,+1) };
-	static constexpr Vertex LHH = { float3(-1,+1,+1) };
-	static constexpr Vertex HHH = { float3(+1,+1,+1) };
-
-	static constexpr Vertex arr[6*6] = {
-		QUAD_INWARD(	LHL,
-						LLL,
-						LLH,
-						LHH ),
-
-		QUAD_INWARD(	HLL,
-						HHL,
-						HHH,
-						HLH ),
-
-		QUAD_INWARD(	LLL,
-						HLL,
-						HLH,
-						LLH ),
-
-		QUAD_INWARD(	HHL,
-						LHL,
-						LHH,
-						HHH ),
-
-		QUAD_INWARD(	HLL,
-						LLL,
-						LHL,
-						HHL ),
-
-		QUAD_INWARD(	LLH,
-						HLH,
-						HHH,
-						LHH )
-	};
-
-	//mesh.upload(arr, 6*6);
-}
-
-void SkyboxGraphics::draw () {
-	//if (shader) {
-	//	shader.bind();
-	//
-	//	glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
-	//	glDepthRange(1, 1); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
-	//
-	//	mesh.bind();
-	//	mesh.draw();
-	//
-	//	glDepthRange(0, 1);
-	//	glDisable(GL_DEPTH_CLAMP);
-	//}
 }
 
 BlockHighlightGraphics::BlockHighlightGraphics () {
@@ -774,46 +715,16 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
 	}
 
-	//// OpenGL drawcalls
-	common_uniforms.set_view_uniforms(view);
-	common_uniforms.set_debug_uniforms();
-
-	//{ // GL state defaults
-	//  // 
-	//	glEnable(GL_FRAMEBUFFER_SRGB);
-	//	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-	//	// scissor
-	//	glDisable(GL_SCISSOR_TEST);
-	//	// depth
-	//	glEnable(GL_DEPTH_TEST);
-	//	glClearDepth(1.0f);
-	//	glDepthFunc(GL_LEQUAL);
-	//	glDepthRange(0.0f, 1.0f);
-	//	glDepthMask(GL_TRUE);
-	//	// culling
-	//	gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
-	//	glCullFace(GL_BACK);
-	//	glFrontFace(GL_CCW);
-	//	// blending
-	//	glDisable(GL_BLEND);
-	//	glBlendEquation(GL_FUNC_ADD);
-	//	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//	//
-	//#ifdef GL_POLYGON_MODE
-	//	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	//#endif
-	//}
+	//// 
+	//common_uniforms.set_view_uniforms(view);
+	//common_uniforms.set_debug_uniforms();
 
 	//glViewport(0,0, input.window_size.x, input.window_size.y);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	////glClear(GL_DEPTH_BUFFER_BIT);
-	//
-	//glDisable(GL_BLEND);
-	//
+
 	//{ //// Opaque pass
 	//	chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 	//
-	//	skybox.draw();
+		//draw_skybox(skybox_pipeline);
 	//}
 	//
 	//glEnable(GL_BLEND);

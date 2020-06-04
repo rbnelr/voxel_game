@@ -125,9 +125,6 @@
     <ClInclude Include="graphics\debug_graphics.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="graphics\common.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="util\file_io.hpp">
       <Filter>util</Filter>
     </ClInclude>
@@ -201,9 +198,6 @@
     <ClInclude Include="items.hpp" />
     <ClInclude Include="voxel_light.hpp" />
     <ClInclude Include="time_of_day.hpp" />
-    <ClInclude Include="graphics\graphics_common.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="util\raw_array.hpp">
       <Filter>util</Filter>
     </ClInclude>
@@ -216,12 +210,17 @@
     <ClInclude Include="util\block_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan.hpp" />
     <ClInclude Include="util\image.hpp">
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="dear_imgui\imgui_impl_vulkan.h">
       <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\renderer.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\vulkan_lib.hpp">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -338,9 +337,6 @@
     <ClCompile Include="graphics\debug_graphics.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="graphics\common.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
     <ClCompile Include="game.cpp" />
     <ClCompile Include="util\file_io.cpp">
       <Filter>util</Filter>
@@ -388,9 +384,11 @@
     <ClCompile Include="util\image.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="vulkan.cpp" />
     <ClCompile Include="dear_imgui\imgui_impl_vulkan.cpp">
       <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="graphics\renderer.cpp">
+      <Filter>graphics</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
