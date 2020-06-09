@@ -2,6 +2,7 @@
 #include "game.hpp"
 #include "graphics/gl.hpp"
 #include "util/threadpool.hpp"
+#include "optick.hpp"
 
 //
 bool FileExists (const char* path) {
@@ -16,8 +17,10 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
+	set_process_priority();
+	set_thread_priority(Priorities::HIGH);
+	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
-	set_high_thread_priority();
 }
 
 void Game::frame () {
@@ -26,6 +29,8 @@ void Game::frame () {
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
 	{
+		OPTICK_EVENT("imgui");
+
 		bool borderless_fullscreen;
 		bool fullscreen = get_fullscreen(&borderless_fullscreen);
 		bool changed = false;
@@ -58,49 +63,53 @@ void Game::frame () {
 	}
 
 	if (!dbg_pause) {
-
-		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
-			fps_display.display_fps();
-
-			ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
-			ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.block_light_time.calc_avg() * 1000 * 1000);
-			ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
-
-			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
-		}
-
-		input.imgui();
-		graphics.imgui(world->chunks);
-
-		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
-		
-			if (ImGui::Button("Recreate")) {
-				world = std::make_unique<World>(world_gen);
-			}
-
-			world_gen.imgui();
-			world->imgui();
-			block_update.imgui();
-		}
-
 		{
-			bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
-		
-			if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
-			if (input.buttons[GLFW_KEY_P].went_down)
-				activate_flycam = !activate_flycam;
+			OPTICK_EVENT("imgui2");
 
-			if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
-			if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
-				world->player.respawn();
+			if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
+				fps_display.display_fps();
+
+				ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
+				ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.block_light_time.calc_avg() * 1000 * 1000);
+				ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
+
+				ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 			}
 
-			if (open) ImGui::Separator();
+			input.imgui();
+			graphics.imgui(world->chunks);
 
-			if (open) flycam.imgui("flycam");
-			if (open) world->player.imgui("player");
+			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
+		
+				if (ImGui::Button("Recreate")) {
+					world = std::make_unique<World>(world_gen);
+				}
 
-			if (open) ImGui::Separator();
+				world_gen.imgui();
+				world->imgui();
+				block_update.imgui();
+			}
+
+			{
+				bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
+		
+				if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
+				if (input.buttons[GLFW_KEY_P].went_down)
+					activate_flycam = !activate_flycam;
+
+				if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
+				if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
+					world->player.respawn();
+				}
+
+				if (open) ImGui::Separator();
+
+				if (open) flycam.imgui("flycam");
+				if (open) world->player.imgui("player");
+
+				if (open) ImGui::Separator();
+			}
+
 		}
 
 		world->chunks.update_chunk_loading(*world, world_gen, world->player);
@@ -128,7 +137,7 @@ void Game::frame () {
 
 		block_update.update_blocks(world->chunks);
 
-		world->chunks.update_chunks(graphics, world->player);
+		world->chunks.update_chunks(graphics, world->world_gen, world->player);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);

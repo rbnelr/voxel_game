@@ -13,6 +13,14 @@ namespace kiss {
 	// Printf that outputs to a std::string
 	std::string prints (char const* format, ...);
 
+	// Convert utf8 'multibyte' strings to windows wchar 'unicode' strings
+	// WARNING: utf8 must be null terminated, which string_view does not garantuee
+	std::basic_string<wchar_t> utf8_to_wchar (std::string_view utf8);
+
+	// Convert windows wchar 'unicode' to utf8 'multibyte' strings
+	// WARNING: wchar must be null terminated, which string_view does not garantuee
+	std::string wchar_to_utf8 (std::basic_string_view<wchar_t> wchar);
+
 	std::string format_thousands (int i, char sep=',');
 	std::string format_thousands (unsigned i, char sep=',');
 	std::string format_thousands (long long i, char sep=',');

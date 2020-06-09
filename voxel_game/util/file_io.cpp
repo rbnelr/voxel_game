@@ -58,6 +58,17 @@ namespace kiss {
 		return data;
 	}
 
+	void save_binary_file (const char* filename, void* data, uint64_t size) {
+		auto f = fopen(filename, "wb");
+		if (!f) {
+			return;
+		}
+
+		auto ret = fwrite(data, 1,size, f);
+
+		fclose(f);
+	}
+
 	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {
 		auto pos = filepath.find_last_of('/');
 		if (pos == std::string::npos)

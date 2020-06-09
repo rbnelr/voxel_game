@@ -1,6 +1,15 @@
 #include "debug_graphics.hpp"
 #include "../util/geometry.hpp"
 
+void DebugGraphics::push_point (float3 pos, float3 size, lrgba col) {
+	lines.push_back({ pos - float3(size.x/2, 0, 0), col });
+	lines.push_back({ pos + float3(size.x/2, 0, 0), col });
+	lines.push_back({ pos - float3(0, size.y/2, 0), col });
+	lines.push_back({ pos + float3(0, size.y/2, 0), col });
+	lines.push_back({ pos - float3(0, 0, size.z/2), col });
+	lines.push_back({ pos + float3(0, 0, size.z/2), col });
+}
+
 void DebugGraphics::push_arrow (float3 pos, float3 dir, lrgba col) {
 	lines.push_back({ pos, col });
 	lines.push_back({ pos + dir, col });

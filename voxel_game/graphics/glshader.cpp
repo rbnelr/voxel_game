@@ -63,7 +63,7 @@ namespace gl {
 		for (auto& kv : shad->uniforms) {
 			kv.second.loc = glGetUniformLocation(shad->shad, kv.first.str.c_str());
 			if (kv.second.loc < 0) {
-				logf(ERROR, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
+				clog(ERROR, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
 			}
 		}
 	}
@@ -90,6 +90,19 @@ namespace gl {
 		if (index != GL_INVALID_INDEX) {
 			glUniformBlockBinding(shad, index, u.binding_point);
 		}
+	}
+
+	kiss::raw_data gl::Shader::get_program_binary (uint64_t* size) {
+		int _size;
+		glGetProgramiv(shad, GL_PROGRAM_BINARY_LENGTH, &_size);
+
+		auto data = std::make_unique<unsigned char[]>(_size);
+
+		GLenum format;
+		glGetProgramBinary(shad, _size, &_size, &format, data.get());
+
+		*size = _size;
+		return std::move(data);
 	}
 
 	bool is_ident_start_c (char c) {
@@ -186,7 +199,7 @@ namespace gl {
 		bool			compile_shader = false;
 
 		void syntax_error (char const* reason, string_view filename, int line_no) {
-			logf(ERROR, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", filename.data(), line_no, reason);
+			clog(ERROR, "ShaderPreprocessor: syntax error around \"%s\":%d!\n>> %s\n", filename.data(), line_no, reason);
 		}
 
 		struct TypeMap {
@@ -195,24 +208,30 @@ namespace gl {
 		};
 		static constexpr TypeMap _type_map[] = {
 			{ "float", gl::FLOAT	},
-		{ "vec2",  gl::FLOAT2	},
-		{ "vec3",  gl::FLOAT3	},
-		{ "vec4",  gl::FLOAT4	},
-		{ "int",   gl::INT		},
-		{ "ivec2", gl::INT2		},
-		{ "ivec3", gl::INT3		},
-		{ "ivec4", gl::INT4		},
-		{ "mat3",  gl::MAT3		},
-		{ "mat4",  gl::MAT4		},
-		{ "bool",  gl::BOOL		},
+			{ "vec2",  gl::FLOAT2	},
+			{ "vec3",  gl::FLOAT3	},
+			{ "vec4",  gl::FLOAT4	},
+			{ "int",   gl::INT		},
+			{ "ivec2", gl::INT2		},
+			{ "ivec3", gl::INT3		},
+			{ "ivec4", gl::INT4		},
+			{ "mat3",  gl::MAT3		},
+			{ "mat4",  gl::MAT4		},
+			{ "bool",  gl::BOOL		},
 
-		{ "sampler1D",			gl::SAMPLER_1D			},
-		{ "sampler2D",			gl::SAMPLER_2D			},
-		{ "sampler3D",			gl::SAMPLER_3D			},
-		{ "samplerCube",		gl::SAMPLER_Cube		},
-		{ "sampler1DArray",		gl::SAMPLER_1D_Array	},
-		{ "sampler2DArray",		gl::SAMPLER_2D_Array	},
-		{ "samplerCubeArray",	gl::SAMPLER_Cube_Array	},
+			{ "sampler1D",			gl::SAMPLER_1D			},
+			{ "sampler2D",			gl::SAMPLER_2D			},
+			{ "sampler3D",			gl::SAMPLER_3D			},
+			{ "isampler1D",			gl::ISAMPLER_1D			},
+			{ "isampler2D",			gl::ISAMPLER_2D			},
+			{ "isampler3D",			gl::ISAMPLER_3D			},
+			{ "usampler1D",			gl::USAMPLER_1D			},
+			{ "usampler2D",			gl::USAMPLER_2D			},
+			{ "usampler3D",			gl::USAMPLER_3D			},
+			{ "samplerCube",		gl::SAMPLER_Cube		},
+			{ "sampler1DArray",		gl::SAMPLER_1D_Array	},
+			{ "sampler2DArray",		gl::SAMPLER_2D_Array	},
+			{ "samplerCubeArray",	gl::SAMPLER_Cube_Array	},
 		};
 		bool get_type (string_view glsl_type, gl::type* type) {
 			for (auto& tm : _type_map) {
@@ -367,7 +386,7 @@ namespace gl {
 					std::string inc_filename = string(path).append(arg);
 					std::string inc_source;
 					if (!kiss::load_text_file(inc_filename.c_str(), &inc_source)) {
-						logf(ERROR, "Could not find include file \"%s\" for shader \"%s\"!\n", inc_filename.c_str(), shader_name);
+						clog(ERROR, "Could not find include file \"%s\" for shader \"%s\"!\n", inc_filename.c_str(), shader_name);
 						return false;
 					}
 
@@ -488,7 +507,7 @@ namespace gl {
 		return str;
 	}
 
-	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view filename, Shader* shader, std::string const& name, bool* error) {
+	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view filename, Shader* shader, std::string const& name, bool* error, std::vector<std::string>* preprocessed_sources) {
 
 		std::string preprocessed = "";
 		{
@@ -527,14 +546,16 @@ namespace gl {
 			success = status == GL_TRUE;
 			if (!success) {
 				// compilation failed
-				logf(ERROR,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+				clog(ERROR,"OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 			} else {
 				// compilation success
 				if (log_avail) {
-					logf(ERROR,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					clog(ERROR,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
+
+		preprocessed_sources->push_back(std::move(preprocessed));
 
 		return shad;
 	}
@@ -546,7 +567,7 @@ namespace gl {
 		string filename = prints("%s%s.glsl", shaders_directory, name.c_str());
 		string source;
 		if (!kiss::load_text_file(filename.c_str(), &source)) {
-			logf(ERROR, "Could not load base source file for shader \"%s\"!\n", name.c_str());
+			clog(ERROR, "Could not load base source file for shader \"%s\"!\n", name.c_str());
 			return s;
 		}
 
@@ -554,9 +575,9 @@ namespace gl {
 
 		// Load, proprocess and compile shader parts
 		bool error = false;
-		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, filename, s.get(), name, &error);
-		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, filename, s.get(), name, &error);
-		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, filename, s.get(), name, &error);
+		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
 
 		// Insert source file into sources set
 		if (std::find(s->sources.begin(), s->sources.end(), filename) == s->sources.end())
@@ -574,11 +595,11 @@ namespace gl {
 			error = status == GL_FALSE;
 			if (error) {
 				// linking failed
-				logf(ERROR,"OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+				clog(ERROR,"OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 			} else {
 				// linking success
 				if (log_avail) {
-					logf(ERROR,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					clog(ERROR,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
@@ -592,7 +613,7 @@ namespace gl {
 		if (geom) glDeleteShader(geom);
 
 		if (error) {
-			logf(ERROR, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
+			clog(ERROR, "Could not load some required source files for shader \"%s\", shader load aborted!\n", name.c_str());
 
 			glDeleteProgram(s->shad);
 			s->shad = 0;

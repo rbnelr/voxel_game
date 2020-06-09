@@ -95,3 +95,8 @@ public:
 
 // global input
 extern Input input;
+
+void glfw_register_input_callbacks (GLFWwindow* window);
+
+void glfw_input_pre_gameloop (GLFWwindow* window);
+void glfw_sample_non_callback_input (GLFWwindow* window);

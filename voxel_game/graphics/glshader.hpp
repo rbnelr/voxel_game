@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "assert.h"
 #include "gl.hpp"
+#include "../util/file_io.hpp"
 
 namespace gl {
 	struct Uniform {
@@ -19,7 +20,7 @@ namespace gl {
 	struct Shader {
 		GLuint shad = 0; // 0 == shader no loaded successfully
 
-						 // all files used in the shader, ie. the source itself and all included files
+		// all files used in the shader, ie. the source itself and all included files
 		std::vector<std::string> sources;
 
 		// all uniforms found in the shader
@@ -28,6 +29,11 @@ namespace gl {
 		bool get_uniform (std::string_view name, Uniform* type);
 
 		void bind_uniform_block (SharedUniformsInfo const& u);
+
+		// for debugging purposes
+		std::vector<std::string> preprocessed_sources;
+
+		kiss::raw_data get_program_binary (uint64_t* size);
 
 		~Shader () {
 			glDeleteProgram(shad);

@@ -234,6 +234,16 @@
     <ClInclude Include="util\raw_array.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="util\read_directory.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\bit_twiddling.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\block_allocator.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="optick.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -417,6 +427,9 @@
     <ClCompile Include="items.cpp" />
     <ClCompile Include="voxel_light.cpp" />
     <ClCompile Include="time_of_day.cpp" />
+    <ClCompile Include="util\read_directory.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">

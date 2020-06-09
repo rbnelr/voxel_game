@@ -1,4 +1,7 @@
 #include "chunk_mesher.hpp"
+#include "world_generator.hpp"
+#include "util/timer.hpp"
+#include "dear_imgui.hpp"
 
 static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
@@ -7,15 +10,18 @@ static constexpr int offs (int3 offset) {
 struct Chunk_Mesher {
 	bool alpha_test;
 
-	ChunkMesh::Vertex* opaque_vertices;
-	ChunkMesh::Vertex* tranparent_vertices;
+	MeshingData* opaque_vertices;
+	MeshingData* tranparent_vertices;
 
-	Block* cur;
+	ChunkData* chunk_data;
+
+	uint64_t cur;
 
 	// per block
-	uint8v3 block_pos;
+	float3 block_pos;
 
 	BlockTileInfo tile;
+	std::vector<BlockMeshVertex> const* block_meshes;
 
 	bool bt_is_opaque (block_id id) {
 		auto t = blocks.transparency[id];
@@ -38,190 +44,207 @@ struct Chunk_Mesher {
 	};
 
 	inline uint8 calc_block_light (BlockFace face, int3 vert_pos) {
-		auto* ptr = cur + offs(vert_pos);
+		auto* block_light = &chunk_data->block_light[cur + offs(vert_pos)];
 		
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += (ptr + offset)->block_light;
+			total += block_light[offset];
 		}
 		
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
-		auto* ptr = cur + offs(vert_pos);
+		auto* sky_light = &chunk_data->sky_light[cur + offs(vert_pos)];
 
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += (ptr + offset)->sky_light;
+			total += sky_light[offset];
 		}
 
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
 
-	ChunkMesh::Vertex* face_nx (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_px (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_ny (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_py (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_nz (ChunkMesh::Vertex* verts);
-	ChunkMesh::Vertex* face_pz (ChunkMesh::Vertex* verts);
+	// float3	pos_model;
+	// float2	uv;
+	// uint8	tex_indx;
+	// uint8	block_light;
+	// uint8	sky_light;
+	// uint8	hp;
 
-	void cube_opaque ();
-	void cube_transperant ();
+#define VERT(x,y,z, u,v, face) \
+		{ block_pos + float3(x,y,z), float2(u,v), (uint8)tile.calc_texture_index(face), \
+		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res);
-};
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res) {
-	Chunk_Mesher cm;
-	return cm.mesh_chunk(chunks, graphics, tile_textures, chunk, res);
-}
+#define POS \
+	{ {0,1,0}, {0,0,0}, {0,0,1}, {0,1,1} }, \
+	{ {1,0,0}, {1,1,0}, {1,1,1}, {1,0,1} }, \
+	{ {0,0,0}, {1,0,0}, {1,0,1}, {0,0,1} }, \
+	{ {1,1,0}, {0,1,0}, {0,1,1}, {1,1,1} }, \
+	{ {0,1,0}, {1,1,0}, {1,0,0}, {0,0,0} }, \
+	{ {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1} }, \
 
-void Chunk_Mesher::mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res) {
-	alpha_test = graphics.alpha_test;
+	static constexpr float3 posf[6][4] = { POS };
+	static constexpr int3   pos[6][4]  = { POS };
 
-	opaque_vertices = res->opaque_vertices.ptr;
-	tranparent_vertices = res->tranparent_vertices.ptr;
+	static constexpr float2 uv[4]   = { {0,0}, {1,0}, {1,1}, {0,1} };
 
-	for (block_pos.z=0; block_pos.z<CHUNK_DIM_Z; ++block_pos.z) {
-		for (block_pos.y=0; block_pos.y<CHUNK_DIM_Y; ++block_pos.y) {
+	static constexpr int tri_oder[2][6] = {
+		{ 0,1,3, 3,1,2 },
+		{ 1,2,0, 0,2,3 },
+	};
 
-			cur = &chunk->blocks[block_pos.z + 1][block_pos.y + 1][1];
+	static constexpr int offsets[6] = {
+		-1,
+		+1,
+		-CHUNK_ROW_OFFS,
+		+CHUNK_ROW_OFFS,
+		-CHUNK_LAYER_OFFS,
+		+CHUNK_LAYER_OFFS,
+	};
 
-			for (block_pos.x=0; block_pos.x<CHUNK_DIM_X; ++block_pos.x) {
+	void face (MeshingData* out, BlockFace facei) {
 
-				if (cur->id != B_AIR) {
-					tile = tile_textures.block_tile_info[cur->id];
+		ChunkMesh::Vertex vert[4];
 
-					if (blocks.transparency[cur->id] == TM_TRANSPARENT)
-						cube_transperant();
-					else
-						cube_opaque();
-				}
+		float3 const* pf = posf[facei];
+		int3 const* p = pos[facei];
 
-				cur++;
-			}
+		auto hp = chunk_data->hp[cur];
+
+		for (int i=0; i<4; ++i)
+			vert[i].pos_model	= block_pos + pf[i];
+		for (int i=0; i<4; ++i)
+			vert[i].uv			= uv[i];
+		for (int i=0; i<4; ++i)
+			vert[i].tex_indx	= (uint8)tile.calc_texture_index(facei);
+		for (int i=0; i<4; ++i)
+			vert[i].block_light	= calc_block_light(facei, p[i]);
+		for (int i=0; i<4; ++i)
+			vert[i].sky_light	= calc_sky_light(facei, p[i]);
+		for (int i=0; i<4; ++i)
+			vert[i].hp			= hp;
+
+		bool b = vert[0].sky_light + vert[2].sky_light >= vert[1].sky_light + vert[3].sky_light;
+
+		int const* order = tri_oder[(int)b];
+		for (int i=0; i<6; ++i) {
+			*out->push() = vert[order[i]];
 		}
 	}
 
-	res->opaque_count = (unsigned)(opaque_vertices - res->opaque_vertices.ptr);
-	res->tranparent_count = (unsigned)(tranparent_vertices - res->tranparent_vertices.ptr);
-}
+	void cube_opaque () {
+		for (int i=0; i<6; ++i) {
+			block_id n = chunk_data->id[cur + offsets[i]];
+			if (!bt_is_opaque(n))
+				face(opaque_vertices, (BlockFace)i);
+		}
+	}
+	void cube_transperant () {
+		for (int i=0; i<6; ++i) {
+			block_id n = chunk_data->id[cur + offsets[i]];
+			block_id b = chunk_data->id[cur];
+			if (!bt_is_opaque(n) && n != b)
+				face(tranparent_vertices, (BlockFace)i);
+		}
+	}
+	void block_mesh (BlockMeshInfo info, int3 block_pos_world, uint64_t world_seed) {
+		//OPTICK_EVENT();
 
-// uint8v3	pos_model;
-// uint8v2	uv;
-// uint8	tex_indx;
-// uint8	block_light;
-// uint8	sky_light;
-// uint8	hp;
+		// get a 'random' but deterministic value based on block position
+		uint64_t h = hash(block_pos_world) ^ world_seed;
 
-#define VERT(x,y,z, u,v, face) \
-		{ block_pos + uint8v3(x,y,z), uint8v2(u,v), (uint8)tile.calc_texture_index(face), \
-		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
+		// get a random determinisitc 2d offset
+		float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
 
-#define QUAD(a,b,c,d)	do { \
-			*out++ = a; *out++ = b; *out++ = d; \
-			*out++ = d; *out++ = b; *out++ = c; \
-		} while (0)
-#define QUAD_ALTERNATE(a,b,c,d)	do { \
-			*out++ = b; *out++ = c; *out++ = a; \
-			*out++ = a; *out++ = c; *out++ = d; \
-		} while (0)
+		float2 rand_offs;
+		rand_offs.x = rand_val;
+		rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
 
-#define FACE \
-		if (vert[0].sky_light + vert[2].sky_light < vert[1].sky_light + vert[3].sky_light) \
-			QUAD(vert[0], vert[1], vert[2], vert[3]); \
-		else \
-			QUAD_ALTERNATE(vert[0], vert[1], vert[2], vert[3]);
-//#define FACE QUAD(vert[0], vert[1], vert[2], vert[3]);
+									   // get a random deterministic variant
+		int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
 
-ChunkMesh::Vertex* Chunk_Mesher::face_nx (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(0,1,0, 0,0, BF_NEG_X),
-		VERT(0,0,0, 1,0, BF_NEG_X),
-		VERT(0,0,1, 1,1, BF_NEG_X),
-		VERT(0,1,1, 0,1, BF_NEG_X),
-	};
- 	FACE
-	return out;
-}
-ChunkMesh::Vertex* Chunk_Mesher::face_px (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(1,0,0, 0,0, BF_POS_X),
-		VERT(1,1,0, 1,0, BF_POS_X),
-		VERT(1,1,1, 1,1, BF_POS_X),
-		VERT(1,0,1, 0,1, BF_POS_X),
-	};
-	FACE
-	return out;
-}
-ChunkMesh::Vertex* Chunk_Mesher::face_ny (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(0,0,0, 0,0, BF_NEG_Y),
-		VERT(1,0,0, 1,0, BF_NEG_Y),
-		VERT(1,0,1, 1,1, BF_NEG_Y),
-		VERT(0,0,1, 0,1, BF_NEG_Y),
-	};
-	FACE
-	return out;
-}
-ChunkMesh::Vertex* Chunk_Mesher::face_py (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(1,1,0, 0,0, BF_POS_Y),
-		VERT(0,1,0, 1,0, BF_POS_Y),
-		VERT(0,1,1, 1,1, BF_POS_Y),
-		VERT(1,1,1, 0,1, BF_POS_Y),
-	};
-	FACE
-	return out;
-}
-ChunkMesh::Vertex* Chunk_Mesher::face_nz (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(0,1,0, 0,0, BF_NEG_Z),
-		VERT(1,1,0, 1,0, BF_NEG_Z),
-		VERT(1,0,0, 1,1, BF_NEG_Z),
-		VERT(0,0,0, 0,1, BF_NEG_Z),
-	};
-	FACE
-	return out;
-}
-ChunkMesh::Vertex* Chunk_Mesher::face_pz (ChunkMesh::Vertex* out) {
-	ChunkMesh::Vertex vert[4] = {
-		VERT(0,0,1, 0,0, BF_POS_Z),
-		VERT(1,0,1, 1,0, BF_POS_Z),
-		VERT(1,1,1, 1,1, BF_POS_Z),
-		VERT(0,1,1, 0,1, BF_POS_Z),
-	};
-	FACE
-	return out;
-}
+		for (int i=0; i<info.size; ++i) {
+			auto v = (*block_meshes)[info.offset + i];
 
-void Chunk_Mesher::cube_opaque () {
-	if (!bt_is_opaque((cur -                1)->id)) opaque_vertices = face_nx(opaque_vertices);
-	if (!bt_is_opaque((cur +                1)->id)) opaque_vertices = face_px(opaque_vertices);
-	if (!bt_is_opaque((cur -   CHUNK_ROW_OFFS)->id)) opaque_vertices = face_ny(opaque_vertices);
-	if (!bt_is_opaque((cur +   CHUNK_ROW_OFFS)->id)) opaque_vertices = face_py(opaque_vertices);
-	if (!bt_is_opaque((cur - CHUNK_LAYER_OFFS)->id)) opaque_vertices = face_nz(opaque_vertices);
-	if (!bt_is_opaque((cur + CHUNK_LAYER_OFFS)->id)) opaque_vertices = face_pz(opaque_vertices);
+			auto ptr = opaque_vertices->push();
+
+			ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
+			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
+
+			ptr->tex_indx = tile.base_index + variant;
+			ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
+			ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
+			ptr->hp = chunk_data->hp[cur];
+		}
+	}
+
+	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+		alpha_test = graphics.alpha_test;
+
+		block_meshes = &tile_textures.block_meshes;
+
+		chunk_data = chunk->blocks.get();
+
+		opaque_vertices		= &res->opaque_vertices;
+		tranparent_vertices	= &res->tranparent_vertices;
+
+		opaque_vertices->init();
+		tranparent_vertices->init();
+
+		bpos chunk_pos_world = chunk->chunk_pos_world();
+
+		//auto _a = get_timestamp();
+		//uint64_t sum = 0;
+
+		int3 i = 0;
+		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
+			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
+
+				i.x = 0;
+				cur = ChunkData::pos_to_index(i);
+
+				for (; i.x<CHUNK_DIM; ++i.x) {
+
+					auto id = chunk_data->id[cur];
+
+					if (id != B_AIR) {
+						//auto _b = get_timestamp();
+
+						block_pos = (float3)i;
+
+						tile = tile_textures.block_tile_info[id];
+						auto mesh_info = tile_textures.block_meshes_info[id];
+
+						if (mesh_info.offset < 0) {
+							if (blocks.transparency[id] == TM_TRANSPARENT)
+								cube_transperant();
+							else
+								cube_opaque();
+						} else {
+
+							block_mesh(mesh_info, i + chunk->chunk_pos_world(), wg.seed);
+						}
+
+						//sum += get_timestamp() - _b;
+					}
+
+					cur++;
+				}
+			}
+		}
+
+		//auto total = get_timestamp() - _a;
+
+		//logf("mesh_chunk total: %7.3f vs %7.3f = %7.3f", (float)total, (float)sum, (float)sum / (float)total);
+	}
 };
-void Chunk_Mesher::cube_transperant () {
-	block_id bt;
 
-	bt = (cur -                1)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_nx(tranparent_vertices);
+void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+	OPTICK_EVENT();
 
-	bt = (cur +                1)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_px(tranparent_vertices);
-
-	bt = (cur -   CHUNK_ROW_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_ny(tranparent_vertices);
-
-	bt = (cur +   CHUNK_ROW_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_py(tranparent_vertices);
-
-	bt = (cur - CHUNK_LAYER_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_nz(tranparent_vertices);
-
-	bt = (cur + CHUNK_LAYER_OFFS)->id;
-	if (!bt_is_opaque(bt) && bt != cur->id) tranparent_vertices = face_pz(tranparent_vertices);
-};
+	Chunk_Mesher cm;
+	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
+}

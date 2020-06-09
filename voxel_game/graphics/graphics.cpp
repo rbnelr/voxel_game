@@ -6,6 +6,11 @@
 #include "../voxel_light.hpp"
 using namespace kiss;
 
+#include "assimp/cimport.h"        // Plain-C interface
+#include "assimp/scene.h"          // Output data structure
+#include "assimp/postprocess.h"    // Post processing flags
+#include "assimp/importer.hpp"
+
 #define QUAD(a,b,c,d) b,c,a, a,c,d // facing outward
 #define QUAD_INWARD(a,b,c,d) a,d,b, b,d,c // facing inward
 
@@ -256,7 +261,7 @@ void GuiGraphics::draw_quickbar (Player const& player, TileTextures const& tile_
 	}
 }
 
-void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	sampler.bind(0);
 
@@ -282,7 +287,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item_block && blocks_vertices.size() > 0) {
 		shader_item_block.bind();
 
-		shader.set_texture_unit("tile_textures", 0);
+		shader_item_block.set_texture_unit("tile_textures", 0);
 		
 		blocks_mesh.upload(blocks_vertices);
 		blocks_vertices.clear();
@@ -294,7 +299,7 @@ void GuiGraphics::draw (Player const& player, TileTextures const& tile_textures)
 	if (shader_item && items_vertices.size() > 0) {
 		shader_item.bind();
 
-		shader.set_texture_unit("tile_textures", 0);
+		shader_item.set_texture_unit("tile_textures", 0);
 		
 		items_mesh.upload(items_vertices);
 		items_vertices.clear();
@@ -315,7 +320,7 @@ PlayerGraphics::PlayerGraphics () {
 	}
 }
 
-void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures) {
+void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler) {
 	auto slot = player.inventory.quickbar.get_selected();
 	item_id item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 
@@ -325,6 +330,11 @@ void PlayerGraphics::draw (Player const& player, TileTextures const& tile_textur
 	if (item != I_NULL) {
 		if (shader_item) {
 			shader_item.bind();
+
+			glActiveTexture(GL_TEXTURE0 + 0);
+			shader.set_texture_unit("tile_textures", 0);
+			sampler.bind(0);
+			tile_textures.tile_textures.bind();
 
 			if (item < MAX_BLOCK_ID) {
 				{
@@ -449,7 +459,7 @@ struct TileLoader {
 			size = img.size;
 		} else {
 			if (!equal(size, img.size)) {
-				logf(ERROR, "Texture size does not match textures/null.png, all textures must be of the same size!");
+				clog(ERROR, "Texture size does not match textures/null.png, all textures must be of the same size!");
 				assert(false);
 				return 0;
 			}
@@ -469,6 +479,21 @@ struct TileLoader {
 				c.set(x,y, C);
 			}
 		}
+	}
+	Image<srgba8> extend_image (Image<srgba8> const& c, int2 offset, int2 size) {
+		auto ret = Image<srgba8>(size);
+		
+		for (int y=0; y<size.y; ++y) {
+			for (int x=0; x<size.x; ++x) {
+				int2 src_pos = int2(x,y) - offset;
+				if (all(src_pos >= 0 && src_pos < c.size))
+					ret.set(x, y, c.get(src_pos.x,src_pos.y));
+				else
+					ret.set(x, y, srgba8(0,0,0,0));
+			}
+		}
+
+		return ret;
 	}
 
 	int add_item (item_id id) {
@@ -494,7 +519,7 @@ struct TileLoader {
 		bool has_alpha = Image<uint8>::load_from_file(alpha_filename.c_str(), &alpha);
 
 		if (has_alpha && !equal(color.size, alpha.size)) {
-			logf(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!");
+			clog(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!");
 			assert(false);
 			return {0};
 		}
@@ -507,8 +532,21 @@ struct TileLoader {
 
 		BlockTileInfo info;
 		info.base_index = (int)images.size();
+		info.uv_pos = 0;
+		info.uv_size = 1;
 
-		if (color.size.y == size.x) {
+		if (equal(color.size, size)) {
+
+			add_texture(std::move(color));
+
+		} else if (color.size.x < size.x || color.size.y < size.y) {
+			int2 offset;
+			offset.x = size.x / 2 - color.size.x / 2;
+			offset.y = 0;
+
+			info.uv_pos = (float2)offset / (float2)size;
+			info.uv_size = (float2)color.size / (float2)size;
+			color = extend_image(color, offset, size);
 
 			add_texture(std::move(color));
 
@@ -526,6 +564,12 @@ struct TileLoader {
 			add_texture(get_sub_tile(color, int2(0,1), size));
 			add_texture(get_sub_tile(color, int2(0,2), size));
 			add_texture(get_sub_tile(color, int2(0,0), size));
+
+		} else if (color.size.x > size.x) {
+
+			info.variants = color.size.x / size.x;
+			for (int i=0; i<info.variants; ++i)
+				add_texture(get_sub_tile(color, int2(i,0), size));
 
 		}
 		
@@ -565,17 +609,61 @@ TileTextures::TileTextures () {
 
 		breaking_textures.upload<uint8, false>(imgs);
 	}
+
+	load_block_meshes();
+}
+
+void TileTextures::load_block_meshes () {
+
+	auto* scene = aiImportFile("meshes/meshes.fbx", aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+
+	for (int bid=0; bid<BLOCK_IDS_COUNT; ++bid) {
+		auto name = blocks.name[bid];
+
+		block_meshes_info[bid] = { -1, -1 };
+
+		for (unsigned i=0; i<scene->mNumMeshes; ++i) {
+			auto* mesh = scene->mMeshes[i];
+
+			if (strcmp(mesh->mName.C_Str(), name) == 0) {
+
+				//printf("%s:\n", mesh->mName.C_Str());
+
+				int offset = (int)block_meshes.size();
+				block_meshes.reserve(offset + mesh->mNumFaces * 3);
+
+				for (unsigned j=0; j<mesh->mNumFaces; ++j) {
+					auto& f = mesh->mFaces[j];
+					assert(f.mNumIndices == 3);
+
+					for (unsigned k=0; k<3; ++k) {
+						unsigned index = f.mIndices[k];
+
+						auto pos = mesh->mVertices[index];
+						auto uv = mesh->mTextureCoords[0][index];
+
+						//printf("  %7.3f %7.3f %7.3f     %7.3f %7.3f\n", pos.x, pos.y, pos.z, uv.x, uv.y);
+
+						block_meshes.push_back({ float3(pos.x, pos.y, pos.z), float2(uv.x, uv.y) });
+					}
+				}
+
+				block_meshes_info[bid] = { offset, (int)block_meshes.size() - offset };
+			}
+		}
+	}
+
+	aiReleaseImport(scene);
 }
 
 void ChunkGraphics::imgui (Chunks& chunks) {
-	sampler.imgui("sampler");
 
 	if (ImGui::Checkbox("alpha_test", &alpha_test)) {
 		chunks.remesh_all();
 	}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -613,7 +701,7 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 	}
 }
 
-void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures) {
+void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler) {
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -715,13 +803,13 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	glViewport(0,0, input.window_size.x, input.window_size.y);
-	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glClear(GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures);
+		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
 		skybox.draw();
 	}
@@ -731,7 +819,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Transparent pass
 
 		if (activate_flycam || world.player.third_person)
-			player.draw(world.player, tile_textures);
+			player.draw(world.player, tile_textures, sampler);
 
 		if (selected_block) {
 			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
@@ -740,7 +828,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		//glCullFace(GL_FRONT);
 		//chunk_graphics.draw_chunks_transparent(chunks);
 		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures);
+		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -750,14 +838,14 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// First person overlay pass
 		if (!activate_flycam && !world.player.third_person) 
-			player.draw(world.player, tile_textures);
+			player.draw(world.player, tile_textures, sampler);
 	}
 
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam)
-			gui.draw(world.player, tile_textures);
+			gui.draw(world.player, tile_textures, sampler);
 
 		glEnable(GL_DEPTH_TEST);
 	}

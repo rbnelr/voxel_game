@@ -35,17 +35,17 @@ enum block_id : uint16_t {
 	B_TREE_LOG			,
 	B_LEAVES			,
 	B_TORCH				,
+	B_TALLGRASS			,
 
 	BLOCK_IDS_COUNT		,
 
-	B_OUT_OF_BOUNDS		=BLOCK_IDS_COUNT,
-	B_NO_CHUNK			,
+	B_NO_CHUNK			=BLOCK_IDS_COUNT,
 
 	PSEUDO_BLOCK_IDS_COUNT,
 };
 
-static inline float TOOL_MATCH_BONUS_DAMAGE = 2;
-static inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
+static constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
+static constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
 #define MAX_LIGHT_LEVEL 18
 
 struct BlockTypes {
@@ -62,11 +62,11 @@ struct BlockTypes {
 		return c == CM_SOLID || c == CM_BREAKABLE;
 	}
 	inline bool grass_can_live_below (block_id id) {
-		return id == B_AIR || id == B_OUT_OF_BOUNDS || transparency[id] == TM_PARTIAL;
+		return id == B_AIR || transparency[id] == TM_PARTIAL;
 	}
 };
 
-static inline BlockTypes load_block_types () {
+static BlockTypes load_block_types () {
 	BlockTypes bt;
 	int cur = 0;
 
@@ -95,6 +95,9 @@ static inline BlockTypes load_block_types () {
 	auto torch = [&] (const char* name, uint8 glow_level) {
 		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, glow_level, 0);
 	};
+	auto plant = [&] (const char* name, uint8 absorb_light_level=1) {
+		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, 0, 1);
+	};
 
 	/* B_NULL				*/ solid("null", 1);
 	/* B_AIR				*/ gas();
@@ -103,10 +106,10 @@ static inline BlockTypes load_block_types () {
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
-	/* B_LEAVES				*/ solid_alpha_test("leaves",    4);
-	/* B_TORCH				*/ torch("null", MAX_LIGHT_LEVEL - 1);
+	/* B_LEAVES				*/ solid_alpha_test("leaves",    1, 2);
+	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
+	/* B_TALLGRASS			*/ plant("tallgrass");
 
-	/* B_OUT_OF_BOUNDS		*/ gas();
 	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
 
 	return bt;
@@ -117,11 +120,11 @@ static inline BlockTypes blocks = load_block_types();
 // Block instance
 struct Block {
 	block_id	id;
-	uint8		block_light; // [0,15]
-	uint8		sky_light; // [0,15]
-	uint8		hp;
+	uint8_t		block_light;
+	uint8_t		sky_light;
+	uint8_t		hp;
 
-	Block () {}
+	Block () = default;
 
 	Block (block_id id): id{id} {
 		block_light = blocks.glow[id];
@@ -131,7 +134,6 @@ struct Block {
 };
 
 // global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
-static inline Block _OUT_OF_BOUNDS = B_OUT_OF_BOUNDS;
 static inline Block _NO_CHUNK      = B_NO_CHUNK     ;
 
 enum BlockFace {

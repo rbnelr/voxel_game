@@ -7,12 +7,12 @@ class Sampler {
 	gl::Sampler sampler;
 
 public:
-	gl::Enum mag_filter = gl::Enum::NEAREST;
+	gl::Enum mag_filter = gl::Enum::LINEAR;
 	gl::Enum min_filter = gl::Enum::LINEAR_MIPMAP_LINEAR;
 
-	gl::Enum wrap_x = gl::Enum::REPEAT;
-	gl::Enum wrap_y = gl::Enum::REPEAT;
-	gl::Enum wrap_z = gl::Enum::REPEAT;
+	gl::Enum wrap_x = gl::Enum::CLAMP_TO_EDGE;
+	gl::Enum wrap_y = gl::Enum::CLAMP_TO_EDGE;
+	gl::Enum wrap_z = gl::Enum::CLAMP_TO_EDGE;
 
 	int mipmap_levels = 1000;
 
@@ -44,7 +44,7 @@ public:
 			glSamplerParameterf(sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
 	}
 
-	void bind (int texture_unit) {
+	void bind (int texture_unit) const {
 		glBindSampler(texture_unit, sampler);
 	}
 
@@ -109,18 +109,24 @@ public:
 	}
 };
 
-class Texture2D {
+
+class Texture1D {
 	//std::string name;
 	gl::Texture tex;
 public:
-	int2 size; // size in pixels
+	int size = -1; // size in pixels
 
-	Texture2D ();
+	Texture1D ();
 
-	Texture2D (char const* filename, bool srgb=true, bool gen_mips=true);
+	// Manual uploading of mipmaps might require
+	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
+
+	void upload_mip (int mip, void const* data, int size, GLenum internal_format, GLenum format, GLenum type);
+
+	void upload (void const* data, int size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type);
 
 	template <typename T>
-	inline Texture2D (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
+	inline void upload (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
 		constexpr auto format = get_format<T>();
 
 		if (format.flt) {
@@ -131,12 +137,72 @@ public:
 		}
 	}
 
+	inline void upload (uint8_t const* data, int size, int channels, bool srgb, bool gen_mips) {
+		GLenum internal_format, format;
+		switch (channels) {
+			case 1:	internal_format = GL_R8;								format = GL_RED;	break;
+			case 2:	internal_format = GL_RG8;								format = GL_RG;		break;
+			case 3:	internal_format = srgb ? GL_SRGB8        : GL_RGB8;		format = GL_RGB;	break;
+			case 4:	internal_format = srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8;	format = GL_RGBA;	break;
+			default:
+				assert(false);
+				return;
+		}
+
+		upload(data, size, gen_mips, internal_format, format, GL_UNSIGNED_BYTE);
+	}
+
+	inline void upload (float const* data, int size, int channels, bool gen_mips) {
+		GLenum internal_format, format;
+		switch (channels) {
+			case 1:	internal_format = GL_R32F;		format = GL_RED;	break;
+			case 2:	internal_format = GL_RG32F;		format = GL_RG;		break;
+			case 3:	internal_format = GL_RGB32F;	format = GL_RGB;	break;
+			case 4:	internal_format = GL_RGBA32F;	format = GL_RGBA;	break;
+			default:
+				assert(false);
+				return;
+		}
+
+		upload(data, size, gen_mips, internal_format, format, GL_FLOAT);
+	}
+
+	void bind () const;
+};
+
+class Texture2D {
+	//std::string name;
+	gl::Texture tex;
+public:
+	int2 size = -1; // size in pixels
+
+	Texture2D ();
+
+	Texture2D (char const* filename, bool srgb=true, bool gen_mips=true);
+
+	template <typename T>
+	inline Texture2D (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
+		upload(img, srgb, gen_mips);
+	}
+
 	// Manual uploading of mipmaps might require
 	///////////// glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmaps);
 
 	void upload_mip (int mip, void const* data, int2 size, GLenum internal_format, GLenum format, GLenum type);
 
 	void upload (void const* data, int2 size, bool gen_mips, GLenum internal_format, GLenum format, GLenum type);
+	
+	template <typename T>
+	inline void upload (Image<T> const& img, bool srgb=true, bool gen_mips=true) {
+		constexpr auto format = get_format<T>();
+
+		if (format.flt) {
+			upload((float*)img.data(), img.size, format.channels, gen_mips);
+		} else {
+			assert(format.bits == 8);
+			upload((uint8_t*)img.data(), img.size, format.channels, srgb, gen_mips);
+		}
+	}
 
 	inline void upload (uint8_t const* data, int2 size, int channels, bool srgb, bool gen_mips) {
 		GLenum internal_format, format;
@@ -176,7 +242,7 @@ class Texture3D {
 	//std::string name;
 	gl::Texture tex;
 public:
-	int3 size; // size in pixels
+	int3 size = -1; // size in pixels
 
 	Texture3D ();
 
@@ -224,8 +290,8 @@ class Texture2DArray {
 	gl::Texture tex;
 
 public:
-	int2 size; // size in pixels
-	int count; // number of slots in array
+	int2 size = -1; // size in pixels
+	int count = -1; // number of slots in array
 
 	Texture2DArray ();
 

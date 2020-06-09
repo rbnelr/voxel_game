@@ -123,6 +123,8 @@ unsigned calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_bloc
 	return (unsigned)max((int)l, (int)(neighbour_light - blocks.absorb[new_block.id] - 1));
 }
 void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, unsigned new_light_level) {
+	OPTICK_EVENT();
+
 	if (new_light_level != old_light_level) {
 		dbg_block_light_add_list.clear();
 		dbg_block_light_remove_list.clear();
@@ -137,36 +139,42 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 
 		auto time = timer.end();
 		chunks.block_light_time.push(time);
-		logf("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
+		clog("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
 	}
 }
 
 void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
-	int sky_light = pos_in_chunk.z >= CHUNK_DIM_Z-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
+	//OPTICK_EVENT();
+
+	int sky_light = pos_in_chunk.z >= CHUNK_DIM-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
 	bpos pos = pos_in_chunk;
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		sky_light = max(sky_light - blocks.absorb[b->id], 0);
+		auto indx = ChunkData::pos_to_index(pos);
+		auto* sl = &chunk->blocks->sky_light[ indx ];
+		auto id = chunk->blocks->id[ indx ];
 
-		b->sky_light = sky_light;
+		sky_light = max(sky_light - blocks.absorb[id], 0);
+		*sl = sky_light;
 	}
 
 	for (; pos.z>=0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		
-		if (b->sky_light == 0)
+		auto* sl = &chunk->blocks->sky_light[ ChunkData::pos_to_index(pos) ];
+
+		if (*sl == 0)
 			break;
 
-		b->sky_light = 0;
+		*sl = 0;
 	}
 
 	chunk->needs_remesh = true;
 }
 void update_sky_light_chunk (Chunk* chunk) {
-	for (int y=0; y<CHUNK_DIM_Y; ++y) {
-		for (int x=0; x<CHUNK_DIM_X; ++x) {
-			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM_Z-1));
+	OPTICK_EVENT();
+
+	for (int y=0; y<CHUNK_DIM; ++y) {
+		for (int x=0; x<CHUNK_DIM; ++x) {
+			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM-1));
 		}
 	}
 }

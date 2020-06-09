@@ -29,7 +29,7 @@ namespace kissmath {
 		
 		
 		// uninitialized constructor
-		float2 ();
+		inline float2 () = default;
 
 		// sets all components to one value
 		// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

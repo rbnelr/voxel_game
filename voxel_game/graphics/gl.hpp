@@ -4,6 +4,8 @@
 #include "../glad/glad.h"
 #include <vector>
 #include "assert.h"
+#include "../dear_imgui.hpp"
+#include "optick.hpp"
 
 /////
 // OpenGL abstractions
@@ -29,6 +31,12 @@ namespace gl {
 		SAMPLER_1D			,
 		SAMPLER_2D			,
 		SAMPLER_3D			,
+		ISAMPLER_1D			,
+		ISAMPLER_2D			,
+		ISAMPLER_3D			,
+		USAMPLER_1D			,
+		USAMPLER_2D			,
+		USAMPLER_3D			,
 		SAMPLER_Cube		,
 		SAMPLER_1D_Array	,
 		SAMPLER_2D_Array	,
@@ -115,6 +123,7 @@ namespace gl {
 	public:
 
 		Texture () {
+			OPTICK_EVENT();
 			glGenTextures(1, &tex);
 		}
 		~Texture () {
@@ -277,6 +286,8 @@ public:
 	void add (int location, const char* name, int stride, uintptr_t offset, bool normalized=false) {
 		static constexpr auto a = to_attrib<T>();
 
+		OPTICK_EVENT("glEnableVertexAttribArray & glVertexAttribPointer");
+
 		glEnableVertexAttribArray(location);
 		glVertexAttribPointer(location, a.components, (GLenum)a.type, normalized, (GLsizei)stride, (void*)offset);
 	}
@@ -331,6 +342,8 @@ class Mesh {
 	gl::Vao vao;
 
 	void init_vao () {
+		OPTICK_EVENT();
+
 		glBindVertexArray(vao);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -369,9 +382,29 @@ public:
 	void upload (T const* data, uintptr_t count) {
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
-		// assume GL_STATIC_DRAW
+		//printf(">> %d\n", (int)(count * sizeof(T) / 1024));
+
+	#if 1
 		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), NULL, GL_STATIC_DRAW); // buffer orphan is supposed to be better for streaming
-		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), data, GL_STATIC_DRAW);
+		
+		if (count > 0)
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), data, GL_STATIC_DRAW);
+	#else
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), NULL, GL_STATIC_DRAW);
+
+		if (count > 0) {
+			auto* ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+			if (!ptr) {
+				clog("glMapBuffer failed!\n");
+			} else {
+
+				memcpy(ptr, data, count * sizeof(T));
+
+				glUnmapBuffer(GL_ARRAY_BUFFER);
+			}
+		}
+	#endif
+		
 		vertex_count = count;
 
 		// dont unbind
@@ -379,6 +412,36 @@ public:
 	// Upload new data to Mesh
 	void upload (std::vector<T> const& data) {
 		upload(data.data(), data.size());
+	}
+
+	// use with caution
+	void _alloc (uintptr_t count) {
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(count * sizeof(T)), NULL, GL_STATIC_DRAW);
+	}
+	// use with caution
+	// offset and count in number of elements (not bytes)
+	void _sub_upload (T const* data, uintptr_t offset, uintptr_t count) {
+		if (count > 0)
+			glBufferSubData(GL_ARRAY_BUFFER, (GLintptr)(offset * sizeof(T)), (GLsizeiptr)(count * sizeof(T)), data);
+	}
+	// use with caution
+	T* _mapbuffer_writeonly () {
+		auto* ptr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		if (!ptr) {
+			clog(ERROR, "glMapBuffer failed!\n");
+			return nullptr;
+		}
+		return (T*)ptr;
+	}
+	// use with caution
+	bool _unmapbuffer_writeonly () {
+		if (glUnmapBuffer(GL_ARRAY_BUFFER) == GL_TRUE)
+			return true;
+
+		clog(ERROR, "glUnmapBuffer failed!\n");
+		return false;
 	}
 
 	// Bind to be able to draw

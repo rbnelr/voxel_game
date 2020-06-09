@@ -24,6 +24,15 @@ float point_square_nearest_dist (float2 square_pos, float2 square_size, float2 p
 	return length(nearest_pos_on_square -pos_rel);
 }
 
+float point_box_nearest_dist (float3 box_pos, float3 box_size, float3 point) {
+
+	float3 pos_rel = point - box_pos;
+
+	float3 nearest_pos_on_square = clamp(pos_rel, 0, box_size);
+
+	return length(nearest_pos_on_square - pos_rel);
+}
+
 // aabb gets culled when is lies completely on +normal dir side of palne
 // returns true when culled
 bool plane_cull_aabb (Plane const& plane, AABB aabb) {

@@ -3,6 +3,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <algorithm>
+#include "optick.hpp"
 
 // based on https://stackoverflow.com/questions/15278343/c11-thread-safe-queue
 
@@ -22,6 +23,8 @@ public:
 	// simply push one element onto the queue
 	// can be called from multiple threads (multiple producer)
 	void push (T elem) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::push");
+
 		std::lock_guard<std::mutex> lock(m);
 		q.emplace_back( std::move(elem) );
 		c.notify_one();
@@ -30,6 +33,8 @@ public:
 	// wait to dequeue one element from the queue
 	// can be called from multiple threads (multiple consumer)
 	T pop () {
+		OPTICK_EVENT("mutex ThreadsafeQueue::pop");
+
 		std::unique_lock<std::mutex> lock(m);
 
 		while(q.empty()) {
@@ -45,6 +50,8 @@ public:
 	// returns if element was popped or shutdown was set as enum
 	// can be called from multiple threads (multiple consumer)
 	enum { POP, SHUTDOWN } pop_or_shutdown (T* out) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::pop_or_shutdown");
+
 		std::unique_lock<std::mutex> lock(m);
 
 		while(!shutdown_flag && q.empty()) {
@@ -61,6 +68,8 @@ public:
 	// deque one element from the queue if there is one
 	// can be called from multiple threads (multiple consumer)
 	bool try_pop (T* out) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::try_pop");
+
 		std::lock_guard<std::mutex> lock(m);
 
 		if (q.empty())
@@ -76,6 +85,8 @@ public:
 	// can be called from multiple threads (multiple consumer)
 	// (pushed on the back of results)
 	bool pop_all (std::vector<T>* results) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::pop_all");
+
 		std::lock_guard<std::mutex> lock(m);
 
 		if (q.empty())
@@ -97,6 +108,8 @@ public:
 
 	// set shutdown which all consumers can recieve via pop_or_shutdown
 	void shutdown () {
+		OPTICK_EVENT("mutex ThreadsafeQueue::shutdown");
+
 		std::lock_guard<std::mutex> lock(m);
 		shutdown_flag = true;
 		c.notify_all();
@@ -106,6 +119,8 @@ public:
 	// elements are allowed to be changed
 	template <typename FOREACH>
 	void iterate_queue (FOREACH callback) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::iterate_queue");
+
 		std::lock_guard<std::mutex> lock(m);
 
 		for (auto it=q.begin(); it!=q.end(); ++it) {
@@ -117,6 +132,8 @@ public:
 	// elements are allowed to be changed
 	template <typename FOREACH>
 	void iterate_queue_newest_first (FOREACH callback) { // front == next to be popped, back == most recently pushed
+		OPTICK_EVENT("mutex ThreadsafeQueue::iterate_queue_newest_first");
+		
 		std::lock_guard<std::mutex> lock(m);
 
 		for (auto it=q.rbegin(); it!=q.rend(); ++it) {
@@ -128,6 +145,8 @@ public:
 	// useful to be able to cancel queued jobs in a threadpool
 	template <typename NEED_TO_CANCEL>
 	void remove_if (NEED_TO_CANCEL need_to_cancel) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::remove_if");
+		
 		std::lock_guard<std::mutex> lock(m);
 
 		for (auto it=q.begin(); it!=q.end();) {
@@ -140,6 +159,8 @@ public:
 	}
 
 	void clear () {
+		OPTICK_EVENT("mutex ThreadsafeQueue::clear");
+
 		std::lock_guard<std::mutex> lock(m);
 
 		q.clear();
@@ -147,6 +168,8 @@ public:
 
 	template <typename COMPARATOR>
 	void sort (COMPARATOR cmp) {
+		OPTICK_EVENT("mutex ThreadsafeQueue::sort");
+		
 		std::lock_guard<std::mutex> lock(m);
 
 		std::sort(q.begin(), q.end(), cmp);
