@@ -107,7 +107,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -157,7 +157,7 @@
       <SDLCheck>false</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -194,6 +194,7 @@
     <ClInclude Include="graphics\atlas.hpp" />
     <ClInclude Include="graphics\graphics_common.hpp" />
     <ClInclude Include="items.hpp" />
+    <ClInclude Include="optick.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
     <ClInclude Include="time_of_day.hpp" />

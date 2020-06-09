@@ -243,6 +243,7 @@
     <ClInclude Include="util\block_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="optick.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

@@ -5,6 +5,7 @@
 #include <vector>
 #include "assert.h"
 #include "../dear_imgui.hpp"
+#include "optick.hpp"
 
 /////
 // OpenGL abstractions
@@ -122,6 +123,7 @@ namespace gl {
 	public:
 
 		Texture () {
+			OPTICK_EVENT();
 			glGenTextures(1, &tex);
 		}
 		~Texture () {
@@ -284,6 +286,8 @@ public:
 	void add (int location, const char* name, int stride, uintptr_t offset, bool normalized=false) {
 		static constexpr auto a = to_attrib<T>();
 
+		OPTICK_EVENT("glEnableVertexAttribArray & glVertexAttribPointer");
+
 		glEnableVertexAttribArray(location);
 		glVertexAttribPointer(location, a.components, (GLenum)a.type, normalized, (GLsizei)stride, (void*)offset);
 	}
@@ -338,6 +342,8 @@ class Mesh {
 	gl::Vao vao;
 
 	void init_vao () {
+		OPTICK_EVENT();
+
 		glBindVertexArray(vao);
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);

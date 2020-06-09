@@ -1,7 +1,7 @@
 #pragma once
 #include "stdlib.h"
 #include "assert.h"
-#include "optick.h"
+#include "optick.hpp"
 
 namespace {
 	size_t _min (size_t a, size_t b) {

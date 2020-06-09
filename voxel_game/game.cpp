@@ -2,7 +2,7 @@
 #include "game.hpp"
 #include "graphics/gl.hpp"
 #include "util/threadpool.hpp"
-#include "optick.h"
+#include "optick.hpp"
 
 //
 bool FileExists (const char* path) {
@@ -17,8 +17,8 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
-	set_process_high_priority();
-	set_thread_high_priority();
+	set_process_priority();
+	set_thread_priority(Priorities::HIGH);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
 }

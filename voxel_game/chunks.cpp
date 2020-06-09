@@ -1,4 +1,4 @@
-#include "chunks.hpp"
+﻿#include "chunks.hpp"
 #include "chunk_mesher.hpp"
 #include "player.hpp"
 #include "world.hpp"
@@ -10,11 +10,25 @@
 
 const int logical_cores = std::thread::hardware_concurrency();
 
-// as many background threads as there are logical cores to allow background threads to use even the main threats time when we are gpu bottlenecked or at an fps cap
-const int background_threads  = max(logical_cores, 1);
+// NOPE: a̶s̶ ̶m̶a̶n̶y̶ ̶b̶a̶c̶k̶g̶r̶o̶u̶n̶d̶ ̶t̶h̶r̶e̶a̶d̶s̶ ̶a̶s̶ ̶t̶h̶e̶r̶e̶ ̶a̶r̶e̶ ̶l̶o̶g̶i̶c̶a̶l̶ ̶c̶o̶r̶e̶s̶ ̶t̶o̶ ̶a̶l̶l̶o̶w̶ ̶b̶a̶c̶k̶g̶r̶o̶u̶n̶d̶ ̶t̶h̶r̶e̶a̶d̶s̶ ̶t̶o̶ ̶u̶s̶e̶ ̶e̶v̶e̶n̶ ̶t̶h̶e̶ ̶m̶a̶i̶n̶ ̶t̶h̶r̶e̶a̶d̶'̶s̶ ̶t̶i̶m̶e̶ ̶w̶h̶e̶n̶ ̶w̶e̶ ̶a̶r̶e̶ ̶g̶p̶u̶ ̶b̶o̶t̶t̶l̶e̶n̶e̶c̶k̶e̶d̶ ̶o̶r̶ ̶a̶t̶ ̶a̶n̶ ̶f̶p̶s̶ ̶c̶a̶p̶
+// A threadpool for async background work tasks
+// keep a reasonable amount of cores free from background work because lower thread priority is not enough to ensure that these threads get preempted when high prio threads need to run
+// this is because of limited frequency of the scheduling interrupt 'timer resolution' on windows at least
+// the main thread should be able to run after waiting and there need to be enough additional cores free for the os tasks, else mainthread often gets preemted for ver long (1ms - 10+ ms) causing serious lag
+// cores:  1 -> threads: 1
+// cores:  2 -> threads: 1
+// cores:  4 -> threads: 2
+// cores:  6 -> threads: 4
+// cores:  8 -> threads: 5
+// cores: 12 -> threads: 9
+// cores: 16 -> threads: 12
+// cores: 24 -> threads: 18
+// cores: 32 -> threads: 25
+const int background_threads  = clamp(roundi((float)logical_cores * 0.80f) - 1, 1, logical_cores);
 
-// main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
-const int parallelism_threads = max(logical_cores >= 4 ? logical_cores - 1 : logical_cores, 1); // leave one thread for system and background apps, but not on dual core systems
+// main thread + parallelism_threads = logical cores -1 to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
+// leave one thread for system and background apps
+const int parallelism_threads = clamp(logical_cores - 1, 1, logical_cores);
 
 static constexpr bool NORMAL_PRIO = false;
 static constexpr bool HIGH_PRIO = true;
@@ -23,6 +37,11 @@ Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMA
 Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads - 1, HIGH_PRIO,   ">> parallelism threadpool" }; // parallelism_threads - 1 to let main thread contribute work too
 
 BlockAllocator<MeshingBlock> meshing_allocator;
+
+void shutdown_threadpools () {
+	background_threadpool.shutdown();
+	parallelism_threadpool.shutdown();
+}
 
 //// Chunk
 
@@ -234,7 +253,22 @@ ParallelismJob ParallelismJob::execute () {
 
 Chunk* ChunkHashmap::alloc_chunk (chunk_coord coord) {
 	OPTICK_EVENT();
-	return hashmap.emplace(chunk_coord_hashmap{ coord }, std::make_unique<Chunk>(coord)).first->second.get();
+
+	std::unique_ptr<Chunk> ptr;
+	Chunk* raw_ptr;
+
+	{
+		OPTICK_EVENT("make_unique<Chunk>");
+		ptr = std::make_unique<Chunk>(coord);
+		raw_ptr = ptr.get();
+	}
+
+	{
+		OPTICK_EVENT("chunk hashmap.emplace");
+		hashmap.emplace(chunk_coord_hashmap{ coord }, std::move(ptr));
+	}
+
+	return raw_ptr;
 }
 Chunk* ChunkHashmap::_lookup_chunk (chunk_coord coord) {
 	auto kv = hashmap.find(chunk_coord_hashmap{ coord });

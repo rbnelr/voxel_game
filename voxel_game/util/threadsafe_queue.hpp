@@ -3,7 +3,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <algorithm>
-#include "optick.h"
+#include "optick.hpp"
 
 // based on https://stackoverflow.com/questions/15278343/c11-thread-safe-queue
 

@@ -5,7 +5,7 @@
 #include "kissmath_colors.hpp"
 using namespace kissmath;
 
-#include "optick.h"
+#include "optick.hpp"
 
 void DearImgui::init () {
 	// Setup Dear ImGui context

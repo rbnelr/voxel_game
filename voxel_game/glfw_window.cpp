@@ -13,7 +13,7 @@ using namespace kissmath;
 #include "dear_imgui.hpp"
 using namespace kiss;
 
-#include "optick.h"
+#include "optick.hpp"
 
 #include <memory>
 #include "stdio.h"
@@ -213,6 +213,8 @@ void glfw_gameloop () {
 
 		frame_counter++;
 	}
+
+	game = nullptr;
 
 	imgui.destroy();
 

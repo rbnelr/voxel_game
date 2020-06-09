@@ -2,18 +2,23 @@
 #include <thread>
 #include "threadsafe_queue.hpp"
 #include "string.hpp"
-#include "optick.h"
+#include "optick.hpp"
 
 // std::thread::hardware_concurrency() gets the number of cpu threads
 
-// Is is probaby reasonable to set a game process priority to high, so that background apps don't interfere with the games performance too much,
+// Is is probaby reasonable to set a game process priority to above_normal, so that background apps don't interfere with the games performance too much,
 // As long as we don't use 100% of the cpu the background apps should run fine, and we might have less random framedrops from being preempted
-void set_process_high_priority ();
+void set_process_priority ();
+
+enum class Priorities {
+	LOW,
+	HIGH,
+};
 
 // used to set priority of gameloop thread to be higher than normal threads to hopefully avoid cpu spiked which cause framedrops and so that background worker threads are sheduled like they should be
 // also used in threadpool threads when 'high_prio' is true to allow non-background 'parallellism', ie. starting work that needs to be done this frame and having the render thread and the threadpool work on it at the same time
 //  preempting the background threadpool and hopefully being done in time
-void set_thread_high_priority ();
+void set_thread_priority (Priorities prio);
 
 // Set a desired cpu core for the current thread to run on
 void set_thread_preferred_core (int core_index);
@@ -30,11 +35,11 @@ template <typename Job>
 class Threadpool {
 	std::vector< std::thread >	threads;
 
-	void thread_main (std::string thread_name, bool high_prio, int preferred_core) { // thread_name mainly for debugging
+	void thread_main (std::string thread_name, Priorities prio, int preferred_core) { // thread_name mainly for debugging
 		OPTICK_THREAD(thread_name.c_str()); // save since, OPTICK_THREAD copies the thread name
 
-		if (high_prio)
-			set_thread_high_priority();
+		set_thread_priority(prio);
+
 		set_thread_preferred_core(preferred_core);
 		set_thread_description(thread_name);
 
@@ -70,7 +75,8 @@ public:
 		int cpu_core = high_prio ? 1 : 0;
 
 		for (int i=0; i<thread_count; ++i) {
-			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), high_prio, cpu_core++);
+			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i),
+				high_prio ? Priorities::HIGH : Priorities::LOW, cpu_core++);
 		}
 	}
 
@@ -104,11 +110,19 @@ public:
 	Threadpool& operator= (Threadpool const& other) = delete;
 	Threadpool& operator= (Threadpool&& other) = delete;
 
-	~Threadpool () {
-		jobs.shutdown(); // set shutdown to all threads
+	// optional manual shutdown
+	void shutdown () {
+		if (!threads.empty())
+			jobs.shutdown(); // set shutdown to all threads
 
 		for (auto& t : threads)
 			t.join(); // wait for all threads to exit thread_main
+
+		threads.clear();
+	}
+
+	~Threadpool () {
+		shutdown();
 	}
 
 	int thread_count () {

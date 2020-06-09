@@ -10,6 +10,8 @@
 #include "graphics/graphics.hpp" // for ChunkMesh
 using namespace kiss;
 
+void shutdown_threadpools ();
+
 #include "stdint.h"
 #include <unordered_map>
 
