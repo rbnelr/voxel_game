@@ -97,6 +97,10 @@ void Game::frame () {
 				if (input.buttons[GLFW_KEY_P].went_down)
 					activate_flycam = !activate_flycam;
 
+				if (open) ImGui::Checkbox("Toggle Creative Mode [C]", &creative_mode);
+				if (input.buttons[GLFW_KEY_C].went_down)
+					creative_mode = !creative_mode;
+
 				if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
 				if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
 					world->player.respawn();
@@ -121,7 +125,7 @@ void Game::frame () {
 		physics.update_player(*world, world->player);
 
 		SelectedBlock selected_block;
-		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, &selected_block);
+		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, creative_mode, &selected_block);
 
 		if (selected_block)
 			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block.id]);

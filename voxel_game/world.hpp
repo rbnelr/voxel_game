@@ -32,6 +32,6 @@ public:
 
 	SelectedBlock raycast_breakable_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);
 
-	void apply_damage (SelectedBlock const& block, Item& item);
+	void apply_damage (SelectedBlock const& block, Item& item, bool creative_mode);
 	bool try_place_block (bpos pos, block_id id);
 };

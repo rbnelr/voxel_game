@@ -59,6 +59,41 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos
 
 static_assert(CHUNK_BLOCK_COUNT == (1 << 15), "");
 
+/*
+	
+n = 8
+
+def bit_reverse(i):
+	#i = ((i & 0x00ff) << 8) | ((i & 0xff00) >> 8)
+	i = ((i & 0x0f0f) << 4) | ((i & 0xf0f0) >> 4)
+	i = ((i & 0x3333) << 2) | ((i & 0xcccc) >> 2)
+	i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1)
+	i = i >> 2
+	return i
+	
+def bit_interleave(a, b):
+    a = (a | (a << 8)) & 0x00FF00FF;
+    a = (a | (a << 4)) & 0x0F0F0F0F;
+    a = (a | (a << 2)) & 0x33333333;
+    a = (a | (a << 1)) & 0x55555555;
+    
+    b = (b | (b << 8)) & 0x00FF00FF;
+    b = (b | (b << 4)) & 0x0F0F0F0F;
+    b = (b | (b << 2)) & 0x33333333;
+    b = (b | (b << 1)) & 0x55555555;
+    
+    return a | (b << 1)
+	
+for y in range(n):
+    for x in range(n):
+        val = bit_reverse(bit_interleave(x ^ y, y))
+        #val = val ^ 0b10110111
+        #val = val / 256
+        print('{0:7.3f}, '.format(val), end='')
+    print("")
+
+*/
+
 uint16_t block_pattern (uint16_t i) {
 	// reverse bits to turn normal x y z block iteration into a somewhat distributed pattern
 	;

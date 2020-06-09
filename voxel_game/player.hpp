@@ -44,7 +44,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
+	void update (World& world, Player& player, bool creative_mode, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
 };
 
 struct InventorySlot {
@@ -206,7 +206,7 @@ public:
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* highlighted_block);
+	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, bool active, bool creative_mode, SelectedBlock* highlighted_block);
 
 	void respawn () {
 		pos = player_spawn_point;
