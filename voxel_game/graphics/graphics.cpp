@@ -203,8 +203,8 @@ void GuiGraphics::draw_item_tile (item_id id, float2 pos_px, float2 size_px, Til
 }
 
 void GuiGraphics::draw_crosshair () {
-	float2 size = (float2)crosshair.size_px * gui_scale * crosshair_scale;
-	float2 pos = (float2)(input.window_size / 2) - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
+	float2 size = (float2)crosshair.size_px * crosshair_scale;
+	float2 pos = (float2)(input.window_size / gui_scale / 2) - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
 
 	draw_texture(crosshair, pos, size);
 }
