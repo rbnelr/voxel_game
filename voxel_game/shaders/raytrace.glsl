@@ -1,4 +1,4 @@
-﻿#version 330 core
+#version 330 core
 
 $include "common.glsl"
 $include "fog.glsl"
@@ -26,7 +26,6 @@ $if fragment
 	uniform	sampler2DArray tile_textures;
 
 	uniform float slider;
-	uniform float octree_slider;
 	uniform vec2 min_chunk;
 	uniform vec2 chunks_lut_size;
 	uniform float voxels_chunks_count;
@@ -34,11 +33,11 @@ $if fragment
 	uniform float iterations_visualize_max;
 	uniform bool iterations_visualize;
 
-	const float INF = 3.4028235e38 + 1.0; // infinity, my laptop shader compiler did not like 1.0 / 0.0
+	const float inf = 3.4028235e38 + 1.0; // infinity, my laptop shader compiler did not like 1.0 / 0.0
 
 	vec4 hit_col = vec4(0.0, 0.0, 0.0, 0.0);
-	vec4 hit_pos_cam = vec4(0.0, 0.0, -INF, 1.0);
-	float hit_dist = INF;
+	vec4 hit_pos_cam = vec4(0.0, 0.0, -inf, 1.0);
+	float hit_dist = inf;
 
 	float iterations = 0;
 
@@ -46,33 +45,7 @@ $if fragment
 		return x / abs(x);
 	}
 
-	bvec3 threeway_min_mask (vec3 v) {
-		return lessThanEqual(v.xyz, min(v.yzx, v.zxy));
-	}
-	bvec3 threeway_max_mask (vec3 v) {
-		return greaterThanEqual(v.xyz, max(v.yzx, v.zxy));
-	}
-	int max_component_index (vec3 v) {
-		if (v.x >= v.y) {
-			if (v.x >= v.z) return 0;
-			else           return 2;
-		} else {
-			if (v.y >= v.z) return 1;
-			else           return 2;
-		}
-	}
-	int min_component_index (vec3 v) {
-		if (v.x <= v.y) {
-			if (v.x <= v.z) return 0;
-			else           return 2;
-		} else {
-			if (v.y <= v.z) return 1;
-			else           return 2;
-		}
-	}
-
-	//////
-	bool uniform_hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, vec3 step_delta, vec3 step_dist, bvec3 mask) {
+	bool hit_block (vec3 voxel_pos, vec3 ray_pos, vec3 ray_dir, vec3 next, vec3 step_delta, vec3 step_dist, bvec3 mask) {
 		
 		if (voxel_pos.z <= 0 || voxel_pos.z >= CHUNK_DIM)
 			return false;
@@ -130,7 +103,7 @@ $if fragment
 		return true;
 	}
 
-	bool uniform_raycast (vec3 pos, vec3 dir, float max_dist) {
+	bool raycast (vec3 pos, vec3 dir, float max_dist) {
 		// get direction of each axis of ray_dir (-1, 0, +1)
 		vec3 step_delta = vec3(	scalar_normalize(dir.x),
 								scalar_normalize(dir.y),
@@ -153,11 +126,11 @@ $if fragment
 		vec3 next = step_dist * mix(pos_in_block, 1 - pos_in_block, step(vec3(0.0), dir));
 
 		// NaN -> Inf
-		next = mix(next, vec3(INF), equal(dir, vec3(0.0)));
+		next = mix(next, vec3(inf), equal(dir, vec3(0.0)));
 
 		bvec3 mask = lessThanEqual(next.xyz, min(next.yzx, next.zxy));
 
-		if (uniform_hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
+		if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
 			return true;
 
 		while (any(lessThanEqual(next, vec3(max_dist)))) {
@@ -169,149 +142,13 @@ $if fragment
 			next      += vec3(mask) * step_dist;
 			cur_voxel += vec3(mask) * step_delta;
 
-			if (uniform_hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
+			if (hit_block(cur_voxel, pos, dir, next, step_delta, step_dist, mask))
 				return true;
 		}
 
 		return false; // stop stepping because max_dist is reached
 	}
 
-	/////
-	int chunk_index;
-
-	// An Efficient Parametric Algorithm for Octree Traversal
-	// J. Revelles, C.Ure ̃na, M.Lastra
-	// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
-	vec3 ray_pos;
-	vec3 ray_dir;
-
-	bool eval_octree_cell (int level, ivec3 voxel_pos, vec3 min, vec3 mid, vec3 max, vec3 t0, vec3 t1, out bool stop_traversal) {
-		int voxel_count = CHUNK_DIM >> level;
-		int voxel_size = 1 << level;
-
-		voxel_pos.z += chunk_index * CHUNK_DIM;
-
-		float id = round(texelFetch(voxels_tex, voxel_pos, level).r * 255);
-			
-		stop_traversal = id != 1;
-		return id == 0; // true == need to drill further down into octree
-	}
-
-	int mirror_mask_int;
-	bvec3 mirror_mask;
-	
-	void traverse_octree (int level, ivec3 voxel_pos, vec3 _min, vec3 _mid, vec3 _max, vec3 ray_pos, vec3 ray_dir) {
-		mirror_mask_int = 0;
-		mirror_mask = bvec3(false, false, false);
-
-		for (int i=0; i<3; ++i) {
-			if (ray_dir[i] < 0) {
-				ray_pos[i] = _mid[i] * 2 - ray_pos[i];
-				ray_dir[i] = -ray_dir[i];
-				mirror_mask_int |= 1 << i;
-				mirror_mask[i] = true;
-			}
-		}
-
-		vec3 rdir_inv = 1.0f / ray_dir;
-
-		vec3 t0 = (_min - ray_pos) * rdir_inv;
-		vec3 t1 = (_max - ray_pos) * rdir_inv;
-
-		if (max(max(t0.x, t0.y), t0.z) < min(min(t1.x, t1.y), t1.z))
-			traverse_subtree(level, voxel_pos, _min, _mid, _max, t0, t1);
-	}
-
-	const int[] lut_a = new int[] ( 1, 0, 0 );
-	const int[] lut_b = new int[] ( 2, 2, 1 );
-
-	const ivec3[] child_offset_lut = new ivec3[8] (
-		int3(0,0,0),
-		int3(1,0,0),
-		int3(0,1,0),
-		int3(1,1,0),
-		int3(0,0,1),
-		int3(1,0,1),
-		int3(0,1,1),
-		int3(1,1,1)
-	);
-	const int[] node_seq_lut = new int[8*3] (
-		1, 2, 4, // 001 010 100
-		8, 3, 5, //   - 011 101
-		3, 8, 6, // 011   - 110
-		8, 8, 7, //   -   - 111
-		5, 6, 8, // 101 110   -
-		8, 7, 8, //   - 111   -
-		7, 8, 8, // 111   -   -
-		8, 8, 8  //   -   -   -
-	);
-
-	int first_node (vec3 t0, vec3 tm) {
-		int max_comp = max_component_index(t0);
-
-		int a = lut_a[max_comp];
-		int b = lut_b[max_comp];
-
-		float cond = t0[max_comp];
-
-		int ret = 0;
-		ret |= (tm[a] < cond) ? (1 << a) : 0;
-		ret |= (tm[b] < cond) ? (1 << b) : 0;
-		return ret;
-	}
-	int next_node (float3 t1, int child_indx) {
-		int min_comp = min_component_index(t1);
-
-		return indices[child_indx * 3 + min_comp];
-	}
-
-	bool traverse_subtree (int level, ivec3 voxel_pos, vec3 min, vec3 mid, vec3 max, vec3 t0, vec3 t1) {
-
-		if (any(less(t1, vec3(0.0))))
-			return false;
-
-		bool stop;
-		bool decend = eval_octree_cell(level, voxel_pos, _min, _mid, _max, t0, t1, stop);
-		if (decend) {
-			vec3 infs = mix(float3(-INF), float3(+INF), less(ray_pos, _mid));
-			vec3 tm = mix(0.5f * (t0 + t1), infs, equal(ray_dir, vec3(0)));
-
-			int cur_node = first_node(t0, tm);
-
-			do {
-				bvec3 mask = bvec3(cur_node & 1, (cur_node >> 1) & 1, (cur_node >> 2) & 1);
-				bvec3 c_mask = mask ^ mirror_mask;
-
-				ivec3 c_pos = voxel_pos * 2 + child_offset_lut[cur_node ^ mirror_mask_int];
-				vec3 c_min = mix(_min, _mid, c_mask);
-				vec3 c_max = mix(_mid, _max, c_mask);
-				vec3 c_mid = 0.5f * (c_max + c_min);
-
-				vec3 tmt1 = mix(tm, t1, mask);
-
-				stop = traverse_subtree(level - 1, c_pos, c_min, c_mid, c_max, mix(t0, tm, mask), tmt1);
-				if (stop)
-					return true;
-
-				cur_node = next_node(tmt1, node_seq_lut[cur_node]);
-			} while (cur_node < 8);
-		}
-
-		return stop;
-	}
-
-	bool octree_raycast (vec3 ray_pos, vec3 ray_dir) {
-		ivec2 chunk_pos = ivec2(floor(ray_pos.xy / CHUNK_DIM));
-		vec3 min = vec3(chunk_pos * CHUNK_DIM, 0);
-		vec3 max = min + CHUNK_DIM;
-		vec3 min = 0.5f * (max + min);
-
-		chunk_index = 0;
-
-		traverse_octree(7, ivec3(chunk_pos, 0), min, mid, max, ray_pos, ray_dir);
-	}
-
-	/////
 	void main () {
 		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
 		if (ndc.x > (slider * 2 - 1))
@@ -327,10 +164,7 @@ $if fragment
 		vec3 ray_pos_world = ( cam_to_world * vec4(pos_cam, 1) ).xyz;
 		vec3 ray_dir_world = ( cam_to_world * vec4(dir_cam, 0) ).xyz;
 
-		if (ndc.x > (octree_slider * 2 - 1))
-			uniform_raycast(ray_pos_world, ray_dir_world, view_dist);
-		else
-			octree_raycast(ray_pos_world, ray_dir_world);
+		raycast(ray_pos_world, ray_dir_world, view_dist);
 
 		if (iterations_visualize)
 			DEBUG(vec3(iterations / iterations_visualize_max, 0, 0));
