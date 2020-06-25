@@ -72,7 +72,6 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 	pos = (float3)chunk->chunk_pos_world();
 }
 
-#if SPARSE_OCTREE
 // build sparse octree depth-first
 int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 	int voxel_count = CHUNK_DIM_X >> level;
@@ -95,7 +94,6 @@ int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 
 	return idx;
 }
-#endif
 
 Octree build_octree (Chunk* chunk) {
 	static_assert(CHUNK_DIM_X == CHUNK_DIM_Y && CHUNK_DIM_X == CHUNK_DIM_Z);
@@ -104,17 +102,12 @@ Octree build_octree (Chunk* chunk) {
 
 	o.build_non_sparse_octree(chunk);
 
-#if SPARSE_OCTREE
 	o.nodes.emplace_back(); // push root
 	o.root = 0;
 	recurse_build_sparse_octree(0, (int)o.levels.size() - 1, 0, &o);
 
 	o.node_count = (int)o.nodes.size();
 	o.total_size = o.node_count * o.node_size;
-#else
-	o.node_count = (int)(o.levels.size() * CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z);
-	o.total_size = o.node_count * o.node_size;
-#endif
 	return o;
 }
 
@@ -174,11 +167,7 @@ struct ParametricOctreeTraverser {
 	Ray ray;
 
 	struct OctreeNode {
-	#if SPARSE_OCTREE
 		int oct_idx; // in sparse octree nodes
-	#else
-		int3 pos; // 3d index (scaled to octree level cell size so that one increment is always as step to the next cell on that level)
-	#endif
 		int level;
 		float3 min;
 		float3 mid;
@@ -187,11 +176,7 @@ struct ParametricOctreeTraverser {
 		OctreeNode get_child (int index, bool3 mask, Octree& octree) {
 			OctreeNode ret;
 
-		#if SPARSE_OCTREE
 			ret.oct_idx = octree.nodes[oct_idx].children_indx() + index;
-		#else
-			ret.pos = pos * 2 + child_offset_lut[index];
-		#endif
 			ret.level = level - 1;
 			ret.min = select(mask, mid, min);
 			ret.max = select(mask, max, mid);
@@ -307,11 +292,7 @@ struct ParametricOctreeTraverser {
 			if (octree.nodes[node.oct_idx].has_children())
 				return true; // need to decend further down into octree to find actual voxels
 
-		#if SPARSE_OCTREE
 			auto b = octree.nodes[node.oct_idx].bid;
-		#else
-			auto b = octree.levels[node.level][node.pos.z * voxel_count*voxel_count + node.pos.y * voxel_count + node.pos.x];
-		#endif
 
 			bool stop = b != B_AIR;
 			if (stop) {
@@ -327,24 +308,241 @@ struct ParametricOctreeTraverser {
 	}
 };
 
-RaytraceHit Octree::raycast (Ray ray, int* iterations) {
+struct EfficentSVORaytracer {
+	// https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
-	ParametricOctreeTraverser::OctreeNode o;
-#if SPARSE_OCTREE
-	o.oct_idx = root;
-#else
-	o.pos = 0;
-#endif
-	o.level = (int)levels.size() - 1;
-	o.min = pos;
-	o.max = pos + (float3)(float)(1 << o.level);
-	o.mid = 0.5f * (o.min + o.max);
+	Octree& octree;
 
-	ParametricOctreeTraverser t = { *this };
-	t.traverse_octree(o, ray);
+	RaytraceHit hit;
+	int iterations = 0;
 
-	if (iterations) *iterations = t.iterations;
-	return t.hit;
+	Ray ray;
+	float3 rinv_dir;
+
+	int mirror_mask_int = 0;
+	bool3 mirror_mask = false;
+
+	float3 intersect_ray (float3 planes) {
+		return rinv_dir * (planes - ray.pos);
+	}
+	void intersect_ray (int3 cube_pos, int cube_scale, float* t0, float* t1, bool3* exit_faces) {
+		float3 cube_min = (float3)cube_pos;
+		float3 cube_max = (float3)(cube_pos + (1 << cube_scale));
+
+		float3 t0v = rinv_dir * (cube_min - ray.pos);
+		float3 t1v = rinv_dir * (cube_max - ray.pos);
+
+		*t0 = max_component( t0v );
+		*t1 = min_component( t1v );
+
+		*exit_faces = *t1 == t1v;
+	}
+
+	struct NodeCoord {
+		int3 pos; // absolute pos code
+		int scale; // inverse depth
+	};
+
+	NodeCoord select_child (float t0, NodeCoord parent) {
+		NodeCoord child;
+		child.scale = parent.scale - 1;
+
+		float3 parent_mid = (float3)(parent.pos + (1 << child.scale));
+		
+		float3 tmid = intersect_ray(parent_mid);
+
+		bool3 comp = t0 >= tmid;
+		int3 bits = (int3)comp;
+
+		child.pos.x = parent.pos.x | (bits.x << child.scale);
+		child.pos.y = parent.pos.y | (bits.y << child.scale);
+		child.pos.z = parent.pos.z | (bits.z << child.scale);
+
+		return child;
+	}
+
+	int highest_differing_bit (int a, int b) {
+		unsigned long diff = (unsigned long)(a ^ b); // bita != bitb => diffbit
+
+		unsigned long bit_index = -1;
+		_BitScanReverse(&bit_index, diff);
+		return bit_index;
+	}
+	int highest_differing_bit (int3 a, int3 b) {
+		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
+	}
+
+	RaytraceHit raytrace (Ray ray, float max_dist, bool debug) {
+
+		if (debug) {
+			if (input.buttons['B'].went_down)
+				__debugbreak();
+			else
+				return { true, 0 };
+		}
+
+		float3 root_min = octree.pos;
+		float3 root_max = octree.pos + (float3)CHUNK_DIM_X;
+		float3 root_mid = 0.5f * (root_min + root_max);
+
+		static constexpr int MAX_SCALE = CHUNK_DIM_SHIFT_X; // 64: 6
+
+		NodeCoord parent_coord = { 0, MAX_SCALE }; // 64: 6
+		
+		// mirror coord system to make all ray dir components positive, like in "An Efficient Parametric Algorithm for Octree Traversal"
+		for (int i=0; i<3; ++i) {
+			if (ray.dir[i] < 0) {
+				ray.pos[i] = root_mid[i] * 2 - ray.pos[i]; // eqivalent to mirror around mid (-1 * (ray.pos[i] - root_mid[i]) + root_mid[i])
+				ray.dir[i] = -ray.dir[i];
+				mirror_mask_int |= 1 << i;
+				mirror_mask[i] = true;
+			}
+		}
+
+		this->ray = ray;
+		rinv_dir = 1.0f / ray.dir;
+
+		Octree::Node parent_node = octree.nodes[ octree.root ];
+
+		// desired ray bounds
+		float tmin = 0;
+		float tmax = max_dist;
+
+		// cube ray range
+		float parent_t0 = max_component( intersect_ray(root_min) );
+		float parent_t1 = min_component( intersect_ray(root_max) );
+
+		parent_t0 = max(tmin, parent_t0);
+		parent_t1 = min(tmax, parent_t1);
+
+		NodeCoord child_coord = select_child(parent_t0, parent_coord);
+
+		if (debug) {
+			ImGui::Text("mirror_mask_int: %d", mirror_mask_int);
+			ImGui::Text("mirror_mask: %d %d %d", mirror_mask.x, mirror_mask.y, mirror_mask.z);
+
+			ImGui::Text("t0: %f", parent_t0);
+			ImGui::Text("t1: %f", parent_t1);
+
+			ImGui::Text("child_pos: %d %d %d", child_coord.pos.x, child_coord.pos.y, child_coord.pos.z);
+		}
+		
+		struct StackData {
+			Octree::Node parent_node;
+			float t1;
+		};
+
+		StackData stack[ MAX_SCALE ];
+
+		for (;;) {
+			// child cube ray range
+			float child_t0, child_t1;
+			bool3 exit_face;
+			intersect_ray(child_coord.pos, child_coord.scale, &child_t0, &child_t1, &exit_face);
+
+			bool voxel_exists = parent_node.has_children();
+			if (voxel_exists && parent_t0 < parent_t1) {
+
+				int idx = 0;
+				idx |= ((child_coord.pos.x >> child_coord.scale) & 1) << 0;
+				idx |= ((child_coord.pos.y >> child_coord.scale) & 1) << 1;
+				idx |= ((child_coord.pos.z >> child_coord.scale) & 1) << 2;
+
+				Octree::Node node = octree.nodes[ parent_node.children_indx() + (idx ^ mirror_mask_int) ];
+
+				//// Intersect
+				// child cube ray range
+				float tv0 = max(child_t0, parent_t0);
+				float tv1 = min(child_t1, parent_t1);
+
+				if (tv0 < tv1) {
+					bool leaf = !node.has_children();
+					if (leaf) {
+						if (node.bid != B_AIR) {
+							hit.did_hit = true;
+							hit.dist = tv0;
+							break; // hit
+						}
+					} else {
+						//// Push
+						assert(child_coord.scale >= 0 && child_coord.scale < MAX_SCALE);
+						stack[child_coord.scale] = { parent_node, parent_t1 };
+
+						// child becomes parent
+						parent_node = node;
+
+						parent_coord = child_coord;
+						child_coord = select_child(tv0, parent_coord);
+
+						parent_t0 = tv0;
+						parent_t1 = tv1;
+
+						continue;
+					}
+				}
+			}
+
+			int3 old_pos = child_coord.pos;
+			bool parent_changed;
+			
+			{ //// Advance
+				int3 step = (int3)exit_face;
+				step.x <<= child_coord.scale;
+				step.y <<= child_coord.scale;
+				step.z <<= child_coord.scale;
+
+				parent_changed =
+					(child_coord.pos.x & step.x) != 0 ||
+					(child_coord.pos.y & step.y) != 0 ||
+					(child_coord.pos.z & step.z) != 0;
+
+				child_coord.pos += step;
+
+				parent_t0 = child_t1;
+			}
+
+			if (parent_changed) {
+				//// Pop
+				child_coord.scale = highest_differing_bit(old_pos, child_coord.pos);
+
+				if (child_coord.scale >= MAX_SCALE)
+					break; // out of root
+
+				assert(child_coord.scale >= 0 && child_coord.scale < MAX_SCALE);
+				parent_node = stack[child_coord.scale].parent_node;
+				parent_t1 = stack[child_coord.scale].t1;
+			}
+		}
+
+		return hit;
+	};
+};
+
+RaytraceHit Octree::raycast (Ray ray, int* iterations, bool debug) {
+
+	bool raytracer_new = true;
+	if (raytracer_new) {
+
+		EfficentSVORaytracer t = { *this };
+		auto hit = t.raytrace(ray, 100, debug);
+
+		if (iterations) *iterations = t.iterations;
+		return hit;
+
+	} else {
+		ParametricOctreeTraverser::OctreeNode o;
+		o.oct_idx = root;
+		o.level = (int)levels.size() - 1;
+		o.min = pos;
+		o.max = pos + (float3)(float)(1 << o.level);
+		o.mid = 0.5f * (o.min + o.max);
+
+		ParametricOctreeTraverser t = { *this };
+		t.traverse_octree(o, ray);
+
+		if (iterations) *iterations = t.iterations;
+		return t.hit;
+	}
 }
 
 void OctreeDevTest::draw (Chunks& chunks) {
@@ -395,8 +593,10 @@ Ray ray_for_pixel (int2 pixel, int2 resolution, Camera_View const& view) {
 lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
 	auto ray = ray_for_pixel(pixel, renderimage.size, view);
 
+	int iterations;
+
 auto time0 = get_timestamp();
-	auto hit = octree.raycast(ray);
+	auto hit = octree.raycast(ray, &iterations, equal(pixel, debug_cursor_pos));
 auto time = (int)(get_timestamp() - time0);
 
 	if (visualize_time) {
@@ -450,6 +650,8 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 	res.y = resolution;
 	res.x = roundi(aspect * (float)resolution);
 	res = max(res, 1);
+
+	debug_cursor_pos = floori(input.cursor_pos * (float)resolution / (float)input.window_size.y);
 
 	if (!equal(renderimage.size, res)) {
 		renderimage = Image<lrgba>(res);

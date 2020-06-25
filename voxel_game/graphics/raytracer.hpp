@@ -30,12 +30,9 @@ struct RaytraceHit {
 // ~84.7 KB
 // ~10 ms
 
-#define SPARSE_OCTREE 1
-
 struct Octree {
 	std::vector<RawArray<block_id>> levels; // non-sparse version for comparison
 
-#if SPARSE_OCTREE
 	union Node {
 		// MSB set if has children, mask MSB to zero to get actual children index
 		// after masking MSB to 0 -> index of 8 consecutive chilren nodes in nodes array, only valid if bid == B_NULL
@@ -64,20 +61,13 @@ struct Octree {
 	int node_size = sizeof(Node);
 	int total_size;
 
-#else
-
-	int node_count;
-	int node_size = sizeof(block_id);
-	int total_size;
-#endif
-
 	float3 pos;
 
 	void build_non_sparse_octree (Chunk* chunk);
 
 	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
 
-	RaytraceHit raycast (Ray ray, int* iterations=nullptr);
+	RaytraceHit raycast (Ray ray, int* iterations=nullptr, bool debug=false);
 };
 
 struct OctreeDevTest {
@@ -108,7 +98,7 @@ public:
 	bool overlay = false;
 	float slider = 0.7f;
 
-	bool visualize_time = true;
+	bool visualize_time = false;
 	int visualize_max_time = 250;
 
 	bool visualize_time_compare = true;
@@ -116,6 +106,8 @@ public:
 	float visualize_time_slider = 0.5f;
 
 	int resolution = 100; // vertical
+
+	int2 debug_cursor_pos;
 
 	void imgui (Chunks& chunks) {
 		if (!imgui_push("Raytracer")) return;
