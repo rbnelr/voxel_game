@@ -65,7 +65,8 @@ struct Octree {
 
 	void build_non_sparse_octree (Chunk* chunk);
 
-	void recurs_draw (int3 index, int level, float3 offset, int& cell_count);
+	void recurs_draw (Node& node, int3 index, int level);
+	void debug_draw ();
 
 	RaytraceHit raycast (Ray ray, int* iterations=nullptr, bool debug=false);
 };
@@ -95,7 +96,7 @@ public:
 	Texture2D rendertexture;
 
 	bool raytracer_draw = true;
-	bool overlay = false;
+	bool overlay = false;//true;
 	float slider = 0.7f;
 
 	bool visualize_time = false;
@@ -107,7 +108,18 @@ public:
 
 	int resolution = 100; // vertical
 
+	//
+	bool octree_debug_draw = false;
+
+	//
+	float2 debug_ray_ang = float2(62, -32);
+	Ray debug_ray = { float3(6.2f, 1.1f, 34.9f) };
+
+	bool draw_debug_ray = true;
+
 	int2 debug_cursor_pos;
+
+	OctreeDevTest dev;
 
 	void imgui (Chunks& chunks) {
 		if (!imgui_push("Raytracer")) return;
@@ -124,6 +136,12 @@ public:
 		ImGui::SliderFloat("visualize_time_slider", &visualize_time_slider, 0,1);
 
 		ImGui::SliderInt("resolution", &resolution, 1, 1440);
+
+		ImGui::Checkbox("octree_debug_draw", &octree_debug_draw);
+
+		ImGui::Checkbox("draw_debug_ray", &draw_debug_ray);
+		ImGui::DragFloat2("debug_ray_ang", &debug_ray_ang.x, 0.1f);
+		ImGui::DragFloat3("debug_ray.pos", &debug_ray.pos.x, 0.1f);
 
 		imgui_pop();
 	}

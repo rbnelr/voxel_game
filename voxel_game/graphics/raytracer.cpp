@@ -111,7 +111,6 @@ Octree build_octree (Chunk* chunk) {
 	return o;
 }
 
-#if 0
 lrgba cols[] = {
 	srgba(255,0,0),
 	srgba(0,255,0),
@@ -124,32 +123,24 @@ lrgba cols[] = {
 	srgba(255,127,255),
 };
 
-void Octree::recurs_draw (int3 index, int level, float3 offset, int& cell_count) { // level 0 == full res
-	int voxel_count = CHUNK_DIM_X >> level;
-	int voxel_size = 1 << level;
-	
-	auto get = [&] (int3 xyz) {
-		return octree_levels[level][xyz.z * voxel_count*voxel_count + xyz.y * voxel_count + xyz.x];
-	};
+void Octree::recurs_draw (Node& node, int3 index, int level) {
+	float voxel_size = (float)(1 << level);
 
-	auto b = get(index);
-	if (b != B_NULL) {
-		debug_graphics->push_wire_cube((float3)index*(float)voxel_size + (float)voxel_size/2 + offset, (float)voxel_size * 0.99f, cols[level]);
-		cell_count++;
-	} else {
-		if (level > 0) {
-			for (int z=0; z<2; ++z) {
-				for (int y=0; y<2; ++y) {
-					for (int x=0; x<2; ++x) {
-						int3 rec_index = index * 2 + int3(x,y,z);
-						recurs_draw(rec_index, level - 1, offset, cell_count);
-					}
-				}
-			}
+	debug_graphics->push_wire_cube((float3)index + pos + 0.5f * voxel_size, voxel_size * 0.99f, cols[level]);
+
+	if (node.has_children()) {
+		Node* children = &nodes[ node.children_indx() ];
+		for (int i=0; i<8; ++i) {
+			int3 child_indx = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+			int child_level = level - 1;
+			recurs_draw(*children++, index + int3(child_indx.x << child_level, child_indx.y << child_level, child_indx.z << child_level), child_level);
 		}
 	}
 }
-#endif
+
+void Octree::debug_draw () {
+	recurs_draw(nodes[root], 0, CHUNK_DIM_SHIFT_X);
+}
 
 struct ParametricOctreeTraverser {
 	// An Efficient Parametric Algorithm for Octree Traversal
@@ -363,23 +354,25 @@ struct EfficentSVORaytracer {
 
 	int highest_differing_bit (int a, int b) {
 		unsigned long diff = (unsigned long)(a ^ b); // bita != bitb => diffbit
-
+		
 		unsigned long bit_index = -1;
-		_BitScanReverse(&bit_index, diff);
-		return bit_index;
+		if (_BitScanReverse(&bit_index, diff))
+			return bit_index;
+		return -1;
 	}
 	int highest_differing_bit (int3 a, int3 b) {
 		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
 	}
 
-	RaytraceHit raytrace (Ray ray, float max_dist, bool debug) {
+	RaytraceHit raytrace (Ray ray, float max_dist, bool debug=false, int show_iter=-1) {
+		int iteration = 0;
 
-		if (debug) {
-			if (input.buttons['B'].went_down)
-				__debugbreak();
-			else
-				return { true, 0 };
-		}
+		//if (debug) {
+		//	if (input.buttons['B'].went_down)
+		//		__debugbreak();
+		//	else
+		//		return { true, 0 };
+		//}
 
 		float3 root_min = octree.pos;
 		float3 root_max = octree.pos + (float3)CHUNK_DIM_X;
@@ -409,20 +402,20 @@ struct EfficentSVORaytracer {
 		float tmax = max_dist;
 
 		// cube ray range
-		float parent_t0 = max_component( intersect_ray(root_min) );
-		float parent_t1 = min_component( intersect_ray(root_max) );
+		float t0 = max_component( intersect_ray(root_min) );
+		float t1 = min_component( intersect_ray(root_max) );
 
-		parent_t0 = max(tmin, parent_t0);
-		parent_t1 = min(tmax, parent_t1);
+		t0 = max(tmin, t0);
+		t1 = min(tmax, t1);
 
-		NodeCoord child_coord = select_child(parent_t0, parent_coord);
+		NodeCoord child_coord = select_child(t0, parent_coord);
 
 		if (debug) {
 			ImGui::Text("mirror_mask_int: %d", mirror_mask_int);
 			ImGui::Text("mirror_mask: %d %d %d", mirror_mask.x, mirror_mask.y, mirror_mask.z);
 
-			ImGui::Text("t0: %f", parent_t0);
-			ImGui::Text("t1: %f", parent_t1);
+			ImGui::Text("t0: %f", t0);
+			ImGui::Text("t1: %f", t1);
 
 			ImGui::Text("child_pos: %d %d %d", child_coord.pos.x, child_coord.pos.y, child_coord.pos.z);
 		}
@@ -440,8 +433,26 @@ struct EfficentSVORaytracer {
 			bool3 exit_face;
 			intersect_ray(child_coord.pos, child_coord.scale, &child_t0, &child_t1, &exit_face);
 
+			if (debug && (show_iter == -1 || iteration++ == show_iter)) {
+				float voxel_size = (float)(1 << child_coord.scale);
+				
+				float3 pos = (float3)child_coord.pos + octree.pos + 0.5f * voxel_size;
+
+				for (int i=0; i<3; ++i) {
+					if ((mirror_mask_int >> i) & 1) {
+						pos[i] = root_mid[i] * 2 - pos[i];
+					}
+				}
+
+				debug_graphics->push_wire_cube(pos, voxel_size * 0.99f, cols[child_coord.scale]);
+
+				ImGui::Text("--------------");
+				ImGui::Text("%d", child_coord.scale);
+				ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
+			}
+
 			bool voxel_exists = parent_node.has_children();
-			if (voxel_exists && parent_t0 < parent_t1) {
+			if (voxel_exists && t0 < t1) {
 
 				int idx = 0;
 				idx |= ((child_coord.pos.x >> child_coord.scale) & 1) << 0;
@@ -452,8 +463,8 @@ struct EfficentSVORaytracer {
 
 				//// Intersect
 				// child cube ray range
-				float tv0 = max(child_t0, parent_t0);
-				float tv1 = min(child_t1, parent_t1);
+				float tv0 = max(child_t0, t0);
+				float tv1 = min(child_t1, t1);
 
 				if (tv0 < tv1) {
 					bool leaf = !node.has_children();
@@ -466,7 +477,7 @@ struct EfficentSVORaytracer {
 					} else {
 						//// Push
 						assert(child_coord.scale >= 0 && child_coord.scale < MAX_SCALE);
-						stack[child_coord.scale] = { parent_node, parent_t1 };
+						stack[child_coord.scale] = { parent_node, t1 };
 
 						// child becomes parent
 						parent_node = node;
@@ -474,8 +485,8 @@ struct EfficentSVORaytracer {
 						parent_coord = child_coord;
 						child_coord = select_child(tv0, parent_coord);
 
-						parent_t0 = tv0;
-						parent_t1 = tv1;
+						t0 = tv0;
+						t1 = tv1;
 
 						continue;
 					}
@@ -492,13 +503,13 @@ struct EfficentSVORaytracer {
 				step.z <<= child_coord.scale;
 
 				parent_changed =
-					(child_coord.pos.x & step.x) != 0 ||
-					(child_coord.pos.y & step.y) != 0 ||
-					(child_coord.pos.z & step.z) != 0;
+					(old_pos.x & step.x) != 0 ||
+					(old_pos.y & step.y) != 0 ||
+					(old_pos.z & step.z) != 0;
 
 				child_coord.pos += step;
 
-				parent_t0 = child_t1;
+				t0 = child_t1;
 			}
 
 			if (parent_changed) {
@@ -509,8 +520,13 @@ struct EfficentSVORaytracer {
 					break; // out of root
 
 				assert(child_coord.scale >= 0 && child_coord.scale < MAX_SCALE);
-				parent_node = stack[child_coord.scale].parent_node;
-				parent_t1 = stack[child_coord.scale].t1;
+				parent_node	= stack[child_coord.scale].parent_node;
+				t1			= stack[child_coord.scale].t1;
+
+				int clear_mask = ~((1 << child_coord.scale) - 1);
+				child_coord.pos.x &= clear_mask;
+				child_coord.pos.y &= clear_mask;
+				child_coord.pos.z &= clear_mask;
 			}
 		}
 
@@ -545,29 +561,6 @@ RaytraceHit Octree::raycast (Ray ray, int* iterations, bool debug) {
 	}
 }
 
-void OctreeDevTest::draw (Chunks& chunks) {
-	//
-	//ImGui::DragFloat3("ray.pos", &ray.pos.x, 0.05f);
-	//
-	//ImGui::DragFloat2("ray_ang", &ray_ang.x, 1);
-	//ray.dir = normalize( rotate3_Z(to_radians(ray_ang.x)) * rotate3_X(to_radians(ray_ang.y)) * float3(0,1,0) );
-	//
-	//debug_graphics->push_arrow(ray.pos, ray.dir * 100, srgba(255,255,0));
-	//
-	//Chunk* chunk;
-	//chunks.query_block(floori(ray.pos), &chunk);
-	//if (!chunk) return;
-	//
-	//octree = build_octree(chunk);
-	//
-	//int cell_count = 0;
-	//octree.recurs_draw(0, (int)octree.octree_levels.size() - 1, (float3)chunk->chunk_pos_world(), cell_count);
-	//
-	//ImGui::Text("Octree stats: %d^3 (%7d voxels) can be stored as %7d octree nodes", CHUNK_DIM_X, CHUNK_DIM_X*CHUNK_DIM_X*CHUNK_DIM_X, cell_count);
-	//
-	//octree.raycast(ray);
-}
-
 #define TIME_START(name) auto __##name = Timer::start()
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
@@ -596,7 +589,7 @@ lrgba Raytracer::raytrace_pixel (int2 pixel, Camera_View const& view) {
 	int iterations;
 
 auto time0 = get_timestamp();
-	auto hit = octree.raycast(ray, &iterations, equal(pixel, debug_cursor_pos));
+	auto hit = octree.raycast(ray, &iterations, false);
 auto time = (int)(get_timestamp() - time0);
 
 	if (visualize_time) {
@@ -643,6 +636,15 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 
 	ImGui::Text("Octree stats:  node_count %d  node_size %d B  total_size %.3f KB", octree.node_count, octree.node_size, octree.total_size / 1024.0f);
 
+	if (draw_debug_ray) {
+		debug_ray.dir = rotate3_Z(to_radians(debug_ray_ang.x)) * rotate3_X(to_radians(debug_ray_ang.y)) * float3(0,1,0);
+
+		debug_graphics->push_arrow(debug_ray.pos, debug_ray.dir * 100, lrgba(1,0,0,1));
+		
+		int iterations;
+		auto hit = octree.raycast(debug_ray, &iterations, true);
+	}
+
 	TIME_START(raytrace);
 	float aspect = (float)input.window_size.x / (float)input.window_size.y;
 
@@ -672,7 +674,10 @@ void Raytracer::raytrace (Chunks& chunks, Camera_View const& view) {
 }
 
 void Raytracer::draw () {
-	if (shader) {
+	if (octree_debug_draw)
+		octree.debug_draw();
+
+	if (overlay && shader) {
 		shader.bind();
 
 		glBindVertexArray(vao);

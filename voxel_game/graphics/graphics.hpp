@@ -478,8 +478,6 @@ public:
 
 	Raytracer				raytracer;
 
-	OctreeDevTest octreeDevTest;
-
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
