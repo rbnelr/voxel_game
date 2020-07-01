@@ -68,7 +68,7 @@ struct Octree {
 	void recurs_draw (Node& node, int3 index, int level);
 	void debug_draw ();
 
-	RaytraceHit raycast (Ray ray, int* iterations=nullptr, bool debug=false);
+	RaytraceHit raycast (Ray ray);
 };
 
 struct OctreeDevTest {
@@ -96,7 +96,7 @@ public:
 	Texture2D rendertexture;
 
 	bool raytracer_draw = true;
-	bool overlay = false;//true;
+	bool overlay = true;
 	float slider = 0.7f;
 
 	bool visualize_time = false;
@@ -111,11 +111,7 @@ public:
 	//
 	bool octree_debug_draw = false;
 
-	//
-	float2 debug_ray_ang = float2(62, -32);
-	Ray debug_ray = { float3(6.2f, 1.1f, 34.9f) };
-
-	bool draw_debug_ray = true;
+	bool draw_debug_ray = false;
 
 	int2 debug_cursor_pos;
 
@@ -140,8 +136,6 @@ public:
 		ImGui::Checkbox("octree_debug_draw", &octree_debug_draw);
 
 		ImGui::Checkbox("draw_debug_ray", &draw_debug_ray);
-		ImGui::DragFloat2("debug_ray_ang", &debug_ray_ang.x, 0.1f);
-		ImGui::DragFloat3("debug_ray.pos", &debug_ray.pos.x, 0.1f);
 
 		imgui_pop();
 	}
