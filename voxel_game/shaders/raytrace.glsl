@@ -24,6 +24,7 @@ $if fragment
 	uniform isampler1D svo_texture;
 	uniform vec3 svo_root_pos;
 
+	uniform int max_iterations = 100;
 	uniform sampler2D heat_gradient;
 	
 	int get_svo_node (int index) {
@@ -31,9 +32,9 @@ $if fragment
 	}
 
 #define CHUNK_DIM 64
-#define B_AIR 1
+#define MAX_SCALE 6
 
-#define INF (1.0 / 0.0)
+#define B_AIR 1
 
 	// SVO format:
 	/*
@@ -50,41 +51,13 @@ $if fragment
 		return max(max(v.x, v.y), v.z);
 	}
 
-	int min_component_index (vec3 v) {
-		if (v.x < v.y && v.x < v.z)
-			return 0;
-		if (v.y < v.z)
-			return 1;
-		return 2;
-	}
-
-	bool any (bvec3 b) {
-		return b.x || b.y || b.z;
-	}
-	bool all (bvec3 b) {
-		return b.x && b.y && b.z;
-	}
-
-	vec3 select (bvec3 c, vec3 l, vec3 r) {
-		return vec3( c.x ? l.x : r.x,
-					 c.y ? l.y : r.y,
-					 c.z ? l.z : r.z );
-	}
-	vec3 select (bool c, vec3 l, vec3 r) {
-		return vec3( c ? l.x : r.x,
-					 c ? l.y : r.y,
-					 c ? l.z : r.z );
-	}
-
-	bvec3 xor (bvec3 l, bvec3 r) { // why is this not a language feature if ivec3 ^ ivec3 is a thing?
-		//return bvec3(l.x ^ r.x, l.y ^ r.y, l.z ^ r.z);
-		return bvec3(ivec3(l) ^ ivec3(r));
-	}
+	//bvec3 xor (bvec3 l, bvec3 r) { // why is this not a language feature if ivec3 ^ ivec3 is a thing?
+	//	//return bvec3(l.x ^ r.x, l.y ^ r.y, l.z ^ r.z);
+	//	return bvec3(ivec3(l) ^ ivec3(r));
+	//}
 
 	vec3 ray_pos;
 	vec3 ray_dir;
-	vec3 unmirrored_ray_pos;
-	vec3 unmirrored_ray_dir;
 
 	void get_ray () {
 		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
@@ -100,155 +73,197 @@ $if fragment
 		ray_pos = ( cam_to_world * vec4(pos_cam, 1)).xyz;
 		ray_dir = ( cam_to_world * vec4(dir_cam, 0)).xyz;
 		ray_dir = normalize(ray_dir);
+
+		ray_pos -= svo_root_pos;
 	}
 
-	// An Efficient Parametric Algorithm for Octree Traversal
-	// J. Revelles, C.Ure ̃na, M.Lastra
-	// http://citeseerx.ist.psu.edu/viewdoc/download;jsessionid=F6810427A1DC4136D615FBD178C1669C?doi=10.1.1.29.987&rep=rep1&type=pdf
-	// optimized by me
+	// https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
-	int mirror_mask_int;
-	bvec3 mirror_mask;
+	vec3 rinv_dir;
+	int mirror_mask_int = 0;
 
-	bool hit_octree_leaf (int node_data, vec3 t0) {
+	vec3 intersect_ray (vec3 planes) {
+		return rinv_dir * (planes - ray_pos);
+	}
+	void intersect_ray (ivec3 cube_pos, int cube_scale, out float t0, out float t1, out bvec3 exit_faces) {
+		vec3 cube_min = vec3(cube_pos);
+		vec3 cube_max = vec3(cube_pos + (1 << cube_scale));
+
+		vec3 t0v = rinv_dir * (cube_min - ray_pos);
+		vec3 t1v = rinv_dir * (cube_max - ray_pos);
+
+		t0 = max_component( t0v );
+		t1 = min_component( t1v );
+
+		exit_faces = t1 == t1v;
+	}
+
+	void select_child (float t0, ivec3 parent_pos, int parent_scale, out ivec3 child_pos, out int child_scale) {
+		child_scale = parent_scale - 1;
+
+		vec3 parent_mid = vec3(parent_pos + (1 << child_scale));
+
+		vec3 tmid = intersect_ray(parent_mid);
+
+		bvec3 comp = t0 >= tmid;
+		ivec3 bits = ivec3(comp);
+
+		child_pos.x = parent_pos.x | (bits.x << child_scale);
+		child_pos.y = parent_pos.y | (bits.y << child_scale);
+		child_pos.z = parent_pos.z | (bits.z << child_scale);
+	}
+
+	int highest_differing_bit (int a, int b) {
+		int diff = a ^ b; // bita != bitb => diffbit
+
+		return findMSB(diff);
+	}
+	int highest_differing_bit (ivec3 a, ivec3 b) {
+		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
+	}
+
+	void raytrace (float max_dist, out int iterations) {
+		int iter = 0;
 		
-		bool did_hit = node_data != B_AIR;
-		if (did_hit) {
-			//d.hit.did_hit = true;
-			//d.hit.id = b;
-			float dist = max_component(t0);
-			vec3 pos_world = unmirrored_ray_pos + unmirrored_ray_dir * dist;
+		ray_pos -= svo_root_pos;
 
-			frag_col = vec4(vec3(dist / 100), 1);
-		}
+		vec3 root_min = 0;
+		vec3 root_max = vec3(CHUNK_DIM);
+		//vec3 root_mid = 0.5 * (root_min + root_max);
 
-		return did_hit;
-	}
-
-	const int[] node_seq_lut = int[8*3] (
-		1, 2, 4, // 001 010 100
-		8, 3, 5, //   - 011 101
-		3, 8, 6, // 011   - 110
-		8, 8, 7, //   -   - 111
-		5, 6, 8, // 101 110   -
-		8, 7, 8, //   - 111   -
-		7, 8, 8, // 111   -   -
-		8, 8, 8  //   -   -   -
-		);
-
-	int first_node (vec3 t0, vec3 tm) {
-		float cond = max_component(t0);
-
-		int ret = 0;
-		ret |= tm[0] < cond ? 1 : 0;
-		ret |= tm[1] < cond ? 2 : 0;
-		ret |= tm[2] < cond ? 4 : 0;
-		return ret;
-	}
-	int next_node (vec3 t1, int octant) {
-		int exit_face = min_component_index(t1);
-
-		return node_seq_lut[octant * 3 + exit_face];
-	}
-	
-	int iterations = 0;
-
-	uniform bool visualize_iterations = false;
-	uniform int max_iterations = 256;
-
-#define RECURSIVE(recursive, recursive2) \
-	bool recursive (int node_data, vec3 min, vec3 max, vec3 t0, vec3 t1) {																\
-																																		\
-		iterations++;																													\
-		if (iterations > max_iterations)																								\
-			return true;																												\
-																																		\
-		if (any(lessThan(t1, vec3(0.0))))																								\
-			return false;																												\
-																																		\
-		if ((node_data & 0x80000000) == 0) /* !has_children */																			\
-			return hit_octree_leaf(node_data, t0);																						\
-																																		\
-		/* need to decend further down into octree to find actual voxels */																\
-																																		\
-		vec3 mid = 0.5 * (min + max);																									\
-		vec3 tm = 0.5 * (t0 + t1);																										\
-																																		\
-		/* account for ray_dir being zero in one or more dimensions	*/																	\
-		tm = select(notEqual(ray_dir, vec3(0.0)), tm, select(lessThan(ray_pos, mid), vec3(+INF), vec3(-INF)));							\
-																																		\
-		int cur_octant = first_node(t0, tm);																							\
-																																		\
-		do {																															\
-			bvec3 oct_mask = bvec3((cur_octant & 1) != 0, (cur_octant & 2) != 0, (cur_octant & 4) != 0);								\
-																																		\
-			/* undo mirroring to get correct child node data */																			\
-			int unmirrored_octant = cur_octant ^ mirror_mask_int;																		\
-			bvec3 unmirrored_mask = xor(oct_mask, mirror_mask);																			\
-																																		\
-			int children_index = (node_data & 0x7fffffff) + unmirrored_octant;															\
-																																		\
-			int _node_data = get_svo_node(children_index);																				\
-			vec3 _min = select(unmirrored_mask, mid, min);																				\
-			vec3 _max = select(unmirrored_mask, max, mid);																				\
-																																		\
-			if (recursive2(_node_data, _min, _max, select(oct_mask, tm, t0), select(oct_mask, t1, tm)))									\
-				return true; /* hit in subtree */																						\
-																																		\
-			cur_octant = next_node(select(oct_mask, t1, tm), cur_octant);																\
-		} while (cur_octant < 8);																										\
-																																		\
-		return false; /* no hit in this node, step into next node */		 															\
-	}
-
-	bool non_reachable (int node_data, vec3 min, vec3 max, vec3 t0, vec3 t1) {
-		return true;
-	}
-
-	RECURSIVE(traverse_subtree_1, non_reachable)
-	RECURSIVE(traverse_subtree_2, traverse_subtree_1)
-	RECURSIVE(traverse_subtree_4, traverse_subtree_2)
-	RECURSIVE(traverse_subtree_8, traverse_subtree_4)
-	RECURSIVE(traverse_subtree_16, traverse_subtree_8)
-	RECURSIVE(traverse_subtree_32, traverse_subtree_16)
-	RECURSIVE(traverse_subtree_64, traverse_subtree_32)
-
-	void traverse_svo () {
-		unmirrored_ray_pos = ray_pos;
-		unmirrored_ray_dir = ray_dir;
+		ivec3 parent_pos = 0;
+		int parent_scale = MAX_SCALE;
 
 		mirror_mask_int = 0;
-
-		int node_data = 0x80000001; //nodes[root]._children; root == 0
-		vec3 min = svo_root_pos;
-		vec3 max = svo_root_pos + vec3(CHUNK_DIM);
-		vec3 mid2 = (min + max); // mid = 0.5 * (min + max); mid2 = mid * 2;
-
-		// mirror ray so that direction is always positive in each direction for purpose of algorithm
+		
+		// mirror coord system to make all ray dir components positive, like in "An Efficient Parametric Algorithm for Octree Traversal"
 		for (int i=0; i<3; ++i) {
 			bool mirror = ray_dir[i] < 0;
-
+		
 			ray_dir[i] = abs(ray_dir[i]);
-			mirror_mask[i] = mirror;
-			if (mirror) ray_pos[i] = mid2[i] - ray_pos[i]; // mirror along mid  ie.  -1 * (ray_pos - mid) + mid -> 2*mid - ray_pos
+			if (mirror) ray_pos[i] = root_max[i] - ray_pos[i]; // mirror along mid  ie.  -1 * (ray_pos - mid) + mid -> 2*mid - ray_pos
 			if (mirror) mirror_mask_int |= 1 << i;
 		}
+		
+		rinv_dir = 1.0 / ray_dir;
 
-		vec3 rdir_inv = vec3(1.0) / ray_dir;
+		int parent_node = get_svo_node(0);
 
-		vec3 t0 = (min - ray_pos) * rdir_inv;
-		vec3 t1 = (max - ray_pos) * rdir_inv;
+		// desired ray bounds
+		float tmin = 0;
+		float tmax = max_dist;
 
-		if (max_component(t0) < min_component(t1))
-			traverse_subtree_64(node_data, min, max, t0, t1);
+		// cube ray range
+		float t0 = max_component( intersect_ray(root_min) );
+		float t1 = min_component( intersect_ray(root_max) );
 
-	}
+		t0 = max(tmin, t0);
+		t1 = min(tmax, t1);
+
+		ivec3 child_pos;
+		int child_scale;
+		select_child(t0, parent_pos, parent_scale, child_pos, child_scale);
+
+		int stack_node[ MAX_SCALE -1 ] = int [ MAX_SCALE -1 ];
+		float stack_t1[ MAX_SCALE -1 ] = float [ MAX_SCALE -1 ];
+
+		for (;;) {
+			if (++iter >= max_iterations) break;
+
+			// child cube ray range
+			float child_t0, child_t1;
+			bvec3 exit_face;
+			intersect_ray(child_pos, child_scale, child_t0, child_t1, exit_face);
+
+			bool voxel_exists = (parent_node & 0x80000000) != 0;
+			if (voxel_exists && t0 < t1) {
+
+				int idx = 0;
+				idx |= ((child_pos.x >> child_scale) & 1) << 0;
+				idx |= ((child_pos.y >> child_scale) & 1) << 1;
+				idx |= ((child_pos.z >> child_scale) & 1) << 2;
+
+				int node = get_svo_node( (parent_node & 0x7fffffffu) + (idx ^ mirror_mask_int) );
+
+				//// Intersect
+				// child cube ray range
+				float tv0 = max(child_t0, t0);
+				float tv1 = min(child_t1, t1);
+
+				if (tv0 < tv1) {
+					bool leaf = (node & 0x80000000) == 0;
+					if (leaf) {
+						if (node.bid != B_AIR) {
+							//hit.did_hit = true;
+							//hit.dist = tv0;
+							break; // hit
+						}
+					} else {
+						//// Push
+						stack_node[child_scale - 1] = parent_node;
+						stack_t1  [child_scale - 1] = t1;
+
+						// child becomes parent
+						parent_node = node;
+
+						parent_coord = child_coord;
+						select_child(tv0, parent_pos, parent_scale, child_pos, child_scale);
+
+						t0 = tv0;
+						t1 = tv1;
+
+						continue;
+					}
+				}
+			}
+
+			ivec3 old_pos = child_pos;
+			bool parent_changed;
+
+			{ //// Advance
+				ivec3 step = ivec3(exit_face);
+				step.x <<= child_scale;
+				step.y <<= child_scale;
+				step.z <<= child_scale;
+
+				parent_changed =
+					(old_pos.x & step.x) != 0 ||
+					(old_pos.y & step.y) != 0 ||
+					(old_pos.z & step.z) != 0;
+
+				child_pos += step;
+
+				t0 = child_t1;
+			}
+
+			if (parent_changed) {
+				//// Pop
+				child_scale = highest_differing_bit(old_pos, child_pos);
+
+				if (child_scale >= MAX_SCALE)
+					break; // out of root
+
+				parent_node	= stack_node[child_scale - 1];
+				t1			= stack_t1  [child_scale - 1];
+
+				int clear_mask = ~((1 << child_scale) - 1);
+				child_pos.x &= clear_mask;
+				child_pos.y &= clear_mask;
+				child_pos.z &= clear_mask;
+			}
+		}
+
+		iterations = iter;
+		//return hit;
+	};
 
 	void main () {
 		frag_col = vec4(0,0,0,0);
 
+		int iterations;
+
 		get_ray();
-		traverse_svo();
+		raytrace(100, iterations);
 		
 		if (visualize_iterations)
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
