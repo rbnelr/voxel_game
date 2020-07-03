@@ -1,5 +1,7 @@
 #pragma once
 #include "glshader.hpp"
+#include "../dear_imgui.hpp"
+#include "../util/string.hpp"
 
 struct ShaderManager {
 
@@ -19,6 +21,46 @@ struct ShaderManager {
 	// $if $endif get processed at the same time as the $if $endif, so a $if fragment part in a file only included inside a $if vertex will never be included in the fragment shader
 	// Shaders gets stored into shaders hashmap and never removed until program exit
 	gl::Shader* load_shader (std::string name);
+
+	std::unordered_map<std::string, bool> shader_windows;
+	void imgui () {
+		if (!imgui_push("ShaderManager")) return;
+
+		for (auto it=shaders.begin(); it!=shaders.end(); ++it) {
+			bool open = shader_windows[it->first];
+			if (ImGui::Button(it->first.c_str()))
+				open = true;
+
+			if (open && ImGui::Begin(it->first.c_str(), &open)) {
+				auto s = it->second.get();
+
+				std::string filename = kiss::prints("shaders/%s.glslasm", it->first.c_str());
+
+				if (ImGui::Button(kiss::prints("Write Disasm To File (%s)###(dump)", filename.c_str()).c_str())) {
+					uint64_t size;
+					auto data = it->second->get_program_binary(&size);
+
+					kiss::save_binary_file(filename.c_str(), data.get(), size);
+				}
+
+				int i=0;
+				for (auto pp : s->preprocessed_sources) {
+					if (ImGui::TreeNodeEx(kiss::prints("%d", i++).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+
+						ImGui::Text(pp.c_str());
+
+						ImGui::TreePop();
+					}
+				}
+
+				ImGui::End();
+			}
+
+			shader_windows[it->first] = open;
+		}
+
+		imgui_pop();
+	}
 };
 
 // global ShaderManager
@@ -124,8 +166,11 @@ struct Shader {
 	void set_texture_unit (std::string_view name, int unit) {
 		gl::Uniform u;
 		if (shader->get_uniform(name, &u)) {
-			assert(gl::is_sampler_type(u.type));
+			if (!gl::is_sampler_type(u.type))
+				logf(WARNING, "Uniform \"%s\" is not a sampler type!", name.data());
 			glUniform1i(u.loc, unit);
+		} else {
+			//logf(WARNING, "Texture \"%s\" does not exist in shader!", name.data());
 		}
 	}
 };

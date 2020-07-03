@@ -47,12 +47,12 @@ RawArray<block_id> filter_octree_level (int size, RawArray<block_id> const& prev
 }
 
 void Octree::build_non_sparse_octree (Chunk* chunk) {
-	RawArray<block_id> l0 = RawArray<block_id>(CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z);
+	RawArray<block_id> l0 = RawArray<block_id>(CHUNK_DIM * CHUNK_DIM * CHUNK_DIM);
 
 	int out = 0;
-	for (int z=0; z<CHUNK_DIM_Z; ++z) {
-		for (int y=0; y<CHUNK_DIM_Y; ++y) {
-			for (int x=0; x<CHUNK_DIM_X; ++x) {
+	for (int z=0; z<CHUNK_DIM; ++z) {
+		for (int y=0; y<CHUNK_DIM; ++y) {
+			for (int x=0; x<CHUNK_DIM; ++x) {
 				l0[out++] = chunk->get_block_unchecked(bpos(x,y,z))->id;
 			}
 		}
@@ -60,7 +60,7 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 
 	levels.push_back(std::move(l0));
 
-	int size = CHUNK_DIM_X;
+	int size = CHUNK_DIM;
 	while (size >= 2) {
 		size /= 2;
 
@@ -74,7 +74,7 @@ void Octree::build_non_sparse_octree (Chunk* chunk) {
 
 // build sparse octree depth-first
 int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
-	int voxel_count = CHUNK_DIM_X >> level;
+	int voxel_count = CHUNK_DIM >> level;
 
 	octree->nodes[idx]._children = 0; // clears has_children
 	octree->nodes[idx].bid = octree->levels[level][pos.z * voxel_count*voxel_count + pos.y * voxel_count + pos.x];
@@ -96,8 +96,6 @@ int recurse_build_sparse_octree(int idx, int level, int3 pos, Octree* octree) {
 }
 
 Octree build_octree (Chunk* chunk) {
-	static_assert(CHUNK_DIM_X == CHUNK_DIM_Y && CHUNK_DIM_X == CHUNK_DIM_Z);
-
 	Octree o;
 
 	o.build_non_sparse_octree(chunk);

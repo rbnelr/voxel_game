@@ -5,8 +5,8 @@
 #include "../util/animation.hpp"
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
-#include "raytracer.hpp"
 #include "graphics_common.hpp"
+#include "raytracer.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -195,8 +195,6 @@ struct GuiGraphics {
 
 	Texture2D gui_atlas = load_texture_atlas<srgba8>({ &crosshair, &quickbar, &quickbar_selected }, 64, srgba8(0), 1, false);
 
-	Sampler sampler;
-
 	std::vector<Vertex> vertices;
 	Mesh<Vertex> mesh;
 
@@ -221,7 +219,7 @@ struct GuiGraphics {
 	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
 	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 struct GenericVertex {
@@ -281,13 +279,13 @@ struct PlayerGraphics {
 
 	PlayerGraphics ();
 
-	void draw (Player const& player, TileTextures const& tile_textures);
+	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 struct ChunkMesh {
 	struct Vertex {
-		uint8v3	pos_model;
-		uint8v2	uv;
+		float3	pos_model;
+		float2	uv;
 		uint8	tex_indx;
 		uint8	block_light;
 		uint8	sky_light;
@@ -320,6 +318,11 @@ struct BlockTileInfo {
 	// side is always at base_index
 	int top = 0; // base_index + top to get block top tile
 	int bottom = 0; // base_index + bottom to get block bottom tile
+	
+	int variants = 1;
+
+	float2 uv_pos;
+	float2 uv_size;
 
 	//bool random_rotation = false;
 
@@ -361,6 +364,15 @@ struct ItemMeshes {
 	void generate (Image<srgba8>* images, int count, int* item_tiles);
 };
 
+struct BlockMeshInfo {
+	int	offset;
+	int	size;
+};
+struct BlockMeshVertex {
+	float3	pos_model;
+	float2	uv;
+};
+
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
 struct TileTextures {
@@ -372,6 +384,9 @@ struct TileTextures {
 
 	int2 tile_size;
 
+	std::vector<BlockMeshVertex> block_meshes;
+	BlockMeshInfo block_meshes_info[BLOCK_IDS_COUNT];
+
 	ItemMeshes item_meshes;
 
 	int breaking_index = 0;
@@ -380,6 +395,7 @@ struct TileTextures {
 	float breaking_mutliplier = 1.15f;
 
 	TileTextures ();
+	void load_block_meshes ();
 
 	inline int get_tile_base_index (block_id id) {
 		return block_tile_info[id].base_index;
@@ -401,14 +417,12 @@ struct ChunkGraphics {
 
 	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
-	Sampler sampler;
-
 	bool alpha_test = !_use_potatomode;
 
 	void imgui (Chunks& chunks);
 
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures);
-	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures);
+	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler);
+	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 class World;
@@ -463,6 +477,7 @@ extern int frame_counter;
 class Graphics {
 public:
 	CommonUniforms			common_uniforms;
+	Sampler					sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 
 	TileTextures			tile_textures;
 
@@ -489,7 +504,11 @@ public:
 		}
 
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+			shaders->imgui();
+
 			common_uniforms.imgui();
+			sampler.imgui("sampler");
+
 			fog.imgui();
 			player.imgui();
 			chunk_graphics.imgui(chunks);
@@ -498,9 +517,9 @@ public:
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 			ImGui::Checkbox("debug_block_light", &debug_block_light);
 
-			raytracer.imgui(chunks);
-
 			ImGui::Separator();
+
+			raytracer.imgui(chunks);
 		}
 	}
 

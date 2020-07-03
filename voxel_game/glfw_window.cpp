@@ -300,6 +300,8 @@ void glfw_gameloop () {
 
 		glfwSwapBuffers(window);
 
+		_input = input;
+
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
 		_input.real_dt = (float)(now - prev) / (float)timestamp_freq;
@@ -374,7 +376,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 
 	logf(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 	
-	__debugbreak();
+	//__debugbreak();
 }
 
 #if _DEBUG || 1

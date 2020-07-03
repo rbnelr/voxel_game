@@ -5,7 +5,7 @@
 
 // Set description of current thread (mainly for debugging)
 // allows for easy overview of threads in debugger
-void set_thread_description (std::string const& description);
+void set_thread_description (std::string_view description);
 
 // std::thread::hardware_concurrency() gets the number of cpu threads
 

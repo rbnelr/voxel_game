@@ -17,43 +17,35 @@ typedef int2	bpos2;
 typedef int3	bpos;
 
 typedef int		chunk_pos_t;
-typedef int2	chunk_coord;
+typedef int3	chunk_coord;
 
-#define CHUNK_DIM_X			64
-#define CHUNK_DIM_Y			64
-#define CHUNK_DIM_Z			64
-#define CHUNK_DIM_SHIFT_X	6 // for coord >> CHUNK_DIM_SHIFT
-#define CHUNK_DIM_SHIFT_Y	6 // for coord >> CHUNK_DIM_SHIFT
-#define CHUNK_DIM_SHIFT_Z	6 // for coord >> CHUNK_DIM_SHIFT
-#define CHUNK_DIM_MASK_X	((1 << CHUNK_DIM_SHIFT_X) -1)
-#define CHUNK_DIM_MASK_Y	((1 << CHUNK_DIM_SHIFT_Y) -1)
-#define CHUNK_DIM_MASK_Z	((1 << CHUNK_DIM_SHIFT_Z) -1)
-#define CHUNK_ROW_OFFS		(CHUNK_DIM_X+2)
-#define CHUNK_LAYER_OFFS	((CHUNK_DIM_Y+2)*(CHUNK_DIM_X+2))
+#define CHUNK_DIM			64
+#define CHUNK_DIM_SHIFT		6 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM_MASK		((1 << CHUNK_DIM_SHIFT) -1)
+#define CHUNK_ROW_OFFS		(CHUNK_DIM+2)
+#define CHUNK_LAYER_OFFS	((CHUNK_DIM+2)*(CHUNK_DIM+2))
 
-#define CHUNK_DIM			bpos(CHUNK_DIM_X, CHUNK_DIM_Y, CHUNK_DIM_Z)
-#define CHUNK_DIM_2D		bpos2(CHUNK_DIM_X, CHUNK_DIM_Y)
-
-#define CHUNK_BLOCK_COUNT	(CHUNK_DIM_X * CHUNK_DIM_Y * CHUNK_DIM_Z)
+#define CHUNK_BLOCK_COUNT	(CHUNK_DIM * CHUNK_DIM * CHUNK_DIM)
 
 // get world chunk coord from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos2 pos) {
+inline chunk_coord get_chunk_from_block_pos (bpos pos) {
 
 	chunk_coord chunk_pos;
-	chunk_pos.x = pos.x >> CHUNK_DIM_SHIFT_X; // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
-	chunk_pos.y = pos.y >> CHUNK_DIM_SHIFT_Y;
+	chunk_pos.x = pos.x >> CHUNK_DIM_SHIFT; // arithmetic shift right instead of divide because we want  -10 / 32  to be  -1 instead of 0
+	chunk_pos.y = pos.y >> CHUNK_DIM_SHIFT;
+	chunk_pos.z = pos.z >> CHUNK_DIM_SHIFT;
 
 	return chunk_pos;
 }
 // get world chunk coord and block pos in chunk from world block position
-inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk=nullptr) {
+inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk) {
 
-	chunk_coord chunk_pos = get_chunk_from_block_pos((bpos2)pos_world);
+	chunk_coord chunk_pos = get_chunk_from_block_pos(pos_world);
 
 	if (bpos_in_chunk) {
-		bpos_in_chunk->x = pos_world.x & CHUNK_DIM_MASK_X;
-		bpos_in_chunk->y = pos_world.y & CHUNK_DIM_MASK_Y;
-		bpos_in_chunk->z = pos_world.z;
+		bpos_in_chunk->x = pos_world.x & CHUNK_DIM_MASK;
+		bpos_in_chunk->y = pos_world.y & CHUNK_DIM_MASK;
+		bpos_in_chunk->z = pos_world.z & CHUNK_DIM_MASK;
 	}
 
 	return chunk_pos;
@@ -64,12 +56,20 @@ struct chunk_coord_hashmap {
 	chunk_coord v;
 
 	bool operator== (chunk_coord_hashmap const& r) const { // for hash map
-		return v.x == r.v.x && v.y == r.v.y;
+		return v.x == r.v.x && v.y == r.v.y && v.z == r.v.z;
 	}
 };
 
 inline size_t hash (chunk_coord v) {
-	return 53ull * (std::hash<bpos_t>()(v.x) + 53ull) + std::hash<bpos_t>()(v.y);
+	size_t h;
+	h  = std::hash<bpos_t>()(v.x);
+	h = 53ull * (h + 53ull);
+
+	h += std::hash<bpos_t>()(v.y);
+	h = 53ull * (h + 53ull);
+
+	h += std::hash<bpos_t>()(v.z);
+	return h;
 };
 
 namespace std {
@@ -87,7 +87,7 @@ class Player;
 static inline constexpr int _block_count (int lod_levels) {
 	int count = 0;
 	for (int lod=0; lod<lod_levels; ++lod) {
-		count += (CHUNK_DIM_Z >> lod) * (CHUNK_DIM_Y >> lod) * (CHUNK_DIM_X >> lod);
+		count += (CHUNK_DIM >> lod) * (CHUNK_DIM >> lod) * (CHUNK_DIM >> lod);
 	}
 	return count;
 };
@@ -95,13 +95,8 @@ static inline constexpr int _block_count (int lod_levels) {
 ////////////// Chunk
 
 struct MeshingResult {
-
-	//std::vector<ChunkMesh::Vertex> opaque_vertices;
-	//std::vector<ChunkMesh::Vertex> tranparent_vertices;
-	RawArray<ChunkMesh::Vertex> opaque_vertices;
-	RawArray<ChunkMesh::Vertex> tranparent_vertices;
-	unsigned opaque_count;
-	unsigned tranparent_count;
+	std::vector<ChunkMesh::Vertex> opaque_vertices;
+	std::vector<ChunkMesh::Vertex> tranparent_vertices;
 };
 
 class Chunk {
@@ -113,7 +108,7 @@ public:
 	void init_blocks ();
 
 	static bpos chunk_pos_world (chunk_coord coord) {
-		return bpos(coord * CHUNK_DIM_2D, 0);
+		return coord * CHUNK_DIM;
 	}
 	bpos chunk_pos_world () const {
 		return chunk_pos_world(coord);
@@ -149,7 +144,7 @@ private:
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
-	Block	blocks[CHUNK_DIM_Z+2][CHUNK_DIM_Y+2][CHUNK_DIM_X+2];
+	Block	blocks[CHUNK_DIM+2][CHUNK_DIM+2][CHUNK_DIM+2];
 public:
 
 	// Gpu mesh data
@@ -170,11 +165,12 @@ struct BackgroundJob { // Chunk gen
 	BackgroundJob execute ();
 };
 
-struct ParallelismJob { // CHunk remesh
+struct ParallelismJob { // Chunk remesh
 	// input
 	Chunk* chunk;
 	Chunks* chunks; // not modfied
 	Graphics const* graphics;
+	WorldGenerator const* wg; 
 	// output
 	MeshingResult remesh_result;
 	float time;
@@ -262,7 +258,7 @@ public:
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float deletion_hysteresis = CHUNK_DIM_X*1.5f;
+	float deletion_hysteresis = CHUNK_DIM*1.5f;
 
 	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
 
@@ -283,8 +279,8 @@ public:
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
 
 		int chunk_count = chunks.count();
-		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM_X*CHUNK_DIM_Y*CHUNK_DIM_Z;
-		uint64_t block_mem = chunk_count * (uint64_t)(CHUNK_DIM_X+2)*(CHUNK_DIM_Y+2)*(CHUNK_DIM_Z+2) * sizeof(Block);
+		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM * CHUNK_DIM * CHUNK_DIM;
+		uint64_t block_mem = chunk_count * (uint64_t)(CHUNK_DIM+2)*(CHUNK_DIM+2)*(CHUNK_DIM+2) * sizeof(Block);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 
@@ -314,6 +310,6 @@ public:
 	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
 
 	// chunk meshing to prepare for drawing
-	void update_chunks (Graphics const& graphics, Player const& player);
+	void update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player);
 };
 

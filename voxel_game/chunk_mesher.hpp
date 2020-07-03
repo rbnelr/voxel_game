@@ -1,4 +1,6 @@
 #pragma once
 #include "chunks.hpp"
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, Chunk* chunk, MeshingResult* res);
+struct WorldGenerator;
+
+void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res);

@@ -26,6 +26,9 @@ bool cylinder_cube_intersect (float3 cyl_origin, float cyl_radius, float cyl_hei
 // nearest distance from point to square (square covers [square_pos, square_pos +square_size] on each axis)
 float point_square_nearest_dist (float2 square_pos, float2 square_size, float2 point);
 
+// nearest distance from point to box (box covers [box_pos, box_pos + box_size] on each axis)
+float point_box_nearest_dist (float3 box_pos, float3 box_size, float3 point);
+
 // cull (return true) if AABB is completely outside of one of the view frustrums planes
 // this cull 99% of the AABB that are invisible, but returns a false negative sometimes
 bool frustrum_cull_aabb (View_Frustrum const& frust, AABB aabb);

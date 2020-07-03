@@ -66,6 +66,9 @@ struct WorldGenerator {
 
 	float tree_desity_period = 200;
 	float tree_density_amp = 1;
+
+	float grass_desity_period = 40;
+	float grass_density_amp = .5f;
 	
 	WorldGenerator (): seed{get_seed(seed_str)} {
 		
@@ -97,6 +100,10 @@ struct WorldGenerator {
 		ImGui::DragFloat("tree_des_per", &tree_desity_period, 0.05f);
 		ImGui::SameLine();
 		ImGui::DragFloat("amp##tree_dens",  &tree_density_amp,  0.05f);
+
+		ImGui::DragFloat("grass_des_per", &grass_desity_period, 0.05f);
+		ImGui::SameLine();
+		ImGui::DragFloat("amp##grass_dens",  &grass_density_amp,  0.05f);
 
 		ImGui::PopItemWidth();
 		imgui_pop();

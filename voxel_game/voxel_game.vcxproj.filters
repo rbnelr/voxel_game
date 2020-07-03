@@ -228,14 +228,17 @@
     <ClInclude Include="items.hpp" />
     <ClInclude Include="voxel_light.hpp" />
     <ClInclude Include="time_of_day.hpp" />
-    <ClInclude Include="graphics\raytracer.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
     <ClInclude Include="graphics\graphics_common.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
     <ClInclude Include="util\raw_array.hpp">
       <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\read_directory.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="graphics\raytracer.hpp">
+      <Filter>graphics</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -420,6 +423,9 @@
     <ClCompile Include="items.cpp" />
     <ClCompile Include="voxel_light.cpp" />
     <ClCompile Include="time_of_day.cpp" />
+    <ClCompile Include="util\read_directory.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
     <ClCompile Include="graphics\raytracer.cpp">
       <Filter>graphics</Filter>
     </ClCompile>

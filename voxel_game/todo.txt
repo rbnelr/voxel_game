@@ -102,18 +102,51 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
    but the branching is just what is inherent to the octree traversal, all the branching which was just handeling logic were converted to calculations and look up tabels
    the current code might be one of the most optimal ways of traversing an octree on a gpu, the amount of calculations amounts to a few compares to mask, and mix'es and (a+b)*0.5 calculations, and the cells visited should be optimal, ie. the voxel lookups and interation count should be optimal
  -raytracer actually looks at octree now and stops at solid cells (can also stop at non size 1 cells, which could be changed if undesirable)
-
-TODO
--FEATURES:
  
- fix crosshair not appearing
-
- fix block updates
+ implement light level, night and torches
 
  implement time of day change
  -vary sunlight multiplier with time of day
  -vary skybox colors with time of day
+
+ fix block updates
+ -> wrote into copy of block instead of using set_block
+
+ explore ray marching for rendering:
+ -no chunk meshes at all, gpu does ray marching
+  -how is the complexity, performance and artifacting
+  -> code is kind of simple but requires pseudo-recursion in glsl, stable 144 fps when drawing a single chunk using an octree traversal algo, no artefacts I noticed
+ -feasable without octree?
+  -> indors maybe, but looking into the sky results in hundreds of iterations, which could quickly destroy performance (i don't remember if i tested a gpu version without octree)
+  -performance difference with octree?
+  -> on cpu version the octree overall reduced the iterations greatly (worst case is equal iterations) but the non-octree algo is so simple that even 10x the iterations beat the octree version
+    -> ground: octree a bit slower, horizon: octree _can_ be a lot slower in some places, sky: octree way faster, this is the worst case for the non-octree algo
+	-> in general the octree algo is faster drawing a single chunk, and drawing multiple chunks was not tested, but i presume the sky would clearly favor the octree version
+ -options: pixel shader, compute shader, opencl, cuda
+  -> compute shader probably makes the most sense, but pixel shader might also be finde since i am basicly trying to display the image anyway
+   -> OpenCL did not work at all (a call called QueueXXX hung, wtf?) which I think might have been because OpenCL cannot work on the same thread as OpenGL?? I abandoned OpenCL, since it seems to have a supid driver and SDK concept and figured that GLSL would be easier for me (it was)
+   -> used a pixel shader with textures for the SVO octree array, works like a charm but I have doubts that it is running at the performance that it should run at, might investigate and even compare with compute shader later
+ -automatic order independent transparency!
+  -> works!
+ -reflections on water / glass
+  -> TODO
+
+TODO
+-FEATURES:
  
+ chunk memory NEEDS to be optimized for big view distances, currently with 3d chunks and > 600 block view dist, I run out of memory (16 Gig)
+ ->octree or rle compression
+
+ try implement the meshing based on a SVO instead of an 3d array, if an octree actually speeds up the meshing too, then that tells me I should just always work with octrees everywhere
+ 
+ fix crosshair not appearing
+
+ BUG? investigate!
+ -program sometimes seems to take >10x as long as normal to start up (ie. render the first frame), only noticed this with the 3d chunks branch
+ -chunk generation/meshing not respecting work-per-frame cap somehow?
+ 
+ placing light near to unloaded chunk hangs the program
+
  rework items to be classes with inheritance?
  -pro: might simplyfy code a lot
  -pro: complex state does not take up memory in union for simple items
@@ -141,8 +174,6 @@ TODO
    -> bounce on collision with block? ie. when not timing jumps perfectly running up slopes
  
  add headbob?
-
- implement light level, night and torches
  
  sounds with openAL instead
 
@@ -178,7 +209,7 @@ TODO
  underwater fog
 
  reflections for water?
- -screenspace reflection
+ -screenspace reflection?
  
  look at COLLISION_SEPERATION_EPSILON, and if the raycast physics can live without it, being grounded should leave pos==block_top and vel.z==0
 
@@ -233,16 +264,6 @@ IDEAS:
   -a trick i just thought of is to not actually use per block noise samples for the very low freqs but instead do one sample per chunk and then interpolate based on a chunk and it's neighbours
     this way the minmax should be 100% possible to calculate and fast too.
   -this might allow for correct 'culling' of chunks before they ever need to be generated in any way, which should allow to bring down the chunk count in a 3d chunk system from view_dist^3 to view_dist^2 (surface area instead of volume)
-
- explore ray marching for rendering:
- -no chunk meshes at all, gpu does ray marching
-  -how is the complexity, performance and artifacting
- -feasable without octree?
-  -performance difference with octree?
- -options: pixel shader, compute shader, opencl, cuda
-  -> compute shader probably makes the most sense, but pixel shader might also be finde since i am basicly trying to display the image anyway
- -automatic order independent transparency!
- -reflections on water / glass
 
  instead of floating blocks everywhere create a basic structural simulation
  -minecraft proved that having large amounts of blocks be "falling blocks" (sand, eg. in desert) is possible

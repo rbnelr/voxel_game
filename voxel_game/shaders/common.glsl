@@ -127,4 +127,12 @@ $if fragment
 		else if (!_debug)
 			frag_col = col;
 	}
+
+	bool RIGHT () {
+		if (gl_FragCoord.x > cursor_pos.x)
+			return true;
+		if (gl_FragCoord.x == cursor_pos.x)
+			DEBUG(0);
+		return false;
+	}
 $endif

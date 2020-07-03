@@ -31,60 +31,60 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 void Chunk::init_blocks () {
 #if 1
 	// bottom
-	for (int y=0; y<CHUNK_DIM_Y+2; ++y) {
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
-			blocks[0][y][x] = _OUT_OF_BOUNDS;
+	for (int y=0; y<CHUNK_DIM+2; ++y) {
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
+			blocks[0][y][x] = _NO_CHUNK;
 		}
 	}
 	// top
-	for (int y=0; y<CHUNK_DIM_Y+2; ++y) {
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
-			blocks[CHUNK_DIM_Z+1][y][x] = _OUT_OF_BOUNDS;
+	for (int y=0; y<CHUNK_DIM+2; ++y) {
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
+			blocks[CHUNK_DIM+1][y][x] = _NO_CHUNK;
 		}
 	}
 
-	for (int z=1; z<CHUNK_DIM_Z+1; ++z) {
+	for (int z=1; z<CHUNK_DIM+1; ++z) {
 		// backward
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
 			blocks[z][0][x] = _NO_CHUNK;
 		}
 
-		for (int y=1; y<CHUNK_DIM_Y+1; ++y) {
-			for (int x=1; x<CHUNK_DIM_X+1; ++x) {
+		for (int y=1; y<CHUNK_DIM+1; ++y) {
+			for (int x=1; x<CHUNK_DIM+1; ++x) {
 				blocks[z][y][x] = Block(B_NULL);
 			}
 		}
 
 		// forward
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
-			blocks[z][CHUNK_DIM_Y+1][x] = _NO_CHUNK;
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
+			blocks[z][CHUNK_DIM+1][x] = _NO_CHUNK;
 		}
 	}
 
-	for (int z=1; z<CHUNK_DIM_Z+1; ++z) {
-		for (int y=1; y<CHUNK_DIM_Y+1; ++y) {
+	for (int z=1; z<CHUNK_DIM+1; ++z) {
+		for (int y=1; y<CHUNK_DIM+1; ++y) {
 			blocks[z][y][0] = _NO_CHUNK; // left
-			blocks[z][y][CHUNK_DIM_X+1] = _NO_CHUNK; // right
+			blocks[z][y][CHUNK_DIM+1] = _NO_CHUNK; // right
 		}
 	}
 #else
 	// bottom
-	for (int y=0; y<CHUNK_DIM_Y+2; ++y) {
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
+	for (int y=0; y<CHUNK_DIM+2; ++y) {
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
 			blocks[0][y][x] = _OUT_OF_BOUNDS;
 		}
 	}
-	for (int z=1; z<CHUNK_DIM_Z+1; ++z) {
-		for (int y=0; y<CHUNK_DIM_Y+2; ++y) {
-			for (int x=0; x<CHUNK_DIM_X+2; ++x) {
+	for (int z=1; z<CHUNK_DIM+1; ++z) {
+		for (int y=0; y<CHUNK_DIM+2; ++y) {
+			for (int x=0; x<CHUNK_DIM+2; ++x) {
 				blocks[z][y][x] = _NO_CHUNK;
 			}
 		}
 	}
 	// top
-	for (int y=0; y<CHUNK_DIM_Y+2; ++y) {
-		for (int x=0; x<CHUNK_DIM_X+2; ++x) {
-			blocks[CHUNK_DIM_Z+1][y][x] = _OUT_OF_BOUNDS;
+	for (int y=0; y<CHUNK_DIM+2; ++y) {
+		for (int x=0; x<CHUNK_DIM+2; ++x) {
+			blocks[CHUNK_DIM+1][y][x] = _OUT_OF_BOUNDS;
 		}
 	}
 #endif
@@ -108,8 +108,8 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 	*blk = b;
 	needs_remesh = true;
 
-	bool2 lo = (bpos2)pos_in_chunk == 0;
-	bool2 hi = (bpos2)pos_in_chunk == (bpos2)CHUNK_DIM-1;
+	bool3 lo = (bpos)pos_in_chunk == 0;
+	bool3 hi = (bpos)pos_in_chunk == (bpos)CHUNK_DIM-1;
 	if (any(lo || hi)) {
 		// block at border
 
@@ -123,14 +123,19 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 		};
 
 		if (lo.x) {
-			update_neighbour_block_copy(chunk_coord(-1, 0), bpos(CHUNK_DIM_X, pos_in_chunk.y, pos_in_chunk.z));
+			update_neighbour_block_copy(chunk_coord(-1, 0, 0), bpos(CHUNK_DIM, pos_in_chunk.y, pos_in_chunk.z));
 		} else if (hi.x) {
-			update_neighbour_block_copy(chunk_coord(+1, 0), bpos(         -1, pos_in_chunk.y, pos_in_chunk.z));
+			update_neighbour_block_copy(chunk_coord(+1, 0, 0), bpos(       -1, pos_in_chunk.y, pos_in_chunk.z));
 		}
 		if (lo.y) {
-			update_neighbour_block_copy(chunk_coord(0, -1), bpos(pos_in_chunk.x, CHUNK_DIM_Y, pos_in_chunk.z));
+			update_neighbour_block_copy(chunk_coord(0, -1, 0), bpos(pos_in_chunk.x, CHUNK_DIM, pos_in_chunk.z));
 		} else if (hi.y) {
-			update_neighbour_block_copy(chunk_coord(0, +1), bpos(pos_in_chunk.x,          -1, pos_in_chunk.z));
+			update_neighbour_block_copy(chunk_coord(0, +1, 0), bpos(pos_in_chunk.x,        -1, pos_in_chunk.z));
+		}
+		if (lo.z) {
+			update_neighbour_block_copy(chunk_coord(0, 0, -1), bpos(pos_in_chunk.x, pos_in_chunk.y, CHUNK_DIM));
+		} else if (hi.z) {
+			update_neighbour_block_copy(chunk_coord(0, 0, +1), bpos(pos_in_chunk.x, pos_in_chunk.y,        -1));
 		}
 	}
 }
@@ -158,64 +163,89 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 }
 
 void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM_Z; ++z) {
-		for (int y=0; y<CHUNK_DIM_Y; ++y) {
-			dst.set_block_unchecked(bpos(CHUNK_DIM_X, y,z), src.get_block(0,y,z));
+	for (int z=0; z<CHUNK_DIM; ++z) {
+		for (int y=0; y<CHUNK_DIM; ++y) {
+			dst.set_block_unchecked(bpos(CHUNK_DIM, y,z), src.get_block(0,y,z));
 		}
 	}
 }
 void set_neighbour_blocks_px (Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM_Z; ++z) {
-		for (int y=0; y<CHUNK_DIM_Y; ++y) {
-			dst.set_block_unchecked(bpos(-1, y,z), src.get_block(CHUNK_DIM_X-1, y,z));
+	for (int z=0; z<CHUNK_DIM; ++z) {
+		for (int y=0; y<CHUNK_DIM; ++y) {
+			dst.set_block_unchecked(bpos(-1, y,z), src.get_block(CHUNK_DIM-1, y,z));
 		}
 	}
 }
 void set_neighbour_blocks_ny (Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM_Z; ++z) {
-		for (int x=0; x<CHUNK_DIM_X; ++x) {
-			dst.set_block_unchecked(bpos(x, CHUNK_DIM_Y, z), src.get_block(x,0,z));
+	for (int z=0; z<CHUNK_DIM; ++z) {
+		for (int x=0; x<CHUNK_DIM; ++x) {
+			dst.set_block_unchecked(bpos(x, CHUNK_DIM, z), src.get_block(x,0,z));
 		}
 	}
 }
 void set_neighbour_blocks_py (Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM_Z; ++z) {
-		for (int x=0; x<CHUNK_DIM_X; ++x) {
-			dst.set_block_unchecked(bpos(x, -1, z), src.get_block(x, CHUNK_DIM_Y-1, z));
+	for (int z=0; z<CHUNK_DIM; ++z) {
+		for (int x=0; x<CHUNK_DIM; ++x) {
+			dst.set_block_unchecked(bpos(x, -1, z), src.get_block(x, CHUNK_DIM-1, z));
+		}
+	}
+}
+void set_neighbour_blocks_nz (Chunk const& src, Chunk& dst) {
+	for (int y=0; y<CHUNK_DIM; ++y) {
+		for (int x=0; x<CHUNK_DIM; ++x) {
+			dst.set_block_unchecked(bpos(x, y, CHUNK_DIM), src.get_block(x,y,0));
+		}
+	}
+}
+void set_neighbour_blocks_pz (Chunk const& src, Chunk& dst) {
+	for (int y=0; y<CHUNK_DIM; ++y) {
+		for (int x=0; x<CHUNK_DIM; ++x) {
+			dst.set_block_unchecked(bpos(x, y, -1), src.get_block(x, y, CHUNK_DIM-1));
 		}
 	}
 }
 
 void Chunk::update_neighbour_blocks (Chunks& chunks) {
 	Chunk* chunk;
-	if ((chunk = chunks.query_chunk(coord + chunk_coord(-1, 0)))) {
+	if ((chunk = chunks.query_chunk(coord + chunk_coord(-1, 0, 0)))) {
 		set_neighbour_blocks_nx(*this, *chunk);
 		set_neighbour_blocks_px(*chunk, *this);
 		chunk->needs_remesh = true;
 	}
-	if ((chunk = chunks.query_chunk(coord + chunk_coord(+1, 0)))) {
+	if ((chunk = chunks.query_chunk(coord + chunk_coord(+1, 0, 0)))) {
 		set_neighbour_blocks_px(*this, *chunk);
 		set_neighbour_blocks_nx(*chunk, *this);
 		chunk->needs_remesh = true;
 	}
 
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,-1)))) {
+	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,-1, 0)))) {
 		set_neighbour_blocks_ny(*this, *chunk);
 		set_neighbour_blocks_py(*chunk, *this);
 		chunk->needs_remesh = true;
 	}
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,+1)))) {
+	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,+1, 0)))) {
 		set_neighbour_blocks_py(*this, *chunk);
 		set_neighbour_blocks_ny(*chunk, *this);
+		chunk->needs_remesh = true;
+	}
+
+	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,-1)))) {
+		set_neighbour_blocks_nz(*this, *chunk);
+		set_neighbour_blocks_pz(*chunk, *this);
+		chunk->needs_remesh = true;
+	}
+	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,+1)))) {
+		set_neighbour_blocks_pz(*this, *chunk);
+		set_neighbour_blocks_nz(*chunk, *this);
 		chunk->needs_remesh = true;
 	}
 }
 
 void Chunk::reupload (MeshingResult const& result) {
-	mesh.opaque_mesh.upload(result.opaque_vertices.ptr, result.opaque_count);
-	mesh.transparent_mesh.upload(result.tranparent_vertices.ptr, result.tranparent_count);
+	mesh.opaque_mesh.upload(result.opaque_vertices.data(), result.opaque_vertices.size());
+	mesh.transparent_mesh.upload(result.tranparent_vertices.data(), result.tranparent_vertices.size());
 
-	face_count = (result.opaque_count + result.tranparent_count) / 6;
+	face_count = (result.opaque_vertices.size() + result.tranparent_vertices.size()) / 6;
 }
 
 //// Chunks
@@ -231,12 +261,9 @@ BackgroundJob BackgroundJob::execute () {
 }
 
 ParallelismJob ParallelismJob::execute () {
-	remesh_result.opaque_vertices     = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
-	remesh_result.tranparent_vertices = RawArray<ChunkMesh::Vertex>(CHUNK_BLOCK_COUNT*6*6);
-
 	auto timer = Timer::start();
 
-	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, chunk, &remesh_result);
+	mesh_chunk(*chunks, graphics->chunk_graphics, graphics->tile_textures, *wg, chunk, &remesh_result);
 
 	time = timer.end();
 	return std::move(*this);
@@ -280,9 +307,6 @@ Block const& Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos
 	if (out_block_pos_chunk)
 		*out_block_pos_chunk = block_pos_chunk;
 
-	if (p.z < 0 || p.z >= CHUNK_DIM_Z)
-		return _OUT_OF_BOUNDS;
-
 	Chunk* chunk = query_chunk(chunk_pos);
 	if (!chunk)
 		return _NO_CHUNK;
@@ -307,8 +331,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
-		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
-		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
+		bpos chunk_origin = pos * CHUNK_DIM;
+		return point_box_nearest_dist((float3)chunk_origin, CHUNK_DIM, player.pos);
 	};
 	auto chunk_lod = [&] (float dist) {
 		return clamp(floori(log2f(dist / generation_radius * 16)), 0,3);
@@ -331,22 +355,24 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 	}
 
 	{ // chunk loading
-		chunk_coord start =	(chunk_coord)floor(	((float2)player.pos - generation_radius) / (float2)CHUNK_DIM_2D );
-		chunk_coord end =	(chunk_coord)ceil(	((float2)player.pos + generation_radius) / (float2)CHUNK_DIM_2D );
+		chunk_coord start =	(chunk_coord)floor(	((float3)player.pos - generation_radius) / (float3)CHUNK_DIM );
+		chunk_coord end =	(chunk_coord)ceil(	((float3)player.pos + generation_radius) / (float3)CHUNK_DIM );
 
 		// check all chunk positions within a square of chunk_generation_radius
 		std::vector<chunk_coord> chunks_to_generate;
 
 		chunk_coord cp;
-		for (cp.x = start.x; cp.x<end.x; ++cp.x) {
+		for (cp.z = start.z; cp.z<end.z; ++cp.z) {
 			for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-				auto* chunk = query_chunk(cp);
-				float dist = chunk_dist_to_player(cp);
+				for (cp.x = start.x; cp.x<end.x; ++cp.x) {
+					auto* chunk = query_chunk(cp);
+					float dist = chunk_dist_to_player(cp);
 
-				if (!chunk) {
-					if (dist <= generation_radius && !pending_chunks.query_chunk(cp)) {
-						// chunk is within chunk_generation_radius and not yet generated
-						chunks_to_generate.push_back(cp);
+					if (!chunk) {
+						if (dist <= generation_radius && !pending_chunks.query_chunk(cp)) {
+							// chunk is within chunk_generation_radius and not yet generated
+							chunks_to_generate.push_back(cp);
+						}
 					}
 				}
 			}
@@ -377,7 +403,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 			res.chunk->update_neighbour_blocks(*this);
 
 			chunk_gen_time.push(res.time);
-			logf("Chunk (%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.time * 1024);
+			logf("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
 		}
 
 	}
@@ -385,10 +411,10 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 }
 
 
-void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
+void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player) {
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
-		bpos2 chunk_origin = pos * CHUNK_DIM_2D;
-		return point_square_nearest_dist((float2)chunk_origin, (float2)CHUNK_DIM_2D, (float2)player.pos);
+		bpos chunk_origin = pos * CHUNK_DIM;
+		return point_box_nearest_dist((float3)chunk_origin, CHUNK_DIM, player.pos);
 	};
 
 	std::vector<Chunk*> chunks_to_remesh;
@@ -410,7 +436,7 @@ void Chunks::update_chunks (Graphics const& graphics, Player const& player) {
 			auto* chunk = chunks_to_remesh[i];
 
 			ParallelismJob job = {
-				chunk, this, &graphics
+				chunk, this, &graphics, &wg
 			};
 			parallelism_threadpool.jobs.push(std::move(job));
 		}
