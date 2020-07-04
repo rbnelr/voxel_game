@@ -50,28 +50,63 @@ $if fragment
 		has_children == 1: payload leaf voxel data, ie. block id
 	*/
 	
-#define DEBUG 1
-#if DEBUG
 	uniform float slider; // debugging
 	uniform int max_iterations = 100; // iteration limiter for debugging
 	uniform bool visualize_iterations = true;
 	uniform sampler2D heat_gradient;
-#endif
 
-	float min_component (vec3 v) {
-		return min(min(v.x, v.y), v.z);
-	}
-	float max_component (vec3 v) {
-		return max(max(v.x, v.y), v.z);
-	}
-
-	//bvec3 xor (bvec3 l, bvec3 r) { // why is this not a language feature if ivec3 ^ ivec3 is a thing?
-	//	//return bvec3(l.x ^ r.x, l.y ^ r.y, l.z ^ r.z);
-	//	return bvec3(ivec3(l) ^ ivec3(r));
-	//}
+	uniform float max_dist = 100;
 
 	vec3 ray_pos;
 	vec3 ray_dir;
+
+	vec3 mirror_ray_pos;
+
+	vec3 rinv_dir;
+	int mirror_mask_int = 0;
+
+	// Textures
+	uniform	sampler2DArray tile_textures;
+	uniform sampler1D block_tile_info;
+
+	/*
+	BlockTileInfo: float4 { base_index, top, bottom, variants }
+	}
+	*/
+
+	float hit_dist = 0.0;
+	vec4 hit_col = vec4(0,0,0,0);
+
+	int iterations = 0;
+
+	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
+		hit_dist = t0;
+
+		vec3 pos_world = ray_dir * hit_dist + ray_pos;
+
+		vec3 pos_fract = pos_world - floor(pos_world);
+
+		vec2 uv;
+
+		if (entry_faces.x)
+			uv = pos_fract.yz;
+		else if (entry_faces.y)
+			uv = pos_fract.xz;
+		else
+			uv = pos_fract.xy;
+
+		uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
+		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
+
+		vec4 bti = texelFetch(block_tile_info, block_id, 0);
+
+		float tex_indx = bti.x; // x=base_index
+		if (entry_faces.z) {
+			tex_indx += ray_dir.z <= 0 ? bti.y : bti.z; // y=top : z=bottom
+		}
+
+		hit_col = texture(tile_textures, vec3(uv, tex_indx));
+	}
 
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray () {
@@ -92,19 +127,24 @@ $if fragment
 		ray_pos -= svo_root_pos;
 	}
 
-	vec3 rinv_dir;
-	int mirror_mask_int = 0;
+	float min_component (vec3 v) {
+		return min(min(v.x, v.y), v.z);
+	}
+	float max_component (vec3 v) {
+		return max(max(v.x, v.y), v.z);
+	}
 
-	void intersect_ray (ivec3 cube_pos, int cube_scale, out float t0, out float t1, out bvec3 exit_faces) {
+	void intersect_ray (ivec3 cube_pos, int cube_scale, out float t0, out float t1, out bvec3 exit_faces, out bvec3 entry_faces) {
 		vec3 cube_min = vec3(cube_pos);
 		vec3 cube_max = vec3(cube_pos + (1 << cube_scale));
 
-		vec3 t0v = rinv_dir * (cube_min - ray_pos);
-		vec3 t1v = rinv_dir * (cube_max - ray_pos);
+		vec3 t0v = rinv_dir * (cube_min - mirror_ray_pos);
+		vec3 t1v = rinv_dir * (cube_max - mirror_ray_pos);
 
 		t0 = max_component( t0v );
 		t1 = min_component( t1v );
 
+		entry_faces = equal(vec3(t0), t0v);
 		exit_faces = equal(vec3(t1), t1v);
 	}
 
@@ -113,7 +153,7 @@ $if fragment
 
 		vec3 parent_mid = vec3(parent_pos + (1 << child_scale));
 
-		vec3 tmid = rinv_dir * (parent_mid - ray_pos);
+		vec3 tmid = rinv_dir * (parent_mid - mirror_ray_pos);
 
 		ivec3 bits = ivec3( greaterThanEqual(vec3(t0), tmid) );
 
@@ -122,18 +162,12 @@ $if fragment
 		child_pos.z = parent_pos.z | (bits.z << child_scale);
 	}
 
-	int highest_differing_bit (int a, int b) {
-		int diff = a ^ b; // bita != bitb => diffbit
-
-		return findMSB(diff);
-	}
 	int highest_differing_bit (ivec3 a, ivec3 b) {
-		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
+		return max(max(findMSB(a.x ^ b.x), findMSB(a.y ^ b.y)), findMSB(a.z ^ b.z));
 	}
 
-	float raytrace (float max_dist, out int iterations) {
-		int iter = 0;
-		float hit_dist = -1;
+	void raytrace () {
+		float hit_dist = -1.0;
 
 		vec3 root_min = vec3(0);
 		vec3 root_max = vec3(CHUNK_DIM);
@@ -143,17 +177,20 @@ $if fragment
 		int parent_scale = MAX_SCALE;
 
 		mirror_mask_int = 0;
-		
+
+		mirror_ray_pos = ray_pos;
+		vec3 mirror_ray_dir;
+
 		// mirror coord system to make all ray dir components positive, like in "An Efficient Parametric Algorithm for Octree Traversal"
 		for (int i=0; i<3; ++i) {
 			bool mirror = ray_dir[i] < 0;
 		
-			ray_dir[i] = abs(ray_dir[i]);
-			if (mirror) ray_pos[i] = root_max[i] - ray_pos[i]; // mirror along mid  ie.  -1 * (ray_pos - mid) + mid -> 2*mid - ray_pos
+			mirror_ray_dir[i] = abs(ray_dir[i]);
+			if (mirror) mirror_ray_pos[i] = root_max[i] - ray_pos[i]; // mirror along mid  ie.  -1 * (ray_pos - mid) + mid -> 2*mid - ray_pos
 			if (mirror) mirror_mask_int |= 1 << i;
 		}
 		
-		rinv_dir = 1.0 / ray_dir;
+		rinv_dir = 1.0 / mirror_ray_dir;
 
 		int parent_node = get_svo_node(0);
 
@@ -162,8 +199,8 @@ $if fragment
 		float tmax = max_dist;
 
 		// cube ray range
-		float t0 = max_component( rinv_dir * (root_min - ray_pos) );
-		float t1 = min_component( rinv_dir * (root_max - ray_pos) );
+		float t0 = max_component( rinv_dir * (root_min - mirror_ray_pos) );
+		float t1 = min_component( rinv_dir * (root_max - mirror_ray_pos) );
 
 		t0 = max(tmin, t0);
 		t1 = min(tmax, t1);
@@ -176,14 +213,12 @@ $if fragment
 		float stack_t1[ MAX_SCALE -1 ];
 
 		for (;;) {
-		#if DEBUG
-			if (iter++ >= max_iterations) break;
-		#endif
+			if (iterations++ >= max_iterations) break;
 
 			// child cube ray range
 			float child_t0, child_t1;
-			bvec3 exit_face;
-			intersect_ray(child_pos, child_scale, child_t0, child_t1, exit_face);
+			bvec3 exit_face, entry_faces;
+			intersect_ray(child_pos, child_scale, child_t0, child_t1, exit_face, entry_faces);
 
 			bool voxel_exists = (parent_node & 0x80000000) != 0;
 			if (voxel_exists && t0 < t1) {
@@ -205,9 +240,8 @@ $if fragment
 					bool leaf = (node & 0x80000000) == 0;
 					if (leaf) {
 						if (node != B_AIR) {
-							//hit.did_hit = true;
-							hit_dist = tv0;
-							break; // hit
+							calc_hit(tv0, entry_faces, node);
+							return; // hit
 						}
 					} else {
 						//// Push
@@ -253,9 +287,8 @@ $if fragment
 				//// Pop
 				child_scale = highest_differing_bit(old_pos, child_pos);
 
-				if (child_scale >= MAX_SCALE) {
-					break; // out of root
-				}
+				if (child_scale >= MAX_SCALE)
+					return; // out of root
 
 				parent_node	= stack_node[child_scale - 1];
 				t1			= stack_t1  [child_scale - 1];
@@ -266,27 +299,15 @@ $if fragment
 				child_pos.z &= clear_mask;
 			}
 		}
-
-		iterations = iter;
-		return hit_dist;
 	}
 
 	void main () {
-		frag_col = vec4(0,0,0,0);
-
-	#if DEBUG
-		int iterations;
-	#endif
-		float max_dist = 100;
-
 		get_ray();
-		float hit_dist = raytrace(max_dist, iterations);
+		raytrace();
 		
-	#if DEBUG
 		if (visualize_iterations)
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 		else
-			frag_col = vec4(vec3(hit_dist / max_dist), 1.0);
-	#endif
+			frag_col = hit_col;
 	}
 $endif

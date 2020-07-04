@@ -373,6 +373,8 @@ struct BlockMeshVertex {
 	float2	uv;
 };
 
+#define ARRLEN(arr) (sizeof(arr)/sizeof(arr[0]))
+
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
 struct TileTextures {

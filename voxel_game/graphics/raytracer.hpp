@@ -59,9 +59,13 @@ public:
 	Sampler svo_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 	Sampler gradient_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
 
+	Texture1D block_tile_info_texture;
+	
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 
 	bool raytracer_draw = true;
+	bool overlay = true;
+
 	float slider = 0.85f;
 
 	int max_iterations = 256;
@@ -75,5 +79,5 @@ public:
 
 	//lrgba raytrace_pixel (int2 pixel, Camera_View const& view);
 
-	void draw (Chunks& chunks, Camera_View const& view);
+	void draw (Chunks& chunks, Camera_View const& view, Graphics& graphics);
 };

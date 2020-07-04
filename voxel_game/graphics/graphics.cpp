@@ -809,7 +809,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
+		if (!raytracer.raytracer_draw || raytracer.overlay)
+			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
 		skybox.draw();
 	}
@@ -825,10 +826,12 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			block_highlight.draw((float3)selected_block.pos, (BlockFace)(selected_block.face >= 0 ? selected_block.face : 0));
 		}
 
-		//glCullFace(GL_FRONT);
-		//chunk_graphics.draw_chunks_transparent(chunks);
-		//glCullFace(GL_BACK);
-		chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
+		if (!raytracer.raytracer_draw || raytracer.overlay) {
+			//glCullFace(GL_FRONT);
+			//chunk_graphics.draw_chunks_transparent(chunks);
+			//glCullFace(GL_BACK);
+			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
+		}
 
 		glEnable(GL_CULL_FACE);
 		debug_graphics->draw();
@@ -836,11 +839,13 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 
-	glDisable(GL_DEPTH_TEST);
-	glDepthMask(GL_FALSE);
-	raytracer.draw(world.chunks, view);
-	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
+	if (raytracer.raytracer_draw) {
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_FALSE);
+		raytracer.draw(world.chunks, view, *this);
+		glDepthMask(GL_TRUE);
+		glEnable(GL_DEPTH_TEST);
+	}
 
 	{ //// First person overlay pass
 		if (!activate_flycam && !world.player.third_person) 

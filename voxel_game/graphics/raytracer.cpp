@@ -152,6 +152,8 @@ void Raytracer::imgui (Chunks& chunks) {
 	if (!imgui_push("Raytracer")) return;
 
 	ImGui::Checkbox("draw", &raytracer_draw);
+	ImGui::Checkbox("overlay", &overlay);
+
 	ImGui::SliderFloat("slider", &slider, 0,1);
 
 	ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
@@ -163,7 +165,7 @@ void Raytracer::imgui (Chunks& chunks) {
 	imgui_pop();
 }
 
-void Raytracer::draw (Chunks& chunks, Camera_View const& view) {
+void Raytracer::draw (Chunks& chunks, Camera_View const& view, Graphics& graphics) {
 	if (octree_debug_draw)
 		octree.debug_draw(octree_debug_draw_depth);
 
@@ -195,14 +197,30 @@ TIME_END(build);
 
 		svo_texture.upload(&octree.nodes[0], (int)octree.nodes.size(), false, GL_R32I, GL_RED_INTEGER, GL_INT);
 
+		std::vector<float4> block_tile_info;
+		for (auto& bti : graphics.tile_textures.block_tile_info) {
+			block_tile_info.push_back((float4)int4( bti.base_index, bti.top, bti.bottom, bti.variants ));
+		}
+		block_tile_info_texture.upload(&block_tile_info[0], (int)block_tile_info.size(), false, GL_RGBA32I, GL_RGBA_INTEGER, GL_INT);
+
 		glActiveTexture(GL_TEXTURE0 + 0);
-		shader.set_texture_unit("svo_texture", 0);
-		svo_sampler.bind(0);
-		svo_texture.bind();
+		shader.set_texture_unit("tile_textures", 0);
+		graphics.sampler.bind(0);
+		graphics.tile_textures.tile_textures.bind();
 
 		glActiveTexture(GL_TEXTURE0 + 1);
-		shader.set_texture_unit("heat_gradient", 1);
-		gradient_sampler.bind(1);
+		shader.set_texture_unit("block_tile_info", 1);
+		svo_sampler.bind(1);
+		block_tile_info_texture.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 2);
+		shader.set_texture_unit("svo_texture", 2);
+		svo_sampler.bind(2);
+		svo_texture.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 3);
+		shader.set_texture_unit("heat_gradient", 3);
+		gradient_sampler.bind(3);
 		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
