@@ -130,24 +130,44 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
   -> works!
  -reflections on water / glass
   -> TODO
-  
- fix crosshair not appearing
- 
- BUG? investigate!
- -program sometimes seems to take >10x as long as normal to start up (ie. render the first frame), only noticed this with the 3d chunks branch
- -chunk generation/meshing not respecting work-per-frame cap somehow?
- 
- made a shader inspector in imgui that shows preprocessed shader code
- and added a feature in the preprocessor that allows reconstruction of line number with errors generated in the compilation of the preprocessed file
- I think this is how c/c++ do it
- 
+
 TODO
+-MAJOR PLANS:
+ ---Full octree for world for nice raytracer
+ -generate octree not every frame, update only parts of octree when changed (update changes per chunk?)
+ -octree with absolute 32 bit pointers (index) for now, so single store of octree nodes makes sense
+  -> world octree class
+ -chunks have refs to their subtree?
+ -dynamic resize nature of subtrees requires block based alloc for efficient mem management
+ -infinite world with not-way-too-deep octree requires moving octree root, which I successully did in the past (unity caves proj)
+   moving root that moves around by half it's size (the size of it's children) means it can just reorder it's children (delete and recreate 4, and shuffle the other 4)
+   so it's quick, math was easy
+  -the problem here might be that the coords are not aligned anymore with the integer bits (pos in nvidia paper)
+   -> but only the root coord itself and the child indexes of the level 1 children would be 'wrong'
+       this might not be an issue
+ -for now I will handle block based alloc with a freelist of block pointers in an array
+  -this could be compacted, sorted etc. at runtime
+ -octree contains absolute pointers for now, but could be turned into relative (16 bit) pointers within blocks and special 32 bit absoulte 'far' pointers to other blocks
+ -chunk octree storage and octree of chunks storage is kinda seperate
+
+ ---Hot C++ reloading
+ -with serialization / deserialization ?
+ -with raw binary memory?
+  -better to have everything as pointer so that you can at least add variables at end of classes?
+
+
 -FEATURES:
- 
+
  chunk memory NEEDS to be optimized for big view distances, currently with 3d chunks and > 600 block view dist, I run out of memory (16 Gig)
  ->octree or rle compression
 
  try implement the meshing based on a SVO instead of an 3d array, if an octree actually speeds up the meshing too, then that tells me I should just always work with octrees everywhere
+ 
+ fix crosshair not appearing
+
+ BUG? investigate!
+ -program sometimes seems to take >10x as long as normal to start up (ie. render the first frame), only noticed this with the 3d chunks branch
+ -chunk generation/meshing not respecting work-per-frame cap somehow?
  
  placing light near to unloaded chunk hangs the program
 
@@ -179,8 +199,6 @@ TODO
  
  add headbob?
  
- make a shader inspector in imgui that can edit shader code
- 
  sounds with openAL instead
 
  npcs
@@ -195,24 +213,19 @@ TODO
    if it is too big then gravity will not accelerate the player fast enough with my 144hz framerate too "reach" the ground fast enough so that suddenly the player only "touches" the ground every 3 frames
    and the position stutters slightly, which also trips up the grounded detection.
  -an epsilon should be close to the limit of float precision to avoid this.
-   but it cannot be that small because then simply by moving 1000 blocks in one direction and the epsilon rounds to 0
+   but it cannot be that small because then simply by moving 1000 blocks in one direction not the epsilon rounds to 0
    > not good
- -doubles would probably solve this issue even for far distances, but gpus do not support doubles usually so that is not a nice option
+ -doubles would probably solve this issue even for far distances, but gpus do not support doubles usually so that is not an option
  -the only remaining solution is to have a "moving" origin, where the graphics and physics happens with these relative coords
    but the actual positions store an additional int to keep track of their real value
  -in this case of already having int indexes for blocks and floats for player, npcs etc. it is advantageous to just split the coords into block pos and fract pos with fract being a float
-  -> floor(pos_world) is already used for getting block pos of world pos now reduces to pos_world.block > nice
+  -> floor(pos_world) reduces to pos_world.block > nice
   -> opengl matricies now need to store their coords relative to the player block, all block pos passed into shaders also need to get the player block substracted
   -> all fractional world positons need to use the new block_pos, fract_pos pair instead, which needs to wrap() its fract part and modify its block pos if the fract part moves wraps
   -> per frame you can simply work with this moving origin being constant, ie. use floats
    -> at the beginning of the frame a global block pos gets set as origin for that frame, coord->float just substracts that origin and float->coord adds it again,
       now this is almost automatic, you just need to make sure to not store float pos_worlds across frames because they get invalidated by the origin moving, just like an iterator into a vector gets invalidated by the vector expanding
-  -> the float origin per frame approach still causes all calculations happening in that frame to happen realtive to this, so a splitscreen mode with 2 players distant to each other might be a problem
-  -> also maybe chunk_index + float offset might make more sense for some parts of the code
-  -> I think just the entity physics code and entity rendering needs floats, so maybe you just deal with these int-float coords and convert to a local origin in the relevant parts,
-       ie. almost like not even having an origin at all, pure floats are just used for relative coords, ie. cube-player collision code usually converts player coords to be relative to the cube already, or ai code might want to get a vector from monster to player, those are the points where int-float - int-float -> float happens
-	   ie. simply implementing float3 operator- (coord, coord) for these coords is enough, the only other case might be int3 get_containing_block (coord), which turns from a floor into a int member read
-
+ 
  movement code in traditional way, ie. check for overlap and depen vector and apply collision response with these (teleport to depen)
  -can still split timestep based on movement speed to make sure teleporting through blocks does not happen
  -by enforcing a max movement speed we can be sure that we never infinite loop
@@ -238,6 +251,8 @@ TODO
  
  better third person camera object avoidance
  -camera should never clip into blocks! currently the camera focus point does not, but the near plane still goes into the block partly
+
+ make a shader inspector in imgui that can edit shader code
 
  add shader directory change notify to reload all shaders that contain a changed file
  
@@ -283,7 +298,12 @@ IDEAS:
  -blocks with stablity 0 cannot be placed or just fall down (randomly maybe)
  -stablity could be visualized by having blocks "sag" with low stablity, ie. the mesher just shifts them down a bit
  -1 block wide towsers would still be 100% stable
-  -maybe a noita-like system (the powder pixels) could be used so that falling blocks also randomly fall off the side of a block to form piles
+  -maybe a noita-like system (the powder pixels) could be used so that falling blocks also randomly fall off the side of a block to form 
+
+
+
+
+
 
 -OLD version:
  convert entire debug optios into new imgui way of doing things
