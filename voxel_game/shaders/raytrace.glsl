@@ -31,6 +31,7 @@ $if fragment
 #define MAX_SCALE 6 // "scale" of root DVO node
 
 #define B_AIR 1 // block id
+#define B_WATER 2 // block id
 
 	int get_svo_node (int index) {
 		return texelFetch(svo_texture, index, 0).r;
@@ -73,12 +74,27 @@ $if fragment
 	float hit_dist = 0.0;
 	vec4 hit_col = vec4(0,0,0,0);
 
-	int cur_medium = B_AIR;
+	int cur_medium = 0;
 
 	int iterations = 0;
 
 	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
-		if (block_id == cur_medium || block_id == B_AIR) return;
+		if (cur_medium == 0) {
+			cur_medium = block_id;
+			return;
+		}
+
+		int effective_block_id = block_id;
+
+		if ((block_id == cur_medium && block_id == B_WATER))
+			return; // only render entry of water, not all octree cubes
+		
+		if (cur_medium == B_WATER && block_id == B_AIR) {
+			effective_block_id = B_WATER; // render water exit into air as water
+		} else if (block_id == B_AIR)
+			return; // never try to render air
+		
+		cur_medium = block_id;
 
 		hit_dist = t0;
 
@@ -98,7 +114,7 @@ $if fragment
 		uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
 		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
 
-		vec4 bti = texelFetch(block_tile_info, block_id, 0);
+		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
 		float tex_indx = bti.x; // x=base_index
 		if (entry_faces.z) {
@@ -111,7 +127,6 @@ $if fragment
 		float effective_alpha = remain_alpha * col.a;
 		hit_col += vec4(effective_alpha * col.rgb, effective_alpha);
 
-		cur_medium = block_id;
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies

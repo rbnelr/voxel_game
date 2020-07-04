@@ -132,8 +132,32 @@ light propagation using algorithm from https://www.seedofandromeda.com/blogs/29-
   -> TODO
 
 TODO
+-MAJOR PLANS:
+ ---Full octree for world for nice raytracer
+ -generate octree not every frame, update only parts of octree when changed (update changes per chunk?)
+ -octree with absolute 32 bit pointers (index) for now, so single store of octree nodes makes sense
+  -> world octree class
+ -chunks have refs to their subtree?
+ -dynamic resize nature of subtrees requires block based alloc for efficient mem management
+ -infinite world with not-way-too-deep octree requires moving octree root, which I successully did in the past (unity caves proj)
+   moving root that moves around by half it's size (the size of it's children) means it can just reorder it's children (delete and recreate 4, and shuffle the other 4)
+   so it's quick, math was easy
+  -the problem here might be that the coords are not aligned anymore with the integer bits (pos in nvidia paper)
+   -> but only the root coord itself and the child indexes of the level 1 children would be 'wrong'
+       this might not be an issue
+ -for now I will handle block based alloc with a freelist of block pointers in an array
+  -this could be compacted, sorted etc. at runtime
+ -octree contains absolute pointers for now, but could be turned into relative (16 bit) pointers within blocks and special 32 bit absoulte 'far' pointers to other blocks
+ -chunk octree storage and octree of chunks storage is kinda seperate
+
+ ---Hot C++ reloading
+ -with serialization / deserialization ?
+ -with raw binary memory?
+  -better to have everything as pointer so that you can at least add variables at end of classes?
+
+
 -FEATURES:
- 
+
  chunk memory NEEDS to be optimized for big view distances, currently with 3d chunks and > 600 block view dist, I run out of memory (16 Gig)
  ->octree or rle compression
 

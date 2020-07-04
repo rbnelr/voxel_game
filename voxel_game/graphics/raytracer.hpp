@@ -46,6 +46,7 @@ struct Octree {
 	void debug_draw (int max_depth=9999);
 };
 
+//$serialize
 class Raytracer {
 public:
 
