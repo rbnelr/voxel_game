@@ -73,9 +73,13 @@ $if fragment
 	float hit_dist = 0.0;
 	vec4 hit_col = vec4(0,0,0,0);
 
+	int cur_medium = B_AIR;
+
 	int iterations = 0;
 
 	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
+		if (block_id == cur_medium || block_id == B_AIR) return;
+
 		hit_dist = t0;
 
 		hit_pos_world = ray_dir * hit_dist + ray_pos;
@@ -106,6 +110,8 @@ $if fragment
 		float remain_alpha = 1.0 - hit_col.a;
 		float effective_alpha = remain_alpha * col.a;
 		hit_col += vec4(effective_alpha * col.rgb, effective_alpha);
+
+		cur_medium = block_id;
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies
@@ -239,12 +245,12 @@ $if fragment
 					
 					bool leaf = (node & 0x80000000) == 0;
 					if (leaf) {
-						if (node != B_AIR) {
+						//if (node != B_AIR) {
 							calc_hit(tv0, entry_faces, node);
 							
 							if (hit_col.a > 0.999)
 								return; // final hit
-						}
+						//}
 					} else {
 						//// Push
 						stack_node[child_scale - 1] = parent_node;
