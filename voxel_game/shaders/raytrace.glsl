@@ -67,13 +67,9 @@ $if fragment
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
-	uniform sampler1D block_tile_info;
+	uniform sampler1D block_tile_info; // BlockTileInfo: float4 { base_index, top, bottom, variants }
 
-	/*
-	BlockTileInfo: float4 { base_index, top, bottom, variants }
-	}
-	*/
-
+	vec3 hit_pos_world = vec3(0.0);
 	float hit_dist = 0.0;
 	vec4 hit_col = vec4(0,0,0,0);
 
@@ -82,9 +78,9 @@ $if fragment
 	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
 		hit_dist = t0;
 
-		vec3 pos_world = ray_dir * hit_dist + ray_pos;
+		hit_pos_world = ray_dir * hit_dist + ray_pos;
 
-		vec3 pos_fract = pos_world - floor(pos_world);
+		vec3 pos_fract = hit_pos_world - floor(hit_pos_world);
 
 		vec2 uv;
 
@@ -309,5 +305,11 @@ $if fragment
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 		else
 			frag_col = hit_col;
+
+		{ // Write depth
+			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
+			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
+			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
+		}
 	}
 $endif
