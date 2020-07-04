@@ -836,7 +836,11 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 
+	glDisable(GL_DEPTH_TEST);
+	glDepthMask(GL_FALSE);
 	raytracer.draw(world.chunks, view);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
 
 	{ //// First person overlay pass
 		if (!activate_flycam && !world.player.third_person) 

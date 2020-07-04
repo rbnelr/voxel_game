@@ -41,6 +41,9 @@ struct Octree {
 	float3 pos;
 
 	void build_non_sparse_octree (Chunk* chunk);
+
+	void recurs_draw (Node& node, int3 index, int level, int max_level);
+	void debug_draw (int max_depth=9999);
 };
 
 class Raytracer {
@@ -63,17 +66,11 @@ public:
 	int max_iterations = 256;
 	bool visualize_iterations = false;
 
-	void imgui (Chunks& chunks) {
-		if (!imgui_push("Raytracer")) return;
+	//
+	bool octree_debug_draw = false;
+	int octree_debug_draw_depth = 99;
 
-		ImGui::Checkbox("draw", &raytracer_draw);
-		ImGui::SliderFloat("slider", &slider, 0,1);
-
-		ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
-		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
-
-		imgui_pop();
-	}
+	void imgui (Chunks& chunks);
 
 	//lrgba raytrace_pixel (int2 pixel, Camera_View const& view);
 

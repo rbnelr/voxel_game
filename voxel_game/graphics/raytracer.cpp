@@ -109,10 +109,64 @@ Octree build_octree (Chunk* chunk) {
 	return o;
 }
 
+
+lrgba cols[] = {
+	srgba(255,0,0),
+	srgba(0,255,0),
+	srgba(0,0,255),
+	srgba(255,255,0),
+	srgba(255,0,255),
+	srgba(0,255,255),
+	srgba(127,0,255),
+	srgba(255,0,127),
+	srgba(255,127,255),
+};
+
+void Octree::recurs_draw (Node& node, int3 index, int level, int max_level) {
+	float voxel_size = (float)(1 << level);
+
+	debug_graphics->push_wire_cube((float3)index + pos + 0.5f * voxel_size, voxel_size * 0.99f, cols[level]);
+
+	if (level <= max_level) return;
+
+	if (node.has_children()) {
+		Node* children = &nodes[ node.children_indx() ];
+		for (int i=0; i<8; ++i) {
+			int3 child_indx = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+			int child_level = level - 1;
+			recurs_draw(*children++,
+				index + int3(child_indx.x << child_level, child_indx.y << child_level, child_indx.z << child_level),
+				child_level, max_level);
+		}
+	}
+}
+
+void Octree::debug_draw (int max_level) {
+	recurs_draw(nodes[root], 0, CHUNK_DIM_SHIFT, CHUNK_DIM_SHIFT - max_level + 1);
+}
+
 #define TIME_START(name) auto __##name = Timer::start()
 #define TIME_END(name) auto __##name##_time = __##name.end()
 
+void Raytracer::imgui (Chunks& chunks) {
+	if (!imgui_push("Raytracer")) return;
+
+	ImGui::Checkbox("draw", &raytracer_draw);
+	ImGui::SliderFloat("slider", &slider, 0,1);
+
+	ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
+	ImGui::Checkbox("visualize_iterations", &visualize_iterations);
+
+	ImGui::Checkbox("octree_debug_draw", &octree_debug_draw);
+	ImGui::SliderInt("octree_debug_draw_depth", &octree_debug_draw_depth, 1, CHUNK_DIM_SHIFT+1);
+
+	imgui_pop();
+}
+
 void Raytracer::draw (Chunks& chunks, Camera_View const& view) {
+	if (octree_debug_draw)
+		octree.debug_draw(octree_debug_draw_depth);
+
 	if (!raytracer_draw) return;
 
 	Chunk* chunk;
@@ -122,6 +176,8 @@ void Raytracer::draw (Chunks& chunks, Camera_View const& view) {
 TIME_START(build);
 	octree = build_octree(chunk);
 TIME_END(build);
+
+	ImGui::Text("Octree stats:  node_count %d  node_size %d B  total_size %.3f KB", octree.node_count, octree.node_size, octree.total_size / 1024.0f);
 
 	build_octree(chunk);
 
@@ -137,7 +193,7 @@ TIME_END(build);
 		shader.set_uniform("max_iterations", max_iterations);
 		shader.set_uniform("visualize_iterations", visualize_iterations);
 
-		svo_texture.upload(&octree.nodes[0], (int)octree.nodes.size(), false, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT);
+		svo_texture.upload(&octree.nodes[0], (int)octree.nodes.size(), false, GL_R32I, GL_RED_INTEGER, GL_INT);
 
 		glActiveTexture(GL_TEXTURE0 + 0);
 		shader.set_texture_unit("svo_texture", 0);

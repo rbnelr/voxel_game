@@ -1,4 +1,4 @@
-﻿#version 330 core
+﻿#version 400 core // for findMSB
 
 $include "common.glsl"
 $include "fog.glsl"
@@ -19,12 +19,13 @@ $if vertex
 $endif
 
 $if fragment
-	
+
 	uniform float slider;
 	uniform isampler1D svo_texture;
 	uniform vec3 svo_root_pos;
 
 	uniform int max_iterations = 100;
+	uniform bool visualize_iterations = true;
 	uniform sampler2D heat_gradient;
 	
 	int get_svo_node (int index) {
@@ -82,9 +83,6 @@ $if fragment
 	vec3 rinv_dir;
 	int mirror_mask_int = 0;
 
-	vec3 intersect_ray (vec3 planes) {
-		return rinv_dir * (planes - ray_pos);
-	}
 	void intersect_ray (ivec3 cube_pos, int cube_scale, out float t0, out float t1, out bvec3 exit_faces) {
 		vec3 cube_min = vec3(cube_pos);
 		vec3 cube_max = vec3(cube_pos + (1 << cube_scale));
@@ -95,7 +93,7 @@ $if fragment
 		t0 = max_component( t0v );
 		t1 = min_component( t1v );
 
-		exit_faces = t1 == t1v;
+		exit_faces = equal(vec3(t1), t1v);
 	}
 
 	void select_child (float t0, ivec3 parent_pos, int parent_scale, out ivec3 child_pos, out int child_scale) {
@@ -103,10 +101,9 @@ $if fragment
 
 		vec3 parent_mid = vec3(parent_pos + (1 << child_scale));
 
-		vec3 tmid = intersect_ray(parent_mid);
+		vec3 tmid = rinv_dir * (parent_mid - ray_pos);
 
-		bvec3 comp = t0 >= tmid;
-		ivec3 bits = ivec3(comp);
+		ivec3 bits = ivec3( greaterThanEqual(vec3(t0), tmid) );
 
 		child_pos.x = parent_pos.x | (bits.x << child_scale);
 		child_pos.y = parent_pos.y | (bits.y << child_scale);
@@ -122,16 +119,27 @@ $if fragment
 		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
 	}
 
-	void raytrace (float max_dist, out int iterations) {
+	void debug_binary_output (uint data, int y) {
+		ivec2 px = ivec2(floor(vec2(gl_FragCoord.xy - viewport_size / 2) / 10));
+		if (px.x >= 0 && px.x < 32 && px.y == y) {
+			if ((data & (0x80000000u >> px.x)) != 0) {
+				frag_col = vec4(1,0,0,1);
+			} else {
+				frag_col = vec4(0,0,0,1);
+			}
+			return;
+		}
+	}
+
+	float raytrace (float max_dist, out int iterations) {
 		int iter = 0;
-		
-		ray_pos -= svo_root_pos;
+		float hit_dist = -1;
 
-		vec3 root_min = 0;
+		vec3 root_min = vec3(0);
 		vec3 root_max = vec3(CHUNK_DIM);
-		//vec3 root_mid = 0.5 * (root_min + root_max);
+		vec3 root_mid = 0.5 * (root_min + root_max);
 
-		ivec3 parent_pos = 0;
+		ivec3 parent_pos = ivec3(0);
 		int parent_scale = MAX_SCALE;
 
 		mirror_mask_int = 0;
@@ -149,13 +157,16 @@ $if fragment
 
 		int parent_node = get_svo_node(0);
 
+		debug_binary_output(uint(parent_node), 0);
+		int debug_y = 1;
+
 		// desired ray bounds
 		float tmin = 0;
 		float tmax = max_dist;
 
 		// cube ray range
-		float t0 = max_component( intersect_ray(root_min) );
-		float t1 = min_component( intersect_ray(root_max) );
+		float t0 = max_component( rinv_dir * (root_min - ray_pos) );
+		float t1 = min_component( rinv_dir * (root_max - ray_pos) );
 
 		t0 = max(tmin, t0);
 		t1 = min(tmax, t1);
@@ -164,11 +175,11 @@ $if fragment
 		int child_scale;
 		select_child(t0, parent_pos, parent_scale, child_pos, child_scale);
 
-		int stack_node[ MAX_SCALE -1 ] = int [ MAX_SCALE -1 ];
-		float stack_t1[ MAX_SCALE -1 ] = float [ MAX_SCALE -1 ];
+		int stack_node[ MAX_SCALE -1 ];
+		float stack_t1[ MAX_SCALE -1 ];
 
 		for (;;) {
-			if (++iter >= max_iterations) break;
+			if (iter++ >= max_iterations) break;
 
 			// child cube ray range
 			float child_t0, child_t1;
@@ -183,7 +194,11 @@ $if fragment
 				idx |= ((child_pos.y >> child_scale) & 1) << 1;
 				idx |= ((child_pos.z >> child_scale) & 1) << 2;
 
-				int node = get_svo_node( (parent_node & 0x7fffffffu) + (idx ^ mirror_mask_int) );
+				debug_binary_output(uint(idx ^ mirror_mask_int), debug_y++);
+
+				int node = get_svo_node( (parent_node & 0x7fffffff) + (idx ^ mirror_mask_int) );
+
+				debug_binary_output(uint(node), debug_y++);
 
 				//// Intersect
 				// child cube ray range
@@ -191,11 +206,12 @@ $if fragment
 				float tv1 = min(child_t1, t1);
 
 				if (tv0 < tv1) {
+					
 					bool leaf = (node & 0x80000000) == 0;
 					if (leaf) {
-						if (node.bid != B_AIR) {
+						if (node != B_AIR) {
 							//hit.did_hit = true;
-							//hit.dist = tv0;
+							hit_dist = tv0;
 							break; // hit
 						}
 					} else {
@@ -206,7 +222,9 @@ $if fragment
 						// child becomes parent
 						parent_node = node;
 
-						parent_coord = child_coord;
+						parent_pos = child_pos;
+						parent_scale = child_scale;
+
 						select_child(tv0, parent_pos, parent_scale, child_pos, child_scale);
 
 						t0 = tv0;
@@ -240,8 +258,9 @@ $if fragment
 				//// Pop
 				child_scale = highest_differing_bit(old_pos, child_pos);
 
-				if (child_scale >= MAX_SCALE)
+				if (child_scale >= MAX_SCALE) {
 					break; // out of root
+				}
 
 				parent_node	= stack_node[child_scale - 1];
 				t1			= stack_t1  [child_scale - 1];
@@ -254,18 +273,21 @@ $if fragment
 		}
 
 		iterations = iter;
-		//return hit;
+		return hit_dist;
 	};
 
 	void main () {
 		frag_col = vec4(0,0,0,0);
 
 		int iterations;
+		float max_dist = 100;
 
 		get_ray();
-		raytrace(100, iterations);
+		float hit_dist = raytrace(max_dist, iterations);
 		
-		if (visualize_iterations)
-			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+		//if (visualize_iterations)
+		//	frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+		//else
+		//	frag_col = vec4(vec3(hit_dist / max_dist), 1.0);
 	}
 $endif
