@@ -101,7 +101,11 @@ $if fragment
 			tex_indx += ray_dir.z <= 0 ? bti.y : bti.z; // y=top : z=bottom
 		}
 
-		hit_col = texture(tile_textures, vec3(uv, tex_indx));
+		vec4 col = texture(tile_textures, vec3(uv, tex_indx));
+
+		float remain_alpha = 1.0 - hit_col.a;
+		float effective_alpha = remain_alpha * col.a;
+		hit_col += vec4(effective_alpha * col.rgb, effective_alpha);
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies
@@ -237,7 +241,9 @@ $if fragment
 					if (leaf) {
 						if (node != B_AIR) {
 							calc_hit(tv0, entry_faces, node);
-							return; // hit
+							
+							if (hit_col.a > 0.999)
+								return; // final hit
 						}
 					} else {
 						//// Push
