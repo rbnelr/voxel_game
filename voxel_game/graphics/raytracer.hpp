@@ -57,6 +57,7 @@ public:
 
 	Texture1D svo_texture;
 	Sampler svo_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
+	Sampler gradient_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
 
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 

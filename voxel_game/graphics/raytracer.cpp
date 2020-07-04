@@ -202,6 +202,7 @@ TIME_END(build);
 
 		glActiveTexture(GL_TEXTURE0 + 1);
 		shader.set_texture_unit("heat_gradient", 1);
+		gradient_sampler.bind(1);
 		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);

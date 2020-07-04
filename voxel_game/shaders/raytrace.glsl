@@ -4,6 +4,7 @@ $include "common.glsl"
 $include "fog.glsl"
 
 $if vertex
+	// Fullscreen quad
 	const vec4[] pos_clip = vec4[] (
 		vec4(+1,-1, 0, 1),
 		vec4(+1,+1, 0, 1),
@@ -19,31 +20,43 @@ $if vertex
 $endif
 
 $if fragment
+	// Sparse Voxel Octree Raytracer
+	// source for algorithm: https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
-	uniform float slider;
+	// SVO data
 	uniform isampler1D svo_texture;
 	uniform vec3 svo_root_pos;
 
-	uniform int max_iterations = 100;
-	uniform bool visualize_iterations = true;
-	uniform sampler2D heat_gradient;
-	
+#define CHUNK_DIM 64 // size of voxel chunk (cubed)
+#define MAX_SCALE 6 // "scale" of root DVO node
+
+#define B_AIR 1 // block id
+
 	int get_svo_node (int index) {
 		return texelFetch(svo_texture, index, 0).r;
 	}
-
-#define CHUNK_DIM 64
-#define MAX_SCALE 6
-
-#define B_AIR 1
-
+	
 	// SVO format:
 	/*
 		union OctreeNode {
 			uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
 			uint16 block_id; // block id (valid when leaf node)
 		};
+
+		 1 bit         31 bit
+		[has_children][payload]
+
+		has_children == 0: payload is index of children OctreeNode[8] in svo_texture
+		has_children == 1: payload leaf voxel data, ie. block id
 	*/
+	
+#define DEBUG 1
+#if DEBUG
+	uniform float slider; // debugging
+	uniform int max_iterations = 100; // iteration limiter for debugging
+	uniform bool visualize_iterations = true;
+	uniform sampler2D heat_gradient;
+#endif
 
 	float min_component (vec3 v) {
 		return min(min(v.x, v.y), v.z);
@@ -60,6 +73,7 @@ $if fragment
 	vec3 ray_pos;
 	vec3 ray_dir;
 
+	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray () {
 		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
 
@@ -77,8 +91,6 @@ $if fragment
 
 		ray_pos -= svo_root_pos;
 	}
-
-	// https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
 	vec3 rinv_dir;
 	int mirror_mask_int = 0;
@@ -119,18 +131,6 @@ $if fragment
 		return max(max(highest_differing_bit(a.x, b.x), highest_differing_bit(a.y, b.y)), highest_differing_bit(a.z, b.z));
 	}
 
-	void debug_binary_output (uint data, int y) {
-		ivec2 px = ivec2(floor(vec2(gl_FragCoord.xy - viewport_size / 2) / 10));
-		if (px.x >= 0 && px.x < 32 && px.y == y) {
-			if ((data & (0x80000000u >> px.x)) != 0) {
-				frag_col = vec4(1,0,0,1);
-			} else {
-				frag_col = vec4(0,0,0,1);
-			}
-			return;
-		}
-	}
-
 	float raytrace (float max_dist, out int iterations) {
 		int iter = 0;
 		float hit_dist = -1;
@@ -157,9 +157,6 @@ $if fragment
 
 		int parent_node = get_svo_node(0);
 
-		debug_binary_output(uint(parent_node), 0);
-		int debug_y = 1;
-
 		// desired ray bounds
 		float tmin = 0;
 		float tmax = max_dist;
@@ -179,7 +176,9 @@ $if fragment
 		float stack_t1[ MAX_SCALE -1 ];
 
 		for (;;) {
+		#if DEBUG
 			if (iter++ >= max_iterations) break;
+		#endif
 
 			// child cube ray range
 			float child_t0, child_t1;
@@ -194,11 +193,7 @@ $if fragment
 				idx |= ((child_pos.y >> child_scale) & 1) << 1;
 				idx |= ((child_pos.z >> child_scale) & 1) << 2;
 
-				debug_binary_output(uint(idx ^ mirror_mask_int), debug_y++);
-
 				int node = get_svo_node( (parent_node & 0x7fffffff) + (idx ^ mirror_mask_int) );
-
-				debug_binary_output(uint(node), debug_y++);
 
 				//// Intersect
 				// child cube ray range
@@ -274,20 +269,24 @@ $if fragment
 
 		iterations = iter;
 		return hit_dist;
-	};
+	}
 
 	void main () {
 		frag_col = vec4(0,0,0,0);
 
+	#if DEBUG
 		int iterations;
+	#endif
 		float max_dist = 100;
 
 		get_ray();
 		float hit_dist = raytrace(max_dist, iterations);
 		
-		//if (visualize_iterations)
-		//	frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
-		//else
-		//	frag_col = vec4(vec3(hit_dist / max_dist), 1.0);
+	#if DEBUG
+		if (visualize_iterations)
+			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+		else
+			frag_col = vec4(vec3(hit_dist / max_dist), 1.0);
+	#endif
 	}
 $endif

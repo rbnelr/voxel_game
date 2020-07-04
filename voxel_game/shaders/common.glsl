@@ -128,6 +128,7 @@ $if fragment
 			frag_col = col;
 	}
 
+#if CURSOR_COMPARE
 	bool RIGHT () {
 		if (gl_FragCoord.x > cursor_pos.x)
 			return true;
@@ -135,4 +136,19 @@ $if fragment
 			DEBUG(0);
 		return false;
 	}
+#endif
+
+#if BIT_DEBUGGER
+	void debug_binary_output (uint data, int y) {
+		ivec2 px = ivec2(floor(vec2(gl_FragCoord.xy - viewport_size / 2) / 10));
+		if (px.x >= 0 && px.x < 32 && px.y == y) {
+			if ((data & (0x80000000u >> px.x)) != 0) {
+				frag_col = vec4(1,0,0,1);
+			} else {
+				frag_col = vec4(0,0,0,1);
+			}
+			return;
+		}
+	}
+#endif
 $endif
