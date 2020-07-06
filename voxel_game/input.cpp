@@ -71,7 +71,7 @@ void glfw_mouse_button_event (GLFWwindow* window, int button, int action, int mo
 	}
 }
 
-int frame_counter = 0;
+extern int frame_counter;
 double _prev_mouse_pos_x, _prev_mouse_pos_y;
 bool _prev_cursor_enabled;
 

@@ -19,29 +19,30 @@ using namespace kiss;
 #include "stdio.h"
 #include "assert.h"
 
+GLFWwindow*	window = nullptr;
+int			frame_counter = 0;
+
 #define WINDOW_RES int2(1920, 1080)
 
 constexpr int GL_VERSION_MAJOR = 3;
 constexpr int GL_VERSION_MINOR = 3;
 constexpr bool VAO_REQUIRED = (GL_VERSION_MAJOR * 100 + GL_VERSION_MINOR) >= 303;
 
-struct Rect {
-	int2 pos;
-	int2 dim;
-};
+//// vsync and fullscreen mode
 
-GLFWwindow*		window;
+// handle vsync interval allowing -1 or not depending on extension
+int				_vsync_on_interval = 1;
+// keep latest vsync for toggle_fullscreen
+bool			vsync;
+
+struct Rect {
+	int2	 pos;
+	int2	 dim;
+};
 
 bool			fullscreen = false;
 bool			borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
 Rect			window_positioning;
-
-//// vsync and fullscreen mode
-
-// handle vsync interval allowing -1 or not depending on extension
-int _vsync_on_interval = 1;
-// keep latest vsync for toggle_fullscreen
-bool vsync;
 
 bool get_vsync () {
 	return vsync;
@@ -56,8 +57,8 @@ void set_vsync (bool on) {
 struct Monitor {
 	GLFWmonitor* monitor;
 	GLFWvidmode const* vidmode;
-	int2 pos;
-	int2 size;
+	int2	 pos;
+	int2	 size;
 };
 
 bool select_monitor_from_window_pos (Rect window_positioning, Monitor* selected_monior) {
@@ -110,7 +111,7 @@ bool get_fullscreen (bool* borderless_fullscreen) {
 bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 	OPTICK_EVENT();
 
-	if (!::fullscreen) {
+	if (!fullscreen) {
 		// store windowed window placement
 		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
 		glfwGetWindowSize(window, &window_positioning.dim.x, &window_positioning.dim.y);
@@ -131,7 +132,8 @@ bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 	} else {
 		// restore windowed window placement
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
-		glfwSetWindowMonitor(window, NULL, window_positioning.pos.x, window_positioning.pos.y, window_positioning.dim.x, window_positioning.dim.y, GLFW_DONT_CARE);
+		glfwSetWindowMonitor(window, NULL, window_positioning.pos.x, window_positioning.pos.y,
+			window_positioning.dim.x, window_positioning.dim.y, GLFW_DONT_CARE);
 	}
 
 	// reset vsync to make sure 
@@ -147,15 +149,8 @@ bool toggle_fullscreen () {
 }
 
 //// gameloop
-void glfw_gameloop () {
-#if 0 // actually using VAOs now
-	GLuint vao;
-	if (VAO_REQUIRED) {
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-	}
-#endif
 
+void glfw_gameloop () {
 	shaders = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
 
@@ -167,7 +162,7 @@ void glfw_gameloop () {
 	auto game = std::make_unique<Game>();
 
 	input.dt = 0; // dt zero on first frame
-	uint64_t prev = get_timestamp();
+	uint64_t prev_frame_end = get_timestamp();
 
 	glfw_input_pre_gameloop(window);
 
@@ -206,10 +201,10 @@ void glfw_gameloop () {
 
 		// Calc dt based on prev frame duration
 		uint64_t now = get_timestamp();
-		input.real_dt = (float)(now - prev) / (float)timestamp_freq;
+		input.real_dt = (float)(now - prev_frame_end) / (float)timestamp_freq;
 		input.dt = min(input.real_dt * (input.pause_time ? 0 : input.time_scale), input.max_dt);
 		input.unscaled_dt = min(input.real_dt, input.max_dt);
-		prev = now;
+		prev_frame_end = now;
 
 		frame_counter++;
 	}
@@ -220,12 +215,6 @@ void glfw_gameloop () {
 
 	debug_graphics = nullptr;
 	shaders = nullptr;
-
-#if 0
-	if (VAO_REQUIRED) {
-		glDeleteVertexArrays(1, &vao);
-	}
-#endif
 }
 
 void glfw_error (int err, const char* msg) {
@@ -237,18 +226,18 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 
 	// hiding irrelevant infos/warnings
 	switch (id) {
-	case 131185: // Buffer detailed info (where the memory lives which is supposed to depend on the usage hint)
-	//case 1282: // using shader that was not compiled successfully
-	//
-	//case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
-	case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
-	
-	//			 //case 131154: // Pixel transfer sync with rendering warning
-	//
-	//			 //case 1282: // Wierd error on notebook when trying to do texture streaming
-	//			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
-	//			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
-		return;
+		case 131185: // Buffer detailed info (where the memory lives which is supposed to depend on the usage hint)
+					 //case 1282: // using shader that was not compiled successfully
+					 //
+					 //case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
+		case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
+
+					 //			 //case 131154: // Pixel transfer sync with rendering warning
+					 //
+					 //			 //case 1282: // Wierd error on notebook when trying to do texture streaming
+					 //			 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
+					 //			 //case 131218: // performance warning, because of shader recompiling based on some 'key'
+			return;
 	}
 
 	const char* src_str = "<unknown>";
@@ -279,13 +268,13 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	}
 
 	clog(ERROR, "OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
-	
+
 	//__debugbreak();
 }
 
 #if _DEBUG || 1
-	#define OPENGL_DEBUG
-	#define GLFW_DEBUG
+#define OPENGL_DEBUG
+#define GLFW_DEBUG
 #endif
 
 void glfw_init_gl () {
@@ -301,9 +290,9 @@ void glfw_init_gl () {
 #ifdef OPENGL_DEBUG
 	if (glfwExtensionSupported("GL_ARB_debug_output")) {
 		glDebugMessageCallbackARB(ogl_debug, 0);
-#if _DEBUG // when displaying opengl debug output in release mode, don't do it syncronously as to (theoretically) not hurt performance
+	#if _DEBUG // when displaying opengl debug output in release mode, don't do it syncronously as to (theoretically) not hurt performance
 		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB); // this exists -> if ogl_debuproc needs to be thread safe
-#endif
+	#endif
 	}
 #endif
 
@@ -350,7 +339,7 @@ int main () {
 			glfwTerminate();
 			return 1;
 		}
-	
+
 		if (glfwRawMouseMotionSupported())
 			glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
 
@@ -367,5 +356,6 @@ int main () {
 	OPTICK_STOP_CAPTURE();
 	OPTICK_SAVE_CAPTURE("capture.opt");
 	OPTICK_SHUTDOWN();
+
 	return 0;
 }

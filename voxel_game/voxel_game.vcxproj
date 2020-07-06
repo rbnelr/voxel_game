@@ -105,7 +105,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);DLL</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -116,9 +116,10 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);$(SolutionDir)x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -155,7 +156,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);DLL</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;%(AdditionalIncludeDirectories);$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\optick_1.3.0\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -172,7 +173,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\$(Configuration);$(SolutionDir)..\assimp\lib\x64\;$(SolutionDir)..\optick_1.3.0\lib\x64\$(Configuration);$(SolutionDir)x64\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;OptickCore.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
@@ -195,6 +196,7 @@
     <ClInclude Include="graphics\atlas.hpp" />
     <ClInclude Include="graphics\graphics_common.hpp" />
     <ClInclude Include="items.hpp" />
+    <ClInclude Include="nlohmann\json.hpp" />
     <ClInclude Include="optick.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
@@ -282,6 +284,7 @@
     <ClCompile Include="audio\read_wav.cpp" />
     <ClCompile Include="block_update.cpp" />
     <ClCompile Include="chunks.cpp" />
+    <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="items.cpp" />
     <ClCompile Include="stb_rect_pack.cpp" />
     <ClCompile Include="time_of_day.cpp" />
@@ -295,7 +298,6 @@
     <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="glad\glad.c" />
     <ClCompile Include="glad\glad_wgl.c" />
-    <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="graphics\camera.cpp" />
     <ClCompile Include="graphics\common.cpp" />
     <ClCompile Include="graphics\debug_graphics.cpp" />
