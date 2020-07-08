@@ -15,6 +15,35 @@ namespace kiss {
 		return file_size;
 	}
 
+	raw_data load_binary_file (const char* filename, uint64_t* size) {
+		auto f = fopen(filename, "rb");
+		if (!f) {
+			return nullptr;
+		}
+
+		uint64_t sz = get_file_size(f);
+		auto data = std::make_unique<byte[]>(sz);
+
+		auto ret = fread(data.get(), 1,sz, f);
+		assert(ret == sz);
+
+		fclose(f);
+
+		*size = sz;
+		return data;
+	}
+
+	void save_binary_file (const char* filename, void const* data, uint64_t size) {
+		auto f = fopen(filename, "wb");
+		if (!f) {
+			return;
+		}
+
+		auto ret = fwrite(data, 1,size, f);
+
+		fclose(f);
+	}
+
 	// reads text file into a std::string (overwriting it's previous contents)
 	// returns false on fail (file not found etc.)
 	bool load_text_file (const char* filename, std::string* out) {
@@ -40,33 +69,9 @@ namespace kiss {
 		return s;
 	}
 
-	raw_data load_binary_file (const char* filename, uint64_t* size) {
-		auto f = fopen(filename, "rb");
-		if (!f) {
-			return nullptr;
-		}
-
-		uint64_t sz = get_file_size(f);
-		auto data = std::make_unique<byte[]>(sz);
-
-		auto ret = fread(data.get(), 1,sz, f);
-		assert(ret == sz);
-
-		fclose(f);
-
-		*size = sz;
-		return data;
-	}
-
-	void save_binary_file (const char* filename, void* data, uint64_t size) {
-		auto f = fopen(filename, "wb");
-		if (!f) {
-			return;
-		}
-
-		auto ret = fwrite(data, 1,size, f);
-
-		fclose(f);
+	// saves a text file
+	void save_text_file (const char* filename, std::string_view str) {
+		save_binary_file(filename, str.data(), str.size());
 	}
 
 	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {

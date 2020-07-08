@@ -7,6 +7,13 @@
 namespace kiss {
 	uint64_t get_file_size (FILE* f);
 
+	typedef unsigned char byte;
+	typedef std::unique_ptr<byte[]> raw_data;
+
+	raw_data load_binary_file (const char* filename, uint64_t* size);
+
+	void save_binary_file (const char* filename, void const* data, uint64_t size);
+
 	// reads text file into a std::string (overwriting it's previous contents)
 	// returns false on fail (file not found etc.)
 	bool load_text_file (const char* filename, std::string* out);
@@ -15,12 +22,8 @@ namespace kiss {
 	// returns "" on fail (file not found etc.)
 	std::string load_text_file (const char* filename);
 
-	typedef unsigned char byte;
-	typedef std::unique_ptr<byte[]> raw_data;
-
-	raw_data load_binary_file (const char* filename, uint64_t* size);
-
-	void save_binary_file (const char* filename, void* data, uint64_t size);
+	// saves a text file
+	void save_text_file (const char* filename, std::string_view str);
 
 	// out_filename is optional
 	// "hello/world.txt" => path: "hello/" out_filename: "world.txt"

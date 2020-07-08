@@ -100,7 +100,7 @@ int portaudio_callback (
 	return 0;
 }
 
-bool test = [] () {
+bool __audio_run = [] () {
 
 	PaError err;
 

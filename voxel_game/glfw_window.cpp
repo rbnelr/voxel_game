@@ -31,18 +31,18 @@ constexpr bool VAO_REQUIRED = (GL_VERSION_MAJOR * 100 + GL_VERSION_MINOR) >= 303
 //// vsync and fullscreen mode
 
 // handle vsync interval allowing -1 or not depending on extension
-int				_vsync_on_interval = 1;
+int		_vsync_on_interval = 1;
 // keep latest vsync for toggle_fullscreen
-bool			vsync;
+bool	vsync;
 
 struct Rect {
 	int2	 pos;
 	int2	 dim;
 };
 
-bool			fullscreen = false;
-bool			borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
-Rect			window_positioning;
+bool	fullscreen = false;
+bool	borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
+Rect	window_positioning;
 
 bool get_vsync () {
 	return vsync;
