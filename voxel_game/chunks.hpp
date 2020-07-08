@@ -1,6 +1,7 @@
 #pragma once
 #include "kissmath.hpp"
 #include "blocks.hpp"
+#include "world_octree.hpp"
 #include "util/move_only_class.hpp"
 #include "util/string.hpp"
 #include "util/running_average.hpp"
@@ -248,6 +249,8 @@ class Chunks {
 public:
 	ChunkHashmap pending_chunks;
 	ChunkHashmap chunks;
+
+	WorldOctree world_octree;
 
 	int count_culled;
 

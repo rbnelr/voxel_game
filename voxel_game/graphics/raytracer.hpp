@@ -64,7 +64,7 @@ public:
 	
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 
-	bool raytracer_draw = true;
+	bool raytracer_draw = false;
 	bool overlay = true;
 
 	float slider = 0.85f;

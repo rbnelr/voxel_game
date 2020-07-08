@@ -27,6 +27,8 @@ $if fragment
 	uniform isampler1D svo_texture;
 	uniform vec3 svo_root_pos;
 
+#define INF (1.0 / 0.0)
+
 #define CHUNK_DIM 64 // size of voxel chunk (cubed)
 #define MAX_SCALE 6 // "scale" of root DVO node
 
@@ -70,8 +72,7 @@ $if fragment
 	uniform	sampler2DArray tile_textures;
 	uniform sampler1D block_tile_info; // BlockTileInfo: float4 { base_index, top, bottom, variants }
 
-	vec3 hit_pos_world = vec3(0.0);
-	float hit_dist = 0.0;
+	float hit_dist = INF;
 	vec4 hit_col = vec4(0,0,0,0);
 
 	int cur_medium = 0;
@@ -98,9 +99,9 @@ $if fragment
 
 		hit_dist = t0;
 
-		hit_pos_world = ray_dir * hit_dist + ray_pos;
+		vec3 hit_pos_chunk = ray_dir * hit_dist + ray_pos;
 
-		vec3 pos_fract = hit_pos_world - floor(hit_pos_world);
+		vec3 pos_fract = hit_pos_chunk - floor(hit_pos_chunk);
 
 		vec2 uv;
 
@@ -334,6 +335,8 @@ $if fragment
 			frag_col = hit_col;
 
 		{ // Write depth
+			vec3 hit_pos_world = ray_dir * hit_dist + ray_pos + svo_root_pos;
+
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
 			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
 			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;

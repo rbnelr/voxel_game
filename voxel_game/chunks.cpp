@@ -399,6 +399,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 				auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
 				chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
 				pending_chunks.erase_chunk({ it });
+
+				world_octree.add_chunk(*res.chunk);
 			}
 			res.chunk->update_neighbour_blocks(*this);
 

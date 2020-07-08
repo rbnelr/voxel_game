@@ -81,6 +81,7 @@ void Game::frame () {
 			world_gen.imgui();
 			world->imgui();
 			block_update.imgui();
+			world->chunks.world_octree.imgui();
 		}
 
 		{
@@ -129,6 +130,8 @@ void Game::frame () {
 		block_update.update_blocks(world->chunks);
 
 		world->chunks.update_chunks(graphics, world->world_gen, world->player);
+
+		world->chunks.world_octree.update();
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);

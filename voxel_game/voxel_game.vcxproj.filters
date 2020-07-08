@@ -36,84 +36,6 @@
     <ClInclude Include="..\..\dear_imgui\imstb_truetype.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
-    <ClInclude Include="kissmath\bool.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float2x2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3x3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3x4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float4x4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\transform2d.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\transform3d.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
     <ClInclude Include="glfw_window.hpp" />
     <ClInclude Include="game.hpp" />
     <ClInclude Include="input.hpp" />
@@ -240,6 +162,85 @@
     <ClInclude Include="graphics\raytracer.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="world_octree.hpp" />
+    <ClInclude Include="kissmath\bool2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\bool3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\bool4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float2x2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float2x3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3x3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float3x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\float4x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\int64v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\transform2d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\transform3d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="kissmath\uint8v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -259,84 +260,6 @@
     </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp">
       <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\bool.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\bool2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\bool3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\bool4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float2x2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float3x3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float3x4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\float4x4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\transform2d.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\transform3d.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\uint8.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\uint8v2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\uint8v3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\uint8v4.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int64.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int64v2.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int64v3.cpp">
-      <Filter>kissmath</Filter>
-    </ClCompile>
-    <ClCompile Include="kissmath\int64v4.cpp">
-      <Filter>kissmath</Filter>
     </ClCompile>
     <ClCompile Include="glfw_window.cpp" />
     <ClCompile Include="input.cpp" />
@@ -429,6 +352,7 @@
     <ClCompile Include="graphics\raytracer.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
+    <ClCompile Include="world_octree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\overlay.glsl">
@@ -466,6 +390,84 @@
     </None>
     <None Include="shaders\raytrace.glsl">
       <Filter>shaders</Filter>
+    </None>
+    <None Include="kissmath\bool2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\bool3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\bool4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float2x2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float2x3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float3x3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float3x4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\float4x4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int64.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int64v2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int64v3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\int64v4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\transform2d.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\transform3d.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\uint8.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\uint8v2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\uint8v3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="kissmath\uint8v4.inl">
+      <Filter>kissmath</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
