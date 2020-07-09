@@ -355,9 +355,6 @@
     <ClCompile Include="world_octree.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\overlay.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="shaders\skybox.glsl">
       <Filter>shaders</Filter>
     </None>
@@ -468,6 +465,9 @@
     </None>
     <None Include="kissmath\uint8v4.inl">
       <Filter>kissmath</Filter>
+    </None>
+    <None Include="shaders\debug_graphics.glsl">
+      <Filter>shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

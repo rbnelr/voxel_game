@@ -7,7 +7,7 @@ enum AnimInterpMode {
 	AIM_LINEAR,
 };
 
-template <typename VAL_T, AnimInterpMode AIM>
+template <typename VAL_T, AnimInterpMode AIM, bool LOOP=true>
 struct Animation {
 	struct Keyframe {
 		float t;
@@ -18,7 +18,7 @@ struct Animation {
 	float duration = 1;
 	bool loop_interp = true;
 
-	Animation (std::initializer_list<Keyframe> keyframes, float duration=1, bool loop_interp=true): keyframes{keyframes}, duration{duration}, loop_interp{loop_interp} {
+	Animation (std::initializer_list<Keyframe> keyframes, float duration=1, bool loop_interp=LOOP): keyframes{keyframes}, duration{duration}, loop_interp{loop_interp} {
 		assert(this->keyframes.size() >= 1);
 	}
 
@@ -62,7 +62,7 @@ struct Animation {
 
 			case AIM_LINEAR:
 				float inter_t = map(t, left.t, right_t);
-				return VAL_T::lerp(left.val, right.val, inter_t);
+				return lerp(left.val, right.val, inter_t);
 		}
 		return {};
 	}
@@ -90,7 +90,7 @@ struct AnimRotation {
 
 	static AnimRotation lerp (AnimRotation const& l, AnimRotation const& r, float t) {
 	#if ROTATION_MODE==0
-		return { ::lerp(l.euler, r.euler, t) };
+		return { kissmath::lerp(l.euler, r.euler, t) };
 	#elif ROTATION_MODE==1
 		return { l.matrix * (1.0f - t) + r.matrix * t };
 	#endif
@@ -108,11 +108,12 @@ struct AnimRotation {
 struct AnimPosRot {
 	float3 pos;
 	AnimRotation rot;
-
-	static AnimPosRot lerp (AnimPosRot const& l, AnimPosRot const& r, float t) {
-		AnimPosRot ret;
-		ret.pos = ::lerp(l.pos, r.pos, t);
-		ret.rot = AnimRotation::lerp(l.rot, r.rot, t);
-		return ret;
-	}
 };
+inline AnimPosRot lerp (AnimPosRot const& l, AnimPosRot const& r, float t) {
+	AnimPosRot ret;
+	ret.pos = lerp(l.pos, r.pos, t);
+	ret.rot = AnimRotation::lerp(l.rot, r.rot, t);
+	return ret;
+}
+
+typedef Animation<lrgba, AIM_LINEAR, false> Gradient;
