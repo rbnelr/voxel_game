@@ -12,39 +12,49 @@ namespace world_octree {
 		imgui_pop();
 	}
 
-	// process parent node and it's children
-	void _recurse (WorldOctree& oct, int3 pos, int scale, int3 insert_pos, int insert_scale, uint32_t node_data_ptr) {
+	struct NodeCoord {
+		int3		pos;
+		int			scale;
+	};
 
-		uint32_t children_i = (uint32_t)oct.trunk.nodes.size();
-		oct.trunk.nodes.emplace_back();
+	void insert_node (WorldOctree& oct, NodeCoord insert_node) {
+		if (any(insert_node.pos < 0))
+			return;
 
-		if (node_data_ptr != (uint32_t)-1)
-			*(&oct.trunk.nodes[0].data[0] + node_data_ptr) = { true, children_i };
+		// start with root node
+		int scale = tree_scale;
+		uint32_t children_ptr = 0;
+		
+		OctreeNode* node_data = nullptr;
 
-		int child_scale = scale - 1;
+		for (;;) {
+			// get child that contains insert_node
+			scale--;
+			
+			int child_idx = (((insert_node.pos.x >> scale) & 1) << 0) |
+							(((insert_node.pos.y >> scale) & 1) << 1) |
+							(((insert_node.pos.z >> scale) & 1) << 2);
 
-		for (int i=0; i<8; ++i) {
-			int3 child_pos = pos | (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
+			// 'recurse' into child node
+			node_data = &oct.trunk.nodes[children_ptr].data[child_idx];
 
-			auto* child_node_data = &oct.trunk.nodes[children_i].data[i];
+			if (scale == insert_node.scale)
+				break;
 
-			bool is_leaf = any(child_pos != 0) || child_scale == insert_scale;
-			if (is_leaf) {
-				*child_node_data = { false, all(child_pos == 0) ? 1u : 0u };
+			if (node_data->has_children) {
+				children_ptr = node_data->data;
 			} else {
-				_recurse(oct, child_pos, child_scale, insert_pos, insert_scale, (uint32_t)(child_node_data - &oct.trunk.nodes[0].data[0]));
+				children_ptr = (uint32_t)oct.trunk.nodes.size();
+
+				// write ptr to children into this nodes slot in parents children array
+				*node_data = { true, children_ptr };
+
+				// alloc children for node
+				oct.trunk.nodes.push_back({0});
 			}
 		}
-	}
 
-	void insert_node (WorldOctree& oct, int3 pos, int scale) {
-		if (any(pos < 0))
-			return;
-		
-		int3 parent_pos = 0;
-		int parent_scale = tree_scale;
-		
-		_recurse(oct, parent_pos, parent_scale, pos, scale, (uint32_t)-1);
+		*node_data = { false, 1 };
 	}
 
 	std::vector<lrgba> colors = [] (int count) {
@@ -63,7 +73,7 @@ namespace world_octree {
 		std::vector<lrgba> cols;
 		for (int i=0; i<count; ++i) {
 			float t = (float)i / (count -1);
-			cols.push_back( grad.calc(1.0f - t) );
+			cols.push_back( grad.calc(t) );
 		}
 
 		return cols;
@@ -73,10 +83,11 @@ namespace world_octree {
 		float size = (float)(1 << scale);
 
 		auto col = colors[scale];
-		if (!node.has_children && node.data == 0)
-			col *= lrgba(.5f,.5f,.5f, .6f);
-		debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col,
-			!node.has_children && node.data == 0 ? GM_STRIPED : GM_FILL);
+		//if (!node.has_children && node.data == 0)
+		//	col *= lrgba(.5f,.5f,.5f, .6f);
+		//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
+		if (node.has_children || node.data != 0)
+			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
 
 		if (node.has_children) {
 			OctreeChildren children = oct.trunk.nodes[node.data];
@@ -96,7 +107,7 @@ namespace world_octree {
 
 	void WorldOctree::update () {
 		if (trunk.nodes.size() == 0) {
-			insert_node(*this, 0, CHUNK_DIM_SHIFT);
+			trunk.nodes.push_back({});
 		}
 
 		if (debug_draw_octree) {
@@ -105,9 +116,9 @@ namespace world_octree {
 	}
 
 	void WorldOctree::add_chunk (Chunk& chunk) {
-		//int3 pos = chunk.coord * CHUNK_DIM;
-		//
-		//insert_node(*this, pos, CHUNK_DIM_SHIFT+1);
+		int3 pos = chunk.coord * CHUNK_DIM;
+		
+		insert_node(*this, { pos, CHUNK_DIM_SHIFT });
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {

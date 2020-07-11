@@ -61,7 +61,11 @@ struct Animation {
 				return left.val;
 
 			case AIM_LINEAR:
-				float inter_t = map(t, left.t, right_t);
+				float len = right_t - left.t;
+				if (len == 0.0f)
+					return left.val;
+
+				float inter_t = (t - left.t) / len;
 				return lerp(left.val, right.val, inter_t);
 		}
 		return {};

@@ -329,6 +329,8 @@ void Chunks::remesh_all () {
 
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player) {
 
+	world_octree.update();
+
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos chunk_origin = pos * CHUNK_DIM;

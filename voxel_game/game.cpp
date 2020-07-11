@@ -131,8 +131,6 @@ void Game::frame () {
 
 		world->chunks.update_chunks(graphics, world->world_gen, world->player);
 
-		world->chunks.world_octree.update();
-
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, selected_block);
 	}
