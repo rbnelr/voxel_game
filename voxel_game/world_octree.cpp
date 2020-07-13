@@ -10,6 +10,10 @@ namespace world_octree {
 
 		ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
 
+		ImGui::Text("       trunk nodes: %d", (int)trunk.nodes.size());
+		ImGui::Text("active trunk nodes: %d", active_trunk_nodes);
+		ImGui::Text("dead   trunk nodes: %d", (int)trunk.nodes.size() - active_trunk_nodes);
+
 		imgui_pop();
 	}
 
@@ -226,6 +230,8 @@ namespace world_octree {
 			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
 
 		if (node.has_children) {
+			oct.active_trunk_nodes++;
+
 			OctreeChildren children = oct.trunk.nodes[node.data];
 			int child_scale = scale - 1;
 
@@ -239,6 +245,8 @@ namespace world_octree {
 	}
 
 	void debug_draw (WorldOctree& oct) {
+		oct.active_trunk_nodes = 0;
+
 		recurse_draw(oct, { true, 0 }, oct.root_pos, oct.root_scale);
 	}
 
@@ -249,6 +257,7 @@ namespace world_octree {
 
 		update_root(*this, player);
 
+		active_trunk_nodes = -1;
 		if (debug_draw_octree) {
 			debug_draw(*this);
 		}

@@ -30,7 +30,10 @@ namespace world_octree {
 
 		OctreeTrunk trunk;
 
+		//
 		bool debug_draw_octree = true;
+
+		int active_trunk_nodes = -1;
 
 		void imgui ();
 		void update (Player const& player);
