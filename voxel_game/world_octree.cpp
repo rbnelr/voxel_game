@@ -1,6 +1,7 @@
 #include "world_octree.hpp"
 #include "dear_imgui.hpp"
 #include "chunks.hpp"
+#include "player.hpp"
 #include <stack>
 
 namespace world_octree {
@@ -18,6 +19,7 @@ namespace world_octree {
 	};
 
 	//
+#if 0
 	void grow_root (WorldOctree& oct) {
 		auto old_root = oct.trunk.nodes[0];
 
@@ -68,6 +70,7 @@ namespace world_octree {
 
 		return true; // did shrink
 	}
+#endif
 
 	int get_child_index (int3 pos, int scale) {
 		//return	(((pos.x >> scale) & 1) << 0) |
@@ -85,9 +88,6 @@ namespace world_octree {
 
 	void insert_node (WorldOctree& oct, NodeCoord insert_node) {
 		int3 relpos = insert_node.pos - oct.root_pos;
-		while (any(relpos < 0 || relpos >= (1 << oct.root_scale)) && oct.root_scale < 13) {
-			grow_root(oct);
-		}
 		if (any(relpos < 0 || relpos >= (1 << oct.root_scale)))
 			return;
 
@@ -101,7 +101,7 @@ namespace world_octree {
 			// get child that contains insert_node
 			scale--;
 			
-			int child_idx = get_child_index(insert_node.pos ^ oct.root_pos, scale); // ^ oct.root_pos to account for root node half-offset
+			int child_idx = get_child_index(insert_node.pos, scale); // ^ oct.root_pos to account for root node half-offset
 
 			// 'recurse' into child node
 			node_data = &oct.trunk.nodes[children_ptr].children[child_idx];
@@ -128,6 +128,10 @@ namespace world_octree {
 	}
 
 	void remove_node (WorldOctree& oct, NodeCoord remove_node) {
+		int3 relpos = remove_node.pos - oct.root_pos;
+		if (any(relpos < 0 || relpos >= (1 << oct.root_scale)))
+			return;
+		
 		// start with root node
 		int scale = oct.root_scale;
 		uint32_t children_ptr = 0;
@@ -142,7 +146,7 @@ namespace world_octree {
 			// get child that contains insert_node
 			scale--;
 
-			int child_idx = get_child_index(remove_node.pos ^ oct.root_pos, scale); // ^ oct.root_pos to account for root node half-offset
+			int child_idx = get_child_index(remove_node.pos, scale); // ^ oct.root_pos to account for root node half-offset
 
 			// 'recurse' into child node
 			node_data = &oct.trunk.nodes[children_ptr].children[child_idx];
@@ -171,8 +175,32 @@ namespace world_octree {
 
 		assert(highest_exclusive_parent);
 		*highest_exclusive_parent = { false, 0 };
+	}
 
-		while (try_root_shrink(oct)); // shrink multiple times
+	void update_root (WorldOctree& oct, Player const& player) {
+		int shift = oct.root_scale - 1;
+		float half_root_scalef = (float)(1 << shift);
+
+		int3 center = roundi(player.pos / half_root_scalef);
+		
+		int3 pos = (center - 1) << shift;
+
+		if (equal(pos, oct.root_pos))
+			return;
+
+		int3 move = (pos - oct.root_pos) >> shift;
+
+		for (int i=0; i<8; ++i) {
+			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+
+			child += move * select(bool3(pos & (1 << shift)), int3(-1), int3(+1));
+
+			if (any(child < 0 || child > 1)) {
+				oct.trunk.nodes[0].children[i] = { false, 0 };
+			}
+		}
+
+		oct.root_pos = pos;
 	}
 
 	Gradient colors = Gradient({
@@ -202,7 +230,8 @@ namespace world_octree {
 			int child_scale = scale - 1;
 
 			for (int i=0; i<8; ++i) {
-				int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
+				int3 xor_mask = (oct.root_pos >> child_scale) & 1;
+				int3 child_pos = pos + ((int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) ^ xor_mask) << child_scale);
 
 				recurse_draw(oct, children.children[i], child_pos, child_scale);
 			}
@@ -213,10 +242,12 @@ namespace world_octree {
 		recurse_draw(oct, { true, 0 }, oct.root_pos, oct.root_scale);
 	}
 
-	void WorldOctree::update () {
+	void WorldOctree::update (Player const& player) {
 		if (trunk.nodes.size() == 0) {
 			trunk.nodes.push_back({});
 		}
+
+		update_root(*this, player);
 
 		if (debug_draw_octree) {
 			debug_draw(*this);

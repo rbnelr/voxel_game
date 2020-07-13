@@ -5,6 +5,7 @@
 
 class Chunk;
 class Chunks;
+class Player;
 
 namespace world_octree {
 	struct OctreeNode {
@@ -32,7 +33,7 @@ namespace world_octree {
 		bool debug_draw_octree = true;
 
 		void imgui ();
-		void update ();
+		void update (Player const& player);
 
 		void add_chunk (Chunk& chunk);
 		void remove_chunk (Chunk& chunk);
