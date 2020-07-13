@@ -2,6 +2,7 @@
 #include "dear_imgui.hpp"
 #include "chunks.hpp"
 #include "player.hpp"
+#include "util/timer.hpp"
 #include <stack>
 
 namespace world_octree {
@@ -207,6 +208,31 @@ namespace world_octree {
 		oct.root_pos = pos;
 	}
 
+	OctreeNode _recurse (std::vector<OctreeChildren>& new_nodes, std::vector<OctreeChildren>& old_nodes, OctreeNode& old_node) {
+		assert(old_node.has_children);
+
+		uint32_t children_ptr = (uint32_t)new_nodes.size();
+		new_nodes.emplace_back();
+
+		auto& old_children = old_nodes[ old_node.data ].children;
+		for (int i=0; i<8; ++i) {
+			new_nodes[ children_ptr ].children[i] = old_children[i].has_children ? _recurse(new_nodes, old_nodes, old_children[i]) : old_children[i];
+		}
+
+		return { true, children_ptr };
+	}
+
+	// 'compact' nodes, ie. iterate the octree nodes and write them in depth first order into a new memory, this fixes the out-of-order nodes left by insert and the dead nodes left by delete
+	void compact_nodes (std::vector<OctreeChildren>& nodes) {
+		std::vector<OctreeChildren> new_nodes;
+
+		OctreeNode old_root = { true, 0 };
+		
+		_recurse(new_nodes, nodes, old_root);
+
+		nodes = new_nodes;
+	}
+
 	Gradient colors = Gradient({
 		{ 0.00f,	srgba(0x010934) },
 		{ 0.12f,	srgba(0x0030c8) },
@@ -250,13 +276,14 @@ namespace world_octree {
 		recurse_draw(oct, { true, 0 }, oct.root_pos, oct.root_scale);
 	}
 
-	void WorldOctree::update (Player const& player) {
+	void WorldOctree::pre_update (Player const& player) {
 		if (trunk.nodes.size() == 0) {
 			trunk.nodes.push_back({});
 		}
 
 		update_root(*this, player);
-
+	}
+	void WorldOctree::post_update () {
 		active_trunk_nodes = -1;
 		if (debug_draw_octree) {
 			debug_draw(*this);
@@ -266,13 +293,29 @@ namespace world_octree {
 	void WorldOctree::add_chunk (Chunk& chunk) {
 		int3 pos = chunk.coord * CHUNK_DIM;
 		
+		auto a = Timer::start();
 		insert_node(*this, { pos, CHUNK_DIM_SHIFT });
+		auto at = a.end();
+
+		auto b = Timer::start();
+		compact_nodes(trunk.nodes);
+		auto bt = b.end();
+
+		logf("WorldOctree::add_chunk:  insert_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {
 		int3 pos = chunk.coord * CHUNK_DIM;
-		
+
+		auto a = Timer::start();
 		remove_node(*this, { pos, CHUNK_DIM_SHIFT });
+		auto at = a.end();
+
+		auto b = Timer::start();
+		compact_nodes(trunk.nodes);
+		auto bt = b.end();
+
+		logf("WorldOctree::remove_chunk:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
 

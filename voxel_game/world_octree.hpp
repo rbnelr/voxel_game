@@ -36,7 +36,8 @@ namespace world_octree {
 		int active_trunk_nodes = -1;
 
 		void imgui ();
-		void update (Player const& player);
+		void pre_update (Player const& player);
+		void post_update ();
 
 		void add_chunk (Chunk& chunk);
 		void remove_chunk (Chunk& chunk);
