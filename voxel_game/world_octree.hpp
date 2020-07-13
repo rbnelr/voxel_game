@@ -25,7 +25,7 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 8;
+		int			root_scale = 12;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		OctreeTrunk trunk;
