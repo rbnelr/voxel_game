@@ -7,18 +7,13 @@ class Chunk;
 class Chunks;
 
 namespace world_octree {
-	static constexpr uint32_t NONLEAF_MASK = 0x80000000u;
-
-	static constexpr int tree_scale = 12;
-	static constexpr int3 root_pos = 0;
-
 	struct OctreeNode {
 		bool has_children : 1;
 		uint32_t data : 31;
 	};
 
 	struct OctreeChildren {
-		OctreeNode data[8];
+		OctreeNode children[8];
 	};
 
 	// Octree of all in-memory chunks
@@ -28,6 +23,9 @@ namespace world_octree {
 
 	class WorldOctree {
 	public:
+
+		int			root_scale = 8;
+		int3		root_pos = -(1 << (root_scale - 1));
 
 		OctreeTrunk trunk;
 

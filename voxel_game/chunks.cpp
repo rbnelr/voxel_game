@@ -317,6 +317,8 @@ Block const& Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos
 }
 
 ChunkHashmap::Iterator Chunks::unload_chunk (ChunkHashmap::Iterator it) {
+	world_octree.remove_chunk(*it);
+
 	// TODO: clear neighbour block copies to _NO_CHUNK here?
 	return chunks.erase_chunk(it);
 }

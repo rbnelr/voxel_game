@@ -255,7 +255,7 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius =	_use_potatomode ? 30.0f : 250.0f;
+	float generation_radius =	40;//250.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
@@ -263,7 +263,7 @@ public:
 	// This way walking back and forth might not even need to load any chunks at all
 	float deletion_hysteresis = CHUNK_DIM*1.5f;
 
-	float active_radius =	_use_potatomode ? 150.0f : 200.0f;
+	float active_radius =	200.0f;
 
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int max_chunks_meshed_per_frame = max(std::thread::hardware_concurrency()*2, 4); // max is 2 meshings per cpu core per frame
