@@ -24,19 +24,24 @@ $if fragment
 	// source for algorithm: https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
 	// SVO data
-	uniform isampler1D svo_texture;
-	uniform vec3 svo_root_pos;
+	uniform isampler2D svo_texture;
+	uniform ivec3 svo_root_pos;
+	uniform int svo_root_scale;
+
+#define LEAF_BIT 0x80000000
 
 #define INF (1.0 / 0.0)
 
-#define CHUNK_DIM 64 // size of voxel chunk (cubed)
-#define MAX_SCALE 6 // "scale" of root DVO node
+#define MAX_SCALE 12
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
 
 	int get_svo_node (int index) {
-		return texelFetch(svo_texture, index, 0).r;
+		ivec2 indx2;
+		indx2.x = index % 2048;
+		indx2.y = index / 2048;
+		return texelFetch(svo_texture, indx2, 0).r;
 	}
 	
 	// SVO format:
@@ -58,7 +63,7 @@ $if fragment
 	uniform bool visualize_iterations = true;
 	uniform sampler2D heat_gradient;
 
-	uniform float max_dist = 100;
+	uniform float max_dist = 9999999;
 
 	vec3 ray_pos;
 	vec3 ray_dir;
@@ -92,7 +97,7 @@ $if fragment
 		
 		if (cur_medium == B_WATER && block_id == B_AIR) {
 			effective_block_id = B_WATER; // render water exit into air as water
-		} else if (block_id == B_AIR)
+		} else if (block_id == B_AIR || block_id == 0)
 			return; // never try to render air
 		
 		cur_medium = block_id;
@@ -128,6 +133,7 @@ $if fragment
 		float effective_alpha = remain_alpha * col.a;
 		hit_col += vec4(effective_alpha * col.rgb, effective_alpha);
 
+
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies
@@ -146,7 +152,7 @@ $if fragment
 		ray_dir = ( cam_to_world * vec4(dir_cam, 0)).xyz;
 		ray_dir = normalize(ray_dir);
 
-		ray_pos -= svo_root_pos;
+		ray_pos -= vec3(svo_root_pos);
 	}
 
 	float min_component (vec3 v) {
@@ -189,14 +195,12 @@ $if fragment
 	}
 
 	void raytrace () {
-		float hit_dist = -1.0;
-
 		vec3 root_min = vec3(0);
-		vec3 root_max = vec3(CHUNK_DIM);
+		vec3 root_max = vec3(float(1 << svo_root_scale));
 		vec3 root_mid = 0.5 * (root_min + root_max);
 
 		ivec3 parent_pos = ivec3(0);
-		int parent_scale = MAX_SCALE;
+		int parent_scale = svo_root_scale;
 
 		mirror_mask_int = 0;
 
@@ -214,7 +218,7 @@ $if fragment
 		
 		rinv_dir = 1.0 / mirror_ray_dir;
 
-		int parent_node = get_svo_node(0);
+		int parent_node = 0;
 
 		// desired ray bounds
 		float tmin = 0;
@@ -242,7 +246,7 @@ $if fragment
 			bvec3 exit_face, entry_faces;
 			intersect_ray(child_pos, child_scale, child_t0, child_t1, exit_face, entry_faces);
 
-			bool voxel_exists = (parent_node & 0x80000000) != 0;
+			bool voxel_exists = (parent_node & LEAF_BIT) == 0;
 			if (voxel_exists && t0 < t1) {
 
 				int idx = 0;
@@ -250,7 +254,9 @@ $if fragment
 				idx |= ((child_pos.y >> child_scale) & 1) << 1;
 				idx |= ((child_pos.z >> child_scale) & 1) << 2;
 
-				int node = get_svo_node( (parent_node & 0x7fffffff) + (idx ^ mirror_mask_int) );
+				idx ^= mirror_mask_int;
+
+				int node = get_svo_node( parent_node*8 + idx );
 
 				//// Intersect
 				// child cube ray range
@@ -259,14 +265,12 @@ $if fragment
 
 				if (tv0 < tv1) {
 					
-					bool leaf = (node & 0x80000000) == 0;
+					bool leaf = (node & LEAF_BIT) != 0;
 					if (leaf) {
-						//if (node != B_AIR) {
-							calc_hit(tv0, entry_faces, node);
-							
-							if (hit_col.a > 0.999)
-								return; // final hit
-						//}
+						calc_hit(tv0, entry_faces, node & ~LEAF_BIT);
+						
+						if (hit_col.a > 0.999)
+							return; // final hit
 					} else {
 						//// Push
 						stack_node[child_scale - 1] = parent_node;
@@ -311,7 +315,7 @@ $if fragment
 				//// Pop
 				child_scale = highest_differing_bit(old_pos, child_pos);
 
-				if (child_scale >= MAX_SCALE)
+				if (child_scale >= svo_root_scale)
 					return; // out of root
 
 				parent_node	= stack_node[child_scale - 1];
@@ -335,7 +339,7 @@ $if fragment
 			frag_col = hit_col;
 
 		{ // Write depth
-			vec3 hit_pos_world = ray_dir * hit_dist + ray_pos + svo_root_pos;
+			vec3 hit_pos_world = ray_dir * hit_dist + ray_pos + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
 			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay

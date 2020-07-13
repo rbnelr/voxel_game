@@ -521,7 +521,7 @@ public:
 
 			ImGui::Separator();
 
-			raytracer.imgui(chunks);
+			raytracer.imgui();
 		}
 	}
 

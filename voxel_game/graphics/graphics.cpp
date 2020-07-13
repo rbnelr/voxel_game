@@ -838,7 +838,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	if (raytracer.raytracer_draw) {
-		raytracer.draw(world.chunks, view, *this);
+		raytracer.draw(world.chunks.world_octree, view, *this);
 	}
 
 	glClear(GL_DEPTH_BUFFER_BIT);

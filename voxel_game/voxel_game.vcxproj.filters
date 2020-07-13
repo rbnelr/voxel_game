@@ -385,9 +385,6 @@
     <None Include="shaders\held_item.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="shaders\raytrace.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="kissmath\bool2.inl">
       <Filter>kissmath</Filter>
     </None>
@@ -467,6 +464,9 @@
       <Filter>kissmath</Filter>
     </None>
     <None Include="shaders\debug_graphics.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\raytrace_svo.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

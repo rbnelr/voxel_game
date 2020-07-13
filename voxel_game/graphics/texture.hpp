@@ -171,9 +171,10 @@ public:
 };
 
 class Texture2D {
+public:
 	//std::string name;
 	gl::Texture tex;
-public:
+//public:
 	int2 size = -1; // size in pixels
 
 	Texture2D ();

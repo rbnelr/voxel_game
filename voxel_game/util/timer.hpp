@@ -17,3 +17,7 @@ namespace kiss {
 		}
 	};
 }
+
+#define TIME_START(name) auto __##name = Timer::start()
+#define TIME_END(name) auto __##name##_time = __##name.end()
+

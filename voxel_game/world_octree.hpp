@@ -8,13 +8,10 @@ class Chunks;
 class Player;
 
 namespace world_octree {
-	struct OctreeNode {
-		bool has_children : 1;
-		uint32_t data : 31;
-	};
+	static uint32_t LEAF_BIT = 0x80000000u;
 
 	struct OctreeChildren {
-		OctreeNode children[8];
+		uint32_t children[8];
 	};
 
 	struct Octree {
@@ -24,10 +21,10 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 8;
+		int			root_scale = 10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
-		Octree trunk;
+		Octree octree;
 
 		//
 		bool debug_draw_octree = false;
