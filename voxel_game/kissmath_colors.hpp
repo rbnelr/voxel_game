@@ -76,9 +76,9 @@ namespace kissmath {
 		return lrgba(to_linear(srgb8(r,g,b)), 1);
 	}
 
-	// #rrbbgg format like in web
+	// 0xrrbbgg format like in web
 	inline lrgba srgba (int32_t rgb_hex) {
-		return srgba(rgb_hex & 0xff, (rgb_hex >> 8) & 0xff, (rgb_hex >> 16) & 0xff);
+		return srgba((rgb_hex >> 16) & 0xff, (rgb_hex >> 8) & 0xff, rgb_hex & 0xff);
 	}
 
 	// alpha is linear

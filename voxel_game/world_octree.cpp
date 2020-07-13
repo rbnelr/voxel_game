@@ -10,6 +10,8 @@ namespace world_octree {
 		if (!imgui_push("WorldOctree")) return;
 
 		ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
+		ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
+		ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
 
 		ImGui::Text("       trunk nodes: %d", (int)trunk.nodes.size());
 		ImGui::Text("active trunk nodes: %d", active_trunk_nodes);
@@ -17,11 +19,6 @@ namespace world_octree {
 
 		imgui_pop();
 	}
-
-	struct NodeCoord {
-		int3		pos;
-		int			scale;
-	};
 
 	//
 #if 0
@@ -91,95 +88,80 @@ namespace world_octree {
 		return ret;
 	}
 
-	void insert_node (WorldOctree& oct, NodeCoord insert_node) {
-		int3 relpos = insert_node.pos - oct.root_pos;
+	void octree_write (WorldOctree& oct, int3 pos, int scale, block_id val) {
+		int3 relpos = pos - oct.root_pos;
 		if (any(relpos < 0 || relpos >= (1 << oct.root_scale)))
 			return;
 
 		// start with root node
-		int scale = oct.root_scale;
+		int cur_scale = oct.root_scale;
+		OctreeNode* cur_node = nullptr;
 		uint32_t children_ptr = 0;
-		
-		OctreeNode* node_data = nullptr;
-
-		for (;;) {
-			// get child that contains insert_node
-			scale--;
-			
-			int child_idx = get_child_index(insert_node.pos, scale); // ^ oct.root_pos to account for root node half-offset
-
-			// 'recurse' into child node
-			node_data = &oct.trunk.nodes[children_ptr].children[child_idx];
-
-			if (scale == insert_node.scale)
-				break;
-
-			if (node_data->has_children) {
-				children_ptr = node_data->data;
-			} else {
-				//// Insert children entry if not was a leaf before
-
-				children_ptr = (uint32_t)oct.trunk.nodes.size();
-
-				// write ptr to children into this nodes slot in parents children array
-				*node_data = { true, children_ptr };
-
-				// alloc children for node
-				oct.trunk.nodes.push_back({0});
-			}
-		}
-
-		*node_data = { false, 1 };
-	}
-
-	void remove_node (WorldOctree& oct, NodeCoord remove_node) {
-		int3 relpos = remove_node.pos - oct.root_pos;
-		if (any(relpos < 0 || relpos >= (1 << oct.root_scale)))
-			return;
-		
-		// start with root node
-		int scale = oct.root_scale;
-		uint32_t children_ptr = 0;
-
-		OctreeNode* node_data = nullptr;
 
 		// biggest node that only contains us as leaf node, this one will be deleted
-		OctreeNode* highest_exclusive_parent = nullptr;
-		int highest_exclusive_parent_scale = -1;
+		OctreeNode* write_node = nullptr;
 
 		for (;;) {
-			// get child that contains insert_node
-			scale--;
+			// get child node that contains target node
+			cur_scale--;
+			
+			auto* siblings = oct.trunk.nodes[children_ptr].children;
 
-			int child_idx = get_child_index(remove_node.pos, scale); // ^ oct.root_pos to account for root node half-offset
+			int child_idx = get_child_index(pos, cur_scale);
 
-			// 'recurse' into child node
-			node_data = &oct.trunk.nodes[children_ptr].children[child_idx];
+			cur_node = &siblings[child_idx];
 
-			{ // count children; if == 1 then set highest_exclusive_parent
+			{ // keep track of highest node that will end up with 8 children of the same leaf type once write happened (overwriting this collapses the subtree)
 				if (children_ptr == 0) {
-					highest_exclusive_parent = node_data;
+					// special case because we neverwant to collapse the root nodes children (because root node is implicit)
+					write_node = cur_node;
 				} else {
-					auto* children = oct.trunk.nodes[children_ptr].children;
-
+					// overwrite highest_exclusive_parent with current node if the siblings have children or are of other type
 					for (int i=0; i<8; ++i) {
-						if ( !(i == child_idx || (!children[i].has_children && children[i].data == 0)) ) {
-							highest_exclusive_parent = node_data;
+						if (i != child_idx && (siblings[i].has_children || siblings[i].data != val)) {
+							write_node = cur_node;
 							break;
 						}
 					}
 				}
 			}
 
-			if (scale == remove_node.scale)
+			if (cur_scale == scale) {
+				// reached target octree depth
 				break;
+			}
 
-			assert(node_data->has_children);
-			children_ptr = node_data->data;
+			if (cur_node->has_children) {
+				// recurse normally
+				children_ptr = cur_node->data;
+			} else {
+				//// Split node into 8 children of same type
+
+				block_id leaf_val = (block_id)cur_node->data;
+
+				if (leaf_val == val) {
+					// do not split node if leaf is already the correct type just at a higher scale
+					assert(write_node == cur_node);
+					break;
+				}
+
+				children_ptr = (uint32_t)oct.trunk.nodes.size();
+
+				// write ptr to children into this nodes slot in parents children array
+				*cur_node = { true, children_ptr };
+
+				// alloc and init children for node
+				oct.trunk.nodes.emplace_back(); // invalidates node_data and highest_exclusive_parent
+				
+				auto& children = oct.trunk.nodes.back().children;
+				for (int i=0; i<8; ++i) {
+					children[i] = { false, leaf_val };
+				}
+			}
 		}
 
-		assert(highest_exclusive_parent);
-		*highest_exclusive_parent = { false, 0 };
+		// do the write
+		*write_node = { false, val };
 	}
 
 	void update_root (WorldOctree& oct, Player const& player) {
@@ -208,7 +190,7 @@ namespace world_octree {
 		oct.root_pos = pos;
 	}
 
-	OctreeNode _recurse (std::vector<OctreeChildren>& new_nodes, std::vector<OctreeChildren>& old_nodes, OctreeNode& old_node) {
+	OctreeNode recurse_comapct (std::vector<OctreeChildren>& new_nodes, std::vector<OctreeChildren>& old_nodes, OctreeNode old_node) {
 		assert(old_node.has_children);
 
 		uint32_t children_ptr = (uint32_t)new_nodes.size();
@@ -216,44 +198,43 @@ namespace world_octree {
 
 		auto& old_children = old_nodes[ old_node.data ].children;
 		for (int i=0; i<8; ++i) {
-			new_nodes[ children_ptr ].children[i] = old_children[i].has_children ? _recurse(new_nodes, old_nodes, old_children[i]) : old_children[i];
+			new_nodes[ children_ptr ].children[i] = old_children[i].has_children ? recurse_comapct(new_nodes, old_nodes, old_children[i]) : old_children[i];
 		}
 
 		return { true, children_ptr };
 	}
 
-	// 'compact' nodes, ie. iterate the octree nodes and write them in depth first order into a new memory, this fixes the out-of-order nodes left by insert and the dead nodes left by delete
+	// 'compact' nodes, ie. iterate the octree nodes recursivly and write them in depth first order into a new array,
+	//  this resorts the out-of-order nodes left by node insertions and the dead nodes left by node collapse
 	void compact_nodes (std::vector<OctreeChildren>& nodes) {
 		std::vector<OctreeChildren> new_nodes;
 
 		OctreeNode old_root = { true, 0 };
-		
-		_recurse(new_nodes, nodes, old_root);
+		recurse_comapct(new_nodes, nodes, old_root);
 
 		nodes = new_nodes;
 	}
 
-	Gradient colors = Gradient({
-		{ 0.00f,	srgba(0x010934) },
-		{ 0.12f,	srgba(0x0030c8) },
-		{ 0.24f,	srgba(0x02f9ff) },
-		{ 0.36f,	srgba(0x3eff64) },
-		{ 0.47f,	srgba(0x63ff00) },
-		{ 0.60f,	srgba(0xfaff27) },
-		{ 0.73f,	srgba(0xffbc06) },
-		{ 0.86f,	srgba(0xff5715) },
-		{ 1.00f,	srgba(0xff00b5) },
-	});
+	lrgba cols[] = {
+		srgba(255,0,0),
+		srgba(0,255,0),
+		srgba(0,0,255),
+		srgba(255,255,0),
+		srgba(255,0,255),
+		srgba(0,255,255),
+		srgba(127,0,255),
+		srgba(255,0,127),
+		srgba(255,127,255),
+	};
 
 	void recurse_draw (WorldOctree& oct, OctreeNode node, int3 pos, int scale) {
 		float size = (float)(1 << scale);
 
-		auto col = colors.calc((float)scale / (oct.root_scale + 1));
 		//if (!node.has_children && node.data == 0)
 		//	col *= lrgba(.5f,.5f,.5f, .6f);
 		//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
-		if (node.has_children || node.data != 0)
-			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
+		if ((node.has_children || node.data != 0) && scale <= oct.debug_draw_octree_max)
+			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, cols[scale % ARRLEN(cols)]);
 
 		if (node.has_children) {
 			oct.active_trunk_nodes++;
@@ -261,11 +242,13 @@ namespace world_octree {
 			OctreeChildren children = oct.trunk.nodes[node.data];
 			int child_scale = scale - 1;
 
-			for (int i=0; i<8; ++i) {
-				int3 xor_mask = (oct.root_pos >> child_scale) & 1;
-				int3 child_pos = pos + ((int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) ^ xor_mask) << child_scale);
+			if (child_scale >= oct.debug_draw_octree_min) {
+				for (int i=0; i<8; ++i) {
+					int3 xor_mask = (oct.root_pos >> child_scale) & 1;
+					int3 child_pos = pos + ((int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) ^ xor_mask) << child_scale);
 
-				recurse_draw(oct, children.children[i], child_pos, child_scale);
+					recurse_draw(oct, children.children[i], child_pos, child_scale);
+				}
 			}
 		}
 	}
@@ -294,36 +277,56 @@ namespace world_octree {
 		int3 pos = chunk.coord * CHUNK_DIM;
 		
 		auto a = Timer::start();
-		insert_node(*this, { pos, CHUNK_DIM_SHIFT });
+		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_AIR);
 		auto at = a.end();
+
+		auto c = Timer::start();
+		{
+			for (int z=0; z<CHUNK_DIM; ++z) {
+				for (int y=0; y<CHUNK_DIM; ++y) {
+					for (int x=0; x<CHUNK_DIM; ++x) {
+						int3 bpos = pos + int3(x,y,z);
+
+						octree_write(*this, bpos, 0, chunk.get_block(int3(x,y,z)).id);
+					}
+				}
+			}
+		}
+		auto ct = c.end();
 
 		auto b = Timer::start();
 		compact_nodes(trunk.nodes);
 		auto bt = b.end();
 
-		logf("WorldOctree::add_chunk:  insert_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		logf("WorldOctree::add_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {
 		int3 pos = chunk.coord * CHUNK_DIM;
 
 		auto a = Timer::start();
-		remove_node(*this, { pos, CHUNK_DIM_SHIFT });
+		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_NULL);
 		auto at = a.end();
 
 		auto b = Timer::start();
 		compact_nodes(trunk.nodes);
 		auto bt = b.end();
 
-		logf("WorldOctree::remove_chunk:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		logf("WorldOctree::remove_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
+	void WorldOctree::update_block (Chunk& chunk, int3 bpos, block_id id) {
+		int3 pos = chunk.coord * CHUNK_DIM;
+		pos += bpos;
 
-	void WorldOctree::add_block (Chunk& chunk, int3 block) {
+		auto a = Timer::start();
+		octree_write(*this, pos, 0, id);
+		auto at = a.end();
 
-	}
+		auto b = Timer::start();
+		compact_nodes(trunk.nodes);
+		auto bt = b.end();
 
-	void WorldOctree::remove_block (Chunk& chunk, int3 block) {
-	
+		logf("WorldOctree::update_block:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 }

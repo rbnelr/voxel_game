@@ -112,7 +112,7 @@ void DebugGraphics::draw () {
 
 		//// lines
 
-		glLineWidth(2.0f);
+		glLineWidth(gl_line_width);
 
 		if (lines.size() != 0) {
 			lines_mesh.upload(lines);

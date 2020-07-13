@@ -2,6 +2,7 @@
 #include "../kissmath.hpp"
 #include "shaders.hpp"
 #include "camera.hpp"
+#include "../dear_imgui.hpp"
 
 struct DebugGraphics {
 	struct Vertex {
@@ -21,6 +22,16 @@ struct DebugGraphics {
 
 	Mesh<Vertex> faces_mesh;
 	Mesh<Vertex> lines_mesh;
+
+	float gl_line_width = 2;
+
+	void imgui () {
+		if (!imgui_push("DebugGraphics")) return;
+
+		ImGui::SliderFloat("glLineWidth", &gl_line_width, .5f, 4);
+
+		imgui_pop();
+	}
 
 	// draw quad
 

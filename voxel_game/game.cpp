@@ -71,6 +71,7 @@ void Game::frame () {
 
 		input.imgui();
 		graphics.imgui(world->chunks);
+		debug_graphics->imgui();
 
 		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 		
