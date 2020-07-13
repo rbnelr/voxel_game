@@ -64,6 +64,7 @@ class Game {
 	BlockUpdate block_update;
 
 	bool activate_flycam = false;
+	bool creative_mode = false;
 
 	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
 
@@ -76,4 +77,8 @@ public:
 
 	void frame ();
 
+	~Game () {
+		// make sure to shutdown global threadpools before optick dumps profiling data
+		shutdown_threadpools();
+	}
 };

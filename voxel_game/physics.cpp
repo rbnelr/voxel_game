@@ -95,7 +95,6 @@ void handle_collison (PhysicsObject& obj, CollisionHit const& hit) {
 extern int frame_counter;
 
 void Physics::update_object (World& world, PhysicsObject& obj) {
-
 	//// gravity
 	obj.vel += physics.grav_accel * input.dt;
 

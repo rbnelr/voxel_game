@@ -16,8 +16,10 @@ bool _use_potatomode = _need_potatomode();
 
 //
 Game::Game () {
+	set_process_priority();
+	set_thread_priority(Priorities::HIGH);
+	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
-	set_high_thread_priority();
 }
 
 void Game::frame () {
@@ -58,26 +60,26 @@ void Game::frame () {
 	}
 
 	if (!dbg_pause) {
+		{
+			if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
+				fps_display.display_fps();
 
-		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
-			fps_display.display_fps();
+				ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
+				ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.block_light_time.calc_avg() * 1000 * 1000);
+				ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
 
-			ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
-			ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.block_light_time.calc_avg() * 1000 * 1000);
-			ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
-
-			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
-		}
+				ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
+			}
 
 		input.imgui();
 		graphics.imgui(world->chunks);
 		debug_graphics->imgui();
 
-		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
+			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 		
-			if (ImGui::Button("Recreate")) {
-				world = std::make_unique<World>(world_gen);
-			}
+				if (ImGui::Button("Recreate")) {
+					world = std::make_unique<World>(world_gen);
+				}
 
 			world_gen.imgui();
 			world->imgui();
@@ -85,24 +87,30 @@ void Game::frame () {
 			world->chunks.world_octree.imgui();
 		}
 
-		{
-			bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
+			{
+				bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
 		
-			if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
-			if (input.buttons[GLFW_KEY_P].went_down)
-				activate_flycam = !activate_flycam;
+				if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
+				if (input.buttons[GLFW_KEY_P].went_down)
+					activate_flycam = !activate_flycam;
 
-			if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
-			if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
-				world->player.respawn();
+				if (open) ImGui::Checkbox("Toggle Creative Mode [C]", &creative_mode);
+				if (input.buttons[GLFW_KEY_C].went_down)
+					creative_mode = !creative_mode;
+
+				if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
+				if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
+					world->player.respawn();
+				}
+
+				if (open) ImGui::Separator();
+
+				if (open) flycam.imgui("flycam");
+				if (open) world->player.imgui("player");
+
+				if (open) ImGui::Separator();
 			}
 
-			if (open) ImGui::Separator();
-
-			if (open) flycam.imgui("flycam");
-			if (open) world->player.imgui("player");
-
-			if (open) ImGui::Separator();
 		}
 
 		world->chunks.update_chunk_loading(*world, world_gen, world->player);
@@ -114,7 +122,7 @@ void Game::frame () {
 		physics.update_player(*world, world->player);
 
 		SelectedBlock selected_block;
-		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, &selected_block);
+		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, creative_mode, &selected_block);
 
 		if (selected_block)
 			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block.id]);

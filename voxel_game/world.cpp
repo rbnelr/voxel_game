@@ -25,7 +25,7 @@ SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* h
 	return b;
 }
 
-void World::apply_damage (SelectedBlock const& block, Item& item) {
+void World::apply_damage (SelectedBlock const& block, Item& item, bool creative_mode) {
 	assert(block);
 	auto tool_props = item.get_props();
 
@@ -44,7 +44,12 @@ void World::apply_damage (SelectedBlock const& block, Item& item) {
 		if (tool_props.tool == blocks.tool[b.id])
 			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
 
-		b.hp -= (uint8)min(ceili(tool_props.damage * damage_multiplier), (int)b.hp);
+		int dmg = ceili(tool_props.damage * damage_multiplier);
+
+		if (creative_mode)
+			dmg = INT_MAX;
+
+		b.hp -= (uint8)min(dmg, (int)b.hp);
 	}
 
 	if (b.hp <= 0) {

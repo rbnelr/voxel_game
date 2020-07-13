@@ -167,7 +167,7 @@ struct Shader {
 		gl::Uniform u;
 		if (shader->get_uniform(name, &u)) {
 			if (!gl::is_sampler_type(u.type))
-				logf(WARNING, "Uniform \"%s\" is not a sampler type!", name.data());
+				clog(WARNING, "Uniform \"%s\" is not a sampler type!", name.data());
 			glUniform1i(u.loc, unit);
 		} else {
 			//logf(WARNING, "Texture \"%s\" does not exist in shader!", name.data());

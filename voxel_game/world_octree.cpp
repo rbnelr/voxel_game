@@ -305,7 +305,7 @@ namespace world_octree {
 		compact_nodes(octree.nodes);
 		auto bt = b.end();
 
-		logf("WorldOctree::add_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::add_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {
@@ -319,7 +319,7 @@ namespace world_octree {
 		compact_nodes(octree.nodes);
 		auto bt = b.end();
 
-		logf("WorldOctree::remove_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::remove_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 
 	void WorldOctree::update_block (Chunk& chunk, int3 bpos, block_id id) {
@@ -334,6 +334,6 @@ namespace world_octree {
 		compact_nodes(octree.nodes);
 		auto bt = b.end();
 
-		logf("WorldOctree::update_block:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::update_block:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 }

@@ -3,7 +3,7 @@
 
 float3	player_spawn_point = float3(0,0,34);
 
-void BreakBlock::update (World& world, Player& player, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
+void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];
 	bool inp = selected_block ? button.is_down : button.went_down;
 
@@ -12,7 +12,7 @@ void BreakBlock::update (World& world, Player& player, PlayerGraphics const& gra
 	}
 	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
 		if (selected_block) {
-			world.apply_damage(selected_block, player.inventory.quickbar.get_selected().item);
+			world.apply_damage(selected_block, player.inventory.quickbar.get_selected().item, creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 		}
 		anim_triggered = true;
@@ -219,7 +219,7 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* selected_block) {
+Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, bool active, bool creative_mode, SelectedBlock* selected_block) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -245,7 +245,7 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 
 	if (active) {
 		*selected_block = calc_selected_block(world);
-		break_block.update(world, *this, graphics, *selected_block);
+		break_block.update(world, *this, creative_mode, graphics, *selected_block);
 		block_place.update(world, *this, *selected_block);
 		inventory.update();
 	}

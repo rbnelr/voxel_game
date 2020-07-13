@@ -115,7 +115,7 @@ void GuiConsole::imgui () {
 		if (line->level == WARNING)		col = srgba(255, 220, 80);
 		else if (line->level == ERROR)	col = srgba(255, 100, 40);
 
-		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line->str.c_str());
+		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line->str);
 	}
 
 	if (autoscroll) // keep scroll set to end of console buffer if it was at the end previously
@@ -131,6 +131,7 @@ void GuiConsole::imgui () {
 }
 
 void GuiConsole::add_line (Line line) {
+	//OPTICK_EVENT();
 
 	auto* ls = line.level == INFO ? &unimportant_lines : &important_lines;
 	
@@ -148,16 +149,23 @@ void GuiConsole::add_line (Line line) {
 extern int frame_counter;
 
 void vlogf (LogLevel level, char const* format, va_list vl) {
-	std::string new_format = kiss::prints("[%5d] %s\n", frame_counter, format);
+	char new_format[128];
+	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", frame_counter, format);
 	
-	std::string line;
-	kiss::vprints(&line, new_format.c_str(), vl);
+	GuiConsole::Line l;
+	vsnprintf(l.str, sizeof(l.str), new_format, vl);
 
-	fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
+	/* puts is too slow to use in a game!!, often taking >1.5ms to execute
+	{
+		OPTICK_EVENT("vlogf fputs");
+		fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
+	}*/
 
-	gui_console.add_line({ std::move(line), level, frame_counter });
+	l.level = level;
+	l.frame = frame_counter;
+	gui_console.add_line(std::move(l));
 }
-void logf (char const* format, ...) {
+void clog (char const* format, ...) {
 	va_list vl;
 	va_start(vl, format);
 
@@ -165,7 +173,7 @@ void logf (char const* format, ...) {
 
 	va_end(vl);
 }
-void logf (LogLevel level, char const* format, ...) {
+void clog (LogLevel level, char const* format, ...) {
 	va_list vl;
 	va_start(vl, format);
 

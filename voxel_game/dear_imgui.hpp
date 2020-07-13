@@ -68,14 +68,14 @@ class GuiConsole {
 	bool imgui_uncollapse = false;
 public:
 	struct Line {
-		std::string str;
+		char str[128 - sizeof(int)*3];
 		LogLevel level;
 		int frame;
 		int counter;
 	};
 
-	circular_buffer<Line> unimportant_lines = circular_buffer<Line>(250);
-	circular_buffer<Line> important_lines = circular_buffer<Line>(250);
+	circular_buffer<Line> unimportant_lines = circular_buffer<Line>(1024);
+	circular_buffer<Line> important_lines = circular_buffer<Line>(1024);
 	bool shown = true;
 
 	bool show_info = false;
@@ -93,5 +93,10 @@ public:
 // Global GuiConsole
 extern GuiConsole gui_console;
 
-void logf (char const* format, ...);
-void logf (LogLevel level, char const* format, ...);
+// log() function name is already taken by <cmath>
+
+// log to console
+void clog (char const* format, ...);
+
+// log to console
+void clog (LogLevel level, char const* format, ...);

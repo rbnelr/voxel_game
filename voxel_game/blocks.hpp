@@ -44,8 +44,8 @@ enum block_id : uint16_t {
 	PSEUDO_BLOCK_IDS_COUNT,
 };
 
-static inline float TOOL_MATCH_BONUS_DAMAGE = 2;
-static inline float TOOL_MISMATCH_PENALTY_BREAK = 2;
+static constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
+static constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
 #define MAX_LIGHT_LEVEL 18
 
 struct BlockTypes {
@@ -66,7 +66,7 @@ struct BlockTypes {
 	}
 };
 
-static inline BlockTypes load_block_types () {
+static BlockTypes load_block_types () {
 	BlockTypes bt;
 	int cur = 0;
 
@@ -106,7 +106,7 @@ static inline BlockTypes load_block_types () {
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
-	/* B_LEAVES				*/ solid_alpha_test("leaves",    12);
+	/* B_LEAVES				*/ solid_alpha_test("leaves",    1, 2);
 	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
 	/* B_TALLGRASS			*/ plant("tallgrass");
 
@@ -120,11 +120,11 @@ static inline BlockTypes blocks = load_block_types();
 // Block instance
 struct Block {
 	block_id	id;
-	uint8		block_light; // [0,15]
-	uint8		sky_light; // [0,15]
-	uint8		hp;
+	uint8_t		block_light;
+	uint8_t		sky_light;
+	uint8_t		hp;
 
-	Block () {}
+	Block () = default;
 
 	Block (block_id id): id{id} {
 		block_light = blocks.glow[id];

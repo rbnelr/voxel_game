@@ -137,28 +137,32 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 
 		auto time = timer.end();
 		chunks.block_light_time.push(time);
-		logf("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
+		clog("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
 	}
 }
 
 void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
+	//OPTICK_EVENT();
+
 	int sky_light = pos_in_chunk.z >= CHUNK_DIM-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
 	bpos pos = pos_in_chunk;
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		sky_light = max(sky_light - blocks.absorb[b->id], 0);
+		auto indx = ChunkData::pos_to_index(pos);
+		auto* sl = &chunk->blocks->sky_light[ indx ];
+		auto id = chunk->blocks->id[ indx ];
 
-		b->sky_light = sky_light;
+		sky_light = max(sky_light - blocks.absorb[id], 0);
+		*sl = sky_light;
 	}
 
 	for (; pos.z>=0; --pos.z) {
-		auto* b = chunk->get_block_unchecked(pos);
-		
-		if (b->sky_light == 0)
+		auto* sl = &chunk->blocks->sky_light[ ChunkData::pos_to_index(pos) ];
+
+		if (*sl == 0)
 			break;
 
-		b->sky_light = 0;
+		*sl = 0;
 	}
 
 	chunk->needs_remesh = true;

@@ -203,8 +203,8 @@ void GuiGraphics::draw_item_tile (item_id id, float2 pos_px, float2 size_px, Til
 }
 
 void GuiGraphics::draw_crosshair () {
-	float2 size = (float2)crosshair.size_px * gui_scale * crosshair_scale;
-	float2 pos = (float2)(input.window_size / 2) - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
+	float2 size = (float2)crosshair.size_px * crosshair_scale;
+	float2 pos = (float2)((float2)input.window_size / gui_scale / 2) - size / 2; // center crosshair on screen, if resoultion is odd number will be off by 1/2 pixel
 
 	draw_texture(crosshair, pos, size);
 }
@@ -459,7 +459,7 @@ struct TileLoader {
 			size = img.size;
 		} else {
 			if (!equal(size, img.size)) {
-				logf(ERROR, "Texture size does not match textures/null.png, all textures must be of the same size!");
+				clog(ERROR, "Texture size does not match textures/null.png, all textures must be of the same size!");
 				assert(false);
 				return 0;
 			}
@@ -519,7 +519,7 @@ struct TileLoader {
 		bool has_alpha = Image<uint8>::load_from_file(alpha_filename.c_str(), &alpha);
 
 		if (has_alpha && !equal(color.size, alpha.size)) {
-			logf(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!");
+			clog(ERROR, "Texture size does not match between *.png and *.alpha.png, all textures must be of the same size!");
 			assert(false);
 			return {0};
 		}
@@ -627,7 +627,7 @@ void TileTextures::load_block_meshes () {
 
 			if (strcmp(mesh->mName.C_Str(), name) == 0) {
 
-				printf("%s:\n", mesh->mName.C_Str());
+				//printf("%s:\n", mesh->mName.C_Str());
 
 				int offset = (int)block_meshes.size();
 				block_meshes.reserve(offset + mesh->mNumFaces * 3);
@@ -642,7 +642,7 @@ void TileTextures::load_block_meshes () {
 						auto pos = mesh->mVertices[index];
 						auto uv = mesh->mTextureCoords[0][index];
 
-						printf("  %7.3f %7.3f %7.3f     %7.3f %7.3f\n", pos.x, pos.y, pos.z, uv.x, uv.y);
+						//printf("  %7.3f %7.3f %7.3f     %7.3f %7.3f\n", pos.x, pos.y, pos.z, uv.x, uv.y);
 
 						block_meshes.push_back({ float3(pos.x, pos.y, pos.z), float2(uv.x, uv.y) });
 					}
