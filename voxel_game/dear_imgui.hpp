@@ -87,7 +87,7 @@ public:
 
 	void imgui ();
 
-	void add_line (Line line);
+	void add_line (Line const& line);
 };
 
 // Global GuiConsole
