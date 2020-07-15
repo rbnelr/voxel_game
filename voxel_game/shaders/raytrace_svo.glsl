@@ -28,6 +28,27 @@ $if fragment
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
+	// SVO format:
+	/*
+	union OctreeNode {
+	uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
+	uint16 block_id; // block id (valid when leaf node)
+	};
+
+	1 bit         31 bit
+	[has_children][payload]
+
+	has_children == 0: payload is index of children OctreeNode[8] in svo_texture
+	has_children == 1: payload leaf voxel data, ie. block id
+	*/
+
+	int get_svo_node (int index) {
+		ivec2 indx2;
+		indx2.x = index % 2048;
+		indx2.y = index / 2048;
+		return texelFetch(svo_texture, indx2, 0).r;
+	}
+
 #define LEAF_BIT 0x80000000
 
 #define INF (1.0 / 0.0)
@@ -36,27 +57,6 @@ $if fragment
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
-
-	int get_svo_node (int index) {
-		ivec2 indx2;
-		indx2.x = index % 2048;
-		indx2.y = index / 2048;
-		return texelFetch(svo_texture, indx2, 0).r;
-	}
-	
-	// SVO format:
-	/*
-		union OctreeNode {
-			uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
-			uint16 block_id; // block id (valid when leaf node)
-		};
-
-		 1 bit         31 bit
-		[has_children][payload]
-
-		has_children == 0: payload is index of children OctreeNode[8] in svo_texture
-		has_children == 1: payload leaf voxel data, ie. block id
-	*/
 	
 	uniform float slider; // debugging
 	uniform int max_iterations = 100; // iteration limiter for debugging
@@ -64,14 +64,6 @@ $if fragment
 	uniform sampler2D heat_gradient;
 
 	uniform float max_dist = 9999999;
-
-	vec3 ray_pos;
-	vec3 ray_dir;
-
-	vec3 mirror_ray_pos;
-
-	vec3 rinv_dir;
-	int mirror_mask_int = 0;
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
@@ -83,6 +75,34 @@ $if fragment
 	int cur_medium = 0;
 
 	int iterations = 0;
+
+	//struct QueuedRay {
+	//	vec3 pos;
+	//	vec3 dir;
+	//	vec3 tint;
+	//	float alpha;
+	//};
+	//QueuedRay[] queue = QueuedRay[8](
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
+	//	QueuedRay(vec3(0),vec3(0),vec3(0),0)
+	//);
+	//
+	//int queued_rays = 0;
+	//int processed_rays = 0;
+	//
+	//void queue_ray (vec3 pos, vec3 dir, vec3 tint, float alpha) {
+	//	queue[queued_rays].pos = pos;
+	//	queue[queued_rays].dir = dir;
+	//	queue[queued_rays].tint = tint;
+	//	queue[queued_rays].alpha = alpha;
+	//	queued_rays++;
+	//}
 
 	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
 		if (cur_medium == 0) {
@@ -104,21 +124,25 @@ $if fragment
 
 		hit_dist = t0;
 
-		vec3 hit_pos_chunk = ray_dir * hit_dist + ray_pos;
+		vec3 hit_pos = ray_dir * hit_dist + ray_pos;
 
-		vec3 pos_fract = hit_pos_chunk - floor(hit_pos_chunk);
+		vec3 pos_fract = hit_pos - floor(hit_pos);
 
 		vec2 uv;
 
-		if (entry_faces.x)
+		if (entry_faces.x) {
 			uv = pos_fract.yz;
-		else if (entry_faces.y)
+		} else if (entry_faces.y) {
 			uv = pos_fract.xz;
-		else
+		} else {
 			uv = pos_fract.xy;
+		}
 
 		uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
 		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
+
+		vec3 normal = mix(vec3(0), vec3(1), entry_faces);
+		normal *= step(ray_dir, vec3(0));
 
 		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
@@ -129,30 +153,16 @@ $if fragment
 
 		vec4 col = texture(tile_textures, vec3(uv, tex_indx));
 
-		float remain_alpha = 1.0 - hit_col.a;
-		float effective_alpha = remain_alpha * col.a;
-		hit_col += vec4(effective_alpha * col.rgb, effective_alpha);
-
-
-	}
-
-	// get pixel ray in world space based on pixel coord and matricies
-	void get_ray () {
-		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
-
-		if (ndc.x > (slider * 2 - 1))
-			discard;
-
-		vec4 clip = vec4(ndc, -1, 1) * clip_near; // ndc = clip / clip.w;
-
-		vec3 pos_cam = (clip_to_cam * clip).xyz;
-		vec3 dir_cam = pos_cam;
-
-		ray_pos = ( cam_to_world * vec4(pos_cam, 1)).xyz;
-		ray_dir = ( cam_to_world * vec4(dir_cam, 0)).xyz;
-		ray_dir = normalize(ray_dir);
-
-		ray_pos -= vec3(svo_root_pos);
+		vec3 ray_tint = queue[processed_rays].tint;
+		float ray_alpha = queue[processed_rays].alpha;
+		
+		if (block_id == B_WATER && processed_rays < 2) {
+			vec3 dir = reflect(ray_dir, normal);
+			queue_ray(hit_pos + dir * 1.0, dir, ray_tint * vec3(0.5, 0.5, 1.0), ray_alpha);
+		} else {
+			float effective_alpha = ray_alpha * col.a;
+			hit_col += vec4(effective_alpha * col.rgb * ray_tint, effective_alpha);
+		}
 	}
 
 	float min_component (vec3 v) {
@@ -162,7 +172,11 @@ $if fragment
 		return max(max(v.x, v.y), v.z);
 	}
 
-	void intersect_ray (ivec3 cube_pos, int cube_scale, out float t0, out float t1, out bvec3 exit_faces, out bvec3 entry_faces) {
+	void intersect_ray (
+			vec3 rinv_dir, vec3 mirror_ray_pos,
+			ivec3 cube_pos, int cube_scale,
+			out float t0, out float t1, out bvec3 exit_faces, out bvec3 entry_faces) {
+
 		vec3 cube_min = vec3(cube_pos);
 		vec3 cube_max = vec3(cube_pos + (1 << cube_scale));
 
@@ -176,7 +190,10 @@ $if fragment
 		exit_faces = equal(vec3(t1), t1v);
 	}
 
-	void select_child (float t0, ivec3 parent_pos, int parent_scale, out ivec3 child_pos, out int child_scale) {
+	void select_child (
+			vec3 rinv_dir, vec3 mirror_ray_pos,
+			float t0, ivec3 parent_pos, int parent_scale,
+			out ivec3 child_pos, out int child_scale) {
 		child_scale = parent_scale - 1;
 
 		vec3 parent_mid = vec3(parent_pos + (1 << child_scale));
@@ -194,17 +211,16 @@ $if fragment
 		return max(max(findMSB(a.x ^ b.x), findMSB(a.y ^ b.y)), findMSB(a.z ^ b.z));
 	}
 
-	void raytrace () {
+	void process_ray (vec3 ray_pos, vec3 ray_dir) {
+		
+		//// init ray in mirrored coord system
 		vec3 root_min = vec3(0);
 		vec3 root_max = vec3(float(1 << svo_root_scale));
 		vec3 root_mid = 0.5 * (root_min + root_max);
 
-		ivec3 parent_pos = ivec3(0);
-		int parent_scale = svo_root_scale;
+		int mirror_mask_int = 0;
 
-		mirror_mask_int = 0;
-
-		mirror_ray_pos = ray_pos;
+		vec3 mirror_ray_pos = ray_pos;
 		vec3 mirror_ray_dir;
 
 		// mirror coord system to make all ray dir components positive, like in "An Efficient Parametric Algorithm for Octree Traversal"
@@ -216,8 +232,11 @@ $if fragment
 			if (mirror) mirror_mask_int |= 1 << i;
 		}
 		
-		rinv_dir = 1.0 / mirror_ray_dir;
+		vec3 rinv_dir = 1.0 / mirror_ray_dir;
 
+		//// Init root
+		ivec3 parent_pos = ivec3(0);
+		int parent_scale = svo_root_scale;
 		int parent_node = 0;
 
 		// desired ray bounds
@@ -233,18 +252,19 @@ $if fragment
 
 		ivec3 child_pos;
 		int child_scale;
-		select_child(t0, parent_pos, parent_scale, child_pos, child_scale);
+		select_child(rinv_dir, mirror_ray_pos, t0, parent_pos, parent_scale, child_pos, child_scale);
 
 		int stack_node[ MAX_SCALE -1 ];
 		float stack_t1[ MAX_SCALE -1 ];
 
+		//// Iterate
 		for (;;) {
-			if (iterations++ >= max_iterations) break;
+			//if (iterations++ >= max_iterations) break;
 
 			// child cube ray range
 			float child_t0, child_t1;
 			bvec3 exit_face, entry_faces;
-			intersect_ray(child_pos, child_scale, child_t0, child_t1, exit_face, entry_faces);
+			intersect_ray(rinv_dir, mirror_ray_pos, child_pos, child_scale, child_t0, child_t1, exit_face, entry_faces);
 
 			bool voxel_exists = (parent_node & LEAF_BIT) == 0;
 			if (voxel_exists && t0 < t1) {
@@ -282,7 +302,7 @@ $if fragment
 						parent_pos = child_pos;
 						parent_scale = child_scale;
 
-						select_child(tv0, parent_pos, parent_scale, child_pos, child_scale);
+						select_child(rinv_dir, mirror_ray_pos, tv0, parent_pos, parent_scale, child_pos, child_scale);
 
 						t0 = tv0;
 						t1 = tv1;
@@ -329,9 +349,40 @@ $if fragment
 		}
 	}
 
+	// get pixel ray in world space based on pixel coord and matricies
+	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
+		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
+
+		if (ndc.x > (slider * 2 - 1))
+			discard;
+
+		vec4 clip = vec4(ndc, -1, 1) * clip_near; // ndc = clip / clip.w;
+
+		vec3 pos_cam = (clip_to_cam * clip).xyz;
+		vec3 dir_cam = pos_cam;
+
+		ray_pos = ( cam_to_world * vec4(pos_cam, 1)).xyz;
+		ray_dir = ( cam_to_world * vec4(dir_cam, 0)).xyz;
+		ray_dir = normalize(ray_dir);
+
+		ray_pos -= vec3(svo_root_pos);
+	}
+
 	void main () {
-		get_ray();
-		raytrace();
+		vec3 ray_pos;
+		vec3 ray_dir;
+
+		get_ray(ray_pos, ray_dir);
+
+		process_ray(ray_pos, ray_dir);
+		
+		//queue_ray(ray_pos, ray_dir, vec3(1.0), 1.0);
+
+		//while (queued_rays > processed_rays) {
+			process_ray(ray_pos, ray_dir);
+
+		//	processed_rays++;
+		//}
 		
 		if (visualize_iterations)
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));

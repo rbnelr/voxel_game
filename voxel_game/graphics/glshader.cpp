@@ -462,6 +462,8 @@ namespace gl {
 		return src_line;
 	}
 
+	// TODO: Bug here? shader compile errors are cut off
+
 	// map line numbers in shader log to real file line numbers
 	std::string map_shader_log (std::string const& shader_log, string_view preprocessed) {
 		// line number syntax on my NV GTX 1080 seems to be like "0(<line_no>): warning"
