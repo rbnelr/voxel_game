@@ -809,10 +809,11 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
-		if (!raytracer.raytracer_draw || raytracer.overlay)
+		if (!raytracer.raytracer_draw || raytracer.overlay) {
 			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
-		skybox.draw();
+			skybox.draw();
+		}
 	}
 
 	glEnable(GL_BLEND);

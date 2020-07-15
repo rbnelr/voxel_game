@@ -52,6 +52,7 @@ $if fragment
 #define LEAF_BIT 0x80000000
 
 #define MAX_SCALE 12
+#define MAX_SEC_RAYS 2
 
 #define INF (1.0 / 0.0)
 
@@ -67,41 +68,19 @@ $if fragment
 	uniform	sampler2DArray tile_textures;
 	uniform sampler1D block_tile_info; // BlockTileInfo: float4 { base_index, top, bottom, variants }
 
-	//struct QueuedRay {
-	//	vec3 pos;
-	//	vec3 dir;
-	//	vec3 tint;
-	//	float alpha;
-	//};
-	//QueuedRay[] queue = QueuedRay[8](
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0),
-	//	QueuedRay(vec3(0),vec3(0),vec3(0),0)
-	//);
-	//
-	//int queued_rays = 0;
-	//int processed_rays = 0;
-	//
-	//void queue_ray (vec3 pos, vec3 dir, vec3 tint, float alpha) {
-	//	queue[queued_rays].pos = pos;
-	//	queue[queued_rays].dir = dir;
-	//	queue[queued_rays].tint = tint;
-	//	queue[queued_rays].alpha = alpha;
-	//	queued_rays++;
-	//}
+	struct QueuedRay {
+		vec3 pos;
+		vec3 dir;
+		vec4 tint;
+	};
 
 	int iterations = 0;
-	int cur_medium = 0;
+	int cur_medium;
 
 	void surface_hit (
-			inout vec4 accum_col,
 			vec3 ray_pos, vec3 ray_dir,
-			float hit_dist, bvec3 entry_faces, int block_id) {
+			float hit_dist, bvec3 entry_faces, int block_id,
+			inout vec4 accum_col, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_ray, vec4 ray_tint) {
 		if (cur_medium == 0) {
 			cur_medium = block_id;
 			return;
@@ -136,8 +115,8 @@ $if fragment
 		uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
 		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
 
-		vec3 normal = mix(vec3(0), vec3(1), entry_faces);
-		normal *= step(ray_dir, vec3(0));
+		vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
+		normal *= step(vec3(0.0), ray_dir) * 2.0 - 1.0;
 
 		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
@@ -148,17 +127,22 @@ $if fragment
 
 		vec4 col = texture(tile_textures, vec3(uv, tex_indx));
 
-		//vec3 ray_tint = queue[processed_rays].tint;
-		//float ray_alpha = queue[processed_rays].alpha;
-		//
-		//if (block_id == B_WATER && processed_rays < 2) {
-		//	vec3 dir = reflect(ray_dir, normal);
-		//	queue_ray(hit_pos + dir * 1.0, dir, ray_tint * vec3(0.5, 0.5, 1.0), ray_alpha);
-		//} else {
-			float alpha_remain = 1.0 - accum_col.a;
+		float alpha_remain = 1.0 - accum_col.a;
+
+		if (block_id == B_WATER && queued_ray < MAX_SEC_RAYS) {
+			vec3 dir = reflect(ray_dir, normal);
+			
+			queue[queued_ray].pos = hit_pos + dir * 0.0001;
+			queue[queued_ray].dir = dir;
+			queue[queued_ray].tint = vec4(0.7, 0.7, 1.0, alpha_remain) * ray_tint;
+			
+			queued_ray++;
+			
+			accum_col.a += alpha_remain;
+		} else {
 			float effective_alpha = alpha_remain * col.a;
 			accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
-		//}
+		}
 	}
 
 	float min_component (vec3 v) {
@@ -207,11 +191,12 @@ $if fragment
 		return max(max(findMSB(a.x ^ b.x), findMSB(a.y ^ b.y)), findMSB(a.z ^ b.z));
 	}
 
-	vec4 process_ray (
+	vec3 process_ray (
 			vec3 ray_pos, vec3 ray_dir,
-			out float hit_dist) {
+			out float hit_dist, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_rays, vec4 ray_tint) {
 		hit_dist = INF;
 		vec4 accum_col = vec4(0.0);
+		cur_medium = 0;
 
 		//// init ray in mirrored coord system
 		vec3 root_min = vec3(0);
@@ -289,9 +274,10 @@ $if fragment
 					bool leaf = (node & LEAF_BIT) != 0;
 					if (leaf) {
 						hit_dist = tv0;
-						surface_hit(accum_col, ray_pos, ray_dir, hit_dist, entry_faces, node & ~LEAF_BIT);
+						surface_hit(ray_pos, ray_dir, hit_dist, entry_faces, node & ~LEAF_BIT,
+							accum_col, queue, queued_rays, ray_tint);
 						
-						if (accum_col.a > 0.999)
+						if (accum_col.a > 0.99999)
 							break; // final hit
 					} else {
 						//// Push
@@ -337,8 +323,10 @@ $if fragment
 				//// Pop
 				child_scale = highest_differing_bit(old_pos, child_pos);
 
-				if (child_scale >= svo_root_scale)
+				if (child_scale >= svo_root_scale) {
+					accum_col.rgb += fog_color(ray_dir) * (1.0 - accum_col.a);
 					break; // out of root
+				}
 
 				parent_node	= stack_node[child_scale - 1];
 				t1			= stack_t1  [child_scale - 1];
@@ -350,7 +338,7 @@ $if fragment
 			}
 		}
 
-		return accum_col;
+		return accum_col.rgb;
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies
@@ -373,27 +361,28 @@ $if fragment
 	}
 
 	void main () {
-		vec3 ray_pos;
-		vec3 ray_dir;
+		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
 
+		int queued_rays = 0;
+		QueuedRay queue[MAX_SEC_RAYS];
+
 		float hit_dist;
-		vec4 ray_col = process_ray(ray_pos, ray_dir, hit_dist);
-		frag_col = ray_col;
+		vec3 accum_col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, vec4(1.0));
 		
-		//queue_ray(ray_pos, ray_dir, vec3(1.0), 1.0);
-		//
-		//while (queued_rays > processed_rays) {
-		//	vec4 ray_col = process_ray(ray_pos, ray_dir);
-		//	frag_col = ray_col;
-		//
-		//	processed_rays++;
-		//}
+		for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
+			float _dist;
+
+			vec3 ray_col = process_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
+			accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
+		}
+		
+		frag_col = vec4(accum_col, 1.0);
 		
 		if (visualize_iterations)
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 
-		{ // Write depth
+		{ // Write depth of furthest hit surface of primary ray (=always opaque) or inf distance if not hit
 			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
