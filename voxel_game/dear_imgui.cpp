@@ -5,8 +5,6 @@
 #include "kissmath_colors.hpp"
 using namespace kissmath;
 
-#include "optick.hpp"
-
 void DearImgui::init () {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -132,12 +130,12 @@ void GuiConsole::imgui () {
 	added_this_frame = 0;
 }
 
-void GuiConsole::add_line (Line line) {
+void GuiConsole::add_line (Line const& line) {
 	//OPTICK_EVENT();
 
 	auto* ls = line.level == INFO ? &unimportant_lines : &important_lines;
-	
-	ls->push(std::move(line));
+
+	ls->push(line);
 
 	added_this_frame++;
 	counter++;
@@ -151,23 +149,35 @@ void GuiConsole::add_line (Line line) {
 extern int frame_counter;
 
 void vlogf (LogLevel level, char const* format, va_list vl) {
-	OPTICK_EVENT("vlogf");
-
-	char new_format[128];
+	char new_format[1024];
 	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", frame_counter, format);
-	
-	GuiConsole::Line l;
-	vsnprintf(l.str, sizeof(l.str), new_format, vl);
+
+	char str[4096];
+	vsnprintf(str, sizeof(str), new_format, vl);
 
 	/* puts is too slow to use in a game!!, often taking >1.5ms to execute
 	{
-		OPTICK_EVENT("vlogf fputs");
-		fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
+	OPTICK_EVENT("vlogf fputs");
+	fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
 	}*/
 
+	GuiConsole::Line l;
 	l.level = level;
 	l.frame = frame_counter;
-	gui_console.add_line(std::move(l));
+
+	char* cur = str;
+	while (*cur != '\0') {
+		char* end = strchr(cur, '\n');
+		if (!end) end = cur + strlen(cur);
+
+		size_t len = min(sizeof(l.str)-1, end - cur);
+		memcpy(l.str, cur, len);
+		l.str[len] = '\0';
+
+		cur += len + (*end == '\0' ? 0 : 1); // skip newline
+
+		gui_console.add_line(l);
+	}
 }
 void clog (char const* format, ...) {
 	va_list vl;
