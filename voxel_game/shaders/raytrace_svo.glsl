@@ -28,21 +28,21 @@ $if fragment
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
-	// SVO format:
-	/*
-	union OctreeNode {
-	uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
-	uint16 block_id; // block id (valid when leaf node)
-	};
+	/* SVO format:
+		union OctreeNode {
+			uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
+			uint16 block_id; // block id (valid when leaf node)
+		};
 
-	1 bit         31 bit
-	[has_children][payload]
+		1 bit         31 bit
+		[has_children][payload]
 
-	has_children == 0: payload is index of children OctreeNode[8] in svo_texture
-	has_children == 1: payload leaf voxel data, ie. block id
+		has_children == 0: payload is index of children OctreeNode[8] in svo_texture
+		has_children == 1: payload leaf voxel data, ie. block id
 	*/
 
 	int get_svo_node (int index) {
+		// access 1d data as 2d texture, because of texture size limits
 		ivec2 indx2;
 		indx2.x = index % 2048;
 		indx2.y = index / 2048;
@@ -51,30 +51,21 @@ $if fragment
 
 #define LEAF_BIT 0x80000000
 
-#define INF (1.0 / 0.0)
-
 #define MAX_SCALE 12
+
+#define INF (1.0 / 0.0)
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
 	
-	uniform float slider; // debugging
+	uniform float slider = 1.0; // debugging
+	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
-	uniform bool visualize_iterations = true;
 	uniform sampler2D heat_gradient;
-
-	uniform float max_dist = 9999999;
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
 	uniform sampler1D block_tile_info; // BlockTileInfo: float4 { base_index, top, bottom, variants }
-
-	float hit_dist = INF;
-	vec4 hit_col = vec4(0,0,0,0);
-
-	int cur_medium = 0;
-
-	int iterations = 0;
 
 	//struct QueuedRay {
 	//	vec3 pos;
@@ -104,7 +95,13 @@ $if fragment
 	//	queued_rays++;
 	//}
 
-	void calc_hit (float t0, bvec3 entry_faces, int block_id) {
+	int iterations = 0;
+	int cur_medium = 0;
+
+	void surface_hit (
+			inout vec4 accum_col,
+			vec3 ray_pos, vec3 ray_dir,
+			float hit_dist, bvec3 entry_faces, int block_id) {
 		if (cur_medium == 0) {
 			cur_medium = block_id;
 			return;
@@ -121,8 +118,6 @@ $if fragment
 			return; // never try to render air
 		
 		cur_medium = block_id;
-
-		hit_dist = t0;
 
 		vec3 hit_pos = ray_dir * hit_dist + ray_pos;
 
@@ -153,16 +148,17 @@ $if fragment
 
 		vec4 col = texture(tile_textures, vec3(uv, tex_indx));
 
-		vec3 ray_tint = queue[processed_rays].tint;
-		float ray_alpha = queue[processed_rays].alpha;
-		
-		if (block_id == B_WATER && processed_rays < 2) {
-			vec3 dir = reflect(ray_dir, normal);
-			queue_ray(hit_pos + dir * 1.0, dir, ray_tint * vec3(0.5, 0.5, 1.0), ray_alpha);
-		} else {
-			float effective_alpha = ray_alpha * col.a;
-			hit_col += vec4(effective_alpha * col.rgb * ray_tint, effective_alpha);
-		}
+		//vec3 ray_tint = queue[processed_rays].tint;
+		//float ray_alpha = queue[processed_rays].alpha;
+		//
+		//if (block_id == B_WATER && processed_rays < 2) {
+		//	vec3 dir = reflect(ray_dir, normal);
+		//	queue_ray(hit_pos + dir * 1.0, dir, ray_tint * vec3(0.5, 0.5, 1.0), ray_alpha);
+		//} else {
+			float alpha_remain = 1.0 - accum_col.a;
+			float effective_alpha = alpha_remain * col.a;
+			accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
+		//}
 	}
 
 	float min_component (vec3 v) {
@@ -211,8 +207,12 @@ $if fragment
 		return max(max(findMSB(a.x ^ b.x), findMSB(a.y ^ b.y)), findMSB(a.z ^ b.z));
 	}
 
-	void process_ray (vec3 ray_pos, vec3 ray_dir) {
-		
+	vec4 process_ray (
+			vec3 ray_pos, vec3 ray_dir,
+			out float hit_dist) {
+		hit_dist = INF;
+		vec4 accum_col = vec4(0.0);
+
 		//// init ray in mirrored coord system
 		vec3 root_min = vec3(0);
 		vec3 root_max = vec3(float(1 << svo_root_scale));
@@ -241,7 +241,7 @@ $if fragment
 
 		// desired ray bounds
 		float tmin = 0;
-		float tmax = max_dist;
+		float tmax = INF;
 
 		// cube ray range
 		float t0 = max_component( rinv_dir * (root_min - mirror_ray_pos) );
@@ -259,7 +259,8 @@ $if fragment
 
 		//// Iterate
 		for (;;) {
-			//if (iterations++ >= max_iterations) break;
+			iterations++;
+			//if (iterations >= max_iterations) break;
 
 			// child cube ray range
 			float child_t0, child_t1;
@@ -287,10 +288,11 @@ $if fragment
 					
 					bool leaf = (node & LEAF_BIT) != 0;
 					if (leaf) {
-						calc_hit(tv0, entry_faces, node & ~LEAF_BIT);
+						hit_dist = tv0;
+						surface_hit(accum_col, ray_pos, ray_dir, hit_dist, entry_faces, node & ~LEAF_BIT);
 						
-						if (hit_col.a > 0.999)
-							return; // final hit
+						if (accum_col.a > 0.999)
+							break; // final hit
 					} else {
 						//// Push
 						stack_node[child_scale - 1] = parent_node;
@@ -336,7 +338,7 @@ $if fragment
 				child_scale = highest_differing_bit(old_pos, child_pos);
 
 				if (child_scale >= svo_root_scale)
-					return; // out of root
+					break; // out of root
 
 				parent_node	= stack_node[child_scale - 1];
 				t1			= stack_t1  [child_scale - 1];
@@ -347,6 +349,8 @@ $if fragment
 				child_pos.z &= clear_mask;
 			}
 		}
+
+		return accum_col;
 	}
 
 	// get pixel ray in world space based on pixel coord and matricies
@@ -371,26 +375,26 @@ $if fragment
 	void main () {
 		vec3 ray_pos;
 		vec3 ray_dir;
-
 		get_ray(ray_pos, ray_dir);
 
-		process_ray(ray_pos, ray_dir);
+		float hit_dist;
+		vec4 ray_col = process_ray(ray_pos, ray_dir, hit_dist);
+		frag_col = ray_col;
 		
 		//queue_ray(ray_pos, ray_dir, vec3(1.0), 1.0);
-
+		//
 		//while (queued_rays > processed_rays) {
-			process_ray(ray_pos, ray_dir);
-
+		//	vec4 ray_col = process_ray(ray_pos, ray_dir);
+		//	frag_col = ray_col;
+		//
 		//	processed_rays++;
 		//}
 		
 		if (visualize_iterations)
 			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
-		else
-			frag_col = hit_col;
 
 		{ // Write depth
-			vec3 hit_pos_world = ray_dir * hit_dist + ray_pos + vec3(svo_root_pos);
+			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
 			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
