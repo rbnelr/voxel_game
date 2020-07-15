@@ -77,6 +77,15 @@ $if fragment
 	int iterations = 0;
 	int cur_medium;
 
+	float fresnel (vec3 view, vec3 norm, float F0) {
+		//	float temp = 1.0 -dotVH;
+		//	float tempSqr = squared(temp);
+		//	fresnel = meshSpecularCol +((1.0 -meshSpecularCol) * (tempSqr * tempSqr * temp));
+		float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
+		float x2 = x*x;
+		return F0 + ((1.0 - F0) * x2 * x2 * x);
+	}
+
 	void surface_hit (
 			vec3 ray_pos, vec3 ray_dir,
 			float hit_dist, bvec3 entry_faces, int block_id,
@@ -118,6 +127,10 @@ $if fragment
 		vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
 		normal *= step(vec3(0.0), ray_dir) * 2.0 - 1.0;
 
+		normal.x += sin(hit_pos.x * 5) * 0.02;
+		//normal.y += cos(hit_pos.y * 5) * 0.2;
+		normal = normalize(normal);
+
 		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
 		float tex_indx = bti.x; // x=base_index
@@ -129,15 +142,29 @@ $if fragment
 
 		float alpha_remain = 1.0 - accum_col.a;
 
-		if (block_id == B_WATER && queued_ray < MAX_SEC_RAYS) {
-			vec3 dir = reflect(ray_dir, normal);
-			
-			queue[queued_ray].pos = hit_pos + dir * 0.0001;
-			queue[queued_ray].dir = dir;
-			queue[queued_ray].tint = vec4(0.7, 0.7, 1.0, alpha_remain) * ray_tint;
-			
-			queued_ray++;
-			
+		if (block_id == B_WATER && queued_ray <= MAX_SEC_RAYS-2) {
+			const float air_ior = 1.0;
+			const float water_ior = 1.333;
+
+			float reflect_fac = fresnel(-ray_dir, -normal, 0.20);
+
+			vec3 reflect_dir = reflect(ray_dir, normal);
+			vec3 refract_dir = refract(ray_dir, -normal, air_ior / water_ior);
+
+			if (queued_ray < MAX_SEC_RAYS) {
+				queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
+				queue[queued_ray].dir = reflect_dir;
+				queue[queued_ray].tint = ray_tint * reflect_fac * alpha_remain;
+				queued_ray++;
+			}
+
+			if (queued_ray < MAX_SEC_RAYS) {
+				queue[queued_ray].pos = hit_pos + refract_dir * 0.0001;
+				queue[queued_ray].dir = refract_dir;
+				queue[queued_ray].tint = ray_tint * (1.0 - reflect_fac) * alpha_remain;
+				queued_ray++;
+			}
+
 			accum_col.a += alpha_remain;
 		} else {
 			float effective_alpha = alpha_remain * col.a;
