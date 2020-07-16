@@ -110,8 +110,8 @@ struct ChunkGenerator {
 	void gen_terrain (bpos chunk_origin) {
 		bpos_t water_level = 21;
 
-		int highest_blocks[DIM.y][DIM.x];
-		int earth_layers[DIM.y][DIM.x];
+		float highest_blocks[DIM.y][DIM.x];
+		float earth_layers[DIM.y][DIM.x];
 
 		{
 			bpos2 i;
@@ -122,10 +122,8 @@ struct ChunkGenerator {
 					float earth_layer;
 					float height = heightmap((float2)pos_world, &earth_layer);
 
-					int fl = (int)(height -1 +0.5f);
-
-					highest_blocks[i.y][i.x] = fl;
-					earth_layers[i.y][i.x] = fl - (int)earth_layer;
+					highest_blocks[i.y][i.x] = height;
+					earth_layers[i.y][i.x] = earth_layer;
 				}
 			}
 		}
@@ -139,14 +137,26 @@ struct ChunkGenerator {
 
 						block_id bid;
 
-						if (pos_world.z <= highest_blocks[i.y][i.x]) {
-							if (pos_world.z <= earth_layers[i.y][i.x]) {
+						float highest_block = highest_blocks[i.y][i.x];
+						float earth_layer = earth_layers[i.y][i.x];
+
+						bool over_water = water_level > highest_block;
+						
+						float sand_thickness = noise((float2)(int2)pos_world, 7.2f, deg(237.17f), 0, 0.8f, 1.7f);
+						bool beach = abs(highest_block - water_level) <= sand_thickness/2;
+
+						if (pos_world.z <= highest_block) {
+							if (pos_world.z <= highest_block - earth_layer) {
 								bid = B_STONE;
 							} else {
-								if (pos_world.z == highest_blocks[i.y][i.x] && pos_world.z >= water_level) {
-									bid = B_GRASS;
+								if (beach) {
+									bid = B_SAND;
 								} else {
-									bid = B_EARTH;
+									if (pos_world.z == int(highest_block) && pos_world.z >= water_level) {
+										bid = B_GRASS;
+									} else {
+										bid = over_water ? B_PEBBLES : B_EARTH;
+									}
 								}
 							}
 						} else {

@@ -20,6 +20,16 @@ void Raytracer::imgui () {
 	ImGui::ColorPicker3("water_fog", &water_fog.x);
 	ImGui::SliderFloat("water_fog_dens", &water_fog_dens, 0, 1.0f);
 
+	ImGui::DragFloat2("water_scroll_dir1", &water_scroll_dir1.x, 0.05f);
+	ImGui::DragFloat2("water_scroll_dir2", &water_scroll_dir2.x, 0.05f);
+	ImGui::DragFloat("water_scale1", &water_scale1, 0.05f);
+	ImGui::DragFloat("water_scale2", &water_scale2, 0.05f);
+	ImGui::DragFloat("water_strength1", &water_strength1, 0.05f);
+	ImGui::DragFloat("water_strength2", &water_strength2, 0.05f);
+
+	ImGui::DragFloat("time", &time);
+	ImGui::DragFloat("time_speed", &time_speed, 0.05f);
+
 	imgui_pop();
 }
 
@@ -43,6 +53,16 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 
 		shader.set_uniform("water_fog", water_fog);
 		shader.set_uniform("water_fog_dens", water_fog_dens);
+
+		shader.set_uniform("water_scroll_dir1", water_scroll_dir1);
+		shader.set_uniform("water_scroll_dir2", water_scroll_dir2);
+		shader.set_uniform("water_scale1", water_scale1);
+		shader.set_uniform("water_scale2", water_scale2);
+		shader.set_uniform("water_strength1", water_strength1);
+		shader.set_uniform("water_strength2", water_strength2);
+
+		time += time_speed * input.dt;
+		shader.set_uniform("time", time);
 
 		{
 			auto* data = (uint32_t*)&octree.octree.nodes[0];
@@ -89,8 +109,13 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		svo_texture.bind();
 
 		glActiveTexture(GL_TEXTURE0 + 3);
-		shader.set_texture_unit("heat_gradient", 3);
-		gradient_sampler.bind(3);
+		shader.set_texture_unit("water_normal", 3);
+		water_sampler.bind(3);
+		water_normal.bind();
+
+		glActiveTexture(GL_TEXTURE0 + 4);
+		shader.set_texture_unit("heat_gradient", 4);
+		gradient_sampler.bind(4);
 		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);

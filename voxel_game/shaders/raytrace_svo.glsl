@@ -71,11 +71,33 @@ $if fragment
 	uniform vec3 water_fog;
 	uniform float water_fog_dens;
 
+	uniform sampler2D water_normal;
+
+	uniform vec2 water_scroll_dir1;
+	uniform vec2 water_scroll_dir2;
+	uniform float water_scale1;
+	uniform float water_scale2;
+	uniform float water_strength1;
+	uniform float water_strength2;
+
+	uniform float time;
+
 #define air_IOR 1.0
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
 	uniform sampler1D block_tile_info; // BlockTileInfo: float4 { base_index, top, bottom, variants }
+
+	// TODO: fix tangent & cotangents for water normal map
+	void water_normal_map (inout vec3 normal, vec2 uv, float sign) {
+		vec3 a = texture(water_normal, (uv + water_scroll_dir1 * time) * water_scale1).rgb * 2.0 - 1.0;
+		a.xy *= water_strength1;
+
+		vec3 b = texture(water_normal, (vec2(uv.y, -uv.x) + water_scroll_dir2 * time) * water_scale2).rgb * 2.0 - 1.0;
+		b.xy *= water_strength2;
+
+		normal = normalize(a + b + normal*0.2) * sign;
+	}
 
 	struct QueuedRay {
 		vec3 pos;
@@ -129,13 +151,6 @@ $if fragment
 			uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
 			uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
 
-			vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
-			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
-
-			normal.x += sin(hit_pos.x * 5) * 0.02;
-			//normal.y += cos(hit_pos.y * 5) * 0.2;
-			normal = normalize(normal);
-
 			vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
 			float tex_indx = bti.x; // x=base_index
@@ -149,6 +164,11 @@ $if fragment
 
 			if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
 					&& queued_ray <= MAX_SEC_RAYS-2) {
+
+				vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
+				normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
+
+				water_normal_map(normal, hit_pos.xy, normal.z);
 
 				float src = cur_medium == B_AIR ? air_IOR : water_IOR;
 				float dst = block_id == B_AIR ? air_IOR : water_IOR;

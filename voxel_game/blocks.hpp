@@ -29,9 +29,11 @@ enum block_id : uint16_t {
 	B_NULL				=0,
 	B_AIR				,
 	B_WATER				,
+	B_STONE				,
 	B_EARTH				,
 	B_GRASS				,
-	B_STONE				,
+	B_SAND				,
+	B_PEBBLES			,
 	B_TREE_LOG			,
 	B_LEAVES			,
 	B_TORCH				,
@@ -102,9 +104,11 @@ static BlockTypes load_block_types () {
 	/* B_NULL				*/ solid("null", 1);
 	/* B_AIR				*/ gas();
 	/* B_WATER				*/ liquid("water");
+	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_EARTH				*/ solid(			"earth"	,    3, SHOVEL );
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
-	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
+	/* B_SAND				*/ solid(			"sand"	,    2, SHOVEL );
+	/* B_PEBBLES			*/ solid(			"pebbles",   4, SHOVEL );
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
 	/* B_LEAVES				*/ solid_alpha_test("leaves",    1, 2);
 	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
