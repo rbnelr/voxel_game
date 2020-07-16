@@ -53,7 +53,7 @@ $if fragment
 #define LEAF_BIT (1 << 31) // This works
 
 #define MAX_SCALE 12
-#define MAX_SEC_RAYS 4
+#define MAX_SEC_RAYS 2
 
 #define INF (1.0 / 0.0)
 
@@ -106,85 +106,84 @@ $if fragment
 
 		int effective_block_id = block_id;
 
-		if ((block_id == cur_medium && block_id == B_WATER))
-			return; // only render entry of water, not all octree cubes
-		
-		if (cur_medium == B_WATER && block_id == B_AIR) {
-			effective_block_id = B_WATER; // render water exit into air as water
-		} else if (block_id == B_AIR || block_id == 0)
-			return; // never try to render air
-
-		vec3 hit_pos = ray_dir * hit_dist + ray_pos;
-
-		vec3 pos_fract = hit_pos - floor(hit_pos);
-
-		vec2 uv;
-
-		if (entry_faces.x) {
-			uv = pos_fract.yz;
-		} else if (entry_faces.y) {
-			uv = pos_fract.xz;
+		if ((block_id == cur_medium && block_id == B_WATER)) {
+			// only render entry of water, not all octree cubes
+		} else if ((block_id == B_AIR && cur_medium != B_WATER) || block_id == 0) {
+			// never try to render air
 		} else {
-			uv = pos_fract.xy;
-		}
 
-		uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
-		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
+			vec3 hit_pos = ray_dir * hit_dist + ray_pos;
 
-		vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
-		normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
+			vec3 pos_fract = hit_pos - floor(hit_pos);
 
-		normal.x += sin(hit_pos.x * 5) * 0.02;
-		//normal.y += cos(hit_pos.y * 5) * 0.2;
-		normal = normalize(normal);
+			vec2 uv;
 
-		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
-
-		float tex_indx = bti.x; // x=base_index
-		if (entry_faces.z) {
-			tex_indx += ray_dir.z <= 0 ? bti.y : bti.z; // y=top : z=bottom
-		}
-
-		vec4 col = texture(tile_textures, vec3(uv, tex_indx));
-
-		float alpha_remain = 1.0 - accum_col.a;
-
-		if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
-				&& queued_ray <= MAX_SEC_RAYS-1) {
-
-			float src = cur_medium == B_AIR ? air_IOR : water_IOR;
-			float dst = block_id == B_AIR ? air_IOR : water_IOR;
-
-			float eta = src / dst;
-
-			float reflect_fac = fresnel(-ray_dir, normal, water_F0);
-			
-			vec3 reflect_dir = reflect(ray_dir, normal);
-			vec3 refract_dir = refract(ray_dir, normal, eta);
-
-			if (dot(refract_dir, refract_dir) == 0.0) {
-				// total internal reflection, ie. outside of snells window
-				reflect_fac = 1.0;
+			if (entry_faces.x) {
+				uv = pos_fract.yz;
+			} else if (entry_faces.y) {
+				uv = pos_fract.xz;
+			} else {
+				uv = pos_fract.xy;
 			}
 
-			if (queued_ray < MAX_SEC_RAYS) {
-				queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
-				queue[queued_ray].dir = reflect_dir;
-				queue[queued_ray].tint = ray_tint * reflect_fac * alpha_remain;
-				queued_ray++;
+			uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
+			uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
+
+			vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
+			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
+
+			normal.x += sin(hit_pos.x * 5) * 0.02;
+			//normal.y += cos(hit_pos.y * 5) * 0.2;
+			normal = normalize(normal);
+
+			vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
+
+			float tex_indx = bti.x; // x=base_index
+			if (entry_faces.z) {
+				tex_indx += ray_dir.z <= 0 ? bti.y : bti.z; // y=top : z=bottom
 			}
 
-			if (queued_ray < MAX_SEC_RAYS) {
-				queue[queued_ray].pos = hit_pos + refract_dir * 0.0001;
-				queue[queued_ray].dir = refract_dir;
-				queue[queued_ray].tint = ray_tint * (1.0 - reflect_fac) * alpha_remain;
-				queued_ray++;
-			}
+			vec4 col = texture(tile_textures, vec3(uv, tex_indx));
 
-			accum_col.a += alpha_remain;
-		} else {
-			float effective_alpha = alpha_remain * col.a;
-			accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
+			float alpha_remain = 1.0 - accum_col.a;
+
+			if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
+					&& queued_ray <= MAX_SEC_RAYS-2) {
+
+				float src = cur_medium == B_AIR ? air_IOR : water_IOR;
+				float dst = block_id == B_AIR ? air_IOR : water_IOR;
+
+				float eta = src / dst;
+
+				float reflect_fac = fresnel(-ray_dir, normal, water_F0);
+				
+				vec3 reflect_dir = reflect(ray_dir, normal);
+				vec3 refract_dir = refract(ray_dir, normal, eta);
+
+				if (dot(refract_dir, refract_dir) == 0.0) {
+					// total internal reflection, ie. outside of snells window
+					reflect_fac = 1.0;
+				}
+
+				if (queued_ray < MAX_SEC_RAYS) {
+					queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
+					queue[queued_ray].dir = reflect_dir;
+					queue[queued_ray].tint = ray_tint * reflect_fac * alpha_remain;
+					queued_ray++;
+				}
+
+				if (queued_ray < MAX_SEC_RAYS) {
+					queue[queued_ray].pos = hit_pos + refract_dir * 0.0001;
+					queue[queued_ray].dir = refract_dir;
+					queue[queued_ray].tint = ray_tint * (1.0 - reflect_fac) * alpha_remain;
+					queued_ray++;
+				}
+
+				accum_col.a += alpha_remain;
+			} else {
+				float effective_alpha = alpha_remain * col.a;
+				accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
+			}
 		}
 
 		cur_medium = block_id;

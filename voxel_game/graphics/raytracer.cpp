@@ -18,7 +18,7 @@ void Raytracer::imgui () {
 	ImGui::SliderFloat("water_IOR", &water_IOR, 0, 2);
 
 	ImGui::ColorPicker3("water_fog", &water_fog.x);
-	ImGui::SliderFloat("water_fog_dens", &water_fog_dens, 0, 0.2f);
+	ImGui::SliderFloat("water_fog_dens", &water_fog_dens, 0, 1.0f);
 
 	imgui_pop();
 }
