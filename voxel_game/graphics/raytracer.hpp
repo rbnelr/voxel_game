@@ -32,6 +32,7 @@ public:
 	bool visualize_iterations = false;
 
 	float water_F0 = 0.2f;
+	float water_IOR = 1.333f;
 
 	void imgui ();
 

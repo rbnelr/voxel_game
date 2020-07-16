@@ -53,7 +53,7 @@ $if fragment
 #define LEAF_BIT (1 << 31) // This works
 
 #define MAX_SCALE 12
-#define MAX_SEC_RAYS 2
+#define MAX_SEC_RAYS 4
 
 #define INF (1.0 / 0.0)
 
@@ -66,6 +66,9 @@ $if fragment
 	uniform sampler2D heat_gradient;
 
 	uniform float water_F0 = 0.2;
+	uniform float water_IOR = 1.333;
+
+#define air_IOR 1.0
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
@@ -145,14 +148,12 @@ $if fragment
 
 		float alpha_remain = 1.0 - accum_col.a;
 
-		if (block_id == B_WATER && queued_ray <= MAX_SEC_RAYS-2) {
-			const float air_ior = 1.0;
-			const float water_ior = 1.333;
+		if (block_id == B_WATER && queued_ray <= MAX_SEC_RAYS-1) {
 
 			float reflect_fac = fresnel(-ray_dir, normal, water_F0);
 			
 			vec3 reflect_dir = reflect(ray_dir, normal);
-			vec3 refract_dir = refract(ray_dir, normal, air_ior / water_ior);
+			vec3 refract_dir = refract(ray_dir, normal, air_IOR / water_IOR);
 
 			if (queued_ray < MAX_SEC_RAYS) {
 				queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
