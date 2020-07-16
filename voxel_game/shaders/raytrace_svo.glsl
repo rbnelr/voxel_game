@@ -68,6 +68,9 @@ $if fragment
 	uniform float water_F0 = 0.2;
 	uniform float water_IOR = 1.333;
 
+	uniform vec3 water_fog;
+	uniform float water_fog_dens;
+
 #define air_IOR 1.0
 
 	// Textures
@@ -110,8 +113,6 @@ $if fragment
 			effective_block_id = B_WATER; // render water exit into air as water
 		} else if (block_id == B_AIR || block_id == 0)
 			return; // never try to render air
-		
-		cur_medium = block_id;
 
 		vec3 hit_pos = ray_dir * hit_dist + ray_pos;
 
@@ -133,9 +134,9 @@ $if fragment
 		vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
 		normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 
-		//normal.x += sin(hit_pos.x * 5) * 0.02;
-		////normal.y += cos(hit_pos.y * 5) * 0.2;
-		//normal = normalize(normal);
+		normal.x += sin(hit_pos.x * 5) * 0.02;
+		//normal.y += cos(hit_pos.y * 5) * 0.2;
+		normal = normalize(normal);
 
 		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
@@ -148,12 +149,23 @@ $if fragment
 
 		float alpha_remain = 1.0 - accum_col.a;
 
-		if (block_id == B_WATER && queued_ray <= MAX_SEC_RAYS-1) {
+		if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
+				&& queued_ray <= MAX_SEC_RAYS-1) {
+
+			float src = cur_medium == B_AIR ? air_IOR : water_IOR;
+			float dst = block_id == B_AIR ? air_IOR : water_IOR;
+
+			float eta = src / dst;
 
 			float reflect_fac = fresnel(-ray_dir, normal, water_F0);
 			
 			vec3 reflect_dir = reflect(ray_dir, normal);
-			vec3 refract_dir = refract(ray_dir, normal, air_IOR / water_IOR);
+			vec3 refract_dir = refract(ray_dir, normal, eta);
+
+			if (dot(refract_dir, refract_dir) == 0.0) {
+				// total internal reflection, ie. outside of snells window
+				reflect_fac = 1.0;
+			}
 
 			if (queued_ray < MAX_SEC_RAYS) {
 				queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
@@ -174,6 +186,8 @@ $if fragment
 			float effective_alpha = alpha_remain * col.a;
 			accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
 		}
+
+		cur_medium = block_id;
 	}
 
 	float min_component (vec3 v) {

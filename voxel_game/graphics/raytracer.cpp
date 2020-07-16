@@ -17,6 +17,9 @@ void Raytracer::imgui () {
 	ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
 	ImGui::SliderFloat("water_IOR", &water_IOR, 0, 2);
 
+	ImGui::ColorPicker3("water_fog", &water_fog.x);
+	ImGui::SliderFloat("water_fog_dens", &water_fog_dens, 0, 0.2f);
+
 	imgui_pop();
 }
 
@@ -37,6 +40,9 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 
 		shader.set_uniform("water_F0", water_F0);
 		shader.set_uniform("water_IOR", water_IOR);
+
+		shader.set_uniform("water_fog", water_fog);
+		shader.set_uniform("water_fog_dens", water_fog_dens);
 
 		{
 			auto* data = (uint32_t*)&octree.octree.nodes[0];

@@ -34,6 +34,9 @@ public:
 	float water_F0 = 0.2f;
 	float water_IOR = 1.333f;
 
+	lrgb water_fog = srgb(0x05, 0x62, 0x94);
+	float water_fog_dens = 0.05f;
+
 	void imgui ();
 
 	void draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics);
