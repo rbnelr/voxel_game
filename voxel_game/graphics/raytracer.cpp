@@ -14,11 +14,12 @@ void Raytracer::imgui () {
 	ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
 	ImGui::Checkbox("visualize_iterations", &visualize_iterations);
 
+	ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
+
 	imgui_pop();
 }
 
 void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics) {
-	if (!raytracer_draw) return;
 
 	if (shader) {
 		shader.bind();
@@ -32,6 +33,8 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 
 		shader.set_uniform("max_iterations", max_iterations);
 		shader.set_uniform("visualize_iterations", visualize_iterations);
+
+		shader.set_uniform("water_F0", water_F0);
 
 		{
 			auto* data = (uint32_t*)&octree.octree.nodes[0];

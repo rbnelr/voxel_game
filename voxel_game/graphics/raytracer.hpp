@@ -31,6 +31,8 @@ public:
 	int max_iterations = 256;
 	bool visualize_iterations = false;
 
+	float water_F0 = 0.2f;
+
 	void imgui ();
 
 	void draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics);

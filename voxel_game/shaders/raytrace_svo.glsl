@@ -49,7 +49,8 @@ $if fragment
 		return texelFetch(svo_texture, indx2, 0).r;
 	}
 
-#define LEAF_BIT 0x80000000
+//#define LEAF_BIT 0x80000000 // This triggers an integer overflow on intel??
+#define LEAF_BIT (1 << 31) // This works
 
 #define MAX_SCALE 12
 #define MAX_SEC_RAYS 2
@@ -63,6 +64,8 @@ $if fragment
 	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
 	uniform sampler2D heat_gradient;
+
+	uniform float water_F0 = 0.2;
 
 	// Textures
 	uniform	sampler2DArray tile_textures;
@@ -125,11 +128,11 @@ $if fragment
 		uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
 
 		vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
-		normal *= step(vec3(0.0), ray_dir) * 2.0 - 1.0;
+		normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 
-		normal.x += sin(hit_pos.x * 5) * 0.02;
-		//normal.y += cos(hit_pos.y * 5) * 0.2;
-		normal = normalize(normal);
+		//normal.x += sin(hit_pos.x * 5) * 0.02;
+		////normal.y += cos(hit_pos.y * 5) * 0.2;
+		//normal = normalize(normal);
 
 		vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
@@ -146,10 +149,10 @@ $if fragment
 			const float air_ior = 1.0;
 			const float water_ior = 1.333;
 
-			float reflect_fac = fresnel(-ray_dir, -normal, 0.20);
-
+			float reflect_fac = fresnel(-ray_dir, normal, water_F0);
+			
 			vec3 reflect_dir = reflect(ray_dir, normal);
-			vec3 refract_dir = refract(ray_dir, -normal, air_ior / water_ior);
+			vec3 refract_dir = refract(ray_dir, normal, air_ior / water_ior);
 
 			if (queued_ray < MAX_SEC_RAYS) {
 				queue[queued_ray].pos = hit_pos + reflect_dir * 0.0001;
@@ -272,7 +275,7 @@ $if fragment
 		//// Iterate
 		for (;;) {
 			iterations++;
-			//if (iterations >= max_iterations) break;
+			if (iterations >= max_iterations) break;
 
 			// child cube ray range
 			float child_t0, child_t1;
@@ -404,10 +407,12 @@ $if fragment
 			accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
 		}
 		
-		frag_col = vec4(accum_col, 1.0);
+		vec4 col = vec4(accum_col, 1.0);
 		
 		if (visualize_iterations)
-			frag_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+			col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+
+		FRAG_COL(col);
 
 		{ // Write depth of furthest hit surface of primary ray (=always opaque) or inf distance if not hit
 			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
