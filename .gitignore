@@ -2,6 +2,7 @@
 */stb/
 imgui.ini
 *.ini
+todo.txt
 
 *.exe
 *.bin

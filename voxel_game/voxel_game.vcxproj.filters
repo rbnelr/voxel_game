@@ -469,22 +469,11 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="notes.txt">
-      <Filter>docs</Filter>
-    </Text>
-    <Text Include="todo.txt">
-      <Filter>docs</Filter>
-    </Text>
-  </ItemGroup>
-  <ItemGroup>
     <Filter Include="shaders">
       <UniqueIdentifier>{0eaa38e6-83d2-4302-a2a0-7a58a3caab29}</UniqueIdentifier>
     </Filter>
     <Filter Include="glad">
       <UniqueIdentifier>{1847271f-a9df-43e4-9628-48a6e79317e5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="docs">
-      <UniqueIdentifier>{1b11874a-b140-448b-801e-122cdf7ac8f4}</UniqueIdentifier>
     </Filter>
     <Filter Include="stb">
       <UniqueIdentifier>{8c80bbda-578d-41da-8727-423370554220}</UniqueIdentifier>
