@@ -63,7 +63,7 @@ namespace gl {
 		for (auto& kv : shad->uniforms) {
 			kv.second.loc = glGetUniformLocation(shad->shad, kv.first.str.c_str());
 			if (kv.second.loc < 0) {
-				clog(ERROR, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
+				clog(WARNING, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
 			}
 		}
 	}
@@ -552,7 +552,7 @@ namespace gl {
 			} else {
 				// compilation success
 				if (log_avail) {
-					clog(ERROR,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					clog(WARNING,"OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
@@ -601,7 +601,7 @@ namespace gl {
 			} else {
 				// linking success
 				if (log_avail) {
-					clog(ERROR,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+					clog(WARNING,"OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
 				}
 			}
 		}
