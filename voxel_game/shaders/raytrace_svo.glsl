@@ -218,6 +218,10 @@ $if fragment
 		return max(max(v.x, v.y), v.z);
 	}
 
+	float rand (vec2 co){
+		return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	}
+
 	void intersect_ray (
 			vec3 rinv_dir, vec3 mirror_ray_pos,
 			ivec3 cube_pos, int cube_scale,
@@ -409,7 +413,12 @@ $if fragment
 
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
-		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
+
+		vec2 rand_input = gl_FragCoord.xy;
+		rand_input += time * vec2(3485.0, 144.0);
+		vec2 px_jitter = vec2(rand(rand_input), rand(rand_input + vec2(11234.0, 0.0))) - 0.5;
+
+		vec2 ndc = (gl_FragCoord.xy + px_jitter) / viewport_size * 2.0 - 1.0;
 
 		if (ndc.x > (slider * 2 - 1))
 			discard;
