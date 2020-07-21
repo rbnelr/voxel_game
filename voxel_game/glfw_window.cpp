@@ -111,7 +111,7 @@ bool get_fullscreen (bool* borderless_fullscreen) {
 bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 	OPTICK_EVENT();
 
-	if (!fullscreen) {
+	if (!::fullscreen) {
 		// store windowed window placement
 		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
 		glfwGetWindowSize(window, &window_positioning.dim.x, &window_positioning.dim.y);
