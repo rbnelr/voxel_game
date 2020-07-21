@@ -43,6 +43,7 @@ public:
 	float2 water_scroll_dir1 = float2(-0.3f, 0.02f), water_scroll_dir2 = float2(-0.163f, -0.216f);
 	float water_scale1 = 0.1f, water_scale2 = 0.641f;
 	float water_strength1 = 0.05f, water_strength2 = 0.025f;
+	float water_lod_bias = 0.0f;
 
 	float time = 0;
 	float time_speed = 1.0f;

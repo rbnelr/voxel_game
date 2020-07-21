@@ -26,6 +26,7 @@ void Raytracer::imgui () {
 	ImGui::DragFloat("water_scale2", &water_scale2, 0.05f);
 	ImGui::DragFloat("water_strength1", &water_strength1, 0.05f);
 	ImGui::DragFloat("water_strength2", &water_strength2, 0.05f);
+	ImGui::DragFloat("water_lod_bias", &water_lod_bias, 0.05f);
 
 	ImGui::DragFloat("time", &time);
 	ImGui::DragFloat("time_speed", &time_speed, 0.05f);
@@ -60,6 +61,7 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		shader.set_uniform("water_scale2", water_scale2);
 		shader.set_uniform("water_strength1", water_strength1);
 		shader.set_uniform("water_strength2", water_strength2);
+		shader.set_uniform("water_lod_bias", water_lod_bias);
 
 		time += time_speed * input.dt;
 		shader.set_uniform("time", time);

@@ -80,6 +80,8 @@ $if fragment
 	uniform float water_strength1;
 	uniform float water_strength2;
 
+	uniform float water_lod_bias;
+
 	uniform float time;
 
 #define air_IOR 1.0
@@ -90,10 +92,10 @@ $if fragment
 
 	// TODO: fix tangent & cotangents for water normal map
 	void water_normal_map (inout vec3 normal, vec2 uv, float sign) {
-		vec3 a = texture(water_normal, (uv + water_scroll_dir1 * time) * water_scale1).rgb * 2.0 - 1.0;
+		vec3 a = texture(water_normal, (uv + water_scroll_dir1 * time) * water_scale1, water_lod_bias).rgb * 2.0 - 1.0;
 		a.xy *= water_strength1;
 
-		vec3 b = texture(water_normal, (vec2(uv.y, -uv.x) + water_scroll_dir2 * time) * water_scale2).rgb * 2.0 - 1.0;
+		vec3 b = texture(water_normal, (vec2(uv.y, -uv.x) + water_scroll_dir2 * time) * water_scale2, water_lod_bias).rgb * 2.0 - 1.0;
 		b.xy *= water_strength2;
 
 		normal = normalize(a + b + normal*0.2) * sign;
