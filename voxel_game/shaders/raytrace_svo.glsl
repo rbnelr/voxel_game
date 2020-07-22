@@ -221,6 +221,16 @@ $if fragment
 				}
 
 				accum_col.a += alpha_remain;
+			} else if (col.a >= 0.99 && queued_ray < MAX_SEC_RAYS) {
+
+				vec3 bounce_dir = normalize(normal + 0.9 * rand3(gl_FragCoord.xy));
+
+				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
+				queue[queued_ray].dir = bounce_dir;
+				queue[queued_ray].tint = ray_tint * vec4(col.rgb, 1.0) * alpha_remain;
+				queued_ray++;
+
+				accum_col.a += alpha_remain;
 			} else {
 				float effective_alpha = alpha_remain * col.a;
 				accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
@@ -473,7 +483,7 @@ $if fragment
 
 			if (shadow_ray_dist < MAX_DIST-1) {
 				// in shadow
-				col *= 0.1;
+				col *= 0.001;
 			} else {
 				col *= sun_col;
 			}
