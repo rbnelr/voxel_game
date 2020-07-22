@@ -69,6 +69,7 @@ $if fragment
 
 	uniform vec3 sun_col = vec3(1.0);
 	uniform vec3 sun_dir = normalize(vec3(3, 4, 6));
+	uniform float sun_radius = 0.1;
 
 	uniform float water_F0 = 0.2;
 	uniform float water_IOR = 1.333;
@@ -88,6 +89,16 @@ $if fragment
 	uniform float water_lod_bias;
 
 	uniform float time;
+
+	float rand (vec2 co) {
+		return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+	}
+	vec2 rand2 (vec2 co) {
+		return vec2(rand(co + vec2(333.0, -19.0)*time), rand(co + vec2(-1234.0, -13.0)*time));
+	}
+	vec3 rand3 (vec2 co) {
+		return vec3(rand(co + vec2(333.0, -19.0)*time), rand(co + vec2(-1234.0, -13.0)*time), rand(co + vec2(+7.0, +234.0)*time));
+	}
 
 #define air_IOR 1.0
 
@@ -224,10 +235,6 @@ $if fragment
 	}
 	float max_component (vec3 v) {
 		return max(max(v.x, v.y), v.z);
-	}
-
-	float rand (vec2 co){
-		return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 	}
 
 	void intersect_ray (
@@ -428,9 +435,7 @@ $if fragment
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
 
-		//vec2 rand_input = gl_FragCoord.xy;
-		//rand_input += time * vec2(3485.0, 144.0);
-		//vec2 px_jitter = vec2(rand(rand_input), rand(rand_input + vec2(11234.0, 0.0))) - 0.5;
+		//vec2 px_jitter = rand2(gl_FragCoord.xy) - 0.5;
 		vec2 px_jitter = vec2(0.0);
 
 		vec2 ndc = (gl_FragCoord.xy + px_jitter) / viewport_size * 2.0 - 1.0;
@@ -460,9 +465,11 @@ $if fragment
 			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
 			hit_pos += _normal * 0.0005;
 
+			vec3 dir = normalize(sun_dir + rand3(gl_FragCoord.xy) * sun_radius);
+
 			int dummy_queued_rays = MAX_SEC_RAYS;
 			float shadow_ray_dist;
-			process_ray(hit_pos, sun_dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
+			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
 
 			if (shadow_ray_dist < MAX_DIST-1) {
 				// in shadow
