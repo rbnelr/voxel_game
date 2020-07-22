@@ -242,7 +242,7 @@ $if fragment
 			if (accum_col.a <= 0.99999) {
 				float effective_alpha = alpha_remain * col.a;
 
-				if (queued_ray < MAX_SEC_RAYS)
+				//if (queued_ray < MAX_SEC_RAYS)
 					accum_col.rgb += effective_alpha * col.rgb;
 
 				accum_col.a += effective_alpha;
@@ -483,7 +483,7 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		if (hit_dist < MAX_DIST-1) { // shadow ray
+		if (false && hit_dist < MAX_DIST-1) { // shadow ray
 			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
 			hit_pos += _normal * 0.0005;
 		
@@ -508,7 +508,7 @@ $if fragment
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
 
-		int queued_rays = 0;
+		int queued_rays = 2;
 		QueuedRay queue[MAX_SEC_RAYS];
 
 		float hit_dist;
