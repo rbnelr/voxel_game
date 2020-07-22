@@ -57,6 +57,8 @@ $if fragment
 
 #define INF (1.0 / 0.0)
 
+#define MAX_DIST INF
+
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
 	
@@ -64,6 +66,9 @@ $if fragment
 	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
 	uniform sampler2D heat_gradient;
+
+	uniform vec3 sun_col = vec3(1.0);
+	uniform vec3 sun_dir = normalize(vec3(3, 4, 6));
 
 	uniform float water_F0 = 0.2;
 	uniform float water_IOR = 1.333;
@@ -119,6 +124,8 @@ $if fragment
 		return F0 + ((1.0 - F0) * x2 * x2 * x);
 	}
 
+	vec3 _normal;
+
 	void surface_hit (
 			vec3 ray_pos, vec3 ray_dir,
 			float hit_dist, bvec3 entry_faces, int block_id,
@@ -153,6 +160,10 @@ $if fragment
 			uv.x *= (entry_faces.x && ray_dir.x > 0) || (entry_faces.y && ray_dir.y <= 0) ? -1 : 1;
 			uv.y *=  entry_faces.z && ray_dir.z > 0 ? -1 : 1;
 
+			vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
+			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
+			_normal = normal;
+
 			vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
 
 			float tex_indx = bti.x; // x=base_index
@@ -166,9 +177,6 @@ $if fragment
 
 			if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
 					&& queued_ray <= MAX_SEC_RAYS-2) {
-
-				vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
-				normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 
 				water_normal_map(normal, hit_pos.xy, normal.z);
 
@@ -296,7 +304,7 @@ $if fragment
 
 		// desired ray bounds
 		float tmin = 0;
-		float tmax = INF;
+		float tmax = MAX_DIST;
 
 		// cube ray range
 		float t0 = max_component( rinv_dir * (root_min - mirror_ray_pos) );
@@ -315,7 +323,10 @@ $if fragment
 		//// Iterate
 		for (;;) {
 			iterations++;
-			if (iterations >= max_iterations) break;
+			if (iterations >= max_iterations) {
+				hit_dist = t1;
+				break;
+			}
 
 			// child cube ray range
 			float child_t0, child_t1;
@@ -343,12 +354,15 @@ $if fragment
 					
 					bool leaf = (node & LEAF_BIT) != 0;
 					if (leaf) {
-						hit_dist = tv0;
-						surface_hit(ray_pos, ray_dir, hit_dist, entry_faces, node & ~LEAF_BIT,
+						float dist = tv0;
+
+						surface_hit(ray_pos, ray_dir, dist, entry_faces, node & ~LEAF_BIT,
 							accum_col, queue, queued_rays, ray_tint);
 						
-						if (accum_col.a > 0.99999)
+						if (accum_col.a > 0.99999) {
+							hit_dist = dist;
 							break; // final hit
+						}
 					} else {
 						//// Push
 						stack_node[child_scale - 1] = parent_node;
@@ -414,9 +428,10 @@ $if fragment
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
 
-		vec2 rand_input = gl_FragCoord.xy;
-		rand_input += time * vec2(3485.0, 144.0);
-		vec2 px_jitter = vec2(rand(rand_input), rand(rand_input + vec2(11234.0, 0.0))) - 0.5;
+		//vec2 rand_input = gl_FragCoord.xy;
+		//rand_input += time * vec2(3485.0, 144.0);
+		//vec2 px_jitter = vec2(rand(rand_input), rand(rand_input + vec2(11234.0, 0.0))) - 0.5;
+		vec2 px_jitter = vec2(0.0);
 
 		vec2 ndc = (gl_FragCoord.xy + px_jitter) / viewport_size * 2.0 - 1.0;
 
@@ -435,6 +450,31 @@ $if fragment
 		ray_pos -= vec3(svo_root_pos);
 	}
 
+	vec3 shadowed_ray (
+			vec3 ray_pos, vec3 ray_dir,
+			out float hit_dist, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_rays, vec4 ray_tint) {
+
+		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
+
+		{ // shadow ray
+			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
+			hit_pos += _normal * 0.0005;
+
+			int dummy_queued_rays = MAX_SEC_RAYS;
+			float shadow_ray_dist;
+			process_ray(hit_pos, sun_dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
+
+			if (shadow_ray_dist < MAX_DIST-1) {
+				// in shadow
+				col *= 0.1;
+			} else {
+				col *= sun_col;
+			}
+		}
+
+		return col;
+	}
+
 	void main () {
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
@@ -443,12 +483,12 @@ $if fragment
 		QueuedRay queue[MAX_SEC_RAYS];
 
 		float hit_dist;
-		vec3 accum_col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, vec4(1.0));
+		vec3 accum_col = shadowed_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, vec4(1.0));
 		
 		for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
 			float _dist;
 
-			vec3 ray_col = process_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
+			vec3 ray_col = shadowed_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
 			accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
 		}
 		
