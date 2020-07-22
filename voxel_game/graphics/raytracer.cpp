@@ -4,9 +4,14 @@
 #include "../world_octree.hpp"
 
 void Raytracer::imgui () {
-	if (!imgui_push("Raytracer")) return;
+	if (!imgui_push("Raytracer")) {
+		ImGui::SameLine();
+		ImGui::Checkbox("draw", &raytracer_draw);
+		return;
+	}
 
 	ImGui::Checkbox("draw", &raytracer_draw);
+
 	ImGui::Checkbox("overlay", &overlay);
 
 	ImGui::SliderFloat("slider", &slider, 0,1);

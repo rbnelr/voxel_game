@@ -7,7 +7,11 @@
 
 namespace world_octree {
 	void WorldOctree::imgui () {
-		if (!imgui_push("WorldOctree")) return;
+		if (!imgui_push("WorldOctree")) {
+			ImGui::SameLine();
+			ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
+			return;
+		}
 
 		ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
 		ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
@@ -117,6 +121,7 @@ namespace world_octree {
 					write_node = cur_node;
 				} else {
 					// overwrite highest_exclusive_parent with current node if the siblings have children or are of other type
+					
 					for (int i=0; i<8; ++i) {
 						if (i != child_idx && ((siblings[i] & LEAF_BIT) == 0 || (siblings[i] & ~LEAF_BIT) != val)) {
 							write_node = cur_node;
@@ -237,8 +242,8 @@ namespace world_octree {
 		//if (!node.has_children && node.data == 0)
 		//	col *= lrgba(.5f,.5f,.5f, .6f);
 		//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
-		if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) != 0) && scale <= oct.debug_draw_octree_max)
-			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size, cols[scale % ARRLEN(cols)]);
+		if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > B_AIR) && scale <= oct.debug_draw_octree_max)
+			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, cols[scale % ARRLEN(cols)]);
 
 		if ((node & LEAF_BIT) == 0) {
 			oct.active_trunk_nodes++;
@@ -334,6 +339,6 @@ namespace world_octree {
 		compact_nodes(octree.nodes);
 		auto bt = b.end();
 
-		clog("WorldOctree::update_block:  remove_node: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::update_block:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
 	}
 }

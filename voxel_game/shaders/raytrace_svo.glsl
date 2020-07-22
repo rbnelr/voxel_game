@@ -142,7 +142,7 @@ $if fragment
 			vec3 ray_pos, vec3 ray_dir,
 			float hit_dist, bvec3 entry_faces, int block_id,
 			inout vec4 accum_col, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_ray, vec4 ray_tint) {
-		if (cur_medium == 0) {
+		if (cur_medium == -1) {
 			cur_medium = block_id;
 			return;
 		}
@@ -231,7 +231,7 @@ $if fragment
 				accum_col.a += alpha_remain;
 			} else if (col.a >= 0.99 && queued_ray < MAX_SEC_RAYS) {
 			
-				vec3 bounce_dir = normalize(normal + 0.9 * rand3(gl_FragCoord.xy));
+				vec3 bounce_dir = normalize(normal + 0.9 * (rand3(gl_FragCoord.xy) -0.5));
 			
 				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
 				queue[queued_ray].dir = bounce_dir;
@@ -303,7 +303,7 @@ $if fragment
 			out float hit_dist, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_rays, vec4 ray_tint) {
 		hit_dist = INF;
 		vec4 accum_col = vec4(0.0);
-		cur_medium = 0;
+		cur_medium = -1;
 
 		//// init ray in mirrored coord system
 		vec3 root_min = vec3(0);

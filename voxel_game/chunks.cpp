@@ -67,14 +67,18 @@ void Chunk::init_blocks () {
 Block Chunk::get_block (bpos pos) const {
 	return blocks->get(pos);
 }
-void Chunk::set_block_unchecked (bpos pos, Block b) {
+void Chunk::set_block_unchecked (Chunks& chunks, bpos pos, Block b) {
 	blocks->set(pos, b);
+
+	chunks.world_octree.update_block(*this, pos, b.id); 
 }
 void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block blk = blocks->get(pos_in_chunk);
 	
 	blocks->set(pos_in_chunk, b);
 	needs_remesh = true;
+
+	chunks.world_octree.update_block(*this, pos_in_chunk, b.id); 
 
 	bool3 lo = (bpos)pos_in_chunk == 0;
 	bool3 hi = (bpos)pos_in_chunk == (bpos)CHUNK_DIM-1;
@@ -130,45 +134,45 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	}
 }
 
-void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_nx (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.set_block_unchecked(bpos(CHUNK_DIM, y,z), src.get_block(int3(0,y,z)));
+			dst.blocks->set(bpos(CHUNK_DIM, y,z), src.get_block(int3(0,y,z)));
 		}
 	}
 }
-void set_neighbour_blocks_px (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_px (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.set_block_unchecked(bpos(-1, y,z), src.get_block(int3(CHUNK_DIM-1, y,z)));
+			dst.blocks->set(bpos(-1, y,z), src.get_block(int3(CHUNK_DIM-1, y,z)));
 		}
 	}
 }
-void set_neighbour_blocks_ny (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_ny (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, CHUNK_DIM, z), src.get_block(int3(x,0,z)));
+			dst.blocks->set(bpos(x, CHUNK_DIM, z), src.get_block(int3(x,0,z)));
 		}
 	}
 }
-void set_neighbour_blocks_py (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_py (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int z=0; z<CHUNK_DIM; ++z) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, -1, z), src.get_block(int3(x, CHUNK_DIM-1, z)));
+			dst.blocks->set(bpos(x, -1, z), src.get_block(int3(x, CHUNK_DIM-1, z)));
 		}
 	}
 }
-void set_neighbour_blocks_nz (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_nz (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int y=0; y<CHUNK_DIM; ++y) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, y, CHUNK_DIM), src.get_block(int3(x,y,0)));
+			dst.blocks->set(bpos(x, y, CHUNK_DIM), src.get_block(int3(x,y,0)));
 		}
 	}
 }
-void set_neighbour_blocks_pz (Chunk const& src, Chunk& dst) {
+void set_neighbour_blocks_pz (Chunks& chunks, Chunk const& src, Chunk& dst) {
 	for (int y=0; y<CHUNK_DIM; ++y) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.set_block_unchecked(bpos(x, y, -1), src.get_block(int3(x, y, CHUNK_DIM-1)));
+			dst.blocks->set(bpos(x, y, -1), src.get_block(int3(x, y, CHUNK_DIM-1)));
 		}
 	}
 }
@@ -176,35 +180,35 @@ void set_neighbour_blocks_pz (Chunk const& src, Chunk& dst) {
 void Chunk::update_neighbour_blocks (Chunks& chunks) {
 	Chunk* chunk;
 	if ((chunk = chunks.query_chunk(coord + chunk_coord(-1, 0, 0)))) {
-		set_neighbour_blocks_nx(*this, *chunk);
-		set_neighbour_blocks_px(*chunk, *this);
+		set_neighbour_blocks_nx(chunks, *this, *chunk);
+		set_neighbour_blocks_px(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 	if ((chunk = chunks.query_chunk(coord + chunk_coord(+1, 0, 0)))) {
-		set_neighbour_blocks_px(*this, *chunk);
-		set_neighbour_blocks_nx(*chunk, *this);
+		set_neighbour_blocks_px(chunks, *this, *chunk);
+		set_neighbour_blocks_nx(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 
 	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,-1, 0)))) {
-		set_neighbour_blocks_ny(*this, *chunk);
-		set_neighbour_blocks_py(*chunk, *this);
+		set_neighbour_blocks_ny(chunks, *this, *chunk);
+		set_neighbour_blocks_py(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,+1, 0)))) {
-		set_neighbour_blocks_py(*this, *chunk);
-		set_neighbour_blocks_ny(*chunk, *this);
+		set_neighbour_blocks_py(chunks, *this, *chunk);
+		set_neighbour_blocks_ny(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 
 	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,-1)))) {
-		set_neighbour_blocks_nz(*this, *chunk);
-		set_neighbour_blocks_pz(*chunk, *this);
+		set_neighbour_blocks_nz(chunks, *this, *chunk);
+		set_neighbour_blocks_pz(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,+1)))) {
-		set_neighbour_blocks_pz(*this, *chunk);
-		set_neighbour_blocks_nz(*chunk, *this);
+		set_neighbour_blocks_pz(chunks, *this, *chunk);
+		set_neighbour_blocks_nz(chunks, *chunk, *this);
 		chunk->needs_remesh = true;
 	}
 }

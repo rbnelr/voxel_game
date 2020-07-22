@@ -233,7 +233,7 @@ public:
 	}
 
 	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
-	void set_block_unchecked (bpos pos, Block b); // only use in World Generator
+	void set_block_unchecked (Chunks& chunks, bpos pos, Block b); // only use in World Generator
 
 	// get block
 	Block get_block (bpos pos) const;
@@ -253,15 +253,10 @@ public:
 	// true: invisible to player -> don't draw
 	bool culled;
 
-private:
-	friend struct Chunk_Mesher;
-	friend struct ChunkGenerator;
-	friend void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk);
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
 	std::unique_ptr<ChunkData> blocks = nullptr;
-public:
 
 	// Gpu mesh data
 	ChunkMesh mesh;

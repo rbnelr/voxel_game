@@ -29,7 +29,7 @@ namespace world_octree {
 		//
 		bool debug_draw_octree = false;
 
-		int debug_draw_octree_min = 0;
+		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;
 
 		int active_trunk_nodes = -1;
