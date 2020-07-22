@@ -199,6 +199,7 @@ namespace world_octree {
 		oct.root_pos = pos;
 	}
 
+#if 0
 	uint32_t recurse_comapct (std::vector<OctreeChildren>& new_nodes, std::vector<OctreeChildren>& old_nodes, uint32_t old_node) {
 		assert((old_node & LEAF_BIT) == 0);
 
@@ -223,6 +224,55 @@ namespace world_octree {
 		
 		nodes = new_nodes;
 	}
+#else
+	void compact_nodes (std::vector<OctreeChildren>& nodes) {
+		std::vector<OctreeChildren> new_nodes;
+		new_nodes.reserve(4096);
+
+		struct Stack {
+			uint32_t	children_ptr;
+			uint32_t	old_parent;
+			uint32_t	child_indx;
+		};
+
+		static constexpr int MAX_DEPTH = 16;
+		Stack stack[MAX_DEPTH];
+		int depth = 0;
+
+		Stack* s = &stack[depth];
+		*s = {0,0,0};
+		
+		// Alloc root children
+		new_nodes.emplace_back();
+
+		for (;;) {
+			if (s->child_indx == 8) {
+				// Pop
+				if (depth == 0)
+					break;
+				s = &stack[--depth];
+			} else {
+				uint32_t child_node = nodes[s->old_parent].children[s->child_indx];
+
+				if (child_node & LEAF_BIT) {
+					new_nodes[ s->children_ptr ].children[s->child_indx++] = child_node;
+				} else {
+					uint32_t alloc = (uint32_t)new_nodes.size();
+
+					// Alloc
+					new_nodes[ s->children_ptr ].children[s->child_indx++] = alloc;
+					new_nodes.emplace_back();
+
+					// Push
+					s = &stack[++depth];
+					*s = { alloc, child_node, 0 };
+				}
+			}
+		}
+
+		nodes = std::move(new_nodes);
+	}
+#endif
 
 	lrgba cols[] = {
 		srgba(255,0,0),
