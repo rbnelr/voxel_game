@@ -14,6 +14,8 @@ void Raytracer::imgui () {
 	ImGui::SliderInt("max_iterations", &max_iterations, 1,512);
 	ImGui::Checkbox("visualize_iterations", &visualize_iterations);
 
+	ImGui::SliderFloat("sun_radius", &sun_radius, 0, 0.5f);
+
 	ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
 	ImGui::SliderFloat("water_IOR", &water_IOR, 0, 2);
 
@@ -34,7 +36,7 @@ void Raytracer::imgui () {
 	imgui_pop();
 }
 
-void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics) {
+void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
 
 	if (shader) {
 		shader.bind();
@@ -48,6 +50,10 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 
 		shader.set_uniform("max_iterations", max_iterations);
 		shader.set_uniform("visualize_iterations", visualize_iterations);
+
+		shader.set_uniform("sun_col", tod.cols.sun_col);
+		shader.set_uniform("sun_dir", tod.sun_dir);
+		shader.set_uniform("sun_radius", sun_radius);
 
 		shader.set_uniform("water_F0", water_F0);
 		shader.set_uniform("water_IOR", water_IOR);

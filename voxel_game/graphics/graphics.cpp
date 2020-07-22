@@ -751,7 +751,9 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
 	uint8 sky_light_reduce;
-	fog.set(world.chunks.generation_radius, world.time_of_day.calc_sky_colors(&sky_light_reduce));
+	world.time_of_day.calc_sky_colors(&sky_light_reduce);
+
+	fog.set(world.chunks.generation_radius, world.time_of_day.cols);
 	
 	frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
 	
@@ -839,7 +841,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	if (raytracer.raytracer_draw) {
-		raytracer.draw(world.chunks.world_octree, view, *this);
+		raytracer.draw(world.chunks.world_octree, view, *this, world.time_of_day);
 	}
 
 	glClear(GL_DEPTH_BUFFER_BIT);

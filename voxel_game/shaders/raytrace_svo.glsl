@@ -52,7 +52,7 @@ $if fragment
 //#define LEAF_BIT 0x80000000 // This triggers an integer overflow on intel??
 #define LEAF_BIT (1 << 31) // This works
 
-#define MAX_SCALE 12
+#define MAX_SCALE 11
 #define MAX_SEC_RAYS 2
 
 #define INF (1.0 / 0.0)
@@ -61,6 +61,7 @@ $if fragment
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
+#define B_TALLGRASS 11 // block id
 	
 	uniform float slider = 1.0; // debugging
 	uniform bool visualize_iterations = false;
@@ -146,12 +147,18 @@ $if fragment
 			return;
 		}
 
-		int effective_block_id = block_id;
+		int hit_id = block_id;
 
-		if ((block_id == cur_medium && block_id == B_WATER)) {
+		if (block_id == B_AIR && cur_medium != B_AIR) {
+			hit_id = cur_medium; // exit to air always rendered with medium texture
+		}
+
+		if ((hit_id == cur_medium && block_id == B_WATER)) {
 			// only render entry of water, not all octree cubes
-		} else if ((block_id == B_AIR && cur_medium != B_WATER) || block_id == 0) {
-			// never try to render air
+		} else if (hit_id == 0 || hit_id == B_AIR) {
+			//
+		} else if (hit_id == B_TALLGRASS && entry_faces.z) {
+			//
 		} else {
 
 			vec3 hit_pos = ray_dir * hit_dist + ray_pos;
@@ -175,7 +182,7 @@ $if fragment
 			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 			_normal = normal;
 
-			vec4 bti = texelFetch(block_tile_info, effective_block_id, 0);
+			vec4 bti = texelFetch(block_tile_info, hit_id, 0);
 
 			float tex_indx = bti.x; // x=base_index
 			if (entry_faces.z) {
@@ -183,6 +190,7 @@ $if fragment
 			}
 
 			vec4 col = texture(tile_textures, vec3(uv, tex_indx));
+			//col.rgb = vec3(1,1,1);
 
 			float alpha_remain = 1.0 - accum_col.a;
 
@@ -222,18 +230,22 @@ $if fragment
 
 				accum_col.a += alpha_remain;
 			} else if (col.a >= 0.99 && queued_ray < MAX_SEC_RAYS) {
-
+			
 				vec3 bounce_dir = normalize(normal + 0.9 * rand3(gl_FragCoord.xy));
-
+			
 				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
 				queue[queued_ray].dir = bounce_dir;
 				queue[queued_ray].tint = ray_tint * vec4(col.rgb, 1.0) * alpha_remain;
 				queued_ray++;
+			}
 
-				accum_col.a += alpha_remain;
-			} else {
+			if (accum_col.a <= 0.99999) {
 				float effective_alpha = alpha_remain * col.a;
-				accum_col += vec4(effective_alpha * col.rgb, effective_alpha);
+
+				if (queued_ray < MAX_SEC_RAYS)
+					accum_col.rgb += effective_alpha * col.rgb;
+
+				accum_col.a += effective_alpha;
 			}
 		}
 
@@ -471,19 +483,19 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		{ // shadow ray
+		if (hit_dist < MAX_DIST-1) { // shadow ray
 			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
 			hit_pos += _normal * 0.0005;
-
-			vec3 dir = normalize(sun_dir + rand3(gl_FragCoord.xy) * sun_radius);
-
+		
+			vec3 dir = normalize(sun_dir + (rand3(gl_FragCoord.xy) -0.5) * sun_radius);
+		
 			int dummy_queued_rays = MAX_SEC_RAYS;
 			float shadow_ray_dist;
 			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
-
+		
 			if (shadow_ray_dist < MAX_DIST-1) {
 				// in shadow
-				col *= 0.001;
+				col *= 0;
 			} else {
 				col *= sun_col;
 			}

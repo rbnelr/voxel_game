@@ -4,6 +4,7 @@
 #include "../util/raw_array.hpp"
 
 class Graphics;
+class TimeOfDay;
 namespace world_octree {
 	class WorldOctree;
 }
@@ -34,6 +35,8 @@ public:
 	int max_iterations = 256;
 	bool visualize_iterations = false;
 
+	float sun_radius = 0.1f;
+
 	float water_F0 = 0.42f;
 	float water_IOR = 1.333f;
 
@@ -50,5 +53,5 @@ public:
 
 	void imgui ();
 
-	void draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics);
+	void draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod);
 };
