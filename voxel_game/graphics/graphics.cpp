@@ -844,7 +844,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		if (!activate_flycam)
+		//if (!activate_flycam)
 			gui.draw(world.player, tile_textures, sampler);
 
 		glEnable(GL_DEPTH_TEST);

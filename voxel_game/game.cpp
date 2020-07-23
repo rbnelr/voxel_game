@@ -124,13 +124,7 @@ void Game::frame () {
 
 		physics.update_player(*world, world->player);
 
-		SelectedBlock selected_block;
-		Camera_View player_view = world->player.update_post_physics(*world, graphics.player, !activate_flycam, creative_mode, &selected_block);
-
-		if (selected_block)
-			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block.id]);
-		else
-			ImGui::Text("Selected Block: None");
+		Camera_View player_view = world->player.update_post_physics(*world);
 
 		Camera_View view;
 		if (activate_flycam) {
@@ -138,6 +132,15 @@ void Game::frame () {
 		} else {
 			view = player_view;
 		}
+
+		SelectedBlock selected_block;
+		
+		update_block_edits(*world, view, graphics.player, creative_mode || activate_flycam, &selected_block);
+
+		if (selected_block)
+			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block.id]);
+		else
+			ImGui::Text("Selected Block: None");
 
 		block_update.update_blocks(world->chunks);
 

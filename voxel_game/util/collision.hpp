@@ -63,21 +63,26 @@ struct VoxelRaycast {
 };
 
 template <typename FUNC>
-bool raycast_voxels (Ray ray, float max_dist, FUNC hit_block, int* iterations=nullptr) {
+bool raycast_voxels (Ray ray, float max_dist, FUNC hit_block, int* iterations=nullptr, bool hit_at_max_dist=false) {
 	VoxelRaycast vrc = VoxelRaycast(ray, max_dist);
 
-	if (hit_block(vrc.cur_voxel, -1, vrc.cur_dist)) // ray started inside block, -1 as no face was hit
+	if (hit_block(vrc.cur_voxel, -1, vrc.cur_dist, false)) // ray started inside block, -1 as no face was hit
 		return true;
 
 	bool hit = false;
 
 	int counter = 1;
 	while (vrc.step()) {
-		if (hit_block(vrc.cur_voxel, vrc.get_step_face(), vrc.cur_dist)) {
+		if (hit_block(vrc.cur_voxel, vrc.get_step_face(), vrc.cur_dist, false)) {
 			hit = true;
 			break;
 		}
 		++counter;
+	}
+
+	if (!hit && hit_at_max_dist) {
+		hit_block(vrc.cur_voxel, vrc.get_step_face(), vrc.cur_dist, true);
+		hit = true;
 	}
 
 	if (iterations) *iterations = counter;

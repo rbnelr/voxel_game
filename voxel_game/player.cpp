@@ -212,14 +212,14 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	
 	{
 		float hit_dist;
-		if (world.raycast_breakable_blocks(ray, dist, &hit_dist))
+		if (world.raycast_breakable_blocks(ray, dist, false, &hit_dist))
 			dist = max(hit_dist - 0.05f, 0.0f);
 	}
 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (World& world, PlayerGraphics const& graphics, bool active, bool creative_mode, SelectedBlock* selected_block) {
+Camera_View Player::update_post_physics (World& world) {
 	OPTICK_EVENT();
 	
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
@@ -245,20 +245,20 @@ Camera_View Player::update_post_physics (World& world, PlayerGraphics const& gra
 	view.clip_far = cam.clip_far;
 	view.calc_frustrum();
 
-	if (active) {
-		*selected_block = calc_selected_block(world);
-		break_block.update(world, *this, creative_mode, graphics, *selected_block);
-		block_place.update(world, *this, *selected_block);
-		inventory.update();
-	}
-
 	return view;
 }
 
-SelectedBlock Player::calc_selected_block (World& world) {
+SelectedBlock calc_selected_block (World& world, Camera_View& view, float reach, bool creative_mode) {
 	Ray ray;
-	ray.dir = (float3x3)head_to_world * float3(0,+1,0);
-	ray.pos = head_to_world * float3(0,0,0);
+	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
+	ray.pos = view.cam_to_world * float3(0,0,0);
 
-	return world.raycast_breakable_blocks(ray, break_block.reach);
+	return world.raycast_breakable_blocks(ray, reach, creative_mode);
+}
+
+void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode, SelectedBlock* selected_block) {
+	*selected_block = calc_selected_block(world, view, world.player.break_block.reach, creative_mode);
+	world.player.break_block.update(world, world.player, creative_mode, graphics, *selected_block);
+	world.player.block_place.update(world, world.player, *selected_block);
+	world.player.inventory.update();
 }

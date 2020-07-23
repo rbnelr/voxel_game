@@ -30,7 +30,7 @@ public:
 
 	//// Raycasting into the world
 
-	SelectedBlock raycast_breakable_blocks (Ray ray, float max_dist, float* hit_dist=nullptr);
+	SelectedBlock raycast_breakable_blocks (Ray ray, float max_dist, bool hit_at_max_dist=false, float* hit_dist=nullptr);
 
 	void apply_damage (SelectedBlock const& block, Item& item, bool creative_mode);
 	bool try_place_block (bpos pos, block_id id);

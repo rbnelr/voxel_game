@@ -1,14 +1,14 @@
 #include "world.hpp"
 
-SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* hit_dist) {
+SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, bool hit_at_max_dist, float* hit_dist) {
 	OPTICK_EVENT();
 
 	SelectedBlock b;
 	float _dist;
-	auto hit_block = [&] (bpos bp, int face, float dist) {
+	auto hit_block = [&] (bpos bp, int face, float dist, bool force_hit) {
 		Chunk* chunk;
 		b.block = chunks.query_block(bp, &chunk);
-		if (chunk && blocks.breakable(b.block.id)) {
+		if (chunk && (blocks.breakable(b.block.id) || force_hit)) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			b.valid = true;
 			b.pos = bp;
@@ -19,7 +19,7 @@ SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, float* h
 		return false;
 	};
 
-	if (!raycast_voxels(ray, max_dist, hit_block)) {
+	if (!raycast_voxels(ray, max_dist, hit_block, nullptr, hit_at_max_dist)) {
 		return {};
 	}
 
