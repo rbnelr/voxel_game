@@ -458,6 +458,8 @@ namespace world_octree {
 		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_AIR);
 		auto at = a.end();
 
+		return;
+
 		auto c = Timer::start();
 		{
 			for (int z=0; z<CHUNK_DIM; ++z) {
