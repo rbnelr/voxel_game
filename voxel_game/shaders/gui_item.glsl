@@ -24,9 +24,6 @@ $if fragment
 
 	uniform	sampler2DArray tile_textures;
 
-	uniform	sampler2DArray tile_textures2;
-	uniform	float blah;
-
 	void main () {
 		frag_col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	}
