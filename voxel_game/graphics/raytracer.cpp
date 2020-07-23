@@ -78,24 +78,17 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		shader.set_uniform("time", time);
 
 		{
-			auto* data = (uint32_t*)&octree.octree.nodes[0];
-			int count = (int)(octree.octree.nodes.size() * 8);
-
-			static constexpr int SVO_TEX_WIDTH = 2048;
-			int2 size = int2(SVO_TEX_WIDTH, (count + (SVO_TEX_WIDTH-1)) / SVO_TEX_WIDTH);
+			static constexpr int WIDTH = world_octree::PAGE_SIZE / sizeof(int);
+			int height = (int)octree.pages.size();
 
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
 			glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
 
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, size.x,size.y, 0, GL_RED_INTEGER, GL_INT, nullptr);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, WIDTH,height, 0, GL_RED_INTEGER, GL_INT, nullptr);
 			
-			// Upload most of the svo data as rectangular region
-			if (size.y > 1)
-				glTexSubImage2D(GL_TEXTURE_2D, 0,  0, 0,		SVO_TEX_WIDTH, size.y-1, GL_RED_INTEGER, GL_INT, data);
-			// copy last row of tex pixels of the svo data
-			if (size.y > 0)
-				glTexSubImage2D(GL_TEXTURE_2D, 0,  0, size.y-1,	count % SVO_TEX_WIDTH, 1, GL_RED_INTEGER, GL_INT, &data[SVO_TEX_WIDTH * (size.y-1)]);
+			for (int i=0; i<height; ++i)
+				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_INT, octree.pages[i].page);
 			
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		}

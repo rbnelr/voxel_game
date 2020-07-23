@@ -1,5 +1,6 @@
 #pragma once
 #include "stdlib.h"
+#include <mutex>
 
 // Custom memory allocator that allocates in fixed blocks using a freelist
 // used to avoid malloc and free overhead

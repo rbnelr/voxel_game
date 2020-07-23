@@ -1,7 +1,7 @@
 #include "player.hpp"
 #include "world.hpp"
 
-float3	player_spawn_point = float3(0,0,34);
+float3	player_spawn_point = float3(3,3,34);
 
 void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];

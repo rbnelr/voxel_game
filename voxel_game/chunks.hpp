@@ -365,13 +365,13 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius =	200.0f;
+	float generation_radius =	0;//200.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float deletion_hysteresis = CHUNK_DIM*1.5f;
+	float deletion_hysteresis = 0;//CHUNK_DIM*1.5f;
 
 	float active_radius =	200.0f;
 
