@@ -215,7 +215,7 @@ namespace world_octree {
 
 		// compact the changed page
 		//  I think I know that none but the last page need to be compacted
-		compact_page(oct, *cur_page);
+		//compact_page(oct, *cur_page);
 	}
 
 	struct PageSplitter {
@@ -272,6 +272,8 @@ namespace world_octree {
 
 		*page = newpage;
 		pages.push_back(childpage); // invalidates page
+
+		clog("split_page");
 	}
 
 	void update_root (WorldOctree& oct, Player const& player) {
@@ -393,44 +395,48 @@ namespace world_octree {
 		srgba(255,127,255),
 	};
 
-	void recurse_draw (WorldOctree& oct, OctreeNode node, int3 pos, int scale) {
-		float size = (float)(1 << scale);
+	struct RecurseDrawer {
+		WorldOctree& oct;
+		AllocatedPage* cur_page;
 
-		AllocatedPage* cur_page = &oct.pages[0];
-		auto get_node = [&] (OctreeNode node) -> OctreeChildren& {
+		OctreeChildren& get_node (OctreeNode node) {
 			if (node & FARPTR_BIT) {
 				cur_page = &oct.pages[ node & ~FARPTR_BIT ];
 				node = (OctreeNode)0;
 			}
 			return cur_page->page->nodes[node];
-		};
+		}
+		
+		void recurse_draw (OctreeNode node, int3 pos, int scale) {
+			float size = (float)(1 << scale);
 
-		//if (!node.has_children && node.data == 0)
-		//	col *= lrgba(.5f,.5f,.5f, .6f);
-		//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
-		if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > B_AIR) && scale <= oct.debug_draw_octree_max)
-			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, cols[scale % ARRLEN(cols)]);
+			//if (!node.has_children && node.data == 0)
+			//	col *= lrgba(.5f,.5f,.5f, .6f);
+			//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
+			if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > B_AIR) && scale <= oct.debug_draw_octree_max)
+				debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, cols[scale % ARRLEN(cols)]);
 
-		if ((node & LEAF_BIT) == 0) {
-			//oct.active_trunk_nodes++;
+			if ((node & LEAF_BIT) == 0) {
+				//oct.active_trunk_nodes++;
 
-			OctreeChildren& children = get_node(node);
-			int child_scale = scale - 1;
+				OctreeChildren& children = get_node(node);
+				int child_scale = scale - 1;
 
-			if (child_scale >= oct.debug_draw_octree_min) {
-				for (int i=0; i<8; ++i) {
-					int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
+				if (child_scale >= oct.debug_draw_octree_min) {
+					for (int i=0; i<8; ++i) {
+						int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
 
-					recurse_draw(oct, children.children[i], child_pos, child_scale);
+						recurse_draw(children.children[i], child_pos, child_scale);
+					}
 				}
 			}
 		}
-	}
+	};
 
 	void debug_draw (WorldOctree& oct) {
 		//oct.active_trunk_nodes = 0;
-
-		recurse_draw(oct, (OctreeNode)0, oct.root_pos, oct.root_scale);
+		RecurseDrawer rd = { oct, &oct.pages[0] };
+		rd.recurse_draw((OctreeNode)0, oct.root_pos, oct.root_scale);
 	}
 
 	void WorldOctree::pre_update (Player const& player) {

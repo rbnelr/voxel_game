@@ -18,8 +18,8 @@ namespace world_octree {
 		OctreeNode children[8];
 	};
 
-	static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = PAGE_SIZE / sizeof(OctreeChildren);
+	//static constexpr uint32_t PAGE_SIZE = 1024*128;
+	static constexpr uint32_t PAGE_NODES = 8;//PAGE_SIZE / sizeof(OctreeChildren);
 
 	struct OctreePage {
 		OctreeChildren nodes[PAGE_NODES];
@@ -34,7 +34,7 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 10;
+		int			root_scale = 7;//10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		BlockAllocator<OctreePage> allocator;
