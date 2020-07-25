@@ -56,6 +56,7 @@ $if fragment
 #define MAX_SEC_RAYS 2
 
 #define INF (1.0 / 0.0)
+#define PI	3.1415926535897932384626433832795
 
 #define MAX_DIST INF
 
@@ -135,6 +136,18 @@ $if fragment
 		float x2 = x*x;
 		return F0 + ((1.0 - F0) * x2 * x2 * x);
 	}
+	
+	vec3 hemisphere_sample () {
+		vec2 uv = rand2(gl_FragCoord.xy);
+
+		float r = sqrt(uv.x);
+		float theta = 2*PI * uv.y;
+
+		float x = r * cos(theta);
+		float y = r * sin(theta);
+
+		return vec3(x,y, sqrt(max(0.0, 1.0 - uv.x)));
+	}
 
 	vec3 _normal;
 
@@ -181,6 +194,10 @@ $if fragment
 			vec3 normal = mix(vec3(0.0), vec3(1.0), entry_faces);
 			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 			_normal = normal;
+
+			//vec3 tangent = mix(vec3(0.0), vec3(1.0), entry_faces);
+			//normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
+			//_normal = normal;
 
 			vec4 bti = texelFetch(block_tile_info, hit_id, 0);
 
@@ -231,8 +248,24 @@ $if fragment
 				accum_col.a += alpha_remain;
 			} else if (col.a >= 0.99 && queued_ray < MAX_SEC_RAYS) {
 			
-				vec3 bounce_dir = normalize(normal + 0.9 * (rand3(gl_FragCoord.xy) -0.5));
-			
+				mat3 tangent_to_world;
+				{
+					vec3 tangent = entry_faces.x ? vec3(0,1,0) : vec3(1,0,0);
+					vec3 bitangent = -cross(tangent, normal);
+				
+					tangent_to_world[0].x = tangent.x;
+					tangent_to_world[0].y = tangent.y;
+					tangent_to_world[0].z = tangent.z;
+					tangent_to_world[1].x = bitangent.x;
+					tangent_to_world[1].y = bitangent.y;
+					tangent_to_world[1].z = bitangent.z;
+					tangent_to_world[2].x = normal.x;
+					tangent_to_world[2].y = normal.y;
+					tangent_to_world[2].z = normal.z;
+				}
+				
+				vec3 bounce_dir = tangent_to_world * hemisphere_sample();
+				
 				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
 				queue[queued_ray].dir = bounce_dir;
 				queue[queued_ray].tint = ray_tint * vec4(col.rgb, 1.0) * alpha_remain;
@@ -483,7 +516,7 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		if (false && hit_dist < MAX_DIST-1) { // shadow ray
+		if (hit_dist < MAX_DIST-1) { // shadow ray
 			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
 			hit_pos += _normal * 0.0005;
 		
@@ -508,7 +541,7 @@ $if fragment
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
 
-		int queued_rays = 2;
+		int queued_rays = 0;
 		QueuedRay queue[MAX_SEC_RAYS];
 
 		float hit_dist;
