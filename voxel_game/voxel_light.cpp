@@ -123,22 +123,22 @@ unsigned calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_bloc
 	return (unsigned)max((int)l, (int)(neighbour_light - blocks.absorb[new_block.id] - 1));
 }
 void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, unsigned new_light_level) {
-	if (new_light_level != old_light_level) {
-		dbg_block_light_add_list.clear();
-		dbg_block_light_remove_list.clear();
-
-		auto timer = Timer::start();
-
-		if (new_light_level > old_light_level) {
-			update_block_light_add(chunks, pos, new_light_level);
-		} else {
-			update_block_light_remove(chunks, pos, old_light_level);
-		}
-
-		auto time = timer.end();
-		chunks.block_light_time.push(time);
-		clog("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
-	}
+	//if (new_light_level != old_light_level) {
+	//	dbg_block_light_add_list.clear();
+	//	dbg_block_light_remove_list.clear();
+	//
+	//	auto timer = Timer::start();
+	//
+	//	if (new_light_level > old_light_level) {
+	//		update_block_light_add(chunks, pos, new_light_level);
+	//	} else {
+	//		update_block_light_remove(chunks, pos, old_light_level);
+	//	}
+	//
+	//	auto time = timer.end();
+	//	chunks.block_light_time.push(time);
+	//	clog("Block light update on set_block() (%4d,%4d,%4d) took %7.3f us", pos.x,pos.y,pos.z, time * 1000000);
+	//}
 }
 
 void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
@@ -168,9 +168,9 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
 	chunk->needs_remesh = true;
 }
 void update_sky_light_chunk (Chunk* chunk) {
-	for (int y=0; y<CHUNK_DIM; ++y) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM-1));
-		}
-	}
+	//for (int y=0; y<CHUNK_DIM; ++y) {
+	//	for (int x=0; x<CHUNK_DIM; ++x) {
+	//		update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM-1));
+	//	}
+	//}
 }
