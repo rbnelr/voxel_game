@@ -397,17 +397,16 @@ namespace world_octree {
 
 	struct RecurseDrawer {
 		WorldOctree& oct;
-		AllocatedPage* cur_page;
 
-		OctreeChildren& get_node (OctreeNode node) {
+		OctreeChildren& get_node (OctreeNode node, AllocatedPage** cur_page) {
 			if (node & FARPTR_BIT) {
-				cur_page = &oct.pages[ node & ~FARPTR_BIT ];
+				*cur_page = &oct.pages[ node & ~FARPTR_BIT ];
 				node = (OctreeNode)0;
 			}
-			return cur_page->page->nodes[node];
+			return (*cur_page)->page->nodes[node];
 		}
 		
-		void recurse_draw (OctreeNode node, int3 pos, int scale) {
+		void recurse_draw (AllocatedPage* cur_page, OctreeNode node, int3 pos, int scale) {
 			float size = (float)(1 << scale);
 
 			//if (!node.has_children && node.data == 0)
@@ -419,14 +418,14 @@ namespace world_octree {
 			if ((node & LEAF_BIT) == 0) {
 				//oct.active_trunk_nodes++;
 
-				OctreeChildren& children = get_node(node);
+				OctreeChildren& children = get_node(node, &cur_page);
 				int child_scale = scale - 1;
 
 				if (child_scale >= oct.debug_draw_octree_min) {
 					for (int i=0; i<8; ++i) {
 						int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
 
-						recurse_draw(children.children[i], child_pos, child_scale);
+						recurse_draw(cur_page, children.children[i], child_pos, child_scale);
 					}
 				}
 			}
@@ -435,8 +434,8 @@ namespace world_octree {
 
 	void debug_draw (WorldOctree& oct) {
 		//oct.active_trunk_nodes = 0;
-		RecurseDrawer rd = { oct, &oct.pages[0] };
-		rd.recurse_draw((OctreeNode)0, oct.root_pos, oct.root_scale);
+		RecurseDrawer rd = { oct };
+		rd.recurse_draw(&oct.pages[0], (OctreeNode)0, oct.root_pos, oct.root_scale);
 	}
 
 	void WorldOctree::pre_update (Player const& player) {
