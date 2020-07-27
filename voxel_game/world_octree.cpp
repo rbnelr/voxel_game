@@ -17,11 +17,16 @@ namespace world_octree {
 		ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
 		ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
 
-		ImGui::Text("pages: %d (%d fragmentation)", active_pages, (int)pages.size() - active_pages);
+		ImGui::Text("pages: %d (%d unused)", active_pages, (int)pages.size() - active_pages);
+		ImGui::Text("last_modified_page: %d (%d/%d nodes)", last_modified_page, last_modified_page >= 0 ? pages[last_modified_page].node_count : -1, PAGE_NODES);
 
-		//ImGui::Text("       trunk nodes: %d", (int)octree.nodes.size());
-		//ImGui::Text("active trunk nodes: %d", active_trunk_nodes);
-		//ImGui::Text("dead   trunk nodes: %d", (int)octree.nodes.size() - active_trunk_nodes);
+		int total_nodes = (int)(pages.size() * PAGE_NODES);
+		int active_nodes = 0;
+		for (auto& page : pages) {
+			active_nodes += page.node_count;
+		}
+
+		ImGui::Text("nodes: %d active / %d allocated  %.2f %% usage", active_nodes, total_nodes, (float)active_nodes / total_nodes * 100);
 
 		imgui_pop();
 	}
@@ -218,6 +223,8 @@ namespace world_octree {
 		// compact the changed page
 		//  I think I know that none but the last page need to be compacted
 		compact_page(oct, *cur_page);
+
+		oct.last_modified_page = (int)(cur_page - &oct.pages[0]);
 	}
 
 	struct PageSplitter {
@@ -411,18 +418,17 @@ namespace world_octree {
 		void recurse_draw (AllocatedPage* cur_page, OctreeNode node, int3 pos, int scale) {
 			float size = (float)(1 << scale);
 
-			//if (!node.has_children && node.data == 0)
-			//	col *= lrgba(.5f,.5f,.5f, .6f);
-			//debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, col);
+			OctreeChildren& children = get_node(node, &cur_page);
+			int child_scale = scale - 1;
+
+			auto col = cols[scale % ARRLEN(cols)];
+			if (oct.debug_draw_pages)
+				col = cols[(cur_page - &oct.pages[0]) % ARRLEN(cols)];
+			
 			if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > B_AIR) && scale <= oct.debug_draw_octree_max)
-				debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, cols[scale % ARRLEN(cols)]);
+				debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
 
 			if ((node & LEAF_BIT) == 0) {
-				//oct.active_trunk_nodes++;
-
-				OctreeChildren& children = get_node(node, &cur_page);
-				int child_scale = scale - 1;
-
 				if (child_scale >= oct.debug_draw_octree_min) {
 					for (int i=0; i<8; ++i) {
 						int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
