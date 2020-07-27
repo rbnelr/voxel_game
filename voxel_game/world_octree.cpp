@@ -18,16 +18,13 @@ namespace world_octree {
 		ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
 
 		ImGui::Text("pages: %d (%d unused)", active_pages, (int)pages.size() - active_pages);
-		ImGui::Text("last_modified_page: %d (%d/%d nodes)", last_modified_page, last_modified_page >= 0 ? pages[last_modified_page].node_count : -1, PAGE_NODES);
-
+		
 		int total_nodes = (int)(pages.size() * PAGE_NODES);
-		int active_nodes = 0;
-		for (auto& page : pages) {
-			active_nodes += page.node_count;
-		}
-
+		
 		ImGui::Text("nodes: %d active / %d allocated  %.2f %% usage", active_nodes, total_nodes, (float)active_nodes / total_nodes * 100);
-
+		
+		ImGui::Text("last_modified_page: %d (%d/%d nodes)", last_modified_page, last_modified_page >= 0 ? pages[last_modified_page].node_count : -1, PAGE_NODES);
+		
 		imgui_pop();
 	}
 
@@ -47,8 +44,8 @@ namespace world_octree {
 
 		return (OctreeNode)children_ptr;
 	}
-	AllocatedPage WorldOctree::page_from_subtree (OctreePage const& srcpage, OctreeNode subroot) {
-		AllocatedPage newpage = { 0, allocator.alloc() };
+	AllocatedPage page_from_subtree (WorldOctree& oct, OctreePage const& srcpage, OctreeNode subroot) {
+		AllocatedPage newpage = { oct.allocator.alloc() };
 
 		recurse_page_from_subtree(newpage, srcpage, subroot);
 
@@ -56,9 +53,68 @@ namespace world_octree {
 	}
 
 	void compact_page (WorldOctree& oct, AllocatedPage& page) {
-		auto newpage = oct.page_from_subtree(*page.page, (OctreeNode)0);
+		auto newpage = page_from_subtree(oct, *page.page, (OctreeNode)0);
 		oct.allocator.free(page.page);
 		page = newpage;
+	}
+
+	struct PageSplitter {
+		OctreePage& page;
+
+		int target_page_size;
+
+		OctreeNode* split_node;
+		int split_node_closeness = INT_MAX;
+
+		uint32_t find_split_node_recurse (OctreeNode& node) {
+			assert((node & LEAF_BIT) == 0);
+
+			int subtree_size = 1; // count ourself
+
+			// cound children subtrees
+			auto& children = page.nodes[ node ].children;
+			for (int i=0; i<8; ++i) {
+				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
+					subtree_size += find_split_node_recurse(children[i]);
+			}
+
+			// keep track of node that splits the node in half the best
+			int closeness = abs(subtree_size - target_page_size);
+			if (closeness < split_node_closeness) {
+				split_node = &node;
+				split_node_closeness = closeness;
+			}
+
+			return subtree_size;
+		}
+	};
+
+	void split_page (WorldOctree& oct, AllocatedPage* page) {
+		PageSplitter ps = { *page->page };
+		ps.target_page_size = page->node_count / 2;
+
+		OctreeNode root = (OctreeNode)0;
+
+		ps.find_split_node_recurse(root);
+
+		assert((*ps.split_node & LEAF_BIT) == 0);
+		if (ps.split_node == &root) {
+			// edge cases that are not allowed to happen because a split of the root node do not actually split the page in a useful way
+			//  this should be impossible with an page subtree depth > 2, I think. (ie. root -> middle -> leaf), which a PAGE_NODES > 
+			// But if the page is in an uncompacted state this might still happen (because the actual active nodes might be as low as 2
+			assert(false);
+		}
+
+		OctreeNode subroot = *ps.split_node;
+		*ps.split_node = (OctreeNode)((uint32_t)oct.pages.size() | FARPTR_BIT);
+
+		auto childpage = page_from_subtree(oct, *page->page, subroot);
+		auto newpage = page_from_subtree(oct, *page->page, root);
+
+		oct.allocator.free(page->page);
+
+		*page = newpage;
+		oct.pages.push_back(childpage); // invalidates page
 	}
 
 #if 0
@@ -128,6 +184,11 @@ namespace world_octree {
 		return ret;
 	}
 
+	// octree write, writes a single voxel at a desired pos, scale to be a particular val
+	// this decends the octree from the root and inserts or deletes nodes when needed
+	// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
+	// NOTE: nodes are deleted by becoming unreachable and nodes are inserted at the end, compact page should be called for all touched pages at some point
+	// NOTE: pages are split as needed if they become full
 	void octree_write (WorldOctree& oct, int3 pos, int scale, block_id val) {
 		pos -= oct.root_pos;
 		if (any(pos < 0 || pos >= (1 << oct.root_scale)))
@@ -196,9 +257,16 @@ namespace world_octree {
 
 				if (cur_page->node_count == PAGE_NODES) {
 					// page full
-					oct.split_page(cur_page);
 
-					// cur_child was invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
+					// Need to compact page, because uncompacted pages can trigger a degenerate case in the page split that I can't handle in any way
+					compact_page(oct, *cur_page);
+
+					if (cur_page->node_count == PAGE_NODES) {
+						// Do split page which will have created 2 new pages with about half the nodes out of the full page
+						split_page(oct, cur_page);
+					}
+
+					// cur_child and cur_page were invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
 					// I might attempt to keep track of cur_child and fix it in split_page, or redecend from the root of the cur page,
 					// but a total redecent should always work, so let's just do that with a goto
 					goto restart_decent;
@@ -220,67 +288,7 @@ namespace world_octree {
 		// do the write
 		*write_node = (OctreeNode)(LEAF_BIT | val);
 
-		// compact the changed page
-		//  I think I know that none but the last page need to be compacted
-		compact_page(oct, *cur_page);
-
 		oct.last_modified_page = (int)(cur_page - &oct.pages[0]);
-	}
-
-	struct PageSplitter {
-		OctreePage& page;
-
-		int target_page_size;
-
-		OctreeNode* split_node;
-		int split_node_closeness = INT_MAX;
-
-		uint32_t find_split_node_recurse (OctreeNode& node) {
-			assert((node & LEAF_BIT) == 0);
-
-			int subtree_size = 1; // count ourself
-
-			// cound children subtrees
-			auto& children = page.nodes[ node ].children;
-			for (int i=0; i<8; ++i) {
-				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
-					subtree_size += find_split_node_recurse(children[i]);
-			}
-
-			// keep track of node that splits the node in half the best
-			int closeness = abs(subtree_size - target_page_size);
-			if (closeness < split_node_closeness) {
-				split_node = &node;
-				split_node_closeness = closeness;
-			}
-
-			return subtree_size;
-		}
-	};
-
-	void WorldOctree::split_page (AllocatedPage* page) {
-		PageSplitter ps = { *page->page };
-		ps.target_page_size = page->node_count / 2;
-
-		OctreeNode root = (OctreeNode)0;
-
-		ps.find_split_node_recurse(root);
-
-		// edge cases that are not allowed to happen because a split of the root or a leaf node do not actually split the page in a useful way
-		//  but I think with PAGE_NODES > 2 this is impossible I hope
-		assert(ps.split_node != &root);
-		assert((*ps.split_node & LEAF_BIT) == 0);
-
-		OctreeNode subroot = *ps.split_node;
-		*ps.split_node = (OctreeNode)((uint32_t)pages.size() | FARPTR_BIT);
-
-		auto childpage = page_from_subtree(*page->page, subroot);
-		auto newpage = page_from_subtree(*page->page, root);
-
-		allocator.free(page->page);
-
-		*page = newpage;
-		pages.push_back(childpage); // invalidates page
 	}
 
 	void update_root (WorldOctree& oct, Player const& player) {
@@ -405,6 +413,7 @@ namespace world_octree {
 	struct RecurseDrawer {
 		WorldOctree& oct;
 		int active_pages = 0;
+		int active_nodes = 0;
 
 		OctreeChildren& get_node (OctreeNode node, AllocatedPage** cur_page) {
 			if (node & FARPTR_BIT) {
@@ -418,9 +427,6 @@ namespace world_octree {
 		void recurse_draw (AllocatedPage* cur_page, OctreeNode node, int3 pos, int scale) {
 			float size = (float)(1 << scale);
 
-			OctreeChildren& children = get_node(node, &cur_page);
-			int child_scale = scale - 1;
-
 			auto col = cols[scale % ARRLEN(cols)];
 			if (oct.debug_draw_pages)
 				col = cols[(cur_page - &oct.pages[0]) % ARRLEN(cols)];
@@ -429,6 +435,11 @@ namespace world_octree {
 				debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
 
 			if ((node & LEAF_BIT) == 0) {
+				active_nodes++;
+
+				OctreeChildren& children = get_node(node, &cur_page);
+				int child_scale = scale - 1;
+
 				if (child_scale >= oct.debug_draw_octree_min) {
 					for (int i=0; i<8; ++i) {
 						int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
@@ -446,11 +457,12 @@ namespace world_octree {
 		rd.recurse_draw(nullptr, (OctreeNode)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
 
 		oct.active_pages = rd.active_pages;
+		oct.active_nodes = rd.active_nodes;
 	}
 
 	void WorldOctree::pre_update (Player const& player) {
 		if (pages.size() == 0) {
-			pages.push_back({ 1, allocator.alloc() });
+			pages.push_back({ allocator.alloc(), 1 });
 
 			for (int i=0; i<8; ++i) {
 				pages[0].page->nodes[0].children[i] = (OctreeNode)(LEAF_BIT | B_NULL);

@@ -19,40 +19,39 @@ namespace world_octree {
 	};
 
 	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 512;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint32_t PAGE_NODES = 2048;//PAGE_SIZE / sizeof(OctreeChildren);
 
 	struct OctreePage {
 		OctreeChildren nodes[PAGE_NODES];
 	};
 
 	struct AllocatedPage {
-		uint32_t	node_count;
-
 		OctreePage*	page;
+
+		uint32_t	node_count = 0;
+		bool		changed = false; // changed flag used for compacting the correct 
 	};
 
 	class WorldOctree {
 	public:
 
-		int			root_scale = 7;//10;
+		int			root_scale = 10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		BlockAllocator<OctreePage> allocator;
 
 		std::vector<AllocatedPage> pages;
 
-		AllocatedPage page_from_subtree (OctreePage const& srcpage, OctreeNode subroot);
-		void split_page (AllocatedPage* page);
-
 		//
-		bool debug_draw_octree = true;//false;
+		bool debug_draw_octree = false;
 
-		int debug_draw_octree_min = 0;//4;
+		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;
 
 		bool debug_draw_pages = true;
 
 		int active_pages = -1;
+		int active_nodes = -1;
 		int last_modified_page = -1;
 
 		void imgui ();
