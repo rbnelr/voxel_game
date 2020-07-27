@@ -19,7 +19,7 @@ namespace world_octree {
 	};
 
 	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 8;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint32_t PAGE_NODES = 4;//PAGE_SIZE / sizeof(OctreeChildren);
 
 	struct OctreePage {
 		OctreeChildren nodes[PAGE_NODES];
@@ -45,10 +45,12 @@ namespace world_octree {
 		void split_page (AllocatedPage* page);
 
 		//
-		bool debug_draw_octree = false;
+		bool debug_draw_octree = true;//false;
 
-		int debug_draw_octree_min = 4;
+		int debug_draw_octree_min = 0;//4;
 		int debug_draw_octree_max = 20;
+
+		int active_pages = -1;
 
 		void imgui ();
 		void pre_update (Player const& player);

@@ -17,6 +17,8 @@ namespace world_octree {
 		ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
 		ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
 
+		ImGui::Text("pages: %d (%d fragmentation)", active_pages, (int)pages.size() - active_pages);
+
 		//ImGui::Text("       trunk nodes: %d", (int)octree.nodes.size());
 		//ImGui::Text("active trunk nodes: %d", active_trunk_nodes);
 		//ImGui::Text("dead   trunk nodes: %d", (int)octree.nodes.size() - active_trunk_nodes);
@@ -147,7 +149,7 @@ namespace world_octree {
 			cur_child = &children[child_idx];
 
 			{ // keep track of highest node that will end up with 8 children of the same leaf type once write happened (overwriting this collapses the subtree)
-				if (node_ptr == 0) {
+				if (node_ptr == 0 && cur_page == &oct.pages[0]) {
 					// special case because we neverwant to collapse the root nodes children (because root node is implicit)
 					write_node = cur_child;
 				} else {
@@ -215,7 +217,7 @@ namespace world_octree {
 
 		// compact the changed page
 		//  I think I know that none but the last page need to be compacted
-		//compact_page(oct, *cur_page);
+		compact_page(oct, *cur_page);
 	}
 
 	struct PageSplitter {
@@ -272,8 +274,6 @@ namespace world_octree {
 
 		*page = newpage;
 		pages.push_back(childpage); // invalidates page
-
-		clog("split_page");
 	}
 
 	void update_root (WorldOctree& oct, Player const& player) {
@@ -397,11 +397,13 @@ namespace world_octree {
 
 	struct RecurseDrawer {
 		WorldOctree& oct;
+		int active_pages = 0;
 
 		OctreeChildren& get_node (OctreeNode node, AllocatedPage** cur_page) {
 			if (node & FARPTR_BIT) {
 				*cur_page = &oct.pages[ node & ~FARPTR_BIT ];
 				node = (OctreeNode)0;
+				active_pages++;
 			}
 			return (*cur_page)->page->nodes[node];
 		}
@@ -435,7 +437,9 @@ namespace world_octree {
 	void debug_draw (WorldOctree& oct) {
 		//oct.active_trunk_nodes = 0;
 		RecurseDrawer rd = { oct };
-		rd.recurse_draw(&oct.pages[0], (OctreeNode)0, oct.root_pos, oct.root_scale);
+		rd.recurse_draw(nullptr, (OctreeNode)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
+
+		oct.active_pages = rd.active_pages;
 	}
 
 	void WorldOctree::pre_update (Player const& player) {
@@ -463,10 +467,9 @@ namespace world_octree {
 		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_AIR);
 		auto at = a.end();
 
-		return;
-
 		auto c = Timer::start();
 		{
+			//for (int z=0; z<CHUNK_DIM; ++z) {
 			for (int z=0; z<CHUNK_DIM; ++z) {
 				for (int y=0; y<CHUNK_DIM; ++y) {
 					for (int x=0; x<CHUNK_DIM; ++x) {
