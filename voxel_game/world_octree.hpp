@@ -3,6 +3,7 @@
 #include "stdint.h"
 #include "util/block_allocator.hpp"
 #include <vector>
+#include "assert.h"
 
 class Chunk;
 class Chunks;
@@ -14,33 +15,56 @@ namespace world_octree {
 		FARPTR_BIT = 0x40000000u,
 	};
 
+	static constexpr int MAX_DEPTH = 20;
+
+	//static constexpr uint32_t PAGE_SIZE = 1024*128;
+	static constexpr uint32_t PAGE_NODES = 64 -1;//2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
+
+	static constexpr uint32_t PAGE_COMPACT_THRES = (uint32_t)(PAGE_NODES * 0.05f);
+	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.7f);
+
 	struct OctreeChildren {
 		OctreeNode children[8];
 	};
 
-	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 2048;//PAGE_SIZE / sizeof(OctreeChildren);
-
+	static constexpr uint32_t INTNULL = (uint32_t)-1;
 	struct OctreePage {
-		OctreeChildren nodes[PAGE_NODES];
-	};
+		uint32_t		count;
+		uint32_t		parent_page;
+		uint32_t		freelist;
 
-	struct AllocatedPage {
-		OctreePage*	page;
+		alignas(sizeof(uint32_t)*8)
+		OctreeChildren	nodes[PAGE_NODES];
 
-		uint32_t	node_count = 0;
-		bool		changed = false; // changed flag used for compacting the correct 
+		uint32_t alloc_node () {
+			assert(count < PAGE_NODES);
+
+			if (freelist == INTNULL) {
+				return count++;
+			}
+
+			uint32_t ret = freelist;
+			freelist = *((uint32_t*)&nodes[freelist]);
+			return ret;
+		}
+		void free_node (uint32_t node) {
+			assert(count > 0);
+
+			*((uint32_t*)&nodes[node]) = freelist;
+			freelist = node;
+			count--;
+		}
 	};
 
 	class WorldOctree {
 	public:
 
-		int			root_scale = 10;
+		int			root_scale = 8;//10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
-		BlockAllocator<OctreePage> allocator;
+		BlockAllocator<OctreePage, sizeof(uint32_t) * 8> allocator;
 
-		std::vector<AllocatedPage> pages;
+		std::vector<OctreePage*> pages;
 
 		//
 		bool debug_draw_octree = false;
@@ -52,7 +76,6 @@ namespace world_octree {
 
 		int active_pages = -1;
 		int active_nodes = -1;
-		int last_modified_page = -1;
 
 		void imgui ();
 		void pre_update (Player const& player);

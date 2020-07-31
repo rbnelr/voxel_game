@@ -1,10 +1,10 @@
 #pragma once
-#include "stdlib.h"
 #include <mutex>
+#include <cstdlib>
 
 // Custom memory allocator that allocates in fixed blocks using a freelist
 // used to avoid malloc and free overhead
-template <typename T>
+template <typename T, int ALIGN=alignof(std::max_align_t)>
 class BlockAllocator {
 	union Block {
 		Block*	next; // link to next block in linked list of free blocks
@@ -32,7 +32,7 @@ public:
 		Block* block = _alloc();
 		if (!block) {
 			// allocate new blocks as needed
-			block = (Block*)malloc(sizeof(Block));
+			block = (Block*)_aligned_malloc(sizeof(Block), ALIGN);
 		}
 		return &block->data;
 	}
@@ -57,7 +57,7 @@ public:
 		// Do the malloc outside the block because malloc can take a long time, which can catastrophically block an entire threadpool
 		if (!block) {
 			// allocate new blocks as needed
-			block = (Block*)malloc(sizeof(Block)); // NOTE: malloc itself mutexes, so there is little point to putting this outside of the lock
+			block = (Block*)_aligned_malloc(sizeof(Block), ALIGN); // NOTE: malloc itself mutexes, so there is little point to putting this outside of the lock
 		}
 		return &block->data;
 	}
@@ -72,7 +72,7 @@ public:
 			Block* block = freelist;
 			freelist = block->next;
 
-			::free(block);
+			_aligned_free(block);
 		}
 	}
 
