@@ -3,12 +3,12 @@
 ////// Inline definitions
 
 #include "bool4.hpp"
-#include "bool2.hpp"
-#include "int2.hpp"
-#include "int64v2.hpp"
-#include "uint8v2.hpp"
-#include "float2.hpp"
 #include "bool3.hpp"
+#include "bool2.hpp"
+#include "int64v2.hpp"
+#include "float2.hpp"
+#include "uint8v2.hpp"
+#include "int2.hpp"
 
 namespace kissmath {
 	//// forward declarations
@@ -27,11 +27,6 @@ namespace kissmath {
 		return arr[i];
 	}
 	
-	
-	// uninitialized constructor
-	inline bool2::bool2 () {
-		
-	}
 	
 	// sets all components to one value
 	// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

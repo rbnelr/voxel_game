@@ -8,12 +8,12 @@
 namespace kissmath {
 	//// forward declarations
 	
-	struct int3;
+	struct bool3;
 	struct int64v3;
 	struct float4;
 	struct uint8v3;
 	struct float2;
-	struct bool3;
+	struct int3;
 	
 	struct float3 {
 		union { // Union with named members and array members to allow vector[] operator, not 100% sure that this is not undefined behavoir, but I think all compilers definitely don't screw up this use case
@@ -31,7 +31,7 @@ namespace kissmath {
 		
 		
 		// uninitialized constructor
-		inline float3 ();
+		inline float3 () = default;
 		
 		// sets all components to one value
 		// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

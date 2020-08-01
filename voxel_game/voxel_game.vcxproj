@@ -143,6 +143,7 @@
     <ClInclude Include="stb_rect_pack.hpp" />
     <ClInclude Include="time_of_day.hpp" />
     <ClInclude Include="util\animation.hpp" />
+    <ClInclude Include="util\freelist_allocator.hpp" />
     <ClInclude Include="util\circular_buffer.hpp" />
     <ClInclude Include="util\clean_windows_h.hpp" />
     <ClInclude Include="util\geometry.hpp" />

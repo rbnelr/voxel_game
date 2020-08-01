@@ -30,11 +30,6 @@ namespace kissmath {
 	//// Constructors
 	
 	
-	// uninitialized constructor
-	inline float4x4::float4x4 () {
-		
-	}
-	
 	// supply one value for all cells
 	inline constexpr float4x4::float4x4 (float all): 
 	arr{float4(all, all, all, all),

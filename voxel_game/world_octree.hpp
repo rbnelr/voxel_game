@@ -1,7 +1,7 @@
 #pragma once
 #include "blocks.hpp"
 #include "stdint.h"
-#include "util/block_allocator.hpp"
+#include "util/freelist_allocator.hpp"
 #include <vector>
 #include "assert.h"
 
@@ -18,7 +18,7 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 
 	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint32_t PAGE_NODES = 128 -1;//2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
 
 	static constexpr uint32_t PAGE_COMPACT_THRES = (uint32_t)(PAGE_NODES * 0.05f);
 	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.7f);
@@ -35,6 +35,12 @@ namespace world_octree {
 
 		alignas(sizeof(uint32_t)*8)
 		OctreeChildren	nodes[PAGE_NODES];
+
+		OctreePage () {
+			count = 0;
+			parent_page = INTNULL;
+			freelist = INTNULL;
+		}
 
 		uint32_t alloc_node () {
 			assert(count < PAGE_NODES);
@@ -63,7 +69,7 @@ namespace world_octree {
 		int			root_scale = 8;//10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
-		BlockAllocator<OctreePage, sizeof(uint32_t) * 8> allocator;
+		FreelistAllocator<OctreePage, sizeof(uint32_t) * 8> allocator;
 
 		std::vector<OctreePage*> pages;
 

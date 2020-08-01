@@ -32,7 +32,7 @@ namespace kissmath {
 		//// Constructors
 		
 		// uninitialized constructor
-		inline float3x4 ();
+		inline float3x4 () = default;
 		
 		// supply one value for all cells
 		inline constexpr explicit float3x4 (float all);

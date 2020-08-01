@@ -2,11 +2,11 @@
 
 ////// Inline definitions
 
-#include "int3.hpp"
-#include "bool2.hpp"
 #include "int64v2.hpp"
-#include "uint8v2.hpp"
+#include "bool2.hpp"
 #include "float2.hpp"
+#include "int3.hpp"
+#include "uint8v2.hpp"
 #include "int4.hpp"
 
 namespace kissmath {
@@ -26,11 +26,6 @@ namespace kissmath {
 		return arr[i];
 	}
 	
-	
-	// uninitialized constructor
-	inline int2::int2 () {
-		
-	}
 	
 	// sets all components to one value
 	// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

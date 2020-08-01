@@ -23,7 +23,8 @@ namespace world_octree {
 		int total_nodes = (int)(pages.size() * PAGE_NODES);
 		int active_nodes = 0;
 		for (auto* page : pages) {
-			active_nodes += page->count;
+			if (page)
+				active_nodes += page->count;
 		}
 
 		ImGui::Text("nodes: %d active / %d allocated  %6.2f%% active",
@@ -50,9 +51,9 @@ namespace world_octree {
 	}
 	OctreePage* page_from_subtree (WorldOctree& oct, OctreePage const& srcpage, OctreeNode subroot) {
 		OctreePage* newpage = oct.allocator.alloc();
-		newpage->count = 0;
-		newpage->parent_page = INTNULL;
-		newpage->freelist = INTNULL;
+	#if !NDEBUG
+		memset(newpage->nodes, 0, sizeof(newpage->nodes));
+	#endif
 
 		recurse_page_from_subtree(*newpage, srcpage, subroot);
 
@@ -64,45 +65,64 @@ namespace world_octree {
 		OctreePage& newpage;
 		uint32_t merge_page;
 
+		uint32_t dbg_counter = 0;
+
 		OctreeNode recurse (OctreePage& srcpage, OctreeNode srcnode) {
 			assert((srcnode & LEAF_BIT) == 0);
 
-			uint32_t children_ptr = newpage.alloc_node();
+			uint32_t children_ptr = newpage.count < PAGE_NODES ? newpage.alloc_node() : (OctreeNode)(LEAF_BIT | B_NULL);
+			//uint32_t children_ptr = dbg_counter++;
 
-			auto& old_children = srcpage.nodes[ srcnode ].children;
 			for (int i=0; i<8; ++i) {
+				auto& old_children = srcpage.nodes[ srcnode ].children;
 				
 				bool is_farptr = old_children[i] & FARPTR_BIT;
 				auto farptr = old_children[i] & ~FARPTR_BIT;
 				
 				OctreeNode val;
 
-				if (old_children[i] & LEAF_BIT || (is_farptr && farptr != merge_page)) {
+				if (old_children[i] & LEAF_BIT) { //  || (is_farptr && farptr != merge_page)
 					val = old_children[i];
 				} else {
 					if (is_farptr) {
-						val = recurse(*oct.pages[farptr], (OctreeNode)0);
+						if (farptr == merge_page) {
+							val = recurse(*oct.pages[farptr], (OctreeNode)0);
+						} else {
+							val = old_children[i];
+						}
 					} else {
 						val = recurse(srcpage, old_children[i]);
 					}
 				}
 
-				newpage.nodes[ children_ptr ].children[i] = val;
+				if ((children_ptr & LEAF_BIT) == 0)
+					newpage.nodes[ children_ptr ].children[i] = val;
 			}
 
 			return (OctreeNode)children_ptr;
 		}
 	};
-	void merge_with_parent (WorldOctree& oct, OctreePage* page, OctreePage*& parent_page) {
+	void merge_with_parent (WorldOctree& oct, OctreePage*& page, OctreePage*& parent_page) {
 		OctreePage* newpage = oct.allocator.alloc();
+	#if !NDEBUG
+		memset(newpage->nodes, 0, sizeof(newpage->nodes));
+	#endif
 
-		uint32_t child_page = (uint32_t)(page - oct.pages[0]);
+		uint32_t child_page = (uint32_t)(&page - &oct.pages[0]);
 
 		Merger m = { oct, *newpage, child_page };
 		m.recurse(*parent_page, (OctreeNode)0);
 
-		oct.allocator.free(parent_page);
 		oct.allocator.free(page);
+		oct.allocator.free(parent_page);
+
+	#if !NDEBUG
+		memset(page, 0, sizeof(OctreePage));
+		memset(parent_page, 0, sizeof(OctreePage));
+	#endif
+
+		// prefer crash on use after free
+		page = nullptr;
 
 		// free page
 
@@ -114,12 +134,12 @@ namespace world_octree {
 
 		OctreePage*& parent_page = oct.pages[ page->parent_page ];
 
-		uint32_t sum = page->count - parent_page->count;
+		uint32_t sum = page->count + parent_page->count;
 
 		if (sum <= PAGE_MERGE_THRES) {
 			merge_with_parent(oct, page, parent_page);
 
-			assert(parent_page->count == sum);
+			//assert(parent_page->count == sum);
 		}
 	}
 
@@ -181,14 +201,10 @@ namespace world_octree {
 		OctreeNode* split_node;
 		int split_node_closeness = INT_MAX;
 
-		int counter = 0;
-
 		uint32_t find_split_node_recurse (OctreeNode& node) {
 			assert((node & LEAF_BIT) == 0);
 
 			int subtree_size = 1; // count ourself
-
-			counter++;
 
 			// cound children subtrees
 			auto& children = page.nodes[ node ].children;
@@ -208,9 +224,9 @@ namespace world_octree {
 		}
 	};
 
-	void split_page (WorldOctree& oct, OctreePage** page) {
-		PageSplitter ps = { **page };
-		ps.target_page_size = (*page)->count / 2;
+	void split_page (WorldOctree& oct, OctreePage*& page) {
+		PageSplitter ps = { *page };
+		ps.target_page_size = page->count / 2;
 
 		OctreeNode root = (OctreeNode)0;
 
@@ -227,14 +243,14 @@ namespace world_octree {
 		OctreeNode subroot = *ps.split_node;
 		*ps.split_node = (OctreeNode)((uint32_t)oct.pages.size() | FARPTR_BIT);
 
-		auto* childpage = page_from_subtree(oct, **page, subroot);
-		auto* newpage = page_from_subtree(oct, **page, root);
-		childpage->parent_page = (uint32_t)( page - &oct.pages[0] );
-		newpage->parent_page = (*page)->parent_page;
+		auto* newpage = page_from_subtree(oct, *page, root);
+		auto* childpage = page_from_subtree(oct, *page, subroot);
+		newpage->parent_page = page->parent_page;
+		childpage->parent_page = (uint32_t)( &page - &oct.pages[0] );
 
-		oct.allocator.free(*page);
+		oct.allocator.free(page);
 
-		*page = newpage;
+		page = newpage;
 		oct.pages.push_back(childpage);
 	}
 
@@ -327,7 +343,7 @@ namespace world_octree {
 			OctreeNode* node;
 			OctreePage** page;
 		};
-		Path node_path[MAX_DEPTH];
+		Path node_path[MAX_DEPTH] = {};
 
 		for (;;) {
 			// get child node that contains target node
@@ -371,7 +387,7 @@ namespace world_octree {
 					// page full
 
 					// Do split page which will have created 2 new pages with about half the nodes out of the full page
-					split_page(oct, pcur_page);
+					split_page(oct, *pcur_page);
 
 					// cur_child and cur_page were invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
 					// I might attempt to keep track of cur_child and fix it in split_page, or redecend from the root of the cur page,
@@ -394,43 +410,50 @@ namespace world_octree {
 
 		auto* write_node = child_node;
 
-		{ // collapse nodes containing same leaf nodes
-			for (int scale=cur_scale;; scale++) {
-				auto path = node_path[scale];
+		// collapse nodes containing same leaf nodes
+		for (int scale=cur_scale;; scale++) {
+			auto path = node_path[scale];
 
-				if (scale == oct.root_scale-1) {
-					write_node = write_node = path.node;
-				}
+			if (scale == oct.root_scale-1) {
+				write_node = path.node;
+				break;
+			}
 
-				// correctly free the subtree that gets collapsed
-				if ((*path.node & LEAF_BIT) == 0) {
-					// free child node since the pointer to it will be overwritten, ie. children unreachable
-					if (*path.node & FARPTR_BIT) {
-						// free page
-					} else {
+			// correctly free the subtree that gets collapsed
+			if ((*path.node & LEAF_BIT) == 0) {
+				// free child node since the pointer to it will be overwritten, ie. children unreachable
+				if (*path.node & FARPTR_BIT) {
+					// free page
+				} else {
+					if (*path.page != nullptr) { // check if page was already merged
 						(*path.page)->free_node(*path.node);
 					}
 				}
+			}
 
-				auto* siblings = (OctreeNode*)((uintptr_t)path.node & ~(sizeof(OctreeChildren) -1));
+			auto* siblings = (OctreeNode*)((uintptr_t)path.node & ~(sizeof(OctreeChildren) -1));
 				
-				for (int i=0; i<8; ++i) {
-					auto& sibling = siblings[i];
-					if (&sibling != path.node && sibling != (LEAF_BIT | val)) {
-						write_node = path.node;
-						goto end; // embrace the goto
-					}
+			for (int i=0; i<8; ++i) {
+				auto& sibling = siblings[i];
+				if (&sibling != path.node && sibling != (LEAF_BIT | val)) {
+					write_node = path.node;
+					goto end; // embrace the goto
 				}
 			}
-			end:;
 		}
+		end:;
+
+		OctreeNode old_node = *write_node;
 
 		// do the write
 		*write_node = (OctreeNode)(LEAF_BIT | val);
 
-		//for (int scale=cur_scale; scale<oct.root_scale; scale++) {
-		//	checked_merge_with_parent(oct, *node_path[scale].page);
-		//}
+		// merge pages if they become to small
+		if ((old_node & (LEAF_BIT|FARPTR_BIT)) == 0) {
+			// there was a subtree that was collapsed (and that was not entirely another page)
+			// then check if a merge of the current page makes sense
+			checked_merge_with_parent(oct, *node_path[cur_scale].page);
+		}
 	}
 
 	void update_root (WorldOctree& oct, Player const& player) {
@@ -528,9 +551,9 @@ namespace world_octree {
 		if (pages.size() == 0) {
 			pages.push_back( allocator.alloc() );
 
-			pages[0]->count = 0;
-			pages[0]->parent_page = INTNULL;
-			pages[0]->freelist = INTNULL;
+		#if !NDEBUG
+			memset(pages[0]->nodes, 0, sizeof(pages[0]->nodes));
+		#endif
 
 			auto& root = pages[0]->nodes[ pages[0]->alloc_node() ];
 			for (int i=0; i<8; ++i) {

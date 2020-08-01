@@ -36,7 +36,7 @@ static constexpr bool HIGH_PRIO = true;
 Threadpool<BackgroundJob > background_threadpool  = { background_threads , NORMAL_PRIO, ">> background threadpool"  };
 Threadpool<ParallelismJob> parallelism_threadpool = { parallelism_threads - 1, HIGH_PRIO,   ">> parallelism threadpool" }; // parallelism_threads - 1 to let main thread contribute work too
 
-BlockAllocator<MeshingBlock> meshing_allocator;
+FreelistAllocator<MeshingBlock> meshing_allocator;
 
 void shutdown_threadpools () {
 	background_threadpool.shutdown();

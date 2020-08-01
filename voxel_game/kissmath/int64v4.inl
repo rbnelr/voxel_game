@@ -2,11 +2,11 @@
 
 ////// Inline definitions
 
+#include "bool4.hpp"
 #include "int64v3.hpp"
 #include "float4.hpp"
-#include "bool4.hpp"
-#include "int64v2.hpp"
 #include "uint8v4.hpp"
+#include "int64v2.hpp"
 #include "int4.hpp"
 
 namespace kissmath {
@@ -14,8 +14,8 @@ namespace kissmath {
 	// typedef these because the _t suffix is kinda unwieldy when using these types often
 	
 	typedef int64_t int64;
-	typedef int64_t int64;
 	typedef uint8_t uint8;
+	typedef int64_t int64;
 	
 	// Component indexing operator
 	inline constexpr int64& int64v4::operator[] (int i) {
@@ -27,11 +27,6 @@ namespace kissmath {
 		return arr[i];
 	}
 	
-	
-	// uninitialized constructor
-	inline int64v4::int64v4 () {
-		
-	}
 	
 	// sets all components to one value
 	// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

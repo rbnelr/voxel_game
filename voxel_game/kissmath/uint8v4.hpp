@@ -8,10 +8,10 @@
 namespace kissmath {
 	//// forward declarations
 	
-	struct float4;
 	struct bool4;
-	struct uint8v2;
+	struct float4;
 	struct uint8v3;
+	struct uint8v2;
 	struct int4;
 	struct int64v4;
 	
@@ -31,7 +31,7 @@ namespace kissmath {
 		
 		
 		// uninitialized constructor
-		inline uint8v4 ();
+		inline uint8v4 () = default;
 		
 		// sets all components to one value
 		// implicit constructor -> float3(x,y,z) * 5 will be turned into float3(x,y,z) * float3(5) by to compiler to be able to execute operator*(float3, float3), which is desirable

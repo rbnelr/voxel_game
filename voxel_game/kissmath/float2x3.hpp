@@ -3,8 +3,8 @@
 
 ////// Forward declarations
 
-#include "float3.hpp"
 #include "float2.hpp"
+#include "float3.hpp"
 
 namespace kissmath {
 	
@@ -32,7 +32,7 @@ namespace kissmath {
 		//// Constructors
 		
 		// uninitialized constructor
-		inline float2x3 ();
+		inline float2x3 () = default;
 		
 		// supply one value for all cells
 		inline constexpr explicit float2x3 (float all);

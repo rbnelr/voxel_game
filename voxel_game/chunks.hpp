@@ -7,7 +7,7 @@
 #include "util/running_average.hpp"
 #include "util/threadpool.hpp"
 #include "util/raw_array.hpp"
-#include "util/block_allocator.hpp"
+#include "util/freelist_allocator.hpp"
 #include "graphics/graphics.hpp" // for ChunkMesh
 using namespace kiss;
 
@@ -149,7 +149,7 @@ union MeshingBlock {
 };
 
 // one for each thread (also gets initialized for the threads that don't need it I think, but thats ok, does not do anything reall on construction)
-extern BlockAllocator<MeshingBlock> meshing_allocator;
+extern FreelistAllocator<MeshingBlock> meshing_allocator;
 
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
 //  we output the mesh data into blocks, which can be allocated by BlockAllocator, which reuses freed blocks

@@ -241,6 +241,9 @@
     <ClInclude Include="kissmath\uint8v4.hpp">
       <Filter>kissmath</Filter>
     </ClInclude>
+    <ClInclude Include="util\freelist_allocator.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

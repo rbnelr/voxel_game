@@ -2,10 +2,12 @@
 #include <mutex>
 #include <cstdlib>
 
+#define FREELIST_ALLOC_DEBUG_VALUES (!NDEBUG)
+
 // Custom memory allocator that allocates in fixed blocks using a freelist
 // used to avoid malloc and free overhead
 template <typename T, int ALIGN=alignof(std::max_align_t)>
-class BlockAllocator {
+class FreelistAllocator {
 	union Block {
 		Block*	next; // link to next block in linked list of free blocks
 		T		data; // data if allocated
@@ -28,24 +30,25 @@ public:
 		return block;
 	}
 
-	T* alloc () {
-		Block* block = _alloc();
+	T* _init (Block* block) {
 		if (!block) {
 			// allocate new blocks as needed
 			block = (Block*)_aligned_malloc(sizeof(Block), ALIGN);
 		}
+
+	#if FREELIST_ALLOC_DEBUG_VALUES
+		memset(block, 0xcd, sizeof(Block));
+	#endif
+
+		// placement new to init T
+		new (&block->data) T ();
+
 		return &block->data;
 	}
 
-	// free a ptr (not threadsafe)
-	void free (T* ptr) {
-		// blocks are never freed for now
-
-		Block* block = (Block*)ptr;
-
-		// add block to freelist
-		block->next = freelist;
-		freelist = block;
+	T* alloc () {
+		Block* block = _alloc();
+		return _init(block);
 	}
 
 	T* alloc_threadsafe () {
@@ -54,12 +57,26 @@ public:
 			std::lock_guard<std::mutex> lock(m);
 			block = _alloc();
 		}
-		// Do the malloc outside the block because malloc can take a long time, which can catastrophically block an entire threadpool
-		if (!block) {
-			// allocate new blocks as needed
-			block = (Block*)_aligned_malloc(sizeof(Block), ALIGN); // NOTE: malloc itself mutexes, so there is little point to putting this outside of the lock
-		}
-		return &block->data;
+
+		return _init(block);
+	}
+
+	// free a ptr (not threadsafe)
+	void free (T* ptr) {
+		// blocks are never freed for now
+
+		Block* block = (Block*)ptr;
+
+		// 'placement' delete by just calling the destructor
+		block->data.~T();
+
+	#if FREELIST_ALLOC_DEBUG_VALUES
+		memset(block, 0xdd, sizeof(Block));
+	#endif
+
+		// add block to freelist
+		block->next = freelist;
+		freelist = block;
 	}
 
 	void free_threadsafe (T* ptr) {
@@ -67,7 +84,7 @@ public:
 		free(ptr);
 	}
 
-	~BlockAllocator () {
+	~FreelistAllocator () {
 		while (freelist) {
 			Block* block = freelist;
 			freelist = block->next;
