@@ -18,7 +18,7 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 
 	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 64 -1;//2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint32_t PAGE_NODES = 2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
 
 	static constexpr uint32_t PAGE_COMPACT_THRES = (uint32_t)(PAGE_NODES * 0.05f);
 	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.7f);
@@ -43,12 +43,13 @@ namespace world_octree {
 				return count++;
 			}
 
+			count++;
 			uint32_t ret = freelist;
 			freelist = *((uint32_t*)&nodes[freelist]);
 			return ret;
 		}
 		void free_node (uint32_t node) {
-			assert(count > 0);
+			assert(count > 0 && (node & (FARPTR_BIT|LEAF_BIT)) == 0 && node < PAGE_NODES);
 
 			*((uint32_t*)&nodes[node]) = freelist;
 			freelist = node;

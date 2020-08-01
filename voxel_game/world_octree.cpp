@@ -181,10 +181,14 @@ namespace world_octree {
 		OctreeNode* split_node;
 		int split_node_closeness = INT_MAX;
 
+		int counter = 0;
+
 		uint32_t find_split_node_recurse (OctreeNode& node) {
 			assert((node & LEAF_BIT) == 0);
 
 			int subtree_size = 1; // count ourself
+
+			counter++;
 
 			// cound children subtrees
 			auto& children = page.nodes[ node ].children;
@@ -396,6 +400,16 @@ namespace world_octree {
 
 				if (scale == oct.root_scale-1) {
 					write_node = write_node = path.node;
+				}
+
+				// correctly free the subtree that gets collapsed
+				if ((*path.node & LEAF_BIT) == 0) {
+					// free child node since the pointer to it will be overwritten, ie. children unreachable
+					if (*path.node & FARPTR_BIT) {
+						// free page
+					} else {
+						(*path.page)->free_node(*path.node);
+					}
 				}
 
 				auto* siblings = (OctreeNode*)((uintptr_t)path.node & ~(sizeof(OctreeChildren) -1));
