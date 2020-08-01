@@ -18,10 +18,9 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 
 	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 128 -1;//2048 -1;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint32_t PAGE_NODES = 128 -1;//PAGE_SIZE / sizeof(OctreeChildren);
 
-	static constexpr uint32_t PAGE_COMPACT_THRES = (uint32_t)(PAGE_NODES * 0.05f);
-	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.7f);
+	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.75f);
 
 	struct OctreeChildren {
 		OctreeNode children[8];
@@ -32,6 +31,7 @@ namespace world_octree {
 		uint32_t		count;
 		uint32_t		parent_page;
 		uint32_t		freelist;
+		bool			active;
 
 		alignas(sizeof(uint32_t)*8)
 		OctreeChildren	nodes[PAGE_NODES];
@@ -40,6 +40,7 @@ namespace world_octree {
 			count = 0;
 			parent_page = INTNULL;
 			freelist = INTNULL;
+			active = false;
 		}
 
 		uint32_t alloc_node () {
@@ -60,6 +61,21 @@ namespace world_octree {
 			*((uint32_t*)&nodes[node]) = freelist;
 			freelist = node;
 			count--;
+		}
+
+		uint32_t _dbg_count_nodes (OctreeNode node=(OctreeNode)0) {
+			assert((node & LEAF_BIT) == 0);
+
+			int subtree_size = 1; // count ourself
+
+			 // cound children subtrees
+			for (int i=0; i<8; ++i) {
+				auto& children = nodes[ node ].children;
+				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
+					subtree_size += _dbg_count_nodes(children[i]);
+			}
+
+			return subtree_size;
 		}
 	};
 

@@ -20,11 +20,13 @@ namespace world_octree {
 
 		ImGui::Text("pages: %d (%d unused)", active_pages, (int)pages.size() - active_pages);
 		
-		int total_nodes = (int)(pages.size() * PAGE_NODES);
+		int total_nodes = 0;
 		int active_nodes = 0;
 		for (auto* page : pages) {
-			if (page)
+			if (page && page->active) {
 				active_nodes += page->count;
+				total_nodes += PAGE_NODES;
+			}
 		}
 
 		ImGui::Text("nodes: %d active / %d allocated  %6.2f%% active",
@@ -40,8 +42,8 @@ namespace world_octree {
 
 		uint32_t children_ptr = newpage.alloc_node();
 
-		auto& old_children = srcpage.nodes[ srcnode ].children;
 		for (int i=0; i<8; ++i) {
+			auto& old_children = srcpage.nodes[ srcnode ].children;
 			newpage.nodes[ children_ptr ].children[i] = (OctreeNode)( (old_children[i] & (LEAF_BIT|FARPTR_BIT)) ?
 				old_children[i] :
 				recurse_page_from_subtree(newpage, srcpage, old_children[i]) );
@@ -136,10 +138,16 @@ namespace world_octree {
 
 		uint32_t sum = page->count + parent_page->count;
 
+		assert(page->count == page->_dbg_count_nodes());
+		assert(parent_page->count == parent_page->_dbg_count_nodes());
+
 		if (sum <= PAGE_MERGE_THRES) {
 			merge_with_parent(oct, page, parent_page);
 
-			//assert(parent_page->count == sum);
+			assert(parent_page->count == parent_page->_dbg_count_nodes());
+
+			// TODO: why does this fail? output seems visually correct
+			assert(parent_page->count == sum);
 		}
 	}
 
@@ -207,8 +215,8 @@ namespace world_octree {
 			int subtree_size = 1; // count ourself
 
 			// cound children subtrees
-			auto& children = page.nodes[ node ].children;
 			for (int i=0; i<8; ++i) {
+				auto& children = page.nodes[ node ].children;
 				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
 					subtree_size += find_split_node_recurse(children[i]);
 			}
@@ -408,26 +416,22 @@ namespace world_octree {
 			}
 		}
 
-		auto* write_node = child_node;
+		int write_scale = cur_scale;
 
 		// collapse nodes containing same leaf nodes
 		for (int scale=cur_scale;; scale++) {
 			auto path = node_path[scale];
 
 			if (scale == oct.root_scale-1) {
-				write_node = path.node;
+				write_scale = oct.root_scale-1;
 				break;
 			}
 
 			// correctly free the subtree that gets collapsed
-			if ((*path.node & LEAF_BIT) == 0) {
+			if ((*path.node & (LEAF_BIT|FARPTR_BIT)) == 0) {
 				// free child node since the pointer to it will be overwritten, ie. children unreachable
-				if (*path.node & FARPTR_BIT) {
-					// free page
-				} else {
-					if (*path.page != nullptr) { // check if page was already merged
-						(*path.page)->free_node(*path.node);
-					}
+				if (*path.page != nullptr) { // check if page was already merged
+					(*path.page)->free_node(*path.node);
 				}
 			}
 
@@ -436,23 +440,26 @@ namespace world_octree {
 			for (int i=0; i<8; ++i) {
 				auto& sibling = siblings[i];
 				if (&sibling != path.node && sibling != (LEAF_BIT | val)) {
-					write_node = path.node;
+					write_scale = scale;
 					goto end; // embrace the goto
 				}
 			}
-		}
-		end:;
+		} end:;
+
+		auto* write_node = node_path[write_scale].node;
 
 		OctreeNode old_node = *write_node;
 
 		// do the write
 		*write_node = (OctreeNode)(LEAF_BIT | val);
 
+		assert((*node_path[write_scale].page)->count == (*node_path[write_scale].page)->_dbg_count_nodes());
+
 		// merge pages if they become to small
 		if ((old_node & (LEAF_BIT|FARPTR_BIT)) == 0) {
 			// there was a subtree that was collapsed (and that was not entirely another page)
 			// then check if a merge of the current page makes sense
-			checked_merge_with_parent(oct, *node_path[cur_scale].page);
+			checked_merge_with_parent(oct, *node_path[write_scale].page);
 		}
 	}
 
@@ -503,13 +510,14 @@ namespace world_octree {
 		int active_pages = 0;
 		int active_nodes = 0;
 
-		OctreeChildren& get_node (OctreeNode node, OctreePage*** cur_page) {
+		OctreeChildren& get_node (OctreeNode node, OctreePage**& cur_page) {
 			if (node & FARPTR_BIT) {
-				*cur_page = &oct.pages[ node & ~FARPTR_BIT ];
+				cur_page = &oct.pages[ node & ~FARPTR_BIT ];
 				node = (OctreeNode)0;
+				(*cur_page)->active = true;
 				active_pages++;
 			}
-			return (**cur_page)->nodes[node];
+			return (*cur_page)->nodes[node];
 		}
 		
 		void recurse_draw (OctreePage** cur_page, OctreeNode node, int3 pos, int scale) {
@@ -525,7 +533,7 @@ namespace world_octree {
 			if ((node & LEAF_BIT) == 0) {
 				active_nodes++;
 
-				OctreeChildren& children = get_node(node, &cur_page);
+				OctreeChildren& children = get_node(node, cur_page);
 				int child_scale = scale - 1;
 
 				if (child_scale >= oct.debug_draw_octree_min) {
@@ -540,6 +548,9 @@ namespace world_octree {
 	};
 
 	void debug_draw (WorldOctree& oct) {
+		for (auto* page : oct.pages)
+			if (page) page->active = false;
+
 		RecurseDrawer rd = { oct };
 		rd.recurse_draw(nullptr, (OctreeNode)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
 
