@@ -23,7 +23,7 @@ void* reserve_address_space (uintptr_t size) {
 }
 
 void release_address_space (void* baseptr, uintptr_t size) {
-	auto ret = VirtualFree(baseptr, size, MEM_RELEASE);
+	auto ret = VirtualFree(baseptr, 0, MEM_RELEASE);
 	assert(ret != 0);
 }
 

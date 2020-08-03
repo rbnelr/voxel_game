@@ -56,7 +56,7 @@ namespace world_octree {
 	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(children_t));
 	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / sizeof(children_t));
 
-	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.75f);
+	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.80f);
 
 	struct Page {
 		PageInfo		info;
@@ -99,6 +99,7 @@ namespace world_octree {
 
 		void remove_all_children () {
 			auto* cur = info.children_ptr;
+			info.children_ptr = nullptr;
 			while (cur) {
 				auto* child = cur;
 				cur = child->info.sibling_ptr;
@@ -107,24 +108,14 @@ namespace world_octree {
 			}
 		}
 
-		//void remove_child (Page* child) {
-		//	auto* cur = children_ptr;
-		//	auto** prev_next = &children_ptr;
-		//	while (cur) {
-		//		if (cur == child) {
-		//			*prev_next = cur->sibling_ptr;
-		//			assert(cur->parent_ptr == this);
-		//			cur->farptr_ptr = nullptr;
-		//			cur->parent_ptr = nullptr;
-		//			cur->sibling_ptr = nullptr;
-		//			return;
-		//		}
-		//		prev_next = &cur->sibling_ptr;
-		//		cur = cur->sibling_ptr;
-		//	}
-		//
-		//	assert(false);
-		//}
+		void remove_child (Page* child) {
+			Page** childref = &info.children_ptr;
+			while (*childref != child) {
+				childref = &(*childref)->info.sibling_ptr;
+			}
+
+			*childref = (*childref)->info.sibling_ptr;
+		}
 
 		uint16_t _dbg_count_nodes (Node node=(Node)0) {
 			assert((node & LEAF_BIT) == 0);
@@ -155,21 +146,66 @@ namespace world_octree {
 			return page;
 		}
 
+		void _print_children (Page* page) {
+			printf("page %d :: children:", indexof(page));
+			auto* child = page->info.children_ptr;
+			while (child) {
+				printf(" %d", indexof(child));
+				child = child->info.sibling_ptr;
+			}
+			printf("\n");
+		}
+		void _validate_farptrs (Page pages[], Page* page, Node node) {
+			assert((node & LEAF_BIT) == 0);
+
+			for (int i=0; i<8; ++i) {
+				auto val = page->nodes[node][i];
+				if ((val & LEAF_BIT) == 0) {
+					if (val & FARPTR_BIT) {
+						printf("page %d: farptr %d\n", indexof(page), val & ~FARPTR_BIT);
+
+						assert((val & ~FARPTR_BIT) < size());
+
+						_validate_farptrs(pages, &pages[val & ~FARPTR_BIT], (Node)0);
+					} else {
+						_validate_farptrs(pages, page, page->nodes[node][i]);
+					}
+				}
+			}
+		}
+
+		void validate_farptrs () {
+			return;
+			
+			static int counter = 0;
+
+			printf(">>>>>>>> validate  %d\n", counter++);
+			printf(">> %d pages\n", size());
+
+			for (int i=0; i<size(); ++i) {
+				_print_children(&(*this)[i]);
+			}
+
+			_validate_farptrs(&(*this)[0], rootpage, (Node)0);
+		}
+
 		// migrate a page to a new memory location, while updating all references to it with the new location
 		void migrate_page (Page* src, Page* dst) {
 			// update octree node farptr to us in parent page
-			if (src->info.farptr_ptr)
+			if (src->info.farptr_ptr) {
+				assert(*src->info.farptr_ptr == (Node)(FARPTR_BIT | allocator.indexof(src)));
 				*src->info.farptr_ptr = (Node)(FARPTR_BIT | allocator.indexof(dst));
+			}
 
 			// update left siblings sibling ptr
 			auto* parent = src->info.parent_ptr();
 			if (parent) {
-				auto* sibling = parent->info.children_ptr;
-				while (sibling->info.sibling_ptr != src) {
-					sibling = sibling->info.sibling_ptr;
+				Page** childref = &parent->info.children_ptr;
+				while (*childref != src) {
+					childref = &(*childref)->info.sibling_ptr;
 				}
 
-				sibling->info.sibling_ptr = dst;
+				*childref = dst;
 			}
 
 			// update parent ptr in children
@@ -185,11 +221,30 @@ namespace world_octree {
 
 		// free a page by swapping it with the last and then shrinking the contiguous page memory by one page
 		void free_page (Page* page) {
-			// overwrite page to be freed with last page 
-			migrate_page(allocator[(uint16_t)allocator.size() -1], page);
+			validate_farptrs();
+
+			printf(">>>>>>free page %d\n", indexof(page));
+
+			// remove from parent
+			auto* parent = page->info.parent_ptr();
+			parent->remove_child(page);
+			
+			// make sure we don't leak pages
+			assert(page->info.children_ptr == nullptr);
+
+			Page* lastpage = allocator[(uint16_t)allocator.size() -1];
+			if (page != lastpage) {
+				// overwrite page to be freed with last page 
+				migrate_page(allocator[(uint16_t)allocator.size() -1], page);
+			}
 
 			// shrink allocated memory to free last page memory
 			allocator.pop_back();
+
+
+			validate_farptrs();
+
+			printf("------------------------------------------------------------------\n");
 		}
 		
 		uint16_t size () { return (uint16_t)allocator.size(); }
@@ -217,8 +272,7 @@ namespace world_octree {
 		int debug_draw_octree_max = 20;
 
 		bool debug_draw_pages = true;
-
-		int active_nodes = -1;
+		bool debug_draw_air = true;
 
 		void imgui ();
 		void pre_update (Player const& player);

@@ -65,7 +65,7 @@ public:
 	inline uintptr_t indexof (T* ptr) const {
 		return ptr - (T*)baseptr;
 	}
-	inline T* operator[] (uint32_t index) const {
+	inline T* operator[] (uintptr_t index) const {
 		return (T*)baseptr + index;
 	}
 
