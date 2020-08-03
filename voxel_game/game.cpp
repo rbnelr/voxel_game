@@ -71,9 +71,10 @@ void Game::frame () {
 				ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 			}
 
-		input.imgui();
-		graphics.imgui(world->chunks);
-		debug_graphics->imgui();
+			input.imgui();
+			audio_manager.imgui();
+			graphics.imgui(world->chunks);
+			debug_graphics->imgui();
 
 			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 		
@@ -112,6 +113,8 @@ void Game::frame () {
 			}
 
 		}
+
+		audio_manager.update();
 
 		world->chunks.update_chunk_loading(*world, world_gen, world->player);
 

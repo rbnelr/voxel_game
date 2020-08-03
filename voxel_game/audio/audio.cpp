@@ -10,8 +10,8 @@ using namespace kissmath;
 #include <atomic>
 
 namespace audio {
-	AudioData16 load_sound_data_from_file (const char* filepath) {
-		return load_wav(filepath);
+	bool load_sound_data_from_file (const char* filepath, AudioData16* data) {
+		return load_wav(filepath, data);
 	}
 }
 
@@ -19,10 +19,10 @@ AudioManager audio_manager;
 
 ////
 constexpr double SAMPLE_RATE = 44100; // output sample rate
-float volume = 0.5f;
 
 std::atomic<bool> locked = false;
-std::atomic<float> _timescale = 1;
+std::atomic<float> timescale = 1;
+std::atomic<float> volume = .5f;
 
 struct PlayingSound {
 	AudioManager::Sound* sound;
@@ -36,6 +36,14 @@ constexpr int MAX_PLAYING_SOUNDS = 128;
 PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
 int playing_sounds_count = 0;
 
+void AudioManager::update () {
+	while (locked)
+		; // busy wait
+
+	timescale = input.time_scale;
+	volume = enabled ? master_volume : 0;
+}
+
 void AudioManager::play_sound (Sound* sound, float volume, float speed) {
 	while (locked)
 		; // busy wait
@@ -44,7 +52,6 @@ void AudioManager::play_sound (Sound* sound, float volume, float speed) {
 		playing_sounds[playing_sounds_count] = { sound, volume * sound->volume, speed * sound->speed, 0 };
 		playing_sounds_count++;
 	}
-	_timescale = input.time_scale;
 }
 
 audio::AudioSample mix_sounds () {
@@ -55,7 +62,7 @@ audio::AudioSample mix_sounds () {
 
 		auto sampl = sound.sound->data.sample( sound.t );
 
-		sound.t += sound.speed / SAMPLE_RATE * (double)_timescale;
+		sound.t += sound.speed / SAMPLE_RATE * (double)timescale;
 
 		total.left  += sampl.left  * sound.volume;
 		total.right += sampl.right * sound.volume;

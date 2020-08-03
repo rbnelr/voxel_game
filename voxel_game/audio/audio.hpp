@@ -5,6 +5,7 @@ using namespace kiss;
 #include <string>
 #include <unordered_map>
 #include "assert.h"
+#include "../dear_imgui.hpp"
 
 namespace audio {
 	inline int max (int a, int b) {
@@ -71,7 +72,7 @@ namespace audio {
 		}
 	};
 
-	AudioData16 load_sound_data_from_file (const char* filepath);
+	bool load_sound_data_from_file (const char* filepath, AudioData16* data);
 }
 
 class AudioManager {
@@ -86,20 +87,59 @@ public:
 
 	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
 
+	bool enabled = true;
+	float master_volume = .5f;
+
+	std::string filename_to_load;
+	std::string errtext;
+
+	void imgui () {
+		if (!ImGui::CollapsingHeader("Audio")) return;
+
+		ImGui::Checkbox("enable", &enabled);
+		ImGui::SliderFloat("master_volume", &master_volume, 0, 1.2f);
+
+		if (ImGui::TreeNode("loaded_sounds")) {
+			for (auto& kv : loaded_sounds) {
+				ImGui::Text(kv.first.c_str());
+				ImGui::SameLine();
+				if (ImGui::Button("Play"))
+					play_sound(kv.second.get(), 1, 1);
+			}
+			ImGui::TreePop();
+		}
+
+		ImGui::InputText("filename_to_load", &filename_to_load);
+		if (ImGui::Button("Load")) {
+			bool success = load_sound(filename_to_load, 1, 1) != nullptr;
+			errtext = success ? "success" : "error";
+		}
+		ImGui::SameLine();
+		ImGui::Text(errtext.c_str());
+	}
+
 	Sound* load_sound (std::string name, float volume, float speed) {
 		auto it = loaded_sounds.find(name);
 		if (it != loaded_sounds.end()) {
 			return it->second.get();
 		}
 
-		auto filepath = prints("%s%s.wav", sounds_directory.c_str(), name.c_str());
-		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath.c_str()), volume, speed }));
+		bool abs_path = name.size() > 0 && name[0] == '/';
+
+		auto filepath = prints("%s%s.wav", abs_path ? "" : sounds_directory.c_str(), name.c_str() + (abs_path ? 1:0));
+		audio::AudioData16 data;
+		if (!audio::load_sound_data_from_file(filepath.c_str(), &data)) {
+			return nullptr;
+		}
+
+		auto ptr = std::make_unique<Sound>(std::move(Sound{ std::move(data), volume, speed }));
 
 		auto* s = ptr.get();
 		loaded_sounds.emplace(std::move(name), std::move(ptr));
 		return s;
 	}
 
+	void update ();
 	void play_sound (Sound* sound, float volume, float speed);
 };
 

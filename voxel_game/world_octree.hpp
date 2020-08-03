@@ -26,7 +26,7 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	static constexpr uint16_t PAGE_SIZE = 4096; // must be power of two
+	static constexpr uint16_t PAGE_SIZE = 4096 * 8; // must be power of two
 
 	struct Page;
 	struct PagedOctree;

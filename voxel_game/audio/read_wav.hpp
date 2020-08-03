@@ -2,5 +2,5 @@
 #include "audio.hpp"
 
 namespace audio {
-	AudioData16 load_wav (const char* filepath);
+	bool load_wav (const char* filepath, AudioData16* data);
 }

@@ -92,12 +92,13 @@ namespace audio {
 		}
 	};
 
-	AudioData16 load_wav (const char* filepath) {
+	bool load_wav (const char* filepath, AudioData16* data) {
 		WAV_Reader reader;
 		reader.file_data = kiss::load_binary_file(filepath, &reader.file_size);
 		if (!reader.file_data)
-			return {};
+			return false;
 
-		return reader.load_wav();
+		*data = reader.load_wav();
+		return true;
 	}
 }
