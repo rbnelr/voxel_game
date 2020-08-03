@@ -34,23 +34,22 @@ $if fragment
 			uint16 block_id; // block id (valid when leaf node)
 		};
 
-		1 bit         31 bit
-		[has_children][payload]
+		1 bit      1 bit       14 bit
+		[leaf_bit][farptr_bit][payload]
 
-		has_children == 0: payload is index of children OctreeNode[8] in svo_texture
-		has_children == 1: payload leaf voxel data, ie. block id
+		leaf_bit == 0 && farptr_bit == 0:	payload is index of children OctreeNode[8] in svo_texture
+		leaf_bit == 0 && farptr_bit == 1:	payload is index of page where OctreeNode[8] at slot 0 is the node
+		leaf_bit == 1:						payload leaf voxel data, ie. block id
 	*/
 
-	int get_svo_node (int index) {
+	int get_svo_node (uint node_index, int child_index) {
 		// access 1d data as 2d texture, because of texture size limits
-		ivec2 indx2;
-		indx2.x = index % 2048;
-		indx2.y = index / 2048;
-		return texelFetch(svo_texture, indx2, 0).r;
+		return texelFetch(svo_texture, ivec2(uvec2(node_index & 0xffff * 8 + uint(child_index), node_index >> 16)), 0).r;
 	}
 
 //#define LEAF_BIT 0x80000000 // This triggers an integer overflow on intel??
-#define LEAF_BIT (1 << 31) // This works
+#define LEAF_BIT (1 << 15)
+#define FARPTR_BIT (1 << 14)
 
 #define MAX_SCALE 11
 #define MAX_SEC_RAYS 2
@@ -329,7 +328,7 @@ $if fragment
 		//// Init root
 		ivec3 parent_pos = ivec3(0);
 		int parent_scale = svo_root_scale;
-		int parent_node = 0;
+		uint parent_node = 0u; // [16bit page index, 16bit node index]
 
 		// desired ray bounds
 		float tmin = 0;
@@ -346,7 +345,7 @@ $if fragment
 		int child_scale;
 		select_child(rinv_dir, mirror_ray_pos, t0, parent_pos, parent_scale, child_pos, child_scale);
 
-		int stack_node[ MAX_SCALE -1 ];
+		uint stack_node[ MAX_SCALE -1 ];
 		float stack_t1[ MAX_SCALE -1 ];
 
 		//// Iterate
@@ -372,7 +371,7 @@ $if fragment
 
 				idx ^= mirror_mask_int;
 
-				int node = get_svo_node( parent_node*8 + idx );
+				int node = get_svo_node(parent_node, idx);
 
 				//// Intersect
 				// child cube ray range
@@ -398,7 +397,15 @@ $if fragment
 						stack_t1  [child_scale - 1] = t1;
 
 						// child becomes parent
-						parent_node = node;
+						{
+							uint parent_page = parent_node & 0xffff0000;
+							if ((node & FARPTR_BIT) != 0) {
+								parent_page = uint(node & ~FARPTR_BIT) << 16;
+								node = 0;
+							}
+
+							parent_node = parent_page | uint(node);
+						}
 
 						parent_pos = child_pos;
 						parent_scale = child_scale;

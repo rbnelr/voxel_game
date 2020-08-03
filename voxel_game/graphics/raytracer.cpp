@@ -78,19 +78,21 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		shader.set_uniform("time", time);
 
 		{
-		//	static constexpr int WIDTH = world_octree::PAGE_SIZE / sizeof(int);
-		//	int height = (int)octree.pages.size();
-		//
-		//	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		//
-		//	glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
-		//
-		//	glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, WIDTH,height, 0, GL_RED_INTEGER, GL_INT, nullptr);
-		//	
-		//	for (int i=0; i<height; ++i)
-		//		glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_INT, octree.pages[i].page);
-		//	
-		//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+			using namespace world_octree;
+
+			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(int);
+			int height = (int)octree.pages.size();
+		
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		
+			glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
+		
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, WIDTH,height, 0, GL_RED_INTEGER, GL_INT, nullptr);
+			
+			for (int i=0; i<height; ++i)
+				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_INT, &octree.pages[i].nodes[0]);
+			
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		}
 
 		std::vector<float4> block_tile_info;
