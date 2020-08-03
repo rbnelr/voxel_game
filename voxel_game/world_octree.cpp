@@ -84,25 +84,17 @@ namespace world_octree {
 
 	void merge (WorldOctree& oct, Page* parent, Page* child) {
 		oct.pages.validate_farptrs();
-		printf("merge page %d > %d\n", oct.pages.indexof(child), oct.pages.indexof(parent));
+		printf("=============merge page %d > %d\n", oct.pages.indexof(child), oct.pages.indexof(parent));
 
-		// copy parent to temp buffer
-		Page tmppage;
-		memcpy(&tmppage, parent, sizeof(Page));
-
-		// remove children from parent and child and clear all nodes of parent to prepare to rebuild merged page into parent
-		parent->remove_all_children();
+		// remove children from child so they can be added to parent node
 		child->remove_all_children();
-		parent->free_all_nodes();
 
-	#if !NDEBUG
-		memset(parent->nodes, 0, sizeof(parent->nodes));
-	#endif
+		// create merged page, by adding nodes of child to parent, then replacing the farptr with the new subtree
+		*child->info.farptr_ptr = page_from_subtree(&oct.pages[0], parent, child, (Node)0);
 
-		// create merged page
-		page_from_subtree(&oct.pages[0], parent, &tmppage, (Node)0, oct.pages.indexof(child));
-
-		oct.pages.free_page(child); // WARNING: might invalidate all Page* or Node* you have here
+		parent->remove_child(child);
+		
+		oct.pages.free_page(child); // WARNING: page will be invalidated, parent might be invalidated
 
 		oct.pages.validate_farptrs();
 		printf("----------------------------------------------------------------------=====--\n");
@@ -208,7 +200,7 @@ namespace world_octree {
 	void split_page (WorldOctree& oct, Page* page) {
 		oct.pages.validate_farptrs();
 
-		printf("split page %d\n", oct.pages.indexof(page));
+		printf("=============split page %d\n", oct.pages.indexof(page));
 
 		// copy page to temp buffer
 		Page tmppage;
@@ -256,30 +248,41 @@ namespace world_octree {
 		printf("------------------------------------------------------------------------\n");
 	}
 
-	void recurse_free_subtree (Page pages[], Page* page, Node node) {
+	void recurse_free_subtree (Page pages[], Page* page, Node node, std::vector<Page*>* pages_to_free) {
 		assert((node & LEAF_BIT) == 0);
 
 		if (node & FARPTR_BIT) {
-			// keep track of page to be freed?
-			//assert(false);
-
 			page = &pages[node & ~FARPTR_BIT];
-			page->info.count = INTNULL;
-
+			pages_to_free->push_back(page);
 			return;
 		}
 
 		for (int i=0; i<8; ++i) {
 			auto child = page->nodes[node][i];
 			if ((child & LEAF_BIT) == 0) {
-				recurse_free_subtree(pages, page, child);
+				recurse_free_subtree(pages, page, child, pages_to_free);
 			}
 		}
 		
 		page->free_node(node);
 	};
-	void free_subtree (Page pages[], Page* page, Node node) {
-		recurse_free_subtree(pages, page, node);
+	void free_subtree (PagedOctree& pages, Page* page, Node node) {
+		printf("========= free_subtree\n");
+
+		std::vector<Page*> pages_to_free;
+		
+		recurse_free_subtree(&pages[0], page, node, &pages_to_free);
+
+		// freeing pages in reverse order ensures that none of the pages to be freed are migrated, this would invlidate the pointer
+		std::sort(pages_to_free.begin(), pages_to_free.end(), [] (Page* a, Page* b) {
+			return std::greater<uintptr_t>()((uintptr_t)a, (uintptr_t)b); // decending ptr addresses
+		});
+
+		for (auto* page : pages_to_free)
+			pages.free_page(page);
+
+		pages.validate_farptrs();
+		printf("------------------------------------------------------------------------\n");
 	};
 
 	int get_child_index (int3 pos, int scale) {
@@ -405,7 +408,7 @@ namespace world_octree {
 
 		// free subtree nodes if subtree was collapsed
 		if ((old_val & LEAF_BIT) == 0) {
-			free_subtree(&oct.pages[0], page, old_val);
+			free_subtree(oct.pages, page, old_val);
 
 			try_merge(oct, page);
 		}

@@ -26,7 +26,7 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	static constexpr uint16_t PAGE_SIZE = 4096 * 8; // must be power of two
+	static constexpr uint16_t PAGE_SIZE = 4096; // must be power of two
 
 	struct Page;
 	struct PagedOctree;
@@ -56,7 +56,7 @@ namespace world_octree {
 	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(children_t));
 	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / sizeof(children_t));
 
-	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.80f);
+	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.90f);
 
 	struct Page {
 		PageInfo		info;
@@ -115,6 +115,7 @@ namespace world_octree {
 			}
 
 			*childref = (*childref)->info.sibling_ptr;
+			child->info.farptr_ptr = nullptr;
 		}
 
 		uint16_t _dbg_count_nodes (Node node=(Node)0) {
@@ -133,6 +134,10 @@ namespace world_octree {
 		}
 	};
 	static_assert(sizeof(Page) == PAGE_SIZE, "");
+
+	inline void printf (...) {
+
+	}
 
 	struct PagedOctree {
 		VirtualAllocator<Page> allocator = VirtualAllocator<Page>(MAX_PAGES);
@@ -183,16 +188,26 @@ namespace world_octree {
 			printf(">> %d pages\n", size());
 
 			for (int i=0; i<size(); ++i) {
-				_print_children(&(*this)[i]);
+				auto* page = &(*this)[i];
+				_print_children(page);
 			}
 
 			_validate_farptrs(&(*this)[0], rootpage, (Node)0);
+
+			for (int i=0; i<size(); ++i) {
+				auto* page = &(*this)[i];
+				if (page->info.farptr_ptr) {
+					auto _indx = allocator.indexof(page);
+					assert(*page->info.farptr_ptr == (Node)(FARPTR_BIT | allocator.indexof(page)));
+				}
+			}
 		}
 
 		// migrate a page to a new memory location, while updating all references to it with the new location
 		void migrate_page (Page* src, Page* dst) {
 			// update octree node farptr to us in parent page
 			if (src->info.farptr_ptr) {
+				auto _indx = allocator.indexof(src);
 				assert(*src->info.farptr_ptr == (Node)(FARPTR_BIT | allocator.indexof(src)));
 				*src->info.farptr_ptr = (Node)(FARPTR_BIT | allocator.indexof(dst));
 			}
@@ -221,13 +236,12 @@ namespace world_octree {
 
 		// free a page by swapping it with the last and then shrinking the contiguous page memory by one page
 		void free_page (Page* page) {
-			validate_farptrs();
-
 			printf(">>>>>>free page %d\n", indexof(page));
 
 			// remove from parent
 			auto* parent = page->info.parent_ptr();
-			parent->remove_child(page);
+			if (parent)
+				parent->remove_child(page);
 			
 			// make sure we don't leak pages
 			assert(page->info.children_ptr == nullptr);
@@ -240,11 +254,6 @@ namespace world_octree {
 
 			// shrink allocated memory to free last page memory
 			allocator.pop_back();
-
-
-			validate_farptrs();
-
-			printf("------------------------------------------------------------------\n");
 		}
 		
 		uint16_t size () { return (uint16_t)allocator.size(); }
