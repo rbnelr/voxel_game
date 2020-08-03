@@ -94,8 +94,16 @@ void Game::frame () {
 				bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
 		
 				if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
-				if (input.buttons[GLFW_KEY_P].went_down)
+				if (input.buttons[GLFW_KEY_P].went_down) {
 					activate_flycam = !activate_flycam;
+
+					if (activate_flycam) {
+						float3x3 cam_to_world_rot;
+						flycam.calc_world_to_cam_rot(&cam_to_world_rot);
+
+						flycam.pos = world->player.pos + world->player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
+					}
+				}
 
 				if (open) ImGui::Checkbox("Toggle Creative Mode [C]", &creative_mode);
 				if (input.buttons[GLFW_KEY_C].went_down)

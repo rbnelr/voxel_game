@@ -165,6 +165,11 @@ float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse) {
 	return             rotate3_Z(+aer.z) * rotate3_X(-aer.y - deg(90)) * rotate3_Z(-aer.x);
 }
 
+
+float3x3 Flycam::calc_world_to_cam_rot (float3x3* cam_to_world_rot) {
+	return calc_aer_rotation(rot_aer, cam_to_world_rot);
+}
+
 Camera_View Flycam::update () {
 
 	//// look
