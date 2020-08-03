@@ -117,27 +117,8 @@ namespace world_octree {
 			*childref = (*childref)->info.sibling_ptr;
 			child->info.farptr_ptr = nullptr;
 		}
-
-		uint16_t _dbg_count_nodes (Node node=(Node)0) {
-			assert((node & LEAF_BIT) == 0);
-
-			int subtree_size = 1; // count ourself
-
-			// cound children subtrees
-			for (int i=0; i<8; ++i) {
-				auto& children = nodes[node];
-				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
-					subtree_size += _dbg_count_nodes(children[i]);
-			}
-
-			return subtree_size;
-		}
 	};
 	static_assert(sizeof(Page) == PAGE_SIZE, "");
-
-	inline void printf (...) {
-
-	}
 
 	struct PagedOctree {
 		VirtualAllocator<Page> allocator = VirtualAllocator<Page>(MAX_PAGES);
@@ -149,58 +130,6 @@ namespace world_octree {
 			page->info = PageInfo{};
 
 			return page;
-		}
-
-		void _print_children (Page* page) {
-			printf("page %d :: children:", indexof(page));
-			auto* child = page->info.children_ptr;
-			while (child) {
-				printf(" %d", indexof(child));
-				child = child->info.sibling_ptr;
-			}
-			printf("\n");
-		}
-		void _validate_farptrs (Page pages[], Page* page, Node node) {
-			assert((node & LEAF_BIT) == 0);
-
-			for (int i=0; i<8; ++i) {
-				auto val = page->nodes[node][i];
-				if ((val & LEAF_BIT) == 0) {
-					if (val & FARPTR_BIT) {
-						printf("page %d: farptr %d\n", indexof(page), val & ~FARPTR_BIT);
-
-						assert((val & ~FARPTR_BIT) < size());
-
-						_validate_farptrs(pages, &pages[val & ~FARPTR_BIT], (Node)0);
-					} else {
-						_validate_farptrs(pages, page, page->nodes[node][i]);
-					}
-				}
-			}
-		}
-
-		void validate_farptrs () {
-			return;
-			
-			static int counter = 0;
-
-			printf(">>>>>>>> validate  %d\n", counter++);
-			printf(">> %d pages\n", size());
-
-			for (int i=0; i<size(); ++i) {
-				auto* page = &(*this)[i];
-				_print_children(page);
-			}
-
-			_validate_farptrs(&(*this)[0], rootpage, (Node)0);
-
-			for (int i=0; i<size(); ++i) {
-				auto* page = &(*this)[i];
-				if (page->info.farptr_ptr) {
-					auto _indx = allocator.indexof(page);
-					assert(*page->info.farptr_ptr == (Node)(FARPTR_BIT | allocator.indexof(page)));
-				}
-			}
 		}
 
 		// migrate a page to a new memory location, while updating all references to it with the new location
@@ -236,8 +165,6 @@ namespace world_octree {
 
 		// free a page by swapping it with the last and then shrinking the contiguous page memory by one page
 		void free_page (Page* page) {
-			printf(">>>>>>free page %d\n", indexof(page));
-
 			// remove from parent
 			auto* parent = page->info.parent_ptr();
 			if (parent)

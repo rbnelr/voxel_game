@@ -70,9 +70,6 @@ namespace world_octree {
 	}
 
 	void merge (WorldOctree& oct, Page* parent, Page* child) {
-		oct.pages.validate_farptrs();
-		printf("=============merge page %d > %d\n", oct.pages.indexof(child), oct.pages.indexof(parent));
-
 		// remove children from child so they can be added to parent node
 		child->remove_all_children();
 
@@ -84,9 +81,6 @@ namespace world_octree {
 		oct.pages.free_page(child); // WARNING: page will be invalidated, parent might be invalidated
 		oct.page_free_counter++;
 
-		oct.pages.validate_farptrs();
-		printf("----------------------------------------------------------------------=====--\n");
-
 		oct.page_merge_counter++;
 	}
 	void try_merge (WorldOctree& oct, Page* page) {
@@ -96,9 +90,6 @@ namespace world_octree {
 		Page* parent = page_from_node(page->info.farptr_ptr);
 
 		uintptr_t sum = page->info.count + parent->info.count;
-
-		//assert(page->info.count == page->_dbg_count_nodes());
-		//assert(parent->info.count == parent->_dbg_count_nodes());
 
 		if (sum <= PAGE_MERGE_THRES) {
 			merge(oct, parent, page);
@@ -167,10 +158,7 @@ namespace world_octree {
 		return (Node)children_ptr;
 	}
 	void split_page (WorldOctree& oct, Page* page) {
-		oct.pages.validate_farptrs();
-
-		printf("=============split page %d\n", oct.pages.indexof(page));
-
+		
 		// find splitnode
 		PageSplitter ps = { page };
 		ps.target_page_size = page->info.count / 2;
@@ -195,9 +183,6 @@ namespace world_octree {
 		// set childpage farptr in tmppage
 		*ps.split_node = (Node)(oct.pages.indexof(childpage) | FARPTR_BIT);
 		page->add_child(ps.split_node, childpage);
-
-		oct.pages.validate_farptrs();
-		printf("------------------------------------------------------------------------\n");
 
 		oct.page_split_counter++;
 	}
@@ -235,8 +220,7 @@ namespace world_octree {
 		page->free_node(node);
 	}
 	Page* free_subtree (WorldOctree& oct, Page* page, Node node) {
-		printf("========= free_subtree\n");
-
+		
 		std::vector<Page*> pages_to_free;
 		pages_to_free.reserve(128);
 		
@@ -258,9 +242,6 @@ namespace world_octree {
 			oct.pages.free_page(p);
 			oct.page_free_counter++;
 		}
-
-		oct.pages.validate_farptrs();
-		printf("------------------------------------------------------------------------\n");
 
 		return page;
 	};
@@ -502,11 +483,8 @@ namespace world_octree {
 		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_AIR);
 		auto at = a.end();
 
-		//return;
-
 		auto c = Timer::start();
 		{
-			//for (int z=0; z<CHUNK_DIM; ++z) {
 			for (int z=0; z<CHUNK_DIM; ++z) {
 				for (int y=0; y<CHUNK_DIM; ++y) {
 					for (int x=0; x<CHUNK_DIM; ++x) {
@@ -519,12 +497,7 @@ namespace world_octree {
 		}
 		auto ct = c.end();
 
-		auto b = Timer::start();
-		//for (auto& page : pages)
-		//	compact_page(*this, page);
-		auto bt = b.end();
-
-		clog("WorldOctree::add_chunk:  octree_write: %f ms  compact_page: %f ms", at * 1000, bt * 1000 / pages.size());
+		clog("WorldOctree::add_chunk:  octree_write: %f ms", at * 1000);
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {
@@ -534,11 +507,7 @@ namespace world_octree {
 		octree_write(*this, pos, CHUNK_DIM_SHIFT, B_NULL);
 		auto at = a.end();
 
-		auto b = Timer::start();
-		//compact_nodes(octree.nodes);
-		auto bt = b.end();
-
-		clog("WorldOctree::remove_chunk:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::remove_chunk:  octree_write: %f ms", at * 1000);
 	}
 
 	void WorldOctree::update_block (Chunk& chunk, int3 bpos, block_id id) {
@@ -549,10 +518,6 @@ namespace world_octree {
 		octree_write(*this, pos, 0, id);
 		auto at = a.end();
 
-		auto b = Timer::start();
-		//compact_nodes(octree.nodes);
-		auto bt = b.end();
-
-		clog("WorldOctree::update_block:  octree_write: %f ms  reorder_nodes: %f ms", at * 1000, bt * 1000);
+		clog("WorldOctree::update_block:  octree_write: %f ms", at * 1000);
 	}
 }
