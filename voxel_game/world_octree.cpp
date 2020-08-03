@@ -19,7 +19,7 @@ namespace world_octree {
 		ImGui::Checkbox("debug_draw_pages", &debug_draw_pages);
 		ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 
-		ImGui::Text("pages: %d", pages.allocator.size());
+		ImGui::Text("pages: %d %6.2f MB", pages.allocator.size(), (float)(pages.allocator.size() * sizeof(Page)) / (1024 * 1024));
 		
 		bool show_all_pages = ImGui::TreeNode("all pages");
 
@@ -38,9 +38,12 @@ namespace world_octree {
 		if (show_all_pages)
 			ImGui::TreePop();
 
-		ImGui::Text("nodes: %d active / %d allocated  %6.2f%% active",
+		ImGui::Text("nodes: %d active / %d allocated   %6.2f / %d nodes avg (%6.2f%%)",
 			active_nodes, total_nodes,
+			(float)active_nodes / pages.size(), PAGE_NODES,
 			(float)active_nodes / total_nodes * 100);
+
+		ImGui::Text("page_counters:  splits: %5d  merges: %5d  frees: %5d", page_split_counter, page_merge_counter, page_free_counter);
 		
 		imgui_pop();
 	}
@@ -79,9 +82,12 @@ namespace world_octree {
 		parent->remove_child(child);
 		
 		oct.pages.free_page(child); // WARNING: page will be invalidated, parent might be invalidated
+		oct.page_free_counter++;
 
 		oct.pages.validate_farptrs();
 		printf("----------------------------------------------------------------------=====--\n");
+
+		oct.page_merge_counter++;
 	}
 	void try_merge (WorldOctree& oct, Page* page) {
 		if (!page->info.farptr_ptr)
@@ -192,6 +198,8 @@ namespace world_octree {
 
 		oct.pages.validate_farptrs();
 		printf("------------------------------------------------------------------------\n");
+
+		oct.page_split_counter++;
 	}
 
 	void recurse_free_subpages (Page* page, std::vector<Page*>* pages_to_free) {
@@ -226,13 +234,13 @@ namespace world_octree {
 		
 		page->free_node(node);
 	}
-	Page* free_subtree (PagedOctree& pages, Page* page, Node node) {
+	Page* free_subtree (WorldOctree& oct, Page* page, Node node) {
 		printf("========= free_subtree\n");
 
 		std::vector<Page*> pages_to_free;
 		pages_to_free.reserve(128);
 		
-		recurse_free_subtree(&pages[0], page, node, &pages_to_free);
+		recurse_free_subtree(&oct.pages[0], page, node, &pages_to_free);
 
 		// freeing pages in reverse order ensures that none of the pages to be freed are migrated, this would invlidate the pointer
 		std::sort(pages_to_free.begin(), pages_to_free.end(), [] (Page* a, Page* b) {
@@ -240,17 +248,18 @@ namespace world_octree {
 		});
 
 		for (auto* p : pages_to_free) {
-			Page* lastpage = pages.allocator[(uint16_t)pages.allocator.size() -1];
+			Page* lastpage = oct.pages.allocator[(uint16_t)oct.pages.allocator.size() -1];
 
 			// enable a page ptr to be preserved through free_page, which might invalidate it, required by caller
 			if (page == lastpage) {
 				page = p;
 			}
 
-			pages.free_page(p);
+			oct.pages.free_page(p);
+			oct.page_free_counter++;
 		}
 
-		pages.validate_farptrs();
+		oct.pages.validate_farptrs();
 		printf("------------------------------------------------------------------------\n");
 
 		return page;
@@ -379,7 +388,7 @@ namespace world_octree {
 
 		// free subtree nodes if subtree was collapsed
 		if ((old_val & LEAF_BIT) == 0) {
-			page = free_subtree(oct.pages, page, old_val);
+			page = free_subtree(oct, page, old_val);
 
 			try_merge(oct, page);
 		}

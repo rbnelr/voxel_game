@@ -26,7 +26,7 @@ namespace world_octree {
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	static constexpr uint16_t PAGE_SIZE = 4096; // must be power of two
+	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
 
 	struct Page;
 	struct PagedOctree;
@@ -56,7 +56,7 @@ namespace world_octree {
 	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(children_t));
 	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / sizeof(children_t));
 
-	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.90f);
+	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.8f);
 
 	struct Page {
 		PageInfo		info;
@@ -282,6 +282,10 @@ namespace world_octree {
 
 		bool debug_draw_pages = true;
 		bool debug_draw_air = true;
+
+		int page_split_counter = 0;
+		int page_merge_counter = 0;
+		int page_free_counter = 0;
 
 		void imgui ();
 		void pre_update (Player const& player);
