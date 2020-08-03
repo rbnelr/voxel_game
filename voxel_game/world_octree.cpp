@@ -46,37 +46,21 @@ namespace world_octree {
 	}
 
 	//
-	Node page_from_subtree (Page pages[], Page* dstpage, Page* srcpage, Node srcnode, uint16_t merge_pagei=INTNULL) {
+	Node page_from_subtree (Page pages[], Page* dstpage, Page* srcpage, Node srcnode) {
 		assert((srcnode & LEAF_BIT) == 0);
 
 		uintptr_t children_ptr = dstpage->alloc_node();
 
 		for (int i=0; i<8; ++i) {
 			auto& child = srcpage->nodes[srcnode][i];
-			Page* childpage = srcpage;
 
-			Node val;
-
-			bool is_farptr = child & FARPTR_BIT;
-			auto farptr = child & ~FARPTR_BIT;
-
-			if (is_farptr) {
+			if (child & FARPTR_BIT) {
 				dstpage->add_child(&dstpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
 			}
 			
-			if (child & LEAF_BIT || (is_farptr && farptr != merge_pagei)) {
-				val = child;
-			} else {
-				if (is_farptr) {
-					child = (Node)0;
-					childpage = &pages[farptr];
-				}
-
-				val = page_from_subtree(pages, dstpage, childpage, child, merge_pagei);
-			}
-
-			if ((children_ptr & LEAF_BIT) == 0)
-				dstpage->nodes[children_ptr][i] = val;
+			dstpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
+				child :
+				page_from_subtree(pages, dstpage, srcpage, child);
 		}
 
 		return (Node)children_ptr;
@@ -116,56 +100,6 @@ namespace world_octree {
 		}
 	}
 
-#if 0 // Iterative version with explicit stack that was not any faster in my testing
-	void compact_nodes (std::vector<OctreeChildren>& nodes) {
-		std::vector<OctreeChildren> new_nodes;
-		new_nodes.reserve(4096);
-
-		struct Stack {
-			uint32_t	children_ptr;
-			uint32_t	old_parent;
-			uint32_t	child_indx;
-		};
-
-		static constexpr int MAX_DEPTH = 16;
-		Stack stack[MAX_DEPTH];
-		int depth = 0;
-
-		Stack* s = &stack[depth];
-		*s = {0,0,0};
-
-		// Alloc root children
-		new_nodes.emplace_back();
-
-		for (;;) {
-			if (s->child_indx == 8) {
-				// Pop
-				if (depth == 0)
-					break;
-				s = &stack[--depth];
-			} else {
-				uint32_t child_node = nodes[s->old_parent].children[s->child_indx];
-
-				if (child_node & LEAF_BIT) {
-					new_nodes[ s->children_ptr ].children[s->child_indx++] = child_node;
-				} else {
-					uint32_t alloc = (uint32_t)new_nodes.size();
-
-					// Alloc
-					new_nodes[ s->children_ptr ].children[s->child_indx++] = alloc;
-					new_nodes.emplace_back();
-
-					// Push
-					s = &stack[++depth];
-					*s = { alloc, child_node, 0 };
-				}
-			}
-		}
-
-		nodes = std::move(new_nodes);
-	}
-#endif
-
 	struct PageSplitter {
 		Page* page;
 
@@ -197,17 +131,42 @@ namespace world_octree {
 		}
 	};
 
+	Node split_subtree (Page pages[], Page* splitpage, Page* srcpage, Node splitnode) {
+		assert((srcnode & LEAF_BIT) == 0);
+
+		// alloc node in splitpage
+		uintptr_t children_ptr = splitpage->alloc_node();
+
+		// copy children nodes
+		children_t children;
+		memcpy(children, srcpage->nodes[splitnode], sizeof(children_t));
+
+		// free children node
+		srcpage->free_node(splitnode);
+
+		for (int i=0; i<8; ++i) {
+			Node child = children[i];
+
+			// move over children to splitnode if node was farptr
+			if (child & FARPTR_BIT) {
+				srcpage->remove_child(&pages[child & ~FARPTR_BIT]);
+				splitpage->add_child(&splitpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
+			}
+
+			splitpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
+				child :
+				split_subtree(pages, splitpage, srcpage, child);
+		}
+
+		return (Node)children_ptr;
+	}
 	void split_page (WorldOctree& oct, Page* page) {
 		oct.pages.validate_farptrs();
 
 		printf("=============split page %d\n", oct.pages.indexof(page));
 
-		// copy page to temp buffer
-		Page tmppage;
-		memcpy(&tmppage, page, sizeof(Page));
-
 		// find splitnode
-		PageSplitter ps = { &tmppage };
+		PageSplitter ps = { page };
 		ps.target_page_size = page->info.count / 2;
 
 		Node root = (Node)0;
@@ -221,28 +180,15 @@ namespace world_octree {
 			assert(false);
 		}
 
-		// remove children from page and clear all nodes
-		// this needs to happen before both page_from_subtree calls, or else this will mess with the child linked lists of the new page children
-		page->remove_all_children();
-		page->free_all_nodes();
-
 		// alloc childpage
 		Page* childpage = oct.pages.alloc_page();
 
 		// create childpage from subtree
-		page_from_subtree(&oct.pages[0], childpage, &tmppage, *ps.split_node);
+		split_subtree(&oct.pages[0], childpage, page, *ps.split_node);
 		
 		// set childpage farptr in tmppage
 		*ps.split_node = (Node)(oct.pages.indexof(childpage) | FARPTR_BIT);
-
-	#if !NDEBUG
-		memset(page->nodes, 0, sizeof(page->nodes));
-	#endif
-
-		// update page to not contain the subtree that was split off
-		// this also links the childpage to page correctly
-		page_from_subtree(&oct.pages[0], page, &tmppage, root);
-
+		page->add_child(ps.split_node, childpage);
 
 		oct.pages.validate_farptrs();
 		printf("------------------------------------------------------------------------\n");
@@ -270,6 +216,7 @@ namespace world_octree {
 		printf("========= free_subtree\n");
 
 		std::vector<Page*> pages_to_free;
+		pages_to_free.reserve(128);
 		
 		recurse_free_subtree(&pages[0], page, node, &pages_to_free);
 
