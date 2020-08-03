@@ -20,12 +20,22 @@ namespace world_octree {
 
 		ImGui::Text("pages: %d", pages.allocator.size());
 		
+		bool show_all_pages = ImGui::TreeNode("all pages");
+
 		int total_nodes = 0;
 		int active_nodes = 0;
 		for (int i=0; i<pages.size(); ++i) {
+			if (pages[i].info.count == INTNULL) continue;
+
 			active_nodes += pages[i].info.count;
 			total_nodes += PAGE_NODES;
+
+			if (show_all_pages)
+				ImGui::Text("page: %d", pages[i].info.count);
 		}
+
+		if (show_all_pages)
+			ImGui::TreePop();
 
 		ImGui::Text("nodes: %d active / %d allocated  %6.2f%% active",
 			active_nodes, total_nodes,
@@ -265,28 +275,32 @@ namespace world_octree {
 		page_from_subtree(&oct.pages[0], page, &tmppage, root);
 	}
 
-	void recurse_free_subtree (Page* page, Node node) {
+	void recurse_free_subtree (Page pages[], Page* page, Node node) {
 		assert((node & LEAF_BIT) == 0);
 
 		if (node & FARPTR_BIT) {
 			// keep track of page to be freed?
 			//assert(false);
+
+			page = &pages[node & ~FARPTR_BIT];
+			page->info.count = INTNULL;
+
 			return;
 		}
 
 		for (int i=0; i<8; ++i) {
 			auto child = page->nodes[node][i];
 			if ((child & LEAF_BIT) == 0) {
-				recurse_free_subtree(page, child);
+				recurse_free_subtree(pages, page, child);
 			}
 		}
 		
 		page->free_node(node);
 	};
-	void free_subtree (Node* node) {
+	void free_subtree (Page pages[], Node* node) {
 		Page* page = page_from_node(node);
 
-		recurse_free_subtree(page, *node);
+		recurse_free_subtree(pages, page, *node);
 	};
 
 	int get_child_index (int3 pos, int scale) {
@@ -404,7 +418,7 @@ namespace world_octree {
 
 		if ((*write_node & LEAF_BIT) == 0) {
 			// subtree collapse
-			free_subtree(write_node);
+			free_subtree(&oct.pages[0], write_node);
 		}
 
 		// do the write
