@@ -269,7 +269,7 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 8;//10;
+		int			root_scale = 8;//12;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		PagedOctree pages;
