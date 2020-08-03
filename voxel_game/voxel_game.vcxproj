@@ -151,6 +151,7 @@
     <ClInclude Include="util\read_directory.hpp" />
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
+    <ClInclude Include="util\virtual_allocator.hpp" />
     <ClInclude Include="voxel_light.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="chunk_mesher.hpp" />
@@ -205,6 +206,7 @@
     <ClCompile Include="time_of_day.cpp" />
     <ClCompile Include="util\read_directory.cpp" />
     <ClCompile Include="util\threadpool.cpp" />
+    <ClCompile Include="util\virtual_allocator.cpp" />
     <ClCompile Include="voxel_light.cpp" />
     <ClCompile Include="world_generator.cpp" />
     <ClCompile Include="chunk_mesher.cpp" />

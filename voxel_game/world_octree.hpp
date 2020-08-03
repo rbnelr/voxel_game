@@ -2,6 +2,7 @@
 #include "blocks.hpp"
 #include "stdint.h"
 #include "util/freelist_allocator.hpp"
+#include "util/virtual_allocator.hpp"
 #include <vector>
 #include "assert.h"
 
@@ -9,73 +10,195 @@ class Chunk;
 class Chunks;
 class Player;
 
+inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
+	return (x + y - 1) & ~(y - 1);
+}
+static constexpr uint16_t INTNULL = (uint16_t)-1;
+
 namespace world_octree {
-	enum OctreeNode : uint32_t {
-		LEAF_BIT = 0x80000000u,
-		FARPTR_BIT = 0x40000000u,
+	enum Node : uint16_t {
+		LEAF_BIT = 0x8000u,
+		FARPTR_BIT = 0x4000u,
 	};
+
+	typedef Node children_t[8];
 
 	static constexpr int MAX_DEPTH = 20;
+	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	//static constexpr uint32_t PAGE_SIZE = 1024*128;
-	static constexpr uint32_t PAGE_NODES = 128 -1;//PAGE_SIZE / sizeof(OctreeChildren);
+	static constexpr uint16_t PAGE_SIZE = 4096; // must be power of two
 
-	static constexpr uint32_t PAGE_MERGE_THRES   = (uint32_t)(PAGE_NODES * 0.75f);
+	struct Page;
+	struct PagedOctree;
 
-	struct OctreeChildren {
-		OctreeNode children[8];
+	// get the page that contains a node
+	inline Page* page_from_node (Node* node) {
+		return (Page*)( (uintptr_t)node & ~(PAGE_SIZE - 1) ); // round down the ptr to get the page pointer
+	}
+	// get the 8 nodes that a node is grouped into (siblings)
+	inline children_t* siblings_from_node (Node* node) {
+		return (children_t*)((uintptr_t)node & ~(sizeof(children_t) -1)); // round down the ptr to get the siblings pointer
+	}
+
+	struct PageInfo {
+		uint16_t		count = 0;
+		uint16_t		freelist = INTNULL;
+
+		Node*			farptr_ptr = nullptr;
+		Page*			sibling_ptr = nullptr; // ptr to next child of parent
+		Page*			children_ptr = nullptr; // ptr to first child
+
+		Page* parent_ptr () {
+			return page_from_node(farptr_ptr);
+		}
 	};
 
-	static constexpr uint32_t INTNULL = (uint32_t)-1;
-	struct OctreePage {
-		uint32_t		count;
-		uint32_t		parent_page;
-		uint32_t		freelist;
-		bool			active;
+	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(children_t));
+	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / sizeof(children_t));
 
-		alignas(sizeof(uint32_t)*8)
-		OctreeChildren	nodes[PAGE_NODES];
+	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.75f);
 
-		OctreePage () {
-			count = 0;
-			parent_page = INTNULL;
-			freelist = INTNULL;
-			active = false;
-		}
+	struct Page {
+		PageInfo		info;
 
-		uint32_t alloc_node () {
-			assert(count < PAGE_NODES);
+		alignas(sizeof(children_t))
+		children_t		nodes[PAGE_NODES];
 
-			if (freelist == INTNULL) {
-				return count++;
+		uint16_t alloc_node () {
+			assert(info.count < PAGE_NODES);
+
+			if (info.freelist == INTNULL) {
+				return info.count++;
 			}
 
-			count++;
-			uint32_t ret = freelist;
-			freelist = *((uint32_t*)&nodes[freelist]);
+			info.count++;
+			uint16_t ret = info.freelist;
+			info.freelist = *((uint16_t*)&nodes[info.freelist]);
 			return ret;
 		}
-		void free_node (uint32_t node) {
-			assert(count > 0 && (node & (FARPTR_BIT|LEAF_BIT)) == 0 && node < PAGE_NODES);
+		void free_node (uint16_t node) {
+			assert(info.count > 0 && (node & (FARPTR_BIT|LEAF_BIT)) == 0 && node < PAGE_NODES);
 
-			*((uint32_t*)&nodes[node]) = freelist;
-			freelist = node;
-			count--;
+			*((uint16_t*)&nodes[node]) = info.freelist;
+			info.freelist = node;
+			info.count--;
 		}
 
-		uint32_t _dbg_count_nodes (OctreeNode node=(OctreeNode)0) {
+		void free_all_nodes () {
+			info.count = 0;
+			info.freelist = INTNULL;
+		}
+
+		void add_child (Node* farptr_ptr, Page* child) {
+			child->info.farptr_ptr = farptr_ptr;
+			child->info.sibling_ptr = info.children_ptr;
+			info.children_ptr = child;
+
+			assert(child->info.parent_ptr() == this);
+		}
+
+		void remove_all_children () {
+			auto* cur = info.children_ptr;
+			while (cur) {
+				auto* child = cur;
+				cur = child->info.sibling_ptr;
+				child->info.sibling_ptr = nullptr;
+				child->info.farptr_ptr = nullptr;
+			}
+		}
+
+		//void remove_child (Page* child) {
+		//	auto* cur = children_ptr;
+		//	auto** prev_next = &children_ptr;
+		//	while (cur) {
+		//		if (cur == child) {
+		//			*prev_next = cur->sibling_ptr;
+		//			assert(cur->parent_ptr == this);
+		//			cur->farptr_ptr = nullptr;
+		//			cur->parent_ptr = nullptr;
+		//			cur->sibling_ptr = nullptr;
+		//			return;
+		//		}
+		//		prev_next = &cur->sibling_ptr;
+		//		cur = cur->sibling_ptr;
+		//	}
+		//
+		//	assert(false);
+		//}
+
+		uint16_t _dbg_count_nodes (Node node=(Node)0) {
 			assert((node & LEAF_BIT) == 0);
 
 			int subtree_size = 1; // count ourself
 
-			 // cound children subtrees
+			// cound children subtrees
 			for (int i=0; i<8; ++i) {
-				auto& children = nodes[ node ].children;
+				auto& children = nodes[node];
 				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
 					subtree_size += _dbg_count_nodes(children[i]);
 			}
 
 			return subtree_size;
+		}
+	};
+	static_assert(sizeof(Page) == PAGE_SIZE, "");
+
+	struct PagedOctree {
+		VirtualAllocator<Page> allocator = VirtualAllocator<Page>(MAX_PAGES);
+
+		Page* rootpage = nullptr;
+
+		Page* alloc_page () {
+			Page* page = allocator.push_back();
+			page->info = PageInfo{};
+
+			return page;
+		}
+
+		// migrate a page to a new memory location, while updating all references to it with the new location
+		void migrate_page (Page* src, Page* dst) {
+			// update octree node farptr to us in parent page
+			if (src->info.farptr_ptr)
+				*src->info.farptr_ptr = (Node)(FARPTR_BIT | allocator.indexof(dst));
+
+			// update left siblings sibling ptr
+			auto* parent = src->info.parent_ptr();
+			if (parent) {
+				auto* sibling = parent->info.children_ptr;
+				while (sibling->info.sibling_ptr != src) {
+					sibling = sibling->info.sibling_ptr;
+				}
+
+				sibling->info.sibling_ptr = dst;
+			}
+
+			// update parent ptr in children
+			auto* child = src->info.children_ptr;
+			while (child) {
+				child->info.farptr_ptr = (Node*)((uintptr_t)child->info.farptr_ptr + (dst - src) * PAGE_SIZE);
+				child = child->info.sibling_ptr;
+			}
+
+			// copy all the data, overwriting the dst page
+			memcpy(dst, src, sizeof(Page));
+		}
+
+		// free a page by swapping it with the last and then shrinking the contiguous page memory by one page
+		void free_page (Page* page) {
+			// overwrite page to be freed with last page 
+			migrate_page(allocator[(uint16_t)allocator.size() -1], page);
+
+			// shrink allocated memory to free last page memory
+			allocator.pop_back();
+		}
+		
+		uint16_t size () { return (uint16_t)allocator.size(); }
+		Page& operator[] (uint16_t i) { return *allocator[i]; }
+
+		uint16_t indexof (Page* page) {
+			uintptr_t index = allocator.indexof(page);
+			assert(index < allocator.size());
+			return (uint16_t)index;
 		}
 	};
 
@@ -85,9 +208,7 @@ namespace world_octree {
 		int			root_scale = 8;//10;
 		int3		root_pos = -(1 << (root_scale - 1));
 
-		FreelistAllocator<OctreePage, sizeof(uint32_t) * 8> allocator;
-
-		std::vector<OctreePage*> pages;
+		PagedOctree pages;
 
 		//
 		bool debug_draw_octree = false;
@@ -97,7 +218,6 @@ namespace world_octree {
 
 		bool debug_draw_pages = true;
 
-		int active_pages = -1;
 		int active_nodes = -1;
 
 		void imgui ();

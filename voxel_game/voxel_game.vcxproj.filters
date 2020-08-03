@@ -244,6 +244,9 @@
     <ClInclude Include="util\freelist_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="util\virtual_allocator.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -356,6 +359,9 @@
       <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="world_octree.cpp" />
+    <ClCompile Include="util\virtual_allocator.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">
