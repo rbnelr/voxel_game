@@ -132,7 +132,7 @@ namespace world_octree {
 	};
 
 	Node split_subtree (Page pages[], Page* splitpage, Page* srcpage, Node splitnode) {
-		assert((srcnode & LEAF_BIT) == 0);
+		assert((splitnode & LEAF_BIT) == 0);
 
 		// alloc node in splitpage
 		uintptr_t children_ptr = splitpage->alloc_node();
@@ -194,12 +194,26 @@ namespace world_octree {
 		printf("------------------------------------------------------------------------\n");
 	}
 
+	void recurse_free_subpages (Page* page, std::vector<Page*>* pages_to_free) {
+		pages_to_free->push_back(page);
+		
+		auto* cur = page->info.children_ptr;
+		page->info.children_ptr = nullptr;
+		while (cur) {
+			auto* child = cur;
+			cur = child->info.sibling_ptr;
+
+			child->info.sibling_ptr = nullptr;
+			child->info.farptr_ptr = nullptr;
+
+			recurse_free_subpages(child, pages_to_free);
+		}
+	}
 	void recurse_free_subtree (Page pages[], Page* page, Node node, std::vector<Page*>* pages_to_free) {
 		assert((node & LEAF_BIT) == 0);
 
 		if (node & FARPTR_BIT) {
-			page = &pages[node & ~FARPTR_BIT];
-			pages_to_free->push_back(page);
+			recurse_free_subpages(&pages[node & ~FARPTR_BIT], pages_to_free);
 			return;
 		}
 
@@ -211,8 +225,8 @@ namespace world_octree {
 		}
 		
 		page->free_node(node);
-	};
-	void free_subtree (PagedOctree& pages, Page* page, Node node) {
+	}
+	Page* free_subtree (PagedOctree& pages, Page* page, Node node) {
 		printf("========= free_subtree\n");
 
 		std::vector<Page*> pages_to_free;
@@ -225,11 +239,21 @@ namespace world_octree {
 			return std::greater<uintptr_t>()((uintptr_t)a, (uintptr_t)b); // decending ptr addresses
 		});
 
-		for (auto* page : pages_to_free)
-			pages.free_page(page);
+		for (auto* p : pages_to_free) {
+			Page* lastpage = pages.allocator[(uint16_t)pages.allocator.size() -1];
+
+			// enable a page ptr to be preserved through free_page, which might invalidate it, required by caller
+			if (page == lastpage) {
+				page = p;
+			}
+
+			pages.free_page(p);
+		}
 
 		pages.validate_farptrs();
 		printf("------------------------------------------------------------------------\n");
+
+		return page;
 	};
 
 	int get_child_index (int3 pos, int scale) {
@@ -355,7 +379,7 @@ namespace world_octree {
 
 		// free subtree nodes if subtree was collapsed
 		if ((old_val & LEAF_BIT) == 0) {
-			free_subtree(oct.pages, page, old_val);
+			page = free_subtree(oct.pages, page, old_val);
 
 			try_merge(oct, page);
 		}
