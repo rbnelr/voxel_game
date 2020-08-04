@@ -29,11 +29,6 @@ $if fragment
 	uniform int svo_root_scale;
 
 	/* SVO format:
-		union OctreeNode {
-			uint32 children_index; // 0x80000000 set if has_children, ie. this node a non-leaf node -> mask away MSB to get index into svo_texture where the nodes for the 8 children lie contiguously
-			uint16 block_id; // block id (valid when leaf node)
-		};
-
 		1 bit      1 bit       14 bit
 		[leaf_bit][farptr_bit][payload]
 

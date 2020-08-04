@@ -27,12 +27,12 @@ public:
 
 	Texture2D water_normal = { "textures/water_normal.jpg", false, true };
 
-	bool raytracer_draw = 1;
+	bool raytracer_draw = 0;
 	bool overlay = 0;
 
-	float slider = 0.80f;
+	float slider = 1.00f;
 
-	int max_iterations = 256;
+	int max_iterations = 300;
 	bool visualize_iterations = false;
 
 	float sun_radius = 0.1f;

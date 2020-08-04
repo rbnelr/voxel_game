@@ -525,5 +525,5 @@ public:
 		}
 	}
 
-	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock highlighted_block);
+	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, SelectedBlock highlighted_block);
 };

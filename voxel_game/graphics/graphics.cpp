@@ -749,7 +749,7 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 	chunks.count_culled = count;
 }
 
-void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, SelectedBlock selected_block) {
+void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, SelectedBlock selected_block) {
 	uint8 sky_light_reduce;
 	world.time_of_day.calc_sky_colors(&sky_light_reduce);
 
@@ -854,7 +854,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{ //// Overlay pass
 		glDisable(GL_DEPTH_TEST);
 
-		//if (!activate_flycam)
+		if (!activate_flycam || creative_mode)
 			gui.draw(world.player, tile_textures, sampler);
 
 		glEnable(GL_DEPTH_TEST);

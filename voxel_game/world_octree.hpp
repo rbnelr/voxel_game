@@ -202,7 +202,7 @@ namespace world_octree {
 		PagedOctree pages;
 
 		//
-		bool debug_draw_octree = true;
+		bool debug_draw_octree = 1;
 
 		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;
