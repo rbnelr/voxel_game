@@ -196,13 +196,13 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 8;//12;
+		int			root_scale = 11;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		PagedOctree pages;
 
 		//
-		bool debug_draw_octree = false;
+		bool debug_draw_octree = true;
 
 		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;

@@ -80,17 +80,17 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		{
 			using namespace world_octree;
 
-			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(int);
+			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
 			int height = (int)octree.pages.size();
 		
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		
 			glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
 		
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32I, WIDTH,height, 0, GL_RED_INTEGER, GL_INT, nullptr);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
 			
 			for (int i=0; i<height; ++i)
-				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_INT, &octree.pages[i].nodes[0]);
+				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &octree.pages[i].nodes[0]);
 			
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 		}

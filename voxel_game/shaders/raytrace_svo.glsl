@@ -24,7 +24,7 @@ $if fragment
 	// source for algorithm: https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
 	// SVO data
-	uniform isampler2D svo_texture;
+	uniform usampler2D svo_texture;
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
@@ -42,14 +42,13 @@ $if fragment
 		leaf_bit == 1:						payload leaf voxel data, ie. block id
 	*/
 
-	int get_svo_node (uint node_index, int child_index) {
+	uint get_svo_node (uint node_index, int child_index) {
 		// access 1d data as 2d texture, because of texture size limits
-		return texelFetch(svo_texture, ivec2(uvec2(node_index & 0xffff * 8 + uint(child_index), node_index >> 16)), 0).r;
+		return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
 	}
 
-//#define LEAF_BIT 0x80000000 // This triggers an integer overflow on intel??
-#define LEAF_BIT (1 << 15)
-#define FARPTR_BIT (1 << 14)
+#define LEAF_BIT	0x8000u
+#define FARPTR_BIT	0x4000u
 
 #define MAX_SCALE 11
 #define MAX_SEC_RAYS 2
@@ -124,7 +123,7 @@ $if fragment
 	};
 
 	int iterations = 0;
-	int cur_medium;
+	uint cur_medium;
 
 	float fresnel (vec3 view, vec3 norm, float F0) {
 		//	float temp = 1.0 -dotVH;
@@ -139,14 +138,14 @@ $if fragment
 
 	void surface_hit (
 			vec3 ray_pos, vec3 ray_dir,
-			float hit_dist, bvec3 entry_faces, int block_id,
+			float hit_dist, bvec3 entry_faces, uint block_id,
 			inout vec4 accum_col, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_ray, vec4 ray_tint) {
 		if (cur_medium == -1) {
 			cur_medium = block_id;
 			return;
 		}
 
-		int hit_id = block_id;
+		uint hit_id = block_id;
 
 		if (block_id == B_AIR && cur_medium != B_AIR) {
 			hit_id = cur_medium; // exit to air always rendered with medium texture
@@ -181,7 +180,7 @@ $if fragment
 			normal *= step(ray_dir, vec3(0.0)) * 2.0 - 1.0;
 			_normal = normal;
 
-			vec4 bti = texelFetch(block_tile_info, hit_id, 0);
+			vec4 bti = texelFetch(block_tile_info, int(hit_id), 0);
 
 			float tex_indx = bti.x; // x=base_index
 			if (entry_faces.z) {
@@ -371,7 +370,7 @@ $if fragment
 
 				idx ^= mirror_mask_int;
 
-				int node = get_svo_node(parent_node, idx);
+				uint node = get_svo_node(parent_node, idx);
 
 				//// Intersect
 				// child cube ray range
@@ -392,19 +391,20 @@ $if fragment
 							break; // final hit
 						}
 					} else {
+
 						//// Push
 						stack_node[child_scale - 1] = parent_node;
 						stack_t1  [child_scale - 1] = t1;
 
 						// child becomes parent
 						{
-							uint parent_page = parent_node & 0xffff0000;
+							uint parent_page = parent_node & 0xffff0000u;
 							if ((node & FARPTR_BIT) != 0) {
-								parent_page = uint(node & ~FARPTR_BIT) << 16;
+								parent_page = (node & ~FARPTR_BIT) << 16u;
 								node = 0;
 							}
 
-							parent_node = parent_page | uint(node);
+							parent_node = parent_page | node;
 						}
 
 						parent_pos = child_pos;
@@ -490,23 +490,23 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		if (false && hit_dist < MAX_DIST-1) { // shadow ray
-			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
-			hit_pos += _normal * 0.0005;
-		
-			vec3 dir = normalize(sun_dir + (rand3(gl_FragCoord.xy) -0.5) * sun_radius);
-		
-			int dummy_queued_rays = MAX_SEC_RAYS;
-			float shadow_ray_dist;
-			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
-		
-			if (shadow_ray_dist < MAX_DIST-1) {
-				// in shadow
-				col *= 0;
-			} else {
-				col *= sun_col;
-			}
-		}
+		//if (false && hit_dist < MAX_DIST-1) { // shadow ray
+		//	vec3 hit_pos = ray_pos + ray_dir * hit_dist;
+		//	hit_pos += _normal * 0.0005;
+		//
+		//	vec3 dir = normalize(sun_dir + (rand3(gl_FragCoord.xy) -0.5) * sun_radius);
+		//
+		//	int dummy_queued_rays = MAX_SEC_RAYS;
+		//	float shadow_ray_dist;
+		//	process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
+		//
+		//	if (shadow_ray_dist < MAX_DIST-1) {
+		//		// in shadow
+		//		col *= 0;
+		//	} else {
+		//		col *= sun_col;
+		//	}
+		//}
 
 		return col;
 	}
@@ -521,12 +521,12 @@ $if fragment
 		float hit_dist;
 		vec3 accum_col = shadowed_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, vec4(1.0));
 		
-		for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
-			float _dist;
-
-			vec3 ray_col = shadowed_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
-			accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
-		}
+		//for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
+		//	float _dist;
+		//
+		//	vec3 ray_col = shadowed_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
+		//	accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
+		//}
 		
 		vec4 col = vec4(accum_col, 1.0);
 		
