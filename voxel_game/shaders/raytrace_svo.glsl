@@ -54,12 +54,14 @@ $if fragment
 #define MAX_SEC_RAYS 2
 
 #define INF (1.0 / 0.0)
+#define PI	3.1415926535897932384626433832795
 
 #define MAX_DIST INF
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
 #define B_TALLGRASS 11 // block id
+#define B_TORCH 10 // block id
 	
 	uniform float slider = 1.0; // debugging
 	uniform bool visualize_iterations = false;
@@ -89,14 +91,29 @@ $if fragment
 
 	uniform float time;
 
-	float rand (vec2 co) {
-		return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+//// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
+	// Gold Noise ©2015 dcerisano@standard3d.com
+	// - based on the Golden Ratio
+	// - uniform normalized distribution
+	// - fastest static noise generator function (also runs at low precision)
+
+	float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
+
+	float gold_noise(in vec2 xy, in float seed){
+		return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
 	}
-	vec2 rand2 (vec2 co) {
-		return vec2(rand(co + vec2(333.0, -19.0)*time), rand(co + vec2(-1234.0, -13.0)*time));
+///
+
+	float seed = time + 1.0;
+
+	float rand () {
+		return gold_noise(gl_FragCoord.xy, seed++);
 	}
-	vec3 rand3 (vec2 co) {
-		return vec3(rand(co + vec2(333.0, -19.0)*time), rand(co + vec2(-1234.0, -13.0)*time), rand(co + vec2(+7.0, +234.0)*time));
+	vec2 rand2 () {
+		return vec2(rand(), rand());
+	}
+	vec3 rand3 () {
+		return vec3(rand(), rand(), rand());
 	}
 
 #define air_IOR 1.0
@@ -132,6 +149,22 @@ $if fragment
 		float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
 		float x2 = x*x;
 		return F0 + ((1.0 - F0) * x2 * x2 * x);
+	}
+	
+	vec3 hemisphere_sample () {
+		// cosine weighted sampling (100% diffuse)
+		// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+
+		vec2 uv = rand2();
+
+		float r = sqrt(uv.y);
+		float theta = 2*PI * uv.x;
+
+		float x = r * cos(theta);
+		float y = r * sin(theta);
+
+		vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+		return dir;
 	}
 
 	vec3 _normal;
@@ -190,6 +223,12 @@ $if fragment
 			vec4 col = texture(tile_textures, vec3(uv, tex_indx));
 			//col.rgb = vec3(1,1,1);
 
+			vec3 emmissive = vec3(0.0);
+			if (block_id == B_TORCH) {
+				col       = vec4(255,224,187,255);
+				emmissive = vec3(255,224,187) / 255.0 * 50;
+			}
+
 			float alpha_remain = 1.0 - accum_col.a;
 
 			if (	((block_id == B_WATER && cur_medium == B_AIR) || (block_id == B_AIR && cur_medium == B_WATER))
@@ -229,8 +268,18 @@ $if fragment
 				accum_col.a += alpha_remain;
 			} else if (col.a >= 0.99 && queued_ray < MAX_SEC_RAYS) {
 			
-				vec3 bounce_dir = normalize(normal + 0.9 * (rand3(gl_FragCoord.xy) -0.5));
-			
+				mat3 tangent_to_world;
+				{
+					vec3 tangent = entry_faces.x ? vec3(0,1,0) : vec3(1,0,0);
+					vec3 bitangent = cross(normal, tangent);
+				
+					tangent_to_world = mat3(tangent, bitangent, normal);
+				}
+				
+				vec3 bounce_dir = tangent_to_world * hemisphere_sample();
+				
+				//DEBUG(bounce_dir);
+
 				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
 				queue[queued_ray].dir = bounce_dir;
 				queue[queued_ray].tint = ray_tint * vec4(col.rgb, 1.0) * alpha_remain;
@@ -242,6 +291,7 @@ $if fragment
 
 				//if (queued_ray < MAX_SEC_RAYS)
 					accum_col.rgb += effective_alpha * col.rgb;
+					accum_col.rgb += emmissive;
 
 				accum_col.a += effective_alpha;
 			}
@@ -490,23 +540,24 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		//if (false && hit_dist < MAX_DIST-1) { // shadow ray
-		//	vec3 hit_pos = ray_pos + ray_dir * hit_dist;
-		//	hit_pos += _normal * 0.0005;
-		//
-		//	vec3 dir = normalize(sun_dir + (rand3(gl_FragCoord.xy) -0.5) * sun_radius);
-		//
-		//	int dummy_queued_rays = MAX_SEC_RAYS;
-		//	float shadow_ray_dist;
-		//	process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
-		//
-		//	if (shadow_ray_dist < MAX_DIST-1) {
-		//		// in shadow
-		//		col *= 0;
-		//	} else {
-		//		col *= sun_col;
-		//	}
-		//}
+		if (hit_dist < MAX_DIST-1) { // shadow ray
+			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
+			hit_pos += _normal * 0.0005;
+		
+			vec3 dir = normalize(sun_dir + (rand3() -0.5) * sun_radius);
+		
+			int dummy_queued_rays = MAX_SEC_RAYS;
+			float shadow_ray_dist;
+			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
+		
+			if (shadow_ray_dist < MAX_DIST-1) {
+				// in shadow
+				col *= 0;
+			} else {
+				col *= sun_col;
+			}
+			//col *= 0;
+		}
 
 		return col;
 	}
@@ -515,18 +566,18 @@ $if fragment
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
 
-		int queued_rays = 2;
+		int queued_rays = 0;
 		QueuedRay queue[MAX_SEC_RAYS];
 
 		float hit_dist;
 		vec3 accum_col = shadowed_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, vec4(1.0));
 		
-		//for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
-		//	float _dist;
-		//
-		//	vec3 ray_col = shadowed_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
-		//	accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
-		//}
+		for (int cur_ray = 0; cur_ray < queued_rays; ++cur_ray) {
+			float _dist;
+
+			vec3 ray_col = shadowed_ray(queue[cur_ray].pos, queue[cur_ray].dir, _dist, queue, queued_rays, queue[cur_ray].tint);
+			accum_col += ray_col * queue[cur_ray].tint.rgb * queue[cur_ray].tint.a;
+		}
 		
 		vec4 col = vec4(accum_col, 1.0);
 		
