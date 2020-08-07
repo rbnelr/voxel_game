@@ -36,12 +36,16 @@ void* commit_pages (void* baseptr, void* neededptr, void* commitptr) {
 	auto ret = VirtualAlloc(commitptr, size_needed, MEM_COMMIT, PAGE_READWRITE);
 	assert(ret != NULL);
 
+	TracyAlloc(commitptr, size_needed);
+
 	return (char*)commitptr + size_needed;
 }
 
 void* decommit_pages (void* baseptr, void* neededptr, void* commitptr) {
 	char* decommit = (char*)round_up_pot((uintptr_t)neededptr, os_page_size);
 	uintptr_t size = (char*)commitptr - decommit; 
+
+	TracyFree(decommit);
 
 	auto ret = VirtualFree(decommit, size, MEM_DECOMMIT);
 	assert(ret != 0);

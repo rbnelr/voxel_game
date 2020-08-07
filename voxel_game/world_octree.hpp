@@ -1,10 +1,8 @@
 #pragma once
+#include "common.hpp"
 #include "blocks.hpp"
-#include "stdint.h"
 #include "util/freelist_allocator.hpp"
 #include "util/virtual_allocator.hpp"
-#include <vector>
-#include "assert.h"
 
 class Chunk;
 class Chunks;
@@ -64,14 +62,19 @@ namespace world_octree {
 		alignas(sizeof(children_t))
 		children_t		nodes[PAGE_NODES];
 
+		bool nodes_full () {
+			return info.count >= PAGE_NODES;
+		}
+
 		uint16_t alloc_node () {
 			assert(info.count < PAGE_NODES);
 
+			auto ptr = info.count++;
+
 			if (info.freelist == INTNULL) {
-				return info.count++;
+				return ptr;
 			}
 
-			info.count++;
 			uint16_t ret = info.freelist;
 			info.freelist = *((uint16_t*)&nodes[info.freelist]);
 			return ret;

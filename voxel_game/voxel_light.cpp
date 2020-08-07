@@ -1,6 +1,4 @@
 #include "voxel_light.hpp"
-#include "util/timer.hpp"
-#include <queue>
 
 struct LitBlock {
 	bpos bp;
@@ -123,6 +121,8 @@ unsigned calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_bloc
 	return (unsigned)max((int)l, (int)(neighbour_light - blocks.absorb[new_block.id] - 1));
 }
 void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, unsigned new_light_level) {
+	ZoneScopedN("update_block_light");
+
 	if (new_light_level != old_light_level) {
 		dbg_block_light_add_list.clear();
 		dbg_block_light_remove_list.clear();
@@ -142,6 +142,7 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 }
 
 void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
+
 	//OPTICK_EVENT();
 
 	int sky_light = pos_in_chunk.z >= CHUNK_DIM-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
@@ -168,6 +169,8 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
 	chunk->needs_remesh = true;
 }
 void update_sky_light_chunk (Chunk* chunk) {
+	ZoneScopedN("update_sky_light_chunk");
+	
 	for (int y=0; y<CHUNK_DIM; ++y) {
 		for (int x=0; x<CHUNK_DIM; ++x) {
 			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM-1));

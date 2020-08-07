@@ -1,6 +1,5 @@
 #pragma once
-#include "kissmath.hpp"
-#include "dear_imgui.hpp"
+#include "common.hpp"
 #include "util/collision.hpp"
 
 #define DEFAULT_GRAVITY 20

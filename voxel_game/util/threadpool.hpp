@@ -2,6 +2,7 @@
 #include <thread>
 #include "threadsafe_queue.hpp"
 #include "string.hpp"
+#include "Tracy.hpp"
 
 // std::thread::hardware_concurrency() gets the number of cpu threads
 
@@ -64,6 +65,7 @@ public:
 
 	// start thread_count threads
 	void start_threads (int thread_count, bool high_prio=false, std::string thread_base_name="<threadpool>") {
+		ZoneScoped;
 		// Threadpools are ideally used with  thread_count <= cpu_core_count  to make use of the cpu without the threads preempting each other (although I don't check the thread count)
 		// I'm just assuming for now that with  high_prio==false -> thread_count==cpu_core_count -> ie. set each threads affinity to one of the cores
 		//  and with high_prio==true you leave at least one core free for the main thread, so we assign the cores 1-n to the threads so that the main thread can be on core 0
@@ -90,6 +92,8 @@ public:
 				res = threadpool.results.pop()
 	*/
 	void contribute_work () {
+		ZoneScoped;
+
 		// Wait for one job to pop and execute or until shutdown signal is sent via jobs.shutdown()
 		Job job;
 		while (jobs.try_pop(&job)) {
@@ -105,6 +109,8 @@ public:
 
 	// optional manual shutdown
 	void shutdown () {
+		ZoneScoped;
+
 		if (!threads.empty())
 			jobs.shutdown(); // set shutdown to all threads
 

@@ -61,6 +61,8 @@ void Game::frame () {
 
 	if (!dbg_pause) {
 		{
+			ZoneScopedN("Imgui stuff");
+
 			if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 				fps_display.display_fps();
 
@@ -82,11 +84,11 @@ void Game::frame () {
 					world = std::make_unique<World>(world_gen);
 				}
 
-			world_gen.imgui();
-			world->imgui();
-			block_update.imgui();
-			world->chunks.world_octree.imgui();
-		}
+				world_gen.imgui();
+				world->imgui();
+				block_update.imgui();
+				world->chunks.world_octree.imgui();
+			}
 
 			{
 				bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);

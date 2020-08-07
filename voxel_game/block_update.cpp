@@ -1,6 +1,5 @@
 #include "block_update.hpp"
 #include "chunks.hpp"
-#include "util/random.hpp"
 
 bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world) {
 	auto above = chunks.query_block(pos_world +bpos(0,0,+1));
@@ -105,6 +104,8 @@ uint16_t block_pattern (uint16_t i) {
 }
 
 void BlockUpdate::update_blocks (Chunks& chunks) {
+	ZoneScopedN("BlockUpdate::update_blocks");
+
 	float tmp = ceil((float)CHUNK_BLOCK_COUNT * block_update_fraction);
 
 	bpos_t blocks_to_update = (bpos_t)tmp;

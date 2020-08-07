@@ -1,4 +1,5 @@
 #pragma once
+#include "common.hpp"
 #include "chunks.hpp"
 
 extern std::vector<bpos> dbg_block_light_add_list;

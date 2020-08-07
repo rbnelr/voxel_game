@@ -1,9 +1,6 @@
 #include "world_octree.hpp"
-#include "dear_imgui.hpp"
 #include "chunks.hpp"
 #include "player.hpp"
-#include "util/timer.hpp"
-#include <stack>
 
 namespace world_octree {
 	void WorldOctree::imgui () {
@@ -70,6 +67,8 @@ namespace world_octree {
 	}
 
 	void merge (WorldOctree& oct, Page* parent, Page* child) {
+		ZoneScopedN("world_octree::merge");
+
 		// remove children from child so they can be added to parent node
 		child->remove_all_children();
 
@@ -158,6 +157,7 @@ namespace world_octree {
 		return (Node)children_ptr;
 	}
 	void split_page (WorldOctree& oct, Page* page) {
+		ZoneScopedN("world_octree::split_page");
 		
 		// find splitnode
 		PageSplitter ps = { page };
@@ -220,6 +220,7 @@ namespace world_octree {
 		page->free_node(node);
 	}
 	Page* free_subtree (WorldOctree& oct, Page* page, Node node) {
+		ZoneScopedN("world_octree::free_subtree");
 		
 		std::vector<Page*> pages_to_free;
 		pages_to_free.reserve(128);
@@ -246,6 +247,15 @@ namespace world_octree {
 		return page;
 	};
 
+}
+
+#include "mmintrin.h"
+#include "immintrin.h"
+#include "emmintrin.h"
+#include "emmintrin.h"
+
+namespace world_octree {
+
 	int get_child_index (int3 pos, int scale) {
 		//return	(((pos.x >> scale) & 1) << 0) |
 		//		(((pos.y >> scale) & 1) << 1) |
@@ -254,7 +264,7 @@ namespace world_octree {
 		//		((pos.y >> (scale-1)) & 2) |
 		//		((pos.z >> (scale-2)) & 4);
 		int ret = 0;
-		if (pos.x & (1 << scale))	ret += 1;
+		if (pos.x & (1 << scale))	ret  = 1;
 		if (pos.y & (1 << scale))	ret += 2;
 		if (pos.z & (1 << scale))	ret += 4;
 		return ret;
@@ -264,6 +274,8 @@ namespace world_octree {
 	// this decends the octree from the root and inserts or deletes nodes when needed
 	// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
 	void octree_write (WorldOctree& oct, int3 pos, int scale, block_id val) {
+		ZoneScopedN("world_octree::octree_write");
+
 		pos -= oct.root_pos;
 		if (any(pos < 0 || pos >= (1 << oct.root_scale)))
 			return;
@@ -281,11 +293,9 @@ namespace world_octree {
 			// get child node that contains target node
 			cur_scale--;
 			
-			auto& children = cur_page->nodes[node_ptr];
-
 			int child_idx = get_child_index(pos, cur_scale);
 
-			child_node = &children[child_idx];
+			child_node = &cur_page->nodes[node_ptr][child_idx];
 
 			// keep track of node path for collapsing of same type octree nodes (these get invalidated on split page, which do never need to collapse)
 			node_path[cur_scale] = child_node;
@@ -316,7 +326,7 @@ namespace world_octree {
 					break;
 				}
 
-				if (cur_page->info.count == PAGE_NODES) {
+				if (cur_page->nodes_full()) {
 					// page full
 
 					// Do split page which will have created 2 new pages with about half the nodes out of the full page
@@ -334,9 +344,8 @@ namespace world_octree {
 				*child_node = node_ptr;
 
 				// alloc and init children for node
-				auto& children = cur_page->nodes[node_ptr];
 				for (int i=0; i<8; ++i) {
-					children[i] = (Node)(LEAF_BIT | leaf_val);
+					cur_page->nodes[node_ptr][i] = (Node)(LEAF_BIT | leaf_val);
 				}
 			}
 		}
@@ -353,8 +362,7 @@ namespace world_octree {
 
 			auto& siblings = *siblings_from_node(write_node);
 				
-			for (int i=0; i<8; ++i) {
-				auto& sibling = siblings[i];
+			for (auto& sibling : siblings) {
 				if (&sibling != write_node && sibling != (LEAF_BIT | val)) {
 					goto end; // embrace the goto
 				}
@@ -454,6 +462,8 @@ namespace world_octree {
 	};
 
 	void debug_draw (WorldOctree& oct) {
+		ZoneScopedN("WorldOctree::debug_draw");
+
 		RecurseDrawer rd = { oct };
 		rd.recurse_draw(nullptr, (Node)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
 	}
@@ -476,7 +486,57 @@ namespace world_octree {
 		}
 	}
 
+	block_id recurse_chunk_to_octree (WorldOctree& oct, Chunk& chunk, Page* page, int3 pos, int scale) {
+
+		if (scale == 0) {
+			return chunk.get_block(pos).id;
+		}
+
+		if (page->nodes_full()) {
+
+			// Do split page which will have created 2 new pages with about half the nodes out of the full page
+			split_page(oct, page);
+
+			// cur_child and cur_page were invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
+			// I might attempt to keep track of cur_child and fix it in split_page, or redecend from the root of the cur page,
+			// but a total redecent should always work, so let's just do that with a goto
+			goto restart_decent;
+		}
+
+		for (int i=0; i<8; ++i) {
+			int3 child_indx = int3(i, i >> 1, i >> 2) & 1;
+
+			int child_scale = scale - 1;
+			int3 child_pos = pos + (child_indx << child_scale);
+
+			block_id child = recurse_chunk_to_octree(oct, chunk, child_pos, child_scale);
+		}
+
+	}
+
+	void chunk_to_octree (WorldOctree& oct, Chunk& chunk) {
+		int3 pos = chunk.coord * CHUNK_DIM;
+
+	#if 0
+		for (int z=0; z<CHUNK_DIM; ++z) {
+			for (int y=0; y<CHUNK_DIM; ++y) {
+				for (int x=0; x<CHUNK_DIM; ++x) {
+					int3 bpos = pos + int3(x,y,z);
+
+					octree_write(oct, bpos, 0, chunk.get_block(int3(x,y,z)).id);
+				}
+			}
+		}
+	#else
+		Page* page = oct.pages.alloc_page();
+
+		recurse_chunk_to_octree(oct, chunk, page, 0, CHUNK_DIM_SHIFT);
+	#endif
+	}
+
 	void WorldOctree::add_chunk (Chunk& chunk) {
+		ZoneScopedN("WorldOctree::add_chunk");
+
 		int3 pos = chunk.coord * CHUNK_DIM;
 
 		auto a = Timer::start();
@@ -484,23 +544,15 @@ namespace world_octree {
 		auto at = a.end();
 
 		auto c = Timer::start();
-		{
-			for (int z=0; z<CHUNK_DIM; ++z) {
-				for (int y=0; y<CHUNK_DIM; ++y) {
-					for (int x=0; x<CHUNK_DIM; ++x) {
-						int3 bpos = pos + int3(x,y,z);
-
-						octree_write(*this, bpos, 0, chunk.get_block(int3(x,y,z)).id);
-					}
-				}
-			}
-		}
+		chunk_to_octree(*this, chunk);
 		auto ct = c.end();
 
 		clog("WorldOctree::add_chunk:  octree_write: %f ms", at * 1000);
 	}
 
 	void WorldOctree::remove_chunk (Chunk& chunk) {
+		ZoneScopedN("WorldOctree::remove_chunk");
+
 		int3 pos = chunk.coord * CHUNK_DIM;
 
 		auto a = Timer::start();
@@ -511,6 +563,8 @@ namespace world_octree {
 	}
 
 	void WorldOctree::update_block (Chunk& chunk, int3 bpos, block_id id) {
+		ZoneScopedN("WorldOctree::update_block");
+
 		int3 pos = chunk.coord * CHUNK_DIM;
 		pos += bpos;
 

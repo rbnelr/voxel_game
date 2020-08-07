@@ -1,11 +1,8 @@
 #pragma once
+#include "common.hpp"
 #include "util/clean_windows_h.hpp"
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
-
-#include "stdio.h"
-#include "assert.h"
-#include <memory>
 
 bool get_vsync ();
 void set_vsync (bool on);

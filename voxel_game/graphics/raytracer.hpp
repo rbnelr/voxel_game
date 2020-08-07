@@ -1,4 +1,5 @@
 #pragma once
+#include "common.hpp"
 #include "graphics_common.hpp"
 #include "../blocks.hpp"
 #include "../util/raw_array.hpp"

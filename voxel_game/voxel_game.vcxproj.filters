@@ -247,6 +247,20 @@
     <ClInclude Include="util\virtual_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="..\tracy\Tracy.hpp">
+      <Filter>tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tracy\TracyC.h">
+      <Filter>tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tracy\TracyOpenGL.hpp">
+      <Filter>tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tracy\TracyVulkan.hpp">
+      <Filter>tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="profiling.hpp" />
+    <ClInclude Include="common.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -361,6 +375,9 @@
     <ClCompile Include="world_octree.cpp" />
     <ClCompile Include="util\virtual_allocator.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tracy\TracyClient.cpp">
+      <Filter>tracy</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -506,6 +523,9 @@
     </Filter>
     <Filter Include="audio">
       <UniqueIdentifier>{8308f250-c772-459a-9e30-8daf4e621711}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tracy">
+      <UniqueIdentifier>{e551c6ec-689e-4052-84b7-92ebdbca2a3e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

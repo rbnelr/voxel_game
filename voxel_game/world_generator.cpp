@@ -1,8 +1,6 @@
 #include "world_generator.hpp"
 #include "blocks.hpp"
 #include "chunks.hpp"
-#include "util/random.hpp"
-#include "util/timer.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
@@ -294,6 +292,8 @@ struct ChunkGenerator {
 };
 
 void WorldGenerator::generate_chunk (Chunk& chunk) const {
+	ZoneScopedN("WorldGenerator::generate_chunk");
+	
 	ChunkGenerator gen = { *this, chunk };
 
 	chunk.init_blocks();

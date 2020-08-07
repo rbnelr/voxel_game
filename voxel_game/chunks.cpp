@@ -2,11 +2,9 @@
 #include "chunk_mesher.hpp"
 #include "player.hpp"
 #include "world.hpp"
-#include "util/timer.hpp"
 #include "util/collision.hpp"
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
-#include <algorithm> // std::sort
 
 const int logical_cores = std::thread::hardware_concurrency();
 
@@ -314,6 +312,8 @@ void Chunks::remesh_all () {
 }
 
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player) {
+	ZoneScopedN("update_chunk_loading");
+
 	world_octree.pre_update(player);
 
 	// check their actual distance to determine if they should be generated or not
@@ -326,6 +326,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 	};
 
 	{ // chunk unloading
+		ZoneScopedN("chunk unloading");
+
 		for (auto it=chunks.begin(); it!=chunks.end();) {
 			float dist = chunk_dist_to_player((*it).coord);
 
@@ -342,6 +344,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 	}
 
 	{ // chunk loading
+		ZoneScopedN("chunk loading");
+
 		chunk_coord start =	(chunk_coord)floor(	((float3)player.pos - generation_radius) / (float3)CHUNK_DIM );
 		chunk_coord end =	(chunk_coord)ceil(	((float3)player.pos + generation_radius) / (float3)CHUNK_DIM );
 
@@ -368,6 +372,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 		}
 
 		{
+			ZoneScopedN("sort chunks_to_generate");
+
 			// load chunks nearest to player first
 			std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
 				[&] (chunk_coord l, chunk_coord r) { return chunk_dist_to_player(l) < chunk_dist_to_player(r); }
@@ -378,6 +384,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 		{
 			for (int i=0; i<count; ++i) {
+				ZoneScopedN("queue chunk_to_generate");
+
 				auto cp = chunks_to_generate[i];
 
 				Chunk* chunk = pending_chunks.alloc_chunk(cp);
@@ -398,6 +406,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 			BackgroundJob res;
 			while (count++ < max_chunk_gens_processed_per_frame && background_threadpool.results.try_pop(&res)) {
+				ZoneScopedN("finialize chunk_to_generate");
+
 				{ // move chunk into real hashmap
 					auto it = pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
 					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
@@ -433,6 +443,8 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 	}
 
 	{
+		ZoneScopedN("sort chunks_to_generate");
+		
 		// update chunks nearest to player first
 		std::sort(chunks_to_remesh.begin(), chunks_to_remesh.end(),
 			[&] (Chunk* l, Chunk* r) { return chunk_dist_to_player(l->coord) < chunk_dist_to_player(r->coord); }
@@ -443,6 +455,8 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 		int count = min((int)chunks_to_remesh.size(), max_chunks_meshed_per_frame);
 
 		for (int i=0; i<count; ++i) {
+			ZoneScopedN("queue chunk_to_remesh");
+
 			auto* chunk = chunks_to_remesh[i];
 
 			ParallelismJob job = {
@@ -457,6 +471,7 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 			auto _total = Timer::start();
 
 			for (int i=0; i<count; ++i) {
+				ZoneScopedN("finialize meshing_result");
 
 				ParallelismJob result = parallelism_threadpool.results.pop();
 

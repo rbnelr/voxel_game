@@ -1,10 +1,5 @@
 #pragma once
-#include "dear_imgui.hpp"
-#include "kissmath.hpp"
-#include "util/random.hpp"
-#include "util/string.hpp"
-#include <vector>
-#include <string>
+#include "common.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);

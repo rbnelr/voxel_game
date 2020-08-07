@@ -1,7 +1,5 @@
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
-#include "util/timer.hpp"
-#include "dear_imgui.hpp"
 
 static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
@@ -243,6 +241,8 @@ struct Chunk_Mesher {
 };
 
 void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+	ZoneScopedN("mesh_chunk");
+
 	Chunk_Mesher cm;
 	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
 }

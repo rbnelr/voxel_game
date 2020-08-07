@@ -1,21 +1,11 @@
 //#include "glad/glad_wgl.h"
 
 #include "glfw_window.hpp"
-#include "kissmath/int2.hpp"
-#include "kissmath/float2.hpp"
 #include "graphics/glshader.hpp"
 #include "graphics/debug_graphics.hpp"
-using namespace kissmath;
 
-#include "util/timer.hpp"
 #include "input.hpp"
 #include "game.hpp"
-#include "dear_imgui.hpp"
-using namespace kiss;
-
-#include <memory>
-#include "stdio.h"
-#include "assert.h"
 
 GLFWwindow*	window = nullptr;
 int			frame_counter = 0;
@@ -46,6 +36,8 @@ bool get_vsync () {
 	return vsync;
 }
 void set_vsync (bool on) {
+	ZoneScopedN("glfwSwapInterval");
+	
 	glfwSwapInterval(on ? _vsync_on_interval : 0);
 	vsync = on;
 }
@@ -105,6 +97,8 @@ bool get_fullscreen (bool* borderless_fullscreen) {
 	return fullscreen;
 }
 bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
+	ZoneScopedN("switch_fullscreen");
+
 	if (!::fullscreen) {
 		// store windowed window placement
 		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
@@ -145,10 +139,12 @@ bool toggle_fullscreen () {
 //// gameloop
 
 void glfw_gameloop () {
+
 	shaders = std::make_unique<ShaderManager>();
 	debug_graphics = std::make_unique<DebugGraphics>();
 
 	{
+		ZoneScopedN("imgui.init()");
 		imgui.init();
 	}
 
@@ -161,6 +157,8 @@ void glfw_gameloop () {
 
 	for (;;) {
 		{
+			ZoneScopedN("get input");
+
 			input.clear_frame_input();
 			glfwPollEvents();
 
@@ -181,6 +179,7 @@ void glfw_gameloop () {
 		}
 
 		{
+			ZoneScopedN("glfwSwapBuffers");
 			glfwSwapBuffers(window);
 		}
 
@@ -194,6 +193,8 @@ void glfw_gameloop () {
 		prev_frame_end = now;
 
 		frame_counter++;
+
+		FrameMark;
 	}
 
 	game = nullptr;
@@ -265,6 +266,8 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 #endif
 
 void glfw_init_gl () {
+	ZoneScopedN("glfw_init_gl");
+
 	glfwMakeContextCurrent(window);
 
 	{
@@ -299,10 +302,16 @@ int main () {
 		glfwSetErrorCallback(glfw_error);
 	#endif
 
-		if (!glfwInit()) {
-			clog(ERROR, "glfwInit failed!\n");
-			return 1;
+		{
+			ZoneScopedN("glfwInit");
+
+			if (!glfwInit()) {
+				clog(ERROR, "glfwInit failed!\n");
+				return 1;
+			}
 		}
+
+		ZoneScopedN("glfwCreateWindow");
 
 	#ifdef OPENGL_DEBUG
 		glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);

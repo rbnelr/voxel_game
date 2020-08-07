@@ -1,6 +1,12 @@
 #pragma once
 #include <mutex>
 #include <cstdlib>
+#include "tracy.hpp"
+
+// Need to wrap locks for tracy
+#define MUTEX				TracyLockableN(std::mutex,	m, "ThreadsafeQueue mutex")
+#define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
+
 
 #define FREELIST_ALLOC_DEBUG_VALUES (!NDEBUG)
 
@@ -15,7 +21,7 @@ class FreelistAllocator {
 
 	Block* freelist = nullptr;
 
-	mutable std::mutex m;
+	MUTEX;
 
 public:
 	// allocate a T (not threadsafe)
@@ -54,7 +60,8 @@ public:
 	T* alloc_threadsafe () {
 		Block* block;
 		{
-			std::lock_guard<std::mutex> lock(m);
+			LOCK_GUARD;
+
 			block = _alloc();
 		}
 
@@ -80,7 +87,8 @@ public:
 	}
 
 	void free_threadsafe (T* ptr) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
+
 		free(ptr);
 	}
 
@@ -105,3 +113,6 @@ public:
 		return count;
 	}
 };
+
+#undef MUTEX			
+#undef LOCK_GUARD		

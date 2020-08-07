@@ -1,6 +1,5 @@
 ﻿#include "raytracer.hpp"
 #include "graphics.hpp"
-#include "../util/timer.hpp"
 #include "../world_octree.hpp"
 
 void Raytracer::imgui () {

@@ -1,11 +1,5 @@
 #pragma once
-#include "../util/string.hpp"
-using namespace kiss;
-
-#include <string>
-#include <unordered_map>
-#include "assert.h"
-#include "../dear_imgui.hpp"
+#include "../common.hpp"
 
 namespace audio {
 	inline int max (int a, int b) {

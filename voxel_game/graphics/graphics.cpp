@@ -1,5 +1,4 @@
 #include "graphics.hpp"
-#include "../util/string.hpp"
 #include "../util/geometry.hpp"
 #include "../chunks.hpp"
 #include "../world.hpp"

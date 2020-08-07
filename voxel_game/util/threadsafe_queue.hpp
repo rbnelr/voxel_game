@@ -3,14 +3,24 @@
 #include <mutex>
 #include <condition_variable>
 #include <algorithm>
+#include "Tracy.hpp"
+
+// Need to wrap locks for tracy
+#define MUTEX				TracyLockableN(std::mutex,	m, "ThreadsafeQueue mutex")
+#define CONDITION_VARIABLE	std::condition_variable_any	c
+
+#define UNIQUE_LOCK			std::unique_lock<LockableBase(std::mutex)> lock(m)
+#define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
+
 
 // based on https://stackoverflow.com/questions/15278343/c11-thread-safe-queue
 
 // multiple producer multiple consumer threadsafe queue with T item
 template <typename T>
 class ThreadsafeQueue {
-	mutable std::mutex		m;
-	std::condition_variable	c;
+	//mutable std::mutex		m;
+	MUTEX;
+	CONDITION_VARIABLE;
 
 	// used like a queue but using a deque to support iteration (a queue is just wrapper around a deque, so it is not less efficient to use a deque over a queue)
 	std::deque<T>			q;
@@ -22,7 +32,8 @@ public:
 	// simply push one element onto the queue
 	// can be called from multiple threads (multiple producer)
 	void push (T elem) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
+
 		q.emplace_back( std::move(elem) );
 		c.notify_one();
 	}
@@ -30,7 +41,7 @@ public:
 	// wait to dequeue one element from the queue
 	// can be called from multiple threads (multiple consumer)
 	T pop () {
-		std::unique_lock<std::mutex> lock(m);
+		UNIQUE_LOCK;
 
 		while(q.empty()) {
 			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
@@ -45,7 +56,7 @@ public:
 	// returns if element was popped or shutdown was set as enum
 	// can be called from multiple threads (multiple consumer)
 	enum { POP, SHUTDOWN } pop_or_shutdown (T* out) {
-		std::unique_lock<std::mutex> lock(m);
+		UNIQUE_LOCK;
 
 		while(!shutdown_flag && q.empty()) {
 			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
@@ -61,7 +72,7 @@ public:
 	// deque one element from the queue if there is one
 	// can be called from multiple threads (multiple consumer)
 	bool try_pop (T* out) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		if (q.empty())
 			return false;
@@ -76,7 +87,7 @@ public:
 	// can be called from multiple threads (multiple consumer)
 	// (pushed on the back of results)
 	bool pop_all (std::vector<T>* results) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		if (q.empty())
 			return false;
@@ -97,7 +108,8 @@ public:
 
 	// set shutdown which all consumers can recieve via pop_or_shutdown
 	void shutdown () {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
+
 		shutdown_flag = true;
 		c.notify_all();
 	}
@@ -106,7 +118,7 @@ public:
 	// elements are allowed to be changed
 	template <typename FOREACH>
 	void iterate_queue (FOREACH callback) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		for (auto it=q.begin(); it!=q.end(); ++it) {
 			callback(*it);
@@ -117,7 +129,7 @@ public:
 	// elements are allowed to be changed
 	template <typename FOREACH>
 	void iterate_queue_newest_first (FOREACH callback) { // front == next to be popped, back == most recently pushed
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		for (auto it=q.rbegin(); it!=q.rend(); ++it) {
 			callback(*it);
@@ -128,7 +140,7 @@ public:
 	// useful to be able to cancel queued jobs in a threadpool
 	template <typename NEED_TO_CANCEL>
 	void remove_if (NEED_TO_CANCEL need_to_cancel) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		for (auto it=q.begin(); it!=q.end();) {
 			if (need_to_cancel(*it)) {
@@ -140,15 +152,20 @@ public:
 	}
 
 	void clear () {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		q.clear();
 	}
 
 	template <typename COMPARATOR>
 	void sort (COMPARATOR cmp) {
-		std::lock_guard<std::mutex> lock(m);
+		LOCK_GUARD;
 
 		std::sort(q.begin(), q.end(), cmp);
 	}
 };
+
+#undef MUTEX				
+#undef CONDITION_VARIABLE
+#undef UNIQUE_LOCK		
+#undef LOCK_GUARD		

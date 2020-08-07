@@ -1,6 +1,5 @@
 #pragma once
-#include "kissmath.hpp"
-#include "dear_imgui.hpp"
+#include "common.hpp"
 
 struct SkyColors {
 	float3 sky_col;

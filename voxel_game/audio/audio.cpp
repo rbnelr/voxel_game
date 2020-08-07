@@ -1,11 +1,8 @@
 #include "audio.hpp"
 #include "read_wav.hpp"
 #include "../input.hpp"
-#include "../kissmath/float.hpp"
-using namespace kissmath;
 
 #include "portaudio.h"
-#include "stdio.h"
 
 #include <atomic>
 
@@ -37,6 +34,8 @@ PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
 int playing_sounds_count = 0;
 
 void AudioManager::update () {
+	ZoneScopedN("AudioManager::update");
+
 	while (locked)
 		; // busy wait
 
@@ -45,6 +44,8 @@ void AudioManager::update () {
 }
 
 void AudioManager::play_sound (Sound* sound, float volume, float speed) {
+	ZoneScopedN("AudioManager::play_sound");
+
 	while (locked)
 		; // busy wait
 

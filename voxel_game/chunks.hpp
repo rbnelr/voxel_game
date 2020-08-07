@@ -1,9 +1,7 @@
 #pragma once
-#include "kissmath.hpp"
+#include "common.hpp"
 #include "blocks.hpp"
 #include "world_octree.hpp"
-#include "util/move_only_class.hpp"
-#include "util/string.hpp"
 #include "util/running_average.hpp"
 #include "util/threadpool.hpp"
 #include "util/raw_array.hpp"
@@ -105,6 +103,13 @@ struct ChunkData {
 	uint8		block_light[COUNT];
 	uint8		sky_light[COUNT];
 	uint8		hp[COUNT];
+
+	ChunkData () {
+		TracyAlloc(this, sizeof(*this));
+	}
+	~ChunkData () {
+		TracyFree(this);
+	}
 
 	static constexpr uint64_t pos_to_index (bpos pos) {
 		return (pos.z + 1) * (CHUNK_DIM+2) * (CHUNK_DIM+2) + (pos.y + 1) * (CHUNK_DIM+2) + (pos.x + 1);
@@ -365,7 +370,7 @@ public:
 	int count_culled;
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius =	50;//200.0f;
+	float generation_radius =	200.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)

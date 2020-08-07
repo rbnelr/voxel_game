@@ -1,11 +1,6 @@
 #pragma once
+#include "common.hpp"
 #include "GLFW/glfw3.h" // using glfw for it's key mapping
-
-#include "kissmath/float2.hpp"
-#include "kissmath/int2.hpp"
-using namespace kissmath;
-
-#include "dear_imgui.hpp"
 
 struct Button {
 	bool is_down   : 1; // button is down

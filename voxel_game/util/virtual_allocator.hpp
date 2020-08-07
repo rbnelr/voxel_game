@@ -1,6 +1,7 @@
 #include "stdint.h"
 #include "move_only_class.hpp"
 #include "assert.h"
+#include "tracy.hpp"
 
 extern const uintptr_t os_page_size;
 
