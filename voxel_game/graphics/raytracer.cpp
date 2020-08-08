@@ -78,6 +78,8 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		shader.set_uniform("time", time);
 
 		{
+			TracyGpuZone("gpu SVO upload");
+
 			using namespace world_octree;
 
 			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);

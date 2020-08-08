@@ -664,6 +664,8 @@ void ChunkGraphics::imgui (Chunks& chunks) {
 }
 
 void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
+	TracyGpuZone("gpu draw_chunks");
+
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -692,6 +694,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
 
 			if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
+				TracyGpuZone("gpu draw_chunk");
+
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.opaque_mesh.bind();
@@ -702,6 +706,8 @@ void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culli
 }
 
 void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler) {
+	TracyGpuZone("gpu draw_chunks_transparent");
+
 	glActiveTexture(GL_TEXTURE0 + 0);
 	tile_textures.tile_textures.bind();
 	sampler.bind(0);
@@ -725,6 +731,8 @@ void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures 
 		for (Chunk const& chunk : chunks.chunks) {
 
 			if (!chunk.culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
+				TracyGpuZone("gpu draw_chunk");
+
 				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
 
 				chunk.mesh.transparent_mesh.bind();
@@ -750,67 +758,85 @@ void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
 }
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, SelectedBlock selected_block) {
+	ZoneScopedN("Graphics::draw");
+	ZoneValue(frame_counter);
+
+	TracyGpuZone("Graphics::draw");
+	
 	uint8 sky_light_reduce;
-	world.time_of_day.calc_sky_colors(&sky_light_reduce);
-
-	fog.set(world.chunks.generation_radius, world.time_of_day.cols);
 	
-	frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
+	{
+		ZoneScopedN("gpu setup");
+		TracyGpuZone("gpu setup");
+
+		world.time_of_day.calc_sky_colors(&sky_light_reduce);
+
+		fog.set(world.chunks.generation_radius, world.time_of_day.cols);
 	
-	if (activate_flycam && debug_frustrum_culling) {
+		frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
+	
+		if (activate_flycam && debug_frustrum_culling) {
 
-		debug_graphics->push_wire_frustrum(player_view, srgba(20, 20, 255));
-		//for (int i=0; i<6; ++i)
-		//	debug_graphics->push_arrow(player_view.frustrum.planes[i].pos, player_view.frustrum.planes[i].normal * 5, cols[i]);
+			debug_graphics->push_wire_frustrum(player_view, srgba(20, 20, 255));
+			//for (int i=0; i<6; ++i)
+			//	debug_graphics->push_arrow(player_view.frustrum.planes[i].pos, player_view.frustrum.planes[i].normal * 5, cols[i]);
 
+		}
+		if (activate_flycam || world.player.third_person) {
+			debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
+		}
+		if (debug_block_light) {
+			for (auto bp : dbg_block_light_add_list)
+				debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.97f, srgba(40,40,250));
+			for (auto bp : dbg_block_light_remove_list)
+				debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
+		}
+
+		//// OpenGL drawcalls
+		common_uniforms.set_view_uniforms(view);
+		common_uniforms.set_debug_uniforms();
+
+		{ // GL state defaults
+		  // 
+			glEnable(GL_FRAMEBUFFER_SRGB);
+			glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+			// scissor
+			glDisable(GL_SCISSOR_TEST);
+			// depth
+			glEnable(GL_DEPTH_TEST);
+			glClearDepth(1.0f);
+			glDepthFunc(GL_LEQUAL);
+			glDepthRange(0.0f, 1.0f);
+			glDepthMask(GL_TRUE);
+			// culling
+			gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
+			glCullFace(GL_BACK);
+			glFrontFace(GL_CCW);
+			// blending
+			glDisable(GL_BLEND);
+			glBlendEquation(GL_FUNC_ADD);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			//
+		#ifdef GL_POLYGON_MODE
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		#endif
+		}
 	}
-	if (activate_flycam || world.player.third_person) {
-		debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
-	}
-	if (debug_block_light) {
-		for (auto bp : dbg_block_light_add_list)
-			debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.97f, srgba(40,40,250));
-		for (auto bp : dbg_block_light_remove_list)
-			debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
-	}
 
-	//// OpenGL drawcalls
-	common_uniforms.set_view_uniforms(view);
-	common_uniforms.set_debug_uniforms();
+	{
+		TracyGpuZone("gpu viewport and clear");
 
-	{ // GL state defaults
-	  // 
-		glEnable(GL_FRAMEBUFFER_SRGB);
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-		// scissor
-		glDisable(GL_SCISSOR_TEST);
-		// depth
-		glEnable(GL_DEPTH_TEST);
-		glClearDepth(1.0f);
-		glDepthFunc(GL_LEQUAL);
-		glDepthRange(0.0f, 1.0f);
-		glDepthMask(GL_TRUE);
-		// culling
-		gl_enable(GL_CULL_FACE, !(common_uniforms.dbg_wireframe && common_uniforms.wireframe_backfaces));
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CCW);
-		// blending
-		glDisable(GL_BLEND);
-		glBlendEquation(GL_FUNC_ADD);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		//
-	#ifdef GL_POLYGON_MODE
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	#endif
+		glViewport(0,0, input.window_size.x, input.window_size.y);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		//glClear(GL_DEPTH_BUFFER_BIT);
 	}
-
-	glViewport(0,0, input.window_size.x, input.window_size.y);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	//glClear(GL_DEPTH_BUFFER_BIT);
 
 	glDisable(GL_BLEND);
 
 	{ //// Opaque pass
+		ZoneScopedN("gpu Opaque pass");
+		TracyGpuZone("gpu Opaque pass");
+
 		if (!raytracer.raytracer_draw || raytracer.overlay) {
 			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
@@ -821,6 +847,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	glEnable(GL_BLEND);
 
 	{ //// Transparent pass
+		ZoneScopedN("gpu Transparent pass");
+		TracyGpuZone("gpu Transparent pass");
 
 		if (activate_flycam || world.player.third_person)
 			player.draw(world.player, tile_textures, sampler);
@@ -841,17 +869,24 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	if (raytracer.raytracer_draw) {
+		ZoneScopedN("gpu raytracer pass");
+		TracyGpuZone("gpu raytracer pass");
+
 		raytracer.draw(world.chunks.world_octree, view, *this, world.time_of_day);
 	}
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 
 	{ //// First person overlay pass
+		TracyGpuZone("gpu First Person pass");
+
 		if (!activate_flycam && !world.player.third_person) 
 			player.draw(world.player, tile_textures, sampler);
 	}
 
 	{ //// Overlay pass
+		TracyGpuZone("gpu Overlay pass");
+
 		glDisable(GL_DEPTH_TEST);
 
 		if (!activate_flycam || creative_mode)

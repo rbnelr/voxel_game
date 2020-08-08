@@ -195,6 +195,8 @@ void glfw_gameloop () {
 
 		frame_counter++;
 
+		TracyGpuCollect;
+
 		FrameMark;
 	}
 
@@ -295,6 +297,8 @@ void glfw_init_gl () {
 		glEnable(GL_FRAMEBUFFER_SRGB);
 	else
 		clog(ERROR, "No sRGB supported! Shading will be non-linear!\n");
+
+	TracyGpuContext;
 }
 
 int main () {
