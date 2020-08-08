@@ -2,19 +2,25 @@
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
 
-static constexpr int offs (int3 offset) {
-	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
-}
-
 struct Chunk_Mesher {
 	bool alpha_test;
 
 	MeshingData* opaque_vertices;
 	MeshingData* tranparent_vertices;
 
-	ChunkData* chunk_data;
+	ChunkData* neighbours[3][3][3];
 
-	uint64_t cur;
+	Block get_block (int3 pos) {
+		int3 bpos;
+		int3 chunk = get_chunk_from_block_pos(pos, &bpos);
+
+		ChunkData* data = neighbours[chunk.z+1][chunk.y+1][chunk.x+1];
+
+		if (data == nullptr)
+			return { B_NULL, 0, 0, 0 };
+
+		return data->get(bpos);
+	}
 
 	// per block
 	float3 block_pos;
@@ -33,33 +39,29 @@ struct Chunk_Mesher {
 		return false;
 	}
 
-	static constexpr int face_offsets[6][4] = {
-		{ offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3(-1, 0,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3( 0,-1, 0)), offs(int3( 0,-1,-1)), offs(int3( 0, 0,-1)) },
-		{ offs(int3( 0,-1, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1, 0,-1)), offs(int3( 0, 0,-1)) },
-		{ offs(int3( 0, 0,-1)), offs(int3(-1, 0,-1)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3( 0,-1, 0)) },
+	static constexpr int3 face_offsets[6][4] = {
+		{ int3(-1, 0, 0), int3(-1,-1, 0), int3(-1,-1,-1), int3(-1, 0,-1) },
+		{ int3( 0, 0, 0), int3( 0,-1, 0), int3( 0,-1,-1), int3( 0, 0,-1) },
+		{ int3( 0,-1, 0), int3(-1,-1, 0), int3(-1,-1,-1), int3( 0,-1,-1) },
+		{ int3( 0, 0, 0), int3(-1, 0, 0), int3(-1, 0,-1), int3( 0, 0,-1) },
+		{ int3( 0, 0,-1), int3(-1, 0,-1), int3(-1,-1,-1), int3( 0,-1,-1) },
+		{ int3( 0, 0, 0), int3(-1, 0, 0), int3(-1,-1, 0), int3( 0,-1, 0) },
 	};
 
-	inline uint8 calc_block_light (BlockFace face, int3 vert_pos) {
-		auto* block_light = &chunk_data->block_light[cur + offs(vert_pos)];
-		
+	inline uint8 calc_block_light (BlockFace face, int3 vert_pos, int3 pos) {
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += block_light[offset];
+			total += get_block(pos + vert_pos + offset).block_light;
 		}
 		
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
-	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
-		auto* sky_light = &chunk_data->sky_light[cur + offs(vert_pos)];
-
+	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos, int3 pos) {
 		int total = 0;
 
 		for (auto offset : face_offsets[face]) {
-			total += sky_light[offset];
+			total += get_block(pos + vert_pos + offset).sky_light;
 		}
 
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
@@ -74,7 +76,7 @@ struct Chunk_Mesher {
 
 #define VERT(x,y,z, u,v, face) \
 		{ block_pos + float3(x,y,z), float2(u,v), (uint8)tile.calc_texture_index(face), \
-		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
+		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), block.hp }
 
 #define POS \
 	{ {0,1,0}, {0,0,0}, {0,0,1}, {0,1,1} }, \
@@ -94,23 +96,23 @@ struct Chunk_Mesher {
 		{ 1,2,0, 0,2,3 },
 	};
 
-	static constexpr int offsets[6] = {
-		-1,
-		+1,
-		-CHUNK_ROW_OFFS,
-		+CHUNK_ROW_OFFS,
-		-CHUNK_LAYER_OFFS,
-		+CHUNK_LAYER_OFFS,
+	static constexpr int3 offsets[6] = {
+		int3(-1, 0, 0),
+		int3(+1, 0, 0),
+		int3(0, -1, 0),
+		int3(0, +1, 0),
+		int3(0, 0, -1),
+		int3(0, 0, +1),
 	};
 
-	void face (MeshingData* out, BlockFace facei) {
+	void face (MeshingData* out, BlockFace facei, Block block, int3 _pos) {
 
 		ChunkMesh::Vertex vert[4];
 
 		float3 const* pf = posf[facei];
 		int3 const* p = pos[facei];
 
-		auto hp = chunk_data->hp[cur];
+		auto hp = block.hp;
 
 		for (int i=0; i<4; ++i)
 			vert[i].pos_model	= block_pos + pf[i];
@@ -119,9 +121,9 @@ struct Chunk_Mesher {
 		for (int i=0; i<4; ++i)
 			vert[i].tex_indx	= (uint8)tile.calc_texture_index(facei);
 		for (int i=0; i<4; ++i)
-			vert[i].block_light	= calc_block_light(facei, p[i]);
+			vert[i].block_light	= calc_block_light(facei, p[i], _pos);
 		for (int i=0; i<4; ++i)
-			vert[i].sky_light	= calc_sky_light(facei, p[i]);
+			vert[i].sky_light	= calc_sky_light(facei, p[i], _pos);
 		for (int i=0; i<4; ++i)
 			vert[i].hp			= hp;
 
@@ -133,22 +135,22 @@ struct Chunk_Mesher {
 		}
 	}
 
-	void cube_opaque () {
+	void cube_opaque (Block block, int3 pos) {
 		for (int i=0; i<6; ++i) {
-			block_id n = chunk_data->id[cur + offsets[i]];
+			block_id n = get_block(pos + offsets[i]).id;
 			if (!bt_is_opaque(n))
-				face(opaque_vertices, (BlockFace)i);
+				face(opaque_vertices, (BlockFace)i, block, pos);
 		}
 	}
-	void cube_transperant () {
+	void cube_transperant (Block block, int3 pos) {
 		for (int i=0; i<6; ++i) {
-			block_id n = chunk_data->id[cur + offsets[i]];
-			block_id b = chunk_data->id[cur];
+			block_id n = get_block(pos + offsets[i]).id;
+			block_id b = block.id;
 			if (!bt_is_opaque(n) && n != b)
-				face(tranparent_vertices, (BlockFace)i);
+				face(tranparent_vertices, (BlockFace)i, block, pos);
 		}
 	}
-	void block_mesh (BlockMeshInfo info, int3 block_pos_world, uint64_t world_seed) {
+	void block_mesh (BlockMeshInfo info, Block block, int3 block_pos_world, uint64_t world_seed) {
 		//OPTICK_EVENT();
 
 		// get a 'random' but deterministic value based on block position
@@ -174,9 +176,9 @@ struct Chunk_Mesher {
 			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
 
 			ptr->tex_indx = tile.base_index + variant;
-			ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
-			ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
-			ptr->hp = chunk_data->hp[cur];
+			ptr->block_light = block.block_light * 255 / MAX_LIGHT_LEVEL;
+			ptr->sky_light = block.sky_light * 255 / MAX_LIGHT_LEVEL;
+			ptr->hp = block.hp;
 		}
 	}
 
@@ -185,7 +187,17 @@ struct Chunk_Mesher {
 
 		block_meshes = &tile_textures.block_meshes;
 
-		chunk_data = chunk->blocks.get();
+		for (int z=-1; z<=1; ++z) {
+			for (int y=-1; y<=1; ++y) {
+				for (int x=-1; x<=1; ++x) {
+					Chunk* ch = x==0 && y==0 && z==0 ? chunk : chunks.query_chunk(chunk->coord + int3(x,y,z));
+		
+					neighbours[z+1][y+1][x+1] = ch ? ch->blocks.get() : nullptr;
+				}
+			}
+		}
+
+		neighbours[1][1][1] = chunk->blocks.get();
 
 		opaque_vertices		= &res->opaque_vertices;
 		tranparent_vertices	= &res->tranparent_vertices;
@@ -201,36 +213,30 @@ struct Chunk_Mesher {
 		int3 i = 0;
 		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
 			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
+				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
 
-				i.x = 0;
-				cur = ChunkData::pos_to_index(i);
+					auto b = get_block(i);
 
-				for (; i.x<CHUNK_DIM; ++i.x) {
-
-					auto id = chunk_data->id[cur];
-
-					if (id != B_AIR) {
+					if (b.id != B_AIR) {
 						//auto _b = get_timestamp();
 
 						block_pos = (float3)i;
 
-						tile = tile_textures.block_tile_info[id];
-						auto mesh_info = tile_textures.block_meshes_info[id];
+						tile = tile_textures.block_tile_info[b.id];
+						auto mesh_info = tile_textures.block_meshes_info[b.id];
 
 						if (mesh_info.offset < 0) {
-							if (blocks.transparency[id] == TM_TRANSPARENT)
-								cube_transperant();
+							if (blocks.transparency[b.id] == TM_TRANSPARENT)
+								cube_transperant(b, i);
 							else
-								cube_opaque();
+								cube_opaque(b, i);
 						} else {
 
-							block_mesh(mesh_info, i + chunk->chunk_pos_world(), wg.seed);
+							block_mesh(mesh_info, b, i + chunk->chunk_pos_world(), wg.seed);
 						}
 
 						//sum += get_timestamp() - _b;
 					}
-
-					cur++;
 				}
 			}
 		}

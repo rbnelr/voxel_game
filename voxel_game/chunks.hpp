@@ -24,8 +24,8 @@ typedef int3	chunk_coord;
 #define CHUNK_DIM			64
 #define CHUNK_DIM_SHIFT		6 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_MASK		((1 << CHUNK_DIM_SHIFT) -1)
-#define CHUNK_ROW_OFFS		(CHUNK_DIM+2)
-#define CHUNK_LAYER_OFFS	((CHUNK_DIM+2)*(CHUNK_DIM+2))
+#define CHUNK_ROW_OFFS		CHUNK_DIM
+#define CHUNK_LAYER_OFFS	(CHUNK_DIM*CHUNK_DIM)
 
 #define CHUNK_BLOCK_COUNT	(CHUNK_DIM * CHUNK_DIM * CHUNK_DIM)
 
@@ -86,18 +86,10 @@ class World;
 struct WorldGenerator;
 class Player;
 
-static inline constexpr int _block_count (int lod_levels) {
-	int count = 0;
-	for (int lod=0; lod<lod_levels; ++lod) {
-		count += (CHUNK_DIM >> lod) * (CHUNK_DIM >> lod) * (CHUNK_DIM >> lod);
-	}
-	return count;
-};
-
 ////////////// Chunk
 
 struct ChunkData {
-	static constexpr uint64_t COUNT = (CHUNK_DIM+2) * (CHUNK_DIM+2) * (CHUNK_DIM+2);
+	static constexpr uint64_t COUNT = CHUNK_DIM * CHUNK_DIM * CHUNK_DIM;
 
 	block_id	id[COUNT];
 	uint8		block_light[COUNT];
@@ -112,11 +104,11 @@ struct ChunkData {
 	}
 
 	static constexpr uint64_t pos_to_index (bpos pos) {
-		return (pos.z + 1) * (CHUNK_DIM+2) * (CHUNK_DIM+2) + (pos.y + 1) * (CHUNK_DIM+2) + (pos.x + 1);
+		return (uint64_t)pos.z * CHUNK_DIM*CHUNK_DIM + (uint64_t)pos.y * CHUNK_DIM + (uint64_t)pos.x;
 	}
 
 	Block get (bpos pos) {
-		assert(all(pos >= -1 && pos <= CHUNK_DIM+1));
+		assert(all(pos >= 0 && pos <= CHUNK_DIM));
 
 		Block b;
 
@@ -130,7 +122,7 @@ struct ChunkData {
 		return b;
 	}
 	void set (bpos pos, Block b) {
-		assert(all(pos >= -1 && pos <= CHUNK_DIM+1));
+		assert(all(pos >= 0 && pos <= CHUNK_DIM));
 
 		auto indx = pos_to_index(pos);
 
@@ -246,8 +238,6 @@ public:
 	void _set_block_no_light_update (Chunks& chunks, bpos pos, Block b);
 	// set block (expensive, -> potentially updates light and copies block data to neighbours if block is at the border of a chunk)
 	void set_block (Chunks& chunks, bpos pos, Block b);
-
-	void update_neighbour_blocks(Chunks& chunks);
 
 	// update flags
 	bool needs_remesh = true;

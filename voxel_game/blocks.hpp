@@ -135,6 +135,10 @@ struct Block {
 		sky_light = 0;
 		hp = 255;
 	}
+	Block (block_id	id, uint8_t block_light, uint8_t sky_light, uint8_t hp):
+			id{id}, block_light{block_light}, sky_light{sky_light}, hp{hp} {
+
+	}
 };
 
 // global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries

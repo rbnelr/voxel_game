@@ -113,7 +113,7 @@ class SparseAllocator {
 public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
-		assert(os_page_size % sizeof(T) == 0);
+		assert(sizeof(T) % os_page_size == 0);
 		baseptr = reserve_address_space(sizeof(T)*max_count);
 	}
 

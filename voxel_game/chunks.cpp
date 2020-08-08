@@ -50,8 +50,8 @@ Chunk::Chunk (chunk_coord coord): coord{coord} {
 
 void ChunkData::init_border () {
 
-	for (int i=0; i<COUNT; ++i)
-		id[i] = B_NO_CHUNK;
+	//for (int i=0; i<COUNT; ++i)
+	//	id[i] = B_NO_CHUNK;
 
 	memset(block_light, 0, sizeof(block_light));
 	//memset(sky_light, 0, sizeof(sky_light)); // always inited by update sky light after chunk gen
@@ -78,37 +78,6 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 	needs_remesh = true;
 
 	chunks.world_octree.update_block(*this, pos_in_chunk, b.id); 
-
-	bool3 lo = (bpos)pos_in_chunk == 0;
-	bool3 hi = (bpos)pos_in_chunk == (bpos)CHUNK_DIM-1;
-	if (any(lo || hi)) {
-		// block at border
-
-		auto update_neighbour_block_copy = [=, &chunks] (chunk_coord chunk_offset, bpos block) {
-			auto chunk = chunks.query_chunk(coord + chunk_offset);
-			if (chunk) {
-				chunk->blocks->set(block, b);
-
-				chunk->needs_remesh = true;
-			}
-		};
-
-		if (lo.x) {
-			update_neighbour_block_copy(chunk_coord(-1, 0, 0), bpos(CHUNK_DIM, pos_in_chunk.y, pos_in_chunk.z));
-		} else if (hi.x) {
-			update_neighbour_block_copy(chunk_coord(+1, 0, 0), bpos(       -1, pos_in_chunk.y, pos_in_chunk.z));
-		}
-		if (lo.y) {
-			update_neighbour_block_copy(chunk_coord(0, -1, 0), bpos(pos_in_chunk.x, CHUNK_DIM, pos_in_chunk.z));
-		} else if (hi.y) {
-			update_neighbour_block_copy(chunk_coord(0, +1, 0), bpos(pos_in_chunk.x,        -1, pos_in_chunk.z));
-		}
-		if (lo.z) {
-			update_neighbour_block_copy(chunk_coord(0, 0, -1), bpos(pos_in_chunk.x, pos_in_chunk.y, CHUNK_DIM));
-		} else if (hi.z) {
-			update_neighbour_block_copy(chunk_coord(0, 0, +1), bpos(pos_in_chunk.x, pos_in_chunk.y,        -1));
-		}
-	}
 }
 void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block blk = blocks->get(pos_in_chunk);
@@ -130,85 +99,6 @@ void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 		update_block_light(chunks, pos, old_block_light, new_block_light);
 
 		update_sky_light_column(this, pos_in_chunk);
-	}
-}
-
-void set_neighbour_blocks_nx (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM; ++z) {
-		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.blocks->set(bpos(CHUNK_DIM, y,z), src.get_block(int3(0,y,z)));
-		}
-	}
-}
-void set_neighbour_blocks_px (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM; ++z) {
-		for (int y=0; y<CHUNK_DIM; ++y) {
-			dst.blocks->set(bpos(-1, y,z), src.get_block(int3(CHUNK_DIM-1, y,z)));
-		}
-	}
-}
-void set_neighbour_blocks_ny (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM; ++z) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.blocks->set(bpos(x, CHUNK_DIM, z), src.get_block(int3(x,0,z)));
-		}
-	}
-}
-void set_neighbour_blocks_py (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int z=0; z<CHUNK_DIM; ++z) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.blocks->set(bpos(x, -1, z), src.get_block(int3(x, CHUNK_DIM-1, z)));
-		}
-	}
-}
-void set_neighbour_blocks_nz (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int y=0; y<CHUNK_DIM; ++y) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.blocks->set(bpos(x, y, CHUNK_DIM), src.get_block(int3(x,y,0)));
-		}
-	}
-}
-void set_neighbour_blocks_pz (Chunks& chunks, Chunk const& src, Chunk& dst) {
-	for (int y=0; y<CHUNK_DIM; ++y) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			dst.blocks->set(bpos(x, y, -1), src.get_block(int3(x, y, CHUNK_DIM-1)));
-		}
-	}
-}
-
-void Chunk::update_neighbour_blocks (Chunks& chunks) {
-	Chunk* chunk;
-	if ((chunk = chunks.query_chunk(coord + chunk_coord(-1, 0, 0)))) {
-		set_neighbour_blocks_nx(chunks, *this, *chunk);
-		set_neighbour_blocks_px(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
-	}
-	if ((chunk = chunks.query_chunk(coord + chunk_coord(+1, 0, 0)))) {
-		set_neighbour_blocks_px(chunks, *this, *chunk);
-		set_neighbour_blocks_nx(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
-	}
-
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,-1, 0)))) {
-		set_neighbour_blocks_ny(chunks, *this, *chunk);
-		set_neighbour_blocks_py(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
-	}
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0,+1, 0)))) {
-		set_neighbour_blocks_py(chunks, *this, *chunk);
-		set_neighbour_blocks_ny(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
-	}
-
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,-1)))) {
-		set_neighbour_blocks_nz(chunks, *this, *chunk);
-		set_neighbour_blocks_pz(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
-	}
-	if ((chunk = chunks.query_chunk(coord + chunk_coord( 0, 0,+1)))) {
-		set_neighbour_blocks_pz(chunks, *this, *chunk);
-		set_neighbour_blocks_nz(chunks, *chunk, *this);
-		chunk->needs_remesh = true;
 	}
 }
 
@@ -416,7 +306,6 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 					world_octree.add_chunk(*res.chunk);
 				}
-				res.chunk->update_neighbour_blocks(*this);
 
 				chunk_gen_time.push(res.time);
 				clog("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
