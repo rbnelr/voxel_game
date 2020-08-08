@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "world_generator.hpp"
 #include "blocks.hpp"
 #include "chunks.hpp"

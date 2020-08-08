@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "blocks.hpp"
 #include "world_octree.hpp"
 #include "util/running_average.hpp"

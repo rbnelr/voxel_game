@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "image.hpp"
 #include "../stb_image.hpp"
 

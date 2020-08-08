@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
 

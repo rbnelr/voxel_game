@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "world_octree.hpp"
 #include "chunks.hpp"
 #include "player.hpp"

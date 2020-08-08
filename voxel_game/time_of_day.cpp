@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "time_of_day.hpp"
 #include "voxel_light.hpp"
 

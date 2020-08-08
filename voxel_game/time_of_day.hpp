@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 
 struct SkyColors {
 	float3 sky_col;

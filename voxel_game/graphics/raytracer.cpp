@@ -1,4 +1,5 @@
-﻿#include "raytracer.hpp"
+﻿#include "stdafx.hpp"
+#include "raytracer.hpp"
 #include "graphics.hpp"
 #include "../world_octree.hpp"
 

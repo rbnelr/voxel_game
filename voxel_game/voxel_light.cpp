@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "voxel_light.hpp"
 
 struct LitBlock {

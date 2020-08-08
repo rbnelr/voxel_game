@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "chunks.hpp"
 #include "graphics/camera.hpp"
 #include "physics.hpp"

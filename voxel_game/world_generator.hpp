@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);

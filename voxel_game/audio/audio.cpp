@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "audio.hpp"
 #include "read_wav.hpp"
 #include "../input.hpp"

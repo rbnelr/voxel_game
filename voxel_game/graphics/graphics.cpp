@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "graphics.hpp"
 #include "../util/geometry.hpp"
 #include "../chunks.hpp"

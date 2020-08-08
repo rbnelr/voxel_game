@@ -1,5 +1,5 @@
 #pragma once
-#include "../common.hpp"
+#include "stdafx.hpp"
 #include "audio.hpp"
 
 namespace audio {

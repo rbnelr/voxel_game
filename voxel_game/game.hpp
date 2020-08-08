@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "world_generator.hpp"
 #include "world.hpp"
 #include "block_update.hpp"

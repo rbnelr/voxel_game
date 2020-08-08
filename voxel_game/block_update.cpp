@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "block_update.hpp"
 #include "chunks.hpp"
 

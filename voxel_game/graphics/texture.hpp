@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.hpp"
 #include "gl.hpp"
 #include "image.hpp"
 #include "../dear_imgui.hpp"

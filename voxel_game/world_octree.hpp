@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "blocks.hpp"
 #include "util/freelist_allocator.hpp"
 #include "util/virtual_allocator.hpp"

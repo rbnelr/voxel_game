@@ -1,4 +1,5 @@
 #pragma 
+#include "stdafx.hpp"
 #include "../kissmath.hpp"
 #include "texture.hpp"
 #include "image.hpp"

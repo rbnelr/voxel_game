@@ -1,4 +1,5 @@
 #pragma once
+#include "stdafx.hpp"
 #include "gl.hpp"
 #include "camera.hpp"
 #include "shaders.hpp"

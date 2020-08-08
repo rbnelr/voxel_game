@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "glfw_window.hpp"
 #include "game.hpp"
 #include "graphics/gl.hpp"

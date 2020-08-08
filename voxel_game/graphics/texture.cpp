@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "texture.hpp"
 #include "../util/file_io.hpp"
 #include "../stb_image.hpp"

@@ -1,4 +1,5 @@
-﻿#include "chunks.hpp"
+﻿#include "stdafx.hpp"
+#include "chunks.hpp"
 #include "chunk_mesher.hpp"
 #include "player.hpp"
 #include "world.hpp"

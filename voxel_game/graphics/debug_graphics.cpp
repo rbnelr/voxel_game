@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "debug_graphics.hpp"
 #include "../util/geometry.hpp"
 

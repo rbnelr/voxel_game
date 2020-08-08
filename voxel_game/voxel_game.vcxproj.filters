@@ -260,7 +260,7 @@
       <Filter>tracy</Filter>
     </ClInclude>
     <ClInclude Include="profiling.hpp" />
-    <ClInclude Include="common.hpp" />
+    <ClInclude Include="stdafx.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -379,6 +379,7 @@
     <ClCompile Include="..\tracy\TracyClient.cpp">
       <Filter>tracy</Filter>
     </ClCompile>
+    <ClCompile Include="stdafx.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "read_wav.hpp"
 #include "../util/file_io.hpp"
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "../common.hpp"
+#include "stdafx.hpp"
 
 namespace audio {
 	inline int max (int a, int b) {

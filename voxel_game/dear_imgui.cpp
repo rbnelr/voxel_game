@@ -1,3 +1,5 @@
+#include "stdafx.hpp"
+
 #include "dear_imgui.hpp"
 #include "glfw_window.hpp"
 #include "util/string.hpp"

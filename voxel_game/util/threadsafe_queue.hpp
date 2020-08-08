@@ -3,6 +3,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <algorithm>
+#include <vector>
 #include "Tracy.hpp"
 
 // Need to wrap locks for tracy

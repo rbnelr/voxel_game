@@ -1,6 +1,7 @@
 #pragma once
 #include "../kissmath.hpp"
 #include <vector>
+#include "assert.h"
 
 enum AnimInterpMode {
 	AIM_NONE,

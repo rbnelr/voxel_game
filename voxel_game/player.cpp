@@ -1,5 +1,8 @@
+#include "stdafx.hpp"
 #include "player.hpp"
 #include "world.hpp"
+#include "input.hpp"
+#include "GLFW/glfw3.h"
 
 float3	player_spawn_point = float3(3,3,34);
 

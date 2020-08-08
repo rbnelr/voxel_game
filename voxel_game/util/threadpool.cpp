@@ -1,6 +1,8 @@
 #include "threadpool.hpp"
 #include "assert.h"
 
+#undef WIN32_LEAN_AND_MEAN
+
 #if defined(_WIN32)
 	#include "windows.h"
 	void set_process_priority () {

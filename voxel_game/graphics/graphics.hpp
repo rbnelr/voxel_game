@@ -1,11 +1,11 @@
 #pragma once
-#include "../common.hpp"
+#include "stdafx.hpp"
 #include "../blocks.hpp"
 #include "../items.hpp"
 #include "../util/animation.hpp"
 #include "atlas.hpp"
 #include "../time_of_day.hpp"
-#include "graphics_common.hpp"
+#include "common.hpp"
 #include "raytracer.hpp"
 
 // rotate from facing up to facing in a block face direction

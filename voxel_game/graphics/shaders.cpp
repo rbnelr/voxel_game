@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "shaders.hpp"
 
 gl::Shader* ShaderManager::load_shader (std::string name) {

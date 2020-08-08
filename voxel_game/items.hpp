@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "blocks.hpp"
 
 enum item_id : uint32_t {

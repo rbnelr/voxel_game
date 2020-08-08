@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "GLFW/glfw3.h" // using glfw for it's key mapping
 
 struct Button {

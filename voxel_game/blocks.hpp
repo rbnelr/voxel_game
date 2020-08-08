@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 
 enum collision_mode : uint8 {
 	CM_GAS			=0, // fall/walk through

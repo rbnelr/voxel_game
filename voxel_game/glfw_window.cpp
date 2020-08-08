@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 //#include "glad/glad_wgl.h"
 
 #include "glfw_window.hpp"

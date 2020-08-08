@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "camera.hpp"
 #include "../input.hpp"
 

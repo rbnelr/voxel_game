@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "util/collision.hpp"
 
 #define DEFAULT_GRAVITY 20

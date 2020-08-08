@@ -1,6 +1,6 @@
 #pragma once
+#include "stdafx.hpp"
 #include "gl.hpp"
-#include "common.hpp"
 #include "shaders.hpp"
 #include "texture.hpp"
 #include "debug_graphics.hpp"

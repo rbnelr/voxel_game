@@ -1,5 +1,5 @@
 #pragma once
-#include "common.hpp"
+#include "stdafx.hpp"
 #include "util/clean_windows_h.hpp"
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"

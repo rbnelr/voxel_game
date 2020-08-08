@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "glshader.hpp"
 #include "common.hpp"
 #include "../util/file_io.hpp"

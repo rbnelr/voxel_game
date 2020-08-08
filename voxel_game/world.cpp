@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "world.hpp"
 
 SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, bool hit_at_max_dist, float* hit_dist) {

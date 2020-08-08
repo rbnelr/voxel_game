@@ -1,3 +1,4 @@
+#include "stdafx.hpp"
 #include "physics.hpp"
 #include "blocks.hpp"
 #include "world.hpp"
