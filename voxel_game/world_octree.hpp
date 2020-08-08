@@ -12,7 +12,6 @@ namespace world_octree {
 	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
 		return (x + y - 1) & ~(y - 1);
 	}
-	static constexpr uint16_t INTNULL = (uint16_t)-1;
 
 	enum Node : uint16_t {
 		LEAF_BIT = 0x8000u,
@@ -40,7 +39,8 @@ namespace world_octree {
 
 	struct PageInfo {
 		uint16_t		count = 0;
-		uint16_t		freelist = INTNULL;
+		uint16_t		freelist = 0; // 0 can never be a valid freelist value, because root (first) node should never be freed
+		uint16_t		scale = 0;
 
 		Node*			farptr_ptr = nullptr;
 		Page*			sibling_ptr = nullptr; // ptr to next child of parent
@@ -71,7 +71,7 @@ namespace world_octree {
 
 			auto ptr = info.count++;
 
-			if (info.freelist == INTNULL) {
+			if (!info.freelist) {
 				return ptr;
 			}
 
@@ -80,7 +80,11 @@ namespace world_octree {
 			return ret;
 		}
 		void free_node (uint16_t node) {
-			assert(info.count > 0 && (node & (FARPTR_BIT|LEAF_BIT)) == 0 && node < PAGE_NODES);
+			assert(node > 0 && info.count > 0 && (node & (FARPTR_BIT|LEAF_BIT)) == 0 && node < PAGE_NODES);
+
+		#if !NDEBUG
+			memset(&nodes[node], 0, sizeof(nodes[node]));
+		#endif
 
 			*((uint16_t*)&nodes[node]) = info.freelist;
 			info.freelist = node;
@@ -89,7 +93,7 @@ namespace world_octree {
 
 		void free_all_nodes () {
 			info.count = 0;
-			info.freelist = INTNULL;
+			info.freelist = 0;
 		}
 
 		void add_child (Node* farptr_ptr, Page* child) {

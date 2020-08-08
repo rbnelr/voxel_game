@@ -24,8 +24,6 @@ namespace world_octree {
 		int total_nodes = 0;
 		int active_nodes = 0;
 		for (int i=0; i<pages.size(); ++i) {
-			if (pages[i].info.count == INTNULL) continue;
-
 			active_nodes += pages[i].info.count;
 			total_nodes += PAGE_NODES;
 
@@ -97,15 +95,21 @@ namespace world_octree {
 		}
 	}
 
+	struct DecentStack {
+		Node*	node;
+		Page*	page;
+	};
+
 	struct PageSplitter {
 		Page* page;
 
 		int target_page_size;
 
 		Node* split_node;
+		uint16_t split_node_scale;
 		int split_node_closeness = INT_MAX;
 
-		uint16_t find_split_node_recurse (Node* node) {
+		uint16_t find_split_node_recurse (Node* node, uint16_t scale) {
 			assert((*node & LEAF_BIT) == 0);
 
 			uint16_t subtree_size = 1; // count ourself
@@ -114,13 +118,14 @@ namespace world_octree {
 			for (int i=0; i<8; ++i) {
 				auto& children = page->nodes[*node];
 				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
-					subtree_size += find_split_node_recurse(&children[i]);
+					subtree_size += find_split_node_recurse(&children[i], scale-1);
 			}
 
 			// keep track of node that splits the node in half the best
 			int closeness = abs(subtree_size - target_page_size);
 			if (closeness < split_node_closeness) {
 				split_node = node;
+				split_node_scale = scale;
 				split_node_closeness = closeness;
 			}
 
@@ -128,36 +133,49 @@ namespace world_octree {
 		}
 	};
 
-	Node split_subtree (Page pages[], Page* splitpage, Page* srcpage, Node splitnode) {
-		assert((splitnode & LEAF_BIT) == 0);
+	struct _SplitSubtree {
+		Page* pages;
+		Page* splitpage;
+		Page* srcpage;
+		Node** stack;
 
-		// alloc node in splitpage
-		uintptr_t children_ptr = splitpage->alloc_node();
+		Node split_subtree (Node splitnode, uint16_t scale) {
+			assert((splitnode & LEAF_BIT) == 0);
 
-		// copy children nodes
-		children_t children;
-		memcpy(children, srcpage->nodes[splitnode], sizeof(children_t));
+			// alloc node in splitpage
+			uint16_t children_ptr = splitpage->alloc_node();
 
-		// free children node
-		srcpage->free_node(splitnode);
+			for (int i=0; i<8; ++i) {
+				Node& child = srcpage->nodes[splitnode][i];
 
-		for (int i=0; i<8; ++i) {
-			Node child = children[i];
+				// move over children to splitnode if node was farptr
+				if (child & FARPTR_BIT) {
+					srcpage->remove_child(&pages[child & ~FARPTR_BIT]);
+					splitpage->add_child(&splitpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
+				}
 
-			// move over children to splitnode if node was farptr
-			if (child & FARPTR_BIT) {
-				srcpage->remove_child(&pages[child & ~FARPTR_BIT]);
-				splitpage->add_child(&splitpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
+				if (stack[scale-1] == &child) {
+					stack[scale-1] = &splitpage->nodes[children_ptr][i];
+				} else {
+					for (uint16_t i=0; i<MAX_DEPTH; ++i) {
+						if (stack[scale] == &child) {
+							assert(false);
+						}
+					}
+				}
+
+				splitpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
+					child :
+					split_subtree(child, scale-1);
 			}
 
-			splitpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
-				child :
-				split_subtree(pages, splitpage, srcpage, child);
-		}
+			// free children node
+			srcpage->free_node(splitnode);
 
-		return (Node)children_ptr;
-	}
-	void split_page (WorldOctree& oct, Page* page) {
+			return (Node)children_ptr;
+		}
+	};
+	void split_page (WorldOctree& oct, Page* page, Node* stack[]) {
 		ZoneScopedN("world_octree::split_page");
 		
 		// find splitnode
@@ -165,7 +183,7 @@ namespace world_octree {
 		ps.target_page_size = page->info.count / 2;
 
 		Node root = (Node)0;
-		ps.find_split_node_recurse(&root);
+		ps.find_split_node_recurse(&root, page->info.scale);
 
 		assert((*ps.split_node & LEAF_BIT) == 0);
 		if (ps.split_node == &root) {
@@ -177,9 +195,10 @@ namespace world_octree {
 
 		// alloc childpage
 		Page* childpage = oct.pages.alloc_page();
+		childpage->info.scale = ps.split_node_scale;
 
 		// create childpage from subtree
-		split_subtree(&oct.pages[0], childpage, page, *ps.split_node);
+		_SplitSubtree{ &oct.pages[0], childpage, page, stack }.split_subtree(*ps.split_node, ps.split_node_scale);
 		
 		// set childpage farptr in tmppage
 		*ps.split_node = (Node)(oct.pages.indexof(childpage) | FARPTR_BIT);
@@ -263,25 +282,24 @@ namespace world_octree {
 		if (any(pos < 0 || pos >= (1 << oct.root_scale)))
 			return;
 
-	restart_decent:
 		// start with root node
 		int cur_scale = oct.root_scale;
-		Page* cur_page = &oct.pages[0];
-		Node node_ptr = (Node)0;
-		Node* child_node = nullptr;
 
-		Node* node_path[MAX_DEPTH] = {};
+		Node* stack[MAX_DEPTH] = {};
+
+		children_t* siblings = &oct.pages[0].nodes[0];
 
 		for (;;) {
-			// get child node that contains target node
 			cur_scale--;
-			
+
+			// get child node that contains target node
 			int child_idx = get_child_index(pos, cur_scale);
 
-			child_node = &cur_page->nodes[node_ptr][child_idx];
+			Node* child_node = &(*siblings)[child_idx];
+			Page* page = page_from_node(child_node);
 
 			// keep track of node path for collapsing of same type octree nodes (these get invalidated on split page, which do never need to collapse)
-			node_path[cur_scale] = child_node;
+			stack[cur_scale] = child_node;
 
 			if (cur_scale == scale) {
 				// reached target octree depth
@@ -291,14 +309,14 @@ namespace world_octree {
 			if ((*child_node & LEAF_BIT) == 0) {
 				// recurse normally
 
-				node_ptr = *child_node;
+				Node node_ptr = *child_node;
 
 				if (node_ptr & FARPTR_BIT) {
-					assert(node_ptr != (Node)INTNULL);
-
-					cur_page = &oct.pages[ node_ptr & ~FARPTR_BIT ];
+					page = &oct.pages[ node_ptr & ~FARPTR_BIT ];
 					node_ptr = (Node)0;
 				}
+
+				siblings = &page->nodes[node_ptr];
 			} else {
 				//// Split node into 8 children of same type
 
@@ -309,26 +327,26 @@ namespace world_octree {
 					break;
 				}
 
-				if (cur_page->nodes_full()) {
+				if (page->nodes_full()) {
 					// page full
 
 					// Do split page which will have created 2 new pages with about half the nodes out of the full page
-					split_page(oct, cur_page);
+					split_page(oct, page, stack);
 
-					// cur_child and cur_page were invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
-					// I might attempt to keep track of cur_child and fix it in split_page, or redecend from the root of the cur page,
-					// but a total redecent should always work, so let's just do that with a goto
-					goto restart_decent;
+					child_node = stack[cur_scale];
+					page = page_from_node(child_node);
 				}
 
-				node_ptr = (Node)cur_page->alloc_node();
+				Node node_ptr = (Node)page->alloc_node();
 
 				// write ptr to children into this nodes slot in parents children array
 				*child_node = node_ptr;
 
+				siblings = &page->nodes[node_ptr];
+
 				// alloc and init children for node
 				for (int i=0; i<8; ++i) {
-					cur_page->nodes[node_ptr][i] = (Node)(LEAF_BIT | leaf_val);
+					(*siblings)[i] = (Node)(LEAF_BIT | leaf_val);
 				}
 			}
 		}
@@ -337,7 +355,7 @@ namespace world_octree {
 
 		// collapse nodes containing same leaf nodes
 		for (int scale=cur_scale;; scale++) {
-			write_node = node_path[scale];
+			write_node = stack[scale];
 
 			if (scale == oct.root_scale-1) {
 				break;
@@ -454,6 +472,7 @@ namespace world_octree {
 	void WorldOctree::pre_update (Player const& player) {
 		if (pages.size() == 0) {
 			auto* rootpage = pages.alloc_page();
+			rootpage->info.scale = root_scale;
 			assert(pages.indexof(rootpage) == 0);
 
 			auto& root = rootpage->nodes[ rootpage->alloc_node() ];
