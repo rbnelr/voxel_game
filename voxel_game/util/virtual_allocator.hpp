@@ -1,65 +1,87 @@
+#pragma once
 #include "stdint.h"
 #include "move_only_class.hpp"
 #include "assert.h"
 #include "tracy.hpp"
+#include <vector>
 
-extern const uintptr_t os_page_size;
+namespace {
+	// round up x to y, assume y is power of two
+	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
+		return (x + y - 1) & ~(y - 1);
+	}
+}
+
+uintptr_t get_os_page_size ();
+
+inline const uintptr_t os_page_size = get_os_page_size();
 
 void* reserve_address_space (uintptr_t size);
 void release_address_space (void* baseptr, uintptr_t size);
-void* commit_pages (void* baseptr, void* neededptr, void* commitptr);
-void* decommit_pages (void* baseptr, void* neededptr, void* commitptr);
+void commit_pages (void* ptr, uintptr_t size);
+void decommit_pages (void* ptr, uintptr_t size);
 
-// Allocator implemented using OS-level virtual memory
-// like std::vector, but can grow up to a max size without needing to copy data (and invalidating pointers)
-// You need to specify a max possible number of allocated 'pages'
-// the memory space is then reserved from the OS, but not committed yet, so no ram will actually be used yet
-// you can then use push_back and pop_back like on a std::vector to allocate pages at the end, only then will they be committed from ram
+/*
+	Allocators implemented using OS-level virtual memory
+*/
+
+// like std::stack, but can grow up to a max size without needing to copy data (or invalidate pointers)
 template <typename T>
-class VirtualAllocator {
+class VirtualStackAllocator {
 	void*		baseptr; // base address of reserved memory pages
-	void*		commitptr; // first page that is not yet committed
+	void*		commitptr; // [baseptr, commitptr) is the commited memory region
 
 	T*			end; // next T to be suballocated (one after end of contiguous allocated Ts)
 	uintptr_t	max_count; // max possible number of Ts, a corresponding number of pages will be reserved
 public:
 
-	VirtualAllocator (uintptr_t max_count): max_count{max_count} {
+	VirtualStackAllocator (uintptr_t max_count): max_count{max_count} {
 		baseptr = reserve_address_space(sizeof(T)*max_count);
 		commitptr = baseptr;
 		end = (T*)baseptr;
 	}
 
-	~VirtualAllocator () {
+	~VirtualStackAllocator () {
 		release_address_space(baseptr, sizeof(T)*max_count);
 	}
 
 	// Allocate from back
-	T* push_back () {
+	T* push (uintptr_t count=1) {
 		assert(size() < max_count);
-		//if (size() >= max_count) {
-		//	return nullptr;
-		//}
 
-		T* ptr = end++;
+		T* ptr = end;
+		end += count;
 
 		if ((char*)end > commitptr) {
 			// at least one page to be committed
-			commitptr = commit_pages(baseptr, end, commitptr);
+
+			uintptr_t size_needed = (char*)end - (char*)commitptr;
+			size_needed = round_up_pot(size_needed, os_page_size);
+
+			commit_pages(commitptr, size_needed);
+
+			commitptr += size_needed;
 		}
 
 		return (T*)ptr;
 	}
 
 	// Free from back
-	void pop_back () {
+	void pop (uintptr_t count=1) {
 		assert(size() > 0);
 
-		T* ptr = end--;
+		T* ptr = end;
+		end -= count;
 
 		if ((char*)end <= (char*)commitptr - os_page_size) {
 			// at least 1 page to be decommitted
-			commitptr = decommit_pages(baseptr, end, commitptr);
+			
+			char* decommit = (char*)round_up_pot((uintptr_t)end, os_page_size);
+			uintptr_t size = (char*)commitptr - decommit; 
+
+			decommit_pages(decommit, size);
+
+			commitptr = decommit;
 		}
 	}
 
@@ -74,3 +96,93 @@ public:
 		return end - (T*)baseptr;
 	}
 };
+
+uint32_t _alloc_first_free (std::vector<uint64_t>& freeset);
+
+// Virtual memory allocator that can accept random order of alloc and free
+// sizeof(T) should be multiple of os page size as to not waste memory and also keep bookkeeping simple
+// TODO: A version of this that allows sizeof(T) to be anything can be implemented with list of pages and list of elements
+// where pages have a refcount of how many elements are allocated out of them (refcount == 0 -> page can be decommitted)
+template <typename T>
+class SparseAllocator {
+	void*					baseptr; // base address of reserved memory pages
+	uint32_t				count = 0;
+	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
+	std::vector<uint64_t>	freeset;
+
+	static const uint32_t alloc_size;
+
+public:
+
+	SparseAllocator (uint32_t max_count): max_count{max_count} {
+		baseptr = reserve_address_space(sizeof(T)*max_count);
+	}
+
+	~SparseAllocator () {
+		release_address_space(baseptr, sizeof(T)*max_count);
+	}
+
+	// Allocate (picks first possible address)
+	T* alloc () {
+		assert(count < max_count);
+
+		uint32_t bookkeeping_range = (uint32_t)freeset.size() * 64;
+		uint32_t free_count = bookkeeping_range - count;
+
+		uint32_t idx;
+
+		if (free_count == 0) {
+			// allocate after the end of the contiguous region of allocated elements
+			idx = bookkeeping_range;
+
+			freeset.push_back(0xfffffffffffffffeull); // push back all 1s except for the LSB representing the one element we are about to allocate
+		} else {
+			// bookkeeping region contains free elements allocate first one with a 64 wide scan
+			idx = _alloc_first_free(freeset);
+		}
+
+		T* ptr = (T*)( (char*)baseptr + idx * alloc_size );
+		count++;
+
+		commit_pages(ptr, alloc_size);
+
+		return ptr;
+	}
+
+	// Free random
+	void free (T* ptr) {
+		uint32_t idx = indexof(ptr);
+
+		uint32_t freesety = idx / 64;
+		uint32_t freesetx = idx % 64;
+		assert(freesety < freeset.size() && ((freeset[freesety] >> freesetx) & 1) == 0); // not freed yet
+		assert(count > 0);
+
+		// set bit in freeset to 1
+		freeset[freesety] |= 1ull << freesetx;
+
+		// shrink freeset if there are contiguous free elements at the end
+		if (freesety == freeset.size()-1) {
+			while (freeset.back() == 0xffffffffffffffffull) {
+				freeset.pop_back();
+			}
+		}
+
+		count--;
+
+		decommit_pages(ptr, alloc_size);
+	}
+
+	inline uint32_t indexof (T* ptr) const {
+		return (uint32_t)(ptr - (T*)baseptr);
+	}
+	inline T* operator[] (uint32_t index) const {
+		return (T*)baseptr + index;
+	}
+
+	inline uint32_t size () {
+		return count;
+	}
+};
+template <typename T>
+const uint32_t SparseAllocator<T>::alloc_size = (uint32_t)round_up_pot(sizeof(T), os_page_size);

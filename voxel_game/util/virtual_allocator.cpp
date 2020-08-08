@@ -8,17 +8,9 @@ uintptr_t get_os_page_size () {
 	return (uintptr_t)info.dwPageSize;
 }
 
-const uintptr_t os_page_size = get_os_page_size();
-
-// round up x to y, assume y is power of two
-uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
-	return (x + y - 1) & ~(y - 1);
-}
-
 void* reserve_address_space (uintptr_t size) {
 	void* baseptr = VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_NOACCESS);
 	assert(baseptr != nullptr);
-
 	return baseptr;
 }
 
@@ -27,28 +19,35 @@ void release_address_space (void* baseptr, uintptr_t size) {
 	assert(ret != 0);
 }
 
-void* commit_pages (void* baseptr, void* neededptr, void* commitptr) {
-
-	uintptr_t size_needed = (char*)neededptr - (char*)commitptr;
-
-	size_needed = round_up_pot(size_needed, os_page_size);
-
-	auto ret = VirtualAlloc(commitptr, size_needed, MEM_COMMIT, PAGE_READWRITE);
+void commit_pages (void* ptr, uintptr_t size) {
+	auto ret = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
 	assert(ret != NULL);
 
-	TracyAlloc(commitptr, size_needed);
-
-	return (char*)commitptr + size_needed;
+	TracyAlloc(ptr, size);
 }
 
-void* decommit_pages (void* baseptr, void* neededptr, void* commitptr) {
-	char* decommit = (char*)round_up_pot((uintptr_t)neededptr, os_page_size);
-	uintptr_t size = (char*)commitptr - decommit; 
+void decommit_pages (void* ptr, uintptr_t size) {
+	TracyFree(ptr);
 
-	TracyFree(decommit);
-
-	auto ret = VirtualFree(decommit, size, MEM_DECOMMIT);
+	auto ret = VirtualFree(ptr, size, MEM_DECOMMIT);
 	assert(ret != 0);
+}
 
-	return decommit;
+uint32_t _alloc_first_free (std::vector<uint64_t>& freeset) {
+	
+	uint32_t i=0;
+	while (freeset[i] == 0ull) {
+		++i;
+	}
+
+	auto& val = freeset[i];
+
+	unsigned long subindex;
+	auto ret = _BitScanForward64(&subindex, val);
+	assert(ret);
+
+	// set the first 1 bit found to 0
+	val ^= 1ull << subindex;
+
+	return i*64 + (uint32_t)subindex;
 }

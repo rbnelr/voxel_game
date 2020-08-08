@@ -8,12 +8,12 @@ class Chunk;
 class Chunks;
 class Player;
 
-inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
-	return (x + y - 1) & ~(y - 1);
-}
-static constexpr uint16_t INTNULL = (uint16_t)-1;
-
 namespace world_octree {
+	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
+		return (x + y - 1) & ~(y - 1);
+	}
+	static constexpr uint16_t INTNULL = (uint16_t)-1;
+
 	enum Node : uint16_t {
 		LEAF_BIT = 0x8000u,
 		FARPTR_BIT = 0x4000u,
@@ -124,49 +124,15 @@ namespace world_octree {
 	static_assert(sizeof(Page) == PAGE_SIZE, "");
 
 	struct PagedOctree {
-		VirtualAllocator<Page> allocator = VirtualAllocator<Page>(MAX_PAGES);
-
-		Page* rootpage = nullptr;
+		SparseAllocator<Page> allocator = SparseAllocator<Page>(MAX_PAGES);
 
 		Page* alloc_page () {
-			Page* page = allocator.push_back();
+			Page* page = allocator.alloc();
 			page->info = PageInfo{};
 
 			return page;
 		}
 
-		// migrate a page to a new memory location, while updating all references to it with the new location
-		void migrate_page (Page* src, Page* dst) {
-			// update octree node farptr to us in parent page
-			if (src->info.farptr_ptr) {
-				auto _indx = allocator.indexof(src);
-				assert(*src->info.farptr_ptr == (Node)(FARPTR_BIT | allocator.indexof(src)));
-				*src->info.farptr_ptr = (Node)(FARPTR_BIT | allocator.indexof(dst));
-			}
-
-			// update left siblings sibling ptr
-			auto* parent = src->info.parent_ptr();
-			if (parent) {
-				Page** childref = &parent->info.children_ptr;
-				while (*childref != src) {
-					childref = &(*childref)->info.sibling_ptr;
-				}
-
-				*childref = dst;
-			}
-
-			// update parent ptr in children
-			auto* child = src->info.children_ptr;
-			while (child) {
-				child->info.farptr_ptr = (Node*)((uintptr_t)child->info.farptr_ptr + (dst - src) * PAGE_SIZE);
-				child = child->info.sibling_ptr;
-			}
-
-			// copy all the data, overwriting the dst page
-			memcpy(dst, src, sizeof(Page));
-		}
-
-		// free a page by swapping it with the last and then shrinking the contiguous page memory by one page
 		void free_page (Page* page) {
 			// remove from parent
 			auto* parent = page->info.parent_ptr();
@@ -176,14 +142,8 @@ namespace world_octree {
 			// make sure we don't leak pages
 			assert(page->info.children_ptr == nullptr);
 
-			Page* lastpage = allocator[(uint16_t)allocator.size() -1];
-			if (page != lastpage) {
-				// overwrite page to be freed with last page 
-				migrate_page(allocator[(uint16_t)allocator.size() -1], page);
-			}
-
-			// shrink allocated memory to free last page memory
-			allocator.pop_back();
+			// free page
+			allocator.free(page);
 		}
 		
 		uint16_t size () { return (uint16_t)allocator.size(); }

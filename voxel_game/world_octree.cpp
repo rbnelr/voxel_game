@@ -77,7 +77,7 @@ namespace world_octree {
 
 		parent->remove_child(child);
 		
-		oct.pages.free_page(child); // WARNING: page will be invalidated, parent might be invalidated
+		oct.pages.free_page(child);
 		oct.page_free_counter++;
 
 		oct.page_merge_counter++;
@@ -219,7 +219,7 @@ namespace world_octree {
 		
 		page->free_node(node);
 	}
-	Page* free_subtree (WorldOctree& oct, Page* page, Node node) {
+	void free_subtree (WorldOctree& oct, Page* page, Node node) {
 		ZoneScopedN("world_octree::free_subtree");
 		
 		std::vector<Page*> pages_to_free;
@@ -233,28 +233,10 @@ namespace world_octree {
 		});
 
 		for (auto* p : pages_to_free) {
-			Page* lastpage = oct.pages.allocator[(uint16_t)oct.pages.allocator.size() -1];
-
-			// enable a page ptr to be preserved through free_page, which might invalidate it, required by caller
-			if (page == lastpage) {
-				page = p;
-			}
-
 			oct.pages.free_page(p);
 			oct.page_free_counter++;
 		}
-
-		return page;
 	};
-
-}
-
-#include "mmintrin.h"
-#include "immintrin.h"
-#include "emmintrin.h"
-#include "emmintrin.h"
-
-namespace world_octree {
 
 	int get_child_index (int3 pos, int scale) {
 		//return	(((pos.x >> scale) & 1) << 0) |
@@ -283,7 +265,7 @@ namespace world_octree {
 	restart_decent:
 		// start with root node
 		int cur_scale = oct.root_scale;
-		Page* cur_page = oct.pages.rootpage;
+		Page* cur_page = &oct.pages[0];
 		Node node_ptr = (Node)0;
 		Node* child_node = nullptr;
 
@@ -377,7 +359,7 @@ namespace world_octree {
 
 		// free subtree nodes if subtree was collapsed
 		if ((old_val & LEAF_BIT) == 0) {
-			page = free_subtree(oct, page, old_val);
+			free_subtree(oct, page, old_val);
 
 			try_merge(oct, page);
 		}
@@ -469,10 +451,11 @@ namespace world_octree {
 	}
 
 	void WorldOctree::pre_update (Player const& player) {
-		if (!pages.rootpage) {
-			pages.rootpage = pages.alloc_page();
+		if (pages.size() == 0) {
+			auto* rootpage = pages.alloc_page();
+			assert(pages.indexof(rootpage) == 0);
 
-			auto& root = pages.rootpage->nodes[ pages.rootpage->alloc_node() ];
+			auto& root = rootpage->nodes[ rootpage->alloc_node() ];
 			for (int i=0; i<8; ++i) {
 				root[i] = (Node)(LEAF_BIT | B_NULL);
 			}
@@ -486,13 +469,16 @@ namespace world_octree {
 		}
 	}
 
-	block_id recurse_chunk_to_octree (WorldOctree& oct, Chunk& chunk, Page* page, int3 pos, int scale) {
-
+#if 0
+	bool recurse_chunk_to_octree (WorldOctree& oct, Chunk& chunk, Page* page, int3 pos, int scale, Node* out_node) {
+		//assert((node & LEAF_BIT) == 0);
+		
 		if (scale == 0) {
-			return chunk.get_block(pos).id;
+			return (Node)(LEAF_BIT | chunk.get_block(pos).id);
 		}
 
 		if (page->nodes_full()) {
+			assert();
 
 			// Do split page which will have created 2 new pages with about half the nodes out of the full page
 			split_page(oct, page);
@@ -500,8 +486,13 @@ namespace world_octree {
 			// cur_child and cur_page were invlidated, I'm not sure how to best fix the fact that the nodes we were iterating though have moved into new pages
 			// I might attempt to keep track of cur_child and fix it in split_page, or redecend from the root of the cur page,
 			// but a total redecent should always work, so let's just do that with a goto
-			goto restart_decent;
+			return false;
 		}
+
+		auto nodei = page->alloc_node();
+
+		Node leaf;
+		bool all_same = true;
 
 		for (int i=0; i<8; ++i) {
 			int3 child_indx = int3(i, i >> 1, i >> 2) & 1;
@@ -509,15 +500,35 @@ namespace world_octree {
 			int child_scale = scale - 1;
 			int3 child_pos = pos + (child_indx << child_scale);
 
-			block_id child = recurse_chunk_to_octree(oct, chunk, child_pos, child_scale);
+			Node child;
+			if (recurse_chunk_to_octree(oct, chunk, page, child_pos, child_scale, &child))
+				return false;
+
+			if (i == 0) {
+				leaf = child;
+			} else if ((child & LEAF_BIT) == 0 || leaf != child) {
+				all_same = false;
+			}
+
+			page->nodes[nodei][i] = child;
 		}
 
+		if (all_same) {
+			page->free_node(nodei);
+
+			*out_node = leaf;
+			return true;
+		}
+
+		*out_node = (Node)nodei;
+		return true;
 	}
+#endif
 
 	void chunk_to_octree (WorldOctree& oct, Chunk& chunk) {
 		int3 pos = chunk.coord * CHUNK_DIM;
 
-	#if 0
+	#if 1
 		for (int z=0; z<CHUNK_DIM; ++z) {
 			for (int y=0; y<CHUNK_DIM; ++y) {
 				for (int x=0; x<CHUNK_DIM; ++x) {
