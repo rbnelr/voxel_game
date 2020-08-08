@@ -533,7 +533,7 @@ namespace world_octree {
 				scale++;
 
 				if (can_collapse(children)) {
-					uint16_t children_ptr = (uint16_t)((children - &page->nodes[0][0]) / 8);
+					uint16_t children_ptr = (uint16_t)(((char*)children - (char*)page->nodes[0]) / (sizeof(Node)*8));
 
 					node_stack[scale][ stack[scale].child_indx ] = children[0];
 
@@ -549,13 +549,15 @@ namespace world_octree {
 
 			} else {
 
-				int3 child_pos;
-				child_pos.x = pos.x + ( (child_indx       & 1) << scale);
-				child_pos.y = pos.y + (((child_indx >> 1) & 1) << scale);
-				child_pos.z = pos.z + (((child_indx >> 2) & 1) << scale);
+				int3 child_pos = pos;
+				int x=pos.x, y=pos.y, z=pos.z;
+				int size = 1 << scale;
+				if (child_indx & 1) x += size;
+				if (child_indx & 2) y += size;
+				if (child_indx & 4) z += size;
 
 				if (scale == 0) {
-					*node = (Node)(LEAF_BIT | chunk.get_block(child_pos).id);
+					*node = (Node)(LEAF_BIT | chunk.get_block(int3(x,y,z)).id);
 				} else {
 					// Push
 					if (page->nodes_full()) {
@@ -572,7 +574,7 @@ namespace world_octree {
 					*node = (Node)nodei;
 
 					scale--;
-					stack[scale] = { child_pos, 0 };
+					stack[scale] = { int3(x,y,z), 0 };
 					node_stack[scale] = child_children;
 
 					// init nodes to leaf nodes so future split_page won't fail if we had this uninitialized
