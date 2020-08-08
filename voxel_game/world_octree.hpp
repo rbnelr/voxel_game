@@ -18,8 +18,6 @@ namespace world_octree {
 		FARPTR_BIT = 0x4000u,
 	};
 
-	typedef Node children_t[8];
-
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
@@ -33,8 +31,8 @@ namespace world_octree {
 		return (Page*)( (uintptr_t)node & ~(PAGE_SIZE - 1) ); // round down the ptr to get the page pointer
 	}
 	// get the 8 nodes that a node is grouped into (siblings)
-	inline children_t* siblings_from_node (Node* node) {
-		return (children_t*)((uintptr_t)node & ~(sizeof(children_t) -1)); // round down the ptr to get the siblings pointer
+	inline Node* siblings_from_node (Node* node) {
+		return (Node*)((uintptr_t)node & ~(sizeof(Node)*8 -1)); // round down the ptr to get the siblings pointer
 	}
 
 	struct PageInfo {
@@ -51,16 +49,16 @@ namespace world_octree {
 		}
 	};
 
-	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(children_t));
-	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / sizeof(children_t));
+	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(Node)*8);
+	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / (sizeof(Node)*8));
 
-	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.8f);
+	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.85f);
 
 	struct Page {
 		PageInfo		info;
 
-		alignas(sizeof(children_t))
-		children_t		nodes[PAGE_NODES];
+		alignas(sizeof(Node)*8)
+		Node			nodes[PAGE_NODES][8];
 
 		bool nodes_full () {
 			return info.count >= PAGE_NODES;
@@ -143,8 +141,13 @@ namespace world_octree {
 			if (parent)
 				parent->remove_child(page);
 			
-			// make sure we don't leak pages
-			assert(page->info.children_ptr == nullptr);
+			// free child pages
+			auto* child = page->info.children_ptr;
+			while (child) {
+				Page* next = child->info.sibling_ptr;
+				free_page(child);
+				child = next;
+			}
 
 			// free page
 			allocator.free(page);
@@ -179,7 +182,6 @@ namespace world_octree {
 
 		int page_split_counter = 0;
 		int page_merge_counter = 0;
-		int page_free_counter = 0;
 
 		void imgui ();
 		void pre_update (Player const& player);

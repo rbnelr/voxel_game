@@ -110,11 +110,10 @@ class SparseAllocator {
 	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
 	std::vector<uint64_t>	freeset;
 
-	static const uint32_t alloc_size;
-
 public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
+		assert(os_page_size % sizeof(T) == 0);
 		baseptr = reserve_address_space(sizeof(T)*max_count);
 	}
 
@@ -141,10 +140,10 @@ public:
 			idx = _alloc_first_free(freeset);
 		}
 
-		T* ptr = (T*)( (char*)baseptr + idx * alloc_size );
+		T* ptr = (T*)baseptr + idx;
 		count++;
 
-		commit_pages(ptr, alloc_size);
+		commit_pages(ptr, sizeof(T));
 
 		return ptr;
 	}
@@ -170,7 +169,7 @@ public:
 
 		count--;
 
-		decommit_pages(ptr, alloc_size);
+		decommit_pages(ptr, sizeof(T));
 	}
 
 	inline uint32_t indexof (T* ptr) const {
@@ -183,6 +182,11 @@ public:
 	inline uint32_t size () {
 		return count;
 	}
+	inline uint32_t freeset_size () {
+		return (uint32_t)freeset.size() * 64;
+	}
+
+	inline bool is_allocated (uint32_t i) {
+		return (freeset[i / 64] >> (i % 64)) == 0;
+	}
 };
-template <typename T>
-const uint32_t SparseAllocator<T>::alloc_size = (uint32_t)round_up_pot(sizeof(T), os_page_size);
