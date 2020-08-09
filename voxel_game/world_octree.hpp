@@ -54,6 +54,8 @@ namespace world_octree {
 
 	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.85f);
 
+	static constexpr float ROOT_MOVE_HISTER		= 0.05f;
+
 	struct Page {
 		PageInfo		info;
 
@@ -166,8 +168,10 @@ namespace world_octree {
 	class WorldOctree {
 	public:
 
-		int			root_scale = 11;
+		int			root_scale = 10;
 		int3		root_pos = -(1 << (root_scale - 1));
+
+		float3		root_move_hister = 0;
 
 		PagedOctree pages;
 

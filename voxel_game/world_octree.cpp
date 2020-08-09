@@ -373,34 +373,53 @@ namespace world_octree {
 		}
 	}
 
+	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
 	void update_root (WorldOctree& oct, Player const& player) {
-		//int shift = oct.root_scale - 1;
-		//float half_root_scalef = (float)(1 << shift);
-		//
-		//int3 center = roundi(player.pos / half_root_scalef);
-		//
-		//int3 pos = (center - 1) << shift;
-		//
-		//if (equal(pos, oct.root_pos))
-		//	return;
-		//
-		//int3 move = (pos - oct.root_pos) >> shift;
-		//
-		//auto old_children = oct.octree.nodes[0];
-		//
-		//for (int i=0; i<8; ++i) {
-		//	int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
-		//
-		//	child += move;
-		//
-		//	if (any(child < 0 || child > 1)) {
-		//		oct.octree.nodes[0].children[i] = LEAF_BIT | B_NULL;
-		//	} else {
-		//		oct.octree.nodes[0].children[i] = old_children.children[ child.x | (child.y << 1) | (child.z << 2) ];
-		//	}
-		//}
-		//
-		//oct.root_pos = pos;
+		int shift = oct.root_scale - 1;
+		float half_root_scalef = (float)(1 << shift);
+		
+		int3 center = roundi((player.pos + oct.root_move_hister) / half_root_scalef);
+		
+		int3 pos = (center - 1) << shift;
+		
+		if (equal(pos, oct.root_pos))
+			return;
+		
+		int3 move = (pos - oct.root_pos) >> shift;
+		
+		oct.root_move_hister = (float3)move * half_root_scalef * ROOT_MOVE_HISTER;
+
+		Page* rootpage = &oct.pages[0];
+
+		// copy old children
+		Node old_children[8];
+		memcpy(old_children, rootpage->nodes[0], sizeof(old_children));
+		
+		for (int i=0; i<8; ++i) {
+			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+		
+			child += move;
+		
+			int child_indx = child.x | (child.y << 1) | (child.z << 2);
+			
+			if (any(child < 0 || child > 1)) {
+				// root moved over this area, no nodes loaded yet
+				rootpage->nodes[0][i] = (Node)(LEAF_BIT | B_NULL);
+			} else {
+				// copy old children to new slot
+				rootpage->nodes[0][i] = old_children[child_indx];
+				old_children[child_indx] = (Node)0;
+			}
+		}
+		
+		// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
+		for (int i=0; i<8; ++i) {
+			if (old_children[i] != 0 && (old_children[i] & LEAF_BIT) == 0) {
+				free_subtree(oct, rootpage, old_children[i]);
+			}
+		}
+		
+		oct.root_pos = pos;
 	}
 
 	lrgba cols[] = {
