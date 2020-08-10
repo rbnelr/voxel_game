@@ -81,14 +81,14 @@ void Game::frame () {
 
 			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 		
-				if (ImGui::Button("Recreate")) {
+				if (ImGui::Button("Recreate")) { // TODO: not safe right now. doing this while chunks are still being generated async will crash or worse
 					world = std::make_unique<World>(world_gen);
 				}
 
 				world_gen.imgui();
 				world->imgui();
 				block_update.imgui();
-				world->chunks.world_octree.imgui();
+				world->chunks.svo.imgui();
 			}
 
 			{

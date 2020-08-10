@@ -2,6 +2,7 @@
 #include "world_generator.hpp"
 #include "blocks.hpp"
 #include "chunks.hpp"
+#include "svo.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
@@ -107,6 +108,8 @@ struct ChunkGenerator {
 	}
 
 	void gen_terrain (bpos chunk_origin) {
+		ZoneScoped;
+
 		bpos_t water_level = 21;
 
 		float highest_blocks[DIM.y][DIM.x];
@@ -170,6 +173,8 @@ struct ChunkGenerator {
 	}
 
 	void place_objects (bpos chunk_origin) {
+		ZoneScoped;
+
 		std::vector<bpos> tree_poss;
 	
 		auto find_min_tree_dist = [&] (bpos2 new_tree_pos) {
@@ -260,6 +265,8 @@ struct ChunkGenerator {
 	}
 
 	void gen () {
+		ZoneScoped;
+
 		osn_noise2 = OSN::Noise<2>(wg.seed);
 
 		bpos chunk_origin = chunk.coord * CHUNK_DIM;
@@ -268,6 +275,7 @@ struct ChunkGenerator {
 		rand = Random(chunk_seed);
 
 		{
+			ZoneScopedN("alloc buffer");
 			blocks = (Blocks*)malloc(sizeof(Blocks));
 		}
 
@@ -276,6 +284,8 @@ struct ChunkGenerator {
 		place_objects(chunk_origin);
 
 		{
+			ZoneScopedN("Copy blocks");
+
 			bpos i;
 			for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
 				for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
@@ -287,16 +297,19 @@ struct ChunkGenerator {
 		}
 
 		{
+			ZoneScopedN("free buffer");
 			free(blocks);
 		}
 	}
 };
 
-void WorldGenerator::generate_chunk (Chunk& chunk) const {
-	ZoneScopedN("WorldGenerator::generate_chunk");
+void WorldGenerator::generate_chunk (Chunk& chunk, svo::SVO& svo) const {
+	ZoneScoped;
 	
 	ChunkGenerator gen = { *this, chunk };
 
 	chunk.init_blocks();
 	gen.gen();
+
+	chunk.svo_node = svo.chunk_to_octree(chunk);
 }

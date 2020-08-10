@@ -248,7 +248,7 @@
     <ClInclude Include="util\string.hpp" />
     <ClInclude Include="util\timer.hpp" />
     <ClInclude Include="world.hpp" />
-    <ClInclude Include="world_octree.hpp" />
+    <ClInclude Include="svo.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -387,7 +387,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="world.cpp" />
-    <ClCompile Include="world_octree.cpp" />
+    <ClCompile Include="svo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="kissmath\bool2.inl" />

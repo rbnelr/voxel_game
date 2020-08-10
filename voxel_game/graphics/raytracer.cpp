@@ -1,7 +1,7 @@
 ﻿#include "stdafx.hpp"
 #include "raytracer.hpp"
 #include "graphics.hpp"
-#include "../world_octree.hpp"
+#include "../svo.hpp"
 
 void Raytracer::imgui () {
 	if (!imgui_push("Raytracer")) {
@@ -41,15 +41,15 @@ void Raytracer::imgui () {
 	imgui_pop();
 }
 
-void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
+void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
 
 	if (shader) {
 		shader.bind();
 
 		glBindVertexArray(vao);
 
-		shader.set_uniform("svo_root_pos", octree.root_pos);
-		shader.set_uniform("svo_root_scale", octree.root_scale);
+		shader.set_uniform("svo_root_pos", svo.root_pos);
+		shader.set_uniform("svo_root_scale", svo.root_scale);
 
 		shader.set_uniform("slider", slider);
 
@@ -80,10 +80,10 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 		{
 			TracyGpuZone("gpu SVO upload");
 
-			using namespace world_octree;
+			using namespace svo;
 
 			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-			int height = (int)octree.pages.allocator.freeset_size();
+			int height = (int)svo.pages.allocator.freeset_size();
 		
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		
@@ -92,8 +92,8 @@ void Raytracer::draw (world_octree::WorldOctree& octree, Camera_View const& view
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
 			
 			for (int i=0; i<height; ++i) {
-				if (octree.pages.allocator.is_allocated(i))
-					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &octree.pages[i].nodes[0]);
+				if (svo.pages.allocator.is_allocated(i))
+					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &svo.pages[i].nodes[0]);
 			}
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);

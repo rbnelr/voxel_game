@@ -162,7 +162,6 @@
     <ClInclude Include="graphics\raytracer.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
-    <ClInclude Include="world_octree.hpp" />
     <ClInclude Include="kissmath\bool2.hpp">
       <Filter>kissmath</Filter>
     </ClInclude>
@@ -261,6 +260,7 @@
     </ClInclude>
     <ClInclude Include="profiling.hpp" />
     <ClInclude Include="stdafx.hpp" />
+    <ClInclude Include="svo.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -372,7 +372,6 @@
     <ClCompile Include="graphics\raytracer.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="world_octree.cpp" />
     <ClCompile Include="util\virtual_allocator.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -380,6 +379,7 @@
       <Filter>tracy</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="svo.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

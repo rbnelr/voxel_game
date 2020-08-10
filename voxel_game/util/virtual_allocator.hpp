@@ -4,6 +4,11 @@
 #include "assert.h"
 #include "tracy.hpp"
 #include <vector>
+#include <mutex>
+
+// Need to wrap locks for tracy
+#define MUTEX				TracyLockableN(std::mutex,	m, "ThreadsafeQueue mutex")
+#define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
 
 namespace {
 	// round up x to y, assume y is power of two
@@ -110,6 +115,8 @@ class SparseAllocator {
 	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
 	std::vector<uint64_t>	freeset;
 
+	MUTEX;
+
 public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
@@ -121,6 +128,7 @@ public:
 		release_address_space(baseptr, sizeof(T)*max_count);
 	}
 
+private:
 	// Allocate (picks first possible address)
 	T* alloc () {
 		assert(count < max_count);
@@ -171,6 +179,16 @@ public:
 
 		decommit_pages(ptr, sizeof(T));
 	}
+public:
+
+	T* alloc_threadsafe () {
+		LOCK_GUARD;
+		return alloc();
+	}
+	void free_threadsafe (T* ptr) {
+		LOCK_GUARD;
+		free(ptr);
+	}
 
 	inline uint32_t indexof (T* ptr) const {
 		return (uint32_t)(ptr - (T*)baseptr);
@@ -190,3 +208,6 @@ public:
 		return (freeset[i / 64] >> (i % 64)) == 0;
 	}
 };
+
+#undef MUTEX			
+#undef LOCK_GUARD		

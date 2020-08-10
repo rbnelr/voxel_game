@@ -42,6 +42,9 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 }
 
 class Chunk;
+namespace svo {
+	class SVO;
+}
 
 struct WorldGenerator {
 	std::string seed_str = "test2";
@@ -104,5 +107,5 @@ struct WorldGenerator {
 		imgui_pop();
 	}
 
-	void generate_chunk (Chunk& chunk) const;
+	void generate_chunk (Chunk& chunk, svo::SVO& svo) const;
 };

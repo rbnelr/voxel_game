@@ -6,8 +6,8 @@
 
 class Graphics;
 class TimeOfDay;
-namespace world_octree {
-	class WorldOctree;
+namespace svo {
+	class SVO;
 }
 
 class Raytracer {
@@ -54,5 +54,5 @@ public:
 
 	void imgui ();
 
-	void draw (world_octree::WorldOctree& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod);
+	void draw (svo::SVO& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod);
 };

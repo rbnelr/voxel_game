@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.hpp"
 #include "blocks.hpp"
-#include "world_octree.hpp"
+#include "svo.hpp"
 #include "util/running_average.hpp"
 #include "util/threadpool.hpp"
 #include "util/raw_array.hpp"
@@ -21,8 +21,8 @@ typedef int3	bpos;
 typedef int		chunk_pos_t;
 typedef int3	chunk_coord;
 
-#define CHUNK_DIM			64
-#define CHUNK_DIM_SHIFT		6 // for coord >> CHUNK_DIM_SHIFT
+#define CHUNK_DIM			32
+#define CHUNK_DIM_SHIFT		5 // for coord >> CHUNK_DIM_SHIFT
 #define CHUNK_DIM_MASK		((1 << CHUNK_DIM_SHIFT) -1)
 #define CHUNK_ROW_OFFS		CHUNK_DIM
 #define CHUNK_LAYER_OFFS	(CHUNK_DIM*CHUNK_DIM)
@@ -248,6 +248,8 @@ public:
 	// true: invisible to player -> don't draw
 	bool culled;
 
+	svo::Node	svo_node;
+
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
@@ -265,6 +267,7 @@ struct BackgroundJob { // Chunk gen
 	// input
 	Chunk* chunk;
 	WorldGenerator const* world_gen;
+	svo::SVO* svo;
 	// output
 	float time;
 
@@ -355,7 +358,7 @@ public:
 	ChunkHashmap pending_chunks;
 	ChunkHashmap chunks;
 
-	WorldOctree world_octree;
+	SVO svo;
 
 	int count_culled;
 
@@ -416,7 +419,7 @@ public:
 	void remesh_all ();
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
+	void update_chunk_loading (World& world, WorldGenerator const& world_gen, Player const& player);
 
 	// chunk meshing to prepare for drawing
 	void update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player);

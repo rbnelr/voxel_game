@@ -57,7 +57,7 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos
 	return changed;
 };
 
-static_assert(CHUNK_BLOCK_COUNT == (1 << 18), "");
+static_assert(CHUNK_BLOCK_COUNT == (1 << 15), "");
 
 /*
 	
@@ -100,7 +100,7 @@ uint16_t block_pattern (uint16_t i) {
 	i = ((i & 0x0f0f) << 4) | ((i & 0xf0f0) >> 4);
 	i = ((i & 0x3333) << 2) | ((i & 0xcccc) >> 2);
 	i = ((i & 0x5555) << 1) | ((i & 0xaaaa) >> 1);
-	i >>= 2;
+	i >>= 1;
 	return i;
 }
 

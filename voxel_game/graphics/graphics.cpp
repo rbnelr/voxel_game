@@ -872,7 +872,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		ZoneScopedN("gpu raytracer pass");
 		TracyGpuZone("gpu raytracer pass");
 
-		raytracer.draw(world.chunks.world_octree, view, *this, world.time_of_day);
+		raytracer.draw(world.chunks.svo, view, *this, world.time_of_day);
 	}
 
 	glClear(GL_DEPTH_BUFFER_BIT);

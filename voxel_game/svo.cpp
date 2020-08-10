@@ -1,10 +1,10 @@
 #include "stdafx.hpp"
-#include "world_octree.hpp"
+#include "svo.hpp"
 #include "chunks.hpp"
 #include "player.hpp"
 
-namespace world_octree {
-	void WorldOctree::imgui () {
+namespace svo {
+	void SVO::imgui () {
 		if (!imgui_push("WorldOctree")) {
 			ImGui::SameLine();
 			ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
@@ -14,6 +14,7 @@ namespace world_octree {
 		ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
 		ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
 		ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
+		ImGui::Checkbox("debug_draw_page_color", &debug_draw_page_color);
 		ImGui::Checkbox("debug_draw_pages", &debug_draw_pages);
 		ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 
@@ -69,7 +70,7 @@ namespace world_octree {
 		return (Node)children_ptr;
 	}
 
-	void merge (WorldOctree& oct, Page* parent, Page* child) {
+	void merge (SVO& oct, Page* parent, Page* child) {
 		ZoneScopedN("world_octree::merge");
 
 		// remove children from child so they can be added to parent node
@@ -84,7 +85,7 @@ namespace world_octree {
 
 		oct.page_merge_counter++;
 	}
-	void try_merge (WorldOctree& oct, Page* page) {
+	void try_merge (SVO& oct, Page* page) {
 		if (!page->info.farptr_ptr)
 			return; // root page
 
@@ -178,7 +179,7 @@ namespace world_octree {
 			return (Node)children_ptr;
 		}
 	};
-	void split_page (WorldOctree& oct, Page* page, Node* stack[]) {
+	void split_page (SVO& oct, Page* page, Node* stack[]) {
 		ZoneScopedN("world_octree::split_page");
 		
 		// find splitnode
@@ -210,7 +211,7 @@ namespace world_octree {
 		oct.page_split_counter++;
 	}
 
-	void recurse_free_subtree (WorldOctree& oct, Page* page, Node node) {
+	void recurse_free_subtree (SVO& oct, Page* page, Node node) {
 		assert((node & LEAF_BIT) == 0);
 
 		if (node & FARPTR_BIT) {
@@ -227,7 +228,7 @@ namespace world_octree {
 		
 		page->free_node(node);
 	}
-	void free_subtree (WorldOctree& oct, Page* page, Node node) {
+	void free_subtree (SVO& oct, Page* page, Node node) {
 		ZoneScopedN("world_octree::free_subtree");
 		
 		recurse_free_subtree(oct, page, node);
@@ -250,7 +251,7 @@ namespace world_octree {
 	// octree write, writes a single voxel at a desired pos, scale to be a particular val
 	// this decends the octree from the root and inserts or deletes nodes when needed
 	// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
-	void octree_write (WorldOctree& oct, int3 pos, int scale, Node val) {
+	void octree_write (SVO& oct, int3 pos, int scale, Node val) {
 		ZoneScopedN("world_octree::octree_write");
 
 		pos -= oct.root_pos;
@@ -374,7 +375,7 @@ namespace world_octree {
 	}
 
 	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
-	void update_root (WorldOctree& oct, Player const& player) {
+	void update_root (SVO& oct, Player const& player) {
 		int shift = oct.root_scale - 1;
 		float half_root_scalef = (float)(1 << shift);
 		
@@ -422,80 +423,6 @@ namespace world_octree {
 		oct.root_pos = pos;
 	}
 
-	lrgba cols[] = {
-		srgba(255,0,0),
-		srgba(0,255,0),
-		srgba(0,0,255),
-		srgba(255,255,0),
-		srgba(255,0,255),
-		srgba(0,255,255),
-		srgba(127,0,255),
-		srgba(255,0,127),
-		srgba(255,127,255),
-	};
-
-	struct RecurseDrawer {
-		WorldOctree& oct;
-
-		Node* get_node (Node node, Page*& cur_page) {
-			if (node & FARPTR_BIT) {
-				cur_page = &oct.pages[node & ~FARPTR_BIT];
-				node = (Node)0;
-			}
-			return cur_page->nodes[node];
-		}
-		
-		void recurse_draw (Page* cur_page, Node node, int3 pos, int scale) {
-			float size = (float)(1 << scale);
-
-			auto col = cols[scale % ARRLEN(cols)];
-			if (oct.debug_draw_pages)
-				col = cols[oct.pages.allocator.indexof(cur_page) % ARRLEN(cols)];
-			
-			if (((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > (oct.debug_draw_air ? B_NULL : B_AIR)) && scale <= oct.debug_draw_octree_max)
-				debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
-
-			if ((node & LEAF_BIT) == 0) {
-				Node* children = get_node(node, cur_page);
-				int child_scale = scale - 1;
-
-				if (child_scale >= oct.debug_draw_octree_min) {
-					for (int i=0; i<8; ++i) {
-						int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
-
-						recurse_draw(cur_page, children[i], child_pos, child_scale);
-					}
-				}
-			}
-		}
-	};
-
-	void debug_draw (WorldOctree& oct) {
-		ZoneScopedN("WorldOctree::debug_draw");
-
-		RecurseDrawer rd = { oct };
-		rd.recurse_draw(nullptr, (Node)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
-	}
-
-	void WorldOctree::pre_update (Player const& player) {
-		if (pages.size() == 0) {
-			auto* rootpage = pages.alloc_page();
-			rootpage->info.scale = root_scale;
-			assert(pages.indexof(rootpage) == 0);
-
-			auto& root = rootpage->nodes[ rootpage->alloc_node() ];
-			for (int i=0; i<8; ++i) {
-				root[i] = (Node)(LEAF_BIT | B_NULL);
-			}
-		}
-
-		update_root(*this, player);
-	}
-	void WorldOctree::post_update () {
-		if (debug_draw_octree) {
-			debug_draw(*this);
-		}
-	}
 
 	bool can_collapse (Node* children) {
 		if ((children[0] & LEAF_BIT) == 0)
@@ -509,12 +436,14 @@ namespace world_octree {
 		return true;
 	}
 
-	Node recurse_chunk_to_octree (WorldOctree& oct, Chunk& chunk, int3 pos) {
-		ZoneScopedN("WorldOctree::recurse_chunk_to_octree");
+	Node SVO::chunk_to_octree (Chunk& chunk) {
+		ZoneScopedN("svo_chunk_to_octree");
 
-		Page* chunk_page = oct.pages.alloc_page();
+		//int3 pos = chunk.coord * CHUNK_DIM;
+
+		Page* chunk_page = pages.alloc_page();
 		chunk_page->info.scale = CHUNK_DIM_SHIFT;
-		
+
 		Node* node_stack[MAX_DEPTH];
 	#if !NDEBUG
 		memset(node_stack, 0, sizeof(node_stack));
@@ -528,7 +457,7 @@ namespace world_octree {
 
 		uint16_t scale = CHUNK_DIM_SHIFT-1;
 
-		Node root = (Node)(FARPTR_BIT | oct.pages.indexof(chunk_page));
+		Node root = (Node)(FARPTR_BIT | pages.indexof(chunk_page));
 
 		node_stack[CHUNK_DIM_SHIFT] = &root;
 		stack[CHUNK_DIM_SHIFT] = { 0, 0 };
@@ -557,7 +486,7 @@ namespace world_octree {
 					node_stack[scale][ stack[scale].child_indx ] = children[0];
 
 					if (children_ptr == 0) {
-						oct.pages.free_page(page);
+						pages.free_page(page);
 					} else {
 						page->free_node(children_ptr);
 					}
@@ -580,8 +509,8 @@ namespace world_octree {
 				} else {
 					// Push
 					if (page->nodes_full()) {
-						split_page(oct, page, node_stack);
-						
+						split_page(*this, page, node_stack);
+
 						children	= node_stack[scale];
 						node = &children[child_indx];
 						page = page_from_node(children);
@@ -611,52 +540,96 @@ namespace world_octree {
 		return root;
 	}
 
-	void chunk_to_octree (WorldOctree& oct, Chunk& chunk) {
-		int3 pos = chunk.coord * CHUNK_DIM;
+	void SVO::add_chunk (Chunk& chunk) {
+		ZoneScopedN("svo_add_chunk");
 
-		Node root = recurse_chunk_to_octree(oct, chunk, 0);
+		octree_write(*this, chunk.coord * CHUNK_DIM, CHUNK_DIM_SHIFT, chunk.svo_node);
+	}
+	
+	lrgba cols[] = {
+		srgba(255,0,0),
+		srgba(0,255,0),
+		srgba(0,0,255),
+		srgba(255,255,0),
+		srgba(255,0,255),
+		srgba(0,255,255),
+		srgba(127,0,255),
+		srgba(255,0,127),
+		srgba(255,127,255),
+	};
 
-		octree_write(oct, pos, CHUNK_DIM_SHIFT, root);
+	void recurse_draw (SVO& oct, Page* cur_page, Node node, int3 pos, int scale) {
+		float size = (float)(1 << scale);
+
+		auto col = cols[scale % ARRLEN(cols)];
+		if (oct.debug_draw_page_color || oct.debug_draw_pages)
+			col = cols[oct.pages.allocator.indexof(cur_page) % ARRLEN(cols)];
+			
+		bool draw = ((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > (oct.debug_draw_air ? B_NULL : B_AIR)) && scale <= oct.debug_draw_octree_max;
+		if (oct.debug_draw_pages ? (node & FARPTR_BIT) : draw)
+			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
+
+		if ((node & LEAF_BIT) == 0) {
+			
+			if (node & FARPTR_BIT) {
+				cur_page = &oct.pages[node & ~FARPTR_BIT];
+				node = (Node)0;
+			}
+
+			Node* children = cur_page->nodes[node];
+			int child_scale = scale - 1;
+
+			if (child_scale >= oct.debug_draw_octree_min) {
+				for (int i=0; i<8; ++i) {
+					int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
+
+					recurse_draw(oct, cur_page, children[i], child_pos, child_scale);
+				}
+			}
+		}
 	}
 
-	void WorldOctree::add_chunk (Chunk& chunk) {
-		ZoneScopedN("WorldOctree::add_chunk");
+	void debug_draw (SVO& oct) {
+		ZoneScopedN("WorldOctree::debug_draw");
 
-		int3 pos = chunk.coord * CHUNK_DIM;
-
-		auto a = Timer::start();
-		//octree_write(*this, pos, CHUNK_DIM_SHIFT, B_AIR);
-		auto at = a.end();
-
-		auto c = Timer::start();
-		chunk_to_octree(*this, chunk);
-		auto ct = c.end();
-
-		clog("WorldOctree::add_chunk:  octree_write: %f ms", at * 1000);
+		recurse_draw(oct, nullptr, (Node)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
 	}
 
-	void WorldOctree::remove_chunk (Chunk& chunk) {
-		ZoneScopedN("WorldOctree::remove_chunk");
+	void SVO::pre_update (Player const& player) {
+		if (pages.size() == 0) {
+			auto* rootpage = pages.alloc_page();
+			rootpage->info.scale = root_scale;
+			assert(pages.indexof(rootpage) == 0);
+
+			auto& root = rootpage->nodes[ rootpage->alloc_node() ];
+			for (int i=0; i<8; ++i) {
+				root[i] = (Node)(LEAF_BIT | B_NULL);
+			}
+		}
+
+		update_root(*this, player);
+	}
+	void SVO::post_update () {
+		if (debug_draw_octree) {
+			debug_draw(*this);
+		}
+	}
+
+	void SVO::remove_chunk (Chunk& chunk) {
+		ZoneScopedN("svo_remove_chunk");
 
 		int3 pos = chunk.coord * CHUNK_DIM;
 
-		auto a = Timer::start();
+		// TODO: could be optimized with by simple freeing subtree chunk.svo_node
 		octree_write(*this, pos, CHUNK_DIM_SHIFT, (Node)(LEAF_BIT | B_NULL));
-		auto at = a.end();
-
-		clog("WorldOctree::remove_chunk:  octree_write: %f ms", at * 1000);
 	}
 
-	void WorldOctree::update_block (Chunk& chunk, int3 bpos, block_id id) {
-		ZoneScopedN("WorldOctree::update_block");
+	void SVO::update_block (Chunk& chunk, int3 bpos, block_id id) {
+		ZoneScopedN("svo_update_block");
 
 		int3 pos = chunk.coord * CHUNK_DIM;
 		pos += bpos;
 
-		auto a = Timer::start();
 		octree_write(*this, pos, 0, (Node)(LEAF_BIT | id));
-		auto at = a.end();
-
-		clog("WorldOctree::update_block:  octree_write: %f ms", at * 1000);
 	}
 }

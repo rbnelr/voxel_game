@@ -8,7 +8,7 @@ class Chunk;
 class Chunks;
 class Player;
 
-namespace world_octree {
+namespace svo {
 	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
 		return (x + y - 1) & ~(y - 1);
 	}
@@ -131,13 +131,17 @@ namespace world_octree {
 		SparseAllocator<Page> allocator = SparseAllocator<Page>(MAX_PAGES);
 
 		Page* alloc_page () {
-			Page* page = allocator.alloc();
+			Page* page = allocator.alloc_threadsafe();
 			page->info = PageInfo{};
 
 			return page;
 		}
 
 		void free_page (Page* page) {
+			// NOTE: This gets called from background threads when they generate the SVO for a chunk
+			// The following ptr updates could seem unsafe, but at no point do the threads ever own pointers to any but the nodes they just allocated
+			// So this is perfectly safe without requiring more sync
+
 			// remove from parent
 			auto* parent = page->info.parent_ptr();
 			if (parent)
@@ -152,7 +156,7 @@ namespace world_octree {
 			}
 
 			// free page
-			allocator.free(page);
+			allocator.free_threadsafe(page);
 		}
 		
 		uint16_t size () { return (uint16_t)allocator.size(); }
@@ -165,7 +169,7 @@ namespace world_octree {
 		}
 	};
 
-	class WorldOctree {
+	class SVO {
 	public:
 
 		int			root_scale = 10;
@@ -181,6 +185,7 @@ namespace world_octree {
 		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;
 
+		bool debug_draw_page_color = true;
 		bool debug_draw_pages = true;
 		bool debug_draw_air = true;
 
@@ -191,10 +196,11 @@ namespace world_octree {
 		void pre_update (Player const& player);
 		void post_update ();
 
+		Node chunk_to_octree (Chunk& chunk);
 		void add_chunk (Chunk& chunk);
 		void remove_chunk (Chunk& chunk);
 
 		void update_block (Chunk& chunk, int3 bpos, block_id id);
 	};
 }
-using world_octree::WorldOctree;
+using svo::SVO;

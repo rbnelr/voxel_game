@@ -69,7 +69,7 @@ Block Chunk::get_block (bpos pos) const {
 void Chunk::set_block_unchecked (Chunks& chunks, bpos pos, Block b) {
 	blocks->set(pos, b);
 
-	chunks.world_octree.update_block(*this, pos, b.id); 
+	chunks.svo.update_block(*this, pos, b.id); 
 }
 void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block blk = blocks->get(pos_in_chunk);
@@ -77,7 +77,7 @@ void Chunk::_set_block_no_light_update (Chunks& chunks, bpos pos_in_chunk, Block
 	blocks->set(pos_in_chunk, b);
 	needs_remesh = true;
 
-	chunks.world_octree.update_block(*this, pos_in_chunk, b.id); 
+	chunks.svo.update_block(*this, pos_in_chunk, b.id); 
 }
 void Chunk::set_block (Chunks& chunks, bpos pos_in_chunk, Block b) {
 	Block blk = blocks->get(pos_in_chunk);
@@ -113,7 +113,7 @@ void Chunk::reupload (MeshingResult& result) {
 BackgroundJob BackgroundJob::execute () {
 	auto timer = Timer::start();
 
-	world_gen->generate_chunk(*chunk);
+	world_gen->generate_chunk(*chunk, *svo);
 
 	time = timer.end();
 
@@ -190,7 +190,7 @@ Block Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos_chunk)
 }
 
 ChunkHashmap::Iterator Chunks::unload_chunk (ChunkHashmap::Iterator it) {
-	world_octree.remove_chunk(*it);
+	svo.remove_chunk(*it);
 
 	// TODO: clear neighbour block copies to _NO_CHUNK here?
 	return chunks.erase_chunk(it);
@@ -202,10 +202,10 @@ void Chunks::remesh_all () {
 	}
 }
 
-void Chunks::update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player) {
+void Chunks::update_chunk_loading (World& world, WorldGenerator const& world_gen, Player const& player) {
 	ZoneScopedN("update_chunk_loading");
 
-	world_octree.pre_update(player);
+	svo.pre_update(player);
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
@@ -285,6 +285,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 				BackgroundJob job;
 				job.chunk = chunk;
 				job.world_gen = &world_gen;
+				job.svo = &world.chunks.svo;
 
 				{
 					background_threadpool.jobs.push(job);
@@ -304,7 +305,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
 					pending_chunks.erase_chunk({ it });
 
-					world_octree.add_chunk(*res.chunk);
+					svo.add_chunk(*res.chunk);
 				}
 
 				chunk_gen_time.push(res.time);
@@ -314,7 +315,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wor
 
 	}
 
-	world_octree.post_update();
+	svo.post_update();
 }
 
 void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player) {
