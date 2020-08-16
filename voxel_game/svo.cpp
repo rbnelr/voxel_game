@@ -435,6 +435,16 @@ namespace svo {
 		int3(0,1,1),
 		int3(1,1,1),
 	};
+	static constexpr float3 corners[8] = {
+		float3(0,0,0),
+		float3(1,0,0),
+		float3(0,1,0),
+		float3(1,1,0),
+		float3(0,0,1),
+		float3(1,0,1),
+		float3(0,1,1),
+		float3(1,1,1),
+	};
 
 	bool can_collapse (Node* children) {
 		if ((children[0] & LEAF_BIT) == 0)
@@ -557,6 +567,25 @@ namespace svo {
 			float dist;
 		};
 		std::vector<Chunk> chunks_to_load;
+		std::vector<Chunk> chunks_to_unload;
+
+		float calc_closest_dist (float3 pos, float size) {
+			float3 pos_rel = player_pos - pos;
+
+			float3 clamped = clamp(pos_rel, 0, size);
+			return length(clamped - pos_rel);
+		}
+		float calc_furthest_dist (float3 pos, float size) {
+			float3 pos_rel = player_pos - pos;
+
+			float max_dist_sqr = -INF;
+			for (auto corner : corners) {
+				float3 p = corner * size;
+				max_dist_sqr = max(max_dist_sqr, length_sqr(p - pos_rel));
+			}
+
+			return sqrt(max_dist_sqr);
+		}
 
 		void recurse_chunk_loading (Page* page, Node node, int3 pos, int scale) {
 			if (node & FARPTR_BIT) {
@@ -577,26 +606,38 @@ namespace svo {
 				// just pretend the child nodes were the same (leaf) node as the parent
 				Node child_node = children_nodes ? children_nodes[i] : node;
 
-				float dist = point_box_nearest_dist((float3)child_pos, (float)(1 << child_scale), player_pos);
-				
-				if (dist > chunks.generation_radius)
-					continue;
-
 				if (child_scale == CHUNK_DIM_SHIFT) {
-					
+
+					float3 posf = (float3)child_pos;
+					float sizef = (float)(1 << child_scale);
+
+					float dist = calc_closest_dist(posf, sizef);
+
 					int3 chunk_coord = (child_pos + svo.root_pos) >> CHUNK_DIM_SHIFT;
-					float size = (float)(1 << child_scale);
 
-					bool unloaded = child_node == (Node)(LEAF_BIT | B_NULL);
-					bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
-					debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * size, size * 0.999f,
-						!unloaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+					bool is_loaded = child_node != (Node)(LEAF_BIT | B_NULL);
 
-					if (child_node == (Node)(LEAF_BIT | B_NULL) && !pending) {
-						// chunk not generated yet
-						chunks_to_load.push_back({ chunk_coord, dist });
+					if (dist > chunks.generation_radius) {
+						if (is_loaded) {
+
+							float fardist = calc_furthest_dist(posf, sizef);
+							if (fardist >= chunks.generation_radius + chunks.deletion_hysteresis) {
+								// unload whole subtree
+								chunks_to_unload.push_back({ chunk_coord, dist });
+							}
+
+						}
+					} else {
+
+						bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
+						debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
+							is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+
+						if (!is_loaded && !pending) {
+							// chunk not generated yet
+							chunks_to_load.push_back({ chunk_coord, dist });
+						}
 					}
-
 				} else {
 					recurse_chunk_loading(page, child_node, child_pos, child_scale);
 				}
@@ -611,6 +652,13 @@ namespace svo {
 		{
 			ZoneScopedN("recurse_chunk_loading");
 			cl.recurse_chunk_loading(nullptr, (Node)(0 | FARPTR_BIT), 0, root_scale);
+		}
+
+		{
+			ZoneScopedN("chunk unloading");
+			for (auto chunk : cl.chunks_to_unload) {
+				unload_chunk(chunks, chunk.coord);
+			}
 		}
 
 		{
