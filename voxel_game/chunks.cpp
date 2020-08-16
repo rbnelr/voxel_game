@@ -190,8 +190,6 @@ Block Chunks::query_block (bpos p, Chunk** out_chunk, bpos* out_block_pos_chunk)
 }
 
 ChunkHashmap::Iterator Chunks::unload_chunk (ChunkHashmap::Iterator it) {
-	svo.remove_chunk(*it);
-
 	// TODO: clear neighbour block copies to _NO_CHUNK here?
 	return chunks.erase_chunk(it);
 }
@@ -202,10 +200,15 @@ void Chunks::remesh_all () {
 	}
 }
 
-void Chunks::update_chunk_loading (World& world, WorldGenerator const& world_gen, Player const& player) {
+void Chunks::update_chunk_loading (World& world, WorldGenerator& world_gen, Player& player) {
 	ZoneScopedN("update_chunk_loading");
 
 	svo.pre_update(player);
+
+	svo.chunk_loading(*this, world_gen, player.pos);
+
+	svo.post_update();
+	return;
 
 	// check their actual distance to determine if they should be generated or not
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
@@ -262,7 +265,7 @@ void Chunks::update_chunk_loading (World& world, WorldGenerator const& world_gen
 			}
 		}
 
-		{
+		if (0) {
 			ZoneScopedN("sort chunks_to_generate");
 
 			// load chunks nearest to player first
@@ -305,7 +308,7 @@ void Chunks::update_chunk_loading (World& world, WorldGenerator const& world_gen
 					chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
 					pending_chunks.erase_chunk({ it });
 
-					svo.add_chunk(*res.chunk);
+					//svo.add_chunk(*res.chunk);
 				}
 
 				chunk_gen_time.push(res.time);
@@ -318,7 +321,7 @@ void Chunks::update_chunk_loading (World& world, WorldGenerator const& world_gen
 	svo.post_update();
 }
 
-void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player) {
+void Chunks::update_chunks (Graphics& graphics, WorldGenerator& wg, Player& player) {
 	auto chunk_dist_to_player = [&] (chunk_coord pos) {
 		bpos chunk_origin = pos * CHUNK_DIM;
 		return point_box_nearest_dist((float3)chunk_origin, CHUNK_DIM, player.pos);
@@ -333,7 +336,7 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 		}
 	}
 
-	{
+	if (0) {
 		ZoneScopedN("sort chunks_to_generate");
 		
 		// update chunks nearest to player first
@@ -374,8 +377,6 @@ void Chunks::update_chunks (Graphics const& graphics, WorldGenerator const& wg, 
 			}
 
 			auto total = _total.end();
-
-			clog(">>> %d", meshing_allocator.count());
 
 			clog("Meshing update for frame took %7.3f ms", total * 1000);
 		}

@@ -157,11 +157,10 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 	char str[4096];
 	vsnprintf(str, sizeof(str), new_format, vl);
 
-	/* puts is too slow to use in a game!!, often taking >1.5ms to execute
-	{
-	OPTICK_EVENT("vlogf fputs");
-	fputs(line.c_str(), level == ERROR || level == WARNING ? stdout : stderr);
-	}*/
+#if !NDEBUG
+	// puts() is too slow to use in a game!!, often taking >1.5ms to execute
+	fputs(str, level == ERROR || level == WARNING ? stdout : stderr);
+#endif
 
 	GuiConsole::Line l;
 	l.level = level;

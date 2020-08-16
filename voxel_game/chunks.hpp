@@ -55,22 +55,22 @@ inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk
 
 // Hashmap key type for chunk_pos
 struct chunk_coord_hashmap {
-	chunk_coord v;
+	int3 v;
 
 	bool operator== (chunk_coord_hashmap const& r) const { // for hash map
 		return v.x == r.v.x && v.y == r.v.y && v.z == r.v.z;
 	}
 };
 
-inline size_t hash (chunk_coord v) {
+inline size_t hash (int3 v) {
 	size_t h;
-	h  = std::hash<bpos_t>()(v.x);
+	h  = std::hash<int>()(v.x);
 	h = 53ull * (h + 53ull);
 
-	h += std::hash<bpos_t>()(v.y);
+	h += std::hash<int>()(v.y);
 	h = 53ull * (h + 53ull);
 
-	h += std::hash<bpos_t>()(v.z);
+	h += std::hash<int>()(v.z);
 	return h;
 };
 
@@ -350,6 +350,10 @@ struct ChunkHashmap {
 		return (int)hashmap.size();
 	}
 
+	bool contains (chunk_coord coord) {
+		return hashmap.find({ coord }) != hashmap.end();
+	}
+
 	Iterator erase_chunk (Iterator it);
 };
 
@@ -384,9 +388,9 @@ public:
 	void imgui () {
 		if (!imgui_push("Chunks")) return;
 
-		ImGui::DragFloat("generation_radius", &generation_radius, 1);
+		ImGui::SliderFloat("generation_radius", &generation_radius, 0, 2000, "%.0f", 2);
 		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
-		ImGui::DragFloat("active_radius", &active_radius, 1);
+		ImGui::SliderFloat("active_radius", &active_radius, 0, 2000, "%.0f", 2);
 
 		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
 
@@ -419,9 +423,9 @@ public:
 	void remesh_all ();
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (World& world, WorldGenerator const& world_gen, Player const& player);
+	void update_chunk_loading (World& world, WorldGenerator& world_gen, Player& player);
 
 	// chunk meshing to prepare for drawing
-	void update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player);
+	void update_chunks (Graphics& graphics, WorldGenerator& wg, Player& player);
 };
 

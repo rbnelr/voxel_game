@@ -197,7 +197,8 @@ public:
 		return (T*)baseptr + index;
 	}
 
-	inline uint32_t size () {
+	inline uint32_t size_threadsafe () {
+		LOCK_GUARD;
 		return count;
 	}
 	inline uint32_t freeset_size () {

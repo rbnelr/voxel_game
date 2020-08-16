@@ -7,6 +7,7 @@
 class Chunk;
 class Chunks;
 class Player;
+struct WorldGenerator;
 
 namespace svo {
 	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
@@ -21,18 +22,27 @@ namespace svo {
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
-
+	static constexpr Node NULLNODE = (Node)(LEAF_BIT | B_NULL);
+	
 	struct Page;
 	struct PagedOctree;
+
+	struct NodeChildren {
+		Node			children[8];
+	};
+
+	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
 
 	// get the page that contains a node
 	inline Page* page_from_node (Node* node) {
 		return (Page*)( (uintptr_t)node & ~(PAGE_SIZE - 1) ); // round down the ptr to get the page pointer
 	}
+	inline Page* page_from_node (NodeChildren* node) {
+		return (Page*)( (uintptr_t)node & ~(PAGE_SIZE - 1) ); // round down the ptr to get the page pointer
+	}
 	// get the 8 nodes that a node is grouped into (siblings)
-	inline Node* siblings_from_node (Node* node) {
-		return (Node*)((uintptr_t)node & ~(sizeof(Node)*8 -1)); // round down the ptr to get the siblings pointer
+	inline NodeChildren* siblings_from_node (Node* node) {
+		return (NodeChildren*)((uintptr_t)node & ~(sizeof(NodeChildren) -1)); // round down the ptr to get the siblings pointer
 	}
 
 	struct PageInfo {
@@ -49,18 +59,18 @@ namespace svo {
 		}
 	};
 
-	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(Node)*8);
-	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / (sizeof(Node)*8));
+	static constexpr uint16_t INFO_SIZE = (uint16_t)round_up_pot(sizeof(PageInfo), sizeof(NodeChildren));
+	static constexpr uint16_t PAGE_NODES = (uint16_t)((PAGE_SIZE - INFO_SIZE) / (sizeof(NodeChildren)));
 
 	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.85f);
 
 	static constexpr float ROOT_MOVE_HISTER		= 0.05f;
 
+
 	struct Page {
 		PageInfo		info;
 
-		alignas(sizeof(Node)*8)
-		Node			nodes[PAGE_NODES][8];
+		NodeChildren	nodes[PAGE_NODES];
 
 		bool nodes_full () {
 			return info.count >= PAGE_NODES;
@@ -159,13 +169,10 @@ namespace svo {
 			allocator.free_threadsafe(page);
 		}
 		
-		uint16_t size () { return (uint16_t)allocator.size(); }
 		Page& operator[] (uint16_t i) { return *allocator[i]; }
 
 		uint16_t indexof (Page* page) {
-			uintptr_t index = allocator.indexof(page);
-			assert(index < allocator.size());
-			return (uint16_t)index;
+			return (uint16_t)allocator.indexof(page);
 		}
 	};
 
@@ -179,8 +186,16 @@ namespace svo {
 
 		PagedOctree pages;
 
+		SVO ();
+
+		//std::unordered_set<chunk_coord_hashmap, std::unique_ptr<Chunk>> queued_chunks;
+		bool is_chunk_load_queued (Chunks& chunks, int3 coord);
+
+		void queue_chunk_load (Chunks& chunks, WorldGenerator& world_gen, int3 coord);
+		void unload_chunk (Chunks& chunks, int3 coord);
+
 		//
-		bool debug_draw_octree = 1;
+		bool debug_draw_octree = 0;//1;
 
 		int debug_draw_octree_min = 4;
 		int debug_draw_octree_max = 20;
@@ -197,8 +212,7 @@ namespace svo {
 		void post_update ();
 
 		Node chunk_to_octree (Chunk& chunk);
-		void add_chunk (Chunk& chunk);
-		void remove_chunk (Chunk& chunk);
+		void chunk_loading (Chunks& chunks, WorldGenerator& world_gen, float3 player_pos);
 
 		void update_block (Chunk& chunk, int3 bpos, block_id id);
 	};

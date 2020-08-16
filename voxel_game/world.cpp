@@ -26,7 +26,7 @@ SelectedBlock World::raycast_breakable_blocks (Ray ray, float max_dist, bool hit
 	return b;
 }
 
-void World::apply_damage (SelectedBlock const& block, Item& item, bool creative_mode) {
+void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) {
 	assert(block);
 	auto tool_props = item.get_props();
 

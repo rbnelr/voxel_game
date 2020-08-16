@@ -6,7 +6,7 @@
 
 float3	player_spawn_point = float3(3,3,34);
 
-void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics const& graphics, SelectedBlock const& selected_block) {
+void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics, SelectedBlock& selected_block) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];
 	bool inp = selected_block ? button.is_down : button.went_down;
 
@@ -26,7 +26,7 @@ void BreakBlock::update (World& world, Player& player, bool creative_mode, Playe
 	}
 }
 
-void BlockPlace::update (World& world, Player const& player, SelectedBlock const& selected_block) {
+void BlockPlace::update (World& world, Player& player, SelectedBlock& selected_block) {
 	auto& slot = player.inventory.quickbar.get_selected();
 	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;

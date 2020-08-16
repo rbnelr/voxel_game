@@ -64,7 +64,7 @@ namespace gl {
 		for (auto& kv : shad->uniforms) {
 			kv.second.loc = glGetUniformLocation(shad->shad, kv.first.str.c_str());
 			if (kv.second.loc < 0) {
-				clog(WARNING, "Uniform \"%s\" in shader \"%s\" not active!\n", kv.first.str.c_str(), name);
+				clog(WARNING, "Uniform \"%s\" in shader \"%s\" not active!", kv.first.str.c_str(), name);
 			}
 		}
 	}

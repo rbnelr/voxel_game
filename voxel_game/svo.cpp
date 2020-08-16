@@ -18,7 +18,9 @@ namespace svo {
 		ImGui::Checkbox("debug_draw_pages", &debug_draw_pages);
 		ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 
-		ImGui::Text("pages: %d %6.2f MB", pages.allocator.size(), (float)(pages.allocator.size() * sizeof(Page)) / (1024 * 1024));
+		int pages_count = pages.allocator.size_threadsafe();
+
+		ImGui::Text("pages: %d %6.2f MB", pages_count, (float)(pages_count * sizeof(Page)) / (1024 * 1024));
 		
 		bool show_all_pages = ImGui::TreeNode("all pages");
 
@@ -41,7 +43,7 @@ namespace svo {
 
 		ImGui::Text("nodes: %d active / %d allocated   %6.2f / %d nodes avg (%6.2f%%)",
 			active_nodes, total_nodes,
-			(float)active_nodes / pages.size(), PAGE_NODES,
+			(float)active_nodes / pages_count, PAGE_NODES,
 			(float)active_nodes / total_nodes * 100);
 
 		ImGui::Text("page_counters:  splits: %5d  merges: %5d", page_split_counter, page_merge_counter);
@@ -56,13 +58,13 @@ namespace svo {
 		uintptr_t children_ptr = dstpage->alloc_node();
 
 		for (int i=0; i<8; ++i) {
-			auto& child = srcpage->nodes[srcnode][i];
+			auto& child = srcpage->nodes[srcnode].children[i];
 
 			if (child & FARPTR_BIT) {
-				dstpage->add_child(&dstpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
+				dstpage->add_child(&dstpage->nodes[children_ptr].children[i], &pages[child & ~FARPTR_BIT]);
 			}
 			
-			dstpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
+			dstpage->nodes[children_ptr].children[i] = child & (LEAF_BIT|FARPTR_BIT) ?
 				child :
 				page_from_subtree(pages, dstpage, srcpage, child);
 		}
@@ -99,7 +101,7 @@ namespace svo {
 		}
 	}
 
-	struct DecentStack {
+	struct DescentStack {
 		Node*	node;
 		Page*	page;
 	};
@@ -120,7 +122,7 @@ namespace svo {
 
 			// cound children subtrees
 			for (int i=0; i<8; ++i) {
-				auto& children = page->nodes[*node];
+				auto& children = page->nodes[*node].children;
 				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
 					subtree_size += find_split_node_recurse(&children[i], scale-1);
 			}
@@ -150,16 +152,16 @@ namespace svo {
 			uint16_t children_ptr = splitpage->alloc_node();
 
 			for (int i=0; i<8; ++i) {
-				Node& child = srcpage->nodes[splitnode][i];
+				Node& child = srcpage->nodes[splitnode].children[i];
 
 				// move over children to splitnode if node was farptr
 				if (child & FARPTR_BIT) {
 					srcpage->remove_child(&pages[child & ~FARPTR_BIT]);
-					splitpage->add_child(&splitpage->nodes[children_ptr][i], &pages[child & ~FARPTR_BIT]);
+					splitpage->add_child(&splitpage->nodes[children_ptr].children[i], &pages[child & ~FARPTR_BIT]);
 				}
 
 				if (stack[scale-1] == &child) {
-					stack[scale-1] = &splitpage->nodes[children_ptr][i];
+					stack[scale-1] = &splitpage->nodes[children_ptr].children[i];
 				} else {
 					for (uint16_t i=0; i<MAX_DEPTH; ++i) {
 						if (stack[scale] == &child) {
@@ -168,7 +170,7 @@ namespace svo {
 					}
 				}
 
-				splitpage->nodes[children_ptr][i] = child & (LEAF_BIT|FARPTR_BIT) ?
+				splitpage->nodes[children_ptr].children[i] = child & (LEAF_BIT|FARPTR_BIT) ?
 					child :
 					split_subtree(child, scale-1);
 			}
@@ -220,7 +222,7 @@ namespace svo {
 		}
 
 		for (int i=0; i<8; ++i) {
-			auto child = page->nodes[node][i];
+			auto child = page->nodes[node].children[i];
 			if ((child & LEAF_BIT) == 0) {
 				recurse_free_subtree(oct, page, child);
 			}
@@ -266,7 +268,7 @@ namespace svo {
 		memset(stack, 0, sizeof(stack));
 	#endif
 
-		Node* siblings = oct.pages[0].nodes[0];
+		Node* siblings = oct.pages[0].nodes[0].children;
 
 		for (;;) {
 			cur_scale--;
@@ -295,7 +297,7 @@ namespace svo {
 					node_ptr = (Node)0;
 				}
 
-				siblings = page->nodes[node_ptr];
+				siblings = page->nodes[node_ptr].children;
 			} else {
 				//// Split node into 8 children of same type
 
@@ -318,7 +320,7 @@ namespace svo {
 				// write ptr to children into this nodes slot in parents children array
 				*child_node = node_ptr;
 
-				siblings = page->nodes[node_ptr];
+				siblings = page->nodes[node_ptr].children;
 
 				// alloc and init children for node
 				for (int i=0; i<8; ++i) {
@@ -338,7 +340,7 @@ namespace svo {
 					break;
 				}
 
-				Node* siblings = siblings_from_node(write_node);
+				Node* siblings = siblings_from_node(write_node)->children;
 			
 				for (int i=0; i<8; ++i) {
 					if (&siblings[i] != write_node && siblings[i] != val) {
@@ -393,8 +395,8 @@ namespace svo {
 		Page* rootpage = &oct.pages[0];
 
 		// copy old children
-		Node old_children[8];
-		memcpy(old_children, rootpage->nodes[0], sizeof(old_children));
+		NodeChildren old_children;
+		memcpy(&old_children, rootpage->nodes[0].children, sizeof(old_children));
 		
 		for (int i=0; i<8; ++i) {
 			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
@@ -405,24 +407,34 @@ namespace svo {
 			
 			if (any(child < 0 || child > 1)) {
 				// root moved over this area, no nodes loaded yet
-				rootpage->nodes[0][i] = (Node)(LEAF_BIT | B_NULL);
+				rootpage->nodes[0].children[i] = (Node)(LEAF_BIT | B_NULL);
 			} else {
 				// copy old children to new slot
-				rootpage->nodes[0][i] = old_children[child_indx];
-				old_children[child_indx] = (Node)0;
+				rootpage->nodes[0].children[i] = old_children.children[child_indx];
+				old_children.children[child_indx] = (Node)0;
 			}
 		}
 		
 		// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
 		for (int i=0; i<8; ++i) {
-			if (old_children[i] != 0 && (old_children[i] & LEAF_BIT) == 0) {
-				free_subtree(oct, rootpage, old_children[i]);
+			if (old_children.children[i] != 0 && (old_children.children[i] & LEAF_BIT) == 0) {
+				free_subtree(oct, rootpage, old_children.children[i]);
 			}
 		}
 		
 		oct.root_pos = pos;
 	}
 
+	static constexpr int3 children_pos[8] = {
+		int3(0,0,0),
+		int3(1,0,0),
+		int3(0,1,0),
+		int3(1,1,0),
+		int3(0,0,1),
+		int3(1,0,1),
+		int3(0,1,1),
+		int3(1,1,1),
+	};
 
 	bool can_collapse (Node* children) {
 		if ((children[0] & LEAF_BIT) == 0)
@@ -462,11 +474,11 @@ namespace svo {
 		node_stack[CHUNK_DIM_SHIFT] = &root;
 		stack[CHUNK_DIM_SHIFT] = { 0, 0 };
 
-		node_stack[scale] = chunk_page->nodes[ chunk_page->alloc_node() ];
+		node_stack[scale] = chunk_page->nodes[ chunk_page->alloc_node() ].children;
 		stack[scale] = { 0, 0 };
 
 		for (int i=0; i<8; ++i) {
-			chunk_page->nodes[0][i] = (Node)(LEAF_BIT | B_NULL);
+			chunk_page->nodes[0].children[i] = NULLNODE;
 		}
 
 		for (;;) {
@@ -481,7 +493,7 @@ namespace svo {
 				scale++;
 
 				if (can_collapse(children)) {
-					uint16_t children_ptr = (uint16_t)(((char*)children - (char*)page->nodes[0]) / (sizeof(Node)*8));
+					uint16_t children_ptr = (uint16_t)(((char*)children - (char*)&page->nodes) / (sizeof(NodeChildren)));
 
 					node_stack[scale][ stack[scale].child_indx ] = children[0];
 
@@ -491,21 +503,16 @@ namespace svo {
 						page->free_node(children_ptr);
 					}
 				}
-
+				
 				if (scale == CHUNK_DIM_SHIFT)
 					break;
 
 			} else {
 
-				int3 child_pos = pos;
-				int x=pos.x, y=pos.y, z=pos.z;
-				int size = 1 << scale;
-				if (child_indx & 1) x += size;
-				if (child_indx & 2) y += size;
-				if (child_indx & 4) z += size;
+				int3 child_pos = pos + (children_pos[child_indx] << scale);
 
 				if (scale == 0) {
-					*node = (Node)(LEAF_BIT | chunk.get_block(int3(x,y,z)).id);
+					*node = (Node)(LEAF_BIT | chunk.get_block(child_pos).id);
 				} else {
 					// Push
 					if (page->nodes_full()) {
@@ -517,17 +524,17 @@ namespace svo {
 					}
 
 					uint16_t nodei = page->alloc_node();
-					Node* child_children = page->nodes[nodei];
+					auto& child_children = page->nodes[nodei];
 
 					*node = (Node)nodei;
 
 					scale--;
-					stack[scale] = { int3(x,y,z), 0 };
-					node_stack[scale] = child_children;
+					stack[scale] = { child_pos, 0 };
+					node_stack[scale] = child_children.children;
 
 					// init nodes to leaf nodes so future split_page won't fail if we had this uninitialized
 					for (int i=0; i<8; ++i) {
-						child_children[i] = (Node)(LEAF_BIT | B_NULL);
+						child_children.children[i] = NULLNODE;
 					}
 
 					continue;
@@ -540,12 +547,145 @@ namespace svo {
 		return root;
 	}
 
-	void SVO::add_chunk (Chunk& chunk) {
-		ZoneScopedN("svo_add_chunk");
+	struct ChunkLoader {
+		SVO& svo;
+		float3 player_pos;
+		Chunks& chunks;
 
-		octree_write(*this, chunk.coord * CHUNK_DIM, CHUNK_DIM_SHIFT, chunk.svo_node);
+		struct Chunk {
+			int3 coord;
+			float dist;
+		};
+		std::vector<Chunk> chunks_to_load;
+
+		void recurse_chunk_loading (Page* page, Node node, int3 pos, int scale) {
+			if (node & FARPTR_BIT) {
+				page = &svo.pages[node & ~FARPTR_BIT];
+				node = (Node)0;
+			}
+
+			// need to recurse into areas that do not exist in the octree yet
+			// -> children_nodes will be nullptr in that case
+			Node* children_nodes = node & LEAF_BIT ? nullptr : page->nodes[node].children;
+
+			int child_scale = scale - 1;
+
+			for (int i=0; i<8; ++i) {
+				int3 child_pos = pos + (children_pos[i] << child_scale);
+
+				// need to recurse into areas that do not exist in the octree yet
+				// just pretend the child nodes were the same (leaf) node as the parent
+				Node child_node = children_nodes ? children_nodes[i] : node;
+
+				float dist = point_box_nearest_dist((float3)child_pos, (float)(1 << child_scale), player_pos);
+				
+				if (dist > chunks.generation_radius)
+					continue;
+
+				if (child_scale == CHUNK_DIM_SHIFT) {
+					
+					int3 chunk_coord = (child_pos + svo.root_pos) >> CHUNK_DIM_SHIFT;
+					float size = (float)(1 << child_scale);
+
+					bool unloaded = child_node == (Node)(LEAF_BIT | B_NULL);
+					bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
+					debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * size, size * 0.999f,
+						!unloaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+
+					if (child_node == (Node)(LEAF_BIT | B_NULL) && !pending) {
+						// chunk not generated yet
+						chunks_to_load.push_back({ chunk_coord, dist });
+					}
+
+				} else {
+					recurse_chunk_loading(page, child_node, child_pos, child_scale);
+				}
+			}
+		}
+	};
+
+	void SVO::chunk_loading (Chunks& chunks, WorldGenerator& world_gen, float3 player_pos) {
+		ZoneScoped;
+
+		ChunkLoader cl = { *this, player_pos - (float3)root_pos, chunks } ;
+		{
+			ZoneScopedN("recurse_chunk_loading");
+			cl.recurse_chunk_loading(nullptr, (Node)(0 | FARPTR_BIT), 0, root_scale);
+		}
+
+		{
+			ZoneScopedN("std::sort chunks_to_load");
+
+			std::sort(cl.chunks_to_load.begin(), cl.chunks_to_load.end(), [] (ChunkLoader::Chunk& l, ChunkLoader::Chunk& r) {
+				return std::less<float>()(l.dist, r.dist);
+			});
+		}
+
+		{
+			ZoneScopedN("queue chunk loads");
+			
+			int count = min((int)cl.chunks_to_load.size(), chunks.max_chunk_gens_processed_per_frame);
+			for (int i=0; i<count; ++i) {
+				auto chunk = cl.chunks_to_load[i];
+				queue_chunk_load(chunks, world_gen, chunk.coord);
+			}
+		}
+
+		{
+			ZoneScopedN("finish chunkgen jobs");
+
+			int count = 0;
+
+			BackgroundJob res;
+			while (count++ < chunks.max_chunk_gens_processed_per_frame && background_threadpool.results.try_pop(&res)) {
+				ZoneScopedN("finialize chunk_to_generate");
+
+				chunks.chunk_gen_time.push(res.time);
+				clog("Chunk (%3d,%3d,%3d) generated in %7.2f ms", res.chunk->coord.x, res.chunk->coord.y, res.chunk->coord.z, res.time * 1024);
+
+				octree_write(*this, res.chunk->coord * CHUNK_DIM, CHUNK_DIM_SHIFT, res.chunk->svo_node);
+
+				{ // move chunk into real hashmap
+					auto it = chunks.pending_chunks.hashmap.find(chunk_coord_hashmap{res.chunk->coord});
+					
+					chunks.chunks.hashmap.emplace(chunk_coord_hashmap{res.chunk->coord}, std::move(it->second));
+					chunks.pending_chunks.erase_chunk({ it });
+				}
+			}
+		}
 	}
-	
+
+	bool SVO::is_chunk_load_queued (Chunks& chunks, int3 coord) {
+		ZoneScoped;
+
+		//return queued_chunks.find({ coord }) != queued_chunks.end();
+		return chunks.pending_chunks.contains(coord);
+	}
+	void SVO::queue_chunk_load (Chunks& chunks, WorldGenerator& world_gen, int3 coord) {
+		ZoneScoped;
+
+		Chunk* chunk = chunks.pending_chunks.alloc_chunk(coord);
+
+		//queued_chunks.emplace(coord);
+
+		BackgroundJob job;
+		job.chunk = chunk;
+		job.world_gen = &world_gen;
+		job.svo = this;
+
+		{
+			background_threadpool.jobs.push(job);
+		}
+	}
+	void SVO::unload_chunk (Chunks& chunks, int3 coord) {
+		ZoneScoped;
+
+		// TODO: could be optimized with by simple freeing subtree chunk.svo_node
+		octree_write(*this, coord * CHUNK_DIM, CHUNK_DIM_SHIFT, (Node)(LEAF_BIT | B_NULL));
+
+		chunks.chunks.erase_chunk( chunks.chunks.hashmap.find({ coord }) );
+	}
+
 	lrgba cols[] = {
 		srgba(255,0,0),
 		srgba(0,255,0),
@@ -576,7 +716,7 @@ namespace svo {
 				node = (Node)0;
 			}
 
-			Node* children = cur_page->nodes[node];
+			Node* children = cur_page->nodes[node].children;
 			int child_scale = scale - 1;
 
 			if (child_scale >= oct.debug_draw_octree_min) {
@@ -595,33 +735,24 @@ namespace svo {
 		recurse_draw(oct, nullptr, (Node)(0 | FARPTR_BIT), oct.root_pos, oct.root_scale);
 	}
 
-	void SVO::pre_update (Player const& player) {
-		if (pages.size() == 0) {
-			auto* rootpage = pages.alloc_page();
-			rootpage->info.scale = root_scale;
-			assert(pages.indexof(rootpage) == 0);
+	SVO::SVO () {
+		auto* rootpage = pages.alloc_page();
+		rootpage->info.scale = root_scale;
+		assert(pages.indexof(rootpage) == 0);
 
-			auto& root = rootpage->nodes[ rootpage->alloc_node() ];
-			for (int i=0; i<8; ++i) {
-				root[i] = (Node)(LEAF_BIT | B_NULL);
-			}
+		auto& root = rootpage->nodes[ rootpage->alloc_node() ];
+		for (int i=0; i<8; ++i) {
+			root.children[i] = (Node)(LEAF_BIT | B_NULL);
 		}
+	}
 
+	void SVO::pre_update (Player const& player) {
 		update_root(*this, player);
 	}
 	void SVO::post_update () {
 		if (debug_draw_octree) {
 			debug_draw(*this);
 		}
-	}
-
-	void SVO::remove_chunk (Chunk& chunk) {
-		ZoneScopedN("svo_remove_chunk");
-
-		int3 pos = chunk.coord * CHUNK_DIM;
-
-		// TODO: could be optimized with by simple freeing subtree chunk.svo_node
-		octree_write(*this, pos, CHUNK_DIM_SHIFT, (Node)(LEAF_BIT | B_NULL));
 	}
 
 	void SVO::update_block (Chunk& chunk, int3 bpos, block_id id) {

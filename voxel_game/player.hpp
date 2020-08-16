@@ -44,7 +44,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, bool creative_mode, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
+	void update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics, SelectedBlock& selected_block);
 };
 
 struct InventorySlot {
@@ -106,7 +106,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player const& player, SelectedBlock const& selected_block);
+	void update (World& world, Player& player, SelectedBlock& selected_block);
 };
 
 class Player {
