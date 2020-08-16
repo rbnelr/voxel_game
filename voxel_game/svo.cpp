@@ -606,18 +606,28 @@ namespace svo {
 				// just pretend the child nodes were the same (leaf) node as the parent
 				Node child_node = children_nodes ? children_nodes[i] : node;
 
+				bool is_loaded = child_node != (Node)(LEAF_BIT | B_NULL);
+
+				float3 posf = (float3)child_pos;
+				float sizef = (float)(1 << child_scale);
+
+				float dist = calc_closest_dist(posf, sizef);
+				bool want_loaded = dist <= chunks.generation_radius;
+
 				if (child_scale == CHUNK_DIM_SHIFT) {
-
-					float3 posf = (float3)child_pos;
-					float sizef = (float)(1 << child_scale);
-
-					float dist = calc_closest_dist(posf, sizef);
 
 					int3 chunk_coord = (child_pos + svo.root_pos) >> CHUNK_DIM_SHIFT;
 
-					bool is_loaded = child_node != (Node)(LEAF_BIT | B_NULL);
+					if (want_loaded) {
+						//bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
+						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
+						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
 
-					if (dist > chunks.generation_radius) {
+						if (!is_loaded && !svo.is_chunk_load_queued(chunks, chunk_coord)) {
+							// chunk not generated yet
+							chunks_to_load.push_back({ chunk_coord, dist });
+						}
+					} else {
 						if (is_loaded) {
 
 							float fardist = calc_furthest_dist(posf, sizef);
@@ -627,19 +637,10 @@ namespace svo {
 							}
 
 						}
-					} else {
-
-						bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
-						debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
-							is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
-
-						if (!is_loaded && !pending) {
-							// chunk not generated yet
-							chunks_to_load.push_back({ chunk_coord, dist });
-						}
 					}
 				} else {
-					recurse_chunk_loading(page, child_node, child_pos, child_scale);
+					if (want_loaded)
+						recurse_chunk_loading(page, child_node, child_pos, child_scale);
 				}
 			}
 		}

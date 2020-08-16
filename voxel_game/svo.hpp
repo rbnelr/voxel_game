@@ -179,7 +179,7 @@ namespace svo {
 	class SVO {
 	public:
 
-		int			root_scale = 10;
+		int			root_scale = 12;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		float3		root_move_hister = 0;
