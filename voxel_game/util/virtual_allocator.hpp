@@ -179,6 +179,15 @@ private:
 
 		decommit_pages(ptr, sizeof(T));
 	}
+
+	// not threadsafe
+	inline uint32_t freeset_size () {
+		return (uint32_t)freeset.size() * 64;
+	}
+	// not threadsafe
+	inline bool is_allocated (uint32_t i) {
+		return (freeset[i / 64] & (1ull << (i % 64))) == 0;
+	}
 public:
 
 	T* alloc_threadsafe () {
@@ -202,14 +211,6 @@ public:
 		return count;
 	}
 
-	// not threadsafe
-	inline uint32_t freeset_size () {
-		return (uint32_t)freeset.size() * 64;
-	}
-	// not threadsafe
-	inline bool is_allocated (uint32_t i) {
-		return (freeset[i / 64] & (1ull << (i % 64))) == 0;
-	}
 };
 
 #undef MUTEX			

@@ -77,7 +77,7 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 			using namespace svo;
 
 			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-			int height = (int)svo.allocator.freeset_size();
+			int height = MAX_PAGES;
 		
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		
@@ -85,9 +85,9 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
 			
-			for (int i=0; i<height; ++i) {
-				if (svo.allocator.is_allocated(i))
-					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &svo.allocator[i]->nodes[0]);
+			for (auto* page : svo.active_pages) {
+				GLint y = svo.allocator.indexof(page);
+				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,y,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &page->nodes[0]);
 			}
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);

@@ -6,7 +6,6 @@
 #include "graphics/debug_graphics.hpp"
 
 namespace svo {
-	//
 	Node page_from_subtree (Page pages[], Page* dstpage, Page* srcpage, Node srcnode) {
 		assert((srcnode & LEAF_BIT) == 0);
 
@@ -39,8 +38,6 @@ namespace svo {
 		parent->remove_child(child);
 		
 		free_page(child);
-
-		page_merge_counter++;
 	}
 	void SVO::try_merge (Page* page) {
 		if (!page->info.farptr_ptr)
@@ -52,7 +49,6 @@ namespace svo {
 
 		if (sum <= PAGE_MERGE_THRES) {
 			merge(parent, page);
-			// WARNING: page is invalidated, parent might be invalidated
 		}
 	}
 
@@ -136,7 +132,7 @@ namespace svo {
 			return (Node)children_ptr;
 		}
 	};
-	void SVO::split_page (Page* page, Node* stack[]) {
+	Page* SVO::split_page (Page* page, Node* stack[], bool active_page) {
 		ZoneScopedN("world_octree::split_page");
 		
 		// find splitnode
@@ -155,7 +151,7 @@ namespace svo {
 		}
 
 		// alloc childpage
-		Page* childpage = alloc_page();
+		Page* childpage = alloc_page(active_page);
 		childpage->info.scale = ps.split_node_scale;
 
 		// create childpage from subtree
@@ -165,14 +161,15 @@ namespace svo {
 		*ps.split_node = (Node)(allocator.indexof(childpage) | FARPTR_BIT);
 		page->add_child(ps.split_node, childpage);
 
-		page_split_counter++;
+		return childpage;
 	}
 
 	void recurse_free_subtree (SVO& oct, Page* page, Node node) {
 		assert((node & LEAF_BIT) == 0);
 
 		if (node & FARPTR_BIT) {
-			oct.free_page(oct.allocator[node & ~FARPTR_BIT]);
+			auto* page = oct.allocator[node & ~FARPTR_BIT];
+			oct.free_page(page);
 			return;
 		}
 
@@ -264,7 +261,7 @@ namespace svo {
 				}
 
 				if (page->nodes_full()) {
-					split_page(page, stack);
+					auto* childpage = split_page(page, stack);
 
 					child_node = stack[cur_scale];
 					page = page_from_node(child_node);
@@ -516,7 +513,7 @@ namespace svo {
 
 		//int3 pos = chunk.coord * CHUNK_DIM;
 
-		Page* chunk_page = alloc_page();
+		Page* chunk_page = alloc_page(false);
 		chunk_page->info.scale = CHUNK_SCALE;
 
 		Node* node_stack[MAX_DEPTH];
@@ -561,7 +558,7 @@ namespace svo {
 					node_stack[scale][ stack[scale].child_indx ] = children[0];
 
 					if (children_ptr == 0) {
-						free_page(page);
+						free_page(page, false);
 					} else {
 						page->free_node(children_ptr);
 					}
@@ -581,7 +578,7 @@ namespace svo {
 				} else {
 					// Push
 					if (page->nodes_full()) {
-						split_page(page, node_stack);
+						split_page(page, node_stack, false);
 
 						children	= node_stack[scale];
 						node = &children[child_indx];
@@ -622,7 +619,7 @@ namespace svo {
 			float dist;
 		};
 		std::vector<Chunk> chunks_to_load;
-		std::vector<Chunk> chunks_to_unload;
+		std::vector<int3> chunks_to_unload;
 
 		float calc_closest_dist (float3 pos, float size) {
 			float3 pos_rel = player_pos - pos;
@@ -688,7 +685,7 @@ namespace svo {
 							float fardist = calc_furthest_dist(posf, sizef);
 							if (fardist >= voxels.load_radius + voxels.unload_hyster) {
 								// unload whole subtree
-								chunks_to_unload.push_back({ chunk_coord, dist });
+								chunks_to_unload.push_back(chunk_coord);
 							}
 
 						}
@@ -700,6 +697,16 @@ namespace svo {
 			}
 		}
 	};
+
+	void SVO::recurse_add_active_pages (Page* page) {
+		active_pages.insert(page);
+
+		Page* child = page->info.children_ptr;
+		while (child) {
+			recurse_add_active_pages(child);
+			child = child->info.sibling_ptr;
+		}
+	}
 
 	void SVO::update_chunk_loading (Voxels& voxels, WorldGenerator& world_gen, float3 player_pos) {
 		ZoneScoped;
@@ -715,7 +722,7 @@ namespace svo {
 		{
 			ZoneScopedN("chunk unloading");
 			for (auto chunk : cl.chunks_to_unload) {
-				unload_chunk(voxels, chunk.coord);
+				octree_write(chunk, CHUNK_SCALE, (Node)(LEAF_BIT | B_NULL));
 			}
 		}
 
@@ -724,7 +731,7 @@ namespace svo {
 
 			std::sort(cl.chunks_to_load.begin(), cl.chunks_to_load.end(), [] (ChunkLoader::Chunk& l, ChunkLoader::Chunk& r) {
 				return std::less<float>()(l.dist, r.dist);
-				});
+			});
 		}
 
 		{
@@ -744,7 +751,7 @@ namespace svo {
 				pending_chunks.emplace(chunk.coord);
 
 				return std::make_unique<WorldgenJob>(chunk.coord, this, &world_gen);
-				});
+			});
 		}
 
 		{
@@ -764,16 +771,5 @@ namespace svo {
 
 			recurse_draw(*this, nullptr, (Node)(0 | FARPTR_BIT), root_pos, root_scale);
 		}
-	}
-
-	bool SVO::is_chunk_load_queued (Voxels& voxels, int3 coord) {
-		ZoneScoped;
-		return pending_chunks.find(coord) != pending_chunks.end();
-	}
-	void SVO::unload_chunk (Voxels& voxels, int3 coord) {
-		ZoneScoped;
-
-		// TODO: could be optimized with by simple freeing subtree chunk.svo_node
-		octree_write(coord * CHUNK_SIZE, CHUNK_SCALE, (Node)(LEAF_BIT | B_NULL));
 	}
 }

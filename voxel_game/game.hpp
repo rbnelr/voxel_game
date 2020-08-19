@@ -77,4 +77,9 @@ public:
 	Game ();
 
 	void frame ();
+
+	~Game () {
+		background_threadpool.shutdown();
+		parallelism_threadpool.shutdown();
+	}
 };

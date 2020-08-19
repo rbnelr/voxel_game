@@ -18,8 +18,12 @@ namespace svo {
 		FARPTR_BIT = 0x4000u,
 	};
 
+	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
+
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
+
+	static constexpr int MAX_MEMORY_SIZE = PAGE_SIZE * MAX_PAGES;
 
 	static constexpr Node NULLNODE = (Node)(LEAF_BIT | B_NULL);
 	
@@ -29,8 +33,6 @@ namespace svo {
 	struct NodeChildren {
 		Node			children[8];
 	};
-
-	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
 
 	// get the page that contains a node
 	inline Page* page_from_node (Node* node) {
@@ -145,13 +147,16 @@ namespace svo {
 
 		float3		root_move_hister = 0;
 
+		// Pages that are currently part of the visible svo (not used in worldgen threads)
+		// Needed to be able to safely iterate over all pages in main thread
+		std::unordered_set<Page*> active_pages;
+		void recurse_add_active_pages (Page* page);
+
 		std::unordered_set<vector_key<int3>> pending_chunks;
 
-		bool is_chunk_load_queued (Voxels& voxels, int3 coord);
-		void unload_chunk (Voxels& voxels, int3 coord);
-
-		int page_split_counter = 0;
-		int page_merge_counter = 0;
+		bool is_chunk_load_queued (Voxels& voxels, int3 coord) {
+			return pending_chunks.find(coord) != pending_chunks.end();
+		}
 
 		//
 		bool debug_draw_octree = 0;//1;
@@ -177,35 +182,28 @@ namespace svo {
 			ImGui::Checkbox("debug_draw_pages", &debug_draw_pages);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 
-			int pages_count = allocator.size_threadsafe();
-
-			ImGui::Text("pages: %d %6.2f MB", pages_count, (float)(pages_count * sizeof(Page)) / (1024 * 1024));
-
-			bool show_all_pages = ImGui::TreeNode("all pages");
-
+			int total_pages = 0;
 			int total_nodes = 0;
 			int active_nodes = 0;
-			for (uint32_t i=0; i<allocator.freeset_size(); ++i) {
-				if (!allocator.is_allocated(i)) continue;
-
-				auto& page = *allocator[i];
-
-				active_nodes += page.info.count;
+			for (auto* page : active_pages) {
+				total_pages++;
+				active_nodes += page->info.count;
 				total_nodes += PAGE_NODES;
-
-				if (show_all_pages)
-					ImGui::Text("page: %d", allocator[i]->info.count);
 			}
 
-			if (show_all_pages)
-				ImGui::TreePop();
+			ImGui::Text("pages: %d %6.2f MB", total_pages, (float)(total_pages * sizeof(Page)) / (1024 * 1024));
 
 			ImGui::Text("nodes: %d active / %d allocated   %6.2f / %d nodes avg (%6.2f%%)",
 				active_nodes, total_nodes,
-				(float)active_nodes / pages_count, PAGE_NODES,
+				(float)active_nodes / total_pages, PAGE_NODES,
 				(float)active_nodes / total_nodes * 100);
 
-			ImGui::Text("page_counters:  splits: %5d  merges: %5d", page_split_counter, page_merge_counter);
+			if (ImGui::TreeNode("all pages")) {
+				for (auto* page : active_pages) {
+					ImGui::Text("page: %d", page->info.count);
+				}
+				ImGui::TreePop();
+			}
 
 			imgui_pop();
 		}
@@ -213,14 +211,16 @@ namespace svo {
 		SVO ();
 		
 		//
-		Page* alloc_page () {
+		Page* alloc_page (bool active_page=true) {
 			Page* page = allocator.alloc_threadsafe();
 			page->info = PageInfo{};
 
+			if (active_page)
+				active_pages.insert(page);
 			return page;
 		}
 
-		void free_page (Page* page) {
+		void free_page (Page* page, bool active_page=true) {
 			// NOTE: This gets called from background threads when they generate the SVO for a chunk
 			// The following ptr updates could seem unsafe, but at no point do the threads ever own pointers to any but the nodes they just allocated
 			// So this is perfectly safe without requiring more sync
@@ -234,18 +234,20 @@ namespace svo {
 			auto* child = page->info.children_ptr;
 			while (child) {
 				Page* next = child->info.sibling_ptr;
-				free_page(child);
+				free_page(child, active_page);
 				child = next;
 			}
 
 			// free page
 			allocator.free_threadsafe(page);
+			if (active_page)
+				active_pages.erase(page);
 		}
 
 		void merge (Page* parent, Page* child);
 		void try_merge (Page* page);
 
-		void split_page (Page* page, Node* stack[]);
+		Page* split_page (Page* page, Node* stack[], bool active_page=true);
 
 		void free_subtree (Page* page, Node node);
 
