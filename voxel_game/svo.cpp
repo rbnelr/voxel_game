@@ -672,11 +672,10 @@ namespace svo {
 					int3 chunk_coord = child_pos + svo.root_pos;
 
 					if (want_loaded) {
-						sizef *= 0.99f;
-
-						bool pending = svo.is_chunk_load_queued(voxels, chunk_coord);
-						debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
-							is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+						//sizef *= 0.99f;
+						//bool pending = svo.is_chunk_load_queued(voxels, chunk_coord);
+						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
+						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
 
 						if (!is_loaded && !svo.is_chunk_load_queued(voxels, chunk_coord)) {
 							// chunk not generated yet

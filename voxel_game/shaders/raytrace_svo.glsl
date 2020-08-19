@@ -583,11 +583,11 @@ $if fragment
 
 		FRAG_COL(col);
 
-		{ // Write depth of furthest hit surface of primary ray (=always opaque) or inf distance if not hit
+		{ // Write depth of furthest hit surface of primary ray (=always opaque) or MAX_DIST distance if not hit
 			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
-			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
+			float ndc_depth = clip.z / clip.w; // bias to fix z fighting with debug overlay
 			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
 
 			//FRAG_COL(vec4(vec3(gl_FragDepth), 1.0));
