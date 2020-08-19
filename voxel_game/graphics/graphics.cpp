@@ -794,8 +794,11 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 				debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
 		}
 
+		framebuffer.update();
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+
 		//// OpenGL drawcalls
-		common_uniforms.set_view_uniforms(view);
+		common_uniforms.set_view_uniforms(view, framebuffer.size);
 		common_uniforms.set_debug_uniforms();
 
 		{ // GL state defaults
@@ -835,7 +838,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	{
 		TracyGpuZone("gpu viewport and clear");
 
-		glViewport(0,0, input.window_size.x, input.window_size.y);
+		glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
+		glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		//glClear(GL_DEPTH_BUFFER_BIT);
 	}
@@ -892,6 +897,15 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		if (!activate_flycam && !world.player.third_person) 
 			player.draw(world.player, tile_textures, sampler);
 	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	framebuffer.blit();
+
+	glViewport(0,0, input.window_size.x, input.window_size.y);
+	glScissor(0,0, input.window_size.x, input.window_size.y);
+	// reset after viewport has changed
+	common_uniforms.set_view_uniforms(view, input.window_size);
+	common_uniforms.set_debug_uniforms();
 
 	{ //// Overlay pass
 		TracyGpuZone("gpu Overlay pass");
