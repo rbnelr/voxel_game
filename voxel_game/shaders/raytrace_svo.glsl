@@ -511,7 +511,7 @@ $if fragment
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
 
-		//vec2 px_jitter = rand2(gl_FragCoord.xy) - 0.5;
+		//vec2 px_jitter = rand2() - 0.5;
 		vec2 px_jitter = vec2(0.0);
 
 		vec2 ndc = (gl_FragCoord.xy + px_jitter) / viewport_size * 2.0 - 1.0;

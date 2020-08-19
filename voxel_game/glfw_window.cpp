@@ -290,11 +290,6 @@ void glfw_init_gl () {
 	if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
 		_vsync_on_interval = -1;
 
-	use_reverse_depth = glfwExtensionSupported("GL_ARB_clip_control");
-	if (use_reverse_depth) {
-		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
-	}
-
 	set_vsync(true);
 
 	// srgb enabled by default if supported
