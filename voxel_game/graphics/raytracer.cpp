@@ -38,6 +38,21 @@ void Raytracer::imgui () {
 	imgui_pop();
 }
 
+Raytracer::Raytracer () {
+	using namespace svo;
+
+	static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
+	int height = MAX_PAGES;
+
+	glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
 void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
 
 	if (shader) {
@@ -78,19 +93,18 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
 			int height = MAX_PAGES;
-		
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		
+
 			glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
-		
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 			
 			for (auto* page : svo.active_pages) {
-				GLint y = svo.allocator.indexof(page);
-				glTexSubImage2D(GL_TEXTURE_2D, 0,  0,y,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &page->nodes[0]);
-			}
+				if (page->info.flags & PAGE_GPU_DIRTY) {
+					GLint y = svo.allocator.indexof(page);
+					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,y,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &page->nodes[0]);
 
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+					page->info.flags &= ~PAGE_GPU_DIRTY;
+				}
+			}
 		}
 
 		std::vector<float4> block_tile_info;

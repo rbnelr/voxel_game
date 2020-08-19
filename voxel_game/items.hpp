@@ -22,17 +22,17 @@ static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 };
 
 struct ItemProperties {
-	tool_type	tool : 4;
-	uint8		damage;
+	tool_type	tool;
+	float		damage;
 	uint8		hardness;
 };
 
-static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 32, 4 };
+static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 32.0f / 255, 4 };
 
 static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_SWORD		*/	{ SWORD		, 32, 4 },
-	/* I_WOOD_PICKAXE	*/	{ PICKAXE	, 32, 4 },
-	/* I_WOOD_SHOVEL	*/	{ SHOVEL	, 32, 4 },
+	/* I_WOOD_SWORD		*/	{ SWORD		, 32.0f / 255, 4 },
+	/* I_WOOD_PICKAXE	*/	{ PICKAXE	, 32.0f / 255, 4 },
+	/* I_WOOD_SHOVEL	*/	{ SHOVEL	, 32.0f / 255, 4 },
 };
 
 static inline constexpr const char* get_item_name (item_id id) {

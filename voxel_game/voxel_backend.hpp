@@ -38,4 +38,7 @@ public:
 	block_id query_block (int3 pos) {
 		return svo.octree_read(pos);
 	}
+	void set_block (int3 pos, block_id bid) {
+		svo.octree_write(pos, 0, (svo::Node)(svo::LEAF_BIT | bid));
+	}
 };

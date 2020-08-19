@@ -45,7 +45,7 @@ $if fragment
 #define LEAF_BIT	0x8000u
 #define FARPTR_BIT	0x4000u
 
-#define MAX_SCALE 11
+#define MAX_SCALE 14
 #define MAX_SEC_RAYS 4
 
 #define INF (1.0 / 0.0)

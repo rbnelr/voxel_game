@@ -38,6 +38,8 @@ namespace svo {
 		parent->remove_child(child);
 		
 		free_page(child);
+
+		parent->info.flags |= PAGE_GPU_DIRTY;
 	}
 	void SVO::try_merge (Page* page) {
 		if (!page->info.farptr_ptr)
@@ -161,6 +163,8 @@ namespace svo {
 		*ps.split_node = (Node)(allocator.indexof(childpage) | FARPTR_BIT);
 		page->add_child(ps.split_node, childpage);
 
+		page->info.flags |= PAGE_GPU_DIRTY;
+		childpage->info.flags |= PAGE_GPU_DIRTY;
 		return childpage;
 	}
 
@@ -278,6 +282,8 @@ namespace svo {
 				for (int i=0; i<8; ++i) {
 					siblings[i] = leaf;
 				}
+
+				page->info.flags |= PAGE_GPU_DIRTY;
 			}
 		}
 
@@ -307,6 +313,7 @@ namespace svo {
 
 		// do the write
 		*write_node = val;
+		page->info.flags |= PAGE_GPU_DIRTY;
 
 		bool collapsed = (old_val & LEAF_BIT) == 0;
 		bool wrote_subpage = val & FARPTR_BIT;

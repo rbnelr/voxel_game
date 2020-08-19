@@ -3,29 +3,30 @@
 #include "voxel_backend.hpp"
 #include "graphics/camera.hpp"
 #include "physics.hpp"
+#include "blocks.hpp"
 #include "items.hpp"
 #include "audio/audio.hpp"
 
 // Global for now, the world should store this if it is not randomized
 extern float3	player_spawn_point;
 
-struct Block;
 class World;
 
 struct SelectedBlock {
-	bool		valid = false;
-	Block		block;
 	int3		pos;
+	block_id	block;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
+	bool		is_selected = false;
+
+	float		damage = 0; // damage is accumulated from prev frame if was_selected then and is_selected now and if pos is the same
 
 	operator bool () const {
-		return valid;
+		return is_selected;
 	}
 };
 
 class BreakBlock {
 public:
-
 	float anim_speed = 4;
 	float damage = 0.25f;
 	float reach = 4.5f;
@@ -44,7 +45,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics, SelectedBlock& selected_block);
+	void update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics);
 };
 
 struct InventorySlot {
@@ -106,7 +107,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, SelectedBlock& selected_block);
+	void update (World& world, Player& player);
 };
 
 class Player {
@@ -129,9 +130,10 @@ public:
 	bool third_person = false;
 
 	////
-	BreakBlock	break_block;
-	BlockPlace	block_place;
-	Inventory	inventory;
+	BreakBlock		break_block;
+	BlockPlace		block_place;
+	Inventory		inventory;
+	SelectedBlock	selected_block;
 
 	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
 
@@ -216,4 +218,4 @@ public:
 	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
 };
 
-void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode, SelectedBlock* selected_block);
+void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode);

@@ -118,13 +118,12 @@ void Game::frame () {
 			view = player_view;
 		}
 
-		SelectedBlock selected_block;
-		
 		if (!activate_flycam || creative_mode)
-			update_block_edits(*world, view, graphics.player, creative_mode, &selected_block);
+			update_block_edits(*world, view, graphics.player, creative_mode);
 
-		if (selected_block)
-			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block.id]);
+		auto& sel = world->player.selected_block;
+		if (sel)
+			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) [%3d] %s %.3f damage", sel.pos.x, sel.pos.y,sel.pos.z, sel.block, blocks.name[sel.block], sel.damage);
 		else
 			ImGui::Text("Selected Block: None");
 
@@ -133,7 +132,7 @@ void Game::frame () {
 		//world->chunks.update_chunks(graphics, world->world_gen, world->player);
 
 		//// Draw
-		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, selected_block);
+		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);
 	}
 	ImGui::PopItemWidth();
 	ImGui::End();

@@ -101,9 +101,9 @@ static BlockTypes load_block_types () {
 		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, 0, 1);
 	};
 
-	/* B_NULL				*/ solid("null", 1);
-	/* B_AIR				*/ gas();
-	/* B_WATER				*/ liquid("water");
+	/* B_NULL				*/ block(			"null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
+	/* B_AIR				*/ gas(				"air");
+	/* B_WATER				*/ liquid(			"water");
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
 	/* B_EARTH				*/ solid(			"earth"	,    3, SHOVEL );
 	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
@@ -111,40 +111,15 @@ static BlockTypes load_block_types () {
 	/* B_PEBBLES			*/ solid(			"pebbles",   4, SHOVEL );
 	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
 	/* B_LEAVES				*/ solid_alpha_test("leaves",    1, 2);
-	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
-	/* B_TALLGRASS			*/ plant("tallgrass");
-
-	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
+	/* B_TORCH				*/ torch(			"torch", MAX_LIGHT_LEVEL - 1);
+	/* B_TALLGRASS			*/ plant(			"tallgrass");
 
 	return bt;
 }
 
 static inline BlockTypes blocks = load_block_types();
 
-// Block instance
-struct Block {
-	block_id	id;
-	uint8_t		block_light;
-	uint8_t		sky_light;
-	uint8_t		hp;
-
-	Block () = default;
-
-	Block (block_id id): id{id} {
-		block_light = blocks.glow[id];
-		sky_light = 0;
-		hp = 255;
-	}
-	Block (block_id	id, uint8_t block_light, uint8_t sky_light, uint8_t hp):
-			id{id}, block_light{block_light}, sky_light{sky_light}, hp{hp} {
-
-	}
-};
-
-// global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
-static inline Block _NO_CHUNK      = B_NO_CHUNK     ;
-
-enum BlockFace {
+enum BlockFace : uint8_t {
 	BF_NULL		=1,
 
 	BF_NEG_X	=0,

@@ -6,16 +6,16 @@
 
 float3	player_spawn_point = float3(3,3,34);
 
-void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics, SelectedBlock& selected_block) {
+void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];
-	bool inp = selected_block ? button.is_down : button.went_down;
+	bool inp = player.selected_block ? button.is_down : button.went_down;
 
 	if (anim_t > 0 || inp) {
 		anim_t += anim_speed * input.dt;
 	}
 	if (!anim_triggered && anim_t >= graphics.anim_hit_t) {
-		if (selected_block) {
-			world.apply_damage(selected_block, player.inventory.quickbar.get_selected().item, creative_mode);
+		if (player.selected_block) {
+			world.apply_damage(player.selected_block, player.inventory.quickbar.get_selected().item, creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 		}
 		anim_triggered = true;
@@ -26,22 +26,22 @@ void BreakBlock::update (World& world, Player& player, bool creative_mode, Playe
 	}
 }
 
-void BlockPlace::update (World& world, Player& player, SelectedBlock& selected_block) {
+void BlockPlace::update (World& world, Player& player) {
 	auto& slot = player.inventory.quickbar.get_selected();
 	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;
 
-	bool inp = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && selected_block && is_block;
+	bool inp = input.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && player.selected_block && is_block;
 	if (inp && anim_t >= anim_speed / repeat_speed) {
 		anim_t = 0;
 	}
 	bool trigger = inp && anim_t == 0;
 
-	if (trigger && selected_block && is_block) {
+	if (trigger && player.selected_block && is_block) {
 		int3 offs = 0;
-		offs[selected_block.face / 2] = (selected_block.face % 2) ? +1 : -1;
+		offs[player.selected_block.face / 2] = (player.selected_block.face % 2) ? +1 : -1;
 
-		int3 block_place_pos = selected_block.pos + offs;
+		int3 block_place_pos = player.selected_block.pos + offs;
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
@@ -213,11 +213,11 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 
 	float dist = tps_camera_dist;
 	
-	{
-		float hit_dist;
-		if (world.raycast_breakable_blocks(ray, dist, false, &hit_dist))
-			dist = max(hit_dist - 0.05f, 0.0f);
-	}
+	//{
+	//	float hit_dist;
+	//	if (world.raycast_breakable_blocks(world.player.selected_block, ray, dist, false, &hit_dist))
+	//		dist = max(hit_dist - 0.05f, 0.0f);
+	//}
 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
@@ -249,17 +249,27 @@ Camera_View Player::update_post_physics (World& world) {
 	return view;
 }
 
-SelectedBlock calc_selected_block (World& world, Camera_View& view, float reach, bool creative_mode) {
+void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view, float reach, bool creative_mode) {
 	Ray ray;
 	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
 	ray.pos = view.cam_to_world * float3(0,0,0);
 
-	return world.raycast_breakable_blocks(ray, reach, creative_mode);
+	world.raycast_breakable_blocks(block, ray, reach, creative_mode);
 }
 
-void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode, SelectedBlock* selected_block) {
-	*selected_block = calc_selected_block(world, view, world.player.break_block.reach, creative_mode);
-	world.player.break_block.update(world, world.player, creative_mode, graphics, *selected_block);
-	world.player.block_place.update(world, world.player, *selected_block);
+void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode) {
+	auto& block = world.player.selected_block;
+	
+	bool was_selected = block.is_selected;
+	int3 old_pos = block.pos;
+	
+	calc_selected_block(block, world, view, world.player.break_block.reach, creative_mode);
+
+	if (!was_selected || !block.is_selected || !equal(old_pos, block.pos)) {
+		block.damage = 0;
+	}
+
+	world.player.break_block.update(world, world.player, creative_mode, graphics);
+	world.player.block_place.update(world, world.player);
 	world.player.inventory.update();
 }

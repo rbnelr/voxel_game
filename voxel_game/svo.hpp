@@ -46,11 +46,16 @@ namespace svo {
 		return (NodeChildren*)((uintptr_t)node & ~(sizeof(NodeChildren) -1)); // round down the ptr to get the siblings pointer
 	}
 
+	enum PageFlags : uint8_t {
+		PAGE_GPU_DIRTY = 0x1
+	};
+
 	struct PageInfo {
 		uint16_t		count = 0;
 		uint16_t		freelist = 0; // 0 can never be a valid freelist value, because root (first) node should never be freed
 		int3			pos = 0;
 		uint8_t			scale = 0;
+		PageFlags		flags = PAGE_GPU_DIRTY;
 
 		Node*			farptr_ptr = nullptr;
 		Page*			sibling_ptr = nullptr; // ptr to next child of parent
@@ -142,7 +147,7 @@ namespace svo {
 	public:
 		SparseAllocator<Page> allocator = SparseAllocator<Page>(MAX_PAGES);
 
-		int			root_scale = 11;
+		int			root_scale = 14;
 		int3		root_pos = -(1 << (root_scale - 1));
 
 		float3		root_move_hister = 0;
@@ -270,3 +275,13 @@ namespace svo {
 	};
 }
 using svo::SVO;
+
+inline svo::PageFlags operator ~ (svo::PageFlags f) {
+	return (svo::PageFlags)~(uint8_t)f;
+}
+inline svo::PageFlags operator |= (svo::PageFlags& l, svo::PageFlags r) {
+	return l = (svo::PageFlags)(l | r);
+}
+inline svo::PageFlags operator &= (svo::PageFlags& l, svo::PageFlags r) {
+	return l = (svo::PageFlags)(l & r);
+}

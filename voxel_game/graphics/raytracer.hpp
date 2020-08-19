@@ -17,10 +17,12 @@ public:
 
 	gl::Vao vao; // empty vao even though I generate a screen-filling quad in the vertex shader, no vao works but generates an error on my machine
 
-	Texture2D svo_texture; // 1d Does not fit because GL_MAX_TEXTURE_SIZE
+	Texture2D svo_texture;
 	Sampler svo_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::NEAREST, gl::Enum::CLAMP_TO_EDGE);
 	Sampler gradient_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
 	Sampler water_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
+
+	Raytracer ();
 
 	Texture1D block_tile_info_texture;
 	
