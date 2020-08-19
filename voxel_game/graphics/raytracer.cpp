@@ -24,9 +24,6 @@ void Raytracer::imgui () {
 	ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
 	ImGui::SliderFloat("water_IOR", &water_IOR, 0, 2);
 
-	ImGui::ColorPicker3("water_fog", &water_fog.x);
-	ImGui::SliderFloat("water_fog_dens", &water_fog_dens, 0, 1.0f);
-
 	ImGui::DragFloat2("water_scroll_dir1", &water_scroll_dir1.x, 0.05f);
 	ImGui::DragFloat2("water_scroll_dir2", &water_scroll_dir2.x, 0.05f);
 	ImGui::DragFloat("water_scale1", &water_scale1, 0.05f);
@@ -63,9 +60,6 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		shader.set_uniform("water_F0", water_F0);
 		shader.set_uniform("water_IOR", water_IOR);
 
-		shader.set_uniform("water_fog", water_fog);
-		shader.set_uniform("water_fog_dens", water_fog_dens);
-
 		shader.set_uniform("water_scroll_dir1", water_scroll_dir1);
 		shader.set_uniform("water_scroll_dir2", water_scroll_dir2);
 		shader.set_uniform("water_scale1", water_scale1);
@@ -83,7 +77,7 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 			using namespace svo;
 
 			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-			int height = (int)svo.pages.allocator.freeset_size();
+			int height = (int)svo.allocator.freeset_size();
 		
 			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 		
@@ -92,8 +86,8 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
 			
 			for (int i=0; i<height; ++i) {
-				if (svo.pages.allocator.is_allocated(i))
-					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &svo.pages[i].nodes[0]);
+				if (svo.allocator.is_allocated(i))
+					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,i,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &svo.allocator[i]->nodes[0]);
 			}
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);

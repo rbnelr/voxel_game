@@ -77,9 +77,4 @@ public:
 	Game ();
 
 	void frame ();
-
-	~Game () {
-		// make sure to shutdown global threadpools before optick dumps profiling data
-		shutdown_threadpools();
-	}
 };

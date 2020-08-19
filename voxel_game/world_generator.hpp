@@ -1,5 +1,7 @@
 #pragma once
 #include "stdafx.hpp"
+#include "threading.hpp"
+#include "svo.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);
@@ -106,6 +108,18 @@ struct WorldGenerator {
 		ImGui::PopItemWidth();
 		imgui_pop();
 	}
+};
 
-	void generate_chunk (Chunk& chunk, svo::SVO& svo) const;
+struct WorldgenJob : ThreadingJob {
+	// input
+	int3					chunk_pos;
+	SVO*					svo;
+	WorldGenerator const*	world_gen;
+	// output
+	svo::Node				svo_node;
+
+	WorldgenJob (int3 chunk_pos, SVO* svo, WorldGenerator const* world_gen): chunk_pos{chunk_pos}, svo{svo}, world_gen{world_gen} {}
+
+	virtual void execute ();
+	virtual void finalize ();
 };

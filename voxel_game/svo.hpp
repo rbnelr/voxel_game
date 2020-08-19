@@ -4,8 +4,7 @@
 #include "util/freelist_allocator.hpp"
 #include "util/virtual_allocator.hpp"
 
-class Chunk;
-class Chunks;
+class Voxels;
 class Player;
 struct WorldGenerator;
 
@@ -48,7 +47,8 @@ namespace svo {
 	struct PageInfo {
 		uint16_t		count = 0;
 		uint16_t		freelist = 0; // 0 can never be a valid freelist value, because root (first) node should never be freed
-		uint16_t		scale = 0;
+		int3			pos = 0;
+		uint8_t			scale = 0;
 
 		Node*			farptr_ptr = nullptr;
 		Page*			sibling_ptr = nullptr; // ptr to next child of parent
@@ -65,7 +65,6 @@ namespace svo {
 	static constexpr uint16_t PAGE_MERGE_THRES   = (uint16_t)(PAGE_NODES * 0.85f);
 
 	static constexpr float ROOT_MOVE_HISTER		= 0.05f;
-
 
 	struct Page {
 		PageInfo		info;
@@ -137,9 +136,83 @@ namespace svo {
 	};
 	static_assert(sizeof(Page) == PAGE_SIZE, "");
 
-	struct PagedOctree {
+	class SVO {
+	public:
 		SparseAllocator<Page> allocator = SparseAllocator<Page>(MAX_PAGES);
 
+		int			root_scale = 12;
+		int3		root_pos = -(1 << (root_scale - 1));
+
+		float3		root_move_hister = 0;
+
+		std::unordered_set<vector_key<int3>> pending_chunks;
+
+		bool is_chunk_load_queued (Voxels& voxels, int3 coord);
+		void unload_chunk (Voxels& voxels, int3 coord);
+
+		int page_split_counter = 0;
+		int page_merge_counter = 0;
+
+		//
+		bool debug_draw_octree = 0;//1;
+
+		int debug_draw_octree_min = 4;
+		int debug_draw_octree_max = 20;
+
+		bool debug_draw_page_color = true;
+		bool debug_draw_pages = true;
+		bool debug_draw_air = true;
+
+		void imgui () {
+			if (!imgui_push("SVO")) {
+				ImGui::SameLine();
+				ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
+				return;
+			}
+
+			ImGui::Checkbox("debug_draw_octree", &debug_draw_octree);
+			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0, 20);
+			ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0, 20);
+			ImGui::Checkbox("debug_draw_page_color", &debug_draw_page_color);
+			ImGui::Checkbox("debug_draw_pages", &debug_draw_pages);
+			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
+
+			int pages_count = allocator.size_threadsafe();
+
+			ImGui::Text("pages: %d %6.2f MB", pages_count, (float)(pages_count * sizeof(Page)) / (1024 * 1024));
+
+			bool show_all_pages = ImGui::TreeNode("all pages");
+
+			int total_nodes = 0;
+			int active_nodes = 0;
+			for (uint32_t i=0; i<allocator.freeset_size(); ++i) {
+				if (!allocator.is_allocated(i)) continue;
+
+				auto& page = *allocator[i];
+
+				active_nodes += page.info.count;
+				total_nodes += PAGE_NODES;
+
+				if (show_all_pages)
+					ImGui::Text("page: %d", allocator[i]->info.count);
+			}
+
+			if (show_all_pages)
+				ImGui::TreePop();
+
+			ImGui::Text("nodes: %d active / %d allocated   %6.2f / %d nodes avg (%6.2f%%)",
+				active_nodes, total_nodes,
+				(float)active_nodes / pages_count, PAGE_NODES,
+				(float)active_nodes / total_nodes * 100);
+
+			ImGui::Text("page_counters:  splits: %5d  merges: %5d", page_split_counter, page_merge_counter);
+
+			imgui_pop();
+		}
+
+		SVO ();
+		
+		//
 		Page* alloc_page () {
 			Page* page = allocator.alloc_threadsafe();
 			page->info = PageInfo{};
@@ -168,53 +241,30 @@ namespace svo {
 			// free page
 			allocator.free_threadsafe(page);
 		}
-		
-		Page& operator[] (uint16_t i) { return *allocator[i]; }
 
-		uint16_t indexof (Page* page) {
-			return (uint16_t)allocator.indexof(page);
-		}
-	};
+		void merge (Page* parent, Page* child);
+		void try_merge (Page* page);
 
-	class SVO {
-	public:
+		void split_page (Page* page, Node* stack[]);
 
-		int			root_scale = 12;
-		int3		root_pos = -(1 << (root_scale - 1));
+		void free_subtree (Page* page, Node node);
 
-		float3		root_move_hister = 0;
+		// octree write, writes a single voxel at a desired pos, scale to be a particular val
+		// this decends the octree from the root and inserts or deletes nodes when needed
+		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
+		void octree_write (int3 pos, int scale, Node val);
 
-		PagedOctree pages;
+		block_id octree_read (int3 pos);
 
-		SVO ();
-
-		//std::unordered_set<chunk_coord_hashmap, std::unique_ptr<Chunk>> queued_chunks;
-		bool is_chunk_load_queued (Chunks& chunks, int3 coord);
-
-		void queue_chunk_load (Chunks& chunks, WorldGenerator& world_gen, int3 coord);
-		void unload_chunk (Chunks& chunks, int3 coord);
+		Node chunk_to_octree (block_id* blocks);
 
 		//
-		bool debug_draw_octree = 0;//1;
-
-		int debug_draw_octree_min = 4;
-		int debug_draw_octree_max = 20;
-
-		bool debug_draw_page_color = true;
-		bool debug_draw_pages = true;
-		bool debug_draw_air = true;
-
-		int page_split_counter = 0;
-		int page_merge_counter = 0;
-
-		void imgui ();
 		void pre_update (Player const& player);
 		void post_update ();
 
-		Node chunk_to_octree (Chunk& chunk);
-		void chunk_loading (Chunks& chunks, WorldGenerator& world_gen, float3 player_pos);
+		void update_chunk_loading (Voxels& voxels, WorldGenerator& world_gen, float3 player_pos);
 
-		void update_block (Chunk& chunk, int3 bpos, block_id id);
+		void update_block (int3 int3, block_id id);
 	};
 }
 using svo::SVO;

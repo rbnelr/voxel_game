@@ -17,8 +17,8 @@
 	//  ABOVE_NORMAL_PRIORITY_CLASS + THREAD_PRIORITY_LOWEST  = 8   which is equal to NORMAL_PRIORITY_CLASS + THREAD_PRIORITY_NORMAL so equal to default threads
 	// 
 	//  HIGH_PRIORITY_CLASS + THREAD_PRIORITY_HIGHEST caused input processing to lag (mouse lag) when 100% cpu
-	void set_thread_priority (Priorities prio) {
-		auto ret = SetThreadPriority(GetCurrentThread(), prio == Priorities::HIGH ? THREAD_PRIORITY_HIGHEST : THREAD_PRIORITY_LOWEST);
+	void set_thread_priority (ThreadPriority prio) {
+		auto ret = SetThreadPriority(GetCurrentThread(), prio == ThreadPriority::HIGH ? THREAD_PRIORITY_HIGHEST : THREAD_PRIORITY_LOWEST);
 		assert(ret != 0);
 	}
 

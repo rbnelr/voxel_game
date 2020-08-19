@@ -1,6 +1,6 @@
 #pragma once
 #include "stdafx.hpp"
-#include "chunks.hpp"
+#include "voxel_backend.hpp"
 #include "graphics/camera.hpp"
 #include "physics.hpp"
 #include "items.hpp"
@@ -15,7 +15,7 @@ class World;
 struct SelectedBlock {
 	bool		valid = false;
 	Block		block;
-	bpos		pos;
+	int3		pos;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
 
 	operator bool () const {

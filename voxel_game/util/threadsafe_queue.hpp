@@ -36,7 +36,34 @@ public:
 		LOCK_GUARD;
 
 		q.emplace_back( std::move(elem) );
-		c.notify_one();
+		c.notify_one(); // TODO: It seems like it might be possible to unlock the mutex and then notify_one, to maybe reduce sync overhead, but i was not entirely convinced that this is safe https://stackoverflow.com/questions/17101922/do-i-have-to-acquire-lock-before-calling-condition-variable-notify-one
+	}
+
+	// push multiple elements onto the queue
+	// can be called from multiple threads (multiple producer)
+	void push_multiple (T* elem, size_t count) {
+		LOCK_GUARD;
+
+		for (size_t i=0; i<count; ++i) {
+			q.emplace_back( std::move(elem[i]) );
+			c.notify_one();
+		}
+	}
+
+	// push multiple elements onto the queue
+	// can be called from multiple threads (multiple producer)
+	template <typename GET_ELEM>
+	void push_multiple (GET_ELEM get_elem) {
+		LOCK_GUARD;
+
+		for (;;) {
+			auto elem = get_elem();
+			if (!elem)
+				return;
+
+			q.emplace_back( std::move(elem) );
+			c.notify_one();
+		}
 	}
 
 	// wait to dequeue one element from the queue
@@ -81,6 +108,21 @@ public:
 		*out = std::move(q.front());
 		q.pop_front();
 		return true;
+	}
+
+	// deque up to count elements from the queue, return how many were dequed
+	// can be called from multiple threads (multiple consumer)
+	size_t pop_multiple (T* out, size_t count) {
+		LOCK_GUARD;
+
+		size_t i=0;
+
+		while (i < count && !q.empty()) {
+			out[i++] = std::move(q.front());
+			q.pop_front();
+		}
+
+		return i;
 	}
 
 	// deque multiple elements from the queue if there is at least one and return true

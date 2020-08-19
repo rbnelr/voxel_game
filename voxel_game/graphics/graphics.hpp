@@ -282,32 +282,14 @@ struct PlayerGraphics {
 	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
-struct ChunkMesh {
-	struct Vertex {
-		float3	pos_model;
-		float2	uv;
-		uint8	tex_indx;
-		uint8	block_light;
-		uint8	sky_light;
-		uint8	hp;
-
-		static void bind (Attributes& a) {
-			int cur = 0;
-			a.add    <decltype(pos_model  )>(cur++, "pos_model" ,  sizeof(Vertex), offsetof(Vertex, pos_model  ));
-			a.add    <decltype(uv         )>(cur++, "uv",          sizeof(Vertex), offsetof(Vertex, uv         ));
-			a.add_int<decltype(tex_indx   )>(cur++, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
-			a.add    <decltype(block_light)>(cur++, "block_light", sizeof(Vertex), offsetof(Vertex, block_light), true);
-			a.add    <decltype(sky_light  )>(cur++, "sky_light",   sizeof(Vertex), offsetof(Vertex, sky_light  ), true);
-			a.add    <decltype(hp         )>(cur++, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ), true);
-		}
-	};
-
-	//std::vector<Vertex> opaque_faces;
-	//std::vector<Vertex> transparent_faces;
-
-	Mesh<Vertex> opaque_mesh;
-	Mesh<Vertex> transparent_mesh;
-};
+//struct ChunkMesh {
+//
+//	//std::vector<Vertex> opaque_faces;
+//	//std::vector<Vertex> transparent_faces;
+//
+//	Mesh<Vertex> opaque_mesh;
+//	Mesh<Vertex> transparent_mesh;
+//};
 
 struct BlockTileInfo {
 	int base_index;
@@ -373,8 +355,6 @@ struct BlockMeshVertex {
 	float2	uv;
 };
 
-#define ARRLEN(arr) (sizeof(arr)/sizeof(arr[0]))
-
 // A single texture object that stores all block tiles
 // could be implemented as a texture atlas but texture arrays are the better choice here
 struct TileTextures {
@@ -412,19 +392,14 @@ struct TileTextures {
 	}
 };
 
-extern bool _use_potatomode;
-class Chunks;
+class Voxels;
 
-struct ChunkGraphics {
+struct VoxelGraphics {
 
 	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
-	bool alpha_test = !_use_potatomode;
-
-	void imgui (Chunks& chunks);
-
-	void draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler);
-	void draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler);
+	void draw (Voxels& voxels, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler);
+	void draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 class World;
@@ -483,7 +458,7 @@ public:
 
 	TileTextures			tile_textures;
 
-	ChunkGraphics			chunk_graphics;
+	VoxelGraphics			voxel_graphics;
 	PlayerGraphics			player;
 
 	BlockHighlightGraphics	block_highlight;
@@ -498,9 +473,9 @@ public:
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
 
-	void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
+	//void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
-	void imgui (Chunks& chunks) {
+	void imgui () {
 		if (frame_counter == 30) {
 			//raytracer.regen_data(chunks);
 		}
@@ -513,7 +488,6 @@ public:
 
 			fog.imgui();
 			player.imgui();
-			chunk_graphics.imgui(chunks);
 			tile_textures.imgui("tile_textures");
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);

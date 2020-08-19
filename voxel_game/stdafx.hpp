@@ -58,3 +58,5 @@
 
 using namespace kiss;
 using namespace kissmath;
+
+#define ARRLEN(arr) (sizeof(arr) / sizeof(arr[0]))

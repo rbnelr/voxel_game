@@ -1,6 +1,6 @@
 #pragma once
 #include "stdafx.hpp"
-#include "chunks.hpp"
+#include "voxel_backend.hpp"
 #include "player.hpp"
 #include "audio/audio.hpp"
 #include "world_generator.hpp"
@@ -10,10 +10,9 @@ class World {
 
 public:
 	WorldGenerator world_gen;
+	Voxels voxels;
 
 	Player player;
-
-	Chunks chunks;
 
 	TimeOfDay time_of_day;
 
@@ -24,7 +23,7 @@ public:
 	}
 
 	void imgui () {
-		chunks.imgui();
+		voxels.imgui();
 		time_of_day.imgui();
 	}
 
@@ -33,5 +32,5 @@ public:
 	SelectedBlock raycast_breakable_blocks (Ray ray, float max_dist, bool hit_at_max_dist=false, float* hit_dist=nullptr);
 
 	void apply_damage (SelectedBlock& block, Item& item, bool creative_mode);
-	bool try_place_block (bpos pos, block_id id);
+	bool try_place_block (int3 pos, block_id id);
 };

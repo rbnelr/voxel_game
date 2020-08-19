@@ -38,10 +38,10 @@ void BlockPlace::update (World& world, Player& player, SelectedBlock& selected_b
 	bool trigger = inp && anim_t == 0;
 
 	if (trigger && selected_block && is_block) {
-		bpos offs = 0;
+		int3 offs = 0;
 		offs[selected_block.face / 2] = (selected_block.face % 2) ? +1 : -1;
 
-		bpos block_place_pos = selected_block.pos + offs;
+		int3 block_place_pos = selected_block.pos + offs;
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
@@ -75,18 +75,18 @@ void Inventory::update () {
 
 bool Player::calc_ground_contact (World& world, bool* stuck) {
 	{ // Check block intersection to see if we are somehow stuck inside a block
-		bpos start =	(bpos)floor(pos -float3(radius, radius, 0));
-		bpos end =		(bpos)ceil(pos +float3(radius, radius, height));
+		int3 start =	(int3)floor(pos -float3(radius, radius, 0));
+		int3 end =		(int3)ceil(pos +float3(radius, radius, height));
 
 		bool any_intersecting = false;
 
-		bpos bp;
+		int3 bp;
 		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto b = world.chunks.query_block(bp);
-					bool block_solid = blocks.collision[b.id] == CM_SOLID;
+					auto b = world.voxels.query_block(bp);
+					bool block_solid = blocks.collision[b] == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
 
@@ -113,24 +113,24 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 	bool grounded = false;
 	{ // for all blocks we could be standing on
 
-		bpos_t pos_z = floori(pos.z);
+		int pos_z = floori(pos.z);
 
 		//logf("pos.z fract: %10.8f  vel.z: %10.8f", (pos.z - pos_z), vel.z);
 		if ((pos.z - pos_z) <= COLLISION_EPSILON * 1.5f && vel.z == 0) {
 
-			bpos2 start =	(bpos2)floor((float2)pos - radius);
-			bpos2 end =		(bpos2)ceil ((float2)pos + radius);
+			int2 start =	(int2)floor((float2)pos - radius);
+			int2 end =		(int2)ceil ((float2)pos + radius);
 
-			bpos bp;
+			int3 bp;
 			bp.z = pos_z -1;
 
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto b = world.chunks.query_block(bp);
+					auto b = world.voxels.query_block(bp);
 
-					bool block_solid = blocks.collision[b.id] == CM_SOLID;
-					if (block_solid && circle_square_intersect((float2)pos -(float2)(bpos2)bp, radius))
+					bool block_solid = blocks.collision[b] == CM_SOLID;
+					if (block_solid && circle_square_intersect((float2)pos -(float2)(int2)bp, radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}
 			}

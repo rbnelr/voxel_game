@@ -31,3 +31,37 @@
 using namespace kissmath;
 
 #include "kissmath_colors.hpp"
+
+#include <type_traits>
+
+// Hashmap key type for vectors
+template <typename VEC>
+struct vector_key {
+	VEC v;
+
+	vector_key (VEC const& v): v{v} {}
+	bool operator== (vector_key<VEC> const& r) const { // for hash map
+		return equal(v, r.v);
+	}
+};
+
+inline size_t hash (int3 v) {
+	size_t h;
+	h  = std::hash<int>()(v.x);
+	h = 53ull * (h + 53ull);
+
+	h += std::hash<int>()(v.y);
+	h = 53ull * (h + 53ull);
+
+	h += std::hash<int>()(v.z);
+	return h;
+};
+
+namespace std {
+	template <typename VEC>
+	struct hash<vector_key<VEC>> { // for hash map
+		size_t operator() (vector_key<VEC> const& v) const {
+			return ::hash(v.v);
+		}
+	};
+}

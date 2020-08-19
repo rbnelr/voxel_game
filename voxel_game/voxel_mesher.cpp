@@ -1,25 +1,25 @@
 #include "stdafx.hpp"
-#include "chunk_mesher.hpp"
+#include "voxel_mesher.hpp"
 #include "world_generator.hpp"
 
+#if 0
+namespace meshing {
 struct Chunk_Mesher {
-	bool alpha_test;
-
-	MeshingData* opaque_vertices;
-	MeshingData* tranparent_vertices;
+	Page* opaque_vertices;
+	Page* tranparent_vertices;
 
 	ChunkData* neighbours[3][3][3];
 
 	Block get_block (int3 pos) {
-		int3 bpos;
-		int3 chunk = get_chunk_from_block_pos(pos, &bpos);
+		int3 int3;
+		int3 chunk = get_chunk_from_block_pos(pos, &int3);
 
 		ChunkData* data = neighbours[chunk.z+1][chunk.y+1][chunk.x+1];
 
 		if (data == nullptr)
 			return { B_NULL, 0, 0, 0 };
 
-		return data->get(bpos);
+		return data->get(int3);
 	}
 
 	// per block
@@ -32,9 +32,6 @@ struct Chunk_Mesher {
 		auto t = blocks.transparency[id];
 		if (t == TM_OPAQUE)
 			return true;
-
-		if (!alpha_test)
-			return t == TM_ALPHA_TEST;
 
 		return false;
 	}
@@ -151,8 +148,7 @@ struct Chunk_Mesher {
 		}
 	}
 	void block_mesh (BlockMeshInfo info, Block block, int3 block_pos_world, uint64_t world_seed) {
-		//OPTICK_EVENT();
-
+		
 		// get a 'random' but deterministic value based on block position
 		uint64_t h = hash(block_pos_world) ^ world_seed;
 
@@ -183,8 +179,6 @@ struct Chunk_Mesher {
 	}
 
 	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
-		alpha_test = graphics.alpha_test;
-
 		block_meshes = &tile_textures.block_meshes;
 
 		for (int z=-1; z<=1; ++z) {
@@ -205,7 +199,7 @@ struct Chunk_Mesher {
 		opaque_vertices->init();
 		tranparent_vertices->init();
 
-		bpos chunk_pos_world = chunk->chunk_pos_world();
+		int3 chunk_pos_world = chunk->chunk_pos_world();
 
 		//auto _a = get_timestamp();
 		//uint64_t sum = 0;
@@ -253,3 +247,5 @@ void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures con
 	Chunk_Mesher cm;
 	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
 }
+}
+#endif

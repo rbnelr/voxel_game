@@ -201,12 +201,14 @@ public:
 		LOCK_GUARD;
 		return count;
 	}
+
+	// not threadsafe
 	inline uint32_t freeset_size () {
 		return (uint32_t)freeset.size() * 64;
 	}
-
+	// not threadsafe
 	inline bool is_allocated (uint32_t i) {
-		return (freeset[i / 64] >> (i % 64)) == 0;
+		return (freeset[i / 64] & (1ull << (i % 64))) == 0;
 	}
 };
 

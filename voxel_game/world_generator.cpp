@@ -1,26 +1,23 @@
 #include "stdafx.hpp"
 #include "world_generator.hpp"
 #include "blocks.hpp"
-#include "chunks.hpp"
+#include "voxel_backend.hpp"
 #include "svo.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 struct ChunkGenerator {
-	WorldGenerator const& wg;
-	Chunk& chunk;
+	int3					chunk_pos;
+	SVO*					svo;
+	WorldGenerator const*	wg;
 
 	OSN::Noise<2> osn_noise2;
 	Random rand;
 
-	static constexpr int3 BORDER = int3(1, 0, 0);
-	static constexpr int3 DIM = int3(CHUNK_DIM + BORDER.x*2, CHUNK_DIM + BORDER.y*2, CHUNK_DIM + BORDER.z*2);
-	
-	struct Blocks {
-		block_id blocks[DIM.z][DIM.y][DIM.x];
-	};
+	block_id blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 
-	Blocks* blocks;
+	float highest_blocks[CHUNK_SIZE][CHUNK_SIZE];
+	float earth_layers[CHUNK_SIZE][CHUNK_SIZE];
 
 	float noise (float2 pos, float period, float ang_offs, float2 offs, float range_l=0, float range_h=1) {
 		pos = rotate2(ang_offs) * pos;
@@ -41,20 +38,20 @@ struct ChunkGenerator {
 		{
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			elevation = noise(pos_world, wg.elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg.elev_amp;
+			elevation = noise(pos_world, wg->elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg->elev_amp;
 
 			++i;
 		}
 		{
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			roughness = noise(pos_world, wg.rough_freq, deg(37.17f) * (float)i, offs, 0,+1);
+			roughness = noise(pos_world, wg->rough_freq, deg(37.17f) * (float)i, offs, 0,+1);
 
 			++i;
 		}
 
 		detail = 0;
-		for (auto& d : wg.detail) {
+		for (auto& d : wg->detail) {
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
 			detail += noise(pos_world, d.freq, deg(37.17f) * (float)i, offs, -1,+1) * d.amp;
@@ -74,7 +71,7 @@ struct ChunkGenerator {
 	}
 
 	float noise_tree_density (float2 pos_world) {
-		float val = noise(pos_world, wg.tree_desity_period, 0,0) * wg.tree_density_amp;
+		float val = noise(pos_world, wg->tree_desity_period, 0,0) * wg->tree_density_amp;
 
 		val = gradient<float>(val, {
 			{ 0.00f,  0						},
@@ -101,25 +98,22 @@ struct ChunkGenerator {
 	}
 
 	float noise_grass_density (float2 pos_world) {
-		float valb = noise(pos_world, 4, 0,0) * wg.grass_density_amp / 2;
-		float val = noise(pos_world, wg.grass_desity_period, 0,0) * wg.grass_density_amp;
+		float valb = noise(pos_world, 4, 0,0) * wg->grass_density_amp / 2;
+		float val = noise(pos_world, wg->grass_desity_period, 0,0) * wg->grass_density_amp;
 
 		return smoothstep( smoothstep(val + valb) );
 	}
 
-	void gen_terrain (bpos chunk_origin) {
+	void gen_terrain (int3 chunk_origin) {
 		ZoneScoped;
 
-		bpos_t water_level = 21;
-
-		float highest_blocks[DIM.y][DIM.x];
-		float earth_layers[DIM.y][DIM.x];
+		int water_level = 21;
 
 		{
-			bpos2 i;
-			for (i.y=0; i.y<DIM.y; ++i.y) {
-				for (i.x=0; i.x<DIM.x; ++i.x) {
-					bpos2 pos_world = i - bpos2(BORDER) + bpos2(chunk_origin);
+			int2 i;
+			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+					int2 pos_world = i + int2(chunk_origin);
 
 					float earth_layer;
 					float height = heightmap((float2)pos_world, &earth_layer);
@@ -131,11 +125,11 @@ struct ChunkGenerator {
 		}
 
 		{
-			bpos i;
-			for (i.z=0; i.z<DIM.z; ++i.z) {
-				for (i.y=0; i.y<DIM.y; ++i.y) {
-					for (i.x=0; i.x<DIM.x; ++i.x) {
-						bpos pos_world = i - BORDER + chunk_origin;
+			int3 i;
+			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+						int3 pos_world = i + chunk_origin;
 
 						block_id bid;
 
@@ -165,40 +159,40 @@ struct ChunkGenerator {
 							bid = pos_world.z <= water_level ? B_WATER : B_AIR;
 						}
 
-						blocks->blocks[i.z][i.y][i.x] = bid;
+						blocks[i.z][i.y][i.x] = bid;
 					}
 				}
 			}
 		}
 	}
 
-	void place_objects (bpos chunk_origin) {
+	void place_objects (int3 chunk_origin) {
 		ZoneScoped;
 
-		std::vector<bpos> tree_poss;
+		std::vector<int3> tree_poss;
 	
-		auto find_min_tree_dist = [&] (bpos2 new_tree_pos) {
+		auto find_min_tree_dist = [&] (int2 new_tree_pos) {
 			float min_dist = +INF;
-			for (bpos p : tree_poss)
-				min_dist = min(min_dist, length((float2)(bpos2)p -(float2)new_tree_pos));
+			for (int3 p : tree_poss)
+				min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
 			return min_dist;
 		};
 	
-		bpos i;
-		for (i.z=0; i.z<DIM.z; ++i.z) {
-			for (i.y=0; i.y<DIM.y; ++i.y) {
-				for (i.x=0; i.x<DIM.x; ++i.x) {
-					bpos pos_world = i - BORDER + chunk_origin;
+		int3 i;
+		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+					int3 pos_world = i + chunk_origin;
 					
-					block_id* bid   =           &blocks->blocks[i.z    ][i.y][i.x];
-					block_id* below = i.z > 0 ? &blocks->blocks[i.z - 1][i.y][i.x] : nullptr;
+					block_id* bid   =           &blocks[i.z    ][i.y][i.x];
+					block_id* below = i.z > 0 ? &blocks[i.z - 1][i.y][i.x] : nullptr;
 	
 					if (*bid == B_AIR && below && (*below == B_GRASS || *below == B_EARTH)) {
 						float tree_density = noise_tree_density((float2)(int2)pos_world);
 	
 						float grass_density = noise_grass_density((float2)(int2)pos_world);
 	
-						float tree_prox_prob = gradient<float>( find_min_tree_dist((bpos2)i), {
+						float tree_prox_prob = gradient<float>( find_min_tree_dist((int2)i), {
 							{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
 							{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
 							{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
@@ -227,22 +221,22 @@ struct ChunkGenerator {
 			}
 		}
 	
-		auto place_tree = [&] (bpos pos) {
+		auto place_tree = [&] (int3 pos) {
 			
-			auto place_block = [&] (bpos pos, block_id bt) {
-				if (any(pos < 0 || pos >= DIM)) return;
+			auto place_block = [&] (int3 pos, block_id bt) {
+				if (any(pos < 0 || pos >= CHUNK_SIZE)) return;
 
-				block_id* bid = &blocks->blocks[pos.z][pos.y][pos.x];
+				block_id* bid = &blocks[pos.z][pos.y][pos.x];
 	
 				if (bid && (*bid == B_AIR || *bid == B_LEAVES)) {
 					*bid = bt;
 				}
 			};
-			auto place_block_sphere = [&] (bpos pos, float3 r, block_id bt) {
-				bpos start = (bpos)floor((float3)pos +0.5f -r);
-				bpos end = (bpos)ceil((float3)pos +0.5f +r);
+			auto place_block_sphere = [&] (int3 pos, float3 r, block_id bt) {
+				int3 start = (int3)floor((float3)pos +0.5f -r);
+				int3 end = (int3)ceil((float3)pos +0.5f +r);
 	
-				bpos i; // position in chunk
+				int3 i; // position in chunk
 				for (i.z=start.z; i.z<end.z; ++i.z) {
 					for (i.y=start.y; i.y<end.y; ++i.y) {
 						for (i.x=start.x; i.x<end.x; ++i.x) {
@@ -252,64 +246,55 @@ struct ChunkGenerator {
 				}
 			};
 	
-			bpos_t tree_height = 6;
+			int tree_height = 6;
 	
-			for (bpos_t i=0; i<tree_height; ++i)
-				place_block(pos +bpos(0,0,i), B_TREE_LOG);
+			for (int i=0; i<tree_height; ++i)
+				place_block(pos +int3(0,0,i), B_TREE_LOG);
 	
-			place_block_sphere(pos +bpos(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
+			place_block_sphere(pos +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
 		};
 	
-		for (bpos p : tree_poss)
+		for (int3 p : tree_poss)
 			place_tree(p);
 	}
 
-	void gen () {
+	svo::Node gen () {
 		ZoneScoped;
 
-		osn_noise2 = OSN::Noise<2>(wg.seed);
+		osn_noise2 = OSN::Noise<2>(wg->seed);
 
-		bpos chunk_origin = chunk.coord * CHUNK_DIM;
-		
-		auto chunk_seed = wg.seed ^ hash(chunk.coord);
+		auto chunk_seed = wg->seed ^ hash(chunk_pos);
 		rand = Random(chunk_seed);
 
-		{
-			ZoneScopedN("alloc buffer");
-			blocks = (Blocks*)malloc(sizeof(Blocks));
-		}
+		gen_terrain(chunk_pos);
 
-		gen_terrain(chunk_origin);
+		place_objects(chunk_pos);
 
-		place_objects(chunk_origin);
-
-		{
-			ZoneScopedN("Copy blocks");
-
-			bpos i;
-			for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-				for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
-					for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
-						chunk.blocks->id[ChunkData::pos_to_index(i)] = blocks->blocks[i.z + BORDER.z][i.y + BORDER.y][i.x + BORDER.x];
-					}
-				}
-			}
-		}
-
-		{
-			ZoneScopedN("free buffer");
-			free(blocks);
-		}
+		return svo->chunk_to_octree(&blocks[0][0][0]);
 	}
 };
 
-void WorldGenerator::generate_chunk (Chunk& chunk, svo::SVO& svo) const {
+void WorldgenJob::execute () {
 	ZoneScoped;
-	
-	ChunkGenerator gen = { *this, chunk };
 
-	chunk.init_blocks();
-	gen.gen();
+	ChunkGenerator* gen;
+	{
+		ZoneScopedN("alloc buffer");
+		gen = (ChunkGenerator*)malloc(sizeof(ChunkGenerator));
+	}
 
-	chunk.svo_node = svo.chunk_to_octree(chunk);
+	gen->chunk_pos	= chunk_pos;
+	gen->svo		= svo;
+	gen->wg			= world_gen;
+	svo_node = gen->gen();
+
+	{
+		ZoneScopedN("free buffer");
+		free(gen);
+	}
+}
+
+void WorldgenJob::finalize () {
+	ZoneScoped;
+	svo->octree_write(chunk_pos, CHUNK_SCALE, svo_node);
 }

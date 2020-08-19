@@ -41,9 +41,6 @@ public:
 	float water_F0 = 0.42f;
 	float water_IOR = 1.333f;
 
-	lrgb water_fog = srgb(0x05, 0x62, 0x94);
-	float water_fog_dens = 0.05f;
-
 	float2 water_scroll_dir1 = float2(-0.3f, 0.02f), water_scroll_dir2 = float2(-0.163f, -0.216f);
 	float water_scale1 = 0.1f, water_scale2 = 0.641f;
 	float water_strength1 = 0.05f, water_strength2 = 0.025f;

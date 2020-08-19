@@ -5,20 +5,9 @@
 #include "util/threadpool.hpp"
 
 //
-bool FileExists (const char* path) {
-	DWORD dwAttrib = GetFileAttributes(path);
-
-	return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
-}
-bool _need_potatomode () {
-	return FileExists("../../._need_potatomode.txt");
-}
-bool _use_potatomode = _need_potatomode();
-
-//
 Game::Game () {
 	set_process_priority();
-	set_thread_priority(Priorities::HIGH);
+	set_thread_priority(ThreadPriority::HIGH);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
 }
@@ -66,17 +55,11 @@ void Game::frame () {
 
 			if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 				fps_display.display_fps();
-
-				ImGui::Text("Chunk generation : %7.2f us avg", world->chunks.chunk_gen_time.calc_avg() * 1000 * 1000);
-				ImGui::Text("Chunk light      : %7.2f us avg", world->chunks.block_light_time.calc_avg() * 1000 * 1000);
-				ImGui::Text("Chunk meshing    : %7.2f us avg", world->chunks.meshing_time.calc_avg() * 1000 * 1000);
-
-				ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 			}
 
 			input.imgui();
 			audio_manager.imgui();
-			graphics.imgui(world->chunks);
+			graphics.imgui(/*world->chunks*/);
 			debug_graphics->imgui();
 
 			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -88,7 +71,6 @@ void Game::frame () {
 				world_gen.imgui();
 				world->imgui();
 				block_update.imgui();
-				world->chunks.svo.imgui();
 			}
 
 			{
@@ -119,7 +101,7 @@ void Game::frame () {
 
 		audio_manager.update();
 
-		world->chunks.update_chunk_loading(*world, world_gen, world->player);
+		world->voxels.svo.update_chunk_loading(world->voxels, world_gen, world->player.pos);
 
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);
@@ -146,9 +128,9 @@ void Game::frame () {
 		else
 			ImGui::Text("Selected Block: None");
 
-		block_update.update_blocks(world->chunks);
+		//block_update.update_blocks(world->chunks);
 
-		world->chunks.update_chunks(graphics, world->world_gen, world->player);
+		//world->chunks.update_chunks(graphics, world->world_gen, world->player);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, selected_block);

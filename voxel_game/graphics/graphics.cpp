@@ -1,9 +1,8 @@
 #include "stdafx.hpp"
 #include "graphics.hpp"
 #include "../util/geometry.hpp"
-#include "../chunks.hpp"
+#include "../voxel_backend.hpp"
 #include "../world.hpp"
-#include "../voxel_light.hpp"
 using namespace kiss;
 
 #include "assimp/cimport.h"        // Plain-C interface
@@ -627,8 +626,6 @@ void TileTextures::load_block_meshes () {
 
 			if (strcmp(mesh->mName.C_Str(), name) == 0) {
 
-				//printf("%s:\n", mesh->mName.C_Str());
-
 				int offset = (int)block_meshes.size();
 				block_meshes.reserve(offset + mesh->mNumFaces * 3);
 
@@ -642,8 +639,6 @@ void TileTextures::load_block_meshes () {
 						auto pos = mesh->mVertices[index];
 						auto uv = mesh->mTextureCoords[0][index];
 
-						//printf("  %7.3f %7.3f %7.3f     %7.3f %7.3f\n", pos.x, pos.y, pos.z, uv.x, uv.y);
-
 						block_meshes.push_back({ float3(pos.x, pos.y, pos.z), float2(uv.x, uv.y) });
 					}
 				}
@@ -656,106 +651,100 @@ void TileTextures::load_block_meshes () {
 	aiReleaseImport(scene);
 }
 
-void ChunkGraphics::imgui (Chunks& chunks) {
-
-	if (ImGui::Checkbox("alpha_test", &alpha_test)) {
-		chunks.remesh_all();
-	}
+void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
+	//TracyGpuZone("gpu draw_chunks");
+	//
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//tile_textures.tile_textures.bind();
+	//sampler.bind(0);
+	//
+	//glActiveTexture(GL_TEXTURE0 + 1);
+	//tile_textures.breaking_textures.bind();
+	//sampler.bind(1);
+	//
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+	//	shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+	//
+	//	shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
+	//
+	//	shader.set_texture_unit("tile_textures", 0);
+	//	shader.set_texture_unit("breaking_textures", 1);
+	//
+	//	// Draw all opaque meshes
+	//	for (Chunk const& chunk : chunks.chunks) {
+	//
+	//		if (debug_frustrum_culling)
+	//			debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
+	//
+	//		if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
+	//			TracyGpuZone("gpu draw_chunk");
+	//
+	//			shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
+	//
+	//			chunk.mesh.opaque_mesh.bind();
+	//			chunk.mesh.opaque_mesh.draw();
+	//		}
+	//	}
+	//}
 }
 
-void ChunkGraphics::draw_chunks (Chunks const& chunks, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
-	TracyGpuZone("gpu draw_chunks");
-
-	glActiveTexture(GL_TEXTURE0 + 0);
-	tile_textures.tile_textures.bind();
-	sampler.bind(0);
-
-	glActiveTexture(GL_TEXTURE0 + 1);
-	tile_textures.breaking_textures.bind();
-	sampler.bind(1);
-
-	if (shader) {
-		shader.bind();
-
-		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-
-		shader.set_uniform("alpha_test", alpha_test);
-
-		shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
-
-		shader.set_texture_unit("tile_textures", 0);
-		shader.set_texture_unit("breaking_textures", 1);
-
-		// Draw all opaque chunk meshes
-		for (Chunk const& chunk : chunks.chunks) {
-
-			if (debug_frustrum_culling)
-				debug_graphics->push_wire_cube((float3)chunk.chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
-
-			if (!chunk.culled && chunk.mesh.opaque_mesh.vertex_count != 0) {
-				TracyGpuZone("gpu draw_chunk");
-
-				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
-
-				chunk.mesh.opaque_mesh.bind();
-				chunk.mesh.opaque_mesh.draw();
-			}
-		}
-	}
+void VoxelGraphics::draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler) {
+	//TracyGpuZone("gpu draw_chunks_transparent");
+	//
+	//glActiveTexture(GL_TEXTURE0 + 0);
+	//tile_textures.tile_textures.bind();
+	//sampler.bind(0);
+	//
+	//glActiveTexture(GL_TEXTURE0 + 1);
+	//tile_textures.breaking_textures.bind();
+	//sampler.bind(1);
+	//
+	//if (shader) {
+	//	shader.bind();
+	//
+	//	shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
+	//	shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
+	//
+	//	shader.set_texture_unit("tile_textures", 0);
+	//	shader.set_texture_unit("breaking_textures", 1);
+	//
+	//	// Draw all transparent chunk meshes
+	//	for (uint32_t i=0; i<voxels.svo.pages.allocator.freeset_size(); ++i) {
+	//		auto* page = voxels.svo.pages.allocator[i];
+	//		if (	voxels.svo.pages.allocator.is_allocated(i)
+	//				//&& !chunk.culled
+	//				//&& chunk.mesh.transparent_mesh.vertex_count != 0
+	//				) {
+	//			TracyGpuZone("gpu draw svo page");
+	//
+	//			shader.set_uniform("chunk_pos", (float3)page->info.pos);
+	//
+	//
+	//
+	//			//chunk.mesh.transparent_mesh.bind();
+	//			//chunk.mesh.transparent_mesh.draw();
+	//		}
+	//	}
+	//}
 }
 
-void ChunkGraphics::draw_chunks_transparent (Chunks const& chunks, TileTextures const& tile_textures, Sampler const& sampler) {
-	TracyGpuZone("gpu draw_chunks_transparent");
-
-	glActiveTexture(GL_TEXTURE0 + 0);
-	tile_textures.tile_textures.bind();
-	sampler.bind(0);
-
-	glActiveTexture(GL_TEXTURE0 + 1);
-	tile_textures.breaking_textures.bind();
-	sampler.bind(1);
-
-	if (shader) {
-		shader.bind();
-
-		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-
-		shader.set_uniform("alpha_test", false);
-
-		shader.set_texture_unit("tile_textures", 0);
-		shader.set_texture_unit("breaking_textures", 1);
-
-		// Draw all transparent chunk meshes
-		for (Chunk const& chunk : chunks.chunks) {
-
-			if (!chunk.culled && chunk.mesh.transparent_mesh.vertex_count != 0) {
-				TracyGpuZone("gpu draw_chunk");
-
-				shader.set_uniform("chunk_pos", (float3)chunk.chunk_pos_world());
-
-				chunk.mesh.transparent_mesh.bind();
-				chunk.mesh.transparent_mesh.draw();
-			}
-		}
-	}
-}
-
-void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
-	int count = 0;
-	for (Chunk& chunk : chunks.chunks) {
-		AABB aabb;
-		aabb.lo = (float3)chunk.chunk_pos_world();
-		aabb.hi = aabb.lo + (float3)CHUNK_DIM;
-
-		chunk.culled = frustrum_cull_aabb(view.frustrum, aabb);
-		if (chunk.culled)
-			count++;
-	}
-
-	chunks.count_culled = count;
-}
+//void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
+//	int count = 0;
+//	for (Chunk& chunk : chunks.chunks) {
+//		AABB aabb;
+//		aabb.lo = (float3)chunk.chunk_pos_world();
+//		aabb.hi = aabb.lo + (float3)CHUNK_DIM;
+//
+//		chunk.culled = frustrum_cull_aabb(view.frustrum, aabb);
+//		if (chunk.culled)
+//			count++;
+//	}
+//
+//	chunks.count_culled = count;
+//}
 
 void Graphics::draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, SelectedBlock selected_block) {
 	ZoneScopedN("Graphics::draw");
@@ -771,9 +760,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 		world.time_of_day.calc_sky_colors(&sky_light_reduce);
 
-		fog.set(world.chunks.generation_radius, world.time_of_day.cols);
+		fog.set(world.voxels.load_radius, world.time_of_day.cols);
 	
-		frustrum_cull_chunks(world.chunks, debug_frustrum_culling ? player_view : view);
+		//frustrum_cull_chunks(world.voxels, debug_frustrum_culling ? player_view : view);
 	
 		if (activate_flycam && debug_frustrum_culling) {
 
@@ -785,12 +774,12 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		if (activate_flycam || world.player.third_person) {
 			debug_graphics->push_cylinder(world.player.pos + float3(0,0, world.player.height/2), world.player.radius, world.player.height, srgba(255, 40, 255, 130), 32);
 		}
-		if (debug_block_light) {
-			for (auto bp : dbg_block_light_add_list)
-				debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.97f, srgba(40,40,250));
-			for (auto bp : dbg_block_light_remove_list)
-				debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
-		}
+		//if (debug_block_light) {
+		//	for (auto bp : dbg_block_light_add_list)
+		//		debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.97f, srgba(40,40,250));
+		//	for (auto bp : dbg_block_light_remove_list)
+		//		debug_graphics->push_wire_cube((float3)bp + 0.5f, 0.93f, srgba(250,40,40));
+		//}
 
 		//// OpenGL drawcalls
 		common_uniforms.set_view_uniforms(view);
@@ -838,7 +827,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		TracyGpuZone("gpu Opaque pass");
 
 		if (!raytracer.raytracer_draw || raytracer.overlay) {
-			chunk_graphics.draw_chunks(world.chunks, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
+			voxel_graphics.draw(world.voxels, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
 
 			skybox.draw();
 		}
@@ -861,7 +850,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			//glCullFace(GL_FRONT);
 			//chunk_graphics.draw_chunks_transparent(chunks);
 			//glCullFace(GL_BACK);
-			chunk_graphics.draw_chunks_transparent(world.chunks, tile_textures, sampler);
+			voxel_graphics.draw_transparent(world.voxels, tile_textures, sampler);
 		}
 
 		glEnable(GL_CULL_FACE);
@@ -872,7 +861,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		ZoneScopedN("gpu raytracer pass");
 		TracyGpuZone("gpu raytracer pass");
 
-		raytracer.draw(world.chunks.svo, view, *this, world.time_of_day);
+		raytracer.draw(world.voxels.svo, view, *this, world.time_of_day);
 	}
 
 	glClear(GL_DEPTH_BUFFER_BIT);

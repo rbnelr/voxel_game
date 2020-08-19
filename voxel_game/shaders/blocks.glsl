@@ -53,7 +53,6 @@ $if fragment
 	uniform float breaking_frames_count;
 	uniform float breaking_mutliplier;
 
-	uniform bool alpha_test;
 	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
@@ -72,11 +71,9 @@ $if fragment
 	
 		col.rgb *= vec3(vs_brightness);
 		
-		if (alpha_test) {
-			if (col.a <= ALPHA_TEST_THRES / 255.0)
-				DISCARD();
-			col.a = 1.0;
-		}
+		if (col.a <= ALPHA_TEST_THRES / 255.0)
+			DISCARD();
+		col.a = 1.0;
 
 		col.rgb = apply_fog(col.rgb, dist_sqr, dir_world);
 		FRAG_COL(col);
