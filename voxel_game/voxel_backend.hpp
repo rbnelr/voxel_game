@@ -4,8 +4,8 @@
 #include "voxel_mesher.hpp"
 #include "threading.hpp"
 
-#define CHUNK_SIZE 32
-#define CHUNK_SCALE 5
+#define CHUNK_SIZE 64
+#define CHUNK_SCALE 6
 
 // Backend system resposible for handling storage, changes to, and displaying of the voxel world
 class Voxels {

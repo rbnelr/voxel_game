@@ -18,12 +18,12 @@ namespace svo {
 		FARPTR_BIT = 0x4000u,
 	};
 
-	static constexpr uint16_t PAGE_SIZE = 4096 * 2; // must be power of two
+	static constexpr uintptr_t PAGE_SIZE = 4096 * 16; // must be power of two
 
 	static constexpr int MAX_DEPTH = 20;
 	static constexpr int MAX_PAGES = 2 << 14; // LEAF_BIT + FARPTR_BIT leave 14 bits as page index
 
-	static constexpr int MAX_MEMORY_SIZE = PAGE_SIZE * MAX_PAGES;
+	static constexpr uintptr_t MAX_MEMORY_SIZE = PAGE_SIZE * MAX_PAGES;
 
 	static constexpr Node NULLNODE = (Node)(LEAF_BIT | B_NULL);
 	

@@ -449,10 +449,85 @@ struct Fog {
 	}
 };
 
+// framebuffer for rendering at different resolution and to make sure we get float depth buffer
+struct Framebuffer {
+	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
+
+	GLuint color	= 0;
+	GLuint depth	= 0;
+	GLuint fbo		= 0;
+
+	int2 size = 0;
+	float renderscale = 1.0f;
+
+	bool nearest = false;
+
+	void imgui () {
+		if (!imgui_push("Framebuffer")) return;
+
+		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
+
+		ImGui::SameLine();
+		ImGui::Text("= %4d x %4d px", size.x, size.y);
+
+		ImGui::Checkbox("blit nearest", &nearest);
+
+		imgui_pop();
+	}
+
+	void update () {
+		auto old_size = size;
+		size = max(1, roundi((float2)input.window_size * renderscale));
+
+		if (!equal(old_size, size)) {
+			// delete old
+			glDeleteTextures(1, &color);
+			glDeleteTextures(1, &depth);
+			glDeleteFramebuffers(1, &fbo);
+
+			// create new (textures created with glTexStorage2D cannot be resized), simply do this, shouldn't cause major lag i think
+			glGenTextures(1, &color);
+			glBindTexture(GL_TEXTURE_2D, color);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, size.x, size.y);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenTextures(1, &depth);
+			glBindTexture(GL_TEXTURE_2D, depth);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH_COMPONENT32F, size.x, size.y);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+
+			GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE) {
+				fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+			}
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+	}
+
+	void blit () {
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // default FBO
+
+		glBlitFramebuffer(
+			0, 0, size.x, size.y,
+			0, 0, input.window_size.x, input.window_size.y,
+			GL_COLOR_BUFFER_BIT, nearest ? GL_NEAREST : GL_LINEAR);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+};
+
 extern int frame_counter;
 
 class Graphics {
 public:
+	Framebuffer				framebuffer;
+
 	CommonUniforms			common_uniforms;
 	Sampler					sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 
@@ -481,6 +556,8 @@ public:
 		}
 
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+			framebuffer.imgui();
+
 			shaders->imgui();
 
 			common_uniforms.imgui();

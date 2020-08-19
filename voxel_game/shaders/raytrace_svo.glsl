@@ -583,7 +583,8 @@ $if fragment
 
 		FRAG_COL(col);
 
-		{ // Write depth of furthest hit surface of primary ray (=always opaque) or MAX_DIST distance if not hit
+		// https://computergraphics.stackexchange.com/questions/6308/why-does-this-gl-fragdepth-calculation-work
+		{ // Write depth of furthest hit surface of primary ray (=always opaque) or inf distance if not hit
 			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);

@@ -57,6 +57,7 @@ float4x4 Camera::calc_cam_to_clip (View_Frustrum* frust, float4x4* clip_to_cam) 
 	}
 }
 
+// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
 float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far, View_Frustrum* frust, float4x4* clip_to_cam) {
 	float2 frust_scale;
 	frust_scale.y = tan(vfov / 2);
@@ -68,8 +69,17 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 
 	float x = frust_scale_inv.x;
 	float y = frust_scale_inv.y;
-	float a = (clip_far + clip_near) / (clip_near - clip_far);
-	float b = (2.0f * clip_far * clip_near) / (clip_near - clip_far);
+
+	float a, b;
+	if (use_reverse_depth) {
+		// use infinite far
+		clip_far = 1000000.0f; // can't actually set far to be infinite, if I want frustrum culling to work without modification
+		a = 0.0f;
+		b = clip_near;
+	} else {
+		a = (clip_far + clip_near) / (clip_near - clip_far);
+		b = (2.0f * clip_far * clip_near) / (clip_near - clip_far);
+	}
 
 	if (frust) {
 		frust->corners[0] = float3(-frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
@@ -103,8 +113,14 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 	float x = 2.0f / hsize;
 	float y = 2.0f / vsize;
 
-	float a = -2.0f / (clip_far - clip_near);
-	float b = clip_near * a - 1;
+	float a, b;
+	if (use_reverse_depth) {
+		a = 1.0f / (clip_far - clip_near);
+		b = clip_near * a + 1.0f;
+	} else {
+		a = -2.0f / (clip_far - clip_near);
+		b = clip_near * a - 1;
+	}
 
 	if (frust) {
 		frust->corners[0] = float3(1.0f / -x, 1.0f / -y, -clip_near);

@@ -62,7 +62,7 @@ struct CommonUniforms {
 		int size = sizeof(DebugUniforms);
 	}
 
-	void set_view_uniforms (Camera_View const& view) {
+	void set_view_uniforms (Camera_View const& view, int2 view_resolution) {
 		ViewUniforms u = {}; // zero padding
 		u.world_to_cam = (float4x4)view.world_to_cam;
 		u.cam_to_world = (float4x4)view.cam_to_world;
@@ -71,7 +71,7 @@ struct CommonUniforms {
 		u.world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
 		u.clip_near = view.clip_near;
 		u.clip_far = view.clip_far;
-		u.viewport_size = (float2)input.window_size;
+		u.viewport_size = (float2)view_resolution;
 		view_uniforms.set(u);
 	}
 
