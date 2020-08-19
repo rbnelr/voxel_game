@@ -49,6 +49,8 @@ void DearImgui::frame_end () {
 		glViewport(0, 0, display_w, display_h);
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	} else {
+		ImGui::EndFrame();
 	}
 }
 

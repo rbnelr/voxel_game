@@ -296,7 +296,11 @@ void WorldgenJob::execute () {
 
 void WorldgenJob::finalize () {
 	ZoneScoped;
+
+	svo->pending_chunks.erase(chunk_pos);
+
 	if (svo_node & svo::FARPTR_BIT)
 		svo->recurse_add_active_pages(svo->allocator[svo_node & ~svo::FARPTR_BIT]);
+
 	svo->octree_write(chunk_pos, CHUNK_SCALE, svo_node);
 }

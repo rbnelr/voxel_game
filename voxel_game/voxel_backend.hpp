@@ -16,7 +16,8 @@ public:
 	float load_radius =	200.0f;
 	float unload_hyster = 0;
 	
-	int cap_chunk_load = 64; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)
+	// artifically limit both the size of the async queue and how many results to take from the results
+	int cap_chunk_load = 64;
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int cap_chunk_mesh = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
 

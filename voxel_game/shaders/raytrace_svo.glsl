@@ -51,7 +51,9 @@ $if fragment
 #define INF (1.0 / 0.0)
 #define PI	3.1415926535897932384626433832795
 
-#define MAX_DIST INF
+// max dist of a ray before iteration will stop, also the depth distance of the sky,
+// so make sure it is outside of the far plane, so that depth compositing with other drawpasses works
+#define MAX_DIST 100000.0
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
@@ -344,7 +346,7 @@ $if fragment
 	vec3 process_ray (
 			vec3 ray_pos, vec3 ray_dir,
 			out float hit_dist, inout QueuedRay[MAX_SEC_RAYS] queue, inout int queued_rays, vec4 ray_tint) {
-		hit_dist = INF;
+		hit_dist = MAX_DIST;
 		vec4 accum_col = vec4(0.0);
 		cur_medium = -1;
 
@@ -535,7 +537,7 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		if (hit_dist < MAX_DIST-1) { // shadow ray
+		if (hit_dist < MAX_DIST) { // shadow ray
 			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
 			hit_pos += _normal * 0.0005;
 		
@@ -545,7 +547,7 @@ $if fragment
 			float shadow_ray_dist;
 			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
 		
-			if (shadow_ray_dist < MAX_DIST-1) {
+			if (shadow_ray_dist < MAX_DIST) {
 				// in shadow
 				col *= 0;
 			} else {
@@ -587,6 +589,8 @@ $if fragment
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
 			float ndc_depth = clip.z / clip.w - 0.00001f; // bias to fix z fighting with debug overlay
 			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
+
+			//FRAG_COL(vec4(vec3(gl_FragDepth), 1.0));
 		}
 	}
 $endif

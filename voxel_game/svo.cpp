@@ -665,15 +665,18 @@ namespace svo {
 
 				float dist = calc_closest_dist(posf, sizef);
 				bool want_loaded = dist <= voxels.load_radius;
+				bool want_unloaded = dist > voxels.load_radius + voxels.unload_hyster;
 
 				if (child_scale == CHUNK_SCALE) {
 
 					int3 chunk_coord = child_pos + svo.root_pos;
 
 					if (want_loaded) {
-						//bool pending = svo.is_chunk_load_queued(chunks, chunk_coord);
-						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
-						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+						sizef *= 0.99f;
+
+						bool pending = svo.is_chunk_load_queued(voxels, chunk_coord);
+						debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
+							is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
 
 						if (!is_loaded && !svo.is_chunk_load_queued(voxels, chunk_coord)) {
 							// chunk not generated yet
@@ -682,8 +685,8 @@ namespace svo {
 					} else {
 						if (is_loaded) {
 
-							float fardist = calc_furthest_dist(posf, sizef);
-							if (fardist >= voxels.load_radius + voxels.unload_hyster) {
+							//float fardist = calc_furthest_dist(posf, sizef);
+							if (want_unloaded) {
 								// unload whole subtree
 								chunks_to_unload.push_back(chunk_coord);
 							}
@@ -691,7 +694,7 @@ namespace svo {
 						}
 					}
 				} else {
-					if (want_loaded)
+					if (want_loaded || is_loaded) // skip parts of the octree that are 
 						recurse_chunk_loading(page, child_node, child_pos, child_scale);
 				}
 			}
@@ -712,6 +715,18 @@ namespace svo {
 		ZoneScoped;
 
 		update_root(*this, player_pos);
+
+		{ // finish first, so that pending_chunks becomes smaller before we cap the newly queued ones to limit this size
+			ZoneScopedN("finish chunkgen jobs");
+
+			std::vector< std::unique_ptr<ThreadingJob> > jobs (voxels.cap_chunk_load);
+
+			size_t count = background_threadpool.results.pop_multiple(&jobs[0], voxels.cap_chunk_load);
+
+			for (size_t i=0; i<count; ++i) {
+				jobs[i]->finalize();
+			}
+		}
 
 		ChunkLoader cl = { *this, player_pos - (float3)root_pos, voxels } ;
 		{
@@ -737,7 +752,7 @@ namespace svo {
 		{
 			ZoneScopedN("queue chunk loads");
 
-			int count = min((int)cl.chunks_to_load.size(), voxels.cap_chunk_load);
+			int count = min((int)cl.chunks_to_load.size(), voxels.cap_chunk_load - (int)pending_chunks.size());
 
 			int i=0;
 			background_threadpool.jobs.push_multiple([&] () -> std::unique_ptr<WorldgenJob> {
@@ -752,18 +767,6 @@ namespace svo {
 
 				return std::make_unique<WorldgenJob>(chunk.coord, this, &world_gen);
 			});
-		}
-
-		{
-			ZoneScopedN("finish chunkgen jobs");
-
-			std::vector< std::unique_ptr<ThreadingJob> > jobs (voxels.cap_chunk_load);
-
-			size_t count = background_threadpool.results.pop_multiple(&jobs[0], voxels.cap_chunk_load);
-
-			for (size_t i=0; i<count; ++i) {
-				jobs[i]->finalize();
-			}
 		}
 
 		if (debug_draw_octree) {
