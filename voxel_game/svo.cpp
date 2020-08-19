@@ -674,19 +674,24 @@ namespace svo {
 				bool want_loaded = dist <= voxels.load_radius;
 				bool want_unloaded = dist > voxels.load_radius + voxels.unload_hyster;
 
-				if (child_scale == CHUNK_SCALE) {
+				int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+
+				if (child_scale <= CHUNK_SCALE + lod) {
 
 					int3 chunk_coord = child_pos + svo.root_pos;
 
 					if (want_loaded) {
-						//sizef *= 0.99f;
+						sizef *= 0.99f;
 						//bool pending = svo.is_chunk_load_queued(voxels, chunk_coord);
 						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
 						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
 
+						if ((child_pos + svo.root_pos).z == 0)
+							debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f, cols[lod % ARRLEN(cols)]);
+
 						if (!is_loaded && !svo.is_chunk_load_queued(voxels, chunk_coord)) {
 							// chunk not generated yet
-							chunks_to_load.push_back({ chunk_coord, dist });
+							//chunks_to_load.push_back({ chunk_coord, dist });
 						}
 					} else {
 						if (is_loaded) {
@@ -694,7 +699,7 @@ namespace svo {
 							//float fardist = calc_furthest_dist(posf, sizef);
 							if (want_unloaded) {
 								// unload whole subtree
-								chunks_to_unload.push_back(chunk_coord);
+								//chunks_to_unload.push_back(chunk_coord);
 							}
 
 						}

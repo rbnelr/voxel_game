@@ -13,8 +13,11 @@ public:
 	SVO	svo;
 	VoxelMesher mesher;
 
-	float load_radius =	200.0f;
+	float load_radius =	50000.0f;
 	float unload_hyster = 0;
+
+	float load_lod_start = 200.0f;
+	float load_lod_unit = 200.0f;
 	
 	// artifically limit both the size of the async queue and how many results to take from the results
 	int cap_chunk_load = 64;
@@ -26,6 +29,9 @@ public:
 
 		ImGui::SliderFloat("load_radius", &load_radius, 0, 2000, "%.0f", 2);
 		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
+
+		ImGui::DragFloat("load_lod_start", &load_lod_start, 1);
+		ImGui::DragFloat("load_lod_unit", &load_lod_unit, 1);
 
 		ImGui::DragInt("cap_chunk_load", &cap_chunk_load, 0.02f);
 		ImGui::DragInt("cap_chunk_mesh", &cap_chunk_mesh, 0.02f);

@@ -53,7 +53,7 @@ $if fragment
 
 // max dist of a ray before iteration will stop, also the depth distance of the sky,
 // so make sure it is outside of the far plane, so that depth compositing with other drawpasses works
-#define MAX_DIST 100000.0
+#define MAX_DIST 10000000.0
 
 #define B_AIR 1 // block id
 #define B_WATER 2 // block id
