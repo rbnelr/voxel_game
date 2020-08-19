@@ -7,6 +7,7 @@
 
 #include "input.hpp"
 #include "game.hpp"
+#include "graphics/camera.hpp" // for use_reverse_depth
 
 GLFWwindow*	window = nullptr;
 int			frame_counter = 0;
@@ -289,6 +290,11 @@ void glfw_init_gl () {
 	if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
 		_vsync_on_interval = -1;
 
+	use_reverse_depth = glfwExtensionSupported("GL_ARB_clip_control");
+	if (use_reverse_depth) {
+		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	}
+
 	set_vsync(true);
 
 	// srgb enabled by default if supported
@@ -311,7 +317,7 @@ int main () {
 			ZoneScopedN("glfwInit");
 
 			if (!glfwInit()) {
-				clog(ERROR, "glfwInit failed!\n");
+				fprintf(stderr, "glfwInit failed!\n");
 				return 1;
 			}
 		}
@@ -326,10 +332,10 @@ int main () {
 		glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 		glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
-
+		
 		window = glfwCreateWindow(WINDOW_RES.x, WINDOW_RES.y, "Voxel Game", NULL, NULL);
 		if (!window) {
-			clog(ERROR, "glfwCreateWindow failed!\n");
+			fprintf(stderr, "glfwCreateWindow failed!\n");
 			glfwTerminate();
 			return 1;
 		}
