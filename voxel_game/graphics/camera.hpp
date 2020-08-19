@@ -142,5 +142,7 @@ public:
 		imgui_pop();
 	}
 
+	float3x3 calc_world_to_cam_rot (float3x3* cam_to_world_rot);
+
 	Camera_View update ();
 };
