@@ -19,7 +19,13 @@ public:
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
 
 	World (WorldGenerator gen): world_gen{gen} {
+		
+	}
 
+	~World () {
+		// shutdown threads so we don't crash when destructing voxels.svo.allocator
+		background_threadpool.flush();
+		parallelism_threadpool.flush();
 	}
 
 	void imgui () {

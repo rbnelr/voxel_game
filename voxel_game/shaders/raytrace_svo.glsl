@@ -46,7 +46,7 @@ $if fragment
 #define FARPTR_BIT	0x4000u
 
 #define MAX_SCALE 11
-#define MAX_SEC_RAYS 2
+#define MAX_SEC_RAYS 4
 
 #define INF (1.0 / 0.0)
 #define PI	3.1415926535897932384626433832795

@@ -24,5 +24,5 @@ inline const int background_threads  = clamp(roundi((float)logical_cores * 0.80f
 // leave one thread for system and background apps
 inline const int parallelism_threads = clamp(logical_cores - 1, 1, logical_cores);
 
-inline Threadpool background_threadpool  = Threadpool( background_threads , ThreadPriority::LOW, ">> background threadpool"  );
-inline Threadpool parallelism_threadpool = Threadpool( parallelism_threads - 1, ThreadPriority::HIGH,   ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
+inline Threadpool background_threadpool		= Threadpool(background_threads		, ThreadPriority::LOW , ">> background threadpool"  );
+inline Threadpool parallelism_threadpool	= Threadpool(parallelism_threads - 1, ThreadPriority::HIGH, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too

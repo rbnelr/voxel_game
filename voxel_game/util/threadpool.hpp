@@ -58,6 +58,9 @@ class Threadpool {
 		}
 	}
 
+	std::string thread_base_name;
+	ThreadPriority prio;
+
 public:
 	// jobs.push(Job) to queue work to be executed by a thread
 	ThreadsafeQueue< std::unique_ptr<ThreadingJob> >	jobs;
@@ -68,7 +71,7 @@ public:
 	Threadpool () {}
 	// start thread_count threads
 	Threadpool (int thread_count, ThreadPriority prio=ThreadPriority::LOW, std::string thread_base_name="<threadpool>") {
-		start_threads(thread_count, prio, thread_base_name);
+		start_threads(thread_count, prio, std::move(thread_base_name));
 	}
 
 	// start thread_count threads
@@ -82,6 +85,9 @@ public:
 		for (int i=0; i<thread_count; ++i) {
 			threads.emplace_back( &Threadpool::thread_main, this, kiss::prints("%s #%d", thread_base_name.c_str(), i), prio, cpu_core++);
 		}
+
+		this->thread_base_name = std::move(thread_base_name);
+		this->prio = prio;
 	}
 
 	// can be called from the producer thread to work on the jobs itself
@@ -119,7 +125,21 @@ public:
 		for (auto& t : threads)
 			t.join(); // wait for all threads to exit thread_main
 
+		jobs.reset_shutdown();
+
 		threads.clear();
+		jobs.clear();
+		results.clear();
+	}
+
+	void flush () {
+		// TODO: could not find a better way of doing this yet. simply restart the threads for now
+
+		int thread_count = (int)threads.size();
+
+		shutdown();
+
+		start_threads(thread_count, prio, std::move(thread_base_name));
 	}
 
 	~Threadpool () {

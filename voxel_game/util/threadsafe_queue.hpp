@@ -156,6 +156,9 @@ public:
 		shutdown_flag = true;
 		c.notify_all();
 	}
+	void reset_shutdown () {
+		shutdown_flag = false;
+	}
 
 	// iterate queued items with template callback 'void func (T&)' in order from the oldest to the newest pushed
 	// elements are allowed to be changed
