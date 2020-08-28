@@ -4,22 +4,14 @@
 #include "assert.h"
 #include "tracy.hpp"
 #include <vector>
-#include <mutex>
 
-// Need to wrap locks for tracy
-#define MUTEX				TracyLockableN(std::mutex,	m, "ThreadsafeQueue mutex")
-#define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
+// set uninitialized stuff to 0xcc to either catch out of unitialized bugs or make viewing it in the debugger clearer
+#define DBG_MEMSET (!NDEBUG) 
+#define DBG_MEMSET_VAL 0xCC
 
-namespace {
-	// round up x to y, assume y is power of two
-	inline constexpr uintptr_t round_up_pot (uintptr_t x, uintptr_t y) {
-		return (x + y - 1) & ~(y - 1);
-	}
-}
+uint32_t get_os_page_size ();
 
-uintptr_t get_os_page_size ();
-
-inline const uintptr_t os_page_size = get_os_page_size();
+inline const uint32_t os_page_size = get_os_page_size();
 
 void* reserve_address_space (uintptr_t size);
 void release_address_space (void* baseptr, uintptr_t size);
@@ -102,25 +94,41 @@ public:
 	}
 };
 
-uint32_t _alloc_first_free (std::vector<uint64_t>& freeset);
+// Bitset used in allocators to find the lowest free slot in a fast way
+struct Bitset {
+	std::vector<uint64_t>	bits;
+	uint32_t				first_set = 0; // index of first set bit in bits, to possibly speed up scanning
 
-// Virtual memory allocator that can accept random order of alloc and free
-// sizeof(T) should be multiple of os page size as to not waste memory and also keep bookkeeping simple
-// TODO: A version of this that allows sizeof(T) to be anything can be implemented with list of pages and list of elements
-// where pages have a refcount of how many elements are allocated out of them (refcount == 0 -> page can be decommitted)
-template <typename T>
+	// finds the first 1 bit and clears it, returns the index of the bit
+	uint32_t clear_first_1 (uint64_t* prev_bits=nullptr);
+
+	// set a bit, safe to set bit that's already set
+	void set_bit (uint32_t idx);
+};
+
+template <typename T, bool DOCOMMIT=true> // DOCOMMIT=false allows manual memory sparseness with sizeof(T) > os_page_size
 class SparseAllocator {
 	void*					baseptr; // base address of reserved memory pages
 	uint32_t				count = 0;
 	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
-	std::vector<uint64_t>	freeset;
+	Bitset					free_slots;
+	uint32_t				paging_shift_mask;
+	uint32_t				paging_mask;
 
-	MUTEX;
+	static_assert(is_pot(sizeof(T)), "SparseAllocator<T>: sizeof(T) needs to be power of two!");
 
 public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
-		assert(sizeof(T) % os_page_size == 0);
+		if (DOCOMMIT) {
+			uint32_t slots_per_page = (uint32_t)(os_page_size / sizeof(T));
+			assert(slots_per_page <= 64); // cannot support more than 64 slots per os page, would require multiple bitset reads to check commit status
+			
+			uint32_t tmp = max(slots_per_page, 1); // prevent 0 problems
+			paging_shift_mask = 0b111111u ^ (tmp - 1); // indx in 64 bitset block, then round down to slots_per_page
+			paging_mask = (1u << tmp) - 1; // simply slots_per_page 1 bits
+		}
+
 		baseptr = reserve_address_space(sizeof(T)*max_count);
 	}
 
@@ -128,89 +136,91 @@ public:
 		release_address_space(baseptr, sizeof(T)*max_count);
 	}
 
-private:
-	// Allocate (picks first possible address)
+	// Allocate first possible slot
 	T* alloc () {
 		assert(count < max_count);
 
-		uint32_t bookkeeping_range = (uint32_t)freeset.size() * 64;
-		uint32_t free_count = bookkeeping_range - count;
-
-		uint32_t idx;
-
-		if (free_count == 0) {
-			// allocate after the end of the contiguous region of allocated elements
-			idx = bookkeeping_range;
-
-			freeset.push_back(0xfffffffffffffffeull); // push back all 1s except for the LSB representing the one element we are about to allocate
-		} else {
-			// bookkeeping region contains free elements allocate first one with a 64 wide scan
-			idx = _alloc_first_free(freeset);
-		}
-
-		T* ptr = (T*)baseptr + idx;
+		uint64_t bits;
+		uint32_t idx = free_slots.clear_first_1(&bits);
 		count++;
 
-		commit_pages(ptr, sizeof(T));
+		T* ptr = (T*)baseptr + idx;
+		
+		if (DOCOMMIT) {
+			// get bits representing prev alloc status of all slots in affected page
+			bits >>= idx & paging_shift_mask;
+		
+			// commit page if all page slots were free before
+			if (((uint32_t)bits & paging_mask) == paging_mask) {
+				commit_pages(ptr, sizeof(T));
+
+			#if DBG_MEMSET
+				memset(ptr, DBG_MEMSET_VAL, sizeof(T));
+			#endif
+			}
+		}
 
 		return ptr;
 	}
 
-	// Free random
+	// Free random slot
 	void free (T* ptr) {
 		uint32_t idx = indexof(ptr);
 
-		uint32_t freesety = idx / 64;
-		uint32_t freesetx = idx % 64;
-		assert(freesety < freeset.size() && ((freeset[freesety] >> freesetx) & 1) == 0); // not freed yet
-		assert(count > 0);
-
-		// set bit in freeset to 1
-		freeset[freesety] |= 1ull << freesetx;
-
-		// shrink freeset if there are contiguous free elements at the end
-		if (freesety == freeset.size()-1) {
-			while (freeset.back() == 0xffffffffffffffffull) {
-				freeset.pop_back();
-			}
-		}
-
+		free_slots.set_bit(idx);
 		count--;
 
-		decommit_pages(ptr, sizeof(T));
+		if (DOCOMMIT) {
+			// get bits representing prev alloc status of all slots in affected page
+			uint64_t bits = free_slots.bits[idx >> 6];
+			bits >>= idx & paging_shift_mask;
+
+			// decommit page if all page slots are free now
+			if (((uint32_t)bits & paging_mask) == paging_mask) {
+				decommit_pages(ptr, sizeof(T));
+			}
+		}
 	}
 
-	// not threadsafe
-	inline uint32_t freeset_size () {
-		return (uint32_t)freeset.size() * 64;
+	uint32_t size () {
+		return count;
 	}
-	// not threadsafe
-	inline bool is_allocated (uint32_t i) {
-		return (freeset[i / 64] & (1ull << (i % 64))) == 0;
-	}
-public:
-
-	T* alloc_threadsafe () {
-		LOCK_GUARD;
-		return alloc();
-	}
-	void free_threadsafe (T* ptr) {
-		LOCK_GUARD;
-		free(ptr);
-	}
-
-	inline uint32_t indexof (T* ptr) const {
+	uint32_t indexof (T* ptr) const {
 		return (uint32_t)(ptr - (T*)baseptr);
 	}
-	inline T* operator[] (uint32_t index) const {
+	T* operator[] (uint32_t index) const {
 		return (T*)baseptr + index;
 	}
 
-	inline uint32_t size_threadsafe () {
+};
+
+// Threadsafe wrappers
+#include <mutex>
+
+// Need to wrap locks for tracy
+#define MUTEX				TracyLockableN(std::mutex,	m, "ThreadsafeQueue mutex")
+#define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
+
+template <typename T>
+class ThreadsafeSparseAllocator : public SparseAllocator<T> {
+	MUTEX;
+
+public:
+	ThreadsafeSparseAllocator (uint32_t max_count): SparseAllocator<T>{max_count} {}
+
+	T* alloc_threadsafe () {
 		LOCK_GUARD;
-		return count;
+		return this->alloc();
+	}
+	void free_threadsafe (T* ptr) {
+		LOCK_GUARD;
+		this->free(ptr);
 	}
 
+	uint32_t size_threadsafe () {
+		LOCK_GUARD;
+		return this->count;
+	}
 };
 
 #undef MUTEX			

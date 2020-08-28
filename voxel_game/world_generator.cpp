@@ -1,13 +1,13 @@
 #include "stdafx.hpp"
 #include "world_generator.hpp"
 #include "blocks.hpp"
-#include "voxel_backend.hpp"
+#include "voxel_system.hpp"
 #include "svo.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 struct ChunkGenerator {
-	int3					chunk_pos;
+	Chunk*					chunk;
 	SVO*					svo;
 	WorldGenerator const*	wg;
 
@@ -258,19 +258,19 @@ struct ChunkGenerator {
 			place_tree(p);
 	}
 
-	svo::Node gen () {
+	void gen () {
 		ZoneScoped;
 
 		osn_noise2 = OSN::Noise<2>(wg->seed);
 
-		auto chunk_seed = wg->seed ^ hash(chunk_pos);
+		auto chunk_seed = wg->seed ^ hash(chunk->pos);
 		rand = Random(chunk_seed);
 
-		gen_terrain(chunk_pos);
+		gen_terrain(chunk->pos);
 
-		place_objects(chunk_pos);
+		place_objects(chunk->pos);
 
-		return svo->chunk_to_octree(&blocks[0][0][0]);
+		svo->chunk_to_octree(chunk, &blocks[0][0][0]);
 	}
 };
 
@@ -283,10 +283,10 @@ void WorldgenJob::execute () {
 		gen = (ChunkGenerator*)malloc(sizeof(ChunkGenerator));
 	}
 
-	gen->chunk_pos	= chunk_pos;
+	gen->chunk		= chunk;
 	gen->svo		= svo;
 	gen->wg			= world_gen;
-	svo_node = gen->gen();
+	gen->gen();
 
 	{
 		ZoneScopedN("free buffer");
@@ -297,10 +297,11 @@ void WorldgenJob::execute () {
 void WorldgenJob::finalize () {
 	ZoneScoped;
 
-	svo->pending_chunks.erase(chunk_pos);
+	assert(svo->pending_chunks.find(chunk->pos) != svo->pending_chunks.end());
+	assert(svo->active_chunks.find(chunk->pos) == svo->active_chunks.end());
 
-	if (svo_node & svo::FARPTR_BIT)
-		svo->recurse_add_active_pages(svo->allocator[svo_node & ~svo::FARPTR_BIT]);
+	svo->pending_chunks.erase(chunk->pos);
+	svo->active_chunks.emplace(chunk->pos, chunk);
 
-	svo->octree_write(chunk_pos, CHUNK_SCALE, svo_node);
+	svo->octree_write(chunk->pos, chunk->scale, svo->chunk_allocator.indexof(chunk));
 }

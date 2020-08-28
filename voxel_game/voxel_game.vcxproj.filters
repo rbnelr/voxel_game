@@ -260,7 +260,7 @@
     <ClInclude Include="svo.hpp" />
     <ClInclude Include="voxel_mesher.hpp" />
     <ClInclude Include="threading.hpp" />
-    <ClInclude Include="voxel_backend.hpp" />
+    <ClInclude Include="voxel_system.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

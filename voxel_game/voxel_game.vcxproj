@@ -212,7 +212,7 @@
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
     <ClInclude Include="util\virtual_allocator.hpp" />
-    <ClInclude Include="voxel_backend.hpp" />
+    <ClInclude Include="voxel_system.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="voxel_mesher.hpp" />
     <ClInclude Include="dear_imgui.hpp" />

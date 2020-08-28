@@ -1,4 +1,4 @@
-﻿#version 400 core // for findMSB
+﻿#version 430 core // for findMSB, SSBO
 
 $include "common.glsl"
 $include "fog.glsl"
@@ -24,29 +24,35 @@ $if fragment
 	// source for algorithm: https://research.nvidia.com/sites/default/files/pubs/2010-02_Efficient-Sparse-Voxel/laine2010i3d_paper.pdf
 
 	// SVO data
-	uniform usampler2D svo_texture;
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
-	/* SVO format:
-		1 bit      1 bit       14 bit
-		[leaf_bit][farptr_bit][payload]
+#define MAX_NODES (1u << 16)
 
-		leaf_bit == 0 && farptr_bit == 0:	payload is index of children OctreeNode[8] in svo_texture
-		leaf_bit == 0 && farptr_bit == 1:	payload is index of page where OctreeNode[8] at slot 0 is the node
-		leaf_bit == 1:						payload leaf voxel data, ie. block id
-	*/
+	struct SvoNode {
+		uint children[4]; // uint16_t children[8]
+		uint leaf_mask; // uint8_t leaf_mask + padding
+		uint _pad[3];
+	};
 
-	uint get_svo_node (uint node_index, int child_index) {
-		// access 1d data as 2d texture, because of texture size limits
-		return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
+	layout(std430, binding = 0) buffer SvoData {
+		SvoNode nodes[];
+	} svo_data;
+
+	uint get_svo_node (uint node_index, int child_index, out bool leaf) {
+		//return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
+
+		uint chunk_index = node_index >> 16;
+		node_index = node_index & 0xffffu;
+
+		SvoNode node = svo_data.nodes[chunk_index * MAX_NODES + node_index];
+
+		leaf = (node.leaf_mask & (1u << child_index)) != 0;
+		return (node.children[child_index / 2] >> (16 * (child_index % 2))) & 0xffffu;
 	}
 
-#define LEAF_BIT	0x8000u
-#define FARPTR_BIT	0x4000u
-
 #define MAX_SCALE 14
-#define MAX_SEC_RAYS 4
+#define MAX_SEC_RAYS 1
 
 #define INF (1.0 / 0.0)
 #define PI	3.1415926535897932384626433832795
@@ -374,7 +380,7 @@ $if fragment
 		//// Init root
 		ivec3 parent_pos = ivec3(0);
 		int parent_scale = svo_root_scale;
-		uint parent_node = 0u; // [16bit page index, 16bit node index]
+		uint parent_node = 0u; // [16bit chunk index, 16bit node index]
 
 		// desired ray bounds
 		float tmin = 0;
@@ -394,6 +400,8 @@ $if fragment
 		uint stack_node[ MAX_SCALE -1 ];
 		float stack_t1[ MAX_SCALE -1 ];
 
+		int counter = 0;
+
 		//// Iterate
 		for (;;) {
 			iterations++;
@@ -407,8 +415,7 @@ $if fragment
 			bvec3 exit_face, entry_faces;
 			intersect_ray(rinv_dir, mirror_ray_pos, child_pos, child_scale, child_t0, child_t1, exit_face, entry_faces);
 
-			bool voxel_exists = (parent_node & LEAF_BIT) == 0;
-			if (voxel_exists && t0 < t1) {
+			if (t0 < t1) {
 
 				int idx = 0;
 				idx |= ((child_pos.x >> child_scale) & 1) << 0;
@@ -417,7 +424,8 @@ $if fragment
 
 				idx ^= mirror_mask_int;
 
-				uint node = get_svo_node(parent_node, idx);
+				bool leaf;
+				uint node = get_svo_node(parent_node, idx, leaf);
 
 				//// Intersect
 				// child cube ray range
@@ -426,11 +434,23 @@ $if fragment
 
 				if (tv0 < tv1) {
 					
-					bool leaf = (node & LEAF_BIT) != 0;
+					uint chunk = parent_node & 0xffff0000u;
+					if (leaf && chunk == 0 && node != 0) {
+						chunk = node << 16u;
+						node = 0;
+						leaf = false;
+					}
+
+					if (visualize_iterations && leaf && child_scale == 0) {
+						DEBUG(float(node) / 300.0);
+					}
+
+					uint child_node = chunk | node;
+
 					if (leaf) {
 						float dist = tv0;
 
-						surface_hit(ray_pos, ray_dir, dist, entry_faces, node & ~LEAF_BIT,
+						surface_hit(ray_pos, ray_dir, dist, entry_faces, node,
 							accum_col, queue, queued_rays, ray_tint);
 						
 						if (accum_col.a > 0.99999) {
@@ -444,16 +464,7 @@ $if fragment
 						stack_t1  [child_scale - 1] = t1;
 
 						// child becomes parent
-						{
-							uint parent_page = parent_node & 0xffff0000u;
-							if ((node & FARPTR_BIT) != 0) {
-								parent_page = (node & ~FARPTR_BIT) << 16u;
-								node = 0;
-							}
-
-							parent_node = parent_page | node;
-						}
-
+						parent_node = child_node;
 						parent_pos = child_pos;
 						parent_scale = child_scale;
 
@@ -465,6 +476,10 @@ $if fragment
 						continue;
 					}
 				}
+			}
+
+			if (visualize_iterations && child_scale == 0) {
+				DEBUG(vec3(1,0,0));
 			}
 
 			ivec3 old_pos = child_pos;
@@ -537,24 +552,24 @@ $if fragment
 
 		vec3 col = process_ray(ray_pos, ray_dir, hit_dist, queue, queued_rays, ray_tint);
 
-		if (hit_dist < MAX_DIST) { // shadow ray
-			vec3 hit_pos = ray_pos + ray_dir * hit_dist;
-			hit_pos += _normal * 0.0005;
-		
-			vec3 dir = normalize(sun_dir + (rand3() -0.5) * sun_radius);
-		
-			int dummy_queued_rays = MAX_SEC_RAYS;
-			float shadow_ray_dist;
-			process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
-		
-			if (shadow_ray_dist < MAX_DIST) {
-				// in shadow
-				col *= 0;
-			} else {
-				col *= sun_col;
-			}
-			//col *= 0;
-		}
+		//if (hit_dist < MAX_DIST) { // shadow ray
+		//	vec3 hit_pos = ray_pos + ray_dir * hit_dist;
+		//	hit_pos += _normal * 0.0005;
+		//
+		//	vec3 dir = normalize(sun_dir + (rand3() -0.5) * sun_radius);
+		//
+		//	int dummy_queued_rays = MAX_SEC_RAYS;
+		//	float shadow_ray_dist;
+		//	process_ray(hit_pos, dir, shadow_ray_dist, queue, dummy_queued_rays, vec4(1.0));
+		//
+		//	if (shadow_ray_dist < MAX_DIST) {
+		//		// in shadow
+		//		col *= 0;
+		//	} else {
+		//		col *= sun_col;
+		//	}
+		//	//col *= 0;
+		//}
 
 		return col;
 	}

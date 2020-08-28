@@ -43,11 +43,6 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
-class Chunk;
-namespace svo {
-	class SVO;
-}
-
 struct WorldGenerator {
 	std::string seed_str = "test2";
 	uint64_t seed;
@@ -112,13 +107,11 @@ struct WorldGenerator {
 
 struct WorldgenJob : ThreadingJob {
 	// input
-	int3					chunk_pos;
+	Chunk*					chunk;
 	SVO*					svo;
 	WorldGenerator const*	world_gen;
-	// output
-	svo::Node				svo_node;
 
-	WorldgenJob (int3 chunk_pos, SVO* svo, WorldGenerator const* world_gen): chunk_pos{chunk_pos}, svo{svo}, world_gen{world_gen} {}
+	WorldgenJob (svo::Chunk* chunk, SVO* svo, WorldGenerator const* world_gen): chunk{chunk}, svo{svo}, world_gen{world_gen} {}
 
 	virtual void execute ();
 	virtual void finalize ();

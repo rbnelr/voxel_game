@@ -10,10 +10,10 @@
 // Backend system resposible for handling storage, changes to, and displaying of the voxel world
 class Voxels {
 public:
-	SVO	svo;
 	VoxelMesher mesher;
+	SVO svo;
 
-	float load_radius =	50000.0f;
+	float load_radius =	20;//2000.0f;
 	float unload_hyster = 0;
 
 	float load_lod_start = 200.0f;
@@ -45,6 +45,6 @@ public:
 		return svo.octree_read(pos);
 	}
 	void set_block (int3 pos, block_id bid) {
-		svo.octree_write(pos, 0, (svo::Node)(svo::LEAF_BIT | bid));
+		svo.octree_write(pos, 0, bid);
 	}
 };

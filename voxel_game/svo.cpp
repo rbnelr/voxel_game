@@ -1,11 +1,12 @@
 #include "stdafx.hpp"
 #include "svo.hpp"
-#include "voxel_backend.hpp"
+#include "voxel_system.hpp"
 #include "world_generator.hpp"
 #include "player.hpp"
 #include "graphics/debug_graphics.hpp"
 
 namespace svo {
+#if 0
 	Node page_from_subtree (Page pages[], Page* dstpage, Page* srcpage, Node srcnode) {
 		assert((srcnode & LEAF_BIT) == 0);
 
@@ -24,315 +25,6 @@ namespace svo {
 		}
 
 		return (Node)children_ptr;
-	}
-
-	void SVO::merge (Page* parent, Page* child) {
-		ZoneScopedN("world_octree::merge");
-
-		// remove children from child so they can be added to parent node
-		child->remove_all_children();
-
-		// create merged page, by adding nodes of child to parent, then replacing the farptr with the new subtree
-		*child->info.farptr_ptr = page_from_subtree(allocator[0], parent, child, (Node)0);
-
-		parent->remove_child(child);
-		
-		free_page(child);
-
-		parent->info.flags |= PAGE_GPU_DIRTY;
-	}
-	void SVO::try_merge (Page* page) {
-		if (!page->info.farptr_ptr)
-			return; // root page
-
-		Page* parent = page_from_node(page->info.farptr_ptr);
-
-		uintptr_t sum = page->info.count + parent->info.count;
-
-		if (sum <= PAGE_MERGE_THRES) {
-			merge(parent, page);
-		}
-	}
-
-	struct DescentStack {
-		Node*	node;
-		Page*	page;
-	};
-
-	struct PageSplitter {
-		Page* page;
-
-		int target_page_size;
-
-		Node* split_node;
-		uint8_t split_node_scale;
-		int split_node_closeness = INT_MAX;
-
-		uint16_t find_split_node_recurse (Node* node, uint8_t scale) {
-			assert((*node & LEAF_BIT) == 0);
-
-			uint16_t subtree_size = 1; // count ourself
-
-			// cound children subtrees
-			for (int i=0; i<8; ++i) {
-				auto& children = page->nodes[*node].children;
-				if ((children[i] & (LEAF_BIT|FARPTR_BIT)) == 0)
-					subtree_size += find_split_node_recurse(&children[i], scale-1);
-			}
-
-			// keep track of node that splits the node in half the best
-			int closeness = abs(subtree_size - target_page_size);
-			if (closeness < split_node_closeness) {
-				split_node = node;
-				split_node_scale = scale;
-				split_node_closeness = closeness;
-			}
-
-			return subtree_size;
-		}
-	};
-
-	struct _SplitSubtree {
-		Page* pages;
-		Page* splitpage;
-		Page* srcpage;
-		Node** stack;
-
-		Node split_subtree (Node splitnode, uint16_t scale) {
-			assert((splitnode & LEAF_BIT) == 0);
-
-			// alloc node in splitpage
-			uint16_t children_ptr = splitpage->alloc_node();
-
-			for (int i=0; i<8; ++i) {
-				Node& child = srcpage->nodes[splitnode].children[i];
-
-				// move over children to splitnode if node was farptr
-				if (child & FARPTR_BIT) {
-					srcpage->remove_child(&pages[child & ~FARPTR_BIT]);
-					splitpage->add_child(&splitpage->nodes[children_ptr].children[i], &pages[child & ~FARPTR_BIT]);
-				}
-
-				if (stack[scale-1] == &child) {
-					stack[scale-1] = &splitpage->nodes[children_ptr].children[i];
-				} else {
-					for (uint16_t i=0; i<MAX_DEPTH; ++i) {
-						if (stack[scale] == &child) {
-							assert(false);
-						}
-					}
-				}
-
-				splitpage->nodes[children_ptr].children[i] = child & (LEAF_BIT|FARPTR_BIT) ?
-					child :
-					split_subtree(child, scale-1);
-			}
-
-			// free children node
-			srcpage->free_node(splitnode);
-
-			return (Node)children_ptr;
-		}
-	};
-	Page* SVO::split_page (Page* page, Node* stack[], bool active_page) {
-		ZoneScopedN("world_octree::split_page");
-		
-		// find splitnode
-		PageSplitter ps = { page };
-		ps.target_page_size = page->info.count / 2;
-
-		Node root = (Node)0;
-		ps.find_split_node_recurse(&root, page->info.scale);
-
-		assert((*ps.split_node & LEAF_BIT) == 0);
-		if (ps.split_node == &root) {
-			// edge cases that are not allowed to happen because a split of the root node do not actually split the page in a useful way
-			//  this should be impossible with an page subtree depth > 2, I think. (ie. root -> middle -> leaf), which a PAGE_NODES > 
-			// But if the page count is invalid because nodes have become unreachable this might still happen
-			assert(false);
-		}
-
-		// alloc childpage
-		Page* childpage = alloc_page(active_page);
-		childpage->info.scale = ps.split_node_scale;
-
-		// create childpage from subtree
-		_SplitSubtree{ allocator[0], childpage, page, stack }.split_subtree(*ps.split_node, ps.split_node_scale);
-		
-		// set childpage farptr in tmppage
-		*ps.split_node = (Node)(allocator.indexof(childpage) | FARPTR_BIT);
-		page->add_child(ps.split_node, childpage);
-
-		page->info.flags |= PAGE_GPU_DIRTY;
-		childpage->info.flags |= PAGE_GPU_DIRTY;
-		return childpage;
-	}
-
-	void recurse_free_subtree (SVO& oct, Page* page, Node node) {
-		assert((node & LEAF_BIT) == 0);
-
-		if (node & FARPTR_BIT) {
-			auto* page = oct.allocator[node & ~FARPTR_BIT];
-			oct.free_page(page);
-			return;
-		}
-
-		for (int i=0; i<8; ++i) {
-			auto child = page->nodes[node].children[i];
-			if ((child & LEAF_BIT) == 0) {
-				recurse_free_subtree(oct, page, child);
-			}
-		}
-		
-		page->free_node(node);
-	}
-	void SVO::free_subtree (Page* page, Node node) {
-		ZoneScopedN("world_octree::free_subtree");
-		
-		recurse_free_subtree(*this, page, node);
-	};
-
-	int get_child_index (int3 pos, int scale) {
-		//return	(((pos.x >> scale) & 1) << 0) |
-		//		(((pos.y >> scale) & 1) << 1) |
-		//		(((pos.z >> scale) & 1) << 2);
-		//return	((pos.x >> (scale  )) & 1) |
-		//		((pos.y >> (scale-1)) & 2) |
-		//		((pos.z >> (scale-2)) & 4);
-		int ret = 0;
-		if (pos.x & (1 << scale))	ret  = 1;
-		if (pos.y & (1 << scale))	ret += 2;
-		if (pos.z & (1 << scale))	ret += 4;
-		return ret;
-	}
-
-	// octree write, writes a single voxel at a desired pos, scale to be a particular val
-	// this decends the octree from the root and inserts or deletes nodes when needed
-	// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
-	void SVO::octree_write (int3 pos, int scale, Node val) {
-		ZoneScopedN("world_octree::octree_write");
-
-		pos -= root_pos;
-		if (any(pos < 0 || pos >= (1 << root_scale)))
-			return;
-
-		// start with root node
-		int cur_scale = root_scale;
-
-		Node* stack[MAX_DEPTH];
-	#if !NDEBUG
-		memset(stack, 0, sizeof(stack));
-	#endif
-
-		Node* siblings = allocator[0]->nodes[0].children;
-
-		for (;;) {
-			cur_scale--;
-
-			// get child node that contains target node
-			int child_idx = get_child_index(pos, cur_scale);
-
-			Node* child_node = siblings + child_idx;
-			Page* page = page_from_node(child_node);
-
-			// keep track of node path for collapsing of same type octree nodes (these get invalidated on split page, which do never need to collapse)
-			stack[cur_scale] = child_node;
-
-			if (cur_scale == scale) {
-				// reached target octree depth
-				break;
-			}
-
-			if ((*child_node & LEAF_BIT) == 0) {
-				// recurse normally
-
-				Node node_ptr = *child_node;
-
-				if (node_ptr & FARPTR_BIT) {
-					page = allocator[ node_ptr & ~FARPTR_BIT ];
-					node_ptr = (Node)0;
-				}
-
-				siblings = page->nodes[node_ptr].children;
-			} else {
-				//// Split node into 8 children of same type
-
-				Node leaf = *child_node;
-
-				if (leaf == val) {
-					// do not split node if leaf is already the correct type just at a higher scale
-					break;
-				}
-
-				if (page->nodes_full()) {
-					auto* childpage = split_page(page, stack);
-
-					child_node = stack[cur_scale];
-					page = page_from_node(child_node);
-				}
-
-				Node node_ptr = (Node)page->alloc_node();
-
-				// write ptr to children into this nodes slot in parents children array
-				*child_node = node_ptr;
-
-				siblings = page->nodes[node_ptr].children;
-
-				// alloc and init children for node
-				for (int i=0; i<8; ++i) {
-					siblings[i] = leaf;
-				}
-
-				page->info.flags |= PAGE_GPU_DIRTY;
-			}
-		}
-
-		Node* write_node = stack[scale];
-
-		if (val & LEAF_BIT) {
-			// collapse nodes containing same leaf nodes
-			for (int scale=cur_scale;; scale++) {
-				write_node = stack[scale];
-
-				if (scale == root_scale-1) {
-					break;
-				}
-
-				Node* siblings = siblings_from_node(write_node)->children;
-			
-				for (int i=0; i<8; ++i) {
-					if (&siblings[i] != write_node && siblings[i] != val) {
-						goto end; // embrace the goto
-					}
-				}
-			} end:;
-		}
-
-		Node old_val = *write_node;
-		Page* page = page_from_node(write_node);
-
-		// do the write
-		*write_node = val;
-		page->info.flags |= PAGE_GPU_DIRTY;
-
-		bool collapsed = (old_val & LEAF_BIT) == 0;
-		bool wrote_subpage = val & FARPTR_BIT;
-
-		if (collapsed) {
-			// free subtree nodes if subtree was collapsed
-			free_subtree(page, old_val);
-		} else if (wrote_subpage) {
-			Page* childpage = allocator[val & ~FARPTR_BIT];
-
-			page->add_child(write_node, childpage);
-
-			page = childpage;
-		}
-
-		if (collapsed || wrote_subpage) {
-
-			try_merge(page);
-		}
 	}
 
 	block_id SVO::octree_read (int3 pos) {
@@ -428,6 +120,8 @@ namespace svo {
 		oct.root_pos = pos;
 	}
 
+#endif
+
 	static constexpr int3 children_pos[8] = {
 		int3(0,0,0),
 		int3(1,0,0),
@@ -448,19 +142,6 @@ namespace svo {
 		float3(0,1,1),
 		float3(1,1,1),
 	};
-
-	bool can_collapse (Node* children) {
-		if ((children[0] & LEAF_BIT) == 0)
-			return false;
-
-		for (int i=1; i<8; ++i) {
-			if (children[i] != children[0])
-				return false;
-		}
-
-		return true;
-	}
-
 	lrgba cols[] = {
 		srgba(255,0,0),
 		srgba(0,255,0),
@@ -473,106 +154,206 @@ namespace svo {
 		srgba(255,127,255),
 	};
 
-	void recurse_draw (SVO& oct, Page* cur_page, Node node, int3 pos, int scale) {
-		float size = (float)(1 << scale);
+	uint16_t Chunk::alloc_node (SVO& svo, StackNode* stack) {
+		if (alloc_ptr >= commit_ptr) {
 
-		auto col = cols[scale % ARRLEN(cols)];
-		if (oct.debug_draw_page_color || oct.debug_draw_pages)
-			col = cols[oct.allocator.indexof(cur_page) % ARRLEN(cols)];
-			
-		bool draw = ((node & LEAF_BIT)==0 || (node & ~LEAF_BIT) > (oct.debug_draw_air ? B_NULL : B_AIR)) && scale <= oct.debug_draw_octree_max;
-		if (oct.debug_draw_pages ? (node & FARPTR_BIT) : draw)
-			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
+			if (nodes == tinydata) {
+				nodes = svo.node_allocator.alloc()->nodes;
 
-		if ((node & LEAF_BIT) == 0) {
-			
-			if (node & FARPTR_BIT) {
-				cur_page = oct.allocator[node & ~FARPTR_BIT];
-				node = (Node)0;
-			}
+				commit_pages(nodes, MAX_NODES*sizeof(Node));
+				commit_ptr = MAX_NODES;
 
-			Node* children = cur_page->nodes[node].children;
-			int child_scale = scale - 1;
+			#if DBG_MEMSET
+				memset(nodes, DBG_MEMSET_VAL, MAX_NODES*sizeof(Node));
+			#endif
 
-			if (child_scale >= oct.debug_draw_octree_min) {
-				for (int i=0; i<8; ++i) {
-					int3 child_pos = pos + (int3(i & 1, (i >> 1) & 1, (i >> 2) & 1) << child_scale);
+				memcpy(nodes, tinydata, sizeof(tinydata));
 
-					recurse_draw(oct, cur_page, children[i], child_pos, child_scale);
+				if (stack) { // fixup stack after we invalidated some of the nodes
+					for (int i=0; i<MAX_DEPTH; ++i) {
+						uintptr_t indx = stack[i].node - tinydata;
+						if (indx < ARRLEN(tinydata)) {
+							stack[i].node = nodes + indx;
+						}
+					}
 				}
+
+			#if DBG_MEMSET
+				memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
+			#endif
 			}
+
 		}
+		return alloc_ptr++;
 	}
 
-	SVO::SVO () {
-		auto* rootpage = alloc_page();
-		rootpage->info.scale = root_scale;
-		assert(allocator.indexof(rootpage) == 0);
-
-		auto& root = rootpage->nodes[ rootpage->alloc_node() ];
-		for (int i=0; i<8; ++i) {
-			root.children[i] = (Node)(LEAF_BIT | B_NULL);
-		}
+	int get_child_index (int3 pos, int scale) {
+		//// Subpar asm generated for a lot of these, at least from what I can tell, might need to look into this if I octree decent actually becomes a bottleneck
+		//return	(((pos.x >> scale) & 1) << 0) |
+		//		(((pos.y >> scale) & 1) << 1) |
+		//		(((pos.z >> scale) & 1) << 2);
+		//return	((pos.x >> (scale  )) & 1) |
+		//		((pos.y >> (scale-1)) & 2) |
+		//		((pos.z >> (scale-2)) & 4);
+		int ret = 0;
+		if (pos.x & (1 << scale))	ret  = 1;
+		if (pos.y & (1 << scale))	ret += 2;
+		if (pos.z & (1 << scale))	ret += 4;
+		return ret;
 	}
 
-	Node SVO::chunk_to_octree (block_id* blocks) {
-		ZoneScopedN("svo_chunk_to_octree");
+	bool can_collapse (Node* node) {
+		if (node[0].leaf_mask != 0xff)
+			return false; // not all leafs, cant collapse
 
-		//int3 pos = chunk.coord * CHUNK_DIM;
+		for (int i=1; i<8; ++i) {
+			if (node->children[i] != node->children[0])
+				return false; // not all leafs equal, cant collapse
+		}
 
-		Page* chunk_page = alloc_page(false);
-		chunk_page->info.scale = CHUNK_SCALE;
+		return true;
+	}
 
-		Node* node_stack[MAX_DEPTH];
-	#if !NDEBUG
-		memset(node_stack, 0, sizeof(node_stack));
+	void SVO::octree_write (int3 pos, int scale, uint16_t val) {
+		ZoneScopedN("world_octree::octree_write");
+
+		pos -= root->pos;
+		if (any(pos < 0 || pos >= (1 << root->scale))) {
+			// writes outside the root node are not possible, should never be attempted by caller
+			assert(false);
+		}
+
+		// start with root node
+		int cur_scale = root->scale;
+		Node* node = &root->nodes[0];
+
+		Chunk* chunk = root;
+
+		StackNode stack[MAX_DEPTH];
+	#if DBG_MEMSET
+		memset(stack, DBG_MEMSET_VAL, sizeof(stack));
 	#endif
 
-		struct Stack {
-			int3 pos;
-			int child_indx;
-		};
-		Stack stack[MAX_DEPTH];
+		assert(scale < root->scale);
 
-		uint16_t scale = CHUNK_SCALE-1;
+		for (;;) {
+			cur_scale--;
+			assert(cur_scale >= 0);
 
-		Node root = (Node)(FARPTR_BIT | allocator.indexof(chunk_page));
+			// get child node that contains target node
+			int child_idx = get_child_index(pos, cur_scale);
 
-		node_stack[CHUNK_SCALE] = &root;
-		stack[CHUNK_SCALE] = { 0, 0 };
+			// update stack
+			stack[cur_scale].node = node;
+			stack[cur_scale].child_indx = child_idx;
 
-		node_stack[scale] = chunk_page->nodes[ chunk_page->alloc_node() ].children;
-		stack[scale] = { 0, 0 };
+			if (cur_scale == scale) {
+				// reached target octree depth
+				break;
+			}
 
-		for (int i=0; i<8; ++i) {
-			chunk_page->nodes[0].children[i] = NULLNODE;
+			uint16_t* child_node = &node->children[child_idx];
+
+			bool child_leaf = node->leaf_mask & (1u << child_idx);
+
+			if (!child_leaf) { 
+				// recurse into child node
+				node = &chunk->nodes[*child_node];
+
+			} else {
+				//// Split node into 8 children of same type
+
+				uint16_t leaf = *child_node;
+
+				if (chunk == root && leaf != B_NULL) {
+					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+					assert(*child_node != 0); // trying to write voxel into unloaded chunk, should never be attempted by caller
+
+					chunk = chunk_allocator[leaf];
+					node = chunk->nodes;
+				}
+
+				//if (leaf == val) {
+				//	// write would be a no-op because the octree already has the desired value at that voxel
+				//	return;
+				//}
+
+				uint16_t node_ptr = chunk->alloc_node(*this, stack);
+
+				// write ptr to children into this nodes slot in parents children array
+				stack[cur_scale].node->children[child_idx] = node_ptr;
+				stack[cur_scale].node->leaf_mask ^= (1u << child_idx);
+
+				// init and recurse into new node
+				node = &chunk->nodes[node_ptr];
+
+				node->leaf_mask = 0xff;
+				// alloc and init children for node
+				for (int i=0; i<8; ++i) {
+					node->children[i] = leaf;
+				}
+
+				chunk->gpu_dirty = true;
+			}
 		}
+
+		// do the write
+		stack[cur_scale].node->children[ stack[cur_scale].child_indx ] = val;
+		stack[cur_scale].node->leaf_mask |= 1u << stack[cur_scale].child_indx;
+
+		chunk->gpu_dirty = true;
+
+		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
+		for (	auto i = cur_scale;
+				i != CHUNK_SCALE-1 && i < root->scale-1 && can_collapse(stack[i].node);
+				++i) {
+
+			stack[i+1].node->children[ stack[i+1].child_indx ] = stack[i].node->children[0];
+			stack[i+1].node->leaf_mask |= 1u << stack[i+1].child_indx;
+
+			// free node
+			chunk->dead_count++;
+		}
+
+	}
+
+	void SVO::chunk_to_octree (Chunk* chunk, block_id* blocks) {
+		ZoneScopedN("svo_chunk_to_octree");
+
+		StackNode stack[MAX_DEPTH];
+
+		Node dummy;
+		stack[CHUNK_SCALE] = { &dummy, 0, 0 };
+
+		uint16_t scale = CHUNK_SCALE;
 
 		for (;;) {
 			int3& pos		= stack[scale].pos;
 			int& child_indx	= stack[scale].child_indx;
-			Node*& children	= node_stack[scale];
-			Node* node		= &children[child_indx];
-			Page* page		= page_from_node(children);
+			Node* node		= stack[scale].node;
 
-			if (child_indx == 8) {
+			if (child_indx >= 8) {
 				// Pop
 				scale++;
 
-				if (can_collapse(children)) {
-					uint16_t children_ptr = (uint16_t)(((char*)children - (char*)&page->nodes) / (sizeof(NodeChildren)));
-
-					node_stack[scale][ stack[scale].child_indx ] = children[0];
-
-					if (children_ptr == 0) {
-						free_page(page, false);
-					} else {
-						page->free_node(children_ptr);
-					}
-				}
-
 				if (scale == CHUNK_SCALE)
 					break;
+
+				if (can_collapse(node)) {
+					// collapse node by writing leaf into parent
+					stack[scale].node->children[ stack[scale].child_indx ] = node->children[0];
+					stack[scale].node->leaf_mask |= 1u << stack[scale].child_indx;
+
+					// free node
+					uint16_t node_ptr = (uint16_t)(node - chunk->nodes);
+
+				#if DBG_MEMSET
+					memset(&chunk->nodes[node_ptr], DBG_MEMSET_VAL, sizeof(Node));
+				#endif
+
+					assert(node_ptr == chunk->alloc_ptr-1); // this algo should only ever free in a stack based order, this allows us to never generate dead nodes
+					chunk->alloc_ptr--;
+				}
 
 			} else {
 
@@ -581,30 +362,16 @@ namespace svo {
 				if (scale == 0) {
 					auto bid = blocks[child_pos.z * CHUNK_SIZE*CHUNK_SIZE + child_pos.y * CHUNK_SIZE + child_pos.x];
 
-					*node = (Node)(LEAF_BIT | bid);
+					node->leaf_mask |= 1u << child_indx;
+					node->children[child_indx] = bid;
 				} else {
 					// Push
-					if (page->nodes_full()) {
-						split_page(page, node_stack, false);
-
-						children	= node_stack[scale];
-						node = &children[child_indx];
-						page = page_from_node(children);
-					}
-
-					uint16_t nodei = page->alloc_node();
-					auto& child_children = page->nodes[nodei];
-
-					*node = (Node)nodei;
+					uint16_t nodei = chunk->alloc_node(*this, stack); // invalidates node
+					chunk->nodes[nodei].leaf_mask = 0;
+					stack[scale].node->children[child_indx] = nodei;
 
 					scale--;
-					stack[scale] = { child_pos, 0 };
-					node_stack[scale] = child_children.children;
-
-					// init nodes to leaf nodes so future split_page won't fail if we had this uninitialized
-					for (int i=0; i<8; ++i) {
-						child_children.children[i] = NULLNODE;
-					}
+					stack[scale] = { &chunk->nodes[nodei], child_pos, 0 };
 
 					continue;
 				}
@@ -613,20 +380,22 @@ namespace svo {
 			stack[scale].child_indx++;
 		}
 
-		return root;
 	}
 
 	struct ChunkLoader {
 		SVO& svo;
-		float3 player_pos;
 		Voxels& voxels;
+		float3 player_pos;
 
-		struct Chunk {
+		struct ChunkToLoad {
 			int3 coord;
+			int scale;
 			float dist;
 		};
-		std::vector<Chunk> chunks_to_load;
-		std::vector<int3> chunks_to_unload;
+		std::vector<ChunkToLoad> chunks_to_load;
+		std::vector<Chunk*> chunks_to_unload;
+
+		int chunk_count = 0;
 
 		float calc_closest_dist (float3 pos, float size) {
 			float3 pos_rel = player_pos - pos;
@@ -646,26 +415,28 @@ namespace svo {
 			return sqrt(max_dist_sqr);
 		}
 
-		void recurse_chunk_loading (Page* page, Node node, int3 pos, int scale) {
-			if (node & FARPTR_BIT) {
-				page = svo.allocator[node & ~FARPTR_BIT];
-				node = (Node)0;
-			}
-
-			// need to recurse into areas that do not exist in the octree yet
-			// -> children_nodes will be nullptr in that case
-			Node* children_nodes = node & LEAF_BIT ? nullptr : page->nodes[node].children;
-
-			int child_scale = scale - 1;
-
+		void recurse_chunk_loading (Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale) {
 			for (int i=0; i<8; ++i) {
+				int child_scale = scale - 1;
 				int3 child_pos = pos + (children_pos[i] << child_scale);
+
+				int3 chunk_coord = child_pos + svo.root->pos;
 
 				// need to recurse into areas that do not exist in the octree yet
 				// just pretend the child nodes were the same (leaf) node as the parent
-				Node child_node = children_nodes ? children_nodes[i] : node;
+				uint32_t child_node = !leaf ? chunk->nodes[node].children[i] : node;
+				bool	 child_leaf = leaf || (chunk->nodes[node].leaf_mask & (1u << i));
 
-				bool is_loaded = child_node != (Node)(LEAF_BIT | B_NULL);
+				Chunk* child_chunk = chunk;
+				if (child_leaf && chunk == svo.root && child_node != B_NULL) {
+					child_chunk = svo.chunk_allocator[node];
+					child_node = 0;
+					child_leaf = false;
+
+					assert(child_chunk->scale == child_scale && equal(child_chunk->pos, chunk_coord));
+				}
+
+				bool is_loaded = !(child_leaf && child_node == B_NULL);
 
 				float3 posf = (float3)child_pos;
 				float sizef = (float)(1 << child_scale);
@@ -674,11 +445,10 @@ namespace svo {
 				bool want_loaded = dist <= voxels.load_radius;
 				bool want_unloaded = dist > voxels.load_radius + voxels.unload_hyster;
 
-				int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+				//int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+				int lod = 0;
 
 				if (child_scale <= CHUNK_SCALE + lod) {
-
-					int3 chunk_coord = child_pos + svo.root_pos;
 
 					if (want_loaded) {
 						sizef *= 0.99f;
@@ -686,12 +456,14 @@ namespace svo {
 						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
 						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
 
-						if ((child_pos + svo.root_pos).z == 0)
-							debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f, cols[lod % ARRLEN(cols)]);
+						//if ((child_pos + svo.root->pos).z == 0)
+						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root->pos) + 0.5f * sizef, sizef * 0.999f, cols[lod % ARRLEN(cols)]);
 
-						if (!is_loaded && !svo.is_chunk_load_queued(voxels, chunk_coord)) {
+						chunk_count++;
+
+						if (!is_loaded && svo.pending_chunks.find(chunk_coord) == svo.pending_chunks.end()) {
 							// chunk not generated yet
-							//chunks_to_load.push_back({ chunk_coord, dist });
+							chunks_to_load.push_back({ chunk_coord, scale, dist });
 						}
 					} else {
 						if (is_loaded) {
@@ -699,33 +471,52 @@ namespace svo {
 							//float fardist = calc_furthest_dist(posf, sizef);
 							if (want_unloaded) {
 								// unload whole subtree
-								//chunks_to_unload.push_back(chunk_coord);
+								assert(child_chunk != svo.root);
+								chunks_to_unload.push_back(child_chunk);
 							}
 
 						}
 					}
 				} else {
 					if (want_loaded || is_loaded) // skip parts of the octree that are 
-						recurse_chunk_loading(page, child_node, child_pos, child_scale);
+						recurse_chunk_loading(chunk, child_node, child_leaf, child_pos, child_scale);
 				}
 			}
 		}
 	};
 
-	void SVO::recurse_add_active_pages (Page* page) {
-		active_pages.insert(page);
+	void recurse_draw (SVO& svo, Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale) {
+		if (leaf && chunk == svo.root) {
+			if (node == B_NULL) return;
 
-		Page* child = page->info.children_ptr;
-		while (child) {
-			recurse_add_active_pages(child);
-			child = child->info.sibling_ptr;
+			chunk = svo.chunk_allocator[node];
+			node = 0;
+			leaf = false;
+		}
+
+		float size = (float)(1 << scale);
+		
+		auto col = cols[scale % ARRLEN(cols)];
+		if ((!leaf || node > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max)
+			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
+
+		int child_scale = scale - 1;
+		if (!leaf && child_scale >= svo.debug_draw_octree_min) {
+
+			Node children = chunk->nodes[node];
+			
+			for (int i=0; i<8; ++i) {
+				int3 child_pos = pos + (children_pos[i] << child_scale);
+
+				recurse_draw(svo, chunk, children.children[i], children.leaf_mask & (1u << i), child_pos, child_scale);
+			}
 		}
 	}
 
-	void SVO::update_chunk_loading (Voxels& voxels, WorldGenerator& world_gen, float3 player_pos) {
+	void SVO::chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen) {
 		ZoneScoped;
 
-		update_root(*this, player_pos);
+		//update_root(*this, player_pos);
 
 		{ // finish first, so that pending_chunks becomes smaller before we cap the newly queued ones to limit this size
 			ZoneScopedN("finish chunkgen jobs");
@@ -739,23 +530,31 @@ namespace svo {
 			}
 		}
 
-		ChunkLoader cl = { *this, player_pos - (float3)root_pos, voxels } ;
+		ChunkLoader cl = { *this, voxels, player.pos - (float3)root->pos } ;
 		{
 			ZoneScopedN("recurse_chunk_loading");
-			cl.recurse_chunk_loading(nullptr, (Node)(0 | FARPTR_BIT), 0, root_scale);
+			cl.recurse_chunk_loading(root, 0, false, 0, root->scale);
+
+			ImGui::Text("chunk_count: %d", cl.chunk_count);
 		}
 
 		{
 			ZoneScopedN("chunk unloading");
 			for (auto chunk : cl.chunks_to_unload) {
-				octree_write(chunk, CHUNK_SCALE, (Node)(LEAF_BIT | B_NULL));
+				assert(pending_chunks.find(chunk->pos) == pending_chunks.end());
+				assert(active_chunks.find(chunk->pos) != active_chunks.end());
+
+				active_chunks.erase(chunk->pos);
+
+				assert(chunk->scale == CHUNK_SCALE);
+				octree_write(chunk->pos, chunk->scale, B_NULL);
 			}
 		}
 
 		{
 			ZoneScopedN("std::sort chunks_to_load");
 
-			std::sort(cl.chunks_to_load.begin(), cl.chunks_to_load.end(), [] (ChunkLoader::Chunk& l, ChunkLoader::Chunk& r) {
+			std::sort(cl.chunks_to_load.begin(), cl.chunks_to_load.end(), [] (ChunkLoader::ChunkToLoad& l, ChunkLoader::ChunkToLoad& r) {
 				return std::less<float>()(l.dist, r.dist);
 			});
 		}
@@ -770,20 +569,26 @@ namespace svo {
 				if (i >= count)
 					return nullptr;
 
+				auto c = cl.chunks_to_load[i++];
+
+				auto* chunk = chunk_allocator.alloc();
+				new (chunk) Chunk (c.coord, CHUNK_SCALE);
+
 				ZoneScopedN("push WorldgenJob");
 
-				auto chunk = cl.chunks_to_load[i++];
+				assert(pending_chunks.find(c.coord) == pending_chunks.end());
+				assert(active_chunks.find(c.coord) == active_chunks.end());
 
-				pending_chunks.emplace(chunk.coord);
+				pending_chunks.emplace(c.coord, chunk);
 
-				return std::make_unique<WorldgenJob>(chunk.coord, this, &world_gen);
+				return std::make_unique<WorldgenJob>(chunk, this, &world_gen);
 			});
 		}
 
-		if (debug_draw_octree) {
+		if (debug_draw_svo) {
 			ZoneScopedN("SVO::debug_draw");
-
-			recurse_draw(*this, nullptr, (Node)(0 | FARPTR_BIT), root_pos, root_scale);
+		
+			recurse_draw(*this, root, 0, false, root->pos, root->scale);
 		}
 	}
 }

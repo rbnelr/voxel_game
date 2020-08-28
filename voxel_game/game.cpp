@@ -109,7 +109,7 @@ void Game::frame () {
 
 		audio_manager.update();
 
-		world->voxels.svo.update_chunk_loading(world->voxels, world_gen, world->player.pos);
+		world->voxels.svo.chunk_loading(world->voxels, world->player, world_gen);
 
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);

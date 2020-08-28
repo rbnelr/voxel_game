@@ -1,11 +1,11 @@
 #include "virtual_allocator.hpp"
 #include "windows.h"
 
-uintptr_t get_os_page_size () {
+uint32_t get_os_page_size () {
 	SYSTEM_INFO info;
 	GetSystemInfo(&info);
 
-	return (uintptr_t)info.dwPageSize;
+	return (uint32_t)info.dwPageSize;
 }
 
 void* reserve_address_space (uintptr_t size) {
@@ -33,21 +33,57 @@ void decommit_pages (void* ptr, uintptr_t size) {
 	assert(ret != 0);
 }
 
-uint32_t _alloc_first_free (std::vector<uint64_t>& freeset) {
-	
-	uint32_t i=0;
-	while (freeset[i] == 0ull) {
-		++i;
+uint32_t _bsf_nonzero (uint64_t val) {
+	unsigned long idx;
+	auto ret = _BitScanForward64(&idx, val);
+	assert(ret);
+	return idx;
+}
+
+// returns count*64 if no set bit found
+uint32_t _bitscan (uint64_t* bits, uint32_t count, uint32_t start=0) {
+	uint32_t x = start;
+
+	while (bits[x] == 0ull) {
+		x++;
+		if (x == count) {
+			return x << 6;
+		}
 	}
 
-	auto& val = freeset[i];
+	return (x << 6) + _bsf_nonzero(bits[x]);
+}
 
-	unsigned long subindex;
-	auto ret = _BitScanForward64(&subindex, val);
-	assert(ret);
+uint32_t Bitset::clear_first_1 (uint64_t* prev_bits) {
+	// get the index to return, which we already know is the lowest set bit
+	uint32_t idx = first_set;
 
-	// set the first 1 bit found to 0
-	val ^= 1ull << subindex;
+	// append to bits if needed
+	if (idx == ((uint32_t)bits.size() << 6))
+		bits.push_back(0xffffffffffffffffull);
 
-	return i*64 + (uint32_t)subindex;
+	// clear bit
+	assert(bits[idx >> 6] & (1ull << (idx & 0b111111u)));
+
+	if (prev_bits)
+		*prev_bits = bits[idx >> 6];
+	bits[idx >> 6] ^= 1ull << (idx & 0b111111u);
+
+	// scan for next set bit for next call, can skip all bits before first_set, since we know they are 0
+	first_set = _bitscan(bits.data(), (uint32_t)bits.size(), first_set >> 6);
+
+	return idx;
+}
+void Bitset::set_bit (uint32_t idx) {
+	// set bit in freeset to 1
+	bits[idx >> 6] |= 1ull << (idx & 0b111111u);
+
+	// shrink bits if there are contiguous zero ints at the end
+	if ((idx >> 6) == (uint32_t)bits.size()) {
+		while (bits.back() == 0xffffffffffffffffull)
+			bits.pop_back();
+	}
+
+	// keep first_set up to date
+	first_set = min(first_set, idx);
 }

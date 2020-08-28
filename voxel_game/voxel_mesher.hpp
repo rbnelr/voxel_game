@@ -51,7 +51,7 @@ namespace meshing {
 	static_assert(sizeof(Page) == PAGE_SIZE);
 
 	struct VoxelMesher {
-		SparseAllocator<Page> allocator = SparseAllocator<Page>(MAX_PAGES);
+		ThreadsafeSparseAllocator<Page> allocator = ThreadsafeSparseAllocator<Page>(MAX_PAGES);
 
 		void imgui () {
 

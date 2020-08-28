@@ -38,6 +38,8 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	float dmg = 0;
 	if (hardness == 0) {
 		dmg = 1.0f;
+	} else if (hardness == 255) {
+		dmg = 0.0f;
 	} else {
 		float damage_multiplier = (float)tool_props.hardness / (float)hardness;
 		if (tool_props.tool == blocks.tool[block.block])

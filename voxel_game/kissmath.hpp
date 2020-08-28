@@ -28,40 +28,51 @@
 #include "kissmath/transform2d.hpp"
 #include "kissmath/transform3d.hpp"
 
-using namespace kissmath;
-
 #include "kissmath_colors.hpp"
 
 #include <type_traits>
 
-// Hashmap key type for vectors
-template <typename VEC>
-struct vector_key {
-	VEC v;
-
-	vector_key (VEC const& v): v{v} {}
-	bool operator== (vector_key<VEC> const& r) const { // for hash map
-		return equal(v, r.v);
+namespace kissmath {
+	// round up x to y, assume y is power of two
+	template <typename T> inline constexpr T round_up_pot (T x, T y) {
+		return (x + y - 1) & ~(y - 1);
 	}
-};
+	// check if power of two
+	template <typename T> inline constexpr T is_pot (T x) {
+		return (x & (x - 1)) == 0;
+	}
 
-inline size_t hash (int3 v) {
-	size_t h;
-	h  = std::hash<int>()(v.x);
-	h = 53ull * (h + 53ull);
+	inline size_t hash (int3 v) {
+		size_t h;
+		h  = ::std::hash<int>()(v.x);
+		h = 53ull * (h + 53ull);
 
-	h += std::hash<int>()(v.y);
-	h = 53ull * (h + 53ull);
+		h += ::std::hash<int>()(v.y);
+		h = 53ull * (h + 53ull);
 
-	h += std::hash<int>()(v.z);
-	return h;
-};
+		h += ::std::hash<int>()(v.z);
+		return h;
+	};
 
-namespace std {
+	// Hashmap key type for vectors
 	template <typename VEC>
-	struct hash<vector_key<VEC>> { // for hash map
-		size_t operator() (vector_key<VEC> const& v) const {
-			return ::hash(v.v);
+	struct vector_key {
+		VEC v;
+
+		vector_key (VEC const& v): v{v} {}
+		bool operator== (vector_key<VEC> const& r) const {
+			return equal(v, r.v);
 		}
 	};
 }
+
+namespace std {
+	template <typename VEC>
+	struct hash<kissmath::vector_key<VEC>> {
+		size_t operator() (kissmath::vector_key<VEC> const& v) const {
+			return kissmath::hash(v.v);
+		}
+	};
+}
+
+using namespace kissmath;

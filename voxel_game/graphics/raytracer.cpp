@@ -41,16 +41,18 @@ void Raytracer::imgui () {
 Raytracer::Raytracer () {
 	using namespace svo;
 
-	static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-	int height = MAX_PAGES;
+	glGenBuffers(1, &svo_ssbo);
 
-	glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
+	//static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
+	//int height = MAX_PAGES;
+	//
+	//glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
+	//
+	//glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
+	//
+	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	//
+	//glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
@@ -60,8 +62,8 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 		glBindVertexArray(vao);
 
-		shader.set_uniform("svo_root_pos", svo.root_pos);
-		shader.set_uniform("svo_root_scale", svo.root_scale);
+		shader.set_uniform("svo_root_pos", svo.root->pos);
+		shader.set_uniform("svo_root_scale", svo.root->scale);
 
 		shader.set_uniform("slider", slider);
 
@@ -87,24 +89,31 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		shader.set_uniform("time", time);
 
 		{
+			using namespace svo;
 			TracyGpuZone("gpu SVO upload");
 
-			using namespace svo;
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
 
-			static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-			int height = MAX_PAGES;
-
-			glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
-			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-			
-			for (auto* page : svo.active_pages) {
-				if (page->info.flags & PAGE_GPU_DIRTY) {
-					GLint y = svo.allocator.indexof(page);
-					glTexSubImage2D(GL_TEXTURE_2D, 0,  0,y,	WIDTH, 1, GL_RED_INTEGER, GL_UNSIGNED_SHORT, &page->nodes[0]);
-
-					page->info.flags &= ~PAGE_GPU_DIRTY;
-				}
+			uint16_t max_chunk_index = 0; // root
+			for (auto& it : svo.active_chunks) {
+				Chunk* chunk = it.second;
+				max_chunk_index = max(max_chunk_index, svo.chunk_allocator.indexof(chunk));
 			}
+
+			uintptr_t size = (max_chunk_index +1) * sizeof(svo::AllocBlock);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
+
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, svo.root->alloc_ptr * sizeof(svo::Node), svo.root->nodes);
+
+			for (auto& it : svo.active_chunks) {
+				Chunk* chunk = it.second;
+				uint16_t indx = svo.chunk_allocator.indexof(chunk);
+
+				uintptr_t offs = indx * sizeof(svo::AllocBlock);
+				glBufferSubData(GL_SHADER_STORAGE_BUFFER, offs, chunk->alloc_ptr * sizeof(svo::Node), chunk->nodes);
+			}
+
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo_ssbo);
 		}
 
 		std::vector<float4> block_tile_info;
@@ -113,31 +122,35 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		}
 		block_tile_info_texture.upload(&block_tile_info[0], (int)block_tile_info.size(), false, GL_RGBA32I, GL_RGBA_INTEGER, GL_INT);
 
-		glActiveTexture(GL_TEXTURE0 + 0);
-		shader.set_texture_unit("tile_textures", 0);
-		graphics.sampler.bind(0);
+		GLint texunit = 0;
+
+		glActiveTexture(GL_TEXTURE0 + texunit);
+		shader.set_texture_unit("tile_textures", texunit);
+		graphics.sampler.bind(texunit++);
 		graphics.tile_textures.tile_textures.bind();
 
-		glActiveTexture(GL_TEXTURE0 + 1);
-		shader.set_texture_unit("block_tile_info", 1);
-		svo_sampler.bind(1);
+		glActiveTexture(GL_TEXTURE0 + texunit);
+		shader.set_texture_unit("block_tile_info", texunit);
+		svo_sampler.bind(texunit++);
 		block_tile_info_texture.bind();
 
-		glActiveTexture(GL_TEXTURE0 + 2);
-		shader.set_texture_unit("svo_texture", 2);
-		svo_sampler.bind(2);
-		svo_texture.bind();
+		//glActiveTexture(GL_TEXTURE0 + texunit);
+		//shader.set_texture_unit("svo_texture", texunit);
+		//svo_sampler.bind(texunit++);
+		//svo_texture.bind();
 
-		glActiveTexture(GL_TEXTURE0 + 3);
-		shader.set_texture_unit("water_normal", 3);
-		water_sampler.bind(3);
+		glActiveTexture(GL_TEXTURE0 + texunit);
+		shader.set_texture_unit("water_normal", texunit);
+		water_sampler.bind(texunit++);
 		water_normal.bind();
 
-		glActiveTexture(GL_TEXTURE0 + 4);
-		shader.set_texture_unit("heat_gradient", 4);
-		gradient_sampler.bind(4);
+		glActiveTexture(GL_TEXTURE0 + texunit);
+		shader.set_texture_unit("heat_gradient", texunit);
+		gradient_sampler.bind(texunit++);
 		heat_gradient.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
 }

@@ -101,7 +101,7 @@ static BlockTypes load_block_types () {
 		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, 0, 1);
 	};
 
-	/* B_NULL				*/ block(			"null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
+	/* B_NULL				*/ block(			"null", CM_SOLID, TM_TRANSPARENT, NONE, 255, 0, 0);
 	/* B_AIR				*/ gas(				"air");
 	/* B_WATER				*/ liquid(			"water");
 	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
