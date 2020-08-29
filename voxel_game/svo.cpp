@@ -156,7 +156,6 @@ namespace svo {
 
 	uint16_t Chunk::alloc_node (SVO& svo, StackNode* stack) {
 		if (alloc_ptr >= commit_ptr) {
-
 			if (nodes == tinydata) {
 				nodes = svo.node_allocator.alloc()->nodes;
 
@@ -181,10 +180,13 @@ namespace svo {
 			#if DBG_MEMSET
 				memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
 			#endif
+			} else {
+				assert(false);
+				throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
 			}
 
 		}
-		return alloc_ptr++;
+		return (uint16_t)alloc_ptr++;
 	}
 
 	int get_child_index (int3 pos, int scale) {
@@ -395,7 +397,7 @@ namespace svo {
 		std::vector<ChunkToLoad> chunks_to_load;
 		std::vector<Chunk*> chunks_to_unload;
 
-		int chunk_count = 0;
+		int iterated_count = 0;
 
 		float calc_closest_dist (float3 pos, float size) {
 			float3 pos_rel = player_pos - pos;
@@ -415,71 +417,58 @@ namespace svo {
 			return sqrt(max_dist_sqr);
 		}
 
-		void recurse_chunk_loading (Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale) {
+		void recurse_chunk_loading (uint32_t node, bool leaf, int3 pos, int scale) {
 			for (int i=0; i<8; ++i) {
 				int child_scale = scale - 1;
 				int3 child_pos = pos + (children_pos[i] << child_scale);
 
-				int3 chunk_coord = child_pos + svo.root->pos;
+				assert(child_scale >= CHUNK_SCALE);
 
-				// need to recurse into areas that do not exist in the octree yet
-				// just pretend the child nodes were the same (leaf) node as the parent
-				uint32_t child_node = !leaf ? chunk->nodes[node].children[i] : node;
-				bool	 child_leaf = leaf || (chunk->nodes[node].leaf_mask & (1u << i));
-
-				Chunk* child_chunk = chunk;
-				if (child_leaf && chunk == svo.root && child_node != B_NULL) {
-					child_chunk = svo.chunk_allocator[node];
-					child_node = 0;
-					child_leaf = false;
-
-					assert(child_chunk->scale == child_scale && equal(child_chunk->pos, chunk_coord));
-				}
-
-				bool is_loaded = !(child_leaf && child_node == B_NULL);
+				uint32_t child_node = !leaf ? svo.root->nodes[node].children[i] : node;
+				bool	 child_leaf = leaf || svo.root->nodes[node].leaf_mask & (1u << i);
 
 				float3 posf = (float3)child_pos;
 				float sizef = (float)(1 << child_scale);
 
 				float dist = calc_closest_dist(posf, sizef);
-				bool want_loaded = dist <= voxels.load_radius;
-				bool want_unloaded = dist > voxels.load_radius + voxels.unload_hyster;
 
-				//int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
-				int lod = 0;
+				//debug_graphics->push_wire_cube((float3)posf + 0.5f * sizef, sizef * 0.95f, cols[child_scale*2 % ARRLEN(cols)]);
 
-				if (child_scale <= CHUNK_SCALE + lod) {
+				iterated_count++;
 
-					if (want_loaded) {
-						sizef *= 0.99f;
-						//bool pending = svo.is_chunk_load_queued(voxels, chunk_coord);
-						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root_pos) + 0.5f * sizef, sizef * 0.999f,
-						//	is_loaded ? srgba(30,30,30,120) : (pending ? lrgba(0,0,1,1) : lrgba(1,0,0,1)));
+				if (child_leaf) {
+					//int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+					int lod = 0;
 
-						//if ((child_pos + svo.root->pos).z == 0)
-						//debug_graphics->push_wire_cube((float3)(child_pos + svo.root->pos) + 0.5f * sizef, sizef * 0.999f, cols[lod % ARRLEN(cols)]);
+					assert(child_scale - CHUNK_SCALE >= lod);
 
-						chunk_count++;
-
-						if (!is_loaded && svo.pending_chunks.find(chunk_coord) == svo.pending_chunks.end()) {
-							// chunk not generated yet
-							chunks_to_load.push_back({ chunk_coord, scale, dist });
+					if (child_node == B_NULL) {
+						// no chunk is loaded
+						if (dist <= voxels.load_radius) {
+							if (child_scale - CHUNK_SCALE == lod) {
+								if (svo.pending_chunks.find(child_pos) == svo.pending_chunks.end()) {
+									// chunk not queued to be generated yet
+									chunks_to_load.push_back({ child_pos, child_scale, dist });
+								}
+							} else {
+								// recurse to the scale we want stuff to be loaded at
+								recurse_chunk_loading(B_NULL, true, child_pos, child_scale);
+							}
 						}
 					} else {
-						if (is_loaded) {
+						// this chunk is loaded
+						Chunk* chunk = svo.chunk_allocator[child_node];
+						assert(chunk->scale == child_scale && equal(chunk->pos, child_pos));
 
-							//float fardist = calc_furthest_dist(posf, sizef);
-							if (want_unloaded) {
-								// unload whole subtree
-								assert(child_chunk != svo.root);
-								chunks_to_unload.push_back(child_chunk);
-							}
+						bool want_refine = lod < child_scale - CHUNK_SCALE;
 
+						if (dist > voxels.load_radius + voxels.unload_hyster) {
+							chunks_to_unload.push_back(chunk);
 						}
 					}
 				} else {
-					if (want_loaded || is_loaded) // skip parts of the octree that are 
-						recurse_chunk_loading(chunk, child_node, child_leaf, child_pos, child_scale);
+					// normal recursion into non chunk nodes
+					recurse_chunk_loading(child_node, child_leaf, child_pos, child_scale);
 				}
 			}
 		}
@@ -530,12 +519,12 @@ namespace svo {
 			}
 		}
 
-		ChunkLoader cl = { *this, voxels, player.pos - (float3)root->pos } ;
+		ChunkLoader cl = { *this, voxels, player.pos } ;
 		{
 			ZoneScopedN("recurse_chunk_loading");
-			cl.recurse_chunk_loading(root, 0, false, 0, root->scale);
+			cl.recurse_chunk_loading(0, false, root->pos, root->scale);
 
-			ImGui::Text("chunk_count: %d", cl.chunk_count);
+			ImGui::Text("chunk_loading iterated_count: %d", cl.iterated_count);
 		}
 
 		{
@@ -589,6 +578,18 @@ namespace svo {
 			ZoneScopedN("SVO::debug_draw");
 		
 			recurse_draw(*this, root, 0, false, root->pos, root->scale);
+		}
+
+		if (debug_draw_chunks) {
+			for (auto& it : active_chunks) {
+				float size = (float)(1 << it.second->scale);
+				debug_graphics->push_wire_cube((float3)it.second->pos + 0.5f * size, size * 0.95f, srgba(0x00, 0x5E, 0xFF, 100));
+			}
+
+			for (auto& it : pending_chunks) {
+				float size = (float)(1 << it.second->scale);
+				debug_graphics->push_wire_cube((float3)it.second->pos + 0.5f * size, size * 0.8f, srgba(0xFF, 0x84, 0x00));
+			}
 		}
 	}
 }

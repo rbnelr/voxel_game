@@ -878,10 +878,10 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		raytracer.draw(world.voxels.svo, view, *this, world.time_of_day);
 	}
 
-	glClear(GL_DEPTH_BUFFER_BIT);
-
 	{ //// First person overlay pass
 		TracyGpuZone("gpu First Person pass");
+
+		glClear(GL_DEPTH_BUFFER_BIT);
 
 		if (!activate_flycam && !world.player.third_person) 
 			player.draw(world.player, tile_textures, sampler);
@@ -900,10 +900,12 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		TracyGpuZone("gpu Overlay pass");
 
 		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_FALSE);
 
 		if (!activate_flycam || creative_mode)
 			gui.draw(world.player, tile_textures, sampler);
 
+		glDepthMask(GL_TRUE);
 		glEnable(GL_DEPTH_TEST);
 	}
 
