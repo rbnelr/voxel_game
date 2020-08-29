@@ -111,7 +111,7 @@ namespace svo {
 			}
 
 			ImGui::Text("Active chunks:        %5d", chunks_count);
-			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %5.0f | %5.0f",
+			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %.0f | %.0f",
 				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
 			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",
 				(float)(commit_nodes * sizeof(Node)) / 1024 / 1024, (float)(commit_nodes - active_nodes) / commit_nodes * 100);
@@ -153,10 +153,7 @@ namespace svo {
 		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
 		void octree_write (int3 pos, int scale, uint16_t val);
 
-		block_id octree_read (int3 pos) {
-			//return svo.octree_read(pos);
-			return B_NULL;
-		}
+		block_id octree_read (int3 pos);
 	};
 }
 using svo::SVO;

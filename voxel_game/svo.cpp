@@ -26,49 +26,6 @@ namespace svo {
 
 		return (Node)children_ptr;
 	}
-
-	block_id SVO::octree_read (int3 pos) {
-		ZoneScopedN("world_octree::octree_write");
-
-		pos -= root_pos;
-		if (any(pos < 0 || pos >= (1 << root_scale)))
-			return B_NULL;
-
-		// start with root node
-		int cur_scale = root_scale;
-
-		Node* siblings = allocator[0]->nodes[0].children;
-
-		for (;;) {
-			cur_scale--;
-
-			// get child node that contains target node
-			int child_idx = get_child_index(pos, cur_scale);
-
-			Node* child_node = siblings + child_idx;
-			Page* page = page_from_node(child_node);
-
-			if ((*child_node & LEAF_BIT) != 0) {
-				return (block_id)(*child_node & ~LEAF_BIT);
-			}
-
-			Node node_ptr = *child_node;
-
-			if (node_ptr & FARPTR_BIT) {
-				page = allocator[ node_ptr & ~FARPTR_BIT ];
-				node_ptr = (Node)0;
-			}
-
-			siblings = page->nodes[node_ptr].children;
-		}
-	}
-
-	void SVO::update_block (int3 pos, block_id id) {
-		ZoneScopedN("svo_update_block");
-
-		octree_write(pos, 0, (Node)(LEAF_BIT | id));
-	}
-
 #endif
 
 	static constexpr int3 children_pos[8] = {
@@ -108,11 +65,12 @@ namespace svo {
 			if (nodes == tinydata) {
 				nodes = svo.node_allocator.alloc()->nodes;
 
-				commit_pages(nodes, MAX_NODES*sizeof(Node));
-				commit_ptr = MAX_NODES;
+				uint32_t commit_block = os_page_size / sizeof(Node);
+				commit_ptr = commit_block;
+				commit_pages(nodes, os_page_size);
 
 			#if DBG_MEMSET
-				memset(nodes, DBG_MEMSET_VAL, MAX_NODES*sizeof(Node));
+				memset(nodes, DBG_MEMSET_VAL, os_page_size);
 			#endif
 
 				memcpy(nodes, tinydata, sizeof(tinydata));
@@ -130,8 +88,20 @@ namespace svo {
 				memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
 			#endif
 			} else {
-				assert(false);
-				throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
+				if (commit_ptr < MAX_NODES) {
+					uint32_t commit_block = os_page_size / sizeof(Node);
+
+					commit_pages(nodes + commit_ptr, os_page_size);
+
+				#if DBG_MEMSET
+					memset(nodes + commit_ptr, DBG_MEMSET_VAL, os_page_size);
+				#endif
+					commit_ptr += commit_block;
+
+				} else {
+					assert(false);
+					throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
+				}
 			}
 
 		}
@@ -166,7 +136,7 @@ namespace svo {
 	}
 
 	void SVO::octree_write (int3 pos, int scale, uint16_t val) {
-		ZoneScopedN("world_octree::octree_write");
+		ZoneScoped;
 
 		pos -= root->pos;
 		if (any(pos < 0 || pos >= (1 << root->scale))) {
@@ -203,33 +173,27 @@ namespace svo {
 				break;
 			}
 
-			uint16_t* child_node = &node->children[child_idx];
+			uint16_t child_val = node->children[child_idx];
 
 			bool child_leaf = node->leaf_mask & (1u << child_idx);
 
 			if (!child_leaf) { 
 				// recurse into child node
-				node = &chunk->nodes[*child_node];
+				node = &chunk->nodes[child_val];
 
+			} else if (chunk == root && child_val != B_NULL) {
+				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+				chunk = chunk_allocator[child_val];
+				node = chunk->nodes;
+
+			// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
+			//} else if (child_val == val) {
+			//	// write would be a no-op because the octree already has the desired value at that voxel
+			//	return;
+			
 			} else {
 				//// Split node into 8 children of same type
-
-				uint16_t leaf = *child_node;
-
-				if (chunk == root && leaf != B_NULL) {
-					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-					assert(*child_node != 0); // trying to write voxel into unloaded chunk, should never be attempted by caller
-
-					chunk = chunk_allocator[leaf];
-					node = chunk->nodes;
-				}
-
-				//if (leaf == val) {
-				//	// write would be a no-op because the octree already has the desired value at that voxel
-				//	return;
-				//}
-
-				uint16_t node_ptr = chunk->alloc_node(*this, stack);
+				uint16_t node_ptr = chunk->alloc_node(*this, stack); // invalidates child_node
 
 				// write ptr to children into this nodes slot in parents children array
 				stack[cur_scale].node->children[child_idx] = node_ptr;
@@ -241,7 +205,7 @@ namespace svo {
 				node->leaf_mask = 0xff;
 				// alloc and init children for node
 				for (int i=0; i<8; ++i) {
-					node->children[i] = leaf;
+					node->children[i] = child_val;
 				}
 
 				chunk->gpu_dirty = true;
@@ -266,6 +230,40 @@ namespace svo {
 			chunk->dead_count++;
 		}
 
+	}
+
+	block_id SVO::octree_read (int3 pos) {
+		ZoneScoped;
+
+		pos -= root->pos;
+		if (any(pos < 0 || pos >= (1 << root->scale)))
+			return B_NULL;
+
+		// start with root node
+		Chunk* chunk = root;
+		int cur_scale = root->scale;
+		Node* node = &root->nodes[0];
+
+		for (;;) {
+			cur_scale--;
+			assert(cur_scale >= 0);
+
+			// get child node that contains target node
+			int child_idx = get_child_index(pos, cur_scale);
+
+			uint16_t child_data = node->children[child_idx];
+			bool leaf = node->leaf_mask & (1u << child_idx);
+
+			if (!leaf) {
+				node = &chunk->nodes[child_data];
+			} else if (chunk == root && child_data != B_NULL) {
+				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+				chunk = chunk_allocator[child_data];
+				node = chunk->nodes;
+			} else {
+				return (block_id)child_data;
+			}
+		}
 	}
 
 	void SVO::chunk_to_octree (Chunk* chunk, block_id* blocks) {
