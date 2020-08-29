@@ -106,8 +106,10 @@ namespace svo {
 			}
 
 			ImGui::Text("Active chunks:        %5d", chunks_count);
-			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %5.0f | %5.0f", active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
-			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%", (float)(commit_nodes * sizeof(Node)) / 1024 / 1024, (float)(commit_nodes - active_nodes) / commit_nodes * 100);
+			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %5.0f | %5.0f",
+				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
+			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",
+				(float)(commit_nodes * sizeof(Node)) / 1024 / 1024, (float)(commit_nodes - active_nodes) / commit_nodes * 100);
 
 			ImGui::Text("Root chunk: active:   %5d     committed: %5d", root->alloc_ptr, root->commit_ptr);
 			
@@ -115,6 +117,12 @@ namespace svo {
 				for (auto& it : active_chunks) {
 					ImGui::Text("%5d | %5d", it.second->alloc_ptr, it.second->commit_ptr);
 				}
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNode("Show allocators")) {
+				ImGui::Text("chunk_allocator:\n%s", chunk_allocator.dbg_string_free_slots().c_str());
+				ImGui::Text("node_allocator:\n%s", node_allocator .dbg_string_free_slots().c_str());
 				ImGui::TreePop();
 			}
 

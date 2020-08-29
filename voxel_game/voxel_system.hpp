@@ -13,7 +13,7 @@ public:
 	VoxelMesher mesher;
 	SVO svo;
 
-	float load_radius =	20;//2000.0f;
+	float load_radius =	200;//2000.0f;
 	float unload_hyster = 0;
 
 	float load_lod_start = 200.0f;

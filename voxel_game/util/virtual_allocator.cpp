@@ -74,12 +74,15 @@ uint32_t Bitset::clear_first_1 (uint64_t* prev_bits) {
 
 	return idx;
 }
-void Bitset::set_bit (uint32_t idx) {
+void Bitset::set_bit (uint32_t idx, uint64_t* new_bits) {
 	// set bit in freeset to 1
 	bits[idx >> 6] |= 1ull << (idx & 0b111111u);
 
+	if (new_bits)
+		*new_bits = bits[idx >> 6];
+
 	// shrink bits if there are contiguous zero ints at the end
-	if ((idx >> 6) == (uint32_t)bits.size()) {
+	if ((idx >> 6) == (uint32_t)bits.size()-1) {
 		while (bits.back() == 0xffffffffffffffffull)
 			bits.pop_back();
 	}

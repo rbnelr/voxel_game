@@ -390,7 +390,7 @@ namespace svo {
 		float3 player_pos;
 
 		struct ChunkToLoad {
-			int3 coord;
+			int3 pos;
 			int scale;
 			float dist;
 		};
@@ -537,6 +537,10 @@ namespace svo {
 
 				assert(chunk->scale == CHUNK_SCALE);
 				octree_write(chunk->pos, chunk->scale, B_NULL);
+
+				if (chunk->nodes != chunk->tinydata)
+					node_allocator.free((AllocBlock*)chunk->nodes);
+				chunk_allocator.free(chunk);
 			}
 		}
 
@@ -561,17 +565,26 @@ namespace svo {
 				auto c = cl.chunks_to_load[i++];
 
 				auto* chunk = chunk_allocator.alloc();
-				new (chunk) Chunk (c.coord, CHUNK_SCALE);
+				new (chunk) Chunk (c.pos, CHUNK_SCALE);
 
 				ZoneScopedN("push WorldgenJob");
 
-				assert(pending_chunks.find(c.coord) == pending_chunks.end());
-				assert(active_chunks.find(c.coord) == active_chunks.end());
+				assert(pending_chunks.find(c.pos) == pending_chunks.end());
+				assert(active_chunks.find(c.pos) == active_chunks.end());
 
-				pending_chunks.emplace(c.coord, chunk);
+				pending_chunks.emplace(c.pos, chunk);
 
 				return std::make_unique<WorldgenJob>(chunk, this, &world_gen);
 			});
+
+			if (debug_draw_chunks) {
+				for (; i<(int)cl.chunks_to_load.size(); ++i) {
+					auto& c = cl.chunks_to_load[i];
+
+					float size = (float)(1 << c.scale);
+					debug_graphics->push_wire_cube((float3)c.pos + 0.5f * size, size * 0.1f, srgba(0xFF, 0x00, 0x37));
+				}
+			}
 		}
 
 		if (debug_draw_svo) {

@@ -4,6 +4,7 @@
 #include "assert.h"
 #include "tracy.hpp"
 #include <vector>
+#include <string>
 
 // set uninitialized stuff to 0xcc to either catch out of unitialized bugs or make viewing it in the debugger clearer
 #define DBG_MEMSET (!NDEBUG) 
@@ -103,7 +104,7 @@ struct Bitset {
 	uint32_t clear_first_1 (uint64_t* prev_bits=nullptr);
 
 	// set a bit, safe to set bit that's already set
-	void set_bit (uint32_t idx);
+	void set_bit (uint32_t idx, uint64_t* new_bits=nullptr);
 };
 
 template <typename T, bool DOCOMMIT=true> // DOCOMMIT=false allows manual memory sparseness with sizeof(T) > os_page_size
@@ -140,18 +141,18 @@ public:
 	T* alloc () {
 		assert(count < max_count);
 
-		uint64_t bits;
-		uint32_t idx = free_slots.clear_first_1(&bits);
+		uint64_t prev_bits;
+		uint32_t idx = free_slots.clear_first_1(&prev_bits);
 		count++;
 
 		T* ptr = (T*)baseptr + idx;
 		
 		if (DOCOMMIT) {
 			// get bits representing prev alloc status of all slots in affected page
-			bits >>= idx & paging_shift_mask;
+			prev_bits >>= idx & paging_shift_mask;
 		
 			// commit page if all page slots were free before
-			if (((uint32_t)bits & paging_mask) == paging_mask) {
+			if (((uint32_t)prev_bits & paging_mask) == paging_mask) {
 				commit_pages(ptr, sizeof(T));
 
 			#if DBG_MEMSET
@@ -167,16 +168,16 @@ public:
 	void free (T* ptr) {
 		uint32_t idx = indexof(ptr);
 
-		free_slots.set_bit(idx);
+		uint64_t new_bits;
+		free_slots.set_bit(idx, &new_bits);
 		count--;
 
 		if (DOCOMMIT) {
-			// get bits representing prev alloc status of all slots in affected page
-			uint64_t bits = free_slots.bits[idx >> 6];
-			bits >>= idx & paging_shift_mask;
+			// get bits representing new alloc status of all slots in affected page
+			new_bits >>= idx & paging_shift_mask;
 
 			// decommit page if all page slots are free now
-			if (((uint32_t)bits & paging_mask) == paging_mask) {
+			if (((uint32_t)new_bits & paging_mask) == paging_mask) {
 				decommit_pages(ptr, sizeof(T));
 			}
 		}
@@ -192,6 +193,17 @@ public:
 		return (T*)baseptr + index;
 	}
 
+	std::string dbg_string_free_slots () {
+		std::string str = "";
+		for (int i=0; i<free_slots.bits.size(); ++i) {
+			char bits[64];
+			for (int j=0; j<64; ++j)
+				bits[j] = (free_slots.bits[i] & (1ull << j)) ? '1':'0';
+			str.append(bits, 64);
+			str.append("\n");
+		}
+		return str;
+	}
 };
 
 // Threadsafe wrappers

@@ -42,17 +42,6 @@ Raytracer::Raytracer () {
 	using namespace svo;
 
 	glGenBuffers(1, &svo_ssbo);
-
-	//static constexpr int WIDTH = (PAGE_SIZE - INFO_SIZE) / sizeof(uint16_t);
-	//int height = MAX_PAGES;
-	//
-	//glBindTexture(GL_TEXTURE_2D, svo_texture.tex);
-	//
-	//glTexImage2D(GL_TEXTURE_2D, 0, GL_R16UI, WIDTH,height, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr);
-	//
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-	//
-	//glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
@@ -94,22 +83,24 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
 
-			uint16_t max_chunk_index = 0; // root
+			int max_chunk_index = 0; // root
 			for (auto& it : svo.active_chunks) {
 				Chunk* chunk = it.second;
-				max_chunk_index = max(max_chunk_index, svo.chunk_allocator.indexof(chunk));
+				max_chunk_index = max(max_chunk_index, (int)svo.chunk_allocator.indexof(chunk));
 			}
 
 			uintptr_t size = (max_chunk_index +1) * sizeof(svo::AllocBlock);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
 
+			ImGui::Text("GPU SVO data: %d MB", size / 1024 / 1024);
+
 			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, svo.root->alloc_ptr * sizeof(svo::Node), svo.root->nodes);
 
 			for (auto& it : svo.active_chunks) {
 				Chunk* chunk = it.second;
-				uint16_t indx = svo.chunk_allocator.indexof(chunk);
+				int indx = (int)svo.chunk_allocator.indexof(chunk);
 
-				uintptr_t offs = indx * sizeof(svo::AllocBlock);
+				GLintptr offs = indx * sizeof(svo::AllocBlock);
 				glBufferSubData(GL_SHADER_STORAGE_BUFFER, offs, chunk->alloc_ptr * sizeof(svo::Node), chunk->nodes);
 			}
 

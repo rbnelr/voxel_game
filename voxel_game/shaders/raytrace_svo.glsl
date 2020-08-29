@@ -281,8 +281,6 @@ $if fragment
 				
 				vec3 bounce_dir = tangent_to_world * hemisphere_sample();
 				
-				//DEBUG(bounce_dir);
-
 				queue[queued_ray].pos = hit_pos + bounce_dir * 0.0001;
 				queue[queued_ray].dir = bounce_dir;
 				queue[queued_ray].tint = ray_tint * vec4(col.rgb, 1.0) * alpha_remain;
@@ -441,10 +439,6 @@ $if fragment
 						leaf = false;
 					}
 
-					if (visualize_iterations && leaf && child_scale == 0) {
-						DEBUG(float(node) / 300.0);
-					}
-
 					uint child_node = chunk | node;
 
 					if (leaf) {
@@ -476,10 +470,6 @@ $if fragment
 						continue;
 					}
 				}
-			}
-
-			if (visualize_iterations && child_scale == 0) {
-				DEBUG(vec3(1,0,0));
 			}
 
 			ivec3 old_pos = child_pos;
@@ -578,7 +568,7 @@ $if fragment
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
 
-		int queued_rays = 0;
+		int queued_rays = MAX_SEC_RAYS;
 		QueuedRay queue[MAX_SEC_RAYS];
 
 		float hit_dist;
