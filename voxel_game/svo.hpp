@@ -17,6 +17,9 @@ namespace svo {
 
 	static constexpr uint32_t MAX_DEPTH = 20;
 	
+	// how far to move in blocks in the opposite direction of a root move before it happens again, to prevent unneeded root moves
+	static constexpr float ROOT_MOVE_HISTER = 20;
+
 	struct Node {
 		uint16_t children[8] = {};
 		uint8_t leaf_mask = 0xff;
@@ -35,8 +38,8 @@ namespace svo {
 	struct Chunk {
 		Node* nodes;
 
-		const int3		pos;
-		const uint8_t	scale;
+		int3	pos;
+		uint8_t	scale;
 
 		bool gpu_dirty;
 
@@ -79,6 +82,8 @@ namespace svo {
 
 		SparseAllocator<Chunk>				chunk_allocator = { MAX_CHUNKS };
 		SparseAllocator<AllocBlock, false>	node_allocator = { MAX_CHUNKS };
+
+		float3 root_move_hister = 0;
 
 		bool debug_draw_chunks = false;
 		bool debug_draw_svo = false;

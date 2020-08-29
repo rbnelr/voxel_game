@@ -69,57 +69,6 @@ namespace svo {
 		octree_write(pos, 0, (Node)(LEAF_BIT | id));
 	}
 
-	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
-	void update_root (SVO& oct, float3 player_pos) {
-		int shift = oct.root_scale - 1;
-		float half_root_scalef = (float)(1 << shift);
-		
-		int3 center = roundi((player_pos + oct.root_move_hister) / half_root_scalef);
-		
-		int3 pos = (center - 1) << shift;
-		
-		if (equal(pos, oct.root_pos))
-			return;
-		
-		ZoneScoped;
-
-		int3 move = (pos - oct.root_pos) >> shift;
-		
-		oct.root_move_hister = (float3)move * half_root_scalef * ROOT_MOVE_HISTER;
-
-		Page* rootpage = oct.allocator[0];
-
-		// copy old children
-		NodeChildren old_children;
-		memcpy(&old_children, rootpage->nodes[0].children, sizeof(old_children));
-		
-		for (int i=0; i<8; ++i) {
-			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
-		
-			child += move;
-		
-			int child_indx = child.x | (child.y << 1) | (child.z << 2);
-			
-			if (any(child < 0 || child > 1)) {
-				// root moved over this area, no nodes loaded yet
-				rootpage->nodes[0].children[i] = (Node)(LEAF_BIT | B_NULL);
-			} else {
-				// copy old children to new slot
-				rootpage->nodes[0].children[i] = old_children.children[child_indx];
-				old_children.children[child_indx] = (Node)0;
-			}
-		}
-		
-		// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
-		for (int i=0; i<8; ++i) {
-			if (old_children.children[i] != 0 && (old_children.children[i] & LEAF_BIT) == 0) {
-				oct.free_subtree(rootpage, old_children.children[i]);
-			}
-		}
-		
-		oct.root_pos = pos;
-	}
-
 #endif
 
 	static constexpr int3 children_pos[8] = {
@@ -474,6 +423,91 @@ namespace svo {
 		}
 	};
 
+	void free_chunk (SVO& svo, Chunk* chunk) {
+		assert(svo.pending_chunks.find(chunk->pos) == svo.pending_chunks.end());
+		assert(svo.active_chunks.find(chunk->pos) != svo.active_chunks.end());
+
+		svo.active_chunks.erase(chunk->pos);
+
+		assert(chunk->scale == CHUNK_SCALE);
+		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
+
+		if (chunk->nodes != chunk->tinydata)
+			svo.node_allocator.free((AllocBlock*)chunk->nodes);
+		svo.chunk_allocator.free(chunk);
+	}
+
+	void recurse_free (SVO& svo, uint32_t node, bool leaf) {
+		if (leaf) {
+			if (node != B_NULL) {
+				Chunk* chunk = svo.chunk_allocator[node];
+				free_chunk(svo, chunk);
+			}
+		} else {
+			for (int i=0; i<8; ++i) {
+				Node& child_node = svo.root->nodes[node];
+				recurse_free(svo, child_node.children[i], child_node.leaf_mask & (1u << i));
+			}
+		}
+	}
+
+	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
+	void update_root (SVO& svo, Player& player) {
+		int shift = svo.root->scale - 1;
+		float half_root_scalef = (float)(1 << shift);
+
+		int3 center = roundi((player.pos + svo.root_move_hister) / half_root_scalef);
+
+		int3 pos = (center - 1) << shift;
+
+		if (equal(pos, svo.root->pos))
+			return;
+
+		ZoneScoped;
+
+		int3 move = (pos - svo.root->pos) >> shift;
+
+		svo.root_move_hister = (float3)move * ROOT_MOVE_HISTER;
+
+		// write moved children into new root node
+		Node new_node;
+		new_node.leaf_mask = 0;
+		for (int i=0; i<8; ++i) {
+			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+
+			child += move;
+
+			int child_indx = child.x | (child.y << 1) | (child.z << 2);
+
+			if (any(child < 0 || child > 1)) {
+				// root moved over this area, no nodes loaded yet
+				new_node.children[i] = B_NULL;
+				new_node.leaf_mask |= 1u << i;
+			} else {
+				// copy old children to new slot
+				new_node.children[i] = svo.root->nodes[0].children[child_indx];
+				if (svo.root->nodes[0].leaf_mask & (1u << child_indx))
+					new_node.leaf_mask |= 1u << i;
+
+				svo.root->nodes[0].children[child_indx] = 0;
+			}
+		}
+
+		// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
+		// this needs to happen before we do svo.root->pos = pos; or free_chunk will free the wrong chunk 
+		for (int i=0; i<8; ++i) {
+			if (svo.root->nodes[0].children[i] != 0) {
+				recurse_free(svo, svo.root->nodes[0].children[i], svo.root->nodes[0].leaf_mask & (1u << i));
+			}
+		}
+
+		// replace old node
+		memcpy(&svo.root->nodes[0], &new_node, sizeof(Node));
+
+		// actually move root
+		svo.root->pos = pos;
+	}
+
 	void recurse_draw (SVO& svo, Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale) {
 		if (leaf && chunk == svo.root) {
 			if (node == B_NULL) return;
@@ -492,7 +526,7 @@ namespace svo {
 		int child_scale = scale - 1;
 		if (!leaf && child_scale >= svo.debug_draw_octree_min) {
 
-			Node children = chunk->nodes[node];
+			Node& children = chunk->nodes[node];
 			
 			for (int i=0; i<8; ++i) {
 				int3 child_pos = pos + (children_pos[i] << child_scale);
@@ -505,7 +539,7 @@ namespace svo {
 	void SVO::chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen) {
 		ZoneScoped;
 
-		//update_root(*this, player_pos);
+		update_root(*this, player);
 
 		{ // finish first, so that pending_chunks becomes smaller before we cap the newly queued ones to limit this size
 			ZoneScopedN("finish chunkgen jobs");
@@ -530,17 +564,7 @@ namespace svo {
 		{
 			ZoneScopedN("chunk unloading");
 			for (auto chunk : cl.chunks_to_unload) {
-				assert(pending_chunks.find(chunk->pos) == pending_chunks.end());
-				assert(active_chunks.find(chunk->pos) != active_chunks.end());
-
-				active_chunks.erase(chunk->pos);
-
-				assert(chunk->scale == CHUNK_SCALE);
-				octree_write(chunk->pos, chunk->scale, B_NULL);
-
-				if (chunk->nodes != chunk->tinydata)
-					node_allocator.free((AllocBlock*)chunk->nodes);
-				chunk_allocator.free(chunk);
+				free_chunk(*this, chunk);
 			}
 		}
 
