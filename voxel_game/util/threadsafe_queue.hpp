@@ -50,22 +50,6 @@ public:
 		}
 	}
 
-	// push multiple elements onto the queue
-	// can be called from multiple threads (multiple producer)
-	template <typename GET_ELEM>
-	void push_multiple (GET_ELEM get_elem) {
-		LOCK_GUARD;
-
-		for (;;) {
-			auto elem = get_elem();
-			if (!elem)
-				return;
-
-			q.emplace_back( std::move(elem) );
-			c.notify_one();
-		}
-	}
-
 	// wait to dequeue one element from the queue
 	// can be called from multiple threads (multiple consumer)
 	T pop () {

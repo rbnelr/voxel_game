@@ -6,6 +6,38 @@
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
+template<typename T>
+struct Gradient_KV {
+	float	key;
+	T		val;
+};
+
+template<typename T>
+inline T gradient (float key, Gradient_KV<T> const* kvs, size_t kvs_count) {
+	if (kvs_count == 0) return T(0);
+
+	size_t i=0;
+	for (; i<kvs_count; ++i) {
+		if (key < kvs[i].key) break;
+	}
+
+	if (i == 0) { // val is lower than the entire range
+		return kvs[0].val;
+	} else if (i == kvs_count) { // val is higher than the entire range
+		return kvs[i -1].val;
+	} else {
+		assert(kvs_count >= 2 && i < kvs_count);
+
+		auto& a = kvs[i -1];
+		auto& b = kvs[i];
+		return map(key, a.key, b.key, a.val, b.val);
+	}
+}
+template<typename T>
+inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) {
+	return gradient<T>(key, &*kvs.begin(), kvs.size());
+}
+
 struct ChunkGenerator {
 	Chunk*					chunk;
 	SVO*					svo;
@@ -274,7 +306,7 @@ struct ChunkGenerator {
 	}
 };
 
-void WorldgenJob::execute () {
+void generate_chunk (Chunk* chunk, SVO& svo, WorldGenerator& wg) {
 	ZoneScoped;
 
 	ChunkGenerator* gen;
@@ -284,24 +316,12 @@ void WorldgenJob::execute () {
 	}
 
 	gen->chunk		= chunk;
-	gen->svo		= svo;
-	gen->wg			= world_gen;
+	gen->svo		= &svo;
+	gen->wg			= &wg;
 	gen->gen();
 
 	{
 		ZoneScopedN("free buffer");
 		free(gen);
 	}
-}
-
-void WorldgenJob::finalize () {
-	ZoneScoped;
-
-	assert(svo->pending_chunks.find(chunk->pos) != svo->pending_chunks.end());
-	assert(svo->active_chunks.find(chunk->pos) == svo->active_chunks.end());
-
-	svo->pending_chunks.erase(chunk->pos);
-	svo->active_chunks.emplace(chunk->pos, chunk);
-
-	svo->octree_write(chunk->pos, chunk->scale, svo->chunk_allocator.indexof(chunk));
 }

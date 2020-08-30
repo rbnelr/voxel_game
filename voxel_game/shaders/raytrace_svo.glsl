@@ -51,7 +51,7 @@ $if fragment
 		return (node.children[child_index / 2] >> (16 * (child_index % 2))) & 0xffffu;
 	}
 
-#define MAX_SCALE 14
+#define MAX_SCALE 16
 #define MAX_SEC_RAYS 1
 
 #define INF (1.0 / 0.0)

@@ -46,11 +46,20 @@ namespace kissmath {
 		size_t h;
 		h  = ::std::hash<int>()(v.x);
 		h = 53ull * (h + 53ull);
-
 		h += ::std::hash<int>()(v.y);
 		h = 53ull * (h + 53ull);
-
 		h += ::std::hash<int>()(v.z);
+		return h;
+	};
+	inline size_t hash (int4 v) {
+		size_t h;
+		h  = ::std::hash<int>()(v.x);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<int>()(v.y);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<int>()(v.z);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<int>()(v.w);
 		return h;
 	};
 

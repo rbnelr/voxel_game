@@ -13,22 +13,16 @@ public:
 	VoxelMesher mesher;
 	SVO svo;
 
-	float load_radius =	200;//2000.0f;
-	float unload_hyster = 0;
-
-	float load_lod_start = 200.0f;
-	float load_lod_unit = 200.0f;
+	float load_lod_start = 0.0f;
+	float load_lod_unit = 60.0f;
 	
 	// artifically limit both the size of the async queue and how many results to take from the results
-	int cap_chunk_load = 64;
+	int cap_chunk_load = 8;
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int cap_chunk_mesh = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
 
 	void imgui () {
 		if (!imgui_push("Voxels")) return;
-
-		ImGui::SliderFloat("load_radius", &load_radius, 0, 2000, "%.0f", 2);
-		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
 		ImGui::DragFloat("load_lod_start", &load_lod_start, 1);
 		ImGui::DragFloat("load_lod_unit", &load_lod_unit, 1);

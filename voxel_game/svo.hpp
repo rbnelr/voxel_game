@@ -2,6 +2,7 @@
 #include "stdafx.hpp"
 #include "blocks.hpp"
 #include "util/virtual_allocator.hpp"
+#include "world_generator.hpp"
 
 class Voxels;
 class Player;
@@ -12,6 +13,8 @@ static constexpr uint32_t CHUNK_SCALE = 6;
 
 static constexpr uint32_t MAX_NODES = 1u << 16;
 static constexpr uint32_t MAX_CHUNKS = 1u << 16;
+
+struct WorldgenJob;
 
 namespace svo {
 
@@ -41,6 +44,8 @@ namespace svo {
 		int3	pos;
 		uint8_t	scale;
 
+		bool locked; // read only, still displayed but not allowed to be modified
+		bool pending; // currently 'locked' because there is an async chunk split or merge currently queued assiciated with this chunk
 		bool gpu_dirty;
 
 		uint32_t alloc_ptr;
@@ -54,6 +59,8 @@ namespace svo {
 		Chunk (int3	pos, uint8_t scale): pos{pos}, scale{scale} {
 			nodes = tinydata;
 
+			locked = false;
+			pending = true;
 			gpu_dirty = true;
 
 			alloc_ptr = 0;
@@ -74,11 +81,27 @@ namespace svo {
 	};
 	static constexpr uint32_t _sz2 = sizeof(AllocBlock);
 
+	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
+
+	struct LoadOp {
+		Chunk* chunk;
+		int3 pos;
+		int scale;
+		float dist;
+
+		enum Type {
+			CREATE,
+			SPLIT,
+			MERGE
+		} type;
+	};
+	
 	struct SVO {
 		Chunk*	root;
 
-		std::unordered_map<vector_key<int3>, Chunk*> active_chunks; // chunks not currently in threadpools
-		std::unordered_map<vector_key<int3>, Chunk*> pending_chunks;
+		std::unordered_map<ChunkKey, Chunk*> chunks; // all loaded chunks + their parents, parents have nullptr, used to easily calculate chunks to lod split or merge
+		std::unordered_map<ChunkKey, Chunk*> chunks_pending_split; // chunks done being generated for a chunk lod split but still waiting for their neighbours to be done
+		int queued_counter = 0;
 
 		SparseAllocator<Chunk>				chunk_allocator = { MAX_CHUNKS };
 		SparseAllocator<AllocBlock, false>	node_allocator = { MAX_CHUNKS };
@@ -104,7 +127,8 @@ namespace svo {
 			uintptr_t active_nodes = 0;
 			uintptr_t commit_nodes = 0;
 
-			for (auto& it : active_chunks) {
+			for (auto& it : chunks) {
+				if (!it.second || it.second->pending) continue;
 				chunks_count++;
 				active_nodes += it.second->alloc_ptr;
 				commit_nodes += it.second->commit_ptr;
@@ -119,7 +143,8 @@ namespace svo {
 			ImGui::Text("Root chunk: active:   %5d     committed: %5d", root->alloc_ptr, root->commit_ptr);
 			
 			if (ImGui::TreeNode("Show all chunks")) {
-				for (auto& it : active_chunks) {
+				for (auto& it : chunks) {
+					if (!it.second || it.second->pending) continue;
 					ImGui::Text("%5d | %5d", it.second->alloc_ptr, it.second->commit_ptr);
 				}
 				ImGui::TreePop();
@@ -135,7 +160,7 @@ namespace svo {
 		}
 
 		SVO () {
-			uint8_t root_scale = 10;
+			uint8_t root_scale = 13;
 			int3 root_pos = -(1 << (root_scale - 1));
 			
 			root = chunk_allocator.alloc();
@@ -143,6 +168,8 @@ namespace svo {
 			root->alloc_ptr++;
 			new (&root->nodes[0]) Node ();
 		}
+
+		void finalize_worldgen_job (WorldgenJob& job);
 
 		void chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen);
 
@@ -154,6 +181,22 @@ namespace svo {
 		void octree_write (int3 pos, int scale, uint16_t val);
 
 		block_id octree_read (int3 pos);
+	};
+
+	struct ChunkLoadJob : ThreadingJob {
+		// input
+		Chunk*			chunk;
+		SVO&			svo;
+		WorldGenerator&	world_gen;
+		LoadOp::Type	load_type;
+
+		ChunkLoadJob (Chunk* chunk, SVO& svo, WorldGenerator& world_gen, LoadOp::Type load_type):
+			chunk{chunk}, svo{svo}, world_gen{world_gen}, load_type{load_type} {}
+
+		virtual void execute () {
+			generate_chunk(chunk, svo, world_gen);
+		}
+		virtual void finalize ();
 	};
 }
 using svo::SVO;

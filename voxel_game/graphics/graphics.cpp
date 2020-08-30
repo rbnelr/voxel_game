@@ -762,7 +762,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 		world.time_of_day.calc_sky_colors(&sky_light_reduce);
 
-		fog.set(world.voxels.load_radius, world.time_of_day.cols);
+		fog.set(200, world.time_of_day.cols);
 	
 		//frustrum_cull_chunks(world.voxels, debug_frustrum_culling ? player_view : view);
 	

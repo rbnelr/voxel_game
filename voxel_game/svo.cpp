@@ -331,103 +331,7 @@ namespace svo {
 
 	}
 
-	struct ChunkLoader {
-		SVO& svo;
-		Voxels& voxels;
-		float3 player_pos;
-
-		struct ChunkToLoad {
-			int3 pos;
-			int scale;
-			float dist;
-		};
-		std::vector<ChunkToLoad> chunks_to_load;
-		std::vector<Chunk*> chunks_to_unload;
-
-		int iterated_count = 0;
-
-		float calc_closest_dist (float3 pos, float size) {
-			float3 pos_rel = player_pos - pos;
-
-			float3 clamped = clamp(pos_rel, 0, size);
-			return length(clamped - pos_rel);
-		}
-		float calc_furthest_dist (float3 pos, float size) {
-			float3 pos_rel = player_pos - pos;
-
-			float max_dist_sqr = -INF;
-			for (auto corner : corners) {
-				float3 p = corner * size;
-				max_dist_sqr = max(max_dist_sqr, length_sqr(p - pos_rel));
-			}
-
-			return sqrt(max_dist_sqr);
-		}
-
-		void recurse_chunk_loading (uint32_t node, bool leaf, int3 pos, int scale) {
-			for (int i=0; i<8; ++i) {
-				int child_scale = scale - 1;
-				int3 child_pos = pos + (children_pos[i] << child_scale);
-
-				assert(child_scale >= CHUNK_SCALE);
-
-				uint32_t child_node = !leaf ? svo.root->nodes[node].children[i] : node;
-				bool	 child_leaf = leaf || svo.root->nodes[node].leaf_mask & (1u << i);
-
-				float3 posf = (float3)child_pos;
-				float sizef = (float)(1 << child_scale);
-
-				float dist = calc_closest_dist(posf, sizef);
-
-				//debug_graphics->push_wire_cube((float3)posf + 0.5f * sizef, sizef * 0.95f, cols[child_scale*2 % ARRLEN(cols)]);
-
-				iterated_count++;
-
-				if (child_leaf) {
-					//int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
-					int lod = 0;
-
-					assert(child_scale - CHUNK_SCALE >= lod);
-
-					if (child_node == B_NULL) {
-						// no chunk is loaded
-						if (dist <= voxels.load_radius) {
-							if (child_scale - CHUNK_SCALE == lod) {
-								if (svo.pending_chunks.find(child_pos) == svo.pending_chunks.end()) {
-									// chunk not queued to be generated yet
-									chunks_to_load.push_back({ child_pos, child_scale, dist });
-								}
-							} else {
-								// recurse to the scale we want stuff to be loaded at
-								recurse_chunk_loading(B_NULL, true, child_pos, child_scale);
-							}
-						}
-					} else {
-						// this chunk is loaded
-						Chunk* chunk = svo.chunk_allocator[child_node];
-						assert(chunk->scale == child_scale && equal(chunk->pos, child_pos));
-
-						bool want_refine = lod < child_scale - CHUNK_SCALE;
-
-						if (dist > voxels.load_radius + voxels.unload_hyster) {
-							chunks_to_unload.push_back(chunk);
-						}
-					}
-				} else {
-					// normal recursion into non chunk nodes
-					recurse_chunk_loading(child_node, child_leaf, child_pos, child_scale);
-				}
-			}
-		}
-	};
-
 	void free_chunk (SVO& svo, Chunk* chunk) {
-		assert(svo.pending_chunks.find(chunk->pos) == svo.pending_chunks.end());
-		assert(svo.active_chunks.find(chunk->pos) != svo.active_chunks.end());
-
-		svo.active_chunks.erase(chunk->pos);
-
-		assert(chunk->scale == CHUNK_SCALE);
 		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
 
 		if (chunk->nodes != chunk->tinydata)
@@ -450,7 +354,7 @@ namespace svo {
 	}
 
 	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
-	void update_root (SVO& svo, Player& player) {
+	void update_root_move (SVO& svo, Player& player) {
 		int shift = svo.root->scale - 1;
 		float half_root_scalef = (float)(1 << shift);
 
@@ -534,42 +438,130 @@ namespace svo {
 		}
 	}
 
+	void ChunkLoadJob::finalize () {
+		ZoneScoped;
+
+		int3 pos = chunk->pos;
+		int scale = chunk->scale;
+
+		svo.queued_counter--;
+		
+		switch (load_type) {
+			case LoadOp::CREATE: {
+				assert(scale == svo.root->scale-1);
+				assert(chunk->pending);
+
+				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
+				chunk->pending = false;
+			} break;
+
+			case LoadOp::SPLIT: {
+				svo.chunks_pending_split.emplace(int4(pos, scale), chunk);
+
+				int3 parent_pos = ((pos - svo.root->pos) & ~((1 << (scale+1)) - 1)) + svo.root->pos;
+
+				// check if all siblings are done
+				for (int i=0; i<8; ++i) {
+					int3 pos = parent_pos + (children_pos[i] << scale);
+					if (svo.chunks_pending_split.find(int4(pos, scale)) == svo.chunks_pending_split.end()) {
+						return; // not all siblings are done, wait until they are
+					}
+				}
+
+				auto parent = svo.chunks.find(int4(parent_pos, scale+1));
+				if (parent != svo.chunks.end()) {
+					free_chunk(svo, parent->second);
+					parent->second = nullptr;
+				}
+
+				// move siblings from pending to real list
+				for (int i=0; i<8; ++i) {
+					int3 pos = parent_pos + (children_pos[i] << scale);
+
+					auto it = svo.chunks_pending_split.find(int4(pos, scale));
+					svo.chunks.emplace(int4(pos, scale), it->second);
+					svo.octree_write(pos, scale, svo.chunk_allocator.indexof(it->second));
+
+					assert(it->second->pending);
+					it->second->pending = false;
+
+					svo.chunks_pending_split.erase(it);
+				}
+			} break;
+		}
+	}
 	void SVO::chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen) {
 		ZoneScoped;
 
-		update_root(*this, player);
+		update_root_move(*this, player);
 
 		{ // finish first, so that pending_chunks becomes smaller before we cap the newly queued ones to limit this size
 			ZoneScopedN("finish chunkgen jobs");
 
-			std::vector< std::unique_ptr<ThreadingJob> > jobs (voxels.cap_chunk_load);
+			static constexpr int finalize_cap = 64;
+			std::vector< std::unique_ptr<ThreadingJob> > jobs (finalize_cap);
 
-			size_t count = background_threadpool.results.pop_multiple(&jobs[0], voxels.cap_chunk_load);
+			size_t count = background_threadpool.results.pop_multiple(&jobs[0], (int)jobs.size());
 
 			for (size_t i=0; i<count; ++i) {
 				jobs[i]->finalize();
 			}
 		}
 
-		ChunkLoader cl = { *this, voxels, player.pos } ;
+		std::vector<LoadOp> ops_to_queue;
 		{
-			ZoneScopedN("recurse_chunk_loading");
-			cl.recurse_chunk_loading(0, false, root->pos, root->scale);
+			ZoneScopedN("chunk iteration");
 
-			ImGui::Text("chunk_loading iterated_count: %d", cl.iterated_count);
-		}
+			for (int i=0; i<8; ++i) {
+				int scale = root->scale -1;
+				int3 pos = root->pos + (children_pos[i] << scale);
 
-		{
-			ZoneScopedN("chunk unloading");
-			for (auto chunk : cl.chunks_to_unload) {
-				free_chunk(*this, chunk);
+				if (root->nodes[0].leaf_mask & (1u << i) && root->nodes[0].children[i] == B_NULL) {
+					// unloaded chunk in root due to root move or initial world creation
+					if (chunks.find(int4(pos, scale)) == chunks.end())
+						ops_to_queue.push_back({ nullptr, pos, root->scale-1, -1, LoadOp::CREATE });
+				}
+			}
+
+			for (auto& it : chunks) {
+				if (it.second != nullptr && (it.second->pending || it.second->locked)) continue;
+
+				int3 pos = (int3)it.first.v;
+				int scale = it.first.v.w;
+				Chunk* chunk = it.second;
+
+				float dist;
+				{
+					float size = (float)(1 << scale);
+
+					float3 pos_rel = player.pos - (float3)pos;
+
+					float3 clamped = clamp(pos_rel, 0, size);
+					dist = length(clamped - pos_rel);
+				}
+
+				int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+
+				if (chunk != nullptr) {
+					// real chunk
+					if (scale > CHUNK_SCALE + lod) {
+						// split chunk into children
+						ops_to_queue.push_back({ chunk, pos, scale, dist, LoadOp::SPLIT });
+					}
+				} else {
+					// parent of real chunk
+					if (scale == CHUNK_SCALE + lod) {
+						// merge children to create this chunk
+						ops_to_queue.push_back({ chunk, pos, scale, dist, LoadOp::MERGE });
+					}
+				}
 			}
 		}
 
 		{
-			ZoneScopedN("std::sort chunks_to_load");
+			ZoneScopedN("std::sort ops_to_queue");
 
-			std::sort(cl.chunks_to_load.begin(), cl.chunks_to_load.end(), [] (ChunkLoader::ChunkToLoad& l, ChunkLoader::ChunkToLoad& r) {
+			std::sort(ops_to_queue.begin(), ops_to_queue.end(), [] (LoadOp& l, LoadOp& r) {
 				return std::less<float>()(l.dist, r.dist);
 			});
 		}
@@ -577,36 +569,66 @@ namespace svo {
 		{
 			ZoneScopedN("queue chunk loads");
 
-			int count = min((int)cl.chunks_to_load.size(), voxels.cap_chunk_load - (int)pending_chunks.size());
+			int count = min((int)ops_to_queue.size(), voxels.cap_chunk_load - queued_counter);
+			std::vector<std::unique_ptr<ThreadingJob>> jobs;
 
-			int i=0;
-			background_threadpool.jobs.push_multiple([&] () -> std::unique_ptr<WorldgenJob> {
-				if (i >= count)
-					return nullptr;
+			for (auto& op : ops_to_queue) {
+				if (jobs.size() >= count)
+					break;
 
-				auto c = cl.chunks_to_load[i++];
+				switch (op.type) {
+					case LoadOp::CREATE: {
+						auto* chunk = chunk_allocator.alloc();
+						new (chunk) Chunk (op.pos, op.scale);
 
-				auto* chunk = chunk_allocator.alloc();
-				new (chunk) Chunk (c.pos, CHUNK_SCALE);
+						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
 
-				ZoneScopedN("push WorldgenJob");
+						chunks[int4( op.pos, op.scale )] = chunk;
+					} break;
 
-				assert(pending_chunks.find(c.pos) == pending_chunks.end());
-				assert(active_chunks.find(c.pos) == active_chunks.end());
+					case LoadOp::SPLIT: {
+						// split
+						op.chunk->locked = true;
 
-				pending_chunks.emplace(c.pos, chunk);
+						// remove parent so it wont be processed any more, this chunk will be the new parent
+						int3 parent_pos = ((op.pos - root->pos) & ~((1 << (op.scale+1)) - 1)) + root->pos;
+						chunks.erase(int4(parent_pos, op.scale+1));
 
-				return std::make_unique<WorldgenJob>(chunk, this, &world_gen);
-			});
+						for (int i=0; i<8; ++i) {
+							int child_scale = op.scale -1;
+							int3 child_pos = op.pos + (children_pos[i] << child_scale);
 
-			if (debug_draw_chunks) {
-				for (; i<(int)cl.chunks_to_load.size(); ++i) {
-					auto& c = cl.chunks_to_load[i];
+							auto* chunk = chunk_allocator.alloc();
+							new (chunk) Chunk (child_pos, child_scale);
 
-					float size = (float)(1 << c.scale);
-					debug_graphics->push_wire_cube((float3)c.pos + 0.5f * size, size * 0.1f, srgba(0xFF, 0x00, 0x37));
+							jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
+						}
+					} break;
+
+				}
+				if (op.chunk != nullptr) {
+					
+				} else {
+				//	// merge
+				//	auto* chunk = chunk_allocator.alloc();
+				//	new (chunk) Chunk (op.pos, op.scale);
+				//
+				//	chunks[int4( op.pos, op.scale )] = chunk;
+				//
+				//	// lock children
+				//	for (int i=0; i<8; ++i) {
+				//		int3 pos = op.pos + (children_pos[i] << (op.scale-1));
+				//		auto it = chunks.find(int4( pos, op.scale-1 ));
+				//		assert(it != chunks.end());
+				//		it->second->locked = true;
+				//	}
+				//
+				//	jobs.emplace_back( std::make_unique<WorldgenJob>(chunk, *this, &world_gen) );
 				}
 			}
+
+			background_threadpool.jobs.push_multiple(jobs.data(), (int)jobs.size());
+			queued_counter += (int)jobs.size();
 		}
 
 		if (debug_draw_svo) {
@@ -616,14 +638,10 @@ namespace svo {
 		}
 
 		if (debug_draw_chunks) {
-			for (auto& it : active_chunks) {
+			for (auto& it : chunks) {
+				if (!it.second || it.second->pending) continue;
 				float size = (float)(1 << it.second->scale);
-				debug_graphics->push_wire_cube((float3)it.second->pos + 0.5f * size, size * 0.95f, srgba(0x00, 0x5E, 0xFF, 100));
-			}
-
-			for (auto& it : pending_chunks) {
-				float size = (float)(1 << it.second->scale);
-				debug_graphics->push_wire_cube((float3)it.second->pos + 0.5f * size, size * 0.8f, srgba(0xFF, 0x84, 0x00));
+				debug_graphics->push_wire_cube((float3)it.second->pos + 0.5f * size, size * 0.95f, cols[it.second->scale % ARRLEN(cols)] * lrgba(1,1,1,0.5f));
 			}
 		}
 	}

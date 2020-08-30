@@ -1,7 +1,6 @@
 #pragma once
 #include "stdafx.hpp"
 #include "threading.hpp"
-#include "svo.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);
@@ -10,37 +9,6 @@ inline uint64_t get_seed (std::string_view str) {
 		return std::hash<uint64_t>()(random.uniform_u64());
 
 	return std::hash<std::string_view>()(str);
-}
-template<typename T>
-struct Gradient_KV {
-	float	key;
-	T		val;
-};
-
-template<typename T>
-inline T gradient (float key, Gradient_KV<T> const* kvs, size_t kvs_count) {
-	if (kvs_count == 0) return T(0);
-
-	size_t i=0;
-	for (; i<kvs_count; ++i) {
-		if (key < kvs[i].key) break;
-	}
-
-	if (i == 0) { // val is lower than the entire range
-		return kvs[0].val;
-	} else if (i == kvs_count) { // val is higher than the entire range
-		return kvs[i -1].val;
-	} else {
-		assert(kvs_count >= 2 && i < kvs_count);
-
-		auto& a = kvs[i -1];
-		auto& b = kvs[i];
-		return map(key, a.key, b.key, a.val, b.val);
-	}
-}
-template<typename T>
-inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) {
-	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
 struct WorldGenerator {
@@ -105,14 +73,5 @@ struct WorldGenerator {
 	}
 };
 
-struct WorldgenJob : ThreadingJob {
-	// input
-	Chunk*					chunk;
-	SVO*					svo;
-	WorldGenerator const*	world_gen;
-
-	WorldgenJob (svo::Chunk* chunk, SVO* svo, WorldGenerator const* world_gen): chunk{chunk}, svo{svo}, world_gen{world_gen} {}
-
-	virtual void execute ();
-	virtual void finalize ();
-};
+namespace svo { struct Chunk; struct SVO; }
+void generate_chunk (svo::Chunk* chunk, svo::SVO& svo, WorldGenerator& wg);
