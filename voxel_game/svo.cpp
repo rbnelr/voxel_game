@@ -449,7 +449,6 @@ namespace svo {
 		switch (load_type) {
 			case LoadOp::CREATE: {
 				assert(scale == svo.root->scale-1);
-				assert(chunk->pending);
 
 				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
 				chunk->pending = false;
@@ -486,6 +485,26 @@ namespace svo {
 					it->second->pending = false;
 
 					svo.chunks_pending_split.erase(it);
+				}
+			} break;
+
+			case LoadOp::MERGE: {
+				// delete children
+				for (int i=0; i<8; ++i) {
+					int3 child_pos = pos + (children_pos[i] << scale-1);
+					auto child = svo.chunks.find(int4(child_pos, scale-1));
+					assert(child != svo.chunks.end());
+					free_chunk(svo, child->second);
+					svo.chunks.erase(child);
+				}
+
+				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
+				chunk->pending = false;
+
+				// add parent to be able to track merges again
+				if (scale < svo.root->scale-1) {
+					int3 parent_pos = ((pos - svo.root->pos) & ~((1 << (scale+1)) - 1)) + svo.root->pos;
+					svo.chunks.emplace(int4(parent_pos, scale+1), nullptr);
 				}
 			} break;
 		}
@@ -561,6 +580,7 @@ namespace svo {
 		{
 			ZoneScopedN("std::sort ops_to_queue");
 
+			// TODO: why is sorting in wrong order, often large scale updates happen first even though they are clearly futher away?
 			std::sort(ops_to_queue.begin(), ops_to_queue.end(), [] (LoadOp& l, LoadOp& r) {
 				return std::less<float>()(l.dist, r.dist);
 			});
@@ -605,25 +625,23 @@ namespace svo {
 						}
 					} break;
 
-				}
-				if (op.chunk != nullptr) {
-					
-				} else {
-				//	// merge
-				//	auto* chunk = chunk_allocator.alloc();
-				//	new (chunk) Chunk (op.pos, op.scale);
-				//
-				//	chunks[int4( op.pos, op.scale )] = chunk;
-				//
-				//	// lock children
-				//	for (int i=0; i<8; ++i) {
-				//		int3 pos = op.pos + (children_pos[i] << (op.scale-1));
-				//		auto it = chunks.find(int4( pos, op.scale-1 ));
-				//		assert(it != chunks.end());
-				//		it->second->locked = true;
-				//	}
-				//
-				//	jobs.emplace_back( std::make_unique<WorldgenJob>(chunk, *this, &world_gen) );
+					case LoadOp::MERGE: {
+						// merge
+						auto* chunk = chunk_allocator.alloc();
+						new (chunk) Chunk (op.pos, op.scale);
+						
+						chunks[int4( op.pos, op.scale )] = chunk;
+						
+						// lock children
+						for (int i=0; i<8; ++i) {
+							int3 pos = op.pos + (children_pos[i] << (op.scale-1));
+							auto it = chunks.find(int4(pos, op.scale-1));
+							assert(it != chunks.end());
+							it->second->locked = true;
+						}
+						
+						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
+					} break;
 				}
 			}
 

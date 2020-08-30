@@ -169,8 +169,6 @@ namespace svo {
 			new (&root->nodes[0]) Node ();
 		}
 
-		void finalize_worldgen_job (WorldgenJob& job);
-
 		void chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen);
 
 		void chunk_to_octree (Chunk* chunk, block_id* blocks);
