@@ -42,6 +42,7 @@ struct ChunkGenerator {
 	Chunk*					chunk;
 	SVO*					svo;
 	WorldGenerator const*	wg;
+	int						lod;
 
 	OSN::Noise<2> osn_noise2;
 	Random rand;
@@ -139,13 +140,15 @@ struct ChunkGenerator {
 	void gen_terrain (int3 chunk_origin) {
 		ZoneScoped;
 
+		float lod_scale = (float)(1u << lod);
+
 		int water_level = 21;
 
 		{
 			int2 i;
 			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-					int2 pos_world = i + int2(chunk_origin);
+					int2 pos_world = (i << lod) + int2(chunk_origin);
 
 					float earth_layer;
 					float height = heightmap((float2)pos_world, &earth_layer);
@@ -161,12 +164,13 @@ struct ChunkGenerator {
 			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
 				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-						int3 pos_world = i + chunk_origin;
+						int3 pos_world = (i << lod) + chunk_origin;
 
 						block_id bid;
 
 						float highest_block = highest_blocks[i.y][i.x];
 						float earth_layer = earth_layers[i.y][i.x];
+						earth_layer = max(earth_layer, lod_scale);
 
 						bool over_water = water_level > highest_block;
 						
@@ -180,7 +184,7 @@ struct ChunkGenerator {
 								if (beach) {
 									bid = B_SAND;
 								} else {
-									if (pos_world.z == int(highest_block) && pos_world.z >= water_level) {
+									if (pos_world.z == int(highest_block / lod_scale) * lod_scale && pos_world.z >= water_level) {
 										bid = B_GRASS;
 									} else {
 										bid = over_water ? B_PEBBLES : B_EARTH;
@@ -214,7 +218,7 @@ struct ChunkGenerator {
 		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
 			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-					int3 pos_world = i + chunk_origin;
+					int3 pos_world = (i << lod) + chunk_origin;
 					
 					block_id* bid   =           &blocks[i.z    ][i.y][i.x];
 					block_id* below = i.z > 0 ? &blocks[i.z - 1][i.y][i.x] : nullptr;
@@ -318,6 +322,7 @@ void generate_chunk (Chunk* chunk, SVO& svo, WorldGenerator& wg) {
 	gen->chunk		= chunk;
 	gen->svo		= &svo;
 	gen->wg			= &wg;
+	gen->lod		= chunk->scale - CHUNK_SCALE;
 	gen->gen();
 
 	{

@@ -14,10 +14,10 @@ public:
 	SVO svo;
 
 	float load_lod_start = 0.0f;
-	float load_lod_unit = 60.0f;
+	float load_lod_unit = 64.0f;
 	
 	// artifically limit both the size of the async queue and how many results to take from the results
-	int cap_chunk_load = 8;
+	int cap_chunk_load = 64;
 	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
 	int cap_chunk_mesh = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
 

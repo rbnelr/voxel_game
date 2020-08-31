@@ -95,20 +95,69 @@ namespace svo {
 			MERGE
 		} type;
 	};
+
+	struct ChunkHashmap {
+		std::unordered_map<ChunkKey, Chunk*> chunks;
+
+		Chunk** get (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			return it == chunks.end() ? nullptr : &it->second;
+		}
+		bool contains (int3 pos, int scale) {
+			return get(pos, scale) != nullptr;
+		}
+		// insert new, error if already exist 
+		void insert (int3 pos, int scale, Chunk* chunk) {
+			assert(!contains(pos, scale));
+			chunks.emplace(int4(pos, scale), chunk);
+		}
+		// remove, return old if did exist
+		Chunk* remove (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			Chunk* c = it == chunks.end() ? nullptr : it->second;
+			if (c)
+				chunks.erase(it);
+			return c;
+		}
+
+		int count () {
+			return (int)chunks.size();
+		}
+
+		struct LoadedChunksIterator {
+			decltype(chunks)::iterator it;
+			std::unordered_map<ChunkKey, Chunk*>& chunks;
+
+			Chunk* operator* () { return it->second; }
+			LoadedChunksIterator& operator++ () {
+				++it;
+				while (it != chunks.end() && it->second && it->second->pending) ++it;
+				return *this;
+			}
+			bool operator!= (LoadedChunksIterator const& r) { return it != r.it; }
+			bool operator== (LoadedChunksIterator const& r) { return it != r.it; }
+		};
+		struct LoadedChunksDummy {
+			std::unordered_map<ChunkKey, Chunk*>& chunks;
+
+			LoadedChunksIterator begin () { return { chunks.begin(), chunks }; }
+			LoadedChunksIterator end () { return { chunks.end(), chunks }; }
+		};
+		LoadedChunksDummy loaded_chunks () { return { chunks }; } 
+	};
 	
 	struct SVO {
 		Chunk*	root;
 
-		std::unordered_map<ChunkKey, Chunk*> chunks; // all loaded chunks + their parents, parents have nullptr, used to easily calculate chunks to lod split or merge
-		std::unordered_map<ChunkKey, Chunk*> chunks_pending_split; // chunks done being generated for a chunk lod split but still waiting for their neighbours to be done
-		int queued_counter = 0;
+		ChunkHashmap chunks; // all loaded chunks + their parents, parents have nullptr, used to easily calculate chunks to lod split or merge
+		int chunks_pending = 0;
 
-		SparseAllocator<Chunk>				chunk_allocator = { MAX_CHUNKS };
-		SparseAllocator<AllocBlock, false>	node_allocator = { MAX_CHUNKS };
+		SparseAllocator<Chunk>		chunk_allocator = { MAX_CHUNKS };
+		SparseMemory<AllocBlock>	node_allocator = { MAX_CHUNKS };
 
 		float3 root_move_hister = 0;
 
-		bool debug_draw_chunks = false;
+		bool debug_draw_chunks = 1;//false;
 		bool debug_draw_svo = false;
 		bool debug_draw_air = false;
 		int debug_draw_octree_min = 3;
@@ -127,11 +176,10 @@ namespace svo {
 			uintptr_t active_nodes = 0;
 			uintptr_t commit_nodes = 0;
 
-			for (auto& it : chunks) {
-				if (!it.second || it.second->pending) continue;
+			for (auto* chunk : chunks.loaded_chunks()) {
 				chunks_count++;
-				active_nodes += it.second->alloc_ptr;
-				commit_nodes += it.second->commit_ptr;
+				active_nodes += chunk->alloc_ptr;
+				commit_nodes += chunk->commit_ptr;
 			}
 
 			ImGui::Text("Active chunks:        %5d", chunks_count);
@@ -143,16 +191,14 @@ namespace svo {
 			ImGui::Text("Root chunk: active:   %5d     committed: %5d", root->alloc_ptr, root->commit_ptr);
 			
 			if (ImGui::TreeNode("Show all chunks")) {
-				for (auto& it : chunks) {
-					if (!it.second || it.second->pending) continue;
-					ImGui::Text("%5d | %5d", it.second->alloc_ptr, it.second->commit_ptr);
+				for (auto* chunk : chunks.loaded_chunks()) {
+					ImGui::Text("%5d | %5d", chunk->alloc_ptr, chunk->commit_ptr);
 				}
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNode("Show allocators")) {
-				ImGui::Text("chunk_allocator:\n%s", chunk_allocator.dbg_string_free_slots().c_str());
-				ImGui::Text("node_allocator:\n%s", node_allocator .dbg_string_free_slots().c_str());
+			if (ImGui::TreeNode("Show allocator")) {
+				ImGui::Text(chunk_allocator.dbg_string_free_slots().c_str());
 				ImGui::TreePop();
 			}
 
@@ -160,7 +206,7 @@ namespace svo {
 		}
 
 		SVO () {
-			uint8_t root_scale = 13;
+			uint8_t root_scale = 16;
 			int3 root_pos = -(1 << (root_scale - 1));
 			
 			root = chunk_allocator.alloc();

@@ -84,9 +84,7 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
 
 			int max_chunk_index = 0; // root
-			for (auto& it : svo.chunks) {
-				if (!it.second || it.second->pending) continue;
-				Chunk* chunk = it.second;
+			for (auto* chunk : svo.chunks.loaded_chunks()) {
 				max_chunk_index = max(max_chunk_index, (int)svo.chunk_allocator.indexof(chunk));
 			}
 
@@ -97,9 +95,7 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, svo.root->alloc_ptr * sizeof(svo::Node), svo.root->nodes);
 
-			for (auto& it : svo.chunks) {
-				if (!it.second || it.second->pending) continue;
-				Chunk* chunk = it.second;
+			for (auto* chunk : svo.chunks.loaded_chunks()) {
 				int indx = (int)svo.chunk_allocator.indexof(chunk);
 
 				GLintptr offs = indx * sizeof(svo::AllocBlock);

@@ -107,7 +107,7 @@ struct Bitset {
 	void set_bit (uint32_t idx, uint64_t* new_bits=nullptr);
 };
 
-template <typename T, bool DOCOMMIT=true> // DOCOMMIT=false allows manual memory sparseness with sizeof(T) > os_page_size
+template <typename T>
 class SparseAllocator {
 	void*					baseptr; // base address of reserved memory pages
 	uint32_t				count = 0;
@@ -121,14 +121,12 @@ class SparseAllocator {
 public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
-		if (DOCOMMIT) {
-			uint32_t slots_per_page = (uint32_t)(os_page_size / sizeof(T));
-			assert(slots_per_page <= 64); // cannot support more than 64 slots per os page, would require multiple bitset reads to check commit status
+		uint32_t slots_per_page = (uint32_t)(os_page_size / sizeof(T));
+		assert(slots_per_page <= 64); // cannot support more than 64 slots per os page, would require multiple bitset reads to check commit status
 			
-			uint32_t tmp = max(slots_per_page, 1); // prevent 0 problems
-			paging_shift_mask = 0b111111u ^ (tmp - 1); // indx in 64 bitset block, then round down to slots_per_page
-			paging_mask = (1u << tmp) - 1; // simply slots_per_page 1 bits
-		}
+		uint32_t tmp = max(slots_per_page, 1); // prevent 0 problems
+		paging_shift_mask = 0b111111u ^ (tmp - 1); // indx in 64 bitset block, then round down to slots_per_page
+		paging_mask = (1u << tmp) - 1; // simply slots_per_page 1 bits
 
 		baseptr = reserve_address_space(sizeof(T)*max_count);
 	}
@@ -147,18 +145,16 @@ public:
 
 		T* ptr = (T*)baseptr + idx;
 		
-		if (DOCOMMIT) {
-			// get bits representing prev alloc status of all slots in affected page
-			prev_bits >>= idx & paging_shift_mask;
+		// get bits representing prev alloc status of all slots in affected page
+		prev_bits >>= idx & paging_shift_mask;
 		
-			// commit page if all page slots were free before
-			if (((uint32_t)prev_bits & paging_mask) == paging_mask) {
-				commit_pages(ptr, sizeof(T));
+		// commit page if all page slots were free before
+		if (((uint32_t)prev_bits & paging_mask) == paging_mask) {
+			commit_pages(ptr, sizeof(T));
 
-			#if DBG_MEMSET
-				memset(ptr, DBG_MEMSET_VAL, sizeof(T));
-			#endif
-			}
+		#if DBG_MEMSET
+			memset(ptr, DBG_MEMSET_VAL, sizeof(T));
+		#endif
 		}
 
 		return ptr;
@@ -172,14 +168,12 @@ public:
 		free_slots.set_bit(idx, &new_bits);
 		count--;
 
-		if (DOCOMMIT) {
-			// get bits representing new alloc status of all slots in affected page
-			new_bits >>= idx & paging_shift_mask;
+		// get bits representing new alloc status of all slots in affected page
+		new_bits >>= idx & paging_shift_mask;
 
-			// decommit page if all page slots are free now
-			if (((uint32_t)new_bits & paging_mask) == paging_mask) {
-				decommit_pages(ptr, sizeof(T));
-			}
+		// decommit page if all page slots are free now
+		if (((uint32_t)new_bits & paging_mask) == paging_mask) {
+			decommit_pages(ptr, sizeof(T));
 		}
 	}
 
@@ -203,6 +197,31 @@ public:
 			str.append("\n");
 		}
 		return str;
+	}
+};
+
+template <typename T>
+class SparseMemory {
+	void*					baseptr; // base address of reserved memory pages
+	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
+
+	static_assert(is_pot(sizeof(T)), "SparseMemory<T>: sizeof(T) needs to be power of two!");
+
+public:
+
+	SparseMemory (uint32_t max_count): max_count{max_count} {
+		baseptr = reserve_address_space(sizeof(T)*max_count);
+	}
+
+	~SparseMemory () {
+		release_address_space(baseptr, sizeof(T)*max_count);
+	}
+
+	uint32_t indexof (T* ptr) const {
+		return (uint32_t)(ptr - (T*)baseptr);
+	}
+	T* operator[] (uint32_t index) const {
+		return (T*)baseptr + index;
 	}
 };
 
