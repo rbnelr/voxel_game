@@ -67,11 +67,27 @@ struct ChunkGenerator {
 		float roughness;
 		float detail;
 
+		float elev_mult;
+
 		int i = 0;
 		{
 			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
 			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			elevation = noise(pos_world, wg->elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg->elev_amp;
+			elev_mult = pow(noise(pos_world, 5000, deg(37.17f) * (float)i, offs, -1,+1), 2);
+
+			++i;
+		}
+		{
+			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
+			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
+			elevation = pow(noise(pos_world, 10000, deg(37.17f) * (float)i, offs, -1,+1), 2) * 1700 * elev_mult;
+
+			++i;
+		}
+		{
+			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
+			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
+			elevation += noise(pos_world, wg->elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg->elev_amp;
 
 			++i;
 		}
@@ -100,7 +116,7 @@ struct ChunkGenerator {
 			++i;
 		}
 
-		return (elevation +32) +(roughness * detail);
+		return elevation +(roughness * detail);
 	}
 
 	float noise_tree_density (float2 pos_world) {
@@ -240,7 +256,7 @@ struct ChunkGenerator {
 						// TODO: can do these if else if chance things with just a single rand call by taking the remaining prob
 						// ex. first case has 60% prob -> if (rand < .6)    rand = [0,1]
 						//     second case wants 30% prob -> possible range now [.6,1] -> if (rand < 0.72)    0.72 = (1 - 0.6) * 0.3 + 0.6     ==   a + b - a * b
-						
+
 						if (rand.uniform() < effective_tree_prob) {
 							*below = B_EARTH;
 	
@@ -289,7 +305,7 @@ struct ChunkGenerator {
 	
 			place_block_sphere(pos +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
 		};
-	
+		
 		for (int3 p : tree_poss)
 			place_tree(p);
 	}
@@ -304,7 +320,8 @@ struct ChunkGenerator {
 
 		gen_terrain(chunk->pos);
 
-		place_objects(chunk->pos);
+		if (lod == 0)
+			place_objects(chunk->pos);
 
 		svo->chunk_to_octree(chunk, &blocks[0][0][0]);
 	}

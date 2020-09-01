@@ -4,7 +4,7 @@
 #include "input.hpp"
 #include "GLFW/glfw3.h"
 
-float3	player_spawn_point = float3(2,3,34);
+float3	player_spawn_point = float3(70,60,34);
 
 void BreakBlock::update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics) {
 	auto& button = input.buttons[GLFW_MOUSE_BUTTON_LEFT];

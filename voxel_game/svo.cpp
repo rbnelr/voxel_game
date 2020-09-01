@@ -208,7 +208,7 @@ namespace svo {
 					node->children[i] = child_val;
 				}
 
-				chunk->gpu_dirty = true;
+				chunk->flags |= GPU_DIRTY;
 			}
 		}
 
@@ -216,7 +216,7 @@ namespace svo {
 		stack[cur_scale].node->children[ stack[cur_scale].child_indx ] = val;
 		stack[cur_scale].node->leaf_mask |= 1u << stack[cur_scale].child_indx;
 
-		chunk->gpu_dirty = true;
+		chunk->flags |= GPU_DIRTY;
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
 		for (	auto i = cur_scale;
@@ -332,9 +332,6 @@ namespace svo {
 	}
 
 	void free_chunk (SVO& svo, Chunk* chunk) {
-		auto c = svo.chunks.remove(chunk->pos, chunk->scale);
-		assert(c == chunk);
-
 		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
 
 		if (chunk->nodes != chunk->tinydata)
@@ -446,9 +443,6 @@ namespace svo {
 
 		int3 pos = chunk->pos;
 		int scale = chunk->scale;
-
-		assert(svo.chunks_pending > 0);
-		svo.chunks_pending--;
 		
 		switch (load_type) {
 			case LoadOp::CREATE: {
@@ -457,60 +451,82 @@ namespace svo {
 				assert(scale == svo.root->scale-1);
 
 				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
-				chunk->pending = false;
+
+				svo.pending_chunks.remove(pos, scale);
+				svo.chunks.insert(pos, scale, chunk);
+
 			} break;
 
 			case LoadOp::SPLIT: {
 				clog("apply SPLIT to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
 
 				// this chunk is done
-				chunk->pending = false;
-				chunk->locked = true;
+				chunk->flags |= LOCKED;
+
+				svo.pending_chunks.remove(pos, scale);
+				svo.chunks.insert(pos, scale, chunk);
 
 				int3 parent_pos = ((pos - svo.root->pos) & ~((1 << (scale+1)) - 1)) + svo.root->pos;
 
 				// check if all siblings are done
-				Chunk* siblings[8];
+				Chunk* siblings[8] = {};
 				for (int i=0; i<8; ++i) {
 					int3 pos = parent_pos + (children_pos[i] << scale);
-					siblings[i] = *svo.chunks.get(pos, scale);
+					svo.chunks.get(pos, scale, &siblings[i]);
 
-					if (siblings[i]->pending)
+					if (!siblings[i])
 						return; // not all siblings are done, wait until they are
 				}
 
-				// free parent chunk, but keep hashmap entry with nullptr
-				auto parent = svo.chunks.get(parent_pos, scale+1);
+				// free parent chunk
+				auto parent = svo.chunks.remove(parent_pos, scale+1);
 				if (parent) {
-					free_chunk(svo, *parent);
-					*parent = nullptr;
+					free_chunk(svo, parent);
+
+					// remove child count from parent parent
+					int3 grandparent_pos = ((parent_pos - svo.root->pos) & ~((1 << (scale+2)) - 1)) + svo.root->pos;
+					
+					auto it = svo.parent_chunks.chunks.find(int4(grandparent_pos, scale+2));
+					if (it != svo.parent_chunks.chunks.end()) {
+						assert(it->second > 0);
+						it->second--;
+						if (it->second == 0) {
+							svo.parent_chunks.chunks.erase(it);
+						}
+					}
+
+					// add parent entry with count of direct children to trigger merge when appropriate
+					svo.parent_chunks.insert(parent_pos, scale+1, 8);
 				}
 
 				// insert us and all siblings into octree
 				for (int i=0; i<8; ++i) {
-					siblings[i]->locked = false;
+					assert(siblings[i]->flags & LOCKED);
+					siblings[i]->flags &= ~LOCKED;
 					svo.octree_write(siblings[i]->pos, siblings[i]->scale, svo.chunk_allocator.indexof(siblings[i]));
 				}
 			} break;
 
 			case LoadOp::MERGE: {
 				clog("apply MERGE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
-
+			
 				// delete children
 				for (int i=0; i<8; ++i) {
 					int3 child_pos = pos + (children_pos[i] << scale-1);
 					auto child = svo.chunks.remove(child_pos, scale-1);
 					free_chunk(svo, child);
 				}
-
+			
 				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
-				assert(chunk->pending);
-				chunk->pending = false;
 
+				svo.pending_chunks.remove(pos, scale);
+				svo.chunks.insert(pos, scale, chunk);
+			
 				// add parent to be able to track merges again
 				if (scale < svo.root->scale-1) {
 					int3 parent_pos = ((pos - svo.root->pos) & ~((1 << (scale+1)) - 1)) + svo.root->pos;
-					svo.chunks.insert(parent_pos, scale+1, nullptr);
+					
+					svo.parent_chunks.chunks[int4(parent_pos, scale+1)]++;
 				}
 			} break;
 		}
@@ -543,42 +559,53 @@ namespace svo {
 
 				if (root->nodes[0].leaf_mask & (1u << i) && root->nodes[0].children[i] == B_NULL) {
 					// unloaded chunk in root due to root move or initial world creation
-					if (!chunks.contains(pos, scale))
+					if (!chunks.contains(pos, scale) && !pending_chunks.contains(pos, scale))
 						ops_to_queue.push_back({ nullptr, pos, root->scale-1, -9999, LoadOp::CREATE });
 				}
 			}
 
-			for (auto& it : chunks.chunks) {
-				if (it.second != nullptr && (it.second->pending || it.second->locked)) continue;
+			auto calc_lod = [&] (int3 pos, int scale, float* out_dist) {
+				float size = (float)(1 << scale);
 
-				int3 pos = (int3)it.first.v;
-				int scale = it.first.v.w;
-				Chunk* chunk = it.second;
+				float3 pos_rel = player.pos - (float3)pos;
 
-				float dist;
-				{
-					float size = (float)(1 << scale);
-
-					float3 pos_rel = player.pos - (float3)pos;
-
-					float3 clamped = clamp(pos_rel, 0, size);
-					dist = length(clamped - pos_rel);
-				}
+				float3 clamped = clamp(pos_rel, 0, size);
+				float dist = length(clamped - pos_rel);
 
 				int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
 
-				if (chunk != nullptr) {
-					// real chunk
-					if (scale > CHUNK_SCALE + lod) {
-						// split chunk into children
-						ops_to_queue.push_back({ chunk, pos, scale, dist, LoadOp::SPLIT });
-					}
-				} else {
-					// parent of real chunk
-					if (scale == CHUNK_SCALE + lod) {
-						// merge children to create this chunk
-						ops_to_queue.push_back({ chunk, pos, scale, dist, LoadOp::MERGE });
-					}
+				*out_dist = dist;
+				return lod;
+			};
+
+			for (auto& it : chunks.chunks) {
+				if (it.second->flags & LOCKED) continue;
+
+				int3 pos = (int3)it.first.v;
+				int scale = it.first.v.w;
+
+				float dist;
+				int lod = calc_lod(pos, scale, &dist);
+
+				if (scale > CHUNK_SCALE + lod) {
+					// split chunk into children
+					ops_to_queue.push_back({ it.second, pos, scale, dist, LoadOp::SPLIT });
+				}
+			}
+
+			for (auto& it : parent_chunks.chunks) {
+				assert(it.second >= 0 && it.second <= 8);
+				if (it.second != 8) continue;
+			
+				int3 pos = (int3)it.first.v;
+				int scale = it.first.v.w;
+			
+				float dist;
+				int lod = calc_lod(pos, scale, &dist);
+			
+				if (scale <= CHUNK_SCALE + lod) {
+					// split chunk into children
+					ops_to_queue.push_back({ nullptr, pos, scale, dist, LoadOp::MERGE });
 				}
 			}
 		}
@@ -594,17 +621,10 @@ namespace svo {
 			});
 		}
 
-		if (voxels.cap_chunk_load - chunks_pending > 0) {
-			clog(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-			clog("pending: %d", chunks_pending);
-			for (auto& op : ops_to_queue)
-				clog("%2d : %+7d,%+7d,%+7d %7.3f %s", op.scale, op.pos.x,op.pos.y,op.pos.z, op.dist, op.type == LoadOp::CREATE ? "CREATE" : ( op.type == LoadOp::SPLIT ? "SPLIT":"MERGE"));
-		}
-
 		{
 			ZoneScopedN("queue chunk loads");
 
-			int count = clamp(voxels.cap_chunk_load - chunks_pending, 0, (int)ops_to_queue.size());
+			int count = clamp(voxels.cap_chunk_load - (int)pending_chunks.count(), 0, (int)ops_to_queue.size());
 			std::vector<std::unique_ptr<ThreadingJob>> jobs;
 
 			for (auto& op : ops_to_queue) {
@@ -616,19 +636,15 @@ namespace svo {
 						auto* chunk = chunk_allocator.alloc();
 						new (chunk) Chunk (op.pos, op.scale);
 
-						chunks.insert(op.pos, op.scale, chunk);
+						pending_chunks.insert(op.pos, op.scale, chunk);
 
-						clog("queue CREATE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
+						//clog("queue CREATE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
 						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
 					} break;
 
 					case LoadOp::SPLIT: {
 						// split
-						op.chunk->locked = true;
-
-						// remove parent so it wont be processed any more, this chunk will be the new parent
-						int3 parent_pos = ((op.pos - root->pos) & ~((1 << (op.scale+1)) - 1)) + root->pos;
-						chunks.remove(parent_pos, op.scale+1);
+						op.chunk->flags |= LOCKED;
 
 						for (int i=0; i<8; ++i) {
 							int child_scale = op.scale -1;
@@ -637,9 +653,9 @@ namespace svo {
 							auto* chunk = chunk_allocator.alloc();
 							new (chunk) Chunk (child_pos, child_scale);
 
-							chunks.insert(child_pos, child_scale, chunk);
+							pending_chunks.insert(child_pos, child_scale, chunk);
 
-							clog("queue SPLIT for %2d : %+7d,%+7d,%+7d", child_scale, child_pos.x,child_pos.y,child_pos.z);
+							//clog("queue SPLIT for %2d : %+7d,%+7d,%+7d", child_scale, child_pos.x,child_pos.y,child_pos.z);
 							jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
 						}
 					} break;
@@ -648,29 +664,25 @@ namespace svo {
 						// merge
 						auto* chunk = chunk_allocator.alloc();
 						new (chunk) Chunk (op.pos, op.scale);
-
-						// make nullptr parent chunk a real (pending) chunk
-						assert(*chunks.get(op.pos, op.scale) == nullptr);
-						*chunks.get(op.pos, op.scale) = chunk;
-						
+					
+						parent_chunks.remove(op.pos, op.scale);
+						pending_chunks.insert(op.pos, op.scale, chunk);
+					
 						// lock children
 						for (int i=0; i<8; ++i) {
-							int child_scale = op.scale -1;
-							int3 child_pos = op.pos + (children_pos[i] << child_scale);
-
-							Chunk** c = chunks.get(child_pos, child_scale);
-							assert(c);
-							(*c)->locked = true;
+							int3 child_pos = op.pos + (children_pos[i] << (op.scale-1));
+					
+							Chunk* c = *chunks.get(child_pos, op.scale-1);
+							c->flags |= LOCKED;
 						}
-
-						clog("queue MERGE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
+					
+						//clog("queue MERGE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
 						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
 					} break;
 				}
 			}
 
 			background_threadpool.jobs.push_multiple(jobs.data(), (int)jobs.size());
-			chunks_pending += (int)jobs.size();
 		}
 
 		if (debug_draw_svo) {
@@ -680,11 +692,22 @@ namespace svo {
 		}
 
 		if (debug_draw_chunks) {
-			for (auto* chunk : chunks.loaded_chunks()) {
+			for (auto* chunk : chunks) {
 				float size = (float)(1 << chunk->scale);
-				if (chunk->pos.z == 0)
-				debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, cols[chunk->scale % ARRLEN(cols)] * lrgba(1,1,1,0.5f));
+				if (!debug_draw_chunks_onlyz0 || chunk->pos.z == 0)
+					debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, cols[chunk->scale % ARRLEN(cols)] * lrgba(1,1,1,0.5f));
 			}
+			//for (auto* chunk : pending_chunks) {
+			//	float size = (float)(1 << chunk->scale);
+			//	if (!debug_draw_chunks_onlyz0 || chunk->pos.z == 0)
+			//		debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.8f, srgba(255, 75, 0));
+			//}
+			//for (auto it : parent_chunks.chunks) {
+			//	int3 pos = (int3)it.first.v;
+			//	float size = (float)(1 << it.first.v.w);
+			//	if (!debug_draw_chunks_onlyz0 || pos.z == 0)
+			//		debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, srgba(20, 255, 0));
+			//}
 		}
 	}
 }

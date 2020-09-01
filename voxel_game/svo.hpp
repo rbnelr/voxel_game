@@ -38,15 +38,19 @@ namespace svo {
 
 	struct SVO;
 
+	enum ChunkFlags : uint8_t {
+		LOCKED = 1, // read only, still displayed but not allowed to be modified
+		GPU_DIRTY = 2,
+	};
+	ENUM_BITFLAG_OPERATORS(ChunkFlags, uint8_t)
+
 	struct Chunk {
 		Node* nodes;
 
 		int3	pos;
 		uint8_t	scale;
 
-		bool locked; // read only, still displayed but not allowed to be modified
-		bool pending; // currently 'locked' because there is an async chunk split or merge currently queued assiciated with this chunk
-		bool gpu_dirty;
+		ChunkFlags flags;
 
 		uint32_t alloc_ptr;
 		uint32_t dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
@@ -59,9 +63,7 @@ namespace svo {
 		Chunk (int3	pos, uint8_t scale): pos{pos}, scale{scale} {
 			nodes = tinydata;
 
-			locked = false;
-			pending = true;
-			gpu_dirty = true;
+			flags = GPU_DIRTY;
 
 			alloc_ptr = 0;
 			dead_count = 0;
@@ -96,61 +98,83 @@ namespace svo {
 		} type;
 	};
 
+	template <typename VALT>
 	struct ChunkHashmap {
-		std::unordered_map<ChunkKey, Chunk*> chunks;
+		std::unordered_map<ChunkKey, VALT> chunks;
 
-		Chunk** get (int3 pos, int scale) {
+		bool get (int3 pos, int scale, VALT* val) {
 			auto it = chunks.find(int4(pos, scale));
-			return it == chunks.end() ? nullptr : &it->second;
+			if (it != chunks.end()) {
+				*val = it->second;
+				return true;
+			} else {
+				return false;
+			}
+		}
+		VALT* get (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				return &it->second;
+			} else {
+				return nullptr;
+			}
 		}
 		bool contains (int3 pos, int scale) {
-			return get(pos, scale) != nullptr;
+			VALT val;
+			return get(pos, scale, &val);
 		}
 		// insert new, error if already exist 
-		void insert (int3 pos, int scale, Chunk* chunk) {
+		void insert (int3 pos, int scale, VALT chunk) {
 			assert(!contains(pos, scale));
 			chunks.emplace(int4(pos, scale), chunk);
 		}
 		// remove, return old if did exist
-		Chunk* remove (int3 pos, int scale) {
+		VALT remove (int3 pos, int scale) {
 			auto it = chunks.find(int4(pos, scale));
-			Chunk* c = it == chunks.end() ? nullptr : it->second;
-			if (c)
+			if (it != chunks.end()) {
+				VALT val = it->second;
 				chunks.erase(it);
-			return c;
+				return val;
+			} else {
+				return VALT();
+			}
 		}
 
 		int count () {
 			return (int)chunks.size();
 		}
 
-		struct LoadedChunksIterator {
-			decltype(chunks)::iterator it;
-			std::unordered_map<ChunkKey, Chunk*>& chunks;
+		struct Iterator {
+			typename decltype(chunks)::iterator it;
 
 			Chunk* operator* () { return it->second; }
-			LoadedChunksIterator& operator++ () {
+			Iterator& operator++ () {
 				++it;
-				while (it != chunks.end() && it->second && it->second->pending) ++it;
 				return *this;
 			}
-			bool operator!= (LoadedChunksIterator const& r) { return it != r.it; }
-			bool operator== (LoadedChunksIterator const& r) { return it != r.it; }
+			bool operator!= (Iterator const& r) { return it != r.it; }
+			bool operator== (Iterator const& r) { return it != r.it; }
 		};
-		struct LoadedChunksDummy {
-			std::unordered_map<ChunkKey, Chunk*>& chunks;
-
-			LoadedChunksIterator begin () { return { chunks.begin(), chunks }; }
-			LoadedChunksIterator end () { return { chunks.end(), chunks }; }
-		};
-		LoadedChunksDummy loaded_chunks () { return { chunks }; } 
+		Iterator begin () {
+			Iterator it = { chunks.begin() };
+			return it;
+		}
+		Iterator end () {
+			return { chunks.end() };
+		}
 	};
 	
 	struct SVO {
 		Chunk*	root;
 
-		ChunkHashmap chunks; // all loaded chunks + their parents, parents have nullptr, used to easily calculate chunks to lod split or merge
-		int chunks_pending = 0;
+		// all loaded chunks, get uploaded to gpu and displayed in debug view,
+		// can be not actually written into the SVO, when still waiting on siblings to finish for split
+		ChunkHashmap<Chunk*>	chunks;
+		// chunks still in the process of being async loaded
+		ChunkHashmap<Chunk*>	pending_chunks;
+		// parents of all chunks in chunks hashmap, with count of direct (not futher split) children as the value ([0,8])
+		// when count is 8 this parent could merge it's children into itself and become a real chunk
+		ChunkHashmap<int>		parent_chunks;
 
 		SparseAllocator<Chunk>		chunk_allocator = { MAX_CHUNKS };
 		SparseMemory<AllocBlock>	node_allocator = { MAX_CHUNKS };
@@ -158,6 +182,7 @@ namespace svo {
 		float3 root_move_hister = 0;
 
 		bool debug_draw_chunks = 1;//false;
+		bool debug_draw_chunks_onlyz0 = 1;//false;
 		bool debug_draw_svo = false;
 		bool debug_draw_air = false;
 		int debug_draw_octree_min = 3;
@@ -167,6 +192,7 @@ namespace svo {
 			if (!imgui_push("SVO")) return;
 
 			ImGui::Checkbox("debug_draw_chunks", &debug_draw_chunks);
+			ImGui::Checkbox("debug_draw_chunks_onlyz0", &debug_draw_chunks_onlyz0);
 			ImGui::Checkbox("debug_draw_svo", &debug_draw_svo);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0,20);
@@ -176,7 +202,7 @@ namespace svo {
 			uintptr_t active_nodes = 0;
 			uintptr_t commit_nodes = 0;
 
-			for (auto* chunk : chunks.loaded_chunks()) {
+			for (auto* chunk : chunks) {
 				chunks_count++;
 				active_nodes += chunk->alloc_ptr;
 				commit_nodes += chunk->commit_ptr;
@@ -191,14 +217,36 @@ namespace svo {
 			ImGui::Text("Root chunk: active:   %5d     committed: %5d", root->alloc_ptr, root->commit_ptr);
 			
 			if (ImGui::TreeNode("Show all chunks")) {
-				for (auto* chunk : chunks.loaded_chunks()) {
-					ImGui::Text("%5d | %5d", chunk->alloc_ptr, chunk->commit_ptr);
+				std::vector<Chunk*> loaded_chunks;
+				for (auto* chunk : chunks)
+					loaded_chunks.push_back(chunk);
+
+				std::sort(loaded_chunks.begin(), loaded_chunks.end(), [] (Chunk* l, Chunk* r) {
+					if (l->scale != r->scale) return std::less<int>()(l->scale, r->scale);
+					if (l->pos.z != r->pos.z) return std::less<int>()(l->pos.z, r->pos.z);
+					if (l->pos.y != r->pos.y) return std::less<int>()(l->pos.y, r->pos.y);
+					if (l->pos.x != r->pos.x) return std::less<int>()(l->pos.x, r->pos.x);
+					return false;
+				});
+
+				ImGui::Text("[ index]                     pos    size -- alloc | commit");
+				for (auto* chunk : loaded_chunks) {
+					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %5d | %5d", chunk_allocator.indexof(chunk),
+						chunk->pos.x,chunk->pos.y,chunk->pos.z, 1 << chunk->scale, chunk->alloc_ptr, chunk->commit_ptr);
 				}
 				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNode("Show allocator")) {
-				ImGui::Text(chunk_allocator.dbg_string_free_slots().c_str());
+
+				for (int i=0; i<chunk_allocator.free_slots.bits.size(); ++i) {
+					char bits[64+1];
+					bits[64] = '\0';
+					for (int j=0; j<64; ++j)
+						bits[j] = (chunk_allocator.free_slots.bits[i] & (1ull << j)) ? '_':'#';
+					ImGui::Text(bits);
+				}
+
 				ImGui::TreePop();
 			}
 

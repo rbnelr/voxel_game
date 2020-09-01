@@ -12,7 +12,7 @@ inline uint64_t get_seed (std::string_view str) {
 }
 
 struct WorldGenerator {
-	std::string seed_str = "test2";
+	std::string seed_str = "test6";
 	uint64_t seed;
 
 	float elev_freq = 400, elev_amp = 25;

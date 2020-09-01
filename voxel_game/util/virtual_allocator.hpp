@@ -108,7 +108,7 @@ struct Bitset {
 };
 
 template <typename T>
-class SparseAllocator {
+struct SparseAllocator {
 	void*					baseptr; // base address of reserved memory pages
 	uint32_t				count = 0;
 	uint32_t				max_count; // max possible number of Ts, a corresponding number of pages will be reserved
@@ -117,8 +117,6 @@ class SparseAllocator {
 	uint32_t				paging_mask;
 
 	static_assert(is_pot(sizeof(T)), "SparseAllocator<T>: sizeof(T) needs to be power of two!");
-
-public:
 
 	SparseAllocator (uint32_t max_count): max_count{max_count} {
 		uint32_t slots_per_page = (uint32_t)(os_page_size / sizeof(T));
@@ -186,18 +184,6 @@ public:
 	T* operator[] (uint32_t index) const {
 		return (T*)baseptr + index;
 	}
-
-	std::string dbg_string_free_slots () {
-		std::string str = "";
-		for (int i=0; i<free_slots.bits.size(); ++i) {
-			char bits[64];
-			for (int j=0; j<64; ++j)
-				bits[j] = (free_slots.bits[i] & (1ull << j)) ? '1':'0';
-			str.append(bits, 64);
-			str.append("\n");
-		}
-		return str;
-	}
 };
 
 template <typename T>
@@ -233,10 +219,9 @@ public:
 #define LOCK_GUARD			std::lock_guard<LockableBase(std::mutex)> lock(m)
 
 template <typename T>
-class ThreadsafeSparseAllocator : public SparseAllocator<T> {
+struct ThreadsafeSparseAllocator : public SparseAllocator<T> {
 	MUTEX;
 
-public:
 	ThreadsafeSparseAllocator (uint32_t max_count): SparseAllocator<T>{max_count} {}
 
 	T* alloc_threadsafe () {
