@@ -261,6 +261,7 @@
     <ClInclude Include="voxel_mesher.hpp" />
     <ClInclude Include="threading.hpp" />
     <ClInclude Include="voxel_system.hpp" />
+    <ClInclude Include="svo_alloc.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

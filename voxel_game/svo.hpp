@@ -3,85 +3,18 @@
 #include "blocks.hpp"
 #include "util/virtual_allocator.hpp"
 #include "world_generator.hpp"
+#include "svo_alloc.hpp"
 
 class Voxels;
 class Player;
 struct WorldGenerator;
 
-static constexpr int CHUNK_SIZE = 64;
-static constexpr uint32_t CHUNK_SCALE = 6;
-
-static constexpr uint32_t MAX_NODES = 1u << 16;
-static constexpr uint32_t MAX_CHUNKS = 1u << 16;
-
 struct WorldgenJob;
 
 namespace svo {
-
-	static constexpr uint32_t MAX_DEPTH = 20;
 	
 	// how far to move in blocks in the opposite direction of a root move before it happens again, to prevent unneeded root moves
 	static constexpr float ROOT_MOVE_HISTER = 20;
-
-	struct Node {
-		uint16_t children[8] = {};
-		uint8_t leaf_mask = 0xff;
-		uint8_t pad[15];
-	};
-	static_assert(is_pot(sizeof(Node)), "sizeof(Node) must be power of two!");
-
-	struct StackNode {
-		Node* node; // parent node
-		int3 pos;
-		int child_indx;
-	};
-
-	struct SVO;
-
-	enum ChunkFlags : uint8_t {
-		LOCKED = 1, // read only, still displayed but not allowed to be modified
-		GPU_DIRTY = 2,
-	};
-	ENUM_BITFLAG_OPERATORS(ChunkFlags, uint8_t)
-
-	struct Chunk {
-		Node* nodes;
-
-		int3	pos;
-		uint8_t	scale;
-
-		ChunkFlags flags;
-
-		uint32_t alloc_ptr;
-		uint32_t dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
-		uint32_t commit_ptr;
-
-		char _pad[28];
-
-		Node tinydata[6];
-
-		Chunk (int3	pos, uint8_t scale): pos{pos}, scale{scale} {
-			nodes = tinydata;
-
-			flags = GPU_DIRTY;
-
-			alloc_ptr = 0;
-			dead_count = 0;
-			commit_ptr = (uint32_t)ARRLEN(tinydata);
-
-		#if DBG_MEMSET
-			memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
-		#endif
-		}
-
-		uint16_t alloc_node (SVO& svo, StackNode* stack=nullptr);
-	};
-	static constexpr uint32_t _sz = sizeof(Chunk);
-
-	struct AllocBlock {
-		Node nodes[MAX_NODES];
-	};
-	static constexpr uint32_t _sz2 = sizeof(AllocBlock);
 
 	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
 
@@ -176,8 +109,7 @@ namespace svo {
 		// when count is 8 this parent could merge it's children into itself and become a real chunk
 		ChunkHashmap<int>		parent_chunks;
 
-		SparseAllocator<Chunk>		chunk_allocator = { MAX_CHUNKS };
-		SparseMemory<AllocBlock>	node_allocator = { MAX_CHUNKS };
+		SVOAllocator			allocator;
 
 		float3 root_move_hister = 0;
 
@@ -208,7 +140,7 @@ namespace svo {
 				commit_nodes += chunk->commit_ptr;
 			}
 
-			ImGui::Text("Active chunks:        %5d", chunks_count);
+			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(chunks_count * sizeof(Chunk)) / 1024);
 			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %.0f | %.0f",
 				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
 			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",
@@ -231,22 +163,14 @@ namespace svo {
 
 				ImGui::Text("[ index]                     pos    size -- alloc | commit");
 				for (auto* chunk : loaded_chunks) {
-					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %5d | %5d", chunk_allocator.indexof(chunk),
+					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %5d | %5d", allocator.indexof(chunk),
 						chunk->pos.x,chunk->pos.y,chunk->pos.z, 1 << chunk->scale, chunk->alloc_ptr, chunk->commit_ptr);
 				}
 				ImGui::TreePop();
 			}
 
 			if (ImGui::TreeNode("Show allocator")) {
-
-				for (int i=0; i<chunk_allocator.free_slots.bits.size(); ++i) {
-					char bits[64+1];
-					bits[64] = '\0';
-					for (int j=0; j<64; ++j)
-						bits[j] = (chunk_allocator.free_slots.bits[i] & (1ull << j)) ? '_':'#';
-					ImGui::Text(bits);
-				}
-
+				allocator.imgui_print_free_slots();
 				ImGui::TreePop();
 			}
 
@@ -257,7 +181,7 @@ namespace svo {
 			uint8_t root_scale = 16;
 			int3 root_pos = -(1 << (root_scale - 1));
 			
-			root = chunk_allocator.alloc();
+			root = allocator.alloc_chunk();
 			new (root) Chunk (root_pos, root_scale);
 			root->alloc_ptr++;
 			new (&root->nodes[0]) Node ();

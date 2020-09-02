@@ -88,5 +88,5 @@ void Bitset::set_bit (uint32_t idx, uint64_t* new_bits) {
 	}
 
 	// keep first_set up to date
-	first_set = min(first_set, idx);
+	first_set = std::min(first_set, idx);
 }

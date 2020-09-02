@@ -41,7 +41,18 @@ void Raytracer::imgui () {
 Raytracer::Raytracer () {
 	using namespace svo;
 
-	glGenBuffers(1, &svo_ssbo);
+	if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
+		clog(ERROR, "GL_ARB_sparse_buffer not supported!");
+		raytracer_draw = false;
+		return;
+	}
+	//glGenBuffers(1, &svo_ssbo);
+	//glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
+	//
+	//GLsizeiptr max_size = MAX_CHUNKS * sizeof(svo::AllocBlock);
+	//glBufferStorage(GL_SHADER_STORAGE_BUFFER, max_size, nullptr, GL_SPARSE_STORAGE_BIT_ARB | GL_DYNAMIC_STORAGE_BIT);
+	//
+	//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics, TimeOfDay& tod) {
@@ -77,40 +88,42 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		time += time_speed * input.dt;
 		shader.set_uniform("time", time);
 
-		{
-			if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
-				clog(ERROR, "GL_ARB_sparse_buffer not supported!");
-				raytracer_draw = false;
-				return;
-			}
-
-
-			using namespace svo;
-			TracyGpuZone("gpu SVO upload");
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
-
-			int max_chunk_index = 0; // root
-			for (auto* chunk : svo.chunks) {
-				max_chunk_index = max(max_chunk_index, (int)svo.chunk_allocator.indexof(chunk));
-			}
-
-			uintptr_t size = (max_chunk_index +1) * sizeof(svo::AllocBlock);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
-
-			ImGui::Text("GPU SVO data: %d MB", size / 1024 / 1024);
-
-			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, svo.root->alloc_ptr * sizeof(svo::Node), svo.root->nodes);
-
-			for (auto* chunk : svo.chunks) {
-				int indx = (int)svo.chunk_allocator.indexof(chunk);
-
-				GLintptr offs = indx * sizeof(svo::AllocBlock);
-				glBufferSubData(GL_SHADER_STORAGE_BUFFER, offs, chunk->alloc_ptr * sizeof(svo::Node), chunk->nodes);
-			}
-
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo_ssbo);
-		}
+		//{
+		//	if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
+		//		clog(ERROR, "GL_ARB_sparse_buffer not supported!");
+		//		raytracer_draw = false;
+		//		return;
+		//	}
+		//
+		//	int page_size;
+		//	glGetIntegerv(GL_SPARSE_BUFFER_PAGE_SIZE_ARB, &page_size);
+		//
+		//	using namespace svo;
+		//	TracyGpuZone("gpu SVO upload");
+		//
+		//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo_ssbo);
+		//	
+		//	int max_chunk_index = 0; // root
+		//	for (auto* chunk : svo.chunks) {
+		//		max_chunk_index = max(max_chunk_index, (int)svo.chunk_allocator.indexof(chunk));
+		//	}
+		//	
+		//	uintptr_t size = (max_chunk_index +1) * sizeof(svo::AllocBlock);
+		//	glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_DYNAMIC_DRAW);
+		//	
+		//	ImGui::Text("GPU SVO data: %d MB", size / 1024 / 1024);
+		//	
+		//	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, svo.root->alloc_ptr * sizeof(svo::Node), svo.root->nodes);
+		//	
+		//	for (auto* chunk : svo.chunks) {
+		//		int indx = (int)svo.chunk_allocator.indexof(chunk);
+		//	
+		//		GLintptr offs = indx * sizeof(svo::AllocBlock);
+		//		glBufferSubData(GL_SHADER_STORAGE_BUFFER, offs, chunk->alloc_ptr * sizeof(svo::Node), chunk->nodes);
+		//	}
+		//	
+		//	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo_ssbo);
+		//}
 
 		std::vector<float4> block_tile_info;
 		for (auto& bti : graphics.tile_textures.block_tile_info) {

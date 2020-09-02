@@ -51,34 +51,34 @@ namespace meshing {
 	static_assert(sizeof(Page) == PAGE_SIZE);
 
 	struct VoxelMesher {
-		ThreadsafeSparseAllocator<Page> allocator = ThreadsafeSparseAllocator<Page>(MAX_PAGES);
-
-		void imgui () {
-
-		}
-
-		Vertex* push_vertex (Page** cur_page) {
-			assert((*cur_page)->info.next == nullptr);
-			if (*cur_page == nullptr || (*cur_page)->info.count == PAGE_VERTEX_COUNT) {
-				auto* newpage = allocator.alloc_threadsafe();
-				newpage->info.next = nullptr;
-				newpage->info.count = 0;
-
-				if (*cur_page != nullptr)
-					(*cur_page)->info.next = newpage;
-
-				*cur_page = newpage;
-			}
-
-			return &(*cur_page)->vertices[ (*cur_page)->info.count++ ];
-		}
-		void free_vertices (Page* vertices) {
-			while (vertices) {
-				auto* next = vertices->info.next;
-				allocator.free_threadsafe(vertices);
-				vertices = next;
-			}
-		}
+	//	ThreadsafeSparseAllocator<Page> allocator = ThreadsafeSparseAllocator<Page>(MAX_PAGES);
+	//
+	//	void imgui () {
+	//
+	//	}
+	//
+	//	Vertex* push_vertex (Page** cur_page) {
+	//		assert((*cur_page)->info.next == nullptr);
+	//		if (*cur_page == nullptr || (*cur_page)->info.count == PAGE_VERTEX_COUNT) {
+	//			auto* newpage = allocator.alloc_threadsafe();
+	//			newpage->info.next = nullptr;
+	//			newpage->info.count = 0;
+	//
+	//			if (*cur_page != nullptr)
+	//				(*cur_page)->info.next = newpage;
+	//
+	//			*cur_page = newpage;
+	//		}
+	//
+	//		return &(*cur_page)->vertices[ (*cur_page)->info.count++ ];
+	//	}
+	//	void free_vertices (Page* vertices) {
+	//		while (vertices) {
+	//			auto* next = vertices->info.next;
+	//			allocator.free_threadsafe(vertices);
+	//			vertices = next;
+	//		}
+	//	}
 	};
 
 	struct MeshingJob : ThreadingJob {

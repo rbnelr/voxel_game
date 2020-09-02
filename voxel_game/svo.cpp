@@ -60,54 +60,6 @@ namespace svo {
 		srgba(255,127,255),
 	};
 
-	uint16_t Chunk::alloc_node (SVO& svo, StackNode* stack) {
-		if (alloc_ptr >= commit_ptr) {
-			if (nodes == tinydata) {
-				nodes = svo.node_allocator[svo.chunk_allocator.indexof(this)]->nodes;
-
-				uint32_t commit_block = os_page_size / sizeof(Node);
-				commit_ptr = commit_block;
-				commit_pages(nodes, os_page_size);
-
-			#if DBG_MEMSET
-				memset(nodes, DBG_MEMSET_VAL, os_page_size);
-			#endif
-
-				memcpy(nodes, tinydata, sizeof(tinydata));
-
-				if (stack) { // fixup stack after we invalidated some of the nodes
-					for (int i=0; i<MAX_DEPTH; ++i) {
-						uintptr_t indx = stack[i].node - tinydata;
-						if (indx < ARRLEN(tinydata)) {
-							stack[i].node = nodes + indx;
-						}
-					}
-				}
-
-			#if DBG_MEMSET
-				memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
-			#endif
-			} else {
-				if (commit_ptr < MAX_NODES) {
-					uint32_t commit_block = os_page_size / sizeof(Node);
-
-					commit_pages(nodes + commit_ptr, os_page_size);
-
-				#if DBG_MEMSET
-					memset(nodes + commit_ptr, DBG_MEMSET_VAL, os_page_size);
-				#endif
-					commit_ptr += commit_block;
-
-				} else {
-					assert(false);
-					throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
-				}
-			}
-
-		}
-		return (uint16_t)alloc_ptr++;
-	}
-
 	int get_child_index (int3 pos, int scale) {
 		//// Subpar asm generated for a lot of these, at least from what I can tell, might need to look into this if I octree decent actually becomes a bottleneck
 		//return	(((pos.x >> scale) & 1) << 0) |
@@ -183,7 +135,7 @@ namespace svo {
 
 			} else if (chunk == root && child_val != B_NULL) {
 				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-				chunk = chunk_allocator[child_val];
+				chunk = allocator[child_val];
 				node = chunk->nodes;
 
 			// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
@@ -193,7 +145,7 @@ namespace svo {
 			
 			} else {
 				//// Split node into 8 children of same type
-				uint16_t node_ptr = chunk->alloc_node(*this, stack); // invalidates child_node
+				uint16_t node_ptr = chunk->alloc_node(allocator, stack); // invalidates child_node
 
 				// write ptr to children into this nodes slot in parents children array
 				stack[cur_scale].node->children[child_idx] = node_ptr;
@@ -258,7 +210,7 @@ namespace svo {
 				node = &chunk->nodes[child_data];
 			} else if (chunk == root && child_data != B_NULL) {
 				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-				chunk = chunk_allocator[child_data];
+				chunk = allocator[child_data];
 				node = chunk->nodes;
 			} else {
 				return (block_id)child_data;
@@ -315,7 +267,7 @@ namespace svo {
 					node->children[child_indx] = bid;
 				} else {
 					// Push
-					uint16_t nodei = chunk->alloc_node(*this, stack); // invalidates node
+					uint16_t nodei = chunk->alloc_node(allocator, stack); // invalidates node
 					chunk->nodes[nodei].leaf_mask = 0;
 					stack[scale].node->children[child_indx] = nodei;
 
@@ -334,15 +286,13 @@ namespace svo {
 	void free_chunk (SVO& svo, Chunk* chunk) {
 		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
 
-		if (chunk->nodes != chunk->tinydata)
-			decommit_pages(chunk->nodes, sizeof(AllocBlock));
-		svo.chunk_allocator.free(chunk);
+		svo.allocator.free_chunk(chunk);
 	}
 
 	void recurse_free (SVO& svo, uint32_t node, bool leaf) {
 		if (leaf) {
 			if (node != B_NULL) {
-				Chunk* chunk = svo.chunk_allocator[node];
+				Chunk* chunk = svo.allocator[node];
 				free_chunk(svo, chunk);
 			}
 		} else {
@@ -414,7 +364,7 @@ namespace svo {
 		if (leaf && chunk == svo.root) {
 			if (node == B_NULL) return;
 
-			chunk = svo.chunk_allocator[node];
+			chunk = svo.allocator[node];
 			node = 0;
 			leaf = false;
 		}
@@ -450,7 +400,7 @@ namespace svo {
 
 				assert(scale == svo.root->scale-1);
 
-				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
+				svo.octree_write(pos, scale, svo.allocator.indexof(chunk));
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
@@ -503,7 +453,7 @@ namespace svo {
 				for (int i=0; i<8; ++i) {
 					assert(siblings[i]->flags & LOCKED);
 					siblings[i]->flags &= ~LOCKED;
-					svo.octree_write(siblings[i]->pos, siblings[i]->scale, svo.chunk_allocator.indexof(siblings[i]));
+					svo.octree_write(siblings[i]->pos, siblings[i]->scale, svo.allocator.indexof(siblings[i]));
 				}
 			} break;
 
@@ -517,7 +467,7 @@ namespace svo {
 					free_chunk(svo, child);
 				}
 			
-				svo.octree_write(pos, scale, svo.chunk_allocator.indexof(chunk));
+				svo.octree_write(pos, scale, svo.allocator.indexof(chunk));
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
@@ -633,7 +583,7 @@ namespace svo {
 
 				switch (op.type) {
 					case LoadOp::CREATE: {
-						auto* chunk = chunk_allocator.alloc();
+						auto* chunk = allocator.alloc_chunk();
 						new (chunk) Chunk (op.pos, op.scale);
 
 						pending_chunks.insert(op.pos, op.scale, chunk);
@@ -650,7 +600,7 @@ namespace svo {
 							int child_scale = op.scale -1;
 							int3 child_pos = op.pos + (children_pos[i] << child_scale);
 
-							auto* chunk = chunk_allocator.alloc();
+							auto* chunk = allocator.alloc_chunk();
 							new (chunk) Chunk (child_pos, child_scale);
 
 							pending_chunks.insert(child_pos, child_scale, chunk);
@@ -662,7 +612,7 @@ namespace svo {
 
 					case LoadOp::MERGE: {
 						// merge
-						auto* chunk = chunk_allocator.alloc();
+						auto* chunk = allocator.alloc_chunk();
 						new (chunk) Chunk (op.pos, op.scale);
 					
 						parent_chunks.remove(op.pos, op.scale);
