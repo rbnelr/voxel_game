@@ -42,7 +42,7 @@
 #include "util/freelist_allocator.hpp"
 #include "util/geometry.hpp"
 #include "kissmath_colors.hpp"
-#include "util/move_only_class.hpp"
+#include "util/macros.hpp"
 #include "util/random.hpp"
 #include "util/raw_array.hpp"
 #include "util/read_directory.hpp"

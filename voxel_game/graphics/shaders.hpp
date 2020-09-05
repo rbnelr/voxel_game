@@ -11,6 +11,8 @@ struct ShaderManager {
 	// string is shader name, ie. source file path without .glsl
 	std::unordered_map<std::string, std::unique_ptr<gl::Shader>> shaders;
 
+	DirectoyChangeNotifier notify = DirectoyChangeNotifier(shaders_directory);
+
 	// Loads a shader file with filename "{name}.glsl" in shaders_directory which gets preprocessed into vertex, fragment, etc. shaders by only including
 	// $if {type}
 	//    ...
@@ -21,10 +23,12 @@ struct ShaderManager {
 	// $include "filepath" includes a file relative to the path of the current file
 	// $if $endif get processed at the same time as the $if $endif, so a $if fragment part in a file only included inside a $if vertex will never be included in the fragment shader
 	// Shaders gets stored into shaders hashmap and never removed until program exit
-	gl::Shader* load_shader (std::string name);
+	gl::Shader* load_shader (std::string name, std::initializer_list<SharedUniformsInfo> UBOs);
 
 	std::unordered_map<std::string, bool> shader_windows;
 	void imgui () {
+		reload_shaders_on_change();
+
 		if (!imgui_push("ShaderManager")) return;
 
 		for (auto it=shaders.begin(); it!=shaders.end(); ++it) {
@@ -62,6 +66,21 @@ struct ShaderManager {
 
 		imgui_pop();
 	}
+
+	void reload_shaders_on_change () {
+		auto changed_files = notify.poll_changes();
+
+		for (auto& it : shaders) {
+			if (changed_files.contains_any(it.second->sources, FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
+				clog(INFO, "reloading shader \"%s\" due to changed file", it.first.c_str());
+
+				auto new_shader = gl::load_shader(it.first, shaders_directory.c_str(), it.second->UBOs);
+
+				if (new_shader->shad != 0)
+					gl::swap(*it.second, *new_shader); // replace old shader with new shader without changing pointer
+			}
+		}
+	}
 };
 
 // global ShaderManager
@@ -73,10 +92,8 @@ struct Shader {
 	gl::Shader* shader = nullptr;
 
 	Shader () {}
-	Shader (std::string name, std::initializer_list<SharedUniformsInfo> uniforms={}) {
-		shader = shaders->load_shader(std::move(name));
-		for (auto& u : uniforms)
-			shader->bind_uniform_block(u);
+	Shader (std::string name, std::initializer_list<SharedUniformsInfo> UBOs={}) {
+		shader = shaders->load_shader(std::move(name), UBOs);
 	}
 
 	void bind () {

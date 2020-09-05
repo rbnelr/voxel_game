@@ -69,12 +69,11 @@ namespace gl {
 		}
 	}
 
-	void bind_uniform_blocks (Shader* shad) {
-		for (auto& u : COMMON_UNIFORMS) {
-			GLuint index = glGetUniformBlockIndex(shad->shad, u.name);   
-			if (index != GL_INVALID_INDEX) {
-				glUniformBlockBinding(shad->shad, index, u.binding_point);
-			}
+
+	void gl::Shader::bind_uniform_block (SharedUniformsInfo const& u) {
+		GLuint index = glGetUniformBlockIndex(shad, u.name);   
+		if (index != GL_INVALID_INDEX) {
+			glUniformBlockBinding(shad, index, u.binding_point);
 		}
 	}
 
@@ -84,13 +83,6 @@ namespace gl {
 			return false;
 		*u = ret->second;
 		return true;
-	}
-
-	void gl::Shader::bind_uniform_block (SharedUniformsInfo const& u) {
-		GLuint index = glGetUniformBlockIndex(shad, u.name);   
-		if (index != GL_INVALID_INDEX) {
-			glUniformBlockBinding(shad, index, u.binding_point);
-		}
 	}
 
 	kiss::raw_data gl::Shader::get_program_binary (uint64_t* size) {
@@ -195,6 +187,7 @@ namespace gl {
 		const char*		shader_name;
 		Shader*			shader;
 		string_view		type;
+		const char*		shaders_directory;
 
 		// shader had a $compile <type> command with matching type
 		bool			compile_shader = false;
@@ -386,7 +379,7 @@ namespace gl {
 
 					std::string inc_filename = string(path).append(arg);
 					std::string inc_source;
-					if (!kiss::load_text_file(inc_filename.c_str(), &inc_source)) {
+					if (!kiss::load_text_file(prints("%s%s", shaders_directory, inc_filename.c_str()).c_str(), &inc_source)) {
 						clog(ERROR, "Could not find include file \"%s\" for shader \"%s\"!\n", inc_filename.c_str(), shader_name);
 						return false;
 					}
@@ -510,7 +503,7 @@ namespace gl {
 		return str;
 	}
 
-	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, std::string_view filename, Shader* shader, std::string const& name, bool* error, std::vector<std::string>* preprocessed_sources) {
+	GLuint load_shader_part (const char* type, GLenum gl_type, std::string const& source, char const* shaders_directory, std::string_view filename, Shader* shader, std::string const& name, bool* error, std::vector<std::string>* preprocessed_sources) {
 
 		std::string preprocessed = "";
 		{
@@ -518,6 +511,7 @@ namespace gl {
 			pp.type = type;
 			pp.shader_name = name.c_str();
 			pp.shader = shader;
+			pp.shaders_directory = shaders_directory;
 			if (!pp.preprocess_shader(source.c_str(), filename, &preprocessed)) {
 				*error = true;
 				return 0;
@@ -563,13 +557,13 @@ namespace gl {
 		return shad;
 	}
 
-	std::unique_ptr<Shader> load_shader (string const& name, const char* shaders_directory) {
+	std::unique_ptr<Shader> load_shader (string const& name, const char* shaders_directory, std::vector<SharedUniformsInfo> UBOs) {
 		auto s = std::make_unique<Shader>();
 
 		// Load shader base source file
-		string filename = prints("%s%s.glsl", shaders_directory, name.c_str());
+		string filename = prints("%s.glsl", name.c_str());
 		string source;
-		if (!kiss::load_text_file(filename.c_str(), &source)) {
+		if (!kiss::load_text_file(prints("%s%s", shaders_directory, filename.c_str()).c_str(), &source)) {
 			clog(ERROR, "Could not load base source file for shader \"%s\"!\n", name.c_str());
 			return s;
 		}
@@ -578,9 +572,9 @@ namespace gl {
 
 		// Load, proprocess and compile shader parts
 		bool error = false;
-		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, filename, s.get(), name, &error, &s->preprocessed_sources);
-		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
-		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint vert = load_shader_part("vertex",   GL_VERTEX_SHADER  , source, shaders_directory, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint frag = load_shader_part("fragment", GL_FRAGMENT_SHADER, source, shaders_directory, filename, s.get(), name, &error, &s->preprocessed_sources);
+		GLuint geom = load_shader_part("geometry", GL_GEOMETRY_SHADER, source, shaders_directory, filename, s.get(), name, &error, &s->preprocessed_sources);
 
 		// Insert source file into sources set
 		if (std::find(s->sources.begin(), s->sources.end(), filename) == s->sources.end())
@@ -624,7 +618,14 @@ namespace gl {
 		}
 
 		get_all_uniforms(s.get(), name.c_str());
-		bind_uniform_blocks(s.get());
+
+		for (auto& u : COMMON_UNIFORMS)
+			s->bind_uniform_block(u);
+
+		s->UBOs = std::move(UBOs);
+		for (auto& u : s->UBOs)
+			s->bind_uniform_block(u);
+
 		return s;
 	}
 }

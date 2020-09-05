@@ -16,8 +16,6 @@ namespace svo {
 	// how far to move in blocks in the opposite direction of a root move before it happens again, to prevent unneeded root moves
 	static constexpr float ROOT_MOVE_HISTER = 20;
 
-	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
-
 	struct LoadOp {
 		Chunk* chunk;
 		int3 pos;
@@ -31,72 +29,8 @@ namespace svo {
 		} type;
 	};
 
-	template <typename VALT>
-	struct ChunkHashmap {
-		std::unordered_map<ChunkKey, VALT> chunks;
+	inline int set_root_scale = 12;
 
-		bool get (int3 pos, int scale, VALT* val) {
-			auto it = chunks.find(int4(pos, scale));
-			if (it != chunks.end()) {
-				*val = it->second;
-				return true;
-			} else {
-				return false;
-			}
-		}
-		VALT* get (int3 pos, int scale) {
-			auto it = chunks.find(int4(pos, scale));
-			if (it != chunks.end()) {
-				return &it->second;
-			} else {
-				return nullptr;
-			}
-		}
-		bool contains (int3 pos, int scale) {
-			VALT val;
-			return get(pos, scale, &val);
-		}
-		// insert new, error if already exist 
-		void insert (int3 pos, int scale, VALT chunk) {
-			assert(!contains(pos, scale));
-			chunks.emplace(int4(pos, scale), chunk);
-		}
-		// remove, return old if did exist
-		VALT remove (int3 pos, int scale) {
-			auto it = chunks.find(int4(pos, scale));
-			if (it != chunks.end()) {
-				VALT val = it->second;
-				chunks.erase(it);
-				return val;
-			} else {
-				return VALT();
-			}
-		}
-
-		int count () {
-			return (int)chunks.size();
-		}
-
-		struct Iterator {
-			typename decltype(chunks)::iterator it;
-
-			Chunk* operator* () { return it->second; }
-			Iterator& operator++ () {
-				++it;
-				return *this;
-			}
-			bool operator!= (Iterator const& r) { return it != r.it; }
-			bool operator== (Iterator const& r) { return it != r.it; }
-		};
-		Iterator begin () {
-			Iterator it = { chunks.begin() };
-			return it;
-		}
-		Iterator end () {
-			return { chunks.end() };
-		}
-	};
-	
 	struct SVO {
 		Chunk*	root;
 
@@ -119,16 +53,19 @@ namespace svo {
 		bool debug_draw_air = false;
 		int debug_draw_octree_min = 3;
 		int debug_draw_octree_max = 20;
+		float debug_draw_octree_range = 100;
 
 		void imgui () {
 			if (!imgui_push("SVO")) return;
 
+			ImGui::DragInt("root_scale", &set_root_scale);
 			ImGui::Checkbox("debug_draw_chunks", &debug_draw_chunks);
 			ImGui::Checkbox("debug_draw_chunks_onlyz0", &debug_draw_chunks_onlyz0);
 			ImGui::Checkbox("debug_draw_svo", &debug_draw_svo);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0,20);
 			ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0,20);
+			ImGui::SliderFloat("debug_draw_octree_range", &debug_draw_octree_range, 0,2048, "%f", 2);
 
 			uintptr_t chunks_count = 0;
 			uintptr_t active_nodes = 0;
@@ -178,7 +115,7 @@ namespace svo {
 		}
 
 		SVO () {
-			uint8_t root_scale = 16;
+			uint8_t root_scale = (uint8_t)set_root_scale;
 			int3 root_pos = -(1 << (root_scale - 1));
 			
 			root = allocator.alloc_chunk();

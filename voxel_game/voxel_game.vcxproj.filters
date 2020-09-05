@@ -106,9 +106,6 @@
       <Filter>util</Filter>
     </ClInclude>
     <ClInclude Include="block_update.hpp" />
-    <ClInclude Include="util\move_only_class.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
     <ClInclude Include="util\animation.hpp">
       <Filter>util</Filter>
     </ClInclude>
@@ -262,6 +259,9 @@
     <ClInclude Include="threading.hpp" />
     <ClInclude Include="voxel_system.hpp" />
     <ClInclude Include="svo_alloc.hpp" />
+    <ClInclude Include="util\macros.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">
@@ -379,6 +379,7 @@
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="svo.cpp" />
     <ClCompile Include="voxel_mesher.cpp" />
+    <ClCompile Include="svo_alloc.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

@@ -118,7 +118,7 @@ namespace svo {
 			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(pos.x, pos.y, pos.z, size);
+			int child_idx = get_child_index(x, y, z, size);
 
 			// update stack
 			stack[cur_scale].node = node;
@@ -207,7 +207,7 @@ namespace svo {
 			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(pos.x, pos.y, pos.z, size);
+			int child_idx = get_child_index(x, y, z, size);
 
 			uint16_t child_data = node->children[child_idx];
 			bool leaf = node->leaf_mask & (1u << child_idx);
@@ -368,7 +368,7 @@ namespace svo {
 		svo.root->pos = pos;
 	}
 
-	void recurse_draw (SVO& svo, Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale) {
+	void recurse_draw (SVO& svo, Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale, float3 player_pos) {
 		if (leaf && chunk == svo.root) {
 			if (node == B_NULL) return;
 
@@ -379,6 +379,10 @@ namespace svo {
 
 		float size = (float)(1 << scale);
 		
+		float3 pos_rel = player_pos - (float3)pos;
+		float dist = max_component(abs(clamp(pos_rel, 0, size) - pos_rel));
+		if (dist > svo.debug_draw_octree_range) return;
+
 		auto col = cols[scale % ARRLEN(cols)];
 		if ((!leaf || node > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max)
 			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
@@ -391,7 +395,7 @@ namespace svo {
 			for (int i=0; i<8; ++i) {
 				int3 child_pos = pos + (children_pos[i] << child_scale);
 
-				recurse_draw(svo, chunk, children.children[i], children.leaf_mask & (1u << i), child_pos, child_scale);
+				recurse_draw(svo, chunk, children.children[i], children.leaf_mask & (1u << i), child_pos, child_scale, player_pos);
 			}
 		}
 	}
@@ -649,7 +653,7 @@ namespace svo {
 		if (debug_draw_svo) {
 			ZoneScopedN("SVO::debug_draw");
 		
-			recurse_draw(*this, root, 0, false, root->pos, root->scale);
+			recurse_draw(*this, root, 0, false, root->pos, root->scale, player.pos);
 		}
 
 		if (debug_draw_chunks) {

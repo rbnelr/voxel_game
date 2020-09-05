@@ -1,6 +1,6 @@
 #pragma once
 #include <thread>
-#include "move_only_class.hpp"
+#include "macros.hpp"
 #include "threadsafe_queue.hpp"
 #include "string.hpp"
 #include "Tracy.hpp"

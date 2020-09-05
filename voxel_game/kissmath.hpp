@@ -86,11 +86,3 @@ namespace std {
 
 using namespace kissmath;
 
-#define ENUM_BITFLAG_OPERATORS(e, itype) \
-	inline e operator| (e l, e r) { return (e)((itype)l | (itype)r); } \
-	inline e operator& (e l, e r) { return (e)((itype)l & (itype)r); } \
-	inline e operator^ (e l, e r) { return (e)((itype)l ^ (itype)r); } \
-	inline e operator~ (e l) { return (e)(~(itype)l); } \
-	inline e& operator|= (e& l, e r) { return l = (e)((itype)l | (itype)r); } \
-	inline e& operator&= (e& l, e r) { return l = (e)((itype)l & (itype)r); } \
-	inline e& operator^= (e& l, e r) { return l = (e)((itype)l ^ (itype)r); }

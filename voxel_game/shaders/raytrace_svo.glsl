@@ -437,6 +437,8 @@ $if fragment
 						chunk = node << 16u;
 						node = 0;
 						leaf = false;
+
+						DEBUG(vec3(1,0,0));
 					}
 
 					uint child_node = chunk | node;

@@ -31,7 +31,7 @@ namespace svo {
 		LOCKED = 1, // read only, still displayed but not allowed to be modified
 		GPU_DIRTY = 2,
 	};
-	ENUM_BITFLAG_OPERATORS(ChunkFlags, uint8_t)
+	ENUM_BITFLAG_OPERATORS_TYPE(ChunkFlags, uint8_t)
 
 	struct Chunk {
 		Node* nodes;
@@ -58,6 +58,7 @@ namespace svo {
 			alloc_ptr = 0;
 			dead_count = 0;
 			commit_ptr = (uint32_t)ARRLEN(tinydata);
+			gpu_commit_ptr = 0;
 
 		#if DBG_MEMSET
 			memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
@@ -69,16 +70,88 @@ namespace svo {
 	};
 	static constexpr auto _sz = sizeof(Chunk);
 
-	inline int get_gpu_page_size () {
-		if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
-			return 0;
+	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
+
+	template <typename VALT>
+	struct ChunkHashmap {
+		std::unordered_map<ChunkKey, VALT> chunks;
+
+		bool get (int3 pos, int scale, VALT* val) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				*val = it->second;
+				return true;
+			} else {
+				return false;
+			}
+		}
+		VALT* get (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				return &it->second;
+			} else {
+				return nullptr;
+			}
+		}
+		bool contains (int3 pos, int scale) {
+			VALT val;
+			return get(pos, scale, &val);
+		}
+		// insert new, error if already exist 
+		void insert (int3 pos, int scale, VALT chunk) {
+			assert(!contains(pos, scale));
+			chunks.emplace(int4(pos, scale), chunk);
+		}
+		// remove, return old if did exist
+		VALT remove (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				VALT val = it->second;
+				chunks.erase(it);
+				return val;
+			} else {
+				return VALT();
+			}
 		}
 
-		GLint i;
-		glGetIntegerv(GL_SPARSE_BUFFER_PAGE_SIZE_ARB, &i);
-		return i;
-	}
-	inline int gpu_page_size;
+		int count () {
+			return (int)chunks.size();
+		}
+
+		struct Iterator {
+			typename decltype(chunks)::iterator it;
+
+			Chunk* operator* () { return it->second; }
+			Iterator& operator++ () {
+				++it;
+				return *this;
+			}
+			bool operator!= (Iterator const& r) { return it != r.it; }
+			bool operator== (Iterator const& r) { return it != r.it; }
+		};
+		Iterator begin () {
+			Iterator it = { chunks.begin() };
+			return it;
+		}
+		Iterator end () {
+			return { chunks.end() };
+		}
+	};
+
+	struct SVO;
+
+	struct glSparseBuffer {
+		int gpu_page_size = 0;
+		GLuint ssbo = 0;
+
+		glSparseBuffer ();
+		~glSparseBuffer () {
+			if (ssbo != 0)
+				glDeleteBuffers(1, &ssbo);
+		}
+
+		void upload_changes (SVO& svo);
+	};
 
 	struct SVOAllocator {
 
@@ -90,7 +163,7 @@ namespace svo {
 		// error C2148: total size of array must not exceed 0x7fffffff bytes, MSVC bug/issue
 		struct Memory {
 			Chunk chunks[MAX_CHUNKS]; // sparse based on free_chunks
-			Node nodes[100/*workaround MAX_CHUNKS*/][MAX_NODES]; // sparse based on commit_ptr in Chunk
+			Node nodes[100/*workaround error C2148 MAX_CHUNKS*/][MAX_NODES]; // sparse based on commit_ptr in Chunk
 		};
 		static constexpr uintptr_t RESERVE_SIZE = sizeof(Chunk) * MAX_CHUNKS + sizeof(Node) * MAX_CHUNKS * MAX_NODES; //sizeof(Memory);
 
@@ -99,12 +172,12 @@ namespace svo {
 		
 		// size of committed regions of pages for chunk structs
 		int						commit_ptr = 0;
-		int						gpu_commit_ptr = 0;
 
 		Bitset					free_chunks;
 
+		glSparseBuffer			gpu_nodes;
+
 		SVOAllocator () {
-			gpu_page_size = get_gpu_page_size();
 			
 			mem = (Memory*)reserve_address_space(RESERVE_SIZE);
 		}

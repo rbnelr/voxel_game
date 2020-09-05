@@ -2,7 +2,6 @@
 #include "stdafx.hpp"
 #include "../kissmath.hpp"
 #include "../util/file_io.hpp"
-#include "../util/move_only_class.hpp"
 #include "assert.h"
 
 struct _Format {

@@ -243,7 +243,7 @@
     <ClInclude Include="stb_image.hpp" />
     <ClInclude Include="util\file_io.hpp" />
     <ClInclude Include="util\collision.hpp" />
-    <ClInclude Include="util\move_only_class.hpp" />
+    <ClInclude Include="util\macros.hpp" />
     <ClInclude Include="util\random.hpp" />
     <ClInclude Include="util\running_average.hpp" />
     <ClInclude Include="util\string.hpp" />
@@ -297,6 +297,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="svo_alloc.cpp" />
     <ClCompile Include="time_of_day.cpp" />
     <ClCompile Include="util\read_directory.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

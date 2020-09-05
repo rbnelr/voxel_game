@@ -21,10 +21,6 @@ public:
 	Sampler gradient_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
 	Sampler water_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 	
-	GLuint svo_ssbo;
-
-	Raytracer ();
-
 	Texture1D block_tile_info_texture;
 	
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };

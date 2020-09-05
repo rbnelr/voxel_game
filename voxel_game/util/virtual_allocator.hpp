@@ -1,6 +1,6 @@
 #pragma once
 #include "stdint.h"
-#include "move_only_class.hpp"
+#include "macros.hpp"
 #include "assert.h"
 #include <vector>
 #include <string>
