@@ -39,6 +39,12 @@ uint32_t _bsf_nonzero (uint64_t val) {
 	assert(ret);
 	return idx;
 }
+uint32_t _bsr_zero (uint64_t val) {
+	unsigned long idx;
+	auto ret = _BitScanReverse64(&idx, ~val);
+	assert(ret);
+	return idx;
+}
 
 // returns count*64 if no set bit found
 uint32_t _bitscan (uint64_t* bits, uint32_t count, uint32_t start=0) {
@@ -89,4 +95,10 @@ void Bitset::set_bit (uint32_t idx, uint64_t* new_bits) {
 
 	// keep first_set up to date
 	first_set = std::min(first_set, idx);
+}
+uint32_t Bitset::scan_last_alloc () {
+	if (bits.empty())
+		return 0;
+
+	return (uint32_t)(bits.size() -1) * 64 + _bsr_zero(bits.back());
 }

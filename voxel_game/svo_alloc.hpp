@@ -44,8 +44,9 @@ namespace svo {
 		uint32_t alloc_ptr;
 		uint32_t dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
 		uint32_t commit_ptr;
+		uint32_t gpu_commit_ptr;
 
-		char _pad[28];
+		char _pad[24];
 
 		Node tinydata[6];
 
@@ -67,6 +68,17 @@ namespace svo {
 	};
 	static constexpr uint32_t _sz = sizeof(Chunk);
 
+	inline uint32_t get_gpu_page_size () {
+		if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
+			return 0;
+		}
+
+		GLint i;
+		glGetIntegerv(GL_SPARSE_BUFFER_PAGE_SIZE_ARB, &i);
+		return (uint32_t)i;
+	}
+	inline uint32_t gpu_page_size;
+
 	struct SVOAllocator {
 
 		static_assert(is_pot(sizeof(Chunk)), "sizeof(Chunk) needs to be power of two!");
@@ -82,22 +94,17 @@ namespace svo {
 		static constexpr uintptr_t RESERVE_SIZE = sizeof(Chunk) * MAX_CHUNKS + sizeof(Node) * MAX_CHUNKS * MAX_NODES; //sizeof(Memory);
 
 		Memory*					mem;
-
 		uint32_t				chunk_count = 0;
+		
+		// size of committed regions of pages for chunk structs
+		uint32_t				commit_ptr = 0;
+		uint32_t				gpu_commit_ptr = 0;
 
-		// sparse chunk paging
 		Bitset					free_chunks;
-		uint32_t				paging_shift_mask;
-		uint32_t				paging_mask;
 
 		SVOAllocator () {
-			uint32_t chunks_per_page = (uint32_t)(os_page_size / sizeof(Chunk));
-			assert(chunks_per_page <= 64); // cannot support more than 64 slots per os page, would require multiple bitset reads to check commit status
-
-			uint32_t tmp = max(chunks_per_page, 1); // prevent 0 problems
-			paging_shift_mask = 0b111111u ^ (tmp - 1); // indx in 64 bitset block, then round down to slots_per_page
-			paging_mask = (1u << tmp) - 1; // simply slots_per_page 1 bits
-
+			gpu_page_size = get_gpu_page_size();
+			
 			mem = (Memory*)reserve_address_space(RESERVE_SIZE);
 		}
 
@@ -105,22 +112,21 @@ namespace svo {
 			release_address_space(mem, RESERVE_SIZE);
 		}
 
+		static inline const uint32_t chunks_per_page = os_page_size / (uint32_t)sizeof(Chunk);
+
 		// Allocate first possible slot
 		Chunk* alloc_chunk () {
 			assert(chunk_count < MAX_CHUNKS);
 
-			uint64_t prev_bits;
-			uint32_t idx = free_chunks.clear_first_1(&prev_bits);
+			uint32_t idx = free_chunks.clear_first_1();
 			chunk_count++;
 
 			Chunk* chunk = &mem->chunks[idx];
 
-			// get bits representing prev alloc status of all slots in affected page
-			prev_bits >>= idx & paging_shift_mask;
-
 			// commit page if all page slots were free before
-			if (((uint32_t)prev_bits & paging_mask) == paging_mask) {
-				commit_pages((void*)((uintptr_t)chunk & ~(uintptr_t)(os_page_size-1)), os_page_size);
+			if (idx >= commit_ptr) {
+				commit_pages(mem->chunks + commit_ptr, os_page_size);
+				commit_ptr += chunks_per_page;
 
 			#if DBG_MEMSET
 				memset(chunk, DBG_MEMSET_VAL, os_page_size);
@@ -137,16 +143,16 @@ namespace svo {
 
 			uint32_t idx = indexof(chunk);
 
-			uint64_t new_bits;
-			free_chunks.set_bit(idx, &new_bits);
+			free_chunks.set_bit(idx);
 			chunk_count--;
 
-			// get bits representing new alloc status of all slots in affected page
-			new_bits >>= idx & paging_shift_mask;
+			uint32_t last_alloc = free_chunks.scan_last_alloc();
 
-			// decommit page if all page slots are free now
-			if (((uint32_t)new_bits & paging_mask) == paging_mask) {
-				decommit_pages((void*)((uintptr_t)chunk & ~(uintptr_t)(os_page_size-1)), os_page_size);
+			// decommit last page(s) if all chunks in pages are free now
+			if (last_alloc < commit_ptr - chunks_per_page) {
+				uint32_t old_commit = commit_ptr;
+				commit_ptr = (last_alloc + 1) & ~(chunks_per_page -1); // round down to page boundary
+				decommit_pages(mem->chunks + commit_ptr, (old_commit - commit_ptr) * (uint32_t)sizeof(Chunk));
 			}
 		}
 

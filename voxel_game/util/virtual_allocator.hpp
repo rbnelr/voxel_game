@@ -106,4 +106,7 @@ struct Bitset {
 
 	// set a bit, safe to set bit that's already set
 	void set_bit (uint32_t idx, uint64_t* new_bits=nullptr);
+
+	// get index of last non-free (zero) bit
+	uint32_t scan_last_alloc ();
 };

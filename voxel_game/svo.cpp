@@ -305,6 +305,8 @@ namespace svo {
 
 	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
 	void update_root_move (SVO& svo, Player& player) {
+		return; // TODO: current lod system is not compatible with root move, unless root move could somehow discard all in-process async chunk generation
+
 		int shift = svo.root->scale - 1;
 		float half_root_scalef = (float)(1 << shift);
 

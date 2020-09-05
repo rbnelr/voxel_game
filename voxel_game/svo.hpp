@@ -140,7 +140,7 @@ namespace svo {
 				commit_nodes += chunk->commit_ptr;
 			}
 
-			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(chunks_count * sizeof(Chunk)) / 1024);
+			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(allocator.commit_ptr * sizeof(Chunk)) / 1024);
 			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %.0f | %.0f",
 				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
 			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",

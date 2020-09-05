@@ -51,6 +51,7 @@ struct ChunkGenerator {
 
 	float highest_blocks[CHUNK_SIZE][CHUNK_SIZE];
 	float earth_layers[CHUNK_SIZE][CHUNK_SIZE];
+	float sand_thicknesss[CHUNK_SIZE][CHUNK_SIZE];
 
 	float noise (float2 pos, float period, float ang_offs, float2 offs, float range_l=0, float range_h=1) {
 		pos = rotate2(ang_offs) * pos;
@@ -161,6 +162,8 @@ struct ChunkGenerator {
 		int water_level = 21;
 
 		{
+			ZoneScopedN("2d noise eval");
+
 			int2 i;
 			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
@@ -168,14 +171,18 @@ struct ChunkGenerator {
 
 					float earth_layer;
 					float height = heightmap((float2)pos_world, &earth_layer);
+					float sand_thickness = noise((float2)pos_world, 7.2f, deg(237.17f), 0, 0.8f, 1.7f);
 
 					highest_blocks[i.y][i.x] = height;
 					earth_layers[i.y][i.x] = earth_layer;
+					sand_thicknesss[i.y][i.x] = sand_thickness;
 				}
 			}
 		}
 
 		{
+			ZoneScopedN("3d block write");
+
 			int3 i;
 			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
 				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
@@ -190,7 +197,7 @@ struct ChunkGenerator {
 
 						bool over_water = water_level > highest_block;
 						
-						float sand_thickness = noise((float2)(int2)pos_world, 7.2f, deg(237.17f), 0, 0.8f, 1.7f);
+						float sand_thickness = sand_thicknesss[i.y][i.x];
 						bool beach = abs(highest_block - water_level) <= sand_thickness/2;
 
 						if (pos_world.z <= highest_block) {
@@ -222,51 +229,55 @@ struct ChunkGenerator {
 		ZoneScoped;
 
 		std::vector<int3> tree_poss;
-	
-		auto find_min_tree_dist = [&] (int2 new_tree_pos) {
-			float min_dist = +INF;
-			for (int3 p : tree_poss)
-				min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
-			return min_dist;
-		};
-	
-		int3 i;
-		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
-			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
-				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-					int3 pos_world = (i << lod) + chunk_origin;
-					
-					block_id* bid   =           &blocks[i.z    ][i.y][i.x];
-					block_id* below = i.z > 0 ? &blocks[i.z - 1][i.y][i.x] : nullptr;
-	
-					if (*bid == B_AIR && below && (*below == B_GRASS || *below == B_EARTH)) {
-						float tree_density = noise_tree_density((float2)(int2)pos_world);
-	
-						float grass_density = noise_grass_density((float2)(int2)pos_world);
-	
-						float tree_prox_prob = gradient<float>( find_min_tree_dist((int2)i), {
-							{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
-							{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
-							{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
-							{ 4,		0.75f },
-							{ 6,		1 },
-							});
-						float effective_tree_prob = tree_density * tree_prox_prob;
-	
-						// TODO: can do these if else if chance things with just a single rand call by taking the remaining prob
-						// ex. first case has 60% prob -> if (rand < .6)    rand = [0,1]
-						//     second case wants 30% prob -> possible range now [.6,1] -> if (rand < 0.72)    0.72 = (1 - 0.6) * 0.3 + 0.6     ==   a + b - a * b
+		
+		{
+			ZoneScopedN("iterate blocks");
 
-						if (rand.uniform() < effective_tree_prob) {
-							*below = B_EARTH;
+			auto find_min_tree_dist = [&] (int2 new_tree_pos) {
+				float min_dist = +INF;
+				for (int3 p : tree_poss)
+					min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
+				return min_dist;
+			};
 	
-							{
-								tree_poss.push_back(i);
+			int3 i;
+			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+						int3 pos_world = (i << lod) + chunk_origin;
+					
+						block_id* bid   =           &blocks[i.z    ][i.y][i.x];
+						block_id* below = i.z > 0 ? &blocks[i.z - 1][i.y][i.x] : nullptr;
+	
+						if (*bid == B_AIR && below && (*below == B_GRASS || *below == B_EARTH)) {
+							float tree_density = noise_tree_density((float2)(int2)pos_world);
+	
+							float grass_density = noise_grass_density((float2)(int2)pos_world);
+	
+							float tree_prox_prob = gradient<float>( find_min_tree_dist((int2)i), {
+								{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
+								{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
+								{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
+								{ 4,		0.75f },
+								{ 6,		1 },
+								});
+							float effective_tree_prob = tree_density * tree_prox_prob;
+	
+							// TODO: can do these if else if chance things with just a single rand call by taking the remaining prob
+							// ex. first case has 60% prob -> if (rand < .6)    rand = [0,1]
+							//     second case wants 30% prob -> possible range now [.6,1] -> if (rand < 0.72)    0.72 = (1 - 0.6) * 0.3 + 0.6     ==   a + b - a * b
+
+							if (rand.uniform() < effective_tree_prob) {
+								*below = B_EARTH;
+	
+								{
+									tree_poss.push_back(i);
+								}
+							} else if (rand.uniform() < grass_density) {
+								*bid = B_TALLGRASS;
+							} else if (rand.uniform() < 0.0005f) {
+								*bid = B_TORCH;
 							}
-						} else if (rand.uniform() < grass_density) {
-							*bid = B_TALLGRASS;
-						} else if (rand.uniform() < 0.0005f) {
-							*bid = B_TORCH;
 						}
 					}
 				}
@@ -274,6 +285,7 @@ struct ChunkGenerator {
 		}
 	
 		auto place_tree = [&] (int3 pos) {
+			ZoneScopedN("place_tree");
 			
 			auto place_block = [&] (int3 pos, block_id bt) {
 				if (any(pos < 0 || pos >= CHUNK_SIZE)) return;
