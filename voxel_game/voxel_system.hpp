@@ -24,8 +24,8 @@ public:
 	void imgui () {
 		if (!imgui_push("Voxels")) return;
 
-		ImGui::DragFloat("load_lod_start", &load_lod_start, 1);
-		ImGui::DragFloat("load_lod_unit", &load_lod_unit, 1);
+		ImGui::DragFloat("load_lod_start", &load_lod_start, 1, 0, 1024);
+		ImGui::DragFloat("load_lod_unit", &load_lod_unit, 1, 16, 1024);
 
 		ImGui::DragInt("cap_chunk_load", &cap_chunk_load, 0.02f);
 		ImGui::DragInt("cap_chunk_mesh", &cap_chunk_mesh, 0.02f);

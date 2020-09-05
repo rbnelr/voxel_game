@@ -2,7 +2,6 @@
 #include "stdint.h"
 #include "move_only_class.hpp"
 #include "assert.h"
-#include "tracy.hpp"
 #include <vector>
 #include <string>
 #include "dear_imgui.hpp"
@@ -13,7 +12,7 @@
 
 uint32_t get_os_page_size ();
 
-inline const uint32_t os_page_size = get_os_page_size();
+inline const int os_page_size = get_os_page_size();
 
 void* reserve_address_space (uintptr_t size);
 void release_address_space (void* baseptr, uintptr_t size);
@@ -99,14 +98,19 @@ public:
 // Bitset used in allocators to find the lowest free slot in a fast way
 struct Bitset {
 	std::vector<uint64_t>	bits;
-	uint32_t				first_set = 0; // index of first set bit in bits, to possibly speed up scanning
+	int						first_set = 0; // index of first set bit in bits, to possibly speed up scanning
 
 	// finds the first 1 bit and clears it, returns the index of the bit
-	uint32_t clear_first_1 (uint64_t* prev_bits=nullptr);
+	int clear_first_1 ();
 
 	// set a bit, safe to set bit that's already set
-	void set_bit (uint32_t idx, uint64_t* new_bits=nullptr);
+	void set_bit (int idx);
 
-	// get index of last non-free (zero) bit
-	uint32_t scan_last_alloc ();
+	// get index of first free (1) bit, starting at some point in the array
+	// returns one past end of array if no 1 bit found, because that one needs to be the next one allocated
+	int bitscan_forward_1 (int start=0);
+
+	// get index of last allocated (0) bit
+	// returns -1 if not 0 bits are found, because all bits can be freed
+	int bitscan_reverse_0 ();
 };

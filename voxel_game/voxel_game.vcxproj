@@ -71,7 +71,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)tracy\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -96,7 +96,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)tracy\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
@@ -127,7 +127,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)tracy\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>

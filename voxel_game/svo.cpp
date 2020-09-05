@@ -60,7 +60,7 @@ namespace svo {
 		srgba(255,127,255),
 	};
 
-	int get_child_index (int3 pos, int scale) {
+	int get_child_index (int x, int y, int z, int size) {
 		//// Subpar asm generated for a lot of these, at least from what I can tell, might need to look into this if I octree decent actually becomes a bottleneck
 		//return	(((pos.x >> scale) & 1) << 0) |
 		//		(((pos.y >> scale) & 1) << 1) |
@@ -69,9 +69,9 @@ namespace svo {
 		//		((pos.y >> (scale-1)) & 2) |
 		//		((pos.z >> (scale-2)) & 4);
 		int ret = 0;
-		if (pos.x & (1 << scale))	ret  = 1;
-		if (pos.y & (1 << scale))	ret += 2;
-		if (pos.z & (1 << scale))	ret += 4;
+		if (x & size) ret |= 1;
+		if (y & size) ret |= 2;
+		if (z & size) ret |= 4;
 		return ret;
 	}
 
@@ -90,8 +90,11 @@ namespace svo {
 	void SVO::octree_write (int3 pos, int scale, uint16_t val) {
 		ZoneScoped;
 
-		pos -= root->pos;
-		if (any(pos < 0 || pos >= (1 << root->scale))) {
+		int size = 1 << root->scale;
+		int x = pos.x - root->pos.x;
+		int y = pos.y - root->pos.y;
+		int z = pos.z - root->pos.z;
+		if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size) {
 			// writes outside the root node are not possible, should never be attempted by caller
 			assert(false);
 		}
@@ -111,10 +114,11 @@ namespace svo {
 
 		for (;;) {
 			cur_scale--;
-			assert(cur_scale >= 0);
+			size >>= 1;
+			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(pos, cur_scale);
+			int child_idx = get_child_index(pos.x, pos.y, pos.z, size);
 
 			// update stack
 			stack[cur_scale].node = node;
@@ -149,7 +153,7 @@ namespace svo {
 
 				// write ptr to children into this nodes slot in parents children array
 				stack[cur_scale].node->children[child_idx] = node_ptr;
-				stack[cur_scale].node->leaf_mask ^= (1u << child_idx);
+				stack[cur_scale].node->leaf_mask &= ~(1u << child_idx);
 
 				// init and recurse into new node
 				node = &chunk->nodes[node_ptr];
@@ -187,21 +191,23 @@ namespace svo {
 	block_id SVO::octree_read (int3 pos) {
 		ZoneScoped;
 
-		pos -= root->pos;
-		if (any(pos < 0 || pos >= (1 << root->scale)))
+		int size = 1 << root->scale;
+		int x = pos.x - root->pos.x;
+		int y = pos.y - root->pos.y;
+		int z = pos.z - root->pos.z;
+		if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size)
 			return B_NULL;
-
+		
 		// start with root node
 		Chunk* chunk = root;
-		int cur_scale = root->scale;
 		Node* node = &root->nodes[0];
 
 		for (;;) {
-			cur_scale--;
-			assert(cur_scale >= 0);
+			size >>= 1;
+			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(pos, cur_scale);
+			int child_idx = get_child_index(pos.x, pos.y, pos.z, size);
 
 			uint16_t child_data = node->children[child_idx];
 			bool leaf = node->leaf_mask & (1u << child_idx);
@@ -286,7 +292,7 @@ namespace svo {
 	void free_chunk (SVO& svo, Chunk* chunk) {
 		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
 
-		svo.allocator.free_chunk(chunk);
+		svo.allocator.free_chunk(chunk, svo.chunks);
 	}
 
 	void recurse_free (SVO& svo, uint32_t node, bool leaf) {
@@ -461,7 +467,7 @@ namespace svo {
 
 			case LoadOp::MERGE: {
 				clog("apply MERGE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
-			
+				
 				// delete children
 				for (int i=0; i<8; ++i) {
 					int3 child_pos = pos + (children_pos[i] << scale-1);
@@ -524,7 +530,10 @@ namespace svo {
 				float3 clamped = clamp(pos_rel, 0, size);
 				float dist = length(clamped - pos_rel);
 
-				int lod = max(floori(log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit )), 0);
+				assert(dist >= 0 && voxels.load_lod_start >= 0 && voxels.load_lod_unit > 0);
+
+				float lg = log2f( (dist - voxels.load_lod_start) / voxels.load_lod_unit );
+				int lod = max(floori(lg), 0);
 
 				*out_dist = dist;
 				return lod;

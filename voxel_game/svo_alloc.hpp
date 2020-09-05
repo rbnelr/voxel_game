@@ -41,10 +41,10 @@ namespace svo {
 
 		ChunkFlags flags;
 
-		uint32_t alloc_ptr;
-		uint32_t dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
-		uint32_t commit_ptr;
-		uint32_t gpu_commit_ptr;
+		int alloc_ptr;
+		int dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
+		int commit_ptr;
+		int gpu_commit_ptr;
 
 		char _pad[24];
 
@@ -64,20 +64,21 @@ namespace svo {
 		#endif
 		}
 
+		inline void realloc_nodes (SVOAllocator& alloc, StackNode* stack);
 		inline uint16_t alloc_node (SVOAllocator& alloc, StackNode* stack=nullptr);
 	};
-	static constexpr uint32_t _sz = sizeof(Chunk);
+	static constexpr auto _sz = sizeof(Chunk);
 
-	inline uint32_t get_gpu_page_size () {
+	inline int get_gpu_page_size () {
 		if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
 			return 0;
 		}
 
 		GLint i;
 		glGetIntegerv(GL_SPARSE_BUFFER_PAGE_SIZE_ARB, &i);
-		return (uint32_t)i;
+		return i;
 	}
-	inline uint32_t gpu_page_size;
+	inline int gpu_page_size;
 
 	struct SVOAllocator {
 
@@ -94,11 +95,11 @@ namespace svo {
 		static constexpr uintptr_t RESERVE_SIZE = sizeof(Chunk) * MAX_CHUNKS + sizeof(Node) * MAX_CHUNKS * MAX_NODES; //sizeof(Memory);
 
 		Memory*					mem;
-		uint32_t				chunk_count = 0;
+		int						chunk_count = 0;
 		
 		// size of committed regions of pages for chunk structs
-		uint32_t				commit_ptr = 0;
-		uint32_t				gpu_commit_ptr = 0;
+		int						commit_ptr = 0;
+		int						gpu_commit_ptr = 0;
 
 		Bitset					free_chunks;
 
@@ -112,13 +113,11 @@ namespace svo {
 			release_address_space(mem, RESERVE_SIZE);
 		}
 
-		static inline const uint32_t chunks_per_page = os_page_size / (uint32_t)sizeof(Chunk);
-
 		// Allocate first possible slot
 		Chunk* alloc_chunk () {
 			assert(chunk_count < MAX_CHUNKS);
 
-			uint32_t idx = free_chunks.clear_first_1();
+			int idx = free_chunks.clear_first_1();
 			chunk_count++;
 
 			Chunk* chunk = &mem->chunks[idx];
@@ -126,34 +125,47 @@ namespace svo {
 			// commit page if all page slots were free before
 			if (idx >= commit_ptr) {
 				commit_pages(mem->chunks + commit_ptr, os_page_size);
-				commit_ptr += chunks_per_page;
+				commit_ptr += os_page_size / (int)sizeof(Chunk);
 
 			#if DBG_MEMSET
 				memset(chunk, DBG_MEMSET_VAL, os_page_size);
 			#endif
 			}
 
+			TracyAlloc(chunk, sizeof(Chunk));
 			return chunk;
 		}
 
 		// Free random slot
-		void free_chunk (Chunk* chunk) {
+		template <typename T>
+		void free_chunk (Chunk* chunk, T all_chunks) {
 			if (chunk->nodes != chunk->tinydata)
 				decommit_pages(chunk->nodes, sizeof(Node)*MAX_NODES);
 
-			uint32_t idx = indexof(chunk);
+			int idx = (int)indexof(chunk);
 
 			free_chunks.set_bit(idx);
 			chunk_count--;
 
-			uint32_t last_alloc = free_chunks.scan_last_alloc();
+			int last_alloc = free_chunks.bitscan_reverse_0(); // -1 on all free
+			
+			auto _check = [&] () {
+				if (last_alloc > -1)
+					assert(((free_chunks.bits[last_alloc / 64] >> (last_alloc % 64)) & 1) == 0);
 
-			// decommit last page(s) if all chunks in pages are free now
-			if (last_alloc < commit_ptr - chunks_per_page) {
-				uint32_t old_commit = commit_ptr;
-				commit_ptr = (last_alloc + 1) & ~(chunks_per_page -1); // round down to page boundary
-				decommit_pages(mem->chunks + commit_ptr, (old_commit - commit_ptr) * (uint32_t)sizeof(Chunk));
+				for (int i=last_alloc+1; i<(int)free_chunks.bits.size(); ++i) {
+					assert(((free_chunks.bits[i / 64] >> (i % 64)) & 1) == 1);
+				}
+			};
+			_check();
+
+			// decommit last page(s)
+			while (last_alloc < commit_ptr - os_page_size / (int)sizeof(Chunk)) {
+				commit_ptr -= os_page_size / (int)sizeof(Chunk);
+				decommit_pages(mem->chunks + commit_ptr, os_page_size);
 			}
+			
+			TracyFree(chunk);
 		}
 
 		uint32_t size () {
@@ -177,51 +189,61 @@ namespace svo {
 		}
 	};
 
-	inline uint16_t Chunk::alloc_node (SVOAllocator& alloc, StackNode* stack) {
-		if (alloc_ptr >= commit_ptr) {
-			if (nodes == tinydata) {
-				nodes = alloc.mem->nodes[alloc.indexof(this)];
+	inline void Chunk::realloc_nodes (SVOAllocator& alloc, StackNode* stack) {
+		assert(alloc_ptr >= commit_ptr);
 
-				uint32_t commit_block = os_page_size / sizeof(Node);
-				commit_ptr = commit_block;
-				commit_pages(nodes, os_page_size);
+		if (nodes == tinydata) {
+			nodes = alloc.mem->nodes[alloc.indexof(this)];
 
-			#if DBG_MEMSET
-				memset(nodes, DBG_MEMSET_VAL, os_page_size);
-			#endif
+			uint32_t commit_block = os_page_size / sizeof(Node);
+			commit_ptr = commit_block;
+			commit_pages(nodes, os_page_size);
 
-				memcpy(nodes, tinydata, sizeof(tinydata));
+			TracyAlloc(nodes, os_page_size);
 
-				if (stack) { // fixup stack after we invalidated some of the nodes
-					for (int i=0; i<MAX_DEPTH; ++i) {
-						uintptr_t indx = stack[i].node - tinydata;
-						if (indx < ARRLEN(tinydata)) {
-							stack[i].node = nodes + indx;
-						}
+		#if DBG_MEMSET
+			memset(nodes, DBG_MEMSET_VAL, os_page_size);
+		#endif
+
+			memcpy(nodes, tinydata, sizeof(tinydata));
+
+			if (stack) { // fixup stack after we invalidated some of the nodes
+				for (int i=0; i<MAX_DEPTH; ++i) {
+					uintptr_t indx = stack[i].node - tinydata;
+					if (indx < ARRLEN(tinydata)) {
+						stack[i].node = nodes + indx;
 					}
-				}
-
-			#if DBG_MEMSET
-				memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
-			#endif
-			} else {
-				if (commit_ptr < MAX_NODES) {
-					uint32_t commit_block = os_page_size / sizeof(Node);
-
-					commit_pages(nodes + commit_ptr, os_page_size);
-
-				#if DBG_MEMSET
-					memset(nodes + commit_ptr, DBG_MEMSET_VAL, os_page_size);
-				#endif
-					commit_ptr += commit_block;
-
-				} else {
-					assert(false);
-					throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
 				}
 			}
 
+		#if DBG_MEMSET
+			memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
+		#endif
+		} else {
+			if (commit_ptr < MAX_NODES) {
+				uint32_t commit_block = os_page_size / sizeof(Node);
+
+				commit_pages(nodes + commit_ptr, os_page_size);
+
+				// free & alloc with tracy to keep all allocs at the same address instead of many tiny allocs
+				TracyFree(nodes);
+				TracyAlloc(nodes, commit_ptr * sizeof(Node) + os_page_size);
+
+			#if DBG_MEMSET
+				memset(nodes + commit_ptr, DBG_MEMSET_VAL, os_page_size);
+			#endif
+				commit_ptr += commit_block;
+
+			} else {
+				assert(false);
+				throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
+			}
 		}
+	}
+	inline uint16_t Chunk::alloc_node (SVOAllocator& alloc, StackNode* stack) {
+		if (alloc_ptr >= commit_ptr)
+			realloc_nodes(alloc, stack);
+
 		return (uint16_t)alloc_ptr++;
 	}
 }
