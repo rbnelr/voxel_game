@@ -595,8 +595,7 @@ $if fragment
 			vec3 hit_pos_world = ray_pos + ray_dir * hit_dist + vec3(svo_root_pos);
 
 			vec4 clip = world_to_clip * vec4(hit_pos_world, 1.0);
-			float ndc_depth = clip.z / clip.w; // bias to fix z fighting with debug overlay
-			gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
+			gl_FragDepth = clip.z / clip.w;
 
 			//FRAG_COL(vec4(vec3(gl_FragDepth), 1.0));
 		}

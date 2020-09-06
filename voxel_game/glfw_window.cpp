@@ -300,6 +300,11 @@ void glfw_init_gl () {
 	else
 		clog(ERROR, "No sRGB supported! Shading will be non-linear!\n");
 
+	if (glfwExtensionSupported("GL_ARB_clip_control"))
+		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	else
+		clog(ERROR, "GL_ARB_clip_control not supported, depth won't be correct!\n");
+
 	TracyGpuContext;
 }
 

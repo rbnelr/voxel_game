@@ -100,8 +100,6 @@ public:
 	float4x4 calc_cam_to_clip (View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
 };
 
-inline bool use_reverse_depth = false;
-
 float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
 float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
 

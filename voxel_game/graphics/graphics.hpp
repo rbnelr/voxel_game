@@ -472,12 +472,6 @@ struct Framebuffer {
 
 		ImGui::Checkbox("blit nearest", &nearest);
 
-		if (ImGui::Checkbox("use_reverse_depth", &use_reverse_depth)) {
-			if (glfwExtensionSupported("GL_ARB_clip_control")) {
-				glClipControl(GL_LOWER_LEFT, use_reverse_depth ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
-			}
-		}
-
 		imgui_pop();
 	}
 
