@@ -77,7 +77,8 @@ void SkyboxGraphics::draw () {
 
 		glEnable(GL_DEPTH_CLAMP); // prevent skybox clipping with near plane
 		
-		float val = use_reverse_depth ? 0.0f : 1.0f;
+		// use_reverse_depth
+		float val = 0.0f;
 		glDepthRange(val, val); // Draw skybox behind everything, even though it's actually a box of size 1 placed on the camera
 
 		mesh.bind();
@@ -799,13 +800,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			// depth
 			glEnable(GL_DEPTH_TEST);
 
-			if (use_reverse_depth) {
-				glClearDepth(0.0f);
-				glDepthFunc(GL_GEQUAL);
-			} else {
-				glClearDepth(1.0f);
-				glDepthFunc(GL_LEQUAL);
-			}
+			// use_reverse_depth
+			glClearDepth(0.0f);
+			glDepthFunc(GL_GEQUAL);
 
 			glDepthRange(0.0f, 1.0f);
 			glDepthMask(GL_TRUE);
