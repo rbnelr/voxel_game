@@ -79,6 +79,7 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		
 		svo.allocator.gpu_nodes.upload_changes(svo);
 
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo.allocator.gpu_nodes.ssbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo);
 
 		std::vector<float4> block_tile_info;
@@ -111,8 +112,13 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 		glActiveTexture(GL_TEXTURE0 + texunit);
 		shader.set_texture_unit("heat_gradient", texunit);
-		gradient_sampler.bind(texunit++);
+		trilinear_sampler.bind(texunit++);
 		heat_gradient.bind();
+
+		glActiveTexture(GL_TEXTURE0 + texunit);
+		shader.set_texture_unit("dbg_font", texunit);
+		nearest_sampler.bind(texunit++);
+		dbg_font.bind();
 
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 

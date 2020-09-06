@@ -18,7 +18,7 @@ namespace svo {
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
 
 		GLsizeiptr reserve_size = (uintptr_t)MAX_CHUNKS * MAX_NODES * sizeof(Node);
-		glBufferStorage(GL_SHADER_STORAGE_BUFFER, reserve_size, nullptr, GL_SPARSE_STORAGE_BIT_ARB | GL_DYNAMIC_STORAGE_BIT);
+		glBufferStorage(GL_SHADER_STORAGE_BUFFER, reserve_size, nullptr, /*GL_SPARSE_STORAGE_BIT_ARB |*/ GL_DYNAMIC_STORAGE_BIT);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
@@ -39,24 +39,21 @@ namespace svo {
 
 			if (chunk->gpu_commit_ptr != new_commit_ptr) {
 
-				if (new_commit_ptr > chunk->gpu_commit_ptr) {
-					GLintptr offs = (uintptr_t)chunk->gpu_commit_ptr * sizeof(Node);
-					GLsizeiptr size = ((uintptr_t)new_commit_ptr - chunk->gpu_commit_ptr) * sizeof(Node);
-					glBufferPageCommitmentARB(GL_SHADER_STORAGE_BUFFER, baseoffs + offs, size, true); // commit
-				} else {
-					GLintptr offs = (uintptr_t)new_commit_ptr * sizeof(Node);
-					GLsizeiptr size = ((uintptr_t)chunk->gpu_commit_ptr - new_commit_ptr) * sizeof(Node);
-					glBufferPageCommitmentARB(GL_SHADER_STORAGE_BUFFER, baseoffs + offs, size, false); // decommit
-				}
+				//if (new_commit_ptr > chunk->gpu_commit_ptr) {
+				//	GLintptr offs = (uintptr_t)chunk->gpu_commit_ptr * sizeof(Node);
+				//	GLsizeiptr size = ((uintptr_t)new_commit_ptr - chunk->gpu_commit_ptr) * sizeof(Node);
+				//	glBufferPageCommitmentARB(GL_SHADER_STORAGE_BUFFER, baseoffs + offs, size, true); // commit
+				//} else {
+				//	GLintptr offs = (uintptr_t)new_commit_ptr * sizeof(Node);
+				//	GLsizeiptr size = ((uintptr_t)chunk->gpu_commit_ptr - new_commit_ptr) * sizeof(Node);
+				//	glBufferPageCommitmentARB(GL_SHADER_STORAGE_BUFFER, baseoffs + offs, size, false); // decommit
+				//}
 
 				chunk->gpu_commit_ptr = new_commit_ptr;
 			}
 
 			GLsizeiptr size = chunk->commit_ptr * sizeof(Node);
 			glBufferSubData(GL_SHADER_STORAGE_BUFFER, baseoffs, size, chunk->nodes);
-
-			//Node tmp[1024];
-			//glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, baseoffs, 1024 * sizeof(Node), tmp);
 
 			chunk->flags &= ~GPU_DIRTY;
 		};
@@ -65,6 +62,12 @@ namespace svo {
 		for (Chunk* chunk : svo.chunks) {
 			update_chunk(chunk);
 		}
+
+		//Node tmp[8][1024];
+		//
+		//for (int i=0; i<8; ++i) {
+		//	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, (uintptr_t)i * MAX_NODES * sizeof(Node), 1024 * sizeof(Node), tmp[i]);
+		//}
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}

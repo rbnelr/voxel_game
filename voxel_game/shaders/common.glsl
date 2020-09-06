@@ -128,27 +128,55 @@ $if fragment
 			frag_col = col;
 	}
 
-#if CURSOR_COMPARE
-	bool RIGHT () {
-		if (gl_FragCoord.x > cursor_pos.x)
-			return true;
-		if (gl_FragCoord.x == cursor_pos.x)
-			DEBUG(0);
-		return false;
-	}
-#endif
-
-#if BIT_DEBUGGER
-	void debug_binary_output (uint data, int y) {
-		ivec2 px = ivec2(floor(vec2(gl_FragCoord.xy - viewport_size / 2) / 10));
-		if (px.x >= 0 && px.x < 32 && px.y == y) {
-			if ((data & (0x80000000u >> px.x)) != 0) {
-				frag_col = vec4(1,0,0,1);
-			} else {
-				frag_col = vec4(0,0,0,1);
-			}
-			return;
+	#if CURSOR_COMPARE
+		bool RIGHT () {
+			if (gl_FragCoord.x > cursor_pos.x)
+				return true;
+			if (gl_FragCoord.x == cursor_pos.x)
+				DEBUG(0);
+			return false;
 		}
-	}
-#endif
+	#endif
+
+	#if BIT_DEBUGGER
+		uniform sampler2D dbg_font;
+		uniform vec2 dbg_font_size = vec2(9, 17);
+		uniform vec2 debug_view_pos = vec2(.3, .2);
+
+		int counter = 0;
+
+		void debug_print (float val) {
+			vec2 pos = floor(viewport_size * debug_view_pos);
+			vec2 char_pos = (gl_FragCoord.xy - pos) / (dbg_font_size + 1); // why does +1 here fix the ugly artefact next to the glyphs?
+			ivec2 char_index = ivec2(floor(char_pos));
+
+			if (char_index.x >= 0 && char_index.x < 32 && char_index.y == counter++) {
+				int ascii = 0;
+				if (char_index.x == 31) { // sign
+					ascii = val < 0.0 ? 45 : 43; // 45='-' 43='+'
+				} else if (char_index.x < 15) {
+
+				} else { // decimal digits
+					int digit_index = 30 - char_index.x;
+					float divided = abs(val) * pow(10.0, -float(digit_index));
+					float digit = divided > 1.0 || digit_index == 0 ? (mod(divided, 10) + 48) : 32; // 48='0' 32=' '
+					ascii = int(digit);
+				}
+
+				vec2 uv = (vec2(ascii % 16, 7 - ascii / 16) + fract(char_pos)) / vec2(16,8);
+				DEBUG(texture(dbg_font, uv));
+			}
+		}
+		void debug_print_binary (uint val) {
+			vec2 pos = floor(viewport_size * debug_view_pos);
+			vec2 char_pos = (gl_FragCoord.xy - pos) / (dbg_font_size + 1); // why does +1 here fix the ugly artefact next to the glyphs?
+			ivec2 char_index = ivec2(floor(char_pos));
+
+			if (char_index.x >= 0 && char_index.x < 32 && char_index.y == counter++) {
+				int ascii = (val & (0x80000000u >> char_index.x)) != 0 ? 49 : 48; // '1' : '0'
+				vec2 uv = (vec2(ascii % 16, 7 - ascii / 16) + fract(char_pos)) / vec2(16,8);
+				DEBUG(texture(dbg_font, uv));
+			}
+		}
+	#endif
 $endif

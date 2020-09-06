@@ -863,10 +863,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			//glCullFace(GL_BACK);
 			voxel_graphics.draw_transparent(world.voxels, tile_textures, sampler);
 		}
-
-		glEnable(GL_CULL_FACE);
-		debug_graphics->draw();
 	}
+
+	glEnable(GL_CULL_FACE);
 
 	if (raytracer.raytracer_draw) {
 		ZoneScopedN("gpu raytracer pass");
@@ -874,6 +873,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 		raytracer.draw(world.voxels.svo, view, *this, world.time_of_day);
 	}
+
+	debug_graphics->draw();
 
 	{ //// First person overlay pass
 		TracyGpuZone("gpu First Person pass");

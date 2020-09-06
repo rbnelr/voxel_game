@@ -5,17 +5,19 @@
 static constexpr int CHUNK_SIZE = 64;
 static constexpr uint32_t CHUNK_SCALE = 6;
 
-static constexpr uint32_t MAX_CHUNKS = 1u << 16;
+static constexpr uint32_t MAX_CHUNKS = 4096;//1u << 16;
 
 namespace svo {
-	static constexpr uint32_t MAX_NODES = 1u << 16;
+	static constexpr uint32_t MAX_NODES = 4096;//1u << 16;
 
 	static constexpr uint32_t MAX_DEPTH = 20;
 
 	struct Node {
 		uint16_t children[8] = {};
-		uint8_t leaf_mask = 0xff;
-		uint8_t pad[15];
+		//uint8_t leaf_mask = 0xff;
+		//uint8_t pad[15];
+		uint32_t leaf_mask = 0xff;
+		uint32_t pad[3];
 	};
 	static_assert(is_pot(sizeof(Node)), "sizeof(Node) must be power of two!");
 

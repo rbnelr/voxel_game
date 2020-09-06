@@ -1,5 +1,7 @@
 ﻿#version 430 core // for findMSB, SSBO
 
+#define BIT_DEBUGGER 1
+
 $include "common.glsl"
 $include "fog.glsl"
 
@@ -27,7 +29,7 @@ $if fragment
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
-#define MAX_NODES (1u << 16)
+#define MAX_NODES 4096//(1u << 16)
 
 	struct SvoNode {
 		uint children[4]; // uint16_t children[8]
@@ -398,8 +400,6 @@ $if fragment
 		uint stack_node[ MAX_SCALE -1 ];
 		float stack_t1[ MAX_SCALE -1 ];
 
-		int counter = 0;
-
 		//// Iterate
 		for (;;) {
 			iterations++;
@@ -430,15 +430,17 @@ $if fragment
 				float tv0 = max(child_t0, t0);
 				float tv1 = min(child_t1, t1);
 
+				debug_print(int(node));
+				debug_print_binary(leaf ? 1 : 0);
+
 				if (tv0 < tv1) {
 					
 					uint chunk = parent_node & 0xffff0000u;
 					if (leaf && chunk == 0 && node != 0) {
+
 						chunk = node << 16u;
 						node = 0;
 						leaf = false;
-
-						DEBUG(vec3(1,0,0));
 					}
 
 					uint child_node = chunk | node;
