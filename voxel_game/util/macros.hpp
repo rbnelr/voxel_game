@@ -62,10 +62,10 @@
 
 // Enumeration bit operators, for using enums as bitfields (very useful because visual studio shows them like "VAL1(1) | VAL2(8) | 128")
 #define ENUM_BITFLAG_OPERATORS_TYPE(e, itype) \
-	inline e operator| (e l, e r) { return (e)((itype)l | (itype)r); } \
-	inline e operator& (e l, e r) { return (e)((itype)l & (itype)r); } \
-	inline e operator^ (e l, e r) { return (e)((itype)l ^ (itype)r); } \
-	inline e operator~ (e l) { return (e)(~(itype)l); } \
+	inline constexpr e operator| (e l, e r) { return (e)((itype)l | (itype)r); } \
+	inline constexpr e operator& (e l, e r) { return (e)((itype)l & (itype)r); } \
+	inline constexpr e operator^ (e l, e r) { return (e)((itype)l ^ (itype)r); } \
+	inline constexpr e operator~ (e l) { return (e)(~(itype)l); } \
 	inline e& operator|= (e& l, e r) { return l = (e)((itype)l | (itype)r); } \
 	inline e& operator&= (e& l, e r) { return l = (e)((itype)l & (itype)r); } \
 	inline e& operator^= (e& l, e r) { return l = (e)((itype)l ^ (itype)r); }

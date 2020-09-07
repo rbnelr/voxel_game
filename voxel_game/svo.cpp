@@ -76,18 +76,17 @@ namespace svo {
 	}
 
 	bool can_collapse (Node* node) {
-		if (node[0].leaf_mask != 0xff)
-			return false; // not all leafs, cant collapse
+		if (node->children_types != ONLY_BLOCK_IDS)
+			return false; // can only collapse block_id voxels
 
 		for (int i=1; i<8; ++i) {
 			if (node->children[i] != node->children[0])
 				return false; // not all leafs equal, cant collapse
 		}
-
 		return true;
 	}
 
-	void SVO::octree_write (int3 pos, int scale, uint16_t val) {
+	void SVO::octree_write (int3 pos, int scale, VoxelType type, Voxel val) {
 		ZoneScoped;
 
 		int size = 1 << root->scale;
@@ -129,66 +128,91 @@ namespace svo {
 				break;
 			}
 
-			uint16_t child_val = node->children[child_idx];
+			VoxelType child_type;
+			Voxel& child_vox = node->get_child(child_idx, &child_type);
 
-			bool child_leaf = node->leaf_mask & (1u << child_idx);
+			switch (child_type) {
+				case NODE_PTR: {
+					// recurse into child node
+					node = &chunk->nodes[child_vox];
+				} break;
 
-			if (!child_leaf) { 
-				// recurse into child node
-				node = &chunk->nodes[child_val];
+				case CHUNK_PTR: {
+					assert(child_vox != 0);
+					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+					chunk = allocator[child_vox];
+					node = chunk->nodes;
+				} break;
 
-			} else if (chunk == root && child_val != B_NULL) {
-				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-				chunk = allocator[child_val];
-				node = chunk->nodes;
+				// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
+				//} else if (child_val == val) {
+				//	// write would be a no-op because the octree already has the desired value at that voxel
+				//	return;
+				
+				default: {
+					assert(child_type == BLOCK_ID);
 
-			// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
-			//} else if (child_val == val) {
-			//	// write would be a no-op because the octree already has the desired value at that voxel
-			//	return;
-			
-			} else {
-				//// Split node into 8 children of same type
-				uint16_t node_ptr = chunk->alloc_node(allocator, stack); // invalidates child_node
+					//// Split node into 8 children of same type
+					uint32_t node_ptr = chunk->alloc_node(allocator);
+					assert(node_ptr);
 
-				// write ptr to children into this nodes slot in parents children array
-				stack[cur_scale].node->children[child_idx] = node_ptr;
-				stack[cur_scale].node->leaf_mask &= ~(1u << child_idx);
+					// write ptr to children into this nodes slot in parents children array
+					stack[cur_scale].node->set_child(child_idx, NODE_PTR, { node_ptr });
 
-				// init and recurse into new node
-				node = &chunk->nodes[node_ptr];
+					// init and recurse into new node
+					node = &chunk->nodes[node_ptr];
 
-				node->leaf_mask = 0xff;
-				// alloc and init children for node
-				for (int i=0; i<8; ++i) {
-					node->children[i] = child_val;
-				}
+					// alloc and init children for node
+					node->children_types = ONLY_BLOCK_IDS;
+					for (int i=0; i<8; ++i) {
+						node->children[i] = child_vox;
+					}
 
-				chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
+					chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
+				};
 			}
 		}
 
+		assert(type == CHUNK_PTR || type == BLOCK_ID);
+		if (type == CHUNK_PTR)
+			assert(chunk == root);
+
 		// do the write
-		stack[cur_scale].node->children[ stack[cur_scale].child_indx ] = val;
-		stack[cur_scale].node->leaf_mask |= 1u << stack[cur_scale].child_indx;
+		stack[cur_scale].node->set_child(stack[cur_scale].child_indx, type, val);
+		
+		//if (type == CHUNK_PTR) {
+		//	// trigger a collapse check that includes the root of the chunk, because chunk load is not able to collapse past the root of the chunk
+		//	chunk = allocator[val];
+		//	assert(chunk->scale == cur_scale);
+		//
+		//	cur_scale--;
+		//	stack[cur_scale].pos = chunk->pos;
+		//	stack[cur_scale].child_indx = 0;
+		//	stack[cur_scale].node = &chunk->nodes[0];
+		//}
 
 		chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
 		for (	auto i = cur_scale;
-				i != CHUNK_SCALE-1 && i < root->scale-1 && can_collapse(stack[i].node);
+				i < chunk->scale-1 && can_collapse(stack[i].node);
 				++i) {
 
-			stack[i+1].node->children[ stack[i+1].child_indx ] = stack[i].node->children[0];
-			stack[i+1].node->leaf_mask |= 1u << stack[i+1].child_indx;
+			stack[i+1].node->set_child(stack[i+1].child_indx, BLOCK_ID, stack[i].node->children[0]);
 
-			// free node
-			chunk->dead_count++;
+			//if (i == chunk->scale) {
+			//	// chunk nodes were completely collapsed away
+			//	assert(chunk != root && chunk->nodes);
+			//	allocator.free_chunk_nodes(chunk);
+			//} else {
+				// free node
+				chunk->dead_count++;
+			//}
 		}
 
 	}
 
-	block_id SVO::octree_read (int3 pos) {
+	block_id SVO::octree_read (int3 pos, bool phys_read) {
 		ZoneScoped;
 
 		int size = 1 << root->scale;
@@ -209,17 +233,37 @@ namespace svo {
 			// get child node that contains target node
 			int child_idx = get_child_index(x, y, z, size);
 
-			uint16_t child_data = node->children[child_idx];
-			bool leaf = node->leaf_mask & (1u << child_idx);
+			VoxelType child_type;
+			Voxel& child_vox = node->get_child(child_idx, &child_type);
 
-			if (!leaf) {
-				node = &chunk->nodes[child_data];
-			} else if (chunk == root && child_data != B_NULL) {
-				// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-				chunk = allocator[child_data];
-				node = chunk->nodes;
-			} else {
-				return (block_id)child_data;
+			switch (child_type) {
+				case NODE_PTR: {
+					// recurse into child node
+					node = &chunk->nodes[child_vox];
+				} break;
+
+				case CHUNK_PTR: {
+					assert(child_vox != 0);
+					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+					chunk = allocator[child_vox];
+					node = chunk->nodes;
+
+					if (phys_read && chunk->scale != CHUNK_SCALE) {
+						// chunk with lod, don't do physics here
+						return B_NULL; // should fix player in chunk or prevent them from entering this chunk
+					}
+				} break;
+
+					// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
+					//} else if (child_val == val) {
+					//	// write would be a no-op because the octree already has the desired value at that voxel
+					//	return;
+
+				default: {
+					assert(child_type == BLOCK_ID);
+
+					return (block_id)child_vox;
+				};
 			}
 		}
 	}
@@ -248,8 +292,7 @@ namespace svo {
 
 				if (can_collapse(node)) {
 					// collapse node by writing leaf into parent
-					stack[scale].node->children[ stack[scale].child_indx ] = node->children[0];
-					stack[scale].node->leaf_mask |= 1u << stack[scale].child_indx;
+					stack[scale].node->set_child(stack[scale].child_indx, BLOCK_ID, node->children[0]);
 
 					// free node
 					uint16_t node_ptr = (uint16_t)(node - chunk->nodes);
@@ -269,13 +312,11 @@ namespace svo {
 				if (scale == 0) {
 					auto bid = blocks[child_pos.z * CHUNK_SIZE*CHUNK_SIZE + child_pos.y * CHUNK_SIZE + child_pos.x];
 
-					node->leaf_mask |= 1u << child_indx;
-					node->children[child_indx] = bid;
+					node->set_child(child_indx, BLOCK_ID, { bid });
 				} else {
 					// Push
-					uint16_t nodei = chunk->alloc_node(allocator, stack); // invalidates node
-					chunk->nodes[nodei].leaf_mask = 0;
-					stack[scale].node->children[child_indx] = nodei;
+					uint16_t nodei = chunk->alloc_node(allocator);
+					stack[scale].node->set_child(child_indx, NODE_PTR, { nodei });
 
 					scale--;
 					stack[scale] = { &chunk->nodes[nodei], child_pos, 0 };
@@ -290,93 +331,89 @@ namespace svo {
 	}
 
 	void free_chunk (SVO& svo, Chunk* chunk) {
-		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
+		svo.octree_write(chunk->pos, chunk->scale, BLOCK_ID, (Voxel)B_NULL);
 
 		svo.allocator.free_chunk(chunk);
 	}
 
-	void recurse_free (SVO& svo, uint32_t node, bool leaf) {
-		if (leaf) {
-			if (node != B_NULL) {
-				Chunk* chunk = svo.allocator[node];
+	void recurse_free (SVO& svo, VoxelType type, Voxel vox) {
+		switch (type) {
+			case CHUNK_PTR: {
+				assert(vox != 0);
+
+				Chunk* chunk = svo.allocator[vox];
 				free_chunk(svo, chunk);
-			}
-		} else {
-			for (int i=0; i<8; ++i) {
-				Node& child_node = svo.root->nodes[node];
-				recurse_free(svo, child_node.children[i], child_node.leaf_mask & (1u << i));
-			}
+			} break;
+			case NODE_PTR: {
+				for (int i=0; i<8; ++i) {
+					VoxelType child_type;
+					Voxel& child = svo.root->nodes[vox].get_child(i, &child_type);
+					recurse_free(svo, child_type, child);
+				}
+			} break;
 		}
 	}
 
 	// move octree root along with player through world, so that ideally all desired visible parts of the world are contained
 	void update_root_move (SVO& svo, Player& player) {
 		return; // TODO: current lod system is not compatible with root move, unless root move could somehow discard all in-process async chunk generation
-
-		int shift = svo.root->scale - 1;
-		float half_root_scalef = (float)(1 << shift);
-
-		int3 center = roundi((player.pos + svo.root_move_hister) / half_root_scalef);
-
-		int3 pos = (center - 1) << shift;
-
-		if (equal(pos, svo.root->pos))
-			return;
-
-		ZoneScoped;
-
-		int3 move = (pos - svo.root->pos) >> shift;
-
-		svo.root_move_hister = (float3)move * ROOT_MOVE_HISTER;
-
-		// write moved children into new root node
-		Node new_node;
-		new_node.leaf_mask = 0;
-		for (int i=0; i<8; ++i) {
-			int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
-
-			child += move;
-
-			int child_indx = child.x | (child.y << 1) | (child.z << 2);
-
-			if (any(child < 0 || child > 1)) {
-				// root moved over this area, no nodes loaded yet
-				new_node.children[i] = B_NULL;
-				new_node.leaf_mask |= 1u << i;
-			} else {
-				// copy old children to new slot
-				new_node.children[i] = svo.root->nodes[0].children[child_indx];
-				if (svo.root->nodes[0].leaf_mask & (1u << child_indx))
-					new_node.leaf_mask |= 1u << i;
-
-				svo.root->nodes[0].children[child_indx] = 0;
-			}
-		}
-
-		// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
-		// this needs to happen before we do svo.root->pos = pos; or free_chunk will free the wrong chunk 
-		for (int i=0; i<8; ++i) {
-			if (svo.root->nodes[0].children[i] != 0) {
-				recurse_free(svo, svo.root->nodes[0].children[i], svo.root->nodes[0].leaf_mask & (1u << i));
-			}
-		}
-
-		// replace old node
-		memcpy(&svo.root->nodes[0], &new_node, sizeof(Node));
-
-		// actually move root
-		svo.root->pos = pos;
+	//
+	//	int shift = svo.root->scale - 1;
+	//	float half_root_scalef = (float)(1 << shift);
+	//
+	//	int3 center = roundi((player.pos + svo.root_move_hister) / half_root_scalef);
+	//
+	//	int3 pos = (center - 1) << shift;
+	//
+	//	if (equal(pos, svo.root->pos))
+	//		return;
+	//
+	//	ZoneScoped;
+	//
+	//	int3 move = (pos - svo.root->pos) >> shift;
+	//
+	//	svo.root_move_hister = (float3)move * ROOT_MOVE_HISTER;
+	//
+	//	// write moved children into new root node
+	//	Node new_node;
+	//	new_node.leaf_mask = 0;
+	//	for (int i=0; i<8; ++i) {
+	//		int3 child = int3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+	//
+	//		child += move;
+	//
+	//		int child_indx = child.x | (child.y << 1) | (child.z << 2);
+	//
+	//		if (any(child < 0 || child > 1)) {
+	//			// root moved over this area, no nodes loaded yet
+	//			new_node.children[i] = B_NULL;
+	//			new_node.leaf_mask |= 1u << i;
+	//		} else {
+	//			// copy old children to new slot
+	//			new_node.children[i] = svo.root->nodes[0].children[child_indx];
+	//			if (svo.root->nodes[0].leaf_mask & (1u << child_indx))
+	//				new_node.leaf_mask |= 1u << i;
+	//
+	//			svo.root->nodes[0].children[child_indx] = 0;
+	//		}
+	//	}
+	//
+	//	// free old subtrees that were dropped (should not really happen all that often because that means our root node is too small)
+	//	// this needs to happen before we do svo.root->pos = pos; or free_chunk will free the wrong chunk 
+	//	for (int i=0; i<8; ++i) {
+	//		if (svo.root->nodes[0].children[i] != 0) {
+	//			recurse_free(svo, svo.root->nodes[0].children[i], svo.root->nodes[0].leaf_mask & (1u << i));
+	//		}
+	//	}
+	//
+	//	// replace old node
+	//	memcpy(&svo.root->nodes[0], &new_node, sizeof(Node));
+	//
+	//	// actually move root
+	//	svo.root->pos = pos;
 	}
 
-	void recurse_draw (SVO& svo, Chunk* chunk, uint32_t node, bool leaf, int3 pos, int scale, float3 player_pos) {
-		if (leaf && chunk == svo.root) {
-			if (node == B_NULL) return;
-
-			chunk = svo.allocator[node];
-			node = 0;
-			leaf = false;
-		}
-
+	void recurse_draw (SVO& svo, Chunk* chunk, VoxelType type, Voxel vox, int3 pos, int scale, float3 player_pos) {
 		float size = (float)(1 << scale);
 		
 		float3 pos_rel = player_pos - (float3)pos;
@@ -384,18 +421,29 @@ namespace svo {
 		if (dist > svo.debug_draw_octree_range) return;
 
 		auto col = cols[scale % ARRLEN(cols)];
-		if ((!leaf || node > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max)
+		if ((type != BLOCK_ID || vox > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max)
 			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
 
 		int child_scale = scale - 1;
-		if (!leaf && child_scale >= svo.debug_draw_octree_min) {
+		if (type != BLOCK_ID && child_scale >= svo.debug_draw_octree_min) {
 
-			Node& children = chunk->nodes[node];
-			
+			Node* child_node;
+			if (type == CHUNK_PTR) {
+				assert(vox != 0);
+				chunk = svo.allocator[vox];
+				child_node = chunk->nodes;
+			} else {
+				assert(vox < chunk->alloc_ptr);
+				child_node = &chunk->nodes[vox];
+			}
+
 			for (int i=0; i<8; ++i) {
 				int3 child_pos = pos + (children_pos[i] << child_scale);
 
-				recurse_draw(svo, chunk, children.children[i], children.leaf_mask & (1u << i), child_pos, child_scale, player_pos);
+				VoxelType child_type;
+				Voxel& child = child_node->get_child(i, &child_type);
+
+				recurse_draw(svo, chunk, child_type, child, child_pos, child_scale, player_pos);
 			}
 		}
 	}
@@ -412,7 +460,7 @@ namespace svo {
 
 				assert(scale == svo.root->scale-1);
 
-				svo.octree_write(pos, scale, svo.allocator.indexof(chunk));
+				svo.octree_write(pos, scale, CHUNK_PTR, (Voxel)svo.allocator.indexof(chunk));
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
@@ -465,7 +513,7 @@ namespace svo {
 				for (int i=0; i<8; ++i) {
 					assert(siblings[i]->flags & LOCKED);
 					siblings[i]->flags &= ~LOCKED;
-					svo.octree_write(siblings[i]->pos, siblings[i]->scale, svo.allocator.indexof(siblings[i]));
+					svo.octree_write(siblings[i]->pos, siblings[i]->scale, CHUNK_PTR, (Voxel)svo.allocator.indexof(siblings[i]));
 				}
 			} break;
 
@@ -479,7 +527,7 @@ namespace svo {
 					free_chunk(svo, child);
 				}
 			
-				svo.octree_write(pos, scale, svo.allocator.indexof(chunk));
+				svo.octree_write(pos, scale, CHUNK_PTR, (Voxel)svo.allocator.indexof(chunk));
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
@@ -519,7 +567,9 @@ namespace svo {
 				int scale = root->scale -1;
 				int3 pos = root->pos + (children_pos[i] << scale);
 
-				if (root->nodes[0].leaf_mask & (1u << i) && root->nodes[0].children[i] == B_NULL) {
+				VoxelType type;
+				Voxel vox = root->nodes[0].get_child(i, &type);
+				if (type == BLOCK_ID && vox == B_NULL) {
 					// unloaded chunk in root due to root move or initial world creation
 					if (!chunks.contains(pos, scale) && !pending_chunks.contains(pos, scale))
 						ops_to_queue.push_back({ nullptr, pos, root->scale-1, -9999, LoadOp::CREATE });
@@ -653,7 +703,7 @@ namespace svo {
 		if (debug_draw_svo) {
 			ZoneScopedN("SVO::debug_draw");
 		
-			recurse_draw(*this, root, 0, false, root->pos, root->scale, player.pos);
+			recurse_draw(*this, root, NODE_PTR, {0}, root->pos, root->scale, player.pos);
 		}
 
 		if (debug_draw_chunks) {

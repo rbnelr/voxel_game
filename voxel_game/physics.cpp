@@ -19,7 +19,7 @@ CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
 		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-					auto b = world.voxels.query_block(bp);
+					auto b = world.voxels.query_block(bp, true);
 
 					if (blocks.collision[b] == CM_SOLID) {
 

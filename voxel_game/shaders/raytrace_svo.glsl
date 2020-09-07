@@ -32,16 +32,19 @@ $if fragment
 	uniform int svo_root_scale;
 
 #define MAX_NODES (1u << 16)
+#define NODE_PTR	0
+#define BLOCK_ID	1
+#define CHUNK_PTR	2
 
 	struct SvoNode {
-		uint children[4]; // uint16_t children[8]
-		uint leaf_mask; // uint8_t leaf_mask + padding
-		uint _pad[3];
+		uint16_t children_types; // uint16_t children_types
+		uint16_t _pad[15];
+		uint32_t children[8];
 	};
 
 	uniform SvoNode* svo_nodes;
 
-	uint get_svo_node (uint node_index, int child_index, out bool leaf) {
+	uint get_svo_node (uint node_index, int child_index, out uint type) {
 		//return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
 
 		uint chunk_index = node_index >> 16;
@@ -49,8 +52,8 @@ $if fragment
 
 		SvoNode node = svo_nodes[chunk_index * MAX_NODES + node_index];
 
-		leaf = (node.leaf_mask & (1u << child_index)) != 0;
-		return (node.children[child_index / 2] >> (16 * (child_index % 2))) & 0xffffu;
+		type = (uint)((node.children_types >> child_index*2) & 3u);
+		return (uint)node.children[child_index];
 	}
 
 #define MAX_SCALE 16
@@ -422,40 +425,37 @@ $if fragment
 
 				idx ^= mirror_mask_int;
 
-				bool leaf;
-				uint node = get_svo_node(parent_node, idx, leaf);
+				uint type;
+				uint node = get_svo_node(parent_node, idx, type);
 
 				//// Intersect
 				// child cube ray range
 				float tv0 = max(child_t0, t0);
 				float tv1 = min(child_t1, t1);
 
+				//debug_print(int(type));
 				//debug_print(int(node));
-				//debug_print_binary(leaf ? 1 : 0);
 
 				if (tv0 < tv1) {
 					
-					uint chunk = parent_node & 0xffff0000u;
-					if (leaf && chunk == 0 && node != 0) {
-
-						chunk = node << 16u;
-						node = 0;
-						leaf = false;
-					}
-
-					uint child_node = chunk | node;
-
-					if (leaf) {
+					if (type == BLOCK_ID) {
 						float dist = tv0;
 
-						surface_hit(ray_pos, ray_dir, dist, entry_faces, node,
-							accum_col, queue, queued_rays, ray_tint);
-						
+						surface_hit(ray_pos, ray_dir, dist, entry_faces, node, accum_col, queue, queued_rays, ray_tint);
+
 						if (accum_col.a > 0.99999) {
 							hit_dist = dist;
 							break; // final hit
 						}
 					} else {
+
+						uint chunk = parent_node & 0xffff0000u;
+						if (type == CHUNK_PTR) {
+							chunk = node << 16u;
+							node = 0;
+						}
+
+						uint child_node = chunk | node;
 
 						//// Push
 						stack_node[child_scale - 1] = parent_node;

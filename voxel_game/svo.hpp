@@ -120,8 +120,9 @@ namespace svo {
 			
 			root = allocator.alloc_chunk();
 			new (root) Chunk (root_pos, root_scale);
-			root->alloc_ptr++;
-			new (&root->nodes[0]) Node ();
+			root->alloc_node(allocator);
+			root->nodes[0].children_types = ONLY_BLOCK_IDS;
+			memset(&root->nodes[0].children, 0, sizeof(root->nodes[0].children));
 		}
 
 		void chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen);
@@ -131,9 +132,9 @@ namespace svo {
 		// octree write, writes a single voxel at a desired pos, scale to be a particular leaf val
 		// this decends the octree from the root and inserts or deletes nodes when needed
 		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
-		void octree_write (int3 pos, int scale, uint16_t val);
+		void octree_write (int3 pos, int scale, VoxelType type, Voxel val);
 
-		block_id octree_read (int3 pos);
+		block_id octree_read (int3 pos, bool phys_read);
 	};
 
 	struct ChunkLoadJob : ThreadingJob {

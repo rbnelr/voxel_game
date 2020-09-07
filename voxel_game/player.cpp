@@ -85,7 +85,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto b = world.voxels.query_block(bp);
+					auto b = world.voxels.query_block(bp, true);
 					bool block_solid = blocks.collision[b] == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
@@ -127,7 +127,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
-					auto b = world.voxels.query_block(bp);
+					auto b = world.voxels.query_block(bp, true);
 
 					bool block_solid = blocks.collision[b] == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)(int2)bp, radius))

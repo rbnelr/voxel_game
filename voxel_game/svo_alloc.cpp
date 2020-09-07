@@ -39,7 +39,7 @@ namespace svo {
 
 			GLintptr baseoffs = (uintptr_t)svo.allocator.indexof(chunk) * MAX_NODES * sizeof(Node);
 
-			int new_commit_ptr = round_up_pot(chunk->commit_ptr, gpu_page_size / (int)sizeof(Node));
+			uint32_t new_commit_ptr = round_up_pot(chunk->commit_ptr, (uint32_t)gpu_page_size / (uint32_t)sizeof(Node));
 
 			if (chunk->gpu_commit_ptr != new_commit_ptr) {
 

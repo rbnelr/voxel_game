@@ -3,23 +3,41 @@
 #include "util/virtual_allocator.hpp"
 
 static constexpr int CHUNK_SIZE = 64;
-static constexpr uint32_t CHUNK_SCALE = 6;
+static constexpr int CHUNK_SCALE = 6;
 
-static constexpr uint32_t MAX_CHUNKS = 1u << 16;
+static constexpr uint32_t MAX_CHUNKS = 1 << 16;
 
 namespace svo {
-	static constexpr uint32_t MAX_NODES = 1u << 16;
+	static constexpr uint32_t MAX_NODES = 1 << 16;
 
-	static constexpr uint32_t MAX_DEPTH = 20;
+	static constexpr int MAX_DEPTH = 20;
+
+	typedef uint32_t Voxel;
+
+	enum VoxelType : uint32_t { // 2 bit
+		NODE_PTR		=0, // uint32_t node index into current chunk
+		BLOCK_ID		=1, // block_id leaf node
+		CHUNK_PTR		=2, // uint32_t chunk index
+	};
+	ENUM_BITFLAG_OPERATORS_TYPE(VoxelType, uint32_t)
+
+	static constexpr uint16_t ONLY_BLOCK_IDS = 0x5555u;
 
 	struct Node {
-		uint16_t children[8] = {};
-		//uint8_t leaf_mask = 0xff;
-		//uint8_t pad[15];
-		uint32_t leaf_mask = 0xff;
-		uint32_t pad[3];
+		uint16_t children_types;
+		uint16_t _pad[15];
+		Voxel children[8];
+
+		Voxel& get_child (int child_idx, VoxelType* out_type) {
+			*out_type = VoxelType((children_types >> child_idx*2) & 3);
+			return children[child_idx];
+		}
+		void set_child (int child_idx, VoxelType type, Voxel vox) {
+			children_types &= ~(3 << child_idx*2);
+			children_types |= type << child_idx*2;
+			children[child_idx] = vox;
+		}
 	};
-	static_assert(is_pot(sizeof(Node)), "sizeof(Node) must be power of two!");
 
 	struct SVOAllocator;
 
@@ -44,32 +62,26 @@ namespace svo {
 
 		ChunkFlags flags;
 
-		int alloc_ptr;
-		int dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
-		int commit_ptr;
-		int gpu_commit_ptr;
+		uint32_t alloc_ptr;
+		uint32_t dead_count; // TODO: cant actually keep track of nodes that disappear because of octree_writes with scale != 0, so maybe just keep a write counter that then occasionally triggers compactings
+		uint32_t commit_ptr;
+		uint32_t gpu_commit_ptr;
 
 		char _pad[24];
 
-		Node tinydata[6];
-
 		Chunk (int3	pos, uint8_t scale): pos{pos}, scale{scale} {
-			nodes = tinydata;
-
-			flags = GPU_DIRTY | MESHING_DIRTY;
+			nodes = nullptr;
 
 			alloc_ptr = 0;
 			dead_count = 0;
-			commit_ptr = (uint32_t)ARRLEN(tinydata);
+			commit_ptr = 0;
 			gpu_commit_ptr = 0;
 
-		#if DBG_MEMSET
-			memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
-		#endif
+			flags = GPU_DIRTY | MESHING_DIRTY;
 		}
 
-		inline void realloc_nodes (SVOAllocator& alloc, StackNode* stack);
-		inline uint16_t alloc_node (SVOAllocator& alloc, StackNode* stack=nullptr);
+		inline void realloc_nodes (SVOAllocator& alloc);
+		inline uint32_t alloc_node (SVOAllocator& alloc);
 	};
 	static constexpr auto _sz = sizeof(Chunk);
 
@@ -160,9 +172,7 @@ namespace svo {
 	struct SVOAllocator {
 
 		static_assert(is_pot(sizeof(Chunk)), "sizeof(Chunk) needs to be power of two!");
-		static_assert(is_pot(sizeof(Node)), "SparseAllocator<T>: sizeof(Node) needs to be power of two!");
-		static_assert(is_pot(sizeof(Node[MAX_NODES])), "SparseAllocator<T>: sizeof(Node[MAX_NODES]) needs to be power of two!");
-
+		
 		// Memory layout, entire memory is reserved, used parts are comitted
 		// error C2148: total size of array must not exceed 0x7fffffff bytes, MSVC bug/issue
 		struct Memory {
@@ -182,7 +192,6 @@ namespace svo {
 		glSparseBuffer			gpu_nodes;
 
 		SVOAllocator () {
-			
 			mem = (Memory*)reserve_address_space(RESERVE_SIZE);
 		}
 
@@ -217,8 +226,7 @@ namespace svo {
 
 		// Free random slot
 		void free_chunk (Chunk* chunk) {
-			if (chunk->nodes != chunk->tinydata)
-				decommit_pages(chunk->nodes, sizeof(Node)*MAX_NODES);
+			free_chunk_nodes(chunk);
 
 			int idx = (int)indexof(chunk);
 
@@ -234,6 +242,16 @@ namespace svo {
 			}
 			
 			TracyFree(chunk);
+		}
+
+		void free_chunk_nodes (Chunk* chunk) {
+			if (chunk->nodes)
+				decommit_pages(chunk->nodes, sizeof(Node)*MAX_NODES);
+
+			chunk->nodes = nullptr;
+			chunk->alloc_ptr = 0;
+			chunk->commit_ptr = 0;
+			chunk->dead_count = 0;
 		}
 
 		uint32_t size () {
@@ -257,10 +275,10 @@ namespace svo {
 		}
 	};
 
-	inline void Chunk::realloc_nodes (SVOAllocator& alloc, StackNode* stack) {
+	inline void Chunk::realloc_nodes (SVOAllocator& alloc) {
 		assert(alloc_ptr >= commit_ptr);
 
-		if (nodes == tinydata) {
+		if (nodes == nullptr) {
 			nodes = alloc.mem->nodes[alloc.indexof(this)];
 
 			uint32_t commit_block = os_page_size / sizeof(Node);
@@ -271,21 +289,6 @@ namespace svo {
 
 		#if DBG_MEMSET
 			memset(nodes, DBG_MEMSET_VAL, os_page_size);
-		#endif
-
-			memcpy(nodes, tinydata, sizeof(tinydata));
-
-			if (stack) { // fixup stack after we invalidated some of the nodes
-				for (int i=0; i<MAX_DEPTH; ++i) {
-					uintptr_t indx = stack[i].node - tinydata;
-					if (indx < ARRLEN(tinydata)) {
-						stack[i].node = nodes + indx;
-					}
-				}
-			}
-
-		#if DBG_MEMSET
-			memset(tinydata, DBG_MEMSET_VAL, sizeof(tinydata));
 		#endif
 		} else {
 			if (commit_ptr < MAX_NODES) {
@@ -308,10 +311,10 @@ namespace svo {
 			}
 		}
 	}
-	inline uint16_t Chunk::alloc_node (SVOAllocator& alloc, StackNode* stack) {
+	inline uint32_t Chunk::alloc_node (SVOAllocator& alloc) {
 		if (alloc_ptr >= commit_ptr)
-			realloc_nodes(alloc, stack);
+			realloc_nodes(alloc);
 
-		return (uint16_t)alloc_ptr++;
+		return alloc_ptr++;
 	}
 }

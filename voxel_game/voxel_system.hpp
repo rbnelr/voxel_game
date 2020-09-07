@@ -35,10 +35,11 @@ public:
 		imgui_pop();
 	}
 
-	block_id query_block (int3 pos) {
-		return svo.octree_read(pos);
+	block_id query_block (int3 pos, bool phys_read=false) {
+		return svo.octree_read(pos, phys_read);
 	}
 	void set_block (int3 pos, block_id bid) {
-		svo.octree_write(pos, 0, bid);
+		using namespace svo;
+		svo.octree_write(pos, 0, BLOCK_ID, (Voxel)bid);
 	}
 };
