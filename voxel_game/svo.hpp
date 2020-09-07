@@ -29,7 +29,7 @@ namespace svo {
 		} type;
 	};
 
-	inline int set_root_scale = 12;
+	inline int set_root_scale = 16;
 
 	struct SVO {
 		Chunk*	root;

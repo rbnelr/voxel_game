@@ -1,4 +1,6 @@
 ﻿#version 430 core // for findMSB, SSBO
+#extension GL_NV_gpu_shader5 : enable
+#extension GL_NV_shader_buffer_load : enable
 
 #define BIT_DEBUGGER 1
 
@@ -37,10 +39,7 @@ $if fragment
 		uint _pad[3];
 	};
 
-	layout(std430, binding = 0) readonly restrict
-	buffer SvoData {
-		SvoNode nodes[];
-	} svo_data;
+	uniform SvoNode* svo_nodes;
 
 	uint get_svo_node (uint node_index, int child_index, out bool leaf) {
 		//return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
@@ -48,7 +47,7 @@ $if fragment
 		uint chunk_index = node_index >> 16;
 		node_index = node_index & 0xffffu;
 
-		SvoNode node = svo_data.nodes[chunk_index * MAX_NODES + node_index];
+		SvoNode node = svo_nodes[chunk_index * MAX_NODES + node_index];
 
 		leaf = (node.leaf_mask & (1u << child_index)) != 0;
 		return (node.children[child_index / 2] >> (16 * (child_index % 2))) & 0xffffu;
@@ -431,8 +430,8 @@ $if fragment
 				float tv0 = max(child_t0, t0);
 				float tv1 = min(child_t1, t1);
 
-				debug_print(int(node));
-				debug_print_binary(leaf ? 1 : 0);
+				//debug_print(int(node));
+				//debug_print_binary(leaf ? 1 : 0);
 
 				if (tv0 < tv1) {
 					

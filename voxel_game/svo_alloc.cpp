@@ -5,8 +5,10 @@
 namespace svo {
 
 	glSparseBuffer::glSparseBuffer () {
-		if (!glfwExtensionSupported("GL_ARB_sparse_buffer")) {
-			clog(ERROR, "GL_ARB_sparse_buffer not supported!");
+		if (	!glfwExtensionSupported("GL_ARB_sparse_buffer") ||
+				!glfwExtensionSupported("GL_NV_gpu_shader5") ||
+				!glfwExtensionSupported("GL_NV_shader_buffer_load")) {
+			clog(ERROR, "GL_ARB_sparse_buffer or GL_NV_gpu_shader5 or GL_NV_shader_buffer_load not supported!");
 			return;
 		}
 
@@ -19,6 +21,8 @@ namespace svo {
 
 		GLsizeiptr reserve_size = (uintptr_t)MAX_CHUNKS * MAX_NODES * sizeof(Node);
 		glBufferStorage(GL_SHADER_STORAGE_BUFFER, reserve_size, nullptr, GL_SPARSE_STORAGE_BIT_ARB | GL_DYNAMIC_STORAGE_BIT);
+
+		glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &ssbo_ptr);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
@@ -63,11 +67,8 @@ namespace svo {
 			update_chunk(chunk);
 		}
 
-		//Node tmp[8][1024];
-		//
-		//for (int i=0; i<8; ++i) {
-		//	glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, (uintptr_t)i * MAX_NODES * sizeof(Node), 1024 * sizeof(Node), tmp[i]);
-		//}
+		if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
+			glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}

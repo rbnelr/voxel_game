@@ -145,6 +145,7 @@ namespace svo {
 	struct glSparseBuffer {
 		int gpu_page_size = 0;
 		GLuint ssbo = 0;
+		GLuint64EXT ssbo_ptr = 0;
 
 		glSparseBuffer ();
 		~glSparseBuffer () {
@@ -224,15 +225,15 @@ namespace svo {
 
 			int last_alloc = free_chunks.bitscan_reverse_0(); // -1 on all free
 			
-			auto _check = [&] () {
-				if (last_alloc > -1)
-					assert(((free_chunks.bits[last_alloc / 64] >> (last_alloc % 64)) & 1) == 0);
-
-				for (int i=last_alloc+1; i<(int)free_chunks.bits.size(); ++i) {
-					assert(((free_chunks.bits[i / 64] >> (i % 64)) & 1) == 1);
-				}
-			};
-			_check();
+			//auto _check = [&] () {
+			//	if (last_alloc > -1)
+			//		assert(((free_chunks.bits[last_alloc / 64] >> (last_alloc % 64)) & 1) == 0);
+			//
+			//	for (int i=last_alloc+1; i<(int)free_chunks.bits.size(); ++i) {
+			//		assert(((free_chunks.bits[i / 64] >> (i % 64)) & 1) == 1);
+			//	}
+			//};
+			//_check();
 
 			// decommit last page(s)
 			while (last_alloc < commit_ptr - os_page_size / (int)sizeof(Chunk)) {

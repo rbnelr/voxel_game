@@ -49,7 +49,7 @@ struct ChunkGenerator {
 
 	block_id blocks[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 
-	float highest_blocks[CHUNK_SIZE][CHUNK_SIZE];
+	float heightmap[CHUNK_SIZE][CHUNK_SIZE];
 	float earth_layers[CHUNK_SIZE][CHUNK_SIZE];
 	float sand_thicknesss[CHUNK_SIZE][CHUNK_SIZE];
 
@@ -63,7 +63,7 @@ struct ChunkGenerator {
 		return val;
 	}
 
-	float heightmap (float2 pos_world, float* earth_layer) {
+	float clac_heightmap (float2 pos_world, float* earth_layer) {
 		float elevation;
 		float roughness;
 		float detail;
@@ -117,7 +117,7 @@ struct ChunkGenerator {
 			++i;
 		}
 
-		return elevation +(roughness * detail);
+		return elevation - 20 +(roughness * detail);
 	}
 
 	float noise_tree_density (float2 pos_world) {
@@ -159,7 +159,7 @@ struct ChunkGenerator {
 
 		float lod_scale = (float)(1u << lod);
 
-		int water_level = 21;
+		float water_level = 0; // z=0 is first air above water
 
 		{
 			ZoneScopedN("2d noise eval");
@@ -167,13 +167,13 @@ struct ChunkGenerator {
 			int2 i;
 			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-					int2 pos_world = (i << lod) + int2(chunk_origin);
+					float2 pos_world = ((float2)i + 0.5f) * lod_scale + (float2)int2(chunk_origin);
 
 					float earth_layer;
-					float height = heightmap((float2)pos_world, &earth_layer);
-					float sand_thickness = noise((float2)pos_world, 7.2f, deg(237.17f), 0, 0.8f, 1.7f);
+					float height = clac_heightmap(pos_world, &earth_layer);
+					float sand_thickness = noise(pos_world, 7.2f, deg(237.17f), 0, 1.2f, 2.7f);
 
-					highest_blocks[i.y][i.x] = height;
+					heightmap[i.y][i.x] = height;
 					earth_layers[i.y][i.x] = earth_layer;
 					sand_thicknesss[i.y][i.x] = sand_thickness;
 				}
@@ -187,30 +187,33 @@ struct ChunkGenerator {
 			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
 				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-						int3 pos_world = (i << lod) + chunk_origin;
+						float3 pos_world = ((float3)i + 0.5f) * lod_scale + (float3)chunk_origin;
 
 						block_id bid;
 
-						float highest_block = highest_blocks[i.y][i.x];
+						float height = heightmap[i.y][i.x];
 						float earth_layer = earth_layers[i.y][i.x];
 						earth_layer = max(earth_layer, lod_scale);
 
-						bool over_water = water_level > highest_block;
-						
 						float sand_thickness = sand_thicknesss[i.y][i.x];
-						bool beach = abs(highest_block - water_level) <= sand_thickness/2;
 
-						if (pos_world.z <= highest_block) {
-							if (pos_world.z <= highest_block - earth_layer) {
+						bool beach = abs(height - water_level) <= sand_thickness/2;
+
+						if (pos_world.z <= height) {
+							if (pos_world.z <= height - earth_layer) {
 								bid = B_STONE;
 							} else {
 								if (beach) {
 									bid = B_SAND;
 								} else {
-									if (pos_world.z == int(highest_block / lod_scale) * lod_scale && pos_world.z >= water_level) {
-										bid = B_GRASS;
+									if (height < water_level) {
+										bid = B_PEBBLES;
 									} else {
-										bid = over_water ? B_PEBBLES : B_EARTH;
+										if ((height - pos_world.z) <= lod_scale) {
+											bid = B_GRASS;
+										} else {
+											bid = B_EARTH;
+										}
 									}
 								}
 							}
@@ -244,7 +247,7 @@ struct ChunkGenerator {
 			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
 				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-						int3 pos_world = (i << lod) + chunk_origin;
+						int3 pos_world = i + chunk_origin;
 					
 						block_id* bid   =           &blocks[i.z    ][i.y][i.x];
 						block_id* below = i.z > 0 ? &blocks[i.z - 1][i.y][i.x] : nullptr;
