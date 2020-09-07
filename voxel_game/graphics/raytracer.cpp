@@ -45,6 +45,16 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 		glBindVertexArray(vao);
 
+		if (svo.allocator.gpu_nodes.ssbo == 0) {
+			clog(ERROR, "GL_ARB_sparse_buffer not supported!");
+			raytracer_draw = false;
+			return;
+		}
+
+		svo.allocator.gpu_nodes.upload_changes(svo);
+
+		shader.set_uniform_pointer("svo_nodes", svo.allocator.gpu_nodes.ssbo_ptr);
+
 		shader.set_uniform("svo_root_pos", svo.root->pos);
 		shader.set_uniform("svo_root_scale", svo.root->scale);
 
@@ -70,19 +80,6 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 
 		time += time_speed * input.dt;
 		shader.set_uniform("time", time);
-
-		if (svo.allocator.gpu_nodes.ssbo == 0) {
-			clog(ERROR, "GL_ARB_sparse_buffer not supported!");
-			raytracer_draw = false;
-			return;
-		}
-		
-		svo.allocator.gpu_nodes.upload_changes(svo);
-
-		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo);
-		//glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo, 0, 2ull * 1024 * 1024 * 1024);
-
-		glUniformui64NV(glGetUniformLocation(shader.shader->shad, "svo_nodes"), svo.allocator.gpu_nodes.ssbo_ptr);
 
 		std::vector<float4> block_tile_info;
 		for (auto& bti : graphics.tile_textures.block_tile_info) {

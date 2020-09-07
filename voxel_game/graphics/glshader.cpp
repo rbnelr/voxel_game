@@ -237,10 +237,14 @@ namespace gl {
 			return false;
 		}
 
-		void uniform_found (string_view glsl_type, string_view name) {
+		void uniform_found (string_view glsl_type, bool is_ptr, string_view name) {
 			gl::type type;
-			if (!get_type(glsl_type, &type))
-				return;
+			if (is_ptr) {
+				type = POINTER;
+			} else {
+				if (!get_type(glsl_type, &type))
+					return;
+			}
 
 			if (shader->uniforms.find(name) == shader->uniforms.end())
 				shader->uniforms.emplace(string(name), type);
@@ -252,15 +256,25 @@ namespace gl {
 
 				whitespace(&c);
 
+				// type name
 				if (!identifier(&c, &type))
 					return;
 
 				whitespace(&c);
 
+				bool is_ptr = false;
+				// NV pointer pointers (*, ** etc.)
+				while (*c == '*') {
+					c++;
+					is_ptr = true;
+					whitespace(&c);
+				}
+
+				// uniform name
 				if (!identifier(&c, &name))
 					return;
 
-				uniform_found(type, name);
+				uniform_found(type, is_ptr, name);
 			}
 		}
 

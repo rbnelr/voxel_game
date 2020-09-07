@@ -181,6 +181,14 @@ struct Shader {
 		}
 	}
 
+	void set_uniform_pointer (std::string_view name, GLuint64EXT ptr) {
+		gl::Uniform u;
+		if (shader->get_uniform(name, &u)) {
+			assert(u.type == gl::POINTER);
+			glUniformui64NV(u.loc, ptr);
+		}
+	}
+
 	void set_texture_unit (std::string_view name, int unit) {
 		gl::Uniform u;
 		if (shader->get_uniform(name, &u)) {

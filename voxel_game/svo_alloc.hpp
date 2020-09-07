@@ -32,6 +32,7 @@ namespace svo {
 	enum ChunkFlags : uint8_t {
 		LOCKED = 1, // read only, still displayed but not allowed to be modified
 		GPU_DIRTY = 2,
+		MESHING_DIRTY = 4,
 	};
 	ENUM_BITFLAG_OPERATORS_TYPE(ChunkFlags, uint8_t)
 
@@ -55,7 +56,7 @@ namespace svo {
 		Chunk (int3	pos, uint8_t scale): pos{pos}, scale{scale} {
 			nodes = tinydata;
 
-			flags = GPU_DIRTY;
+			flags = GPU_DIRTY | MESHING_DIRTY;
 
 			alloc_ptr = 0;
 			dead_count = 0;
@@ -192,6 +193,8 @@ namespace svo {
 		// Allocate first possible slot
 		Chunk* alloc_chunk () {
 			assert(chunk_count < MAX_CHUNKS);
+			if (chunk_count >= MAX_CHUNKS)
+				throw new std::runtime_error("Octree chunk allocation overflow!");
 
 			int idx = free_chunks.clear_first_1();
 			chunk_count++;
@@ -213,8 +216,7 @@ namespace svo {
 		}
 
 		// Free random slot
-		template <typename T>
-		void free_chunk (Chunk* chunk, T all_chunks) {
+		void free_chunk (Chunk* chunk) {
 			if (chunk->nodes != chunk->tinydata)
 				decommit_pages(chunk->nodes, sizeof(Node)*MAX_NODES);
 
@@ -225,16 +227,6 @@ namespace svo {
 
 			int last_alloc = free_chunks.bitscan_reverse_0(); // -1 on all free
 			
-			//auto _check = [&] () {
-			//	if (last_alloc > -1)
-			//		assert(((free_chunks.bits[last_alloc / 64] >> (last_alloc % 64)) & 1) == 0);
-			//
-			//	for (int i=last_alloc+1; i<(int)free_chunks.bits.size(); ++i) {
-			//		assert(((free_chunks.bits[i / 64] >> (i % 64)) & 1) == 1);
-			//	}
-			//};
-			//_check();
-
 			// decommit last page(s)
 			while (last_alloc < commit_ptr - os_page_size / (int)sizeof(Chunk)) {
 				commit_ptr -= os_page_size / (int)sizeof(Chunk);
@@ -312,7 +304,7 @@ namespace svo {
 
 			} else {
 				assert(false);
-				throw std::runtime_error("Octree allocation overflow"); // crash is preferable to corrupting our octree
+				throw std::runtime_error("Octree node allocation overflow!"); // crash is preferable to corrupting our octree
 			}
 		}
 	}

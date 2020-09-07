@@ -164,7 +164,7 @@ namespace svo {
 					node->children[i] = child_val;
 				}
 
-				chunk->flags |= GPU_DIRTY;
+				chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
 			}
 		}
 
@@ -172,7 +172,7 @@ namespace svo {
 		stack[cur_scale].node->children[ stack[cur_scale].child_indx ] = val;
 		stack[cur_scale].node->leaf_mask |= 1u << stack[cur_scale].child_indx;
 
-		chunk->flags |= GPU_DIRTY;
+		chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
 		for (	auto i = cur_scale;
@@ -292,7 +292,7 @@ namespace svo {
 	void free_chunk (SVO& svo, Chunk* chunk) {
 		svo.octree_write(chunk->pos, chunk->scale, B_NULL);
 
-		svo.allocator.free_chunk(chunk, svo.chunks);
+		svo.allocator.free_chunk(chunk);
 	}
 
 	void recurse_free (SVO& svo, uint32_t node, bool leaf) {

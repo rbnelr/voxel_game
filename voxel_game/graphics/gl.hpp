@@ -27,6 +27,8 @@ namespace gl {
 		MAT4			,
 		BOOL			,
 
+		POINTER			, // NV_shader_buffer_load has 64 bit pointer types in glsl
+
 		SAMPLER_1D			,
 		SAMPLER_2D			,
 		SAMPLER_3D			,
