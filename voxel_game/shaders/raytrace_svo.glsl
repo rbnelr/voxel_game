@@ -29,7 +29,7 @@ $if fragment
 	uniform ivec3 svo_root_pos;
 	uniform int svo_root_scale;
 
-#define MAX_NODES 4096//(1u << 16)
+#define MAX_NODES (1u << 16)
 
 	struct SvoNode {
 		uint children[4]; // uint16_t children[8]
@@ -37,7 +37,8 @@ $if fragment
 		uint _pad[3];
 	};
 
-	layout(std430, binding = 0) buffer SvoData {
+	layout(std430, binding = 0) readonly restrict
+	buffer SvoData {
 		SvoNode nodes[];
 	} svo_data;
 

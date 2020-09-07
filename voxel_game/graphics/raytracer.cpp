@@ -80,7 +80,8 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		svo.allocator.gpu_nodes.upload_changes(svo);
 
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, svo.allocator.gpu_nodes.ssbo);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo);
+		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, svo.allocator.gpu_nodes.ssbo, 0, 2ull * 1024 * 1024 * 1024);
 
 		std::vector<float4> block_tile_info;
 		for (auto& bti : graphics.tile_textures.block_tile_info) {

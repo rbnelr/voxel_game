@@ -485,7 +485,7 @@ struct Framebuffer {
 			glDeleteTextures(1, &depth);
 			glDeleteFramebuffers(1, &fbo);
 
-			// create new (textures created with glTexStorage2D cannot be resized), simply do this, shouldn't cause major lag i think
+			// create new (textures created with glTexStorage2D cannot be resized), shouldn't cause noticable lag i think
 			glGenTextures(1, &color);
 			glBindTexture(GL_TEXTURE_2D, color);
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, size.x, size.y);

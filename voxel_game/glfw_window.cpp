@@ -223,7 +223,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 					 //
 					 //case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
 		case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
-
+	
 					 //			 //case 131154: // Pixel transfer sync with rendering warning
 					 //
 					 //			 //case 1282: // Wierd error on notebook when trying to do texture streaming

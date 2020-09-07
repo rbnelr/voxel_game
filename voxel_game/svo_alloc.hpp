@@ -5,10 +5,10 @@
 static constexpr int CHUNK_SIZE = 64;
 static constexpr uint32_t CHUNK_SCALE = 6;
 
-static constexpr uint32_t MAX_CHUNKS = 4096;//1u << 16;
+static constexpr uint32_t MAX_CHUNKS = 1u << 16;
 
 namespace svo {
-	static constexpr uint32_t MAX_NODES = 4096;//1u << 16;
+	static constexpr uint32_t MAX_NODES = 1u << 16;
 
 	static constexpr uint32_t MAX_DEPTH = 20;
 
