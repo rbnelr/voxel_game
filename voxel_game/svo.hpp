@@ -72,27 +72,31 @@ namespace svo {
 	typedef uint32_t Voxel;
 
 	enum VoxelType : uint32_t { // 2 bit
-		NODE_PTR		=0, // uint32_t node index into current chunk
-		BLOCK_ID		=1, // block_id leaf node
+		BLOCK_ID		=0, // block_id leaf node
+		NODE_PTR		=1, // uint32_t node index into current chunk
 		CHUNK_PTR		=2, // uint32_t chunk index
 	};
 	ENUM_BITFLAG_OPERATORS_TYPE(VoxelType, uint32_t)
 
-	static constexpr uint16_t ONLY_BLOCK_IDS = 0x5555u;
+	static constexpr uint16_t ONLY_BLOCK_IDS = 0;
+
+	struct TypedVoxel {
+		VoxelType	type;
+		Voxel		value;
+	};
 
 	struct Node {
 		uint16_t children_types;
 		uint16_t _pad[1];
 		Voxel children[8];
 
-		Voxel& get_child (int child_idx, VoxelType* out_type) {
-			*out_type = VoxelType((children_types >> child_idx*2) & 3);
-			return children[child_idx];
+		TypedVoxel get_child (int child_idx) {
+			return { VoxelType((children_types >> child_idx*2) & 3), children[child_idx] };
 		}
-		void set_child (int child_idx, VoxelType type, Voxel vox) {
+		void set_child (int child_idx, TypedVoxel vox) {
 			children_types &= ~(3u << child_idx*2);
-			children_types |= type << child_idx*2;
-			children[child_idx] = vox;
+			children_types |= vox.type << child_idx*2;
+			children[child_idx] = vox.value;
 		}
 	};
 
@@ -347,20 +351,13 @@ namespace svo {
 		int child_idx;
 	};
 
-	struct LoadOp {
-		Chunk* chunk;
-		int3 pos;
-		int scale;
-		float dist;
-
-		enum Type {
-			CREATE,
-			SPLIT,
-			MERGE
-		} type;
-	};
-
 	inline int set_root_scale = 8;//16;
+
+	struct OctreeReadResult {
+		TypedVoxel	vox;
+		int			size;
+		int			lod;
+	};
 
 	struct SVO {
 		Chunk*	root;
@@ -376,6 +373,14 @@ namespace svo {
 
 		Allocator				allocator;
 
+		float load_lod_start = 0.0f;
+		float load_lod_unit = 64.0f;
+
+		// artifically limit both the size of the async queue and how many results to take from the results
+		int cap_chunk_load = 64;
+		// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
+		int cap_chunk_mesh = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
+
 		float3 root_move_hister = 0;
 
 		bool debug_draw_chunks = 1;//false;
@@ -389,6 +394,12 @@ namespace svo {
 
 		void imgui () {
 			if (!imgui_push("SVO")) return;
+
+			ImGui::DragFloat("load_lod_start", &load_lod_start, 1, 0, 1024);
+			ImGui::DragFloat("load_lod_unit", &load_lod_unit, 1, 16, 1024);
+
+			ImGui::DragInt("cap_chunk_load", &cap_chunk_load, 0.02f);
+			ImGui::DragInt("cap_chunk_mesh", &cap_chunk_mesh, 0.02f);
 
 			ImGui::DragInt("root_scale", &set_root_scale);
 			ImGui::Checkbox("debug_draw_chunks", &debug_draw_chunks);
@@ -455,20 +466,38 @@ namespace svo {
 
 			root = allocator.alloc_chunk(root_pos, root_scale);
 			Node* root_node = allocator.alloc_node(root, &root_idx);
+
 			root_node->children_types = ONLY_BLOCK_IDS;
 			memset(&root_node->children, 0, sizeof(root_node->children));
 		}
 
-		void update_chunk_loading_and_meshing (Voxels& voxels, Player& player, WorldGenerator& world_gen, Graphics& graphics);
+		void update_chunk_loading (Player& player, WorldGenerator& world_gen);
+
+		void update_chunk_gpu_data (Graphics& graphics, WorldGenerator& world_gen);
+
+		void update_chunk_loading_and_meshing (Player& player, WorldGenerator& world_gen, Graphics& graphics);
 
 		void chunk_to_octree (Chunk* chunk, block_id* blocks);
 
 		// octree write, writes a single voxel at a desired pos, scale to be a particular leaf val
 		// this decends the octree from the root and inserts or deletes nodes when needed
 		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
-		void octree_write (int3 pos, int scale, VoxelType type, Voxel val);
+		void octree_write (int x, int y, int z, int scale, TypedVoxel vox);
 
-		block_id octree_read (int3 pos, bool phys_read);
+		OctreeReadResult octree_read (int x, int y, int z, int target_size);
+	};
+
+	struct LoadOp {
+		Chunk* chunk;
+		int3 pos;
+		int scale;
+		float dist;
+
+		enum Type {
+			CREATE,
+			SPLIT,
+			MERGE
+		} type;
 	};
 
 	struct ChunkLoadJob : ThreadingJob {

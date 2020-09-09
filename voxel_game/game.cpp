@@ -135,7 +135,7 @@ void Game::frame () {
 
 		//block_update.update_blocks(world->chunks);
 
-		world->voxels.svo.update_chunk_loading_and_meshing(world->voxels, world->player, world_gen, graphics);
+		world->voxels.svo.update_chunk_loading_and_meshing(world->player, world_gen, graphics);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);

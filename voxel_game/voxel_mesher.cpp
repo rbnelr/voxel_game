@@ -104,69 +104,18 @@ struct ChunkRemesher {
 		for (int face=0; face<6; ++face) {
 			int3 nb_pos = abs_pos + FACES[face] * size;
 			
-			int nb_size;
-			block_id nb_bid = find_neighbour(nb_pos.x,nb_pos.y,nb_pos.z, size, &nb_size);
+			auto nb = svo.octree_read(nb_pos.x, nb_pos.y, nb_pos.z, size);
 
-			if (nb_size >= size) {
+			if (nb.size >= size) {
+				assert(nb.vox.type == BLOCK_ID);
+
 				// generate face facing to neighbour
-				if (should_render_face(bid, nb_bid))
+				if (should_render_face(bid, (block_id)nb.vox.value))
 					push_face(opaque_mesh, posf, sizef, face, 0);
 
 				// generate face of neighbour facing us
-				if (should_render_face(nb_bid, bid))
+				if (should_render_face((block_id)nb.vox.value, bid))
 					push_face(opaque_mesh, posf, sizef, face, 1);
-			}
-		}
-	}
-
-	block_id find_neighbour (int x, int y, int z, int target_size, int* out_size) {
-		int size = 1 << svo.root->scale;
-		x -= svo.root->pos.x;
-		y -= svo.root->pos.y;
-		z -= svo.root->pos.z;
-		if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size) {
-			*out_size = size;
-			return B_NULL;
-		}
-
-		// start with root node
-		Chunk* chunk = svo.root;
-		Node* node = svo.allocator.get_node(svo.root, 0);
-
-		for (;;) {
-			size >>= 1;
-			assert(size > 0);
-
-			// get child node that contains target node
-			int child_idx = get_child_index(x, y, z, size);
-
-			VoxelType child_type;
-			Voxel child_vox = node->get_child(child_idx, &child_type);
-
-			if (size == target_size) {
-				// return size if block_id of desired size or bigger is found,
-				// else return -1 to signal that the target node is made up of further subdivided voxels
-				*out_size = child_type == BLOCK_ID ? size : -1;
-				return (block_id)child_vox;
-			}
-
-			switch (child_type) {
-				case NODE_PTR: {
-					// recurse into child node
-					node = svo.allocator.get_node(chunk, child_vox);
-				} break;
-
-				case CHUNK_PTR: {
-					assert(child_vox != 0);
-					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-					chunk = &svo.allocator.chunks[child_vox];
-					node = svo.allocator.get_node(chunk, 0);
-				} break;
-
-				default: {
-					assert(child_type == BLOCK_ID);
-					return (block_id)child_vox;
-				};
 			}
 		}
 	}
@@ -196,21 +145,20 @@ struct ChunkRemesher {
 
 				int3 child_pos = pos + (children_pos[child_idx] << scale);
 
-				VoxelType type;
-				Voxel vox = node->get_child(child_idx, &type);
+				auto vox = node->get_child(child_idx);
 
-				if (type == NODE_PTR) {
+				if (vox.type == NODE_PTR) {
 					// Push
 					scale--;
 					size >>= 1;
 
-					stack[scale] = { svo.allocator.get_node(chunk, vox), child_pos, 0 };
+					stack[scale] = { svo.allocator.get_node(chunk, vox.value), child_pos, 0 };
 
 					continue; // don't inc child indx
 				} else {
-					assert(type == BLOCK_ID);
+					assert(vox.type == BLOCK_ID);
 
-					chunk_block(child_pos, size, (block_id)vox);
+					chunk_block(child_pos, size, (block_id)vox.value);
 				}
 			}
 
