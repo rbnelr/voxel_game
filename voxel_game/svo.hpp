@@ -413,21 +413,22 @@ namespace svo {
 
 			uintptr_t chunks_count = 0;
 			uintptr_t active_nodes = 0;
-			uintptr_t commit_nodes = 0;
+			uintptr_t commit_bytes = 0;
 
 			for (auto* chunk : chunks) {
 				chunks_count++;
 				active_nodes += chunk->alloc_ptr;
-				commit_nodes += chunk->commit_ptr / sizeof(Node);
+				commit_bytes += chunk->commit_ptr;
 			}
 
-			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(allocator.commit_ptr - (char*)allocator.chunks) / 1024);
-			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %.0f | %.0f",
-				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
-			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",
-				(float)(commit_nodes * sizeof(Node)) / 1024 / 1024, (float)(commit_nodes - active_nodes) / commit_nodes * 100);
+			uintptr_t active_bytes = active_nodes * sizeof(Node);
 
-			ImGui::Text("Root chunk: active:   %5d     committed: %5d", root->alloc_ptr, root->commit_ptr);
+			ImGui::Text("Active chunks:      %7d (structs take ~%.2f KB)", chunks_count, (float)(allocator.commit_ptr - (char*)allocator.chunks) / 1024);
+			ImGui::Text("SVO Nodes: active:  %7.2f k", (float)active_nodes / 1000);
+			ImGui::Text("SVO mem: committed: %7.2f MB  wasted: %5.2f%%",
+				(float)active_bytes / 1024 / 1024, (float)(commit_bytes - active_bytes) / commit_bytes * 100);
+
+			ImGui::Text("Root chunk: active:   %5d", root->alloc_ptr);
 			
 			if (ImGui::TreeNode("Show all chunks")) {
 				std::vector<Chunk*> loaded_chunks;
@@ -442,10 +443,11 @@ namespace svo {
 					return false;
 				});
 
-				ImGui::Text("[ index]                     pos    size -- alloc | commit");
+				ImGui::Text("[ index]                     pos    size -- alloc B | commit B  wasted");
 				for (auto* chunk : loaded_chunks) {
-					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %5d | %5d", allocator.indexof(chunk),
-						chunk->pos.x,chunk->pos.y,chunk->pos.z, 1 << chunk->scale, chunk->alloc_ptr, chunk->commit_ptr);
+					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %7d | %7d  %2.0f %%", allocator.indexof(chunk),
+						chunk->pos.x,chunk->pos.y,chunk->pos.z, 1 << chunk->scale, chunk->alloc_ptr * sizeof(Node), chunk->commit_ptr,
+						(float)(chunk->commit_ptr - chunk->alloc_ptr * sizeof(Node)) / chunk->commit_ptr * 100);
 				}
 				ImGui::TreePop();
 			}

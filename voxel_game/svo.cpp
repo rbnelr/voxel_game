@@ -757,11 +757,14 @@ namespace svo {
 
 		parallelism_threadpool.contribute_work();
 
-		auto results = parallelism_threadpool.results.pop_all();
-		assert(results.size() == remeshing_jobs.size());
+		int results_count = 0;
+		while (results_count < (int)remeshing_jobs.size()) {
+			auto results = parallelism_threadpool.results.pop_all();
 
-		for (auto& res : results) {
-			res->finalize();
+			for (auto& res : results) {
+				res->finalize();
+				results_count++;
+			}
 		}
 	}
 
