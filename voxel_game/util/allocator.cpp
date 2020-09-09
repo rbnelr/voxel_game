@@ -1,4 +1,4 @@
-#include "virtual_allocator.hpp"
+#include "allocator.hpp"
 #include "windows.h"
 
 uint32_t get_os_page_size () {
@@ -22,6 +22,10 @@ void release_address_space (void* baseptr, uintptr_t size) {
 void commit_pages (void* ptr, uintptr_t size) {
 	auto ret = VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
 	assert(ret != NULL);
+
+#if DBG_MEMSET
+	memset(ptr, DBG_MEMSET_VAL, size);
+#endif
 }
 
 void decommit_pages (void* ptr, uintptr_t size) {
@@ -29,7 +33,7 @@ void decommit_pages (void* ptr, uintptr_t size) {
 	assert(ret != 0);
 }
 
-#define ONES 0xffffffffffffffffull
+#define ONES (~0ull) //0xffffffffffffffffull
 
 uint32_t _bsf_1 (uint64_t val) {
 	unsigned long idx;

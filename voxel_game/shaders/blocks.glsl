@@ -7,10 +7,7 @@ $include "fog.glsl"
 $if vertex
 	layout (location = 0) in vec3	pos_model;
 	layout (location = 1) in vec2	uv;
-	layout (location = 2) in int	tex_indx;
-	layout (location = 3) in float	block_light;
-	layout (location = 4) in float	sky_light;
-	layout (location = 5) in float	hp;
+	layout (location = 2) in float	tex_indx;
 
 	uniform vec3 chunk_pos;
 	uniform float sky_light_reduce;
@@ -18,12 +15,6 @@ $if vertex
 	out vec3	vs_pos_cam;
 	out vec2	vs_uv;
 	out float	vs_tex_indx;
-	out float	vs_brightness;
-	out float	vs_hp_ratio;
-
-	float brightness_function (float light) {
-		return light * pow(1.0 / (2.0 - light), 4.0); 
-	}
 
 	void main () {
 		vec4 pos_cam = world_to_cam * vec4(pos_model + chunk_pos, 1);
@@ -32,9 +23,7 @@ $if vertex
 
 		vs_pos_cam =		pos_cam.xyz;
 		vs_uv =		        uv;
-		vs_tex_indx =		float(tex_indx);
-		vs_brightness =		brightness_function( max(block_light, sky_light - sky_light_reduce) );
-		vs_hp_ratio =		hp;
+		vs_tex_indx =		tex_indx;
 
 		WIREFRAME_MACRO;
 	}
@@ -44,14 +33,8 @@ $if fragment
 	in vec3		vs_pos_cam;
 	in vec2	    vs_uv;
 	in float	vs_tex_indx;
-	in float	vs_brightness;
-	in float	vs_hp_ratio;
 
 	uniform	sampler2DArray tile_textures;
-	uniform	sampler2DArray breaking_textures;
-
-	uniform float breaking_frames_count;
-	uniform float breaking_mutliplier;
 
 	#define ALPHA_TEST_THRES 127.0
 
@@ -61,15 +44,7 @@ $if fragment
 		
 		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	
-		if (vs_hp_ratio < 1) {
-			float breaking_frame = floor(vs_hp_ratio * breaking_frames_count + 0.00001f);
-		
-			if (breaking_frame < breaking_frames_count) {
-				col.rgb *= 1 + (texture(breaking_textures, vec3(vs_uv, breaking_frame)).rrr * 255.0 - 127.0) / 127.0 * breaking_mutliplier;
-			}
-		}
-	
-		col.rgb *= vec3(vs_brightness);
+		//col.rgb *= vec3(vs_brightness);
 		
 		if (col.a <= ALPHA_TEST_THRES / 255.0)
 			DISCARD();

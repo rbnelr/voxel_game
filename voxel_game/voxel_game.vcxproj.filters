@@ -237,9 +237,6 @@
     <ClInclude Include="util\freelist_allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="util\virtual_allocator.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
     <ClInclude Include="..\tracy\Tracy.hpp">
       <Filter>tracy</Filter>
     </ClInclude>
@@ -258,8 +255,10 @@
     <ClInclude Include="voxel_mesher.hpp" />
     <ClInclude Include="threading.hpp" />
     <ClInclude Include="voxel_system.hpp" />
-    <ClInclude Include="svo_alloc.hpp" />
     <ClInclude Include="util\macros.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util\allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
   </ItemGroup>
@@ -370,16 +369,15 @@
     <ClCompile Include="graphics\raytracer.cpp">
       <Filter>graphics</Filter>
     </ClCompile>
-    <ClCompile Include="util\virtual_allocator.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\tracy\TracyClient.cpp">
       <Filter>tracy</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="svo.cpp" />
     <ClCompile Include="voxel_mesher.cpp" />
-    <ClCompile Include="svo_alloc.cpp" />
+    <ClCompile Include="util\allocator.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

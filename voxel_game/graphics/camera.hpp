@@ -116,7 +116,7 @@ float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse=nullptr);
 class Flycam : public Camera {
 public:
 	float base_speed = 0.5f;
-	float max_speed = 1000.0f;
+	float max_speed = 1000000.0f;
 	float speedup_factor = 2;
 	float fast_multiplier = 4;
 

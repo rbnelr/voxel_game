@@ -200,7 +200,6 @@
     <ClInclude Include="profiling.hpp" />
     <ClInclude Include="stb\stb_rect_pack.h" />
     <ClInclude Include="stb_rect_pack.hpp" />
-    <ClInclude Include="svo_alloc.hpp" />
     <ClInclude Include="threading.hpp" />
     <ClInclude Include="time_of_day.hpp" />
     <ClInclude Include="util\animation.hpp" />
@@ -212,7 +211,7 @@
     <ClInclude Include="util\read_directory.hpp" />
     <ClInclude Include="util\threadpool.hpp" />
     <ClInclude Include="util\threadsafe_queue.hpp" />
-    <ClInclude Include="util\virtual_allocator.hpp" />
+    <ClInclude Include="util\allocator.hpp" />
     <ClInclude Include="voxel_system.hpp" />
     <ClInclude Include="world_generator.hpp" />
     <ClInclude Include="voxel_mesher.hpp" />
@@ -297,7 +296,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="svo_alloc.cpp" />
     <ClCompile Include="time_of_day.cpp" />
     <ClCompile Include="util\read_directory.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -309,7 +307,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="util\virtual_allocator.cpp">
+    <ClCompile Include="util\allocator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>

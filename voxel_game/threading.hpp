@@ -22,7 +22,12 @@ inline const int background_threads  = clamp(roundi((float)logical_cores * 0.80f
 
 // main thread + parallelism_threads = logical cores -1 to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
 // leave one thread for system and background apps
-inline const int parallelism_threads = clamp(logical_cores - 1, 1, logical_cores);
+inline const int parallelism_threads = 
+	#if NDEBUG
+		clamp(logical_cores - 1, 1, logical_cores);
+	#else
+		0;
+	#endif
 
 inline Threadpool background_threadpool		= Threadpool(background_threads		, ThreadPriority::LOW , ">> background threadpool"  );
 inline Threadpool parallelism_threadpool	= Threadpool(parallelism_threads - 1, ThreadPriority::HIGH, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too

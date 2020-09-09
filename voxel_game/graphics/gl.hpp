@@ -53,6 +53,7 @@ namespace gl {
 		FLOAT			= GL_FLOAT,
 		INT				= GL_INT,
 		UNSIGNED_BYTE	= GL_UNSIGNED_BYTE,
+		UNSIGNED_SHORT	= GL_UNSIGNED_SHORT,
 		BOOL			= GL_BOOL,
 
 		NEAREST					= GL_NEAREST,
@@ -270,6 +271,7 @@ class Attributes {
 	template<> static inline constexpr _Attribute to_attrib<uint8v2 > () { return { gl::Enum::UNSIGNED_BYTE, 2 }; }
 	template<> static inline constexpr _Attribute to_attrib<uint8v3 > () { return { gl::Enum::UNSIGNED_BYTE, 3 }; }
 	template<> static inline constexpr _Attribute to_attrib<uint8v4 > () { return { gl::Enum::UNSIGNED_BYTE, 4 }; }
+	template<> static inline constexpr _Attribute to_attrib<uint16_t> () { return { gl::Enum::UNSIGNED_SHORT, 1 }; }
 	//template<> static inline constexpr _Attribute to_attrib<bool    > (Attribute<bool    > a) { return { a.name, Type::BOOL , 1, a.normalized, a.stride, a.offs }; }
 
 public:

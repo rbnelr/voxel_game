@@ -38,11 +38,14 @@ $if fragment
 
 	struct SvoNode {
 		uint16_t children_types; // uint16_t children_types
-		uint16_t _pad[15];
+		uint16_t _pad[1];
 		uint32_t children[8];
 	};
 
-	uniform SvoNode* svo_nodes;
+	layout(std430, binding = 0) readonly restrict
+	buffer SvoData {
+		SvoNode* chunks_nodes[];
+	} svo_data;
 
 	uint get_svo_node (uint node_index, int child_index, out uint type) {
 		//return texelFetch(svo_texture, ivec2(uvec2((node_index & 0xffff) * 8 + uint(child_index), node_index >> 16)), 0).r;
@@ -50,7 +53,7 @@ $if fragment
 		uint chunk_index = node_index >> 16;
 		node_index = node_index & 0xffffu;
 
-		SvoNode node = svo_nodes[chunk_index * MAX_NODES + node_index];
+		SvoNode node = svo_data.chunks_nodes[chunk_index][node_index];
 
 		type = (uint)((node.children_types >> child_index*2) & 3u);
 		return (uint)node.children[child_index];

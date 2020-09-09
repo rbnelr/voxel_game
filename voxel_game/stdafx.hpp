@@ -51,7 +51,7 @@
 #include "util/threadpool.hpp"
 #include "util/threadsafe_queue.hpp"
 #include "util/timer.hpp"
-#include "util/virtual_allocator.hpp"
+#include "util/allocator.hpp"
 
 #include "dear_imgui.hpp"
 #include "profiling.hpp"

@@ -4,13 +4,9 @@
 #include "voxel_mesher.hpp"
 #include "threading.hpp"
 
-#define CHUNK_SIZE 64
-#define CHUNK_SCALE 6
-
 // Backend system resposible for handling storage, changes to, and displaying of the voxel world
 class Voxels {
 public:
-	VoxelMesher mesher;
 	SVO svo;
 
 	float load_lod_start = 0.0f;

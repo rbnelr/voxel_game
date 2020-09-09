@@ -1,9 +1,10 @@
 #pragma once
 #include "stdafx.hpp"
 #include "blocks.hpp"
-#include "util/virtual_allocator.hpp"
+#include "util/allocator.hpp"
 #include "world_generator.hpp"
-#include "svo_alloc.hpp"
+#include "graphics/graphics.hpp"
+#include "voxel_mesher.hpp"
 
 class Voxels;
 class Player;
@@ -11,10 +12,340 @@ struct WorldGenerator;
 
 struct WorldgenJob;
 
+
+static constexpr int CHUNK_SIZE = 128;
+static constexpr int CHUNK_SCALE = 7;
+
 namespace svo {
+
+	static inline constexpr int MAX_DEPTH = 20;
+	static inline constexpr int MAX_CHUNKS = 256 * 1024;
+	static inline constexpr int MAX_NODES = 256 * 1024;
+
+	static inline constexpr int3 children_pos[8] = {
+		int3(0,0,0),
+		int3(1,0,0),
+		int3(0,1,0),
+		int3(1,1,0),
+		int3(0,0,1),
+		int3(1,0,1),
+		int3(0,1,1),
+		int3(1,1,1),
+	};
+	static inline constexpr float3 corners[8] = {
+		float3(0,0,0),
+		float3(1,0,0),
+		float3(0,1,0),
+		float3(1,1,0),
+		float3(0,0,1),
+		float3(1,0,1),
+		float3(0,1,1),
+		float3(1,1,1),
+	};
+	static inline lrgba cols[] = {
+		srgba(255,0,0),
+		srgba(0,255,0),
+		srgba(0,0,255),
+		srgba(255,255,0),
+		srgba(255,0,255),
+		srgba(0,255,255),
+		srgba(127,0,255),
+		srgba(255,0,127),
+		srgba(255,127,255),
+	};
+
+	inline int get_child_index (int x, int y, int z, int size) {
+		//// Subpar asm generated for a lot of these, at least from what I can tell, might need to look into this if I octree decent actually becomes a bottleneck
+		//return	(((pos.x >> scale) & 1) << 0) |
+		//		(((pos.y >> scale) & 1) << 1) |
+		//		(((pos.z >> scale) & 1) << 2);
+		//return	((pos.x >> (scale  )) & 1) |
+		//		((pos.y >> (scale-1)) & 2) |
+		//		((pos.z >> (scale-2)) & 4);
+		int ret = 0;
+		if (x & size) ret |= 1;
+		if (y & size) ret |= 2;
+		if (z & size) ret |= 4;
+		return ret;
+	}
+
+	typedef uint32_t Voxel;
+
+	enum VoxelType : uint32_t { // 2 bit
+		NODE_PTR		=0, // uint32_t node index into current chunk
+		BLOCK_ID		=1, // block_id leaf node
+		CHUNK_PTR		=2, // uint32_t chunk index
+	};
+	ENUM_BITFLAG_OPERATORS_TYPE(VoxelType, uint32_t)
+
+	static constexpr uint16_t ONLY_BLOCK_IDS = 0x5555u;
+
+	struct Node {
+		uint16_t children_types;
+		uint16_t _pad[1];
+		Voxel children[8];
+
+		Voxel& get_child (int child_idx, VoxelType* out_type) {
+			*out_type = VoxelType((children_types >> child_idx*2) & 3);
+			return children[child_idx];
+		}
+		void set_child (int child_idx, VoxelType type, Voxel vox) {
+			children_types &= ~(3u << child_idx*2);
+			children_types |= type << child_idx*2;
+			children[child_idx] = vox;
+		}
+	};
+
+	enum ChunkFlags : uint8_t {
+		LOCKED = 1, // read only, still displayed but not allowed to be modified
+		SVO_DIRTY = 2, // svo data changed, reupload to gpu
+		MESH_DIRTY = 4, // change that requires remesh
+	};
+	ENUM_BITFLAG_OPERATORS_TYPE(ChunkFlags, uint8_t)
+
+	struct Chunk {
+		const int3		pos;
+		const uint8_t	scale;
+
+		ChunkFlags flags = (ChunkFlags)0;
+
+		uint32_t alloc_ptr = 0; // in nodes
+		uint32_t commit_ptr = 0; // in bytes
+
+		uint32_t svo_data_size = 0;
+		uint32_t opaque_vertex_count = 0;
+		uint32_t transparent_vertex_count = 0;
+
+		GLuint gl_svo_data = 0;
+		GLuint gl_mesh = 0;
+
+		GLuint64EXT gl_svo_data_ptr = 0;
+		
+		Chunk (int3 pos, uint8_t scale): pos{pos}, scale{scale} {}
+
+		~Chunk () {
+			if (gl_svo_data)
+				glDeleteBuffers(1, &gl_svo_data);
+			if (gl_mesh)
+				glDeleteBuffers(1, &gl_mesh);
+		}
+	};
+	static constexpr auto _sz = sizeof(Chunk);
+
+	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
+
+	template <typename VALT>
+	struct ChunkHashmap {
+		std::unordered_map<ChunkKey, VALT> chunks;
+
+		bool get (int3 pos, int scale, VALT* val) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				*val = it->second;
+				return true;
+			} else {
+				return false;
+			}
+		}
+		VALT* get (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				return &it->second;
+			} else {
+				return nullptr;
+			}
+		}
+		bool contains (int3 pos, int scale) {
+			VALT val;
+			return get(pos, scale, &val);
+		}
+		// insert new, error if already exist 
+		void insert (int3 pos, int scale, VALT chunk) {
+			assert(!contains(pos, scale));
+			chunks.emplace(int4(pos, scale), chunk);
+		}
+		// remove, return old if did exist
+		VALT remove (int3 pos, int scale) {
+			auto it = chunks.find(int4(pos, scale));
+			if (it != chunks.end()) {
+				VALT val = it->second;
+				chunks.erase(it);
+				return val;
+			} else {
+				return VALT();
+			}
+		}
+
+		int count () {
+			return (int)chunks.size();
+		}
+
+		struct Iterator {
+			typename decltype(chunks)::iterator it;
+
+			Chunk* operator* () { return it->second; }
+			Iterator& operator++ () {
+				++it;
+				return *this;
+			}
+			bool operator!= (Iterator const& r) { return it != r.it; }
+			bool operator== (Iterator const& r) { return it != r.it; }
+		};
+		Iterator begin () {
+			Iterator it = { chunks.begin() };
+			return it;
+		}
+		Iterator end () {
+			return { chunks.end() };
+		}
+	};
+
+	struct Allocator {
+		Chunk*				chunks;
+		Node*				nodes;
+
+		char*				commit_ptr; // end of commited chunks, in bytes
+
+		Bitset				free_chunks;
+		int					chunk_count = 0;
+
+		uint32_t			node_ptrs_ssbo_length = 0;
+		GLuint				node_ptrs_ssbo;
+
+		uint32_t indexof (Chunk* chunk) {
+			return (uint32_t)(chunk - chunks);
+		}
+		uint32_t indexof (Chunk* chunk, Node* node) {
+			return (uint32_t)(node - get_node(chunk, 0));
+		}
+		Node* get_node (Chunk* chunk, uint32_t idx) {
+			return nodes + ((uintptr_t)indexof(chunk) * MAX_NODES + idx);
+		}
+
+		uint32_t comitted_chunk_count () {
+			return (uint32_t)free_chunks.bits.size() * 64;
+		}
+		bool chunk_is_allocated (uint32_t idx) {
+			return (free_chunks.bits[idx / 64] & (1ull << (idx % 64))) == 0;
+		}
+
+		Allocator () {
+			assert((sizeof(Node) * MAX_NODES) % os_page_size == 0);
+
+			chunks = (Chunk*)reserve_address_space((uintptr_t)MAX_CHUNKS * sizeof(Chunk));
+			nodes = (Node*)reserve_address_space((uintptr_t)MAX_CHUNKS * MAX_NODES * sizeof(Node));
+			commit_ptr = (char*)chunks;
+
+			glGenBuffers(1, &node_ptrs_ssbo);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, node_ptrs_ssbo);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		}
+		~Allocator () {
+			glDeleteBuffers(1, &node_ptrs_ssbo);
+			node_ptrs_ssbo = 0;
+
+			for (uint32_t i=0; i<comitted_chunk_count(); ++i) {
+				if (chunk_is_allocated(i)) {
+					chunks[i].~Chunk();
+				}
+			}
+
+			release_address_space(chunks, (uintptr_t)MAX_CHUNKS * sizeof(Chunk));
+			release_address_space(nodes, (uintptr_t)MAX_CHUNKS * MAX_NODES * sizeof(Node));
+		}
+
+		// Allocate first possible slot
+		Chunk* alloc_chunk (int3 pos, int scale) {
+			if (chunk_count >= MAX_CHUNKS) {
+				assert(chunk_count < MAX_CHUNKS);
+				throw new std::runtime_error("max chunks reached!");
+			}
+
+			int idx = free_chunks.clear_first_1();
+			chunk_count++;
+
+			Chunk* chunk = &chunks[idx];
+
+			// commit page if all page slots were free before
+			if ((char*)(chunk + 1) > commit_ptr) {
+				commit_pages(commit_ptr, os_page_size);
+				commit_ptr += os_page_size;
+			}
+
+			new (chunk) Chunk (pos, (uint8_t)scale);
+			return chunk;
+		}
+
+		// Free random slot
+		void free_chunk (Chunk* chunk) {
+			free_nodes(chunk);
+			chunk->~Chunk();
+		#if DBG_MEMSET
+			memset(chunk, DBG_MEMSET_VAL, sizeof(Chunk));
+		#endif
+
+			int idx = (int)indexof(chunk);
+
+			free_chunks.set_bit(idx);
+			chunk_count--;
+
+			int last_alloc = free_chunks.bitscan_reverse_0(); // -1 on all free
+
+			// decommit last page(s)
+			Chunk* last_chunk = &chunks[last_alloc];
+			while ((char*)(last_chunk + 1) <= commit_ptr - os_page_size) {
+				commit_ptr -= os_page_size;
+				decommit_pages(commit_ptr, os_page_size);
+			}
+		}
+
+		Node* alloc_node (Chunk* chunk, uint32_t* idx) {
+			if (chunk->alloc_ptr >= MAX_NODES) {
+				assert(chunk->alloc_ptr < MAX_NODES);
+				throw new std::runtime_error("max nodes reached!");
+			}
+
+			Node* new_node = nodes + ((uintptr_t)indexof(chunk) * MAX_NODES + chunk->alloc_ptr);
+			*idx = chunk->alloc_ptr++;
+
+			if (chunk->alloc_ptr * sizeof(Node) > chunk->commit_ptr) {
+				char* new_page = (char*)(nodes + ((uintptr_t)indexof(chunk) * MAX_NODES)) + chunk->commit_ptr;
+
+				commit_pages(new_page, os_page_size);
+				chunk->commit_ptr += os_page_size;
+			}
+
+			return new_node;
+		}
+		void free_nodes (Chunk* chunk) {
+			Node* nodes = get_node(chunk, 0);
+
+			decommit_pages(nodes, MAX_NODES * sizeof(Node));
+			chunk->alloc_ptr = 0;
+			chunk->commit_ptr = 0;
+		}
+
+		void imgui_print_free_slots () {
+			for (int i=0; i<free_chunks.bits.size(); ++i) {
+				char bits[64+1];
+				bits[64] = '\0';
+				for (int j=0; j<64; ++j)
+					bits[j] = (free_chunks.bits[i] & (1ull << j)) ? '_':'#';
+				ImGui::Text(bits);
+			}
+		}
+	};
 	
 	// how far to move in blocks in the opposite direction of a root move before it happens again, to prevent unneeded root moves
 	static constexpr float ROOT_MOVE_HISTER = 20;
+
+	struct StackNode {
+		// parent node
+		Node* node;
+		// child info
+		int3 pos;
+		int child_idx;
+	};
 
 	struct LoadOp {
 		Chunk* chunk;
@@ -29,7 +360,7 @@ namespace svo {
 		} type;
 	};
 
-	inline int set_root_scale = 16;
+	inline int set_root_scale = 8;//16;
 
 	struct SVO {
 		Chunk*	root;
@@ -43,7 +374,7 @@ namespace svo {
 		// when count is 8 this parent could merge it's children into itself and become a real chunk
 		ChunkHashmap<int>		parent_chunks;
 
-		SVOAllocator			allocator;
+		Allocator				allocator;
 
 		float3 root_move_hister = 0;
 
@@ -51,6 +382,7 @@ namespace svo {
 		bool debug_draw_chunks_onlyz0 = 1;//false;
 		bool debug_draw_svo = false;
 		bool debug_draw_air = false;
+		float debug_draw_inset = 0.05f;
 		int debug_draw_octree_min = 3;
 		int debug_draw_octree_max = 20;
 		float debug_draw_octree_range = 100;
@@ -63,6 +395,7 @@ namespace svo {
 			ImGui::Checkbox("debug_draw_chunks_onlyz0", &debug_draw_chunks_onlyz0);
 			ImGui::Checkbox("debug_draw_svo", &debug_draw_svo);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
+			ImGui::SliderFloat("debug_draw_inset", &debug_draw_inset, 0, 10, "%7.5f", 3);
 			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0,20);
 			ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0,20);
 			ImGui::SliderFloat("debug_draw_octree_range", &debug_draw_octree_range, 0,2048, "%f", 2);
@@ -74,10 +407,10 @@ namespace svo {
 			for (auto* chunk : chunks) {
 				chunks_count++;
 				active_nodes += chunk->alloc_ptr;
-				commit_nodes += chunk->commit_ptr;
+				commit_nodes += chunk->commit_ptr / sizeof(Node);
 			}
 
-			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(allocator.commit_ptr * sizeof(Chunk)) / 1024);
+			ImGui::Text("Active chunks:        %5d (structs take ~%.2f KB)", chunks_count, (float)(allocator.commit_ptr - (char*)allocator.chunks) / 1024);
 			ImGui::Text("SVO Nodes: active:    %5d k   committed: %5d k  avg/chunk: %.0f | %.0f",
 				active_nodes / 1000, commit_nodes / 1000, (float)active_nodes / chunks_count, (float)commit_nodes / chunks_count);
 			ImGui::Text("SVO mem: committed: %7.2f MB  wasted:    %5.2f%%",
@@ -118,14 +451,15 @@ namespace svo {
 			uint8_t root_scale = (uint8_t)set_root_scale;
 			int3 root_pos = -(1 << (root_scale - 1));
 			
-			root = allocator.alloc_chunk();
-			new (root) Chunk (root_pos, root_scale);
-			root->alloc_node(allocator);
-			root->nodes[0].children_types = ONLY_BLOCK_IDS;
-			memset(&root->nodes[0].children, 0, sizeof(root->nodes[0].children));
+			uint32_t root_idx;
+
+			root = allocator.alloc_chunk(root_pos, root_scale);
+			Node* root_node = allocator.alloc_node(root, &root_idx);
+			root_node->children_types = ONLY_BLOCK_IDS;
+			memset(&root_node->children, 0, sizeof(root_node->children));
 		}
 
-		void chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen);
+		void update_chunk_loading_and_meshing (Voxels& voxels, Player& player, WorldGenerator& world_gen, Graphics& graphics);
 
 		void chunk_to_octree (Chunk* chunk, block_id* blocks);
 
@@ -149,6 +483,25 @@ namespace svo {
 
 		virtual void execute () {
 			generate_chunk(chunk, svo, world_gen);
+		}
+		virtual void finalize ();
+	};
+
+	struct RemeshChunkJob : ThreadingJob {
+		// input
+		Chunk* chunk;
+		SVO& svo;
+		Graphics const& g;
+		WorldGenerator const& wg;
+		// output
+		std::vector<VoxelVertex> opaque_mesh;
+		std::vector<VoxelVertex> transparent_mesh;
+
+		RemeshChunkJob (Chunk* chunk, SVO& svo, Graphics const& g, WorldGenerator const& wg):
+			chunk{chunk}, svo{svo}, g{g}, wg{wg} {}
+
+		virtual void execute () {
+			remesh_chunk(chunk, svo, g, wg, opaque_mesh, transparent_mesh);
 		}
 		virtual void finalize ();
 	};

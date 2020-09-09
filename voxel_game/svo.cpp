@@ -27,54 +27,6 @@ namespace svo {
 		return (Node)children_ptr;
 	}
 #endif
-
-	static constexpr int3 children_pos[8] = {
-		int3(0,0,0),
-		int3(1,0,0),
-		int3(0,1,0),
-		int3(1,1,0),
-		int3(0,0,1),
-		int3(1,0,1),
-		int3(0,1,1),
-		int3(1,1,1),
-	};
-	static constexpr float3 corners[8] = {
-		float3(0,0,0),
-		float3(1,0,0),
-		float3(0,1,0),
-		float3(1,1,0),
-		float3(0,0,1),
-		float3(1,0,1),
-		float3(0,1,1),
-		float3(1,1,1),
-	};
-	lrgba cols[] = {
-		srgba(255,0,0),
-		srgba(0,255,0),
-		srgba(0,0,255),
-		srgba(255,255,0),
-		srgba(255,0,255),
-		srgba(0,255,255),
-		srgba(127,0,255),
-		srgba(255,0,127),
-		srgba(255,127,255),
-	};
-
-	int get_child_index (int x, int y, int z, int size) {
-		//// Subpar asm generated for a lot of these, at least from what I can tell, might need to look into this if I octree decent actually becomes a bottleneck
-		//return	(((pos.x >> scale) & 1) << 0) |
-		//		(((pos.y >> scale) & 1) << 1) |
-		//		(((pos.z >> scale) & 1) << 2);
-		//return	((pos.x >> (scale  )) & 1) |
-		//		((pos.y >> (scale-1)) & 2) |
-		//		((pos.z >> (scale-2)) & 4);
-		int ret = 0;
-		if (x & size) ret |= 1;
-		if (y & size) ret |= 2;
-		if (z & size) ret |= 4;
-		return ret;
-	}
-
 	bool can_collapse (Node* node) {
 		if (node->children_types != ONLY_BLOCK_IDS)
 			return false; // can only collapse block_id voxels
@@ -100,7 +52,7 @@ namespace svo {
 
 		// start with root node
 		int cur_scale = root->scale;
-		Node* node = &root->nodes[0];
+		Node* node = allocator.get_node(root, 0);
 
 		Chunk* chunk = root;
 
@@ -121,7 +73,7 @@ namespace svo {
 
 			// update stack
 			stack[cur_scale].node = node;
-			stack[cur_scale].child_indx = child_idx;
+			stack[cur_scale].child_idx = child_idx;
 
 			if (cur_scale == scale) {
 				// reached target octree depth
@@ -134,14 +86,14 @@ namespace svo {
 			switch (child_type) {
 				case NODE_PTR: {
 					// recurse into child node
-					node = &chunk->nodes[child_vox];
+					node = allocator.get_node(chunk, child_vox);
 				} break;
 
 				case CHUNK_PTR: {
 					assert(child_vox != 0);
 					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-					chunk = allocator[child_vox];
-					node = chunk->nodes;
+					chunk = &allocator.chunks[child_vox];
+					node = allocator.get_node(chunk, 0);
 				} break;
 
 				// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
@@ -153,14 +105,15 @@ namespace svo {
 					assert(child_type == BLOCK_ID);
 
 					//// Split node into 8 children of same type
-					uint32_t node_ptr = chunk->alloc_node(allocator);
-					assert(node_ptr);
+					uint32_t node_ptr;
+					Node* new_node = allocator.alloc_node(chunk, &node_ptr);
+					assert(node_ptr > 0);
 
 					// write ptr to children into this nodes slot in parents children array
-					stack[cur_scale].node->set_child(child_idx, NODE_PTR, { node_ptr });
+					node->set_child(child_idx, NODE_PTR, { node_ptr });
 
-					// init and recurse into new node
-					node = &chunk->nodes[node_ptr];
+					// recurse into new node
+					node = new_node;
 
 					// alloc and init children for node
 					node->children_types = ONLY_BLOCK_IDS;
@@ -168,7 +121,7 @@ namespace svo {
 						node->children[i] = child_vox;
 					}
 
-					chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
+					chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 				};
 			}
 		}
@@ -178,36 +131,33 @@ namespace svo {
 			assert(chunk == root);
 
 		// do the write
-		stack[cur_scale].node->set_child(stack[cur_scale].child_indx, type, val);
-		
-		//if (type == CHUNK_PTR) {
-		//	// trigger a collapse check that includes the root of the chunk, because chunk load is not able to collapse past the root of the chunk
-		//	chunk = allocator[val];
-		//	assert(chunk->scale == cur_scale);
-		//
-		//	cur_scale--;
-		//	stack[cur_scale].pos = chunk->pos;
-		//	stack[cur_scale].child_indx = 0;
-		//	stack[cur_scale].node = &chunk->nodes[0];
-		//}
+		stack[cur_scale].node->set_child(stack[cur_scale].child_idx, type, val);
 
-		chunk->flags |= GPU_DIRTY | MESHING_DIRTY;
+		chunk->flags |= SVO_DIRTY | MESH_DIRTY;
+		
+		if (type == CHUNK_PTR) {
+			// trigger a collapse check that includes the root of the chunk, because chunk load is not able to collapse past the root of the chunk
+			chunk = &allocator.chunks[val];
+			assert(chunk->scale == cur_scale);
+		
+			cur_scale--;
+			stack[cur_scale].child_idx = 0;
+			stack[cur_scale].node = allocator.get_node(chunk, 0);
+		}
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
 		for (	auto i = cur_scale;
 				i < chunk->scale-1 && can_collapse(stack[i].node);
 				++i) {
 
-			stack[i+1].node->set_child(stack[i+1].child_indx, BLOCK_ID, stack[i].node->children[0]);
+			stack[i+1].node->set_child(stack[i+1].child_idx, BLOCK_ID, stack[i].node->children[0]);
 
-			//if (i == chunk->scale) {
-			//	// chunk nodes were completely collapsed away
-			//	assert(chunk != root && chunk->nodes);
-			//	allocator.free_chunk_nodes(chunk);
-			//} else {
-				// free node
-				chunk->dead_count++;
-			//}
+			if (i == chunk->scale) {
+				// chunk nodes were completely collapsed away
+				allocator.free_nodes(chunk);
+			} else {
+				
+			}
 		}
 
 	}
@@ -224,7 +174,7 @@ namespace svo {
 		
 		// start with root node
 		Chunk* chunk = root;
-		Node* node = &root->nodes[0];
+		Node* node = allocator.get_node(root, 0);
 
 		for (;;) {
 			size >>= 1;
@@ -239,14 +189,14 @@ namespace svo {
 			switch (child_type) {
 				case NODE_PTR: {
 					// recurse into child node
-					node = &chunk->nodes[child_vox];
+					node = allocator.get_node(chunk, child_vox);
 				} break;
 
 				case CHUNK_PTR: {
 					assert(child_vox != 0);
 					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
-					chunk = allocator[child_vox];
-					node = chunk->nodes;
+					chunk = &allocator.chunks[child_vox];
+					node = allocator.get_node(chunk, 0);
 
 					if (phys_read && chunk->scale != CHUNK_SCALE) {
 						// chunk with lod, don't do physics here
@@ -272,16 +222,16 @@ namespace svo {
 		ZoneScopedN("svo_chunk_to_octree");
 
 		StackNode stack[MAX_DEPTH];
-
+		
 		Node dummy;
 		stack[CHUNK_SCALE] = { &dummy, 0, 0 };
 
 		uint16_t scale = CHUNK_SCALE;
 
 		for (;;) {
-			int3& pos		= stack[scale].pos;
-			int& child_indx	= stack[scale].child_indx;
-			Node* node		= stack[scale].node;
+			int3& pos			= stack[scale].pos;
+			int& child_indx		= stack[scale].child_idx;
+			Node* node			= stack[scale].node;
 
 			if (child_indx >= 8) {
 				// Pop
@@ -292,16 +242,16 @@ namespace svo {
 
 				if (can_collapse(node)) {
 					// collapse node by writing leaf into parent
-					stack[scale].node->set_child(stack[scale].child_indx, BLOCK_ID, node->children[0]);
+					stack[scale].node->set_child(stack[scale].child_idx, BLOCK_ID, node->children[0]);
 
 					// free node
-					uint16_t node_ptr = (uint16_t)(node - chunk->nodes);
-
 				#if DBG_MEMSET
-					memset(&chunk->nodes[node_ptr], DBG_MEMSET_VAL, sizeof(Node));
+					memset(node, DBG_MEMSET_VAL, sizeof(Node));
 				#endif
 
-					assert(node_ptr == chunk->alloc_ptr-1); // this algo should only ever free in a stack based order, this allows us to never generate dead nodes
+					uint32_t node_idx = allocator.indexof(chunk, node);
+
+					assert(node_idx == chunk->alloc_ptr -1); // this algo should only ever free in a stack based order, this allows us to never generate dead nodes
 					chunk->alloc_ptr--;
 				}
 
@@ -315,17 +265,19 @@ namespace svo {
 					node->set_child(child_indx, BLOCK_ID, { bid });
 				} else {
 					// Push
-					uint16_t nodei = chunk->alloc_node(allocator);
-					stack[scale].node->set_child(child_indx, NODE_PTR, { nodei });
+					uint32_t node_ptr;
+					Node* new_node = allocator.alloc_node(chunk, &node_ptr);
+
+					node->set_child(child_indx, NODE_PTR, { node_ptr });
 
 					scale--;
-					stack[scale] = { &chunk->nodes[nodei], child_pos, 0 };
+					stack[scale] = { new_node, child_pos, 0 };
 
 					continue;
 				}
 			}
 
-			stack[scale].child_indx++;
+			stack[scale].child_idx++;
 		}
 
 	}
@@ -341,13 +293,13 @@ namespace svo {
 			case CHUNK_PTR: {
 				assert(vox != 0);
 
-				Chunk* chunk = svo.allocator[vox];
+				Chunk* chunk = &svo.allocator.chunks[vox];
 				free_chunk(svo, chunk);
 			} break;
 			case NODE_PTR: {
 				for (int i=0; i<8; ++i) {
 					VoxelType child_type;
-					Voxel& child = svo.root->nodes[vox].get_child(i, &child_type);
+					Voxel& child = svo.allocator.get_node(svo.root, vox)->get_child(i, &child_type);
 					recurse_free(svo, child_type, child);
 				}
 			} break;
@@ -421,27 +373,27 @@ namespace svo {
 		if (dist > svo.debug_draw_octree_range) return;
 
 		auto col = cols[scale % ARRLEN(cols)];
-		if ((type != BLOCK_ID || vox > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max)
-			debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.999f, col);
+		if ((type != BLOCK_ID || vox > (svo.debug_draw_air ? B_NULL : B_AIR)) && scale <= svo.debug_draw_octree_max) {
+			debug_graphics->push_wire_cube((float3)pos + 0.5f*size, size - 2 * svo.debug_draw_inset, col);
+		}
 
 		int child_scale = scale - 1;
 		if (type != BLOCK_ID && child_scale >= svo.debug_draw_octree_min) {
 
-			Node* child_node;
+			uint32_t child_idx = vox;
 			if (type == CHUNK_PTR) {
 				assert(vox != 0);
-				chunk = svo.allocator[vox];
-				child_node = chunk->nodes;
-			} else {
-				assert(vox < chunk->alloc_ptr);
-				child_node = &chunk->nodes[vox];
+				chunk = &svo.allocator.chunks[vox];
+				child_idx = 0;
 			}
+
+			Node* node = svo.allocator.get_node(chunk, child_idx);
 
 			for (int i=0; i<8; ++i) {
 				int3 child_pos = pos + (children_pos[i] << child_scale);
 
 				VoxelType child_type;
-				Voxel& child = child_node->get_child(i, &child_type);
+				Voxel& child = node->get_child(i, &child_type);
 
 				recurse_draw(svo, chunk, child_type, child, child_pos, child_scale, player_pos);
 			}
@@ -464,6 +416,7 @@ namespace svo {
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
+				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 
 			} break;
 
@@ -513,6 +466,7 @@ namespace svo {
 				for (int i=0; i<8; ++i) {
 					assert(siblings[i]->flags & LOCKED);
 					siblings[i]->flags &= ~LOCKED;
+					siblings[i]->flags |= SVO_DIRTY | MESH_DIRTY;
 					svo.octree_write(siblings[i]->pos, siblings[i]->scale, CHUNK_PTR, (Voxel)svo.allocator.indexof(siblings[i]));
 				}
 			} break;
@@ -531,6 +485,7 @@ namespace svo {
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
+				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 			
 				// add parent to be able to track merges again
 				if (scale < svo.root->scale-1) {
@@ -541,7 +496,50 @@ namespace svo {
 			} break;
 		}
 	}
-	void SVO::chunk_loading (Voxels& voxels, Player& player, WorldGenerator& world_gen) {
+
+	void RemeshChunkJob::finalize () {
+		ZoneScoped;
+
+		static constexpr uintptr_t MESH_PAGING = 4096; // round up sizes so that not every single vertex addition triggers a realloc
+
+		uintptr_t old_count = (uintptr_t)chunk->opaque_vertex_count   + chunk->transparent_vertex_count;
+		uintptr_t new_count = opaque_mesh.size() + transparent_mesh.size();
+
+		uintptr_t old_size = round_up_pot((uintptr_t)old_count * sizeof(VoxelVertex), MESH_PAGING);
+		uintptr_t new_size = round_up_pot((uintptr_t)new_count * sizeof(VoxelVertex), MESH_PAGING);
+
+		// reallocate buffer if size changed
+		if (old_size != new_size) {
+			if (chunk->gl_mesh)
+				glDeleteBuffers(1, &chunk->gl_mesh);
+
+			if (new_size > 0) {
+				glGenBuffers(1, &chunk->gl_mesh);
+
+				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+				glBufferStorage(GL_ARRAY_BUFFER, new_size, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+			}
+
+			chunk->opaque_vertex_count = (uint32_t)opaque_mesh.size();
+			chunk->transparent_vertex_count = (uint32_t)transparent_mesh.size();
+		} else {
+			glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+		}
+
+		if (new_size > 0) {
+			// copy data
+			void* data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+
+			memcpy((VoxelVertex*)data,						opaque_mesh.data(),			opaque_mesh.size() * sizeof(VoxelVertex));
+			memcpy((VoxelVertex*)data + opaque_mesh.size(),	transparent_mesh.data(),	transparent_mesh.size() * sizeof(VoxelVertex));
+
+			glUnmapBuffer(GL_ARRAY_BUFFER);
+		}
+
+		//glBindBuffer(GL_VERTEX_ARRAY, 0);
+	}
+
+	void SVO::update_chunk_loading_and_meshing (Voxels& voxels, Player& player, WorldGenerator& world_gen, Graphics& graphics) {
 		ZoneScoped;
 
 		update_root_move(*this, player);
@@ -568,7 +566,7 @@ namespace svo {
 				int3 pos = root->pos + (children_pos[i] << scale);
 
 				VoxelType type;
-				Voxel vox = root->nodes[0].get_child(i, &type);
+				Voxel vox = allocator.get_node(root, 0)->get_child(i, &type);
 				if (type == BLOCK_ID && vox == B_NULL) {
 					// unloaded chunk in root due to root move or initial world creation
 					if (!chunks.contains(pos, scale) && !pending_chunks.contains(pos, scale))
@@ -636,7 +634,7 @@ namespace svo {
 			});
 		}
 
-		{
+		{ // queue chunk loads
 			ZoneScopedN("queue chunk loads");
 
 			int count = clamp(voxels.cap_chunk_load - (int)pending_chunks.count(), 0, (int)ops_to_queue.size());
@@ -646,10 +644,11 @@ namespace svo {
 				if ((int)jobs.size() >= count)
 					break;
 
+				ZoneScopedN("queue chunk load");
+
 				switch (op.type) {
 					case LoadOp::CREATE: {
-						auto* chunk = allocator.alloc_chunk();
-						new (chunk) Chunk (op.pos, op.scale);
+						auto* chunk = allocator.alloc_chunk(op.pos, op.scale);
 
 						pending_chunks.insert(op.pos, op.scale, chunk);
 
@@ -665,8 +664,7 @@ namespace svo {
 							int child_scale = op.scale -1;
 							int3 child_pos = op.pos + (children_pos[i] << child_scale);
 
-							auto* chunk = allocator.alloc_chunk();
-							new (chunk) Chunk (child_pos, child_scale);
+							auto* chunk = allocator.alloc_chunk(child_pos, child_scale);
 
 							pending_chunks.insert(child_pos, child_scale, chunk);
 
@@ -677,8 +675,7 @@ namespace svo {
 
 					case LoadOp::MERGE: {
 						// merge
-						auto* chunk = allocator.alloc_chunk();
-						new (chunk) Chunk (op.pos, op.scale);
+						auto* chunk = allocator.alloc_chunk(op.pos, op.scale);
 					
 						parent_chunks.remove(op.pos, op.scale);
 						pending_chunks.insert(op.pos, op.scale, chunk);
@@ -700,6 +697,97 @@ namespace svo {
 			background_threadpool.jobs.push_multiple(jobs.data(), (int)jobs.size());
 		}
 
+		{ // Chunk gpu handling
+			ZoneScopedN("chunk remeshing");
+
+			// map node_ptrs ssbo
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
+
+			uint32_t commited_chunks = allocator.comitted_chunk_count();
+
+			bool realloc_node_ptrs = allocator.node_ptrs_ssbo_length != commited_chunks;
+			if (realloc_node_ptrs) {
+				glBufferData(GL_SHADER_STORAGE_BUFFER, commited_chunks * sizeof(GLuint64EXT), nullptr, GL_DYNAMIC_DRAW);
+				allocator.node_ptrs_ssbo_length = commited_chunks;
+			}
+
+			GLuint64EXT* node_ptrs = (GLuint64EXT*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+			std::vector<std::unique_ptr<ThreadingJob>> remeshing_jobs;
+
+			// realloc chunk svo ssbo if needed, get new ptr and update ptr in node_ptrs
+			for (uint32_t i=0; i<commited_chunks; ++i) {
+				Chunk* chunk = &allocator.chunks[i];
+				if (!allocator.chunk_is_allocated(i)) continue;
+
+				bool svo_changed = chunk->flags & SVO_DIRTY;
+
+				if (svo_changed) {
+					ZoneScopedN("chunk svo upload");
+
+					assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
+
+					// reallocate buffer if size changed (only on page boundries, not on every node alloc)
+					if (chunk->svo_data_size != chunk->commit_ptr) {
+						if (chunk->gl_svo_data)
+							glDeleteBuffers(1, &chunk->gl_svo_data);
+
+						if (chunk->commit_ptr != 0) {
+							glGenBuffers(1, &chunk->gl_svo_data);
+
+							glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+							glBufferStorage(GL_SHADER_STORAGE_BUFFER, chunk->commit_ptr, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+						}
+
+						chunk->svo_data_size = chunk->commit_ptr;
+					} else {
+						glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+					}
+
+					// copy data
+					void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+					memcpy(data, allocator.get_node(chunk, 0), chunk->commit_ptr);
+					glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+					// get gpu ptr
+					if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
+						glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+
+					glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &chunk->gl_svo_data_ptr);
+
+					//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+				}
+
+				if (realloc_node_ptrs || svo_changed) {
+					node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
+				}
+				
+				if (i > 0 && chunk->flags & MESH_DIRTY) { // never mesh root
+					// queue remshing
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
+				}
+
+				chunk->flags &= ~(SVO_DIRTY | MESH_DIRTY);
+			}
+			
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
+			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+			//
+			parallelism_threadpool.jobs.push_multiple(remeshing_jobs.data(), (int)remeshing_jobs.size());
+
+			parallelism_threadpool.contribute_work();
+
+			auto results = parallelism_threadpool.results.pop_all();
+			assert(results.size() == remeshing_jobs.size());
+
+			for (auto& res : results) {
+				res->finalize();
+			}
+		}
+
 		if (debug_draw_svo) {
 			ZoneScopedN("SVO::debug_draw");
 		
@@ -707,6 +795,8 @@ namespace svo {
 		}
 
 		if (debug_draw_chunks) {
+			ZoneScopedN("SVO::debug_draw_chunks");
+
 			for (auto* chunk : chunks) {
 				float size = (float)(1 << chunk->scale);
 				if (!debug_draw_chunks_onlyz0 || chunk->pos.z == 0)

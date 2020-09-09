@@ -1,251 +1,226 @@
 #include "stdafx.hpp"
 #include "voxel_mesher.hpp"
-#include "world_generator.hpp"
+#include "svo.hpp"
+#include "blocks.hpp"
 
-#if 0
-namespace meshing {
-struct Chunk_Mesher {
-	Page* opaque_vertices;
-	Page* tranparent_vertices;
+using namespace svo;
 
-	ChunkData* neighbours[3][3][3];
+struct ChunkRemesher {
+	Chunk* chunk;
+	svo::SVO& svo;
+	Graphics const& g;
+	WorldGenerator const& wg;
+	std::vector<VoxelVertex>& opaque_mesh;
+	std::vector<VoxelVertex>& transparent_mesh;
 
-	Block get_block (int3 pos) {
-		int3 int3;
-		int3 chunk = get_chunk_from_block_pos(pos, &int3);
+	void push_face (std::vector<VoxelVertex>& buf, float3 pos, float size, int face, int inverse) {
+		static constexpr int FACE_INDICES[2][6] {
+			{ 1,3,0, 0,3,2 }, // facing in positive dir
+			{ 0,2,1, 1,2,3 }, // facing in negative dir
+		};
+		static constexpr float3 FACES[6][4] {
+			{ // X- face
+				float3(0,1,0),
+				float3(0,0,0),
+				float3(0,1,1),
+				float3(0,0,1),
+			},
+			{ // X+ face
+				float3(1,0,0),
+				float3(1,1,0),
+				float3(1,0,1),
+				float3(1,1,1),
+			},
+			{ // Y- face
+				float3(0,0,0),
+				float3(1,0,0),
+				float3(0,0,1),
+				float3(1,0,1),
+			},
+			{ // Y+ face
+				float3(1,1,0),
+				float3(0,1,0),
+				float3(1,1,1),
+				float3(0,1,1),
+			},
+			{ // Z- face
+				float3(0,1,0),
+				float3(1,1,0),
+				float3(0,0,0),
+				float3(1,0,0),
+			},
+			{ // Z+ face
+				float3(0,0,1),
+				float3(1,0,1),
+				float3(0,1,1),
+				float3(1,1,1),
+			},
+		};
+		static constexpr uint8v2 UVS[4] {
+			uint8v2(0x00, 0x00),
+			uint8v2(0xff, 0x00),
+			uint8v2(0x00, 0xff),
+			uint8v2(0xff, 0xff),
+		};
 
-		ChunkData* data = neighbours[chunk.z+1][chunk.y+1][chunk.x+1];
+		int out = (int)buf.size();
+		buf.resize(out + 6);
 
-		if (data == nullptr)
-			return { B_NULL, 0, 0, 0 };
-
-		return data->get(int3);
-	}
-
-	// per block
-	float3 block_pos;
-
-	BlockTileInfo tile;
-	std::vector<BlockMeshVertex> const* block_meshes;
-
-	bool bt_is_opaque (block_id id) {
-		auto t = blocks.transparency[id];
-		if (t == TM_OPAQUE)
-			return true;
-
-		return false;
-	}
-
-	static constexpr int3 face_offsets[6][4] = {
-		{ int3(-1, 0, 0), int3(-1,-1, 0), int3(-1,-1,-1), int3(-1, 0,-1) },
-		{ int3( 0, 0, 0), int3( 0,-1, 0), int3( 0,-1,-1), int3( 0, 0,-1) },
-		{ int3( 0,-1, 0), int3(-1,-1, 0), int3(-1,-1,-1), int3( 0,-1,-1) },
-		{ int3( 0, 0, 0), int3(-1, 0, 0), int3(-1, 0,-1), int3( 0, 0,-1) },
-		{ int3( 0, 0,-1), int3(-1, 0,-1), int3(-1,-1,-1), int3( 0,-1,-1) },
-		{ int3( 0, 0, 0), int3(-1, 0, 0), int3(-1,-1, 0), int3( 0,-1, 0) },
-	};
-
-	inline uint8 calc_block_light (BlockFace face, int3 vert_pos, int3 pos) {
-		int total = 0;
-
-		for (auto offset : face_offsets[face]) {
-			total += get_block(pos + vert_pos + offset).block_light;
+		VoxelVertex vertices[4];
+		for (int i=0; i<4; ++i) {
+			vertices[i].pos_model = FACES[face][i] * size + pos;
+			vertices[i].uv = UVS[i];
+			vertices[i].tex_indx = 5;
 		}
-		
-		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
-	}
-	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos, int3 pos) {
-		int total = 0;
 
-		for (auto offset : face_offsets[face]) {
-			total += get_block(pos + vert_pos + offset).sky_light;
-		}
-
-		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
-	}
-
-	// float3	pos_model;
-	// float2	uv;
-	// uint8	tex_indx;
-	// uint8	block_light;
-	// uint8	sky_light;
-	// uint8	hp;
-
-#define VERT(x,y,z, u,v, face) \
-		{ block_pos + float3(x,y,z), float2(u,v), (uint8)tile.calc_texture_index(face), \
-		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), block.hp }
-
-#define POS \
-	{ {0,1,0}, {0,0,0}, {0,0,1}, {0,1,1} }, \
-	{ {1,0,0}, {1,1,0}, {1,1,1}, {1,0,1} }, \
-	{ {0,0,0}, {1,0,0}, {1,0,1}, {0,0,1} }, \
-	{ {1,1,0}, {0,1,0}, {0,1,1}, {1,1,1} }, \
-	{ {0,1,0}, {1,1,0}, {1,0,0}, {0,0,0} }, \
-	{ {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1} }, \
-
-	static constexpr float3 posf[6][4] = { POS };
-	static constexpr int3   pos[6][4]  = { POS };
-
-	static constexpr float2 uv[4]   = { {0,0}, {1,0}, {1,1}, {0,1} };
-
-	static constexpr int tri_oder[2][6] = {
-		{ 0,1,3, 3,1,2 },
-		{ 1,2,0, 0,2,3 },
-	};
-
-	static constexpr int3 offsets[6] = {
-		int3(-1, 0, 0),
-		int3(+1, 0, 0),
-		int3(0, -1, 0),
-		int3(0, +1, 0),
-		int3(0, 0, -1),
-		int3(0, 0, +1),
-	};
-
-	void face (MeshingData* out, BlockFace facei, Block block, int3 _pos) {
-
-		ChunkMesh::Vertex vert[4];
-
-		float3 const* pf = posf[facei];
-		int3 const* p = pos[facei];
-
-		auto hp = block.hp;
-
-		for (int i=0; i<4; ++i)
-			vert[i].pos_model	= block_pos + pf[i];
-		for (int i=0; i<4; ++i)
-			vert[i].uv			= uv[i];
-		for (int i=0; i<4; ++i)
-			vert[i].tex_indx	= (uint8)tile.calc_texture_index(facei);
-		for (int i=0; i<4; ++i)
-			vert[i].block_light	= calc_block_light(facei, p[i], _pos);
-		for (int i=0; i<4; ++i)
-			vert[i].sky_light	= calc_sky_light(facei, p[i], _pos);
-		for (int i=0; i<4; ++i)
-			vert[i].hp			= hp;
-
-		bool b = vert[0].sky_light + vert[2].sky_light >= vert[1].sky_light + vert[3].sky_light;
-
-		int const* order = tri_oder[(int)b];
 		for (int i=0; i<6; ++i) {
-			*out->push() = vert[order[i]];
+			buf[out++] = vertices[ FACE_INDICES[inverse][i] ];
 		}
 	}
 
-	void cube_opaque (Block block, int3 pos) {
-		for (int i=0; i<6; ++i) {
-			block_id n = get_block(pos + offsets[i]).id;
-			if (!bt_is_opaque(n))
-				face(opaque_vertices, (BlockFace)i, block, pos);
-		}
-	}
-	void cube_transperant (Block block, int3 pos) {
-		for (int i=0; i<6; ++i) {
-			block_id n = get_block(pos + offsets[i]).id;
-			block_id b = block.id;
-			if (!bt_is_opaque(n) && n != b)
-				face(tranparent_vertices, (BlockFace)i, block, pos);
-		}
-	}
-	void block_mesh (BlockMeshInfo info, Block block, int3 block_pos_world, uint64_t world_seed) {
-		
-		// get a 'random' but deterministic value based on block position
-		uint64_t h = hash(block_pos_world) ^ world_seed;
+	// should we render the face of block a facing to block b
+	bool should_render_face (block_id a, block_id b) {
+		// special case for now, might consider doing more logic here
+		// for ex. the surface of water seen from inside the water is technically the surface of the air, so wont get rendered
+		if (a == B_AIR || a == B_NULL)
+			return false;
 
-		// get a random determinisitc 2d offset
-		float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		auto tb = blocks.transparency[b];
 
-		float2 rand_offs;
-		rand_offs.x = rand_val;
-		rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
-
-									   // get a random deterministic variant
-		int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
-
-		for (int i=0; i<info.size; ++i) {
-			auto v = (*block_meshes)[info.offset + i];
-
-			auto ptr = opaque_vertices->push();
-
-			ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
-			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
-
-			ptr->tex_indx = tile.base_index + variant;
-			ptr->block_light = block.block_light * 255 / MAX_LIGHT_LEVEL;
-			ptr->sky_light = block.sky_light * 255 / MAX_LIGHT_LEVEL;
-			ptr->hp = block.hp;
-		}
+		//return tb != TM_OPAQUE;
+		return b == B_AIR || b == B_NULL;
 	}
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
-		block_meshes = &tile_textures.block_meshes;
+	void chunk_block (int3 pos, int size, block_id bid) {
+		static constexpr int3 FACES[6] {
+			int3(-1,0,0), int3(+1,0,0), int3(0,-1,0), int3(0,+1,0), int3(0,0,-1), int3(0,0,+1)
+		};
 
-		for (int z=-1; z<=1; ++z) {
-			for (int y=-1; y<=1; ++y) {
-				for (int x=-1; x<=1; ++x) {
-					Chunk* ch = x==0 && y==0 && z==0 ? chunk : chunks.query_chunk(chunk->coord + int3(x,y,z));
-		
-					neighbours[z+1][y+1][x+1] = ch ? ch->blocks.get() : nullptr;
-				}
+		float3 posf = (float3)pos;
+		float sizef = (float)size;
+
+		int3 abs_pos = pos + chunk->pos;
+
+		for (int face=0; face<6; ++face) {
+			int3 nb_pos = abs_pos + FACES[face] * size;
+			
+			int nb_size;
+			block_id nb_bid = find_neighbour(nb_pos.x,nb_pos.y,nb_pos.z, size, &nb_size);
+
+			if (nb_size >= size) {
+				// generate face facing to neighbour
+				if (should_render_face(bid, nb_bid))
+					push_face(opaque_mesh, posf, sizef, face, 0);
+
+				// generate face of neighbour facing us
+				if (should_render_face(nb_bid, bid))
+					push_face(opaque_mesh, posf, sizef, face, 1);
 			}
 		}
+	}
 
-		neighbours[1][1][1] = chunk->blocks.get();
-
-		opaque_vertices		= &res->opaque_vertices;
-		tranparent_vertices	= &res->tranparent_vertices;
-
-		opaque_vertices->init();
-		tranparent_vertices->init();
-
-		int3 chunk_pos_world = chunk->chunk_pos_world();
-
-		//auto _a = get_timestamp();
-		//uint64_t sum = 0;
-
-		int3 i = 0;
-		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
-				for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
-
-					auto b = get_block(i);
-
-					if (b.id != B_AIR) {
-						//auto _b = get_timestamp();
-
-						block_pos = (float3)i;
-
-						tile = tile_textures.block_tile_info[b.id];
-						auto mesh_info = tile_textures.block_meshes_info[b.id];
-
-						if (mesh_info.offset < 0) {
-							if (blocks.transparency[b.id] == TM_TRANSPARENT)
-								cube_transperant(b, i);
-							else
-								cube_opaque(b, i);
-						} else {
-
-							block_mesh(mesh_info, b, i + chunk->chunk_pos_world(), wg.seed);
-						}
-
-						//sum += get_timestamp() - _b;
-					}
-				}
-			}
+	block_id find_neighbour (int x, int y, int z, int target_size, int* out_size) {
+		int size = 1 << svo.root->scale;
+		x -= svo.root->pos.x;
+		y -= svo.root->pos.y;
+		z -= svo.root->pos.z;
+		if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size) {
+			*out_size = size;
+			return B_NULL;
 		}
 
-		//auto total = get_timestamp() - _a;
+		// start with root node
+		Chunk* chunk = svo.root;
+		Node* node = svo.allocator.get_node(svo.root, 0);
 
-		//logf("mesh_chunk total: %7.3f vs %7.3f = %7.3f", (float)total, (float)sum, (float)sum / (float)total);
+		for (;;) {
+			size >>= 1;
+			assert(size > 0);
+
+			// get child node that contains target node
+			int child_idx = get_child_index(x, y, z, size);
+
+			VoxelType child_type;
+			Voxel child_vox = node->get_child(child_idx, &child_type);
+
+			if (size == target_size) {
+				// return size if block_id of desired size or bigger is found,
+				// else return -1 to signal that the target node is made up of further subdivided voxels
+				*out_size = child_type == BLOCK_ID ? size : -1;
+				return (block_id)child_vox;
+			}
+
+			switch (child_type) {
+				case NODE_PTR: {
+					// recurse into child node
+					node = svo.allocator.get_node(chunk, child_vox);
+				} break;
+
+				case CHUNK_PTR: {
+					assert(child_vox != 0);
+					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
+					chunk = &svo.allocator.chunks[child_vox];
+					node = svo.allocator.get_node(chunk, 0);
+				} break;
+
+				default: {
+					assert(child_type == BLOCK_ID);
+					return (block_id)child_vox;
+				};
+			}
+		}
+	}
+
+	void remesh_chunk () {
+		ZoneScoped;
+
+		StackNode stack[MAX_DEPTH];
+		stack[chunk->scale-1] = { svo.allocator.get_node(chunk, 0), 0, 0 };
+
+		int scale = chunk->scale-1;
+		int size = 1 << scale;
+
+		while (scale < chunk->scale) {
+			assert(scale >= 0);
+
+			int3& pos			= stack[scale].pos;
+			int& child_idx		= stack[scale].child_idx;
+			Node* node			= stack[scale].node;
+
+			if (child_idx >= 8) {
+				// Pop
+				scale++;
+				size <<= 1;
+
+			} else {
+
+				int3 child_pos = pos + (children_pos[child_idx] << scale);
+
+				VoxelType type;
+				Voxel vox = node->get_child(child_idx, &type);
+
+				if (type == NODE_PTR) {
+					// Push
+					scale--;
+					size >>= 1;
+
+					stack[scale] = { svo.allocator.get_node(chunk, vox), child_pos, 0 };
+
+					continue; // don't inc child indx
+				} else {
+					assert(type == BLOCK_ID);
+
+					chunk_block(child_pos, size, (block_id)vox);
+				}
+			}
+
+			stack[scale].child_idx++;
+		}
 	}
 };
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
-	ZoneScopedN("mesh_chunk");
-
-	Chunk_Mesher cm;
-	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
+void remesh_chunk (Chunk* chunk, svo::SVO& svo, Graphics const& g, WorldGenerator const& wg,
+		std::vector<VoxelVertex>& opaque_mesh, std::vector<VoxelVertex>& transparent_mesh) {
+	
+	ChunkRemesher{ chunk, svo, g, wg, opaque_mesh, transparent_mesh }.remesh_chunk();
 }
-}
-#endif

@@ -109,8 +109,6 @@ void Game::frame () {
 
 		audio_manager.update();
 
-		world->voxels.svo.chunk_loading(world->voxels, world->player, world_gen);
-
 		if (!activate_flycam) {
 			world->player.update_movement_controls(*world);
 		}
@@ -137,7 +135,7 @@ void Game::frame () {
 
 		//block_update.update_blocks(world->chunks);
 
-		//world->chunks.update_chunks(graphics, world->world_gen, world->player);
+		world->voxels.svo.update_chunk_loading_and_meshing(world->voxels, world->player, world_gen, graphics);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);

@@ -8,10 +8,10 @@ enum collision_mode : uint8 {
 	CM_BREAKABLE	,	// fall/walk through like gas, but breakable by interaction (breaking torches etc.)
 };
 enum transparency_mode : uint8 {
-	TM_OPAQUE		=0, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
-	TM_TRANSPARENT	,   // see-through blocks              :  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
-	TM_ALPHA_TEST	,   // blocks with holes               :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
-	TM_PARTIAL		,	// objects not filling the voxel   :  all faces of these blocks are rendered (like leaves)
+	TM_OPAQUE		=0, // normal blocks which are opaque						:  only opaque to non-opaque faces are rendered
+	TM_TRANSPARENT	,   // see-through blocks									:  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
+	TM_PARTIAL		,   // blocks that are see though because they have holes   :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
+	TM_BLOCK_MESH	,	// blocks with meshes									:  these blocks are rendered as meshes (torches, etc.)
 };
 
 enum tool_type : uint8 {
@@ -92,13 +92,13 @@ static BlockTypes load_block_types () {
 		block(name, CM_SOLID, TM_OPAQUE, tool, hardness, glow_level, MAX_LIGHT_LEVEL);
 	};
 	auto solid_alpha_test = [&] (const char* name, uint8 hardness, uint8 absorb_light_level=1, tool_type tool=NONE, uint8 glow_level=0) {
-		block(name, CM_SOLID, TM_ALPHA_TEST, tool, hardness, glow_level, absorb_light_level);
+		block(name, CM_SOLID, TM_PARTIAL, tool, hardness, glow_level, absorb_light_level);
 	};
 	auto torch = [&] (const char* name, uint8 glow_level) {
-		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, glow_level, 0);
+		block(name, CM_BREAKABLE, TM_BLOCK_MESH, NONE, 0, glow_level, 0);
 	};
 	auto plant = [&] (const char* name, uint8 absorb_light_level=1) {
-		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, 0, 1);
+		block(name, CM_BREAKABLE, TM_BLOCK_MESH, NONE, 0, 0, 1);
 	};
 
 	/* B_NULL				*/ block(			"null", CM_SOLID, TM_TRANSPARENT, NONE, 255, 0, 0);

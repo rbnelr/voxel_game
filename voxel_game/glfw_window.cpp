@@ -262,7 +262,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	clog(severity == GL_DEBUG_SEVERITY_HIGH_ARB ? ERROR : WARNING,
 		"OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 
-	//__debugbreak();
+	__debugbreak();
 }
 
 #if _DEBUG || 1
@@ -304,6 +304,11 @@ void glfw_init_gl () {
 		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
 	else
 		clog(ERROR, "GL_ARB_clip_control not supported, depth won't be correct!\n");
+
+	if (	!glfwExtensionSupported("GL_NV_gpu_shader5") ||
+			!glfwExtensionSupported("GL_NV_shader_buffer_load")) {
+		clog(ERROR, "GL_NV_gpu_shader5 or GL_NV_shader_buffer_load not supported!\n");
+	}
 
 	TracyGpuContext;
 }
