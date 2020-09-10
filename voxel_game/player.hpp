@@ -80,7 +80,8 @@ public:
 			slots[5] = { 1, { (item_id)B_STONE } };
 			slots[6] = { 1, { (item_id)B_TREE_LOG } };
 			slots[7] = { 1, { (item_id)B_LEAVES } };
-			slots[8] = { 1, { (item_id)B_WATER } };
+			//slots[8] = { 1, { (item_id)B_WATER } };
+			slots[8] = { 1, { (item_id)B_TALLGRASS } };
 			slots[9] = { 1, { (item_id)B_TORCH } };
 		}
 	};
