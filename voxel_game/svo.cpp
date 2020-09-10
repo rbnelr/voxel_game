@@ -50,7 +50,8 @@ namespace svo {
 		return _mm256_testz_si256(cmp, cmp); // true if zero, ie. all children == child0
 	}
 
-	void SVO::octree_write (int x, int y, int z, int scale, TypedVoxel vox) {
+	void __vectorcall SVO::octree_write (int x, int y, int z, int scale, TypedVoxel vox) {
+		int cur_scale = root->scale;
 		int size = 1 << root->scale;
 		x -= root->pos.x;
 		y -= root->pos.y;
@@ -61,8 +62,7 @@ namespace svo {
 		}
 
 		// start with root node
-		int cur_scale = root->scale;
-		Node* node = allocator.get_node(root, 0);
+		Node* node = &root->nodes[0];
 
 		Chunk* chunk = root;
 
@@ -79,7 +79,7 @@ namespace svo {
 			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(x, y, z, size);
+			int child_idx = get_child_index(x,y,z, size);
 
 			// update stack
 			stack[cur_scale].node = node;
@@ -106,7 +106,7 @@ namespace svo {
 				}
 
 				// recurse into child node
-				node = allocator.get_node(chunk, child_vox.value);
+				node = &chunk->nodes[child_vox.value];
 
 			} else {
 				//// Split node into 8 children of same type and recurse into the correct child
@@ -148,7 +148,7 @@ namespace svo {
 		
 			cur_scale--;
 			stack[cur_scale].child_idx = 0;
-			stack[cur_scale].node = allocator.get_node(chunk, 0);
+			stack[cur_scale].node = &chunk->nodes[0];
 		}
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
@@ -166,8 +166,10 @@ namespace svo {
 
 	}
 
-	OctreeReadResult SVO::octree_read (int x, int y, int z, int target_size) {
+	OctreeReadResult __vectorcall SVO::octree_read (int x, int y, int z, int target_size) {
+		int scale = root->scale;
 		int size = 1 << root->scale;
+		
 		x -= root->pos.x;
 		y -= root->pos.y;
 		z -= root->pos.z;
@@ -177,16 +179,17 @@ namespace svo {
 
 		// start with root node
 		Chunk* chunk = root;
-		Node* node = allocator.get_node(root, 0);
+		Node* node = &root->nodes[0];
 
 		TypedVoxel vox;
 
 		for (;;) {
+			scale--;
 			size >>= 1;
 			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(x, y, z, size);
+			int child_idx = get_child_index(x,y,z, size);
 
 			vox = node->get_child(child_idx);
 
@@ -205,7 +208,7 @@ namespace svo {
 				}
 
 				// recurse into child node
-				node = allocator.get_node(chunk, node_ptr);
+				node = &chunk->nodes[node_ptr];
 
 				if (size == target_size) {
 					// return size=-1 to signal that the target node is made up of further subdivided voxels
@@ -328,7 +331,7 @@ namespace svo {
 			} break;
 			case NODE_PTR: {
 				for (int i=0; i<8; ++i) {
-					auto child = svo.allocator.get_node(svo.root, vox.value)->get_child(i);
+					auto child = svo.root->nodes[vox.value].get_child(i);
 					recurse_free(svo, child);
 				}
 			} break;
@@ -416,7 +419,7 @@ namespace svo {
 				child_idx = 0;
 			}
 
-			Node* node = svo.allocator.get_node(chunk, child_idx);
+			Node* node = &chunk->nodes[child_idx];
 
 			for (int i=0; i<8; ++i) {
 				int3 child_pos = pos + (children_pos[i] << child_scale);
@@ -579,7 +582,7 @@ namespace svo {
 				int scale = root->scale -1;
 				int3 pos = root->pos + (children_pos[i] << scale);
 
-				auto vox = allocator.get_node(root, 0)->get_child(i);
+				auto vox = root->nodes[0].get_child(i);
 				if (vox.type == BLOCK_ID && vox.value == B_NULL) {
 					// unloaded chunk in root due to root move or initial world creation
 					if (!chunks.contains(pos, scale) && !pending_chunks.contains(pos, scale))
@@ -763,7 +766,7 @@ namespace svo {
 
 					// copy data
 					void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-					memcpy(data, allocator.get_node(chunk, 0), chunk->commit_ptr);
+					memcpy(data, chunk->nodes, chunk->commit_ptr);
 					glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 
 					// get gpu ptr

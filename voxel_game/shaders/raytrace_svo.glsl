@@ -32,8 +32,8 @@ $if fragment
 	uniform int svo_root_scale;
 
 #define MAX_NODES (1u << 16)
-#define NODE_PTR	0
-#define BLOCK_ID	1
+#define BLOCK_ID	0
+#define NODE_PTR	1
 #define CHUNK_PTR	2
 
 	struct SvoNode {

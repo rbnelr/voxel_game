@@ -6,6 +6,8 @@
 #include "graphics/graphics.hpp"
 #include "voxel_mesher.hpp"
 
+#include "immintrin.h"
+
 class Voxels;
 class Player;
 struct WorldGenerator;
@@ -121,6 +123,8 @@ namespace svo {
 	ENUM_BITFLAG_OPERATORS_TYPE(ChunkFlags, uint8_t)
 
 	struct Chunk {
+		Node*	nodes = nullptr;
+
 		const int3		pos;
 		const uint8_t	scale;
 
@@ -233,10 +237,7 @@ namespace svo {
 			return (uint32_t)(chunk - chunks);
 		}
 		uint32_t indexof (Chunk* chunk, Node* node) {
-			return (uint32_t)(node - get_node(chunk, 0));
-		}
-		Node* get_node (Chunk* chunk, uint32_t idx) {
-			return nodes + ((uintptr_t)indexof(chunk) * MAX_NODES + idx);
+			return (uint32_t)(node - chunk->nodes);
 		}
 
 		uint32_t comitted_chunk_count () {
@@ -290,6 +291,7 @@ namespace svo {
 			}
 
 			new (chunk) Chunk (pos, (uint8_t)scale);
+			chunk->nodes = nodes + (uintptr_t)idx * MAX_NODES;
 			return chunk;
 		}
 
@@ -316,28 +318,29 @@ namespace svo {
 			}
 		}
 
-		Node* alloc_node (Chunk* chunk, uint32_t* idx) {
+		void grow_nodes (Chunk* chunk) {
 			if (chunk->alloc_ptr >= MAX_NODES) {
 				assert(chunk->alloc_ptr < MAX_NODES);
 				throw new std::runtime_error("max nodes reached!");
 			}
 
-			Node* new_node = nodes + ((uintptr_t)indexof(chunk) * MAX_NODES + chunk->alloc_ptr);
-			*idx = chunk->alloc_ptr++;
+			char* new_page = (char*)chunk->nodes + chunk->commit_ptr;
+
+			commit_pages(new_page, os_page_size);
+			chunk->commit_ptr += os_page_size;
+		}
+		Node* alloc_node (Chunk* chunk, uint32_t* idx) {
+			uint32_t new_idx = chunk->alloc_ptr++;
 
 			if (chunk->alloc_ptr * sizeof(Node) > chunk->commit_ptr) {
-				char* new_page = (char*)(nodes + ((uintptr_t)indexof(chunk) * MAX_NODES)) + chunk->commit_ptr;
-
-				commit_pages(new_page, os_page_size);
-				chunk->commit_ptr += os_page_size;
+				grow_nodes(chunk);
 			}
 
-			return new_node;
+			*idx = new_idx;
+			return chunk->nodes + new_idx;
 		}
 		void free_nodes (Chunk* chunk) {
-			Node* nodes = get_node(chunk, 0);
-
-			decommit_pages(nodes, MAX_NODES * sizeof(Node));
+			decommit_pages(chunk->nodes, MAX_NODES * sizeof(Node));
 			chunk->alloc_ptr = 0;
 			chunk->commit_ptr = 0;
 		}
@@ -364,7 +367,7 @@ namespace svo {
 		int child_idx;
 	};
 
-	inline int set_root_scale = 8;//16;
+	inline int set_root_scale = 16;
 
 	struct OctreeReadResult {
 		TypedVoxel	vox;
@@ -507,9 +510,9 @@ namespace svo {
 		// octree write, writes a single voxel at a desired pos, scale to be a particular leaf val
 		// this decends the octree from the root and inserts or deletes nodes when needed
 		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
-		void octree_write (int x, int y, int z, int scale, TypedVoxel vox);
+		void __vectorcall octree_write (int x, int y, int z, int scale, TypedVoxel vox);
 
-		OctreeReadResult octree_read (int x, int y, int z, int target_size);
+		OctreeReadResult __vectorcall octree_read (int x, int y, int z, int target_size);
 	};
 
 	struct LoadOp {
