@@ -398,7 +398,9 @@ struct VoxelGraphics {
 
 	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
-	void draw (Voxels& voxels, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler);
+	gl::Vao vao;
+
+	void draw (Voxels& voxels, bool debug_frustrum_culling, TileTextures const& tile_textures, Sampler const& sampler);
 	void draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler);
 };
 

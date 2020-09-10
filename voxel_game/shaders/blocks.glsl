@@ -36,6 +36,7 @@ $if fragment
 
 	uniform	sampler2DArray tile_textures;
 
+	uniform bool alpha_test;
 	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
@@ -45,10 +46,12 @@ $if fragment
 		vec4 col = texture(tile_textures, vec3(vs_uv, vs_tex_indx));
 	
 		//col.rgb *= vec3(vs_brightness);
-		
-		if (col.a <= ALPHA_TEST_THRES / 255.0)
-			DISCARD();
-		col.a = 1.0;
+
+		if (alpha_test) {
+			if (col.a <= ALPHA_TEST_THRES / 255.0)
+				DISCARD();
+			col.a = 1.0;
+		}
 
 		col.rgb = apply_fog(col.rgb, dist_sqr, dir_world);
 		FRAG_COL(col);

@@ -630,7 +630,7 @@ void TileTextures::load_block_meshes () {
 			if (strcmp(mesh->mName.C_Str(), name) == 0) {
 
 				int offset = (int)block_meshes.size();
-				block_meshes.reserve(offset + mesh->mNumFaces * 3);
+				block_meshes.reserve((size_t)offset + mesh->mNumFaces * 3);
 
 				for (unsigned j=0; j<mesh->mNumFaces; ++j) {
 					auto& f = mesh->mFaces[j];
@@ -654,90 +654,84 @@ void TileTextures::load_block_meshes () {
 	aiReleaseImport(scene);
 }
 
-void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, uint8 sky_light_reduce, TileTextures const& tile_textures, Sampler const& sampler) {
+void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextures const& tile_textures, Sampler const& sampler) {
 	ZoneScoped;
 	TracyGpuZone("gpu draw_chunks");
 	
-	glActiveTexture(GL_TEXTURE0 + 0);
-	tile_textures.tile_textures.bind();
-	sampler.bind(0);
-	
-	glActiveTexture(GL_TEXTURE0 + 1);
-	tile_textures.breaking_textures.bind();
-	sampler.bind(1);
-	
 	if (shader) {
 		shader.bind();
-	
-		shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-		shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-	
-		shader.set_uniform("sky_light_reduce", (float)sky_light_reduce * (1.0f / (float)MAX_LIGHT_LEVEL));
-	
+
+		glBindVertexArray(vao);
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		tile_textures.tile_textures.bind();
 		shader.set_texture_unit("tile_textures", 0);
-		shader.set_texture_unit("breaking_textures", 1);
+		sampler.bind(0);
+
+		shader.set_uniform("alpha_test", true);
 	
 		// Draw all opaque meshes
 		for (Chunk* chunk : voxels.svo.chunks) {
 			//if (debug_frustrum_culling)
 			//	debug_graphics->push_wire_cube((float3)chunk->chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
-	
-			if (chunk->opaque_vertex_count > 0) {
+
+			if (!(((chunk->opaque_vertex_count + chunk->transparent_vertex_count) == 0) == (chunk->gl_mesh == 0)))
+				throw new std::runtime_error("blah");
+
+			if (chunk->gl_mesh && chunk->opaque_vertex_count > 0) {
 				TracyGpuZone("gpu draw_chunk");
 	
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
 				
 				assert(chunk->gl_mesh != 0);
-
 				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
 
 				Attributes a;
 				VoxelVertex::bind(a);
 
 				glDrawArrays(GL_TRIANGLES, 0, chunk->opaque_vertex_count);
+
 			}
 		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 }
-
 void VoxelGraphics::draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler) {
-	//TracyGpuZone("gpu draw_chunks_transparent");
-	//
-	//glActiveTexture(GL_TEXTURE0 + 0);
-	//tile_textures.tile_textures.bind();
-	//sampler.bind(0);
-	//
-	//glActiveTexture(GL_TEXTURE0 + 1);
-	//tile_textures.breaking_textures.bind();
-	//sampler.bind(1);
-	//
-	//if (shader) {
-	//	shader.bind();
-	//
-	//	shader.set_uniform("breaking_frames_count", (float)tile_textures.breaking_frames_count);
-	//	shader.set_uniform("breaking_mutliplier", (float)tile_textures.breaking_mutliplier);
-	//
-	//	shader.set_texture_unit("tile_textures", 0);
-	//	shader.set_texture_unit("breaking_textures", 1);
-	//
-	//	// Draw all transparent chunk meshes
-	//	for (uint32_t i=0; i<voxels.svo.pages.allocator.freeset_size(); ++i) {
-	//		auto* page = voxels.svo.pages.allocator[i];
-	//		if (	voxels.svo.pages.allocator.is_allocated(i)
-	//				//&& !chunk.culled
-	//				//&& chunk.mesh.transparent_mesh.vertex_count != 0
-	//				) {
-	//			TracyGpuZone("gpu draw svo page");
-	//
-	//			shader.set_uniform("chunk_pos", (float3)page->info.pos);
-	//
-	//
-	//
-	//			//chunk.mesh.transparent_mesh.bind();
-	//			//chunk.mesh.transparent_mesh.draw();
-	//		}
-	//	}
-	//}
+	ZoneScoped;
+	TracyGpuZone("gpu draw_chunks_transparent");
+
+	if (shader) {
+		shader.bind();
+
+		glBindVertexArray(vao);
+
+		glActiveTexture(GL_TEXTURE0 + 0);
+		tile_textures.tile_textures.bind();
+		shader.set_texture_unit("tile_textures", 0);
+		sampler.bind(0);
+
+		shader.set_uniform("alpha_test", false);
+
+		// Draw all transparent meshes
+		for (Chunk* chunk : voxels.svo.chunks) {
+			if (chunk->gl_mesh && chunk->transparent_vertex_count > 0) {
+				TracyGpuZone("gpu draw_chunk_transparent");
+
+				shader.set_uniform("chunk_pos", (float3)chunk->pos);
+
+				assert(chunk->gl_mesh != 0);
+				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+
+				Attributes a;
+				VoxelVertex::bind(a);
+
+				glDrawArrays(GL_TRIANGLES, chunk->opaque_vertex_count, chunk->transparent_vertex_count);
+			}
+		}
+
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 }
 
 //void Graphics::frustrum_cull_chunks (Chunks& chunks, Camera_View const& view) {
@@ -844,7 +838,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		TracyGpuZone("gpu Opaque pass");
 
 		if (!raytracer.raytracer_draw || raytracer.overlay) {
-			voxel_graphics.draw(world.voxels, debug_frustrum_culling, sky_light_reduce, tile_textures, sampler);
+			voxel_graphics.draw(world.voxels, debug_frustrum_culling, tile_textures, sampler);
 
 			skybox.draw();
 		}

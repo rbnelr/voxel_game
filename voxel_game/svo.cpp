@@ -64,7 +64,7 @@ namespace svo {
 			}
 		}
 	}
-	void flag_neighbour_meshing (SVO& svo, Chunk* chunk, int x, int y, int z, int scale, int size) {
+	void flag_neighbour_meshing (SVO& svo, Chunk* chunk, int scale, int size, int x, int y, int z) {
 		int chunk_size = 1 << chunk->scale;
 		int relx = x - chunk->pos.x;
 		int rely = y - chunk->pos.y;
@@ -177,7 +177,7 @@ namespace svo {
 			stack[i+1].node->set_child(stack[i+1].child_idx, { BLOCK_ID, stack[i].node->children[0] });
 		}
 
-		flag_neighbour_meshing(*this, vox.type == CHUNK_PTR ? &allocator.chunks[vox.value] : chunk, x,y,z, scale, size);
+		flag_neighbour_meshing(*this, vox.type == CHUNK_PTR ? &allocator.chunks[vox.value] : chunk, scale, size, x,y,z);
 	}
 
 	OctreeReadResult __vectorcall SVO::octree_read (int x, int y, int z, int target_scale, bool read_chunk) {
@@ -559,8 +559,10 @@ namespace svo {
 
 		// reallocate buffer if size changed
 		if (old_size != new_size) {
-			if (chunk->gl_mesh)
+			if (chunk->gl_mesh) {
 				glDeleteBuffers(1, &chunk->gl_mesh);
+				chunk->gl_mesh = 0;
+			}
 
 			if (new_size > 0) {
 				glGenBuffers(1, &chunk->gl_mesh);
@@ -766,8 +768,10 @@ namespace svo {
 
 					// reallocate buffer if size changed (only on page boundries, not on every node alloc)
 					if (chunk->svo_data_size != chunk->commit_ptr) {
-						if (chunk->gl_svo_data)
+						if (chunk->gl_svo_data) {
 							glDeleteBuffers(1, &chunk->gl_svo_data);
+							chunk->gl_svo_data = 0;
+						}
 
 						if (chunk->commit_ptr != 0) {
 							glGenBuffers(1, &chunk->gl_svo_data);

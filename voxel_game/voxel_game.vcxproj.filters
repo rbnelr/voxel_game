@@ -527,7 +527,4 @@
       <UniqueIdentifier>{e551c6ec-689e-4052-84b7-92ebdbca2a3e}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="NatvisFile.natvis" />
-  </ItemGroup>
 </Project>

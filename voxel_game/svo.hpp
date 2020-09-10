@@ -441,11 +441,15 @@ namespace svo {
 			uintptr_t chunks_count = 0;
 			uintptr_t active_nodes = 0;
 			uintptr_t commit_bytes = 0;
+			uintptr_t mesh_vertices = 0;
+			uintptr_t mesh_bytes = 0;
 
 			for (auto* chunk : chunks) {
 				chunks_count++;
 				active_nodes += chunk->alloc_ptr;
 				commit_bytes += chunk->commit_ptr;
+				mesh_vertices += chunk->opaque_vertex_count + chunk->transparent_vertex_count;
+				mesh_bytes += (chunk->opaque_vertex_count + chunk->transparent_vertex_count) * sizeof(VoxelVertex);
 			}
 
 			uintptr_t active_bytes = active_nodes * sizeof(Node);
@@ -454,6 +458,8 @@ namespace svo {
 			ImGui::Text("SVO Nodes: active:  %7.2f k", (float)active_nodes / 1000);
 			ImGui::Text("SVO mem: committed: %7.2f MB  wasted: %5.2f%%",
 				(float)active_bytes / 1024 / 1024, (float)(commit_bytes - active_bytes) / commit_bytes * 100);
+			ImGui::Text("Meshing: vertices: %7.2f M  mem: %7.2f MB",
+				(float)mesh_vertices / 1000 / 1000, (float)mesh_bytes / 1024 / 1024);
 
 			ImGui::Text("Root chunk: active:   %5d", root->alloc_ptr);
 			
@@ -470,11 +476,12 @@ namespace svo {
 					return false;
 				});
 
-				ImGui::Text("[ index]                     pos    size -- alloc B | commit B  wasted");
+				ImGui::Text("[ index]                     pos    size -- alloc B | commit B  wasted    mesh O | T");
 				for (auto* chunk : loaded_chunks) {
-					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %7d | %7d  %2.0f %%", allocator.indexof(chunk),
+					ImGui::Text("[%6d] %+7d,%+7d,%+7d %7d -- %7d | %7d   %2.0f %%     %5d | %5d", allocator.indexof(chunk),
 						chunk->pos.x,chunk->pos.y,chunk->pos.z, 1 << chunk->scale, chunk->alloc_ptr * sizeof(Node), chunk->commit_ptr,
-						(float)(chunk->commit_ptr - chunk->alloc_ptr * sizeof(Node)) / chunk->commit_ptr * 100);
+						(float)(chunk->commit_ptr - chunk->alloc_ptr * sizeof(Node)) / chunk->commit_ptr * 100,
+						chunk->opaque_vertex_count, chunk->transparent_vertex_count);
 				}
 				ImGui::TreePop();
 			}
