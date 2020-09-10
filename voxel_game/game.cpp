@@ -92,9 +92,8 @@ void Game::frame () {
 				if (input.buttons[GLFW_KEY_C].went_down)
 					creative_mode = !creative_mode;
 
-				if (open) ImGui::DragFloat3("player_spawn_point", &player_spawn_point.x, 0.2f);
-				if ((open && ImGui::Button("Respawn Player [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
-					world->player.respawn();
+				if ((open && ImGui::Button("Teleport Player to Flycam [Q]")) || input.buttons[GLFW_KEY_Q].went_down) {
+					world->player.pos = flycam.pos;
 				}
 
 				if (open) ImGui::Separator();
