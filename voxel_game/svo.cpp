@@ -557,36 +557,56 @@ namespace svo {
 		uintptr_t old_size = round_up_pot((uintptr_t)old_count * sizeof(VoxelVertex), MESH_PAGING);
 		uintptr_t new_size = round_up_pot((uintptr_t)new_count * sizeof(VoxelVertex), MESH_PAGING);
 
+		//// reallocate buffer if size changed
+		//if (old_size != new_size) {
+		//	if (chunk->gl_mesh) {
+		//		glDeleteBuffers(1, &chunk->gl_mesh);
+		//		chunk->gl_mesh = 0;
+		//	}
+		//
+		//	if (new_size > 0) {
+		//		glGenBuffers(1, &chunk->gl_mesh);
+		//
+		//		glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+		//		glBufferStorage(GL_ARRAY_BUFFER, new_size, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+		//	}
+		//
+		//	chunk->opaque_vertex_count = (uint32_t)opaque_mesh.size();
+		//	chunk->transparent_vertex_count = (uint32_t)transparent_mesh.size();
+		//} else {
+		//	glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+		//}
+		//
+		//if (new_size > 0) {
+		//	// copy data
+		//	void* data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+		//
+		//	memcpy((VoxelVertex*)data,						opaque_mesh.data(),			opaque_mesh.size() * sizeof(VoxelVertex));
+		//	memcpy((VoxelVertex*)data + opaque_mesh.size(),	transparent_mesh.data(),	transparent_mesh.size() * sizeof(VoxelVertex));
+		//
+		//	glUnmapBuffer(GL_ARRAY_BUFFER);
+		//}
+
 		// reallocate buffer if size changed
 		if (old_size != new_size) {
-			if (chunk->gl_mesh) {
-				glDeleteBuffers(1, &chunk->gl_mesh);
-				chunk->gl_mesh = 0;
-			}
-
 			if (new_size > 0) {
 				glGenBuffers(1, &chunk->gl_mesh);
-
+		
 				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
-				glBufferStorage(GL_ARRAY_BUFFER, new_size, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+				glBufferData(GL_ARRAY_BUFFER, new_size, nullptr, GL_DYNAMIC_DRAW);
 			}
-
+		
 			chunk->opaque_vertex_count = (uint32_t)opaque_mesh.size();
 			chunk->transparent_vertex_count = (uint32_t)transparent_mesh.size();
 		} else {
 			glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
 		}
-
-		if (new_size > 0) {
-			// copy data
-			void* data = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-
-			memcpy((VoxelVertex*)data,						opaque_mesh.data(),			opaque_mesh.size() * sizeof(VoxelVertex));
-			memcpy((VoxelVertex*)data + opaque_mesh.size(),	transparent_mesh.data(),	transparent_mesh.size() * sizeof(VoxelVertex));
-
-			glUnmapBuffer(GL_ARRAY_BUFFER);
-		}
-
+		
+		if (opaque_mesh.size() > 0)
+			glBufferSubData(GL_ARRAY_BUFFER, 0										 , opaque_mesh.size()      * sizeof(VoxelVertex), opaque_mesh.data());
+		if (transparent_mesh.size() > 0)
+			glBufferSubData(GL_ARRAY_BUFFER, opaque_mesh.size() * sizeof(VoxelVertex), transparent_mesh.size() * sizeof(VoxelVertex), transparent_mesh.data());
+		
 		//glBindBuffer(GL_VERTEX_ARRAY, 0);
 	}
 
@@ -740,18 +760,18 @@ namespace svo {
 		{
 			ZoneScopedN("Upload svo data & collect chunks to remesh");
 
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
+			//glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
 
 			uint32_t commited_chunks = allocator.comitted_chunk_count();
 
-			bool realloc_node_ptrs = allocator.node_ptrs_ssbo_length != commited_chunks;
-			if (realloc_node_ptrs) {
-				glBufferData(GL_SHADER_STORAGE_BUFFER, commited_chunks * sizeof(GLuint64EXT), nullptr, GL_DYNAMIC_DRAW);
-				allocator.node_ptrs_ssbo_length = commited_chunks;
-			}
-
-			GLuint64EXT* node_ptrs = (GLuint64EXT*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+			//bool realloc_node_ptrs = allocator.node_ptrs_ssbo_length != commited_chunks;
+			//if (realloc_node_ptrs) {
+			//	glBufferData(GL_SHADER_STORAGE_BUFFER, commited_chunks * sizeof(GLuint64EXT), nullptr, GL_DYNAMIC_DRAW);
+			//	allocator.node_ptrs_ssbo_length = commited_chunks;
+			//}
+			//
+			//GLuint64EXT* node_ptrs = (GLuint64EXT*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+			//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
 			// realloc chunk svo ssbo if needed, get new ptr and update ptr in node_ptrs
 			for (uint32_t i=0; i<commited_chunks; ++i) {
@@ -761,48 +781,48 @@ namespace svo {
 				if (i > 0 && (chunk->flags & SVO_DIRTY))
 					assert(chunk->flags & MESH_DIRTY);
 
-				if (chunk->flags & SVO_DIRTY) {
-					ZoneScopedN("chunk svo upload");
-
-					assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
-
-					// reallocate buffer if size changed (only on page boundries, not on every node alloc)
-					if (chunk->svo_data_size != chunk->commit_ptr) {
-						if (chunk->gl_svo_data) {
-							glDeleteBuffers(1, &chunk->gl_svo_data);
-							chunk->gl_svo_data = 0;
-						}
-
-						if (chunk->commit_ptr != 0) {
-							glGenBuffers(1, &chunk->gl_svo_data);
-
-							glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
-							glBufferStorage(GL_SHADER_STORAGE_BUFFER, chunk->commit_ptr, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
-						}
-
-						chunk->svo_data_size = chunk->commit_ptr;
-					} else {
-						glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
-					}
-
-					// copy data
-					// TODO: DOn't do this, this blocks! buffer orphan might be the correct way to do this, but I don't know if that works with glGetBufferParameterui64vNV
-					void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-					memcpy(data, chunk->nodes, chunk->commit_ptr);
-					glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-
-					// get gpu ptr
-					if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
-						glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-
-					glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &chunk->gl_svo_data_ptr);
-
-					//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-				}
-
-				if (realloc_node_ptrs || (chunk->flags & SVO_DIRTY)) {
-					node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
-				}
+				//if (chunk->flags & SVO_DIRTY) {
+				//	ZoneScopedN("chunk svo upload");
+				//
+				//	assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
+				//
+				//	// reallocate buffer if size changed (only on page boundries, not on every node alloc)
+				//	if (chunk->svo_data_size != chunk->commit_ptr) {
+				//		if (chunk->gl_svo_data) {
+				//			glDeleteBuffers(1, &chunk->gl_svo_data);
+				//			chunk->gl_svo_data = 0;
+				//		}
+				//
+				//		if (chunk->commit_ptr != 0) {
+				//			glGenBuffers(1, &chunk->gl_svo_data);
+				//
+				//			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+				//			glBufferStorage(GL_SHADER_STORAGE_BUFFER, chunk->commit_ptr, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+				//		}
+				//
+				//		chunk->svo_data_size = chunk->commit_ptr;
+				//	} else {
+				//		glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+				//	}
+				//
+				//	// copy data
+				//	// TODO: DOn't do this, this blocks! buffer orphan might be the correct way to do this, but I don't know if that works with glGetBufferParameterui64vNV
+				//	void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+				//	memcpy(data, chunk->nodes, chunk->commit_ptr);
+				//	glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+				//
+				//	// get gpu ptr
+				//	if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
+				//		glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+				//
+				//	glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &chunk->gl_svo_data_ptr);
+				//
+				//	//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+				//}
+				//
+				//if (realloc_node_ptrs || (chunk->flags & SVO_DIRTY)) {
+				//	node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
+				//}
 
 				if (i > 0 && (chunk->flags & MESH_DIRTY)) { // never mesh root
 					// queue remeshing
@@ -815,9 +835,9 @@ namespace svo {
 				chunk->flags &= ~(SVO_DIRTY|MESH_DIRTY);
 			}
 
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
-			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+			//glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
+			//glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+			//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 		}
 		
 		{ //

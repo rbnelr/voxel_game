@@ -675,10 +675,10 @@ void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextu
 			//if (debug_frustrum_culling)
 			//	debug_graphics->push_wire_cube((float3)chunk->chunk_pos_world() + (float3)CHUNK_DIM/2, (float3)CHUNK_DIM - 0.5f, chunk.culled ? srgba(255,50,50) : srgba(50,255,50));
 
-			if (!(((chunk->opaque_vertex_count + chunk->transparent_vertex_count) == 0) == (chunk->gl_mesh == 0)))
-				throw new std::runtime_error("blah");
+			//if (!(((chunk->opaque_vertex_count + chunk->transparent_vertex_count) == 0) == (chunk->gl_mesh == 0)))
+			//	throw new std::runtime_error("blah");
 
-			if (chunk->gl_mesh && chunk->opaque_vertex_count > 0) {
+			if (chunk->opaque_vertex_count > 0) {
 				TracyGpuZone("gpu draw_chunk");
 	
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
