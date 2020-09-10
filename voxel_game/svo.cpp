@@ -222,6 +222,7 @@ namespace svo {
 		uint16_t scale = CHUNK_SCALE;
 
 		for (;;) {
+			assert(scale > 0);
 			int3& pos			= stack[scale].pos;
 			int& child_indx		= stack[scale].child_idx;
 			Node* node			= stack[scale].node;
@@ -250,12 +251,42 @@ namespace svo {
 
 			} else {
 
-				int3 child_pos = pos + (children_pos[child_indx] << scale);
+				int x = pos.x + (children_pos[child_indx].x << scale);
+				int y = pos.y + (children_pos[child_indx].y << scale);
+				int z = pos.z + (children_pos[child_indx].z << scale);
 
-				if (scale == 0) {
-					auto bid = blocks[child_pos.z * CHUNK_SIZE*CHUNK_SIZE + child_pos.y * CHUNK_SIZE + child_pos.x];
+				if (scale == 1) {
+					// generate 8 leaf nodes in a more optimized way than pushing and poping
+					Node n = {};
+					n.children_types = ONLY_BLOCK_IDS;
 
-					node->set_child(child_indx, { BLOCK_ID, bid });
+					// use seperate CHUNK_3D_INDEX for parent xyz and child offset to make compiler understand how to do this indexing efficently
+					uintptr_t block_idx = CHUNK_3D_INDEX(x,y,z);
+					for (int i=0; i<8; i++) {
+						n.children[i] = blocks[block_idx + CHUNK_3D_INDEX(i%2, i/2%2, i/4)];
+					}
+
+					bool can_collapse = true;
+					for (int i=1; i<8; ++i) {
+						if (n.children[i] != n.children[0]) {
+							can_collapse = false; // not all leafs equal, cant collapse
+							break;
+						}
+					}
+
+					if (can_collapse) {
+
+						node->set_child(child_indx, { BLOCK_ID, n.children[0] });
+
+					} else {
+						uint32_t node_ptr;
+						Node* new_node = allocator.alloc_node(chunk, &node_ptr);
+
+						memcpy(new_node, &n, sizeof(Node));
+
+						node->set_child(child_indx, { NODE_PTR, node_ptr });
+					}
+
 				} else {
 					// Push
 					uint32_t node_ptr;
@@ -264,8 +295,7 @@ namespace svo {
 					node->set_child(child_indx, { NODE_PTR, node_ptr });
 
 					scale--;
-					stack[scale] = { new_node, child_pos, 0 };
-
+					stack[scale] = { new_node, int3(x, y, z), 0 };
 					continue;
 				}
 			}

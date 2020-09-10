@@ -16,6 +16,12 @@ struct WorldgenJob;
 static constexpr int CHUNK_SIZE = 128;
 static constexpr int CHUNK_SCALE = 7;
 
+// Calc 3d index into flattened [CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE] array because compiler sometimes does too much math
+#define CHUNK_3D_INDEX(x,y,z) (\
+	 ((uintptr_t)(z) << CHUNK_SCALE*2) \
+	+((uintptr_t)(y) << CHUNK_SCALE  ) \
+	+((uintptr_t)(x)                 ))
+
 namespace svo {
 
 	static inline constexpr int MAX_DEPTH = 20;
