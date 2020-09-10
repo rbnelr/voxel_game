@@ -13,10 +13,9 @@ struct ChunkRemesher {
 	std::vector<VoxelVertex>& opaque_mesh;
 	std::vector<VoxelVertex>& transparent_mesh;
 
-	void push_face (std::vector<VoxelVertex>& buf, float3 pos, float size, int face, int inverse) {
-		static constexpr int FACE_INDICES[2][6] {
-			{ 1,3,0, 0,3,2 }, // facing in positive dir
-			{ 0,2,1, 1,2,3 }, // facing in negative dir
+	void push_face (std::vector<VoxelVertex>& buf, float3 pos, float size, int face, int tex_indx) {
+		static constexpr int FACE_INDICES[6] {
+			1,3,0, 0,3,2
 		};
 		static constexpr float3 FACES[6][4] {
 			{ // X- face
@@ -56,11 +55,11 @@ struct ChunkRemesher {
 				float3(1,1,1),
 			},
 		};
-		static constexpr uint8v2 UVS[4] {
-			uint8v2(0x00, 0x00),
-			uint8v2(0xff, 0x00),
-			uint8v2(0x00, 0xff),
-			uint8v2(0xff, 0xff),
+		static constexpr float2 UVS[4] {
+			float2(0, 0),
+			float2(1, 0),
+			float2(0, 1),
+			float2(1, 1),
 		};
 
 		int out = (int)buf.size();
@@ -70,11 +69,11 @@ struct ChunkRemesher {
 		for (int i=0; i<4; ++i) {
 			vertices[i].pos_model = FACES[face][i] * size + pos;
 			vertices[i].uv = UVS[i];
-			vertices[i].tex_indx = 5;
+			vertices[i].tex_indx = tex_indx;
 		}
 
 		for (int i=0; i<6; ++i) {
-			buf[out++] = vertices[ FACE_INDICES[inverse][i] ];
+			buf[out++] = vertices[ FACE_INDICES[i] ];
 		}
 	}
 
@@ -110,12 +109,17 @@ struct ChunkRemesher {
 				assert(nb.vox.type == BLOCK_ID);
 
 				// generate face facing to neighbour
-				if (should_render_face(bid, (block_id)nb.vox.value))
-					push_face(opaque_mesh, posf, sizef, face, 0);
+				// only if neighbour is a voxel of same size or large (ie. not subdivided futher) because we would have to recurse further to generate the correct faces
+				if (should_render_face(bid, (block_id)nb.vox.value)) {
+					push_face(opaque_mesh, posf, sizef, face, 5);
+				}
 
-				// generate face of neighbour facing us
-				if (should_render_face((block_id)nb.vox.value, bid))
-					push_face(opaque_mesh, posf, sizef, face, 1);
+				// generate face of neighbour for it
+				// if it is larger than us (ie. it did not want to recurse further to find us as it's neightbour) like described above
+				if (nb.size > size && should_render_face((block_id)nb.vox.value, bid)) {
+					float3 nb_mesh_pos = (float3)(pos + FACES[face] * size);
+					push_face(opaque_mesh, nb_mesh_pos, sizef, face ^ 1, 5); // ^1 flips the -X face to +X and the inverse, since we need to generate the face the other way around
+				}
 			}
 		}
 	}

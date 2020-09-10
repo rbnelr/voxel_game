@@ -398,12 +398,17 @@ namespace svo {
 
 		bool debug_draw_chunks = 1;//false;
 		bool debug_draw_chunks_onlyz0 = 1;//false;
+
 		bool debug_draw_svo = false;
 		bool debug_draw_air = false;
+
 		float debug_draw_inset = 0.05f;
 		int debug_draw_octree_min = 3;
 		int debug_draw_octree_max = 20;
 		float debug_draw_octree_range = 100;
+
+		bool debug_spam_place_block = false;
+		int debug_spam_place_block_per_frame = 10;
 
 		void imgui () {
 			if (!imgui_push("SVO")) return;
@@ -415,14 +420,20 @@ namespace svo {
 			ImGui::DragInt("cap_chunk_mesh", &cap_chunk_mesh, 0.02f);
 
 			ImGui::DragInt("root_scale", &set_root_scale);
+			
 			ImGui::Checkbox("debug_draw_chunks", &debug_draw_chunks);
 			ImGui::Checkbox("debug_draw_chunks_onlyz0", &debug_draw_chunks_onlyz0);
+			
 			ImGui::Checkbox("debug_draw_svo", &debug_draw_svo);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
+			
 			ImGui::SliderFloat("debug_draw_inset", &debug_draw_inset, 0, 10, "%7.5f", 3);
 			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0,20);
 			ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0,20);
 			ImGui::SliderFloat("debug_draw_octree_range", &debug_draw_octree_range, 0,2048, "%f", 2);
+			
+			ImGui::Checkbox("debug_spam_place_block", &debug_spam_place_block);
+			ImGui::SliderInt("debug_spam_place_block_per_frame", &debug_spam_place_block_per_frame, 0,200);
 
 			uintptr_t chunks_count = 0;
 			uintptr_t active_nodes = 0;

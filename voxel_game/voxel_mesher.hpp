@@ -12,13 +12,13 @@ namespace svo {
 
 struct VoxelVertex {
 	float3		pos_model;
-	uint8v2		uv;
-	uint16_t	tex_indx;
+	float2		uv;
+	int			tex_indx;
 
 	static void bind (Attributes& a) {
 		int cur = 0;
 		a.add<decltype(pos_model  )>(cur++, "pos_model" ,  sizeof(VoxelVertex), offsetof(VoxelVertex, pos_model  ));
-		a.add<decltype(uv         )>(cur++, "uv",          sizeof(VoxelVertex), offsetof(VoxelVertex, uv         ), true);
+		a.add<decltype(uv         )>(cur++, "uv",          sizeof(VoxelVertex), offsetof(VoxelVertex, uv         ));
 		a.add<decltype(tex_indx   )>(cur++, "tex_indx",    sizeof(VoxelVertex), offsetof(VoxelVertex, tex_indx   ));
 	}
 };

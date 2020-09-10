@@ -43,20 +43,17 @@ struct _Random {
 		return generate(distribution);
 	}
 
-	inline bool2  chance2  (float2 prob=0.5f            ) { return bool2( uniform(prob)        , uniform(prob)        ); }
-	inline int2   uniform2 (int2   min  ,  int2   max   ) { return int2(  uniform(min, max)    , uniform(min, max)    ); }
-	inline float  uniform2 (int2   min=0,  float2 max=1 ) { return int2(  uniform(min, max)    , uniform(min, max)    ); }
-	inline float2 normal2  (float2 stddev, float2 mean=0) { return float2(uniform(stddev, mean), uniform(stddev, mean)); }
+	inline int2   uniform2 (int2   min  , int2   max   ) { return int2(  uniform(min.x, max.x), uniform(min.y, max.y)); }
+	inline float2 uniform2 (float2 min=0, float2 max=1 ) { return float2(uniform(min.x, max.x), uniform(min.y, max.y)); }
+	inline float2 normal2  (float2 stddev, float2 mean=0) { return float2(normal(stddev.x, mean.x), normal(stddev.y, mean.y)); }
 
-	inline bool3  chance3  (float3 prob=0.5f            ) { return bool3( uniform(prob)        , uniform(prob)        , uniform(prob)        ); }
-	inline int3   uniform3 (int3   min  ,  int3   max   ) { return int3(  uniform(min, max)    , uniform(min, max)    , uniform(min, max)    ); }
-	inline float  uniform3 (int3   min=0,  float3 max=1 ) { return int3(  uniform(min, max)    , uniform(min, max)    , uniform(min, max)    ); }
-	inline float3 normal3  (float3 stddev, float3 mean=0) { return float3(uniform(stddev, mean), uniform(stddev, mean), uniform(stddev, mean)); }
+	inline int3   uniform3 (int3   min  , int3   max   ) { return int3(  uniform(min.x, max.x), uniform(min.y, max.y), uniform(min.z, max.z)); }
+	inline float3 uniform3 (float3 min=0, float3 max=1 ) { return float3(uniform(min.x, max.x), uniform(min.y, max.y), uniform(min.z, max.z)); }
+	inline float3 normal3  (float3 stddev, float3 mean=0) { return float3(normal(stddev.x, mean.x), normal(stddev.y, mean.y), normal(stddev.z, mean.z)); }
 
-	inline bool4  chance4  (float4 prob=0.5f            ) { return bool4( uniform(prob)        , uniform(prob)        , uniform(prob)        , uniform(prob)        ); }
-	inline int4   uniform4 (int4   min  ,  int4   max   ) { return int4(  uniform(min, max)    , uniform(min, max)    , uniform(min, max)    , uniform(min, max)    ); }
-	inline float  uniform4 (int4   min=0,  float4 max=1 ) { return int4(  uniform(min, max)    , uniform(min, max)    , uniform(min, max)    , uniform(min, max)    ); }
-	inline float4 normal4  (float4 stddev, float4 mean=0) { return float4(uniform(stddev, mean), uniform(stddev, mean), uniform(stddev, mean), uniform(stddev, mean)); }
+	inline int4   uniform4 (int4   min  , int4   max   ) { return int4(  uniform(min.x, max.x), uniform(min.y, max.y), uniform(min.z, max.z), uniform(min.w, max.w)    ); }
+	inline float4 uniform4 (float4 min=0, float4 max=1 ) { return float4(uniform(min.x, max.x), uniform(min.y, max.y), uniform(min.z, max.z), uniform(min.w, max.w)    ); }
+	inline float4 normal4  (float4 stddev, float4 mean=0) { return float4(normal(stddev.x, mean.x), normal(stddev.y, mean.y), normal(stddev.z, mean.z), normal(stddev.w, mean.w)); }
 
 	inline float3 uniform_in_sphere (float radius) {
 		float3 pos;

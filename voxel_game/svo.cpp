@@ -51,8 +51,6 @@ namespace svo {
 	}
 
 	void SVO::octree_write (int x, int y, int z, int scale, TypedVoxel vox) {
-		ZoneScoped;
-
 		int size = 1 << root->scale;
 		x -= root->pos.x;
 		y -= root->pos.y;
@@ -94,46 +92,43 @@ namespace svo {
 
 			auto child_vox = node->get_child(child_idx);
 
-			switch (child_vox.type) {
-				case NODE_PTR: {
-					// recurse into child node
-					node = allocator.get_node(chunk, child_vox.value);
-				} break;
+			// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
+			//} else if (child_val == val) {
+			//	// write would be a no-op because the octree already has the desired value at that voxel
+			//	return;
 
-				case CHUNK_PTR: {
+			if (child_vox.type != BLOCK_ID) {
+				if (child_vox.type == CHUNK_PTR) {
 					assert(child_vox.value != 0);
 					// leafs in root svo (ie. svo of chunks) are chunks, so recurse into chunk nodes
 					chunk = &allocator.chunks[child_vox.value];
-					node = allocator.get_node(chunk, 0);
-				} break;
+					child_vox.value = 0;
+				}
 
-				// Could early out on no-op octree writes, but should probably just make sure they don't happen instead of optimizing the performance of a no-op, since additional code could even slow us down
-				//} else if (child_val == val) {
-				//	// write would be a no-op because the octree already has the desired value at that voxel
-				//	return;
-				
-				default: {
-					assert(child_vox.type == BLOCK_ID);
+				// recurse into child node
+				node = allocator.get_node(chunk, child_vox.value);
 
-					//// Split node into 8 children of same type
-					uint32_t node_ptr;
-					Node* new_node = allocator.alloc_node(chunk, &node_ptr);
-					assert(node_ptr > 0);
+			} else {
+				//// Split node into 8 children of same type and recurse into the correct child
+				assert(child_vox.type == BLOCK_ID);
 
-					// write ptr to children into this nodes slot in parents children array
-					node->set_child(child_idx, { NODE_PTR, node_ptr });
+				uint32_t node_ptr;
+				Node* new_node = allocator.alloc_node(chunk, &node_ptr);
+				assert(node_ptr > 0);
 
-					// recurse into new node
-					node = new_node;
+				// write ptr to children into this nodes slot in parents children array
+				node->set_child(child_idx, { NODE_PTR, node_ptr });
 
-					// alloc and init children for node
-					node->children_types = ONLY_BLOCK_IDS;
-					for (int i=0; i<8; ++i) {
-						node->children[i] = child_vox.value;
-					}
+				// recurse into new node
+				node = new_node;
 
-					chunk->flags |= SVO_DIRTY | MESH_DIRTY;
-				};
+				// alloc and init children for node
+				node->children_types = ONLY_BLOCK_IDS;
+				for (int i=0; i<8; ++i) {
+					node->children[i] = child_vox.value;
+				}
+
+				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 			}
 		}
 
@@ -712,100 +707,110 @@ namespace svo {
 				}
 			}
 
-			background_threadpool.jobs.push_multiple(jobs.data(), (int)jobs.size());
+			background_threadpool.jobs.push_n(jobs.data(), jobs.size());
 		}
 	}
 
 	void SVO::update_chunk_gpu_data (Graphics& graphics, WorldGenerator& world_gen) {
 		ZoneScoped;
 
-		// map node_ptrs ssbo
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
-
-		uint32_t commited_chunks = allocator.comitted_chunk_count();
-
-		bool realloc_node_ptrs = allocator.node_ptrs_ssbo_length != commited_chunks;
-		if (realloc_node_ptrs) {
-			glBufferData(GL_SHADER_STORAGE_BUFFER, commited_chunks * sizeof(GLuint64EXT), nullptr, GL_DYNAMIC_DRAW);
-			allocator.node_ptrs_ssbo_length = commited_chunks;
-		}
-
-		GLuint64EXT* node_ptrs = (GLuint64EXT*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
 		std::vector<std::unique_ptr<ThreadingJob>> remeshing_jobs;
 
-		// realloc chunk svo ssbo if needed, get new ptr and update ptr in node_ptrs
-		for (uint32_t i=0; i<commited_chunks; ++i) {
-			Chunk* chunk = &allocator.chunks[i];
-			if (!allocator.chunk_is_allocated(i)) continue;
+		{ // map node_ptrs ssbo
+			ZoneScopedN("Upload svo data");
 
-			bool svo_changed = chunk->flags & SVO_DIRTY;
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
 
-			if (svo_changed) {
-				ZoneScopedN("chunk svo upload");
+			uint32_t commited_chunks = allocator.comitted_chunk_count();
 
-				assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
+			bool realloc_node_ptrs = allocator.node_ptrs_ssbo_length != commited_chunks;
+			if (realloc_node_ptrs) {
+				glBufferData(GL_SHADER_STORAGE_BUFFER, commited_chunks * sizeof(GLuint64EXT), nullptr, GL_DYNAMIC_DRAW);
+				allocator.node_ptrs_ssbo_length = commited_chunks;
+			}
 
-				// reallocate buffer if size changed (only on page boundries, not on every node alloc)
-				if (chunk->svo_data_size != chunk->commit_ptr) {
-					if (chunk->gl_svo_data)
-						glDeleteBuffers(1, &chunk->gl_svo_data);
+			GLuint64EXT* node_ptrs = (GLuint64EXT*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-					if (chunk->commit_ptr != 0) {
-						glGenBuffers(1, &chunk->gl_svo_data);
+			// realloc chunk svo ssbo if needed, get new ptr and update ptr in node_ptrs
+			for (uint32_t i=0; i<commited_chunks; ++i) {
+				Chunk* chunk = &allocator.chunks[i];
+				if (!allocator.chunk_is_allocated(i)) continue;
 
+				bool svo_changed = chunk->flags & SVO_DIRTY;
+
+				if (svo_changed) {
+					ZoneScopedN("chunk svo upload");
+
+					assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
+
+					// reallocate buffer if size changed (only on page boundries, not on every node alloc)
+					if (chunk->svo_data_size != chunk->commit_ptr) {
+						if (chunk->gl_svo_data)
+							glDeleteBuffers(1, &chunk->gl_svo_data);
+
+						if (chunk->commit_ptr != 0) {
+							glGenBuffers(1, &chunk->gl_svo_data);
+
+							glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+							glBufferStorage(GL_SHADER_STORAGE_BUFFER, chunk->commit_ptr, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
+						}
+
+						chunk->svo_data_size = chunk->commit_ptr;
+					} else {
 						glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
-						glBufferStorage(GL_SHADER_STORAGE_BUFFER, chunk->commit_ptr, nullptr, GL_MAP_WRITE_BIT | GL_DYNAMIC_STORAGE_BIT);
 					}
 
-					chunk->svo_data_size = chunk->commit_ptr;
-				} else {
-					glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_svo_data);
+					// copy data
+					void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
+					memcpy(data, allocator.get_node(chunk, 0), chunk->commit_ptr);
+					glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+
+					// get gpu ptr
+					if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
+						glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+
+					glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &chunk->gl_svo_data_ptr);
+
+					//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 				}
 
-				// copy data
-				void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
-				memcpy(data, allocator.get_node(chunk, 0), chunk->commit_ptr);
-				glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+				if (realloc_node_ptrs || svo_changed) {
+					node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
+				}
 
-				// get gpu ptr
-				if (!glIsBufferResidentNV(GL_SHADER_STORAGE_BUFFER))
-					glMakeBufferResidentNV(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+				if (i > 0 && chunk->flags & MESH_DIRTY) { // never mesh root
+					// queue remshing
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
+				}
 
-				glGetBufferParameterui64vNV(GL_SHADER_STORAGE_BUFFER, GL_BUFFER_GPU_ADDRESS_NV, &chunk->gl_svo_data_ptr);
-
-				//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+				chunk->flags &= ~(SVO_DIRTY | MESH_DIRTY);
 			}
 
-			if (realloc_node_ptrs || svo_changed) {
-				node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
-			}
-
-			if (i > 0 && chunk->flags & MESH_DIRTY) { // never mesh root
-														// queue remshing
-				remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
-			}
-
-			chunk->flags &= ~(SVO_DIRTY | MESH_DIRTY);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
+			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 		}
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
-		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		{ //
+			ZoneScopedN("Multithreaded remesh");
 
-		//
-		parallelism_threadpool.jobs.push_multiple(remeshing_jobs.data(), (int)remeshing_jobs.size());
+			parallelism_threadpool.jobs.push_n(remeshing_jobs.data(), remeshing_jobs.size());
 
-		parallelism_threadpool.contribute_work();
+			parallelism_threadpool.contribute_work();
 
-		int results_count = 0;
-		while (results_count < (int)remeshing_jobs.size()) {
-			auto results = parallelism_threadpool.results.pop_all();
+			size_t results_count = 0;
+			while (results_count < remeshing_jobs.size()) {
+				ZoneScopedN("dequeue results");
 
-			for (auto& res : results) {
-				res->finalize();
-				results_count++;
+				std::unique_ptr<ThreadingJob> results[64];
+				size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+
+				for (size_t i=0; i<count; ++i) {
+					results[i]->finalize();
+				}
+
+				results_count += count;
 			}
 		}
 	}
@@ -819,12 +824,12 @@ namespace svo {
 			ZoneScopedN("finish chunkgen jobs");
 
 			static constexpr int finalize_cap = 64;
-			std::vector< std::unique_ptr<ThreadingJob> > jobs (finalize_cap);
 
-			size_t count = background_threadpool.results.pop_multiple(&jobs[0], (int)jobs.size());
+			std::unique_ptr<ThreadingJob> results [finalize_cap];
+			size_t count = background_threadpool.results.pop_n(results, ARRLEN(results));
 
 			for (size_t i=0; i<count; ++i) {
-				jobs[i]->finalize();
+				results[i]->finalize();
 			}
 		}
 
@@ -857,6 +862,13 @@ namespace svo {
 			//	if (!debug_draw_chunks_onlyz0 || pos.z == 0)
 			//		debug_graphics->push_wire_cube((float3)pos + 0.5f * size, size * 0.995f, srgba(20, 255, 0));
 			//}
+		}
+
+		if (debug_spam_place_block) {
+			for (int i=0; i<debug_spam_place_block_per_frame; ++i) {
+				int3 pos = roundi(random.normal3(10, float3(0,0,20)));
+				octree_write(pos.x, pos.y, pos.z, 0, { BLOCK_ID, B_LEAVES });
+			}
 		}
 	}
 }

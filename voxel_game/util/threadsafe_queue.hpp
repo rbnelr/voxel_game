@@ -31,7 +31,6 @@ class ThreadsafeQueue {
 
 public:
 	// simply push one element onto the queue
-	// can be called from multiple threads (multiple producer)
 	void push (T elem) {
 		LOCK_GUARD;
 
@@ -40,8 +39,7 @@ public:
 	}
 
 	// push multiple elements onto the queue
-	// can be called from multiple threads (multiple producer)
-	void push_multiple (T* elem, size_t count) {
+	void push_n (T* elem, size_t count) {
 		LOCK_GUARD;
 
 		for (size_t i=0; i<count; ++i) {
@@ -52,7 +50,7 @@ public:
 
 	// wait to dequeue one element from the queue
 	// can be called from multiple threads (multiple consumer)
-	T pop () {
+	T pop_wait () {
 		UNIQUE_LOCK;
 
 		while(q.empty()) {
@@ -62,23 +60,6 @@ public:
 		T val = std::move(q.front());
 		q.pop_front();
 		return val;
-	}
-
-	// wait to dequeue one element from the queue or until shutdown is set
-	// returns if element was popped or shutdown was set as enum
-	// can be called from multiple threads (multiple consumer)
-	enum { POP, SHUTDOWN } pop_or_shutdown (T* out) {
-		UNIQUE_LOCK;
-
-		while(!shutdown_flag && q.empty()) {
-			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
-		}
-		if (shutdown_flag)
-			return SHUTDOWN;
-
-		*out = std::move(q.front());
-		q.pop_front();
-		return POP;
 	}
 
 	// deque one element from the queue if there is one
@@ -94,43 +75,91 @@ public:
 		return true;
 	}
 
-	// deque up to count elements from the queue, return how many were dequed
-	// can be called from multiple threads (multiple consumer)
-	size_t pop_multiple (T* out, size_t count) {
-		LOCK_GUARD;
+	// wait until min elements are available, then dequeue up to max elements
+	// writes the elements into their repective indicies in output
+	// returns the number of elements dequeued
+	size_t pop_n_wait (T output[], size_t min, size_t max) {
+		UNIQUE_LOCK;
 
-		size_t i=0;
+		while (q.size() < min) {
+			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
+		}
 
-		while (i < count && !q.empty()) {
-			out[i++] = std::move(q.front());
+		size_t count = std::min(q.size(), max);
+		for (size_t i=0; i<count; ++i) {
+			output[i] = std::move(q.front());
 			q.pop_front();
 		}
 
-		return i;
+		return count;
 	}
 
-	// deque multiple elements from the queue if there is at least one and return true
-	// or return false of queue is empty
-	// can be called from multiple threads (multiple consumer)
-	// (pushed on the back of results)
-	bool pop_all (std::vector<T>* results) {
+	// dequeue up to max elements (or none); never waits
+	// writes the elements into their repective indicies in output
+	// returns the number of elements dequeued
+	size_t pop_n (T output[], size_t max) {
 		LOCK_GUARD;
 
-		if (q.empty())
-			return false;
-
-		while (!q.empty()) {
-			results->push_back(std::move(q.front()));
+		size_t count = std::min(q.size(), max);
+		for (size_t i=0; i<count; ++i) {
+			output[i] = std::move(q.front());
 			q.pop_front();
 		}
-		return true;
+
+		return count;
 	}
-	// deque multiple elements from the queue (or zero if queue is empty) 
+
+	// wait until min elements are available, then dequeue all elements
+	// returns the number of elements dequeued
+	size_t pop_all_wait (std::vector<T>* output, size_t min) {
+		UNIQUE_LOCK;
+
+		while (q.size() < min) {
+			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
+		}
+
+		size_t count = q.size();
+		output->reserve(count);
+
+		for (size_t i=0; i<count; ++i) {
+			output->emplace_back( std::move(q.front()) );
+			q.pop_front();
+		}
+
+		return count;
+	}
+
+	// dequeue all elements (including none); never waits
+	// returns the number of elements dequeued
+	size_t pop_all (std::vector<T>* output) {
+		LOCK_GUARD;
+
+		size_t count = q.size();
+		output->reserve(count);
+
+		for (size_t i=0; i<count; ++i) {
+			output->emplace_back( std::move(q.front()) );
+			q.pop_front();
+		}
+
+		return count;
+	}
+
+	// wait to dequeue one element from the queue or until shutdown is set
+	// returns if element was popped or shutdown was set as enum
 	// can be called from multiple threads (multiple consumer)
-	std::vector<T> pop_all () {
-		std::vector<T> results;
-		pop_all(&results);
-		return results;
+	enum { POP, SHUTDOWN } pop_or_shutdown_wait (T* out) {
+		UNIQUE_LOCK;
+
+		while(!shutdown_flag && q.empty()) {
+			c.wait(lock); // release lock as long as the wait and reaquire it afterwards.
+		}
+		if (shutdown_flag)
+			return SHUTDOWN;
+
+		*out = std::move(q.front());
+		q.pop_front();
+		return POP;
 	}
 
 	// set shutdown which all consumers can recieve via pop_or_shutdown

@@ -52,7 +52,7 @@ class Threadpool {
 
 		// Wait for one job to pop and execute or until shutdown signal is sent via jobs.shutdown()
 		std::unique_ptr<ThreadingJob> job;
-		while (jobs.pop_or_shutdown(&job) != decltype(jobs)::SHUTDOWN) {
+		while (jobs.pop_or_shutdown_wait(&job) != decltype(jobs)::SHUTDOWN) {
 			job->execute();
 			results.push(std::move(job));
 		}
