@@ -50,13 +50,41 @@ namespace svo {
 		return _mm256_testz_si256(cmp, cmp); // true if zero, ie. all children == child0
 	}
 
+	void recurse_neighbour (SVO& svo, TypedVoxel vox, int mask, int side) { // mask selects axis that neighbour touches, side says which side (1=right)
+		if (vox.type == NODE_PTR) {
+			for (int i=0; i<8; ++i) {
+				if ((i & mask) == side)
+					recurse_neighbour(svo, svo.root->nodes[vox.value].get_child(i), mask, side);
+			}
+		} else {
+			if (vox.type == CHUNK_PTR) {
+				assert(vox.value != 0);
+				Chunk* chunk = &svo.allocator.chunks[vox.value];
+				chunk->flags |= MESH_DIRTY;
+			}
+		}
+	}
+	void flag_neighbour_meshing (SVO& svo, Chunk* chunk, int x, int y, int z, int scale, int size) {
+		int chunk_size = 1 << chunk->scale;
+		int relx = x - chunk->pos.x;
+		int rely = y - chunk->pos.y;
+		int relz = z - chunk->pos.z;
+
+		if (relx == 0)					recurse_neighbour(svo, svo.octree_read(x -size, y, z, scale, true).vox, 1, 1);
+		if (relx +size == chunk_size)	recurse_neighbour(svo, svo.octree_read(x +size, y, z, scale, true).vox, 1, 0);
+		if (rely == 0)					recurse_neighbour(svo, svo.octree_read(x, y -size, z, scale, true).vox, 2, 2);
+		if (rely +size == chunk_size)	recurse_neighbour(svo, svo.octree_read(x, y +size, z, scale, true).vox, 2, 0);
+		if (relz == 0)					recurse_neighbour(svo, svo.octree_read(x, y, z -size, scale, true).vox, 4, 4);
+		if (relz +size == chunk_size)	recurse_neighbour(svo, svo.octree_read(x, y, z +size, scale, true).vox, 4, 0);
+	}
+
 	void __vectorcall SVO::octree_write (int x, int y, int z, int scale, TypedVoxel vox) {
 		int cur_scale = root->scale;
 		int size = 1 << root->scale;
-		x -= root->pos.x;
-		y -= root->pos.y;
-		z -= root->pos.z;
-		if (x < 0 || y < 0 || z < 0 || x >= size || y >= size || z >= size) {
+		int relx = x - root->pos.x;
+		int rely = y - root->pos.y;
+		int relz = z - root->pos.z;
+		if (relx < 0 || rely < 0 || relz < 0 || relx >= size || rely >= size || relz >= size) {
 			// writes outside the root node are not possible, should never be attempted by caller
 			assert(false);
 		}
@@ -79,7 +107,7 @@ namespace svo {
 			assert(size > 0);
 
 			// get child node that contains target node
-			int child_idx = get_child_index(x,y,z, size);
+			int child_idx = get_child_index(relx,rely,relz, size);
 
 			// update stack
 			stack[cur_scale].node = node;
@@ -128,7 +156,7 @@ namespace svo {
 					node->children[i] = child_vox.value;
 				}
 
-				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
+				chunk->flags |= SVO_DIRTY;
 			}
 		}
 
@@ -140,16 +168,6 @@ namespace svo {
 		stack[cur_scale].node->set_child(stack[cur_scale].child_idx, vox);
 
 		chunk->flags |= SVO_DIRTY | MESH_DIRTY;
-		
-		if (vox.type == CHUNK_PTR) {
-			// trigger a collapse check that includes the root of the chunk, because chunk load is not able to collapse past the root of the chunk
-			chunk = &allocator.chunks[vox.value];
-			assert(chunk->scale == cur_scale);
-		
-			cur_scale--;
-			stack[cur_scale].child_idx = 0;
-			stack[cur_scale].node = &chunk->nodes[0];
-		}
 
 		// collapse octree nodes with same leaf values by walking up the stack, stop at chunk root or svo root or if can't collapse
 		for (	auto i = cur_scale;
@@ -157,13 +175,9 @@ namespace svo {
 				++i) {
 
 			stack[i+1].node->set_child(stack[i+1].child_idx, { BLOCK_ID, stack[i].node->children[0] });
-
-			if (i == chunk->scale) {
-				// chunk nodes were completely collapsed away
-				allocator.free_nodes(chunk);
-			}
 		}
 
+		flag_neighbour_meshing(*this, vox.type == CHUNK_PTR ? &allocator.chunks[vox.value] : chunk, x,y,z, scale, size);
 	}
 
 	OctreeReadResult __vectorcall SVO::octree_read (int x, int y, int z, int target_scale, bool read_chunk) {
@@ -447,10 +461,10 @@ namespace svo {
 				assert(scale == svo.root->scale-1);
 
 				svo.octree_write(pos.x, pos.y, pos.z, scale, { CHUNK_PTR, svo.allocator.indexof(chunk) });
+				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
-				chunk->flags |= SVO_DIRTY;
 
 			} break;
 
@@ -500,9 +514,9 @@ namespace svo {
 				for (int i=0; i<8; ++i) {
 					assert(siblings[i]->flags & LOCKED);
 					siblings[i]->flags &= ~LOCKED;
-					siblings[i]->flags |= SVO_DIRTY;
 					auto p = siblings[i]->pos;
 					svo.octree_write(p.x, p.y, p.z, siblings[i]->scale, { CHUNK_PTR, svo.allocator.indexof(siblings[i]) });
+					siblings[i]->flags |= SVO_DIRTY | MESH_DIRTY;
 				}
 			} break;
 
@@ -517,10 +531,10 @@ namespace svo {
 				}
 			
 				svo.octree_write(pos.x, pos.y, pos.z, scale, { CHUNK_PTR, svo.allocator.indexof(chunk) });
+				chunk->flags |= SVO_DIRTY | MESH_DIRTY;
 
 				svo.pending_chunks.remove(pos, scale);
 				svo.chunks.insert(pos, scale, chunk);
-				chunk->flags |= SVO_DIRTY;
 			
 				// add parent to be able to track merges again
 				if (scale < svo.root->scale-1) {
@@ -717,34 +731,12 @@ namespace svo {
 		}
 	}
 
-	void recurse_neighbour (SVO& svo, TypedVoxel vox, int mask, int side) { // mask selects axis that neighbour touches, side says which side (1=right)
-		if (vox.type == NODE_PTR) {
-			for (int i=0; i<8; ++i) {
-				if ((i & mask) == side)
-					recurse_neighbour(svo, svo.root->nodes[vox.value].get_child(i), mask, side);
-			}
-		} else {
-			if (vox.type == CHUNK_PTR) {
-				assert(vox.value != 0);
-				Chunk* chunk = &svo.allocator.chunks[vox.value];
-				chunk->flags |= MESH_DIRTY;
-			}
-		}
-	}
-	void flag_neighbour_meshing (SVO& svo, Chunk* chunk) {
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x -(1 << chunk->scale), chunk->pos.y, chunk->pos.z, chunk->scale, true).vox, 1, 1);
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x +(1 << chunk->scale), chunk->pos.y, chunk->pos.z, chunk->scale, true).vox, 1, 0);
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x, chunk->pos.y -(1 << chunk->scale), chunk->pos.z, chunk->scale, true).vox, 2, 2);
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x, chunk->pos.y +(1 << chunk->scale), chunk->pos.z, chunk->scale, true).vox, 2, 0);
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x, chunk->pos.y, chunk->pos.z -(1 << chunk->scale), chunk->scale, true).vox, 4, 4);
-		recurse_neighbour(svo, svo.octree_read(chunk->pos.x, chunk->pos.y, chunk->pos.z +(1 << chunk->scale), chunk->scale, true).vox, 4, 0);
-	}
-
 	void SVO::update_chunk_gpu_data (Graphics& graphics, WorldGenerator& world_gen) {
 		ZoneScoped;
 
+		std::vector<std::unique_ptr<ThreadingJob>> remeshing_jobs;
 		{
-			ZoneScopedN("Upload svo data");
+			ZoneScopedN("Upload svo data & collect chunks to remesh");
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
 
@@ -764,9 +756,10 @@ namespace svo {
 				Chunk* chunk = &allocator.chunks[i];
 				if (!allocator.chunk_is_allocated(i)) continue;
 
-				bool svo_changed = chunk->flags & SVO_DIRTY;
+				if (i > 0 && (chunk->flags & SVO_DIRTY))
+					assert(chunk->flags & MESH_DIRTY);
 
-				if (svo_changed) {
+				if (chunk->flags & SVO_DIRTY) {
 					ZoneScopedN("chunk svo upload");
 
 					assert((chunk->svo_data_size == 0) == (chunk->gl_svo_data == 0));
@@ -803,37 +796,24 @@ namespace svo {
 					//glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 				}
 
-				if (realloc_node_ptrs || svo_changed) {
+				if (realloc_node_ptrs || (chunk->flags & SVO_DIRTY)) {
 					node_ptrs[ allocator.indexof(chunk) ] = chunk->gl_svo_data_ptr;
 				}
 
-				if (i > 0 && svo_changed) // never mesh root
-					flag_neighbour_meshing(*this, chunk);
+				if (i > 0 && (chunk->flags & MESH_DIRTY)) { // never mesh root
+					// queue remeshing
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
 
-				chunk->flags &= ~SVO_DIRTY;
+					float size = (float)(1 << chunk->scale);
+					debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, lrgba(1,0,0,1));
+				}
+
+				chunk->flags &= ~(SVO_DIRTY|MESH_DIRTY);
 			}
 
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, allocator.node_ptrs_ssbo);
 			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-		}
-
-		std::vector<std::unique_ptr<ThreadingJob>> remeshing_jobs;
-		{ // iterate MESH_DIRTY flags
-			ZoneScopedN("Iterate  data");
-
-			// realloc chunk svo ssbo if needed, get new ptr and update ptr in node_ptrs
-			for (uint32_t i=1; i<allocator.comitted_chunk_count(); ++i) {
-				Chunk* chunk = &allocator.chunks[i];
-				if (!allocator.chunk_is_allocated(i)) continue;
-
-				if (chunk->flags & MESH_DIRTY) { // never mesh root
-					// queue remshing
-					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
-				}
-
-				chunk->flags &= ~MESH_DIRTY;
-			}
 		}
 		
 		{ //
@@ -878,7 +858,6 @@ namespace svo {
 		}
 
 		update_chunk_loading(player, world_gen);
-		
 		update_chunk_gpu_data(graphics, world_gen);
 
 		if (debug_draw_svo) {
