@@ -765,6 +765,7 @@ namespace svo {
 					}
 
 					// copy data
+					// TODO: DOn't do this, this blocks! buffer orphan might be the correct way to do this, but I don't know if that works with glGetBufferParameterui64vNV
 					void* data = glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_WRITE_ONLY);
 					memcpy(data, chunk->nodes, chunk->commit_ptr);
 					glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);

@@ -537,6 +537,7 @@ namespace svo {
 
 		ChunkLoadJob (Chunk* chunk, SVO& svo, WorldGenerator& world_gen, LoadOp::Type load_type):
 			chunk{chunk}, svo{svo}, world_gen{world_gen}, load_type{load_type} {}
+		virtual ~ChunkLoadJob() = default;
 
 		virtual void execute () {
 			generate_chunk(chunk, svo, world_gen);
@@ -555,12 +556,18 @@ namespace svo {
 		std::vector<VoxelVertex> transparent_mesh;
 
 		RemeshChunkJob (Chunk* chunk, SVO& svo, Graphics const& g, WorldGenerator const& wg):
-			chunk{chunk}, svo{svo}, g{g}, wg{wg} {}
+				chunk{chunk}, svo{svo}, g{g}, wg{wg} {
+			// reserve 16k x 3faces
+			opaque_mesh		.reserve(16 * 1024 * 3 * 6);
+			transparent_mesh.reserve(16 * 1024 * 3 * 6);
+		}
+		virtual ~RemeshChunkJob() = default;
 
 		virtual void execute () {
 			remesh_chunk(chunk, svo, g, wg, opaque_mesh, transparent_mesh);
 		}
 		virtual void finalize ();
+
 	};
 }
 using svo::SVO;

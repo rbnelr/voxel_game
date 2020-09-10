@@ -29,6 +29,8 @@ void set_thread_preferred_core (int core_index);
 void set_thread_description (std::string_view description);
 
 struct ThreadingJob {
+	virtual ~ThreadingJob () {};
+
 	// code to execute on other thread
 	virtual void execute () = 0;
 	// code to execute on main thread after execute was called
