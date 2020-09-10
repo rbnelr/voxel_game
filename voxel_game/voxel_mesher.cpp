@@ -92,13 +92,15 @@ struct ChunkRemesher {
 		return b == B_AIR || b == B_NULL;
 	}
 
-	void chunk_block (int posx, int posy, int posz, int size, block_id bid) {
+	void chunk_block (int posx, int posy, int posz, int scale, block_id bid) {
 		static constexpr int3 FACES[6] {
 			int3(-1,0,0), int3(+1,0,0), int3(0,-1,0), int3(0,+1,0), int3(0,0,-1), int3(0,0,+1)
 		};
 		static constexpr float3 FACESf[6] {
 			float3(-1,0,0), float3(+1,0,0), float3(0,-1,0), float3(0,+1,0), float3(0,0,-1), float3(0,0,+1)
 		};
+
+		int size = 1 << scale;
 
 		float posfx = (float)posx;
 		float posfy = (float)posy;
@@ -114,7 +116,7 @@ struct ChunkRemesher {
 			int nb_posy = abs_posy + FACES[face].y * size;
 			int nb_posz = abs_posz + FACES[face].z * size;
 			
-			auto nb = svo.octree_read(nb_posx, nb_posy, nb_posz, size);
+			auto nb = svo.octree_read(nb_posx, nb_posy, nb_posz, scale);
 
 			if (nb.size >= size) {
 				assert(nb.vox.type == BLOCK_ID);
@@ -145,7 +147,6 @@ struct ChunkRemesher {
 		stack[chunk->scale-1] = { &chunk->nodes[0], 0, 0 };
 
 		int scale = chunk->scale-1;
-		int size = 1 << scale;
 
 		while (scale < chunk->scale) {
 			assert(scale >= 0);
@@ -157,7 +158,6 @@ struct ChunkRemesher {
 			if (child_idx >= 8) {
 				// Pop
 				scale++;
-				size <<= 1;
 
 			} else {
 
@@ -170,7 +170,6 @@ struct ChunkRemesher {
 				if (vox.type == NODE_PTR) {
 					// Push
 					scale--;
-					size >>= 1;
 
 					stack[scale] = { &chunk->nodes[vox.value], int3(child_x, child_y, child_z), 0 };
 
@@ -178,7 +177,7 @@ struct ChunkRemesher {
 				} else {
 					assert(vox.type == BLOCK_ID);
 
-					chunk_block(child_x, child_y, child_z, size, (block_id)vox.value);
+					chunk_block(child_x, child_y, child_z, scale, (block_id)vox.value);
 				}
 			}
 

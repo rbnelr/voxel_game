@@ -512,7 +512,8 @@ namespace svo {
 		// (ex. writing a 4x4x4 area to be air will delete the nodes of smaller scale contained)
 		void __vectorcall octree_write (int x, int y, int z, int scale, TypedVoxel vox);
 
-		OctreeReadResult __vectorcall octree_read (int x, int y, int z, int target_size);
+		// target_scale=-1: stop at chunk
+		OctreeReadResult __vectorcall octree_read (int x, int y, int z, int target_scale, bool read_chunk=false);
 	};
 
 	struct LoadOp {
