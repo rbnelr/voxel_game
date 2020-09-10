@@ -31,11 +31,23 @@ namespace svo {
 		if (node->children_types != ONLY_BLOCK_IDS)
 			return false; // can only collapse block_id voxels
 
-		for (int i=1; i<8; ++i) {
-			if (node->children[i] != node->children[0])
-				return false; // not all leafs equal, cant collapse
-		}
-		return true;
+		//for (int i=1; i<8; ++i) {
+		//	if (node->children[i] != node->children[0])
+		//		return false; // not all leafs equal, cant collapse
+		//}
+
+		//return // manual unroll because compiler does not do it, faster
+		//	node->children[1] == node->children[0] && 
+		//	node->children[2] == node->children[0] && 
+		//	node->children[3] == node->children[0] && 
+		//	node->children[4] == node->children[0] && 
+		//	node->children[5] == node->children[0] && 
+		//	node->children[6] == node->children[0] && 
+		//	node->children[7] == node->children[0];
+
+		// simd version of the check
+		auto cmp = _mm256_xor_si256(_mm256_loadu_si256((__m256i*)node->children), _mm256_set1_epi32(node->children[0]));
+		return _mm256_testz_si256(cmp, cmp); // true if zero, ie. all children == child0
 	}
 
 	void SVO::octree_write (int x, int y, int z, int scale, TypedVoxel vox) {
@@ -257,32 +269,32 @@ namespace svo {
 
 				if (scale == 1) {
 					// generate 8 leaf nodes in a more optimized way than pushing and poping
-					Node n = {};
-					n.children_types = ONLY_BLOCK_IDS;
-
+					
 					// use seperate CHUNK_3D_INDEX for parent xyz and child offset to make compiler understand how to do this indexing efficently
-					uintptr_t block_idx = CHUNK_3D_INDEX(x,y,z);
-					for (int i=0; i<8; i++) {
-						n.children[i] = blocks[block_idx + CHUNK_3D_INDEX(i%2, i/2%2, i/4)];
-					}
-
-					bool can_collapse = true;
-					for (int i=1; i<8; ++i) {
-						if (n.children[i] != n.children[0]) {
-							can_collapse = false; // not all leafs equal, cant collapse
-							break;
-						}
-					}
+					uintptr_t blocks_idx = CHUNK_3D_INDEX(x,y,z);
+					
+					// manual unroll because compiler was not able to do this efficently
+					bool can_collapse =
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(1)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(2)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(3)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(4)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(5)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(6)] == blocks[blocks_idx] && 
+						blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(7)] == blocks[blocks_idx];
 
 					if (can_collapse) {
 
-						node->set_child(child_indx, { BLOCK_ID, n.children[0] });
+						node->set_child(child_indx, { BLOCK_ID, blocks[blocks_idx] });
 
 					} else {
 						uint32_t node_ptr;
 						Node* new_node = allocator.alloc_node(chunk, &node_ptr);
 
-						memcpy(new_node, &n, sizeof(Node));
+						new_node->children_types = ONLY_BLOCK_IDS;
+						for (int i=0; i<8; i++) {
+							new_node->children[i] = blocks[blocks_idx + CHUNK_3D_CHILD_OFFSET(i)];
+						}
 
 						node->set_child(child_indx, { NODE_PTR, node_ptr });
 					}

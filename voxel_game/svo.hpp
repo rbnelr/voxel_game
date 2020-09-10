@@ -17,10 +17,17 @@ static constexpr int CHUNK_SIZE = 128;
 static constexpr int CHUNK_SCALE = 7;
 
 // Calc 3d index into flattened [CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE] array because compiler sometimes does too much math
-#define CHUNK_3D_INDEX(x,y,z) (\
-	 ((uintptr_t)(z) << CHUNK_SCALE*2) \
-	+((uintptr_t)(y) << CHUNK_SCALE  ) \
-	+((uintptr_t)(x)                 ))
+static constexpr inline uintptr_t CHUNK_3D_INDEX (int x, int y, int z) {
+	 return  ((uintptr_t)z << CHUNK_SCALE*2) 
+			+((uintptr_t)y << CHUNK_SCALE  )
+			+((uintptr_t)x                 );
+}
+// i=1 -> + int3(1,0,0)  i=6 -> + int3(1,1,0) offs in 3d array etc.
+static constexpr inline uintptr_t CHUNK_3D_CHILD_OFFSET (int i) {
+	return   ((uintptr_t)((i&4) >> 2) << CHUNK_SCALE*2)
+			+((uintptr_t)((i&2) >> 1) << CHUNK_SCALE  )
+			+((uintptr_t)((i&1)     )                 );
+}
 
 namespace svo {
 
@@ -475,8 +482,7 @@ namespace svo {
 			root = allocator.alloc_chunk(root_pos, root_scale);
 			Node* root_node = allocator.alloc_node(root, &root_idx);
 
-			root_node->children_types = ONLY_BLOCK_IDS;
-			memset(&root_node->children, 0, sizeof(root_node->children));
+			*root_node = { ONLY_BLOCK_IDS }; // clear to all B_NULL block ids
 		}
 
 		void update_chunk_loading (Player& player, WorldGenerator& world_gen);
