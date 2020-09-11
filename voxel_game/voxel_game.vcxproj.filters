@@ -1,242 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="blocks.hpp" />
-    <ClInclude Include="glad\glad.h">
-      <Filter>glad</Filter>
-    </ClInclude>
-    <ClInclude Include="glad\khrplatform.h">
-      <Filter>glad</Filter>
-    </ClInclude>
-    <ClInclude Include="stb\stb_image.h">
-      <Filter>stb</Filter>
-    </ClInclude>
-    <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp">
-      <Filter>open_simplex_noise</Filter>
-    </ClInclude>
-    <ClInclude Include="dear_imgui\imgui_impl_glfw.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imgui.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imgui_internal.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imstb_rectpack.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imstb_textedit.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imstb_truetype.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="glfw_window.hpp" />
-    <ClInclude Include="game.hpp" />
-    <ClInclude Include="input.hpp" />
-    <ClInclude Include="glad\glad_wgl.h">
-      <Filter>glad</Filter>
-    </ClInclude>
-    <ClInclude Include="stb_image.hpp">
-      <Filter>stb</Filter>
-    </ClInclude>
-    <ClInclude Include="dear_imgui.hpp">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\camera.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="player.hpp" />
-    <ClInclude Include="physics.hpp" />
-    <ClInclude Include="graphics\glshader.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\graphics.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\debug_graphics.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\gl.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\common.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\image.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\texture.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="util\file_io.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\running_average.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\string.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\timer.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath_colors.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\collision.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="world.hpp" />
-    <ClInclude Include="util\random.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="world_generator.hpp" />
-    <ClInclude Include="util\geometry.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="block_update.hpp" />
-    <ClInclude Include="util\animation.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\circular_buffer.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\clean_windows_h.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\dear_imgui\imconfig.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="audio\audio.hpp">
-      <Filter>audio</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\shaders.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="audio\read_wav.hpp">
-      <Filter>audio</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\atlas.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="stb\stb_rect_pack.h">
-      <Filter>stb</Filter>
-    </ClInclude>
-    <ClInclude Include="stb_rect_pack.hpp">
-      <Filter>stb</Filter>
-    </ClInclude>
-    <ClInclude Include="util\threadsafe_queue.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\threadpool.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="items.hpp" />
-    <ClInclude Include="time_of_day.hpp" />
-    <ClInclude Include="graphics\graphics_common.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="util\raw_array.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\read_directory.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="graphics\raytracer.hpp">
-      <Filter>graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\bool4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float2x2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float2x3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3x3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float3x4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\float4x4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\int64v4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\transform2d.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\transform3d.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v2.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v3.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="kissmath\uint8v4.hpp">
-      <Filter>kissmath</Filter>
-    </ClInclude>
-    <ClInclude Include="util\freelist_allocator.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
     <ClInclude Include="..\tracy\Tracy.hpp">
       <Filter>tracy</Filter>
     </ClInclude>
@@ -249,30 +13,233 @@
     <ClInclude Include="..\tracy\TracyVulkan.hpp">
       <Filter>tracy</Filter>
     </ClInclude>
-    <ClInclude Include="profiling.hpp" />
+    <ClInclude Include="src\block_update.hpp" />
+    <ClInclude Include="src\blocks.hpp" />
+    <ClInclude Include="src\dear_imgui.hpp" />
+    <ClInclude Include="src\game.hpp" />
+    <ClInclude Include="src\glfw_window.hpp" />
+    <ClInclude Include="src\input.hpp" />
+    <ClInclude Include="src\items.hpp" />
+    <ClInclude Include="src\kissmath.hpp" />
+    <ClInclude Include="src\kissmath_colors.hpp" />
+    <ClInclude Include="src\physics.hpp" />
+    <ClInclude Include="src\player.hpp" />
+    <ClInclude Include="src\profiling.hpp" />
+    <ClInclude Include="src\serialization.hpp" />
+    <ClInclude Include="src\svo.hpp" />
+    <ClInclude Include="src\threading.hpp" />
+    <ClInclude Include="src\time_of_day.hpp" />
+    <ClInclude Include="src\voxel_mesher.hpp" />
+    <ClInclude Include="src\voxel_system.hpp" />
+    <ClInclude Include="src\world.hpp" />
+    <ClInclude Include="src\world_generator.hpp" />
+    <ClInclude Include="src\util\allocator.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\animation.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\bit_twiddling.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\circular_buffer.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\clean_windows_h.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\collision.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\file_io.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\freelist_allocator.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\geometry.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\macros.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\random.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\raw_array.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\read_directory.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\running_average.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\string.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\threadpool.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\threadsafe_queue.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\util\timer.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stb\stb_image.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stb\stb_image.hpp">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stb\stb_rect_pack.h">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stb\stb_rect_pack.hpp">
+      <Filter>stb</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\bool2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\bool3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\bool4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float2x2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float2x3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float3x3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float3x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\float4x4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int64.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int64v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int64v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\int64v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\transform2d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\transform3d.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\uint8.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\uint8v2.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\uint8v3.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\kissmath\uint8v4.hpp">
+      <Filter>kissmath</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\atlas.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\camera.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\common.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\debug_graphics.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\gl.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\glshader.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\graphics.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\graphics_common.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\image.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\raytracer.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\shaders.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\graphics\texture.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="src\glad\glad.h">
+      <Filter>glad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\glad\glad_wgl.h">
+      <Filter>glad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\glad\khrplatform.h">
+      <Filter>glad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dear_imgui\imgui_impl_glfw.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dear_imgui\imgui_impl_opengl3.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\audio\audio.hpp">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="src\audio\read_wav.hpp">
+      <Filter>audio</Filter>
+    </ClInclude>
+    <ClInclude Include="src\open_simplex_noise\open_simplex_noise.hpp">
+      <Filter>open_simplex_noise</Filter>
+    </ClInclude>
     <ClInclude Include="stdafx.hpp" />
-    <ClInclude Include="svo.hpp" />
-    <ClInclude Include="voxel_mesher.hpp" />
-    <ClInclude Include="threading.hpp" />
-    <ClInclude Include="voxel_system.hpp" />
-    <ClInclude Include="util\macros.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="util\allocator.hpp">
-      <Filter>util</Filter>
-    </ClInclude>
-    <ClInclude Include="serialization.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="glad\glad.c">
-      <Filter>glad</Filter>
-    </ClCompile>
-    <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
@@ -282,103 +249,110 @@
     <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
-    <ClCompile Include="glfw_window.cpp" />
-    <ClCompile Include="input.cpp" />
-    <ClCompile Include="glad\glad_wgl.c">
-      <Filter>glad</Filter>
-    </ClCompile>
-    <ClCompile Include="stb_image.cpp">
-      <Filter>stb</Filter>
-    </ClCompile>
-    <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp">
-      <Filter>open_simplex_noise</Filter>
-    </ClCompile>
-    <ClCompile Include="dear_imgui.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\camera.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="player.cpp" />
-    <ClCompile Include="physics.cpp" />
-    <ClCompile Include="graphics\glshader.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\graphics.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\debug_graphics.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\gl.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\common.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\image.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\texture.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="game.cpp" />
-    <ClCompile Include="util\file_io.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="util\string.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="util\timer.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="util\collision.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="world.cpp" />
-    <ClCompile Include="util\random.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
-    <ClCompile Include="world_generator.cpp" />
-    <ClCompile Include="block_update.cpp" />
     <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
       <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="audio\audio.cpp">
-      <Filter>audio</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\shaders.cpp">
-      <Filter>graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="audio\read_wav.cpp">
-      <Filter>audio</Filter>
-    </ClCompile>
-    <ClCompile Include="stb_rect_pack.cpp">
-      <Filter>stb</Filter>
-    </ClCompile>
-    <ClCompile Include="util\threadpool.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="items.cpp" />
-    <ClCompile Include="time_of_day.cpp" />
-    <ClCompile Include="util\read_directory.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="graphics\raytracer.cpp">
-      <Filter>graphics</Filter>
     </ClCompile>
     <ClCompile Include="..\tracy\TracyClient.cpp">
       <Filter>tracy</Filter>
     </ClCompile>
-    <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="svo.cpp" />
-    <ClCompile Include="voxel_mesher.cpp" />
-    <ClCompile Include="util\allocator.cpp">
+    <ClCompile Include="src\block_update.cpp" />
+    <ClCompile Include="src\dear_imgui.cpp" />
+    <ClCompile Include="src\game.cpp" />
+    <ClCompile Include="src\glfw_window.cpp" />
+    <ClCompile Include="src\input.cpp" />
+    <ClCompile Include="src\items.cpp" />
+    <ClCompile Include="src\physics.cpp" />
+    <ClCompile Include="src\player.cpp" />
+    <ClCompile Include="src\svo.cpp" />
+    <ClCompile Include="src\time_of_day.cpp" />
+    <ClCompile Include="src\voxel_mesher.cpp" />
+    <ClCompile Include="src\world.cpp" />
+    <ClCompile Include="src\world_generator.cpp" />
+    <ClCompile Include="src\util\allocator.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="src\util\collision.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\file_io.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\random.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\read_directory.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\string.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\threadpool.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\util\timer.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stb\stb_image.cpp">
+      <Filter>stb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stb\stb_rect_pack.cpp">
+      <Filter>stb</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\camera.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\common.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\debug_graphics.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\gl.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\glshader.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\graphics.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\image.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\raytracer.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\shaders.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\graphics\texture.cpp">
+      <Filter>graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="src\glad\glad.c">
+      <Filter>glad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\glad\glad_wgl.c">
+      <Filter>glad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dear_imgui\imgui_impl_glfw.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dear_imgui\imgui_impl_opengl3.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\audio.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\audio\read_wav.cpp">
+      <Filter>audio</Filter>
+    </ClCompile>
+    <ClCompile Include="src\open_simplex_noise\open_simplex_noise.cpp">
+      <Filter>open_simplex_noise</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">
@@ -411,89 +385,89 @@
     <None Include="shaders\held_item.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="kissmath\bool2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\bool3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\bool4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float2x2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float2x3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float3x3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float3x4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\float4x4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int64.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int64v2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int64v3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\int64v4.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\transform2d.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\transform3d.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\uint8.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\uint8v2.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\uint8v3.inl">
-      <Filter>kissmath</Filter>
-    </None>
-    <None Include="kissmath\uint8v4.inl">
-      <Filter>kissmath</Filter>
-    </None>
     <None Include="shaders\debug_graphics.glsl">
       <Filter>shaders</Filter>
     </None>
     <None Include="shaders\raytrace_svo.glsl">
       <Filter>shaders</Filter>
+    </None>
+    <None Include="src\kissmath\bool2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\bool3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\bool4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float2x2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float2x3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float3x3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float3x4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\float4x4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int64.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int64v2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int64v3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\int64v4.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\transform2d.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\transform3d.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\uint8.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\uint8v2.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\uint8v3.inl">
+      <Filter>kissmath</Filter>
+    </None>
+    <None Include="src\kissmath\uint8v4.inl">
+      <Filter>kissmath</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>
@@ -502,9 +476,6 @@
     </Filter>
     <Filter Include="glad">
       <UniqueIdentifier>{1847271f-a9df-43e4-9628-48a6e79317e5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="stb">
-      <UniqueIdentifier>{8c80bbda-578d-41da-8727-423370554220}</UniqueIdentifier>
     </Filter>
     <Filter Include="open_simplex_noise">
       <UniqueIdentifier>{bcf11987-2db6-4a5f-8768-e9f29417b695}</UniqueIdentifier>
@@ -526,6 +497,9 @@
     </Filter>
     <Filter Include="tracy">
       <UniqueIdentifier>{e551c6ec-689e-4052-84b7-92ebdbca2a3e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="stb">
+      <UniqueIdentifier>{5dc04b86-4a19-423d-b0c8-976bebabebf3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -1,7 +1,7 @@
 #include "stdafx.hpp"
 #include "texture.hpp"
 #include "../util/file_io.hpp"
-#include "../stb_image.hpp"
+#include "stb/stb_image.hpp"
 
 Texture1D::Texture1D () {
 	glBindTexture(GL_TEXTURE_1D, tex);

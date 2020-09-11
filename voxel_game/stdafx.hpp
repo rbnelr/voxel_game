@@ -28,8 +28,8 @@
 #include "Tracy.hpp"
 #include "TracyOpenGL.hpp"
 
-#include "stb_rect_pack.hpp"
-#include "stb_image.hpp"
+#include "stb/stb_rect_pack.hpp"
+#include "stb/stb_image.hpp"
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 //

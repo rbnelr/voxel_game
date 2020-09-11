@@ -3,7 +3,7 @@
 #include "../kissmath.hpp"
 #include "texture.hpp"
 #include "image.hpp"
-#include "../stb_rect_pack.hpp"
+#include "stb/stb_rect_pack.hpp"
 #include <string>
 
 struct AtlasedTexture {

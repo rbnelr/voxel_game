@@ -70,7 +70,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -83,8 +83,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
     </Link>
   </ItemDefinitionGroup>
@@ -95,7 +95,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -113,8 +113,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
     </Link>
@@ -126,7 +126,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -144,112 +144,106 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2017;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;portaudio_static_x64.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\portaudio\lib;$(SolutionDir)..\assimp\lib\x64\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <Profile>true</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\dear_imgui\imconfig.h" />
-    <ClInclude Include="..\..\dear_imgui\imgui.h" />
-    <ClInclude Include="..\..\dear_imgui\imgui_internal.h" />
-    <ClInclude Include="..\..\dear_imgui\imstb_rectpack.h" />
-    <ClInclude Include="..\..\dear_imgui\imstb_textedit.h" />
-    <ClInclude Include="..\..\dear_imgui\imstb_truetype.h" />
-    <ClInclude Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="..\tracy\Tracy.hpp" />
     <ClInclude Include="..\tracy\TracyC.h" />
     <ClInclude Include="..\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\tracy\TracyVulkan.hpp" />
-    <ClInclude Include="audio\audio.hpp" />
-    <ClInclude Include="audio\read_wav.hpp" />
-    <ClInclude Include="blocks.hpp" />
-    <ClInclude Include="block_update.hpp" />
-    <ClInclude Include="serialization.hpp" />
+    <ClInclude Include="src\audio\audio.hpp" />
+    <ClInclude Include="src\audio\read_wav.hpp" />
+    <ClInclude Include="src\blocks.hpp" />
+    <ClInclude Include="src\block_update.hpp" />
+    <ClInclude Include="src\dear_imgui.hpp" />
+    <ClInclude Include="src\dear_imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="src\dear_imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="src\game.hpp" />
+    <ClInclude Include="src\glad\glad.h" />
+    <ClInclude Include="src\glad\glad_wgl.h" />
+    <ClInclude Include="src\glad\khrplatform.h" />
+    <ClInclude Include="src\glfw_window.hpp" />
+    <ClInclude Include="src\graphics\atlas.hpp" />
+    <ClInclude Include="src\graphics\camera.hpp" />
+    <ClInclude Include="src\graphics\common.hpp" />
+    <ClInclude Include="src\graphics\debug_graphics.hpp" />
+    <ClInclude Include="src\graphics\gl.hpp" />
+    <ClInclude Include="src\graphics\glshader.hpp" />
+    <ClInclude Include="src\graphics\graphics.hpp" />
+    <ClInclude Include="src\graphics\graphics_common.hpp" />
+    <ClInclude Include="src\graphics\image.hpp" />
+    <ClInclude Include="src\graphics\raytracer.hpp" />
+    <ClInclude Include="src\graphics\shaders.hpp" />
+    <ClInclude Include="src\graphics\texture.hpp" />
+    <ClInclude Include="src\input.hpp" />
+    <ClInclude Include="src\items.hpp" />
+    <ClInclude Include="src\kissmath.hpp" />
+    <ClInclude Include="src\kissmath\bool2.hpp" />
+    <ClInclude Include="src\kissmath\bool3.hpp" />
+    <ClInclude Include="src\kissmath\bool4.hpp" />
+    <ClInclude Include="src\kissmath\float.hpp" />
+    <ClInclude Include="src\kissmath\float2.hpp" />
+    <ClInclude Include="src\kissmath\float2x2.hpp" />
+    <ClInclude Include="src\kissmath\float2x3.hpp" />
+    <ClInclude Include="src\kissmath\float3.hpp" />
+    <ClInclude Include="src\kissmath\float3x3.hpp" />
+    <ClInclude Include="src\kissmath\float3x4.hpp" />
+    <ClInclude Include="src\kissmath\float4.hpp" />
+    <ClInclude Include="src\kissmath\float4x4.hpp" />
+    <ClInclude Include="src\kissmath\int.hpp" />
+    <ClInclude Include="src\kissmath\int2.hpp" />
+    <ClInclude Include="src\kissmath\int3.hpp" />
+    <ClInclude Include="src\kissmath\int4.hpp" />
+    <ClInclude Include="src\kissmath\int64.hpp" />
+    <ClInclude Include="src\kissmath\int64v2.hpp" />
+    <ClInclude Include="src\kissmath\int64v3.hpp" />
+    <ClInclude Include="src\kissmath\int64v4.hpp" />
+    <ClInclude Include="src\kissmath\transform2d.hpp" />
+    <ClInclude Include="src\kissmath\transform3d.hpp" />
+    <ClInclude Include="src\kissmath\uint8.hpp" />
+    <ClInclude Include="src\kissmath\uint8v2.hpp" />
+    <ClInclude Include="src\kissmath\uint8v3.hpp" />
+    <ClInclude Include="src\kissmath\uint8v4.hpp" />
+    <ClInclude Include="src\kissmath_colors.hpp" />
+    <ClInclude Include="src\open_simplex_noise\open_simplex_noise.hpp" />
+    <ClInclude Include="src\physics.hpp" />
+    <ClInclude Include="src\player.hpp" />
+    <ClInclude Include="src\profiling.hpp" />
+    <ClInclude Include="src\serialization.hpp" />
+    <ClInclude Include="src\stb\stb_image.h" />
+    <ClInclude Include="src\stb\stb_image.hpp" />
+    <ClInclude Include="src\stb\stb_rect_pack.h" />
+    <ClInclude Include="src\stb\stb_rect_pack.hpp" />
+    <ClInclude Include="src\svo.hpp" />
+    <ClInclude Include="src\threading.hpp" />
+    <ClInclude Include="src\time_of_day.hpp" />
+    <ClInclude Include="src\util\allocator.hpp" />
+    <ClInclude Include="src\util\animation.hpp" />
+    <ClInclude Include="src\util\bit_twiddling.hpp" />
+    <ClInclude Include="src\util\circular_buffer.hpp" />
+    <ClInclude Include="src\util\clean_windows_h.hpp" />
+    <ClInclude Include="src\util\collision.hpp" />
+    <ClInclude Include="src\util\file_io.hpp" />
+    <ClInclude Include="src\util\freelist_allocator.hpp" />
+    <ClInclude Include="src\util\geometry.hpp" />
+    <ClInclude Include="src\util\macros.hpp" />
+    <ClInclude Include="src\util\random.hpp" />
+    <ClInclude Include="src\util\raw_array.hpp" />
+    <ClInclude Include="src\util\read_directory.hpp" />
+    <ClInclude Include="src\util\running_average.hpp" />
+    <ClInclude Include="src\util\string.hpp" />
+    <ClInclude Include="src\util\threadpool.hpp" />
+    <ClInclude Include="src\util\threadsafe_queue.hpp" />
+    <ClInclude Include="src\util\timer.hpp" />
+    <ClInclude Include="src\voxel_mesher.hpp" />
+    <ClInclude Include="src\voxel_system.hpp" />
+    <ClInclude Include="src\world.hpp" />
+    <ClInclude Include="src\world_generator.hpp" />
     <ClInclude Include="stdafx.hpp" />
-    <ClInclude Include="graphics\atlas.hpp" />
-    <ClInclude Include="graphics\graphics_common.hpp" />
-    <ClInclude Include="graphics\raytracer.hpp" />
-    <ClInclude Include="items.hpp" />
-    <ClInclude Include="kissmath\bool2.hpp" />
-    <ClInclude Include="kissmath\bool3.hpp" />
-    <ClInclude Include="kissmath\bool4.hpp" />
-    <ClInclude Include="kissmath\float.hpp" />
-    <ClInclude Include="kissmath\float2.hpp" />
-    <ClInclude Include="kissmath\float2x2.hpp" />
-    <ClInclude Include="kissmath\float2x3.hpp" />
-    <ClInclude Include="kissmath\float3.hpp" />
-    <ClInclude Include="kissmath\float3x3.hpp" />
-    <ClInclude Include="kissmath\float3x4.hpp" />
-    <ClInclude Include="kissmath\float4.hpp" />
-    <ClInclude Include="kissmath\float4x4.hpp" />
-    <ClInclude Include="kissmath\int.hpp" />
-    <ClInclude Include="kissmath\int2.hpp" />
-    <ClInclude Include="kissmath\int3.hpp" />
-    <ClInclude Include="kissmath\int4.hpp" />
-    <ClInclude Include="kissmath\int64.hpp" />
-    <ClInclude Include="kissmath\int64v2.hpp" />
-    <ClInclude Include="kissmath\int64v3.hpp" />
-    <ClInclude Include="kissmath\int64v4.hpp" />
-    <ClInclude Include="kissmath\transform2d.hpp" />
-    <ClInclude Include="kissmath\transform3d.hpp" />
-    <ClInclude Include="kissmath\uint8.hpp" />
-    <ClInclude Include="kissmath\uint8v2.hpp" />
-    <ClInclude Include="kissmath\uint8v3.hpp" />
-    <ClInclude Include="kissmath\uint8v4.hpp" />
-    <ClInclude Include="profiling.hpp" />
-    <ClInclude Include="stb\stb_rect_pack.h" />
-    <ClInclude Include="stb_rect_pack.hpp" />
-    <ClInclude Include="threading.hpp" />
-    <ClInclude Include="time_of_day.hpp" />
-    <ClInclude Include="util\animation.hpp" />
-    <ClInclude Include="util\freelist_allocator.hpp" />
-    <ClInclude Include="util\circular_buffer.hpp" />
-    <ClInclude Include="util\clean_windows_h.hpp" />
-    <ClInclude Include="util\geometry.hpp" />
-    <ClInclude Include="util\raw_array.hpp" />
-    <ClInclude Include="util\read_directory.hpp" />
-    <ClInclude Include="util\threadpool.hpp" />
-    <ClInclude Include="util\threadsafe_queue.hpp" />
-    <ClInclude Include="util\allocator.hpp" />
-    <ClInclude Include="voxel_system.hpp" />
-    <ClInclude Include="world_generator.hpp" />
-    <ClInclude Include="voxel_mesher.hpp" />
-    <ClInclude Include="dear_imgui.hpp" />
-    <ClInclude Include="dear_imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="dear_imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="game.hpp" />
-    <ClInclude Include="glad\glad.h" />
-    <ClInclude Include="glad\glad_wgl.h" />
-    <ClInclude Include="glad\khrplatform.h" />
-    <ClInclude Include="glfw_window.hpp" />
-    <ClInclude Include="graphics\camera.hpp" />
-    <ClInclude Include="graphics\common.hpp" />
-    <ClInclude Include="graphics\debug_graphics.hpp" />
-    <ClInclude Include="graphics\graphics.hpp" />
-    <ClInclude Include="graphics\gl.hpp" />
-    <ClInclude Include="graphics\glshader.hpp" />
-    <ClInclude Include="graphics\image.hpp" />
-    <ClInclude Include="graphics\shaders.hpp" />
-    <ClInclude Include="graphics\texture.hpp" />
-    <ClInclude Include="input.hpp" />
-    <ClInclude Include="kissmath.hpp" />
-    <ClInclude Include="kissmath_colors.hpp" />
-    <ClInclude Include="open_simplex_noise\open_simplex_noise.hpp" />
-    <ClInclude Include="physics.hpp" />
-    <ClInclude Include="player.hpp" />
-    <ClInclude Include="stb\stb_image.h" />
-    <ClInclude Include="stb_image.hpp" />
-    <ClInclude Include="util\file_io.hpp" />
-    <ClInclude Include="util\collision.hpp" />
-    <ClInclude Include="util\macros.hpp" />
-    <ClInclude Include="util\random.hpp" />
-    <ClInclude Include="util\running_average.hpp" />
-    <ClInclude Include="util\string.hpp" />
-    <ClInclude Include="util\timer.hpp" />
-    <ClInclude Include="world.hpp" />
-    <ClInclude Include="svo.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -282,139 +276,113 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="audio\audio.cpp" />
-    <ClCompile Include="audio\read_wav.cpp" />
-    <ClCompile Include="block_update.cpp" />
-    <ClCompile Include="graphics\raytracer.cpp" />
-    <ClCompile Include="items.cpp" />
-    <ClCompile Include="stb_rect_pack.cpp">
+    <ClCompile Include="src\audio\audio.cpp" />
+    <ClCompile Include="src\audio\read_wav.cpp" />
+    <ClCompile Include="src\block_update.cpp" />
+    <ClCompile Include="src\dear_imgui.cpp" />
+    <ClCompile Include="src\dear_imgui\imgui_impl_glfw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="src\dear_imgui\imgui_impl_opengl3.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\game.cpp" />
+    <ClCompile Include="src\glad\glad.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\glad\glad_wgl.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\glfw_window.cpp" />
+    <ClCompile Include="src\graphics\camera.cpp" />
+    <ClCompile Include="src\graphics\common.cpp" />
+    <ClCompile Include="src\graphics\debug_graphics.cpp" />
+    <ClCompile Include="src\graphics\gl.cpp" />
+    <ClCompile Include="src\graphics\glshader.cpp" />
+    <ClCompile Include="src\graphics\graphics.cpp" />
+    <ClCompile Include="src\graphics\image.cpp" />
+    <ClCompile Include="src\graphics\raytracer.cpp" />
+    <ClCompile Include="src\graphics\shaders.cpp" />
+    <ClCompile Include="src\graphics\texture.cpp" />
+    <ClCompile Include="src\input.cpp" />
+    <ClCompile Include="src\items.cpp" />
+    <ClCompile Include="src\open_simplex_noise\open_simplex_noise.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\physics.cpp" />
+    <ClCompile Include="src\player.cpp" />
+    <ClCompile Include="src\stb\stb_image.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\stb\stb_rect_pack.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\svo.cpp" />
+    <ClCompile Include="src\time_of_day.cpp" />
+    <ClCompile Include="src\util\allocator.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\collision.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\file_io.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\random.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\read_directory.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\string.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\threadpool.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\util\timer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\voxel_mesher.cpp" />
+    <ClCompile Include="src\world.cpp" />
+    <ClCompile Include="src\world_generator.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="time_of_day.cpp" />
-    <ClCompile Include="util\read_directory.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\threadpool.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\allocator.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="world_generator.cpp" />
-    <ClCompile Include="voxel_mesher.cpp" />
-    <ClCompile Include="dear_imgui.cpp" />
-    <ClCompile Include="dear_imgui\imgui_impl_glfw.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="dear_imgui\imgui_impl_opengl3.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="glad\glad.c">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="glad\glad_wgl.c">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="glfw_window.cpp" />
-    <ClCompile Include="graphics\camera.cpp" />
-    <ClCompile Include="graphics\common.cpp" />
-    <ClCompile Include="graphics\debug_graphics.cpp" />
-    <ClCompile Include="graphics\graphics.cpp" />
-    <ClCompile Include="graphics\gl.cpp" />
-    <ClCompile Include="graphics\glshader.cpp" />
-    <ClCompile Include="graphics\image.cpp" />
-    <ClCompile Include="graphics\shaders.cpp" />
-    <ClCompile Include="graphics\texture.cpp" />
-    <ClCompile Include="input.cpp" />
-    <ClCompile Include="open_simplex_noise\open_simplex_noise.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="physics.cpp" />
-    <ClCompile Include="player.cpp" />
-    <ClCompile Include="stb_image.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="game.cpp" />
-    <ClCompile Include="util\collision.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\file_io.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\random.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\string.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="util\timer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
-    <ClCompile Include="world.cpp" />
-    <ClCompile Include="svo.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="kissmath\bool2.inl" />
-    <None Include="kissmath\bool3.inl" />
-    <None Include="kissmath\bool4.inl" />
-    <None Include="kissmath\float.inl" />
-    <None Include="kissmath\float2.inl" />
-    <None Include="kissmath\float2x2.inl" />
-    <None Include="kissmath\float2x3.inl" />
-    <None Include="kissmath\float3.inl" />
-    <None Include="kissmath\float3x3.inl" />
-    <None Include="kissmath\float3x4.inl" />
-    <None Include="kissmath\float4.inl" />
-    <None Include="kissmath\float4x4.inl" />
-    <None Include="kissmath\int.inl" />
-    <None Include="kissmath\int2.inl" />
-    <None Include="kissmath\int3.inl" />
-    <None Include="kissmath\int4.inl" />
-    <None Include="kissmath\int64.inl" />
-    <None Include="kissmath\int64v2.inl" />
-    <None Include="kissmath\int64v3.inl" />
-    <None Include="kissmath\int64v4.inl" />
-    <None Include="kissmath\transform2d.inl" />
-    <None Include="kissmath\transform3d.inl" />
-    <None Include="kissmath\uint8.inl" />
-    <None Include="kissmath\uint8v2.inl" />
-    <None Include="kissmath\uint8v3.inl" />
-    <None Include="kissmath\uint8v4.inl" />
     <None Include="shaders\blocks.glsl" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
@@ -427,6 +395,32 @@
     <None Include="shaders\raytrace_svo.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
+    <None Include="src\kissmath\bool2.inl" />
+    <None Include="src\kissmath\bool3.inl" />
+    <None Include="src\kissmath\bool4.inl" />
+    <None Include="src\kissmath\float.inl" />
+    <None Include="src\kissmath\float2.inl" />
+    <None Include="src\kissmath\float2x2.inl" />
+    <None Include="src\kissmath\float2x3.inl" />
+    <None Include="src\kissmath\float3.inl" />
+    <None Include="src\kissmath\float3x3.inl" />
+    <None Include="src\kissmath\float3x4.inl" />
+    <None Include="src\kissmath\float4.inl" />
+    <None Include="src\kissmath\float4x4.inl" />
+    <None Include="src\kissmath\int.inl" />
+    <None Include="src\kissmath\int2.inl" />
+    <None Include="src\kissmath\int3.inl" />
+    <None Include="src\kissmath\int4.inl" />
+    <None Include="src\kissmath\int64.inl" />
+    <None Include="src\kissmath\int64v2.inl" />
+    <None Include="src\kissmath\int64v3.inl" />
+    <None Include="src\kissmath\int64v4.inl" />
+    <None Include="src\kissmath\transform2d.inl" />
+    <None Include="src\kissmath\transform3d.inl" />
+    <None Include="src\kissmath\uint8.inl" />
+    <None Include="src\kissmath\uint8v2.inl" />
+    <None Include="src\kissmath\uint8v3.inl" />
+    <None Include="src\kissmath\uint8v4.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

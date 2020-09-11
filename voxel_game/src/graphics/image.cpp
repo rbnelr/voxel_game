@@ -1,6 +1,6 @@
 #include "stdafx.hpp"
 #include "image.hpp"
-#include "../stb_image.hpp"
+#include "stb/stb_image.hpp"
 
 void* _stbi_load_from_memory (unsigned char* file_data, uint64_t file_size, _Format format, int2* size) {
 
