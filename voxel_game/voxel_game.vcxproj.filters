@@ -261,6 +261,7 @@
     <ClInclude Include="util\allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="serialization.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glad\glad.c">

@@ -1,31 +1,53 @@
 #pragma once
+#include "stdafx.hpp"
 #include "nlohmann/json_fwd.hpp"
+#include "nlohmann/json.hpp"
+#include "util/file_io.hpp"
+#include "kissmath.hpp"
+#include "dear_imgui.hpp"
 using nlohmann::json;
 
-static constexpr const char* settings_filepath = "settings.json";
-
-class Game;
-
-//void save_settings (Game const& game);
-//void load_settings (Game& game);
-
-#include "game.hpp"
-#include "util/file_io.hpp"
-
 template <typename T>
-void save (std::string_view filename, T const& obj) {
+bool save (char const* filename, T const& obj) {
 	json json = obj;
-	save_text_file(filename.data(), json.dump(2));
-}
-template <typename T>
-void load (std::string_view filename, T& obj) {
-	std::string str;
-	if (!load_text_file(filename.data(), &str))
-		return;
-	json json = json::parse(str);
-	obj = json.get<T>();
+	std::string json_str;
+	try {
+		json.dump(1, '\t');
+	} catch (std::exception& ex) {
+		clog(ERROR, "Error when serializing something: %s", ex.what());
+		return true;
+	}
+
+	if (!kiss::save_text_file(filename, json_str)) {
+		clog(ERROR, "Error when serializing something: Can't save file \"%s\"", filename);
+		return false;
+	}
+	return true;
 }
 
+template <typename T>
+bool load (char const* filename, T* obj) {
+	std::string str;
+	if (!kiss::load_text_file(filename, &str)) {
+		clog(WARNING, "Can't load file \"%s\", using defaults.", filename);
+		return false;
+	}
+	try {
+		json json = json::parse(str);
+		*obj = json.get<T>();
+	} catch (std::exception& ex) {
+		clog(ERROR, "Error when deserializing something: %s", ex.what());
+		return false;
+	}
+	return true;
+}
+
+template <typename T>
+T load (char const* filename) {
+	T t = default(T);
+	load(filename, &t);
+	return t;
+}
 
 #define _JSON_EXPAND( x ) x
 #define _JSON_GET_MACRO(_1,_2,_3,_4,_5,_6, _7, _8, _9, _10, _11, NAME,...) NAME
@@ -54,3 +76,16 @@ void load (std::string_view filename, T& obj) {
     void to_json(nlohmann::json& j, const Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_TO, __VA_ARGS__)) } \
     void from_json(const nlohmann::json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
 
+namespace nlohmann {
+	template <>
+	struct adl_serializer<float2> {
+		using type = float2;
+		static void to_json(json& j, const type& val) {
+			j = { val.x, val.y };
+		}
+		static void from_json(const json& j, type& val) {
+			j.at(0).get_to(val.x);
+			j.at(1).get_to(val.y);
+		}
+	};
+}

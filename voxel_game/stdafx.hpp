@@ -53,10 +53,9 @@
 #include "util/timer.hpp"
 #include "util/allocator.hpp"
 
-#include "dear_imgui.hpp"
-#include "profiling.hpp"
-
 using namespace kiss;
 using namespace kissmath;
 
-#define ARRLEN(arr) (sizeof(arr) / sizeof(arr[0]))
+#include "dear_imgui.hpp"
+#include "profiling.hpp"
+//#include "serialization.hpp" // wierd identifier not found error??

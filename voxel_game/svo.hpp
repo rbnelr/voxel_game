@@ -540,15 +540,15 @@ namespace svo {
 		// input
 		Chunk*			chunk;
 		SVO&			svo;
-		WorldGenerator&	world_gen;
+		WorldGenerator&	wg;
 		LoadOp::Type	load_type;
 
-		ChunkLoadJob (Chunk* chunk, SVO& svo, WorldGenerator& world_gen, LoadOp::Type load_type):
-			chunk{chunk}, svo{svo}, world_gen{world_gen}, load_type{load_type} {}
+		ChunkLoadJob (Chunk* chunk, SVO& svo, WorldGenerator& wg, LoadOp::Type load_type):
+			chunk{chunk}, svo{svo}, wg{wg}, load_type{load_type} {}
 		virtual ~ChunkLoadJob() = default;
 
 		virtual void execute () {
-			generate_chunk(chunk, svo, world_gen);
+			wg.generate_chunk(chunk, svo);
 		}
 		virtual void finalize ();
 	};

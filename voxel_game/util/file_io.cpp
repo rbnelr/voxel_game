@@ -33,15 +33,16 @@ namespace kiss {
 		return data;
 	}
 
-	void save_binary_file (const char* filename, void const* data, uint64_t size) {
+	bool save_binary_file (const char* filename, void const* data, uint64_t size) {
 		auto f = fopen(filename, "wb");
 		if (!f) {
-			return;
+			return false;
 		}
 
 		auto ret = fwrite(data, 1,size, f);
 
 		fclose(f);
+		return true;
 	}
 
 	// reads text file into a std::string (overwriting it's previous contents)
@@ -70,8 +71,8 @@ namespace kiss {
 	}
 
 	// saves a text file
-	void save_text_file (const char* filename, std::string_view str) {
-		save_binary_file(filename, str.data(), str.size());
+	bool save_text_file (const char* filename, std::string_view str) {
+		return save_binary_file(filename, str.data(), str.size());
 	}
 
 	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {

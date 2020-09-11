@@ -7,6 +7,7 @@
 #include "graphics/graphics.hpp"
 #include "util/running_average.hpp"
 
+#include "serialization.hpp"
 extern bool _use_potatomode;
 
 struct FPS_Display {

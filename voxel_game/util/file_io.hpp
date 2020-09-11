@@ -12,7 +12,7 @@ namespace kiss {
 
 	raw_data load_binary_file (const char* filename, uint64_t* size);
 
-	void save_binary_file (const char* filename, void const* data, uint64_t size);
+	bool save_binary_file (const char* filename, void const* data, uint64_t size);
 
 	// reads text file into a std::string (overwriting it's previous contents)
 	// returns false on fail (file not found etc.)
@@ -23,7 +23,7 @@ namespace kiss {
 	std::string load_text_file (const char* filename);
 
 	// saves a text file
-	void save_text_file (const char* filename, std::string_view str);
+	bool save_text_file (const char* filename, std::string_view str);
 
 	// out_filename is optional
 	// "hello/world.txt" => path: "hello/" out_filename: "world.txt"
