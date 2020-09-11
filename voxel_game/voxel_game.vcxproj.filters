@@ -238,6 +238,7 @@
       <Filter>open_simplex_noise</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.hpp" />
+    <ClInclude Include="src\noise.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -353,6 +354,7 @@
       <Filter>open_simplex_noise</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="src\noise.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

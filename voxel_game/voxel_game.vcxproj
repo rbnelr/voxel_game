@@ -209,6 +209,7 @@
     <ClInclude Include="src\kissmath\uint8v3.hpp" />
     <ClInclude Include="src\kissmath\uint8v4.hpp" />
     <ClInclude Include="src\kissmath_colors.hpp" />
+    <ClInclude Include="src\noise.hpp" />
     <ClInclude Include="src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="src\physics.hpp" />
     <ClInclude Include="src\player.hpp" />
@@ -314,6 +315,7 @@
     <ClCompile Include="src\graphics\texture.cpp" />
     <ClCompile Include="src\input.cpp" />
     <ClCompile Include="src\items.cpp" />
+    <ClCompile Include="src\noise.cpp" />
     <ClCompile Include="src\open_simplex_noise\open_simplex_noise.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>

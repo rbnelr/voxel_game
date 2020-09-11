@@ -5,6 +5,7 @@
 #include "svo.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
+#include "noise.hpp"
 
 namespace worldgen {
 	template<typename T>
@@ -155,10 +156,32 @@ namespace worldgen {
 			return smoothstep( smoothstep(val + valb) );
 		}
 
+
+		inline block_id gen_block (float3 pos) {
+			float noise_val = noise::perlin(pos.x / 12) * 20;
+
+			return pos.z + 0.5f <= noise_val ? B_GRASS : B_AIR;
+		}
+
 		void gen_terrain (int3 chunk_origin) {
 			ZoneScoped;
-
+			
 			float lod_scale = (float)(1u << lod);
+
+		#if 1 // noise dev test
+			int3 i;
+			for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+				for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+					for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+						float3 pos_world = ((float3)i + 0.5f) * lod_scale + (float3)chunk_origin;
+
+						blocks[i.z][i.y][i.x] = gen_block(pos_world);
+					}
+				}
+			}
+
+			return;
+		#endif
 
 			float water_level = 0; // z=0 is first air above water
 
@@ -336,8 +359,8 @@ namespace worldgen {
 
 			gen_terrain(chunk->pos);
 
-			if (lod == 0)
-				place_objects(chunk->pos);
+			//if (lod == 0)
+			//	place_objects(chunk->pos);
 
 			svo.chunk_to_octree(chunk, &blocks[0][0][0]);
 		}

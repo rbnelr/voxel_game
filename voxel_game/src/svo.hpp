@@ -15,8 +15,8 @@ struct WorldGenerator;
 struct WorldgenJob;
 
 
-static constexpr int CHUNK_SIZE = 128;
-static constexpr int CHUNK_SCALE = 7;
+static constexpr int CHUNK_SIZE = 64;
+static constexpr int CHUNK_SCALE = 6;
 
 // Calc 3d index into flattened [CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE] array because compiler sometimes does too much math
 static constexpr inline uintptr_t CHUNK_3D_INDEX (int x, int y, int z) {
@@ -367,7 +367,7 @@ namespace svo {
 		int child_idx;
 	};
 
-	inline int set_root_scale = 16;
+	inline int set_root_scale = 9;
 
 	struct OctreeReadResult {
 		TypedVoxel	vox;
