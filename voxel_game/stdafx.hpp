@@ -30,7 +30,6 @@
 
 #include "stb/stb_rect_pack.hpp"
 #include "stb/stb_image.hpp"
-#include "open_simplex_noise/open_simplex_noise.hpp"
 
 //
 #include "kissmath.hpp"

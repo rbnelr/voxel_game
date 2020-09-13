@@ -1,6 +1,6 @@
 #pragma once
 #include "stdafx.hpp"
-#include "world_generator.hpp"
+#include "worldgen.hpp"
 #include "world.hpp"
 #include "block_update.hpp"
 #include "graphics/camera.hpp"
@@ -52,7 +52,52 @@ struct FPS_Display {
 	}
 };
 
+// Hot-reloadable dll for quick iteration of worldgen
+// Recompiling this dll writes to a hot_reload.txt in the build folder, which gets detected by directory_watcher
+// We then trigger a world recreate and reload the dll dynamically
+struct DLL {
+	HMODULE h = NULL;
+
+	std::string dll_filename;
+	std::string tmp_filename;
+
+	static std::string get_exe_path () {
+		char path[1024];
+		auto len = GetModuleFileName(NULL, path, ARRLEN(path));
+
+		return std::string( kiss::get_path(std::string_view(path, len), nullptr, '\\') );
+	}
+	DLL () {
+		std::string exe_path = get_exe_path();
+
+		dll_filename = exe_path + "worldgen.dll";
+		tmp_filename = exe_path + "worldgen_tmp.dll";
+	}
+
+	void reload () {
+		if (h)
+			FreeLibrary(h);
+
+		DeleteFile(tmp_filename.c_str());
+
+		// Need to load a copy of the dll or else the compiler won't be able to overwrite the dll since we are using it
+		auto ret = CopyFile(dll_filename.c_str(), tmp_filename.c_str(), false);
+		if (ret == 0) {
+			auto err = GetLastError();
+			clog(ERROR, "Reload failed [%d]", err);
+		}
+		
+		h = LoadLibrary(tmp_filename.c_str());
+	}
+	~DLL () {
+		FreeLibrary(h);
+	}
+};
+
 class Game {
+	DirectoyChangeNotifier directory_watcher = DirectoyChangeNotifier(".", true);
+	DLL worldgen_dll = DLL();
+
 	bool dbg_pause = false;
 
 	FPS_Display fps_display;
@@ -61,7 +106,7 @@ class Game {
 	WorldGenerator world_gen;
 
 	// World gets world gen copy on create 
-	std::unique_ptr<World> world = std::make_unique<World>(world_gen);
+	std::unique_ptr<World> world;
 
 	BlockUpdate block_update;
 

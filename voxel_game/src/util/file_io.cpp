@@ -75,8 +75,8 @@ namespace kiss {
 		return save_binary_file(filename, str.data(), str.size());
 	}
 
-	std::string_view get_path (std::string_view filepath, std::string_view* out_filename) {
-		auto pos = filepath.find_last_of('/');
+	std::string_view get_path (std::string_view filepath, std::string_view* out_filename, char slash) {
+		auto pos = filepath.find_last_of(slash);
 		if (pos == std::string::npos)
 			pos = 0; // no '/' found => '/' is considered to be at position 0
 		else

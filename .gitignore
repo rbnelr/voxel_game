@@ -3,6 +3,7 @@
 imgui.ini
 *.ini
 todo.txt
+hot_reload.txt
 
 *.exe
 *.bin

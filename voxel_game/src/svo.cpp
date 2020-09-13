@@ -1,7 +1,7 @@
 #include "stdafx.hpp"
 #include "svo.hpp"
 #include "voxel_system.hpp"
-#include "world_generator.hpp"
+#include "worldgen.hpp"
 #include "player.hpp"
 #include "graphics/debug_graphics.hpp"
 
@@ -448,6 +448,9 @@ namespace svo {
 		}
 	}
 
+	void ChunkLoadJob::execute () {
+		wg.generate_chunk(chunk, svo);
+	}
 	void ChunkLoadJob::finalize () {
 		ZoneScoped;
 
@@ -456,7 +459,7 @@ namespace svo {
 		
 		switch (load_type) {
 			case LoadOp::CREATE: {
-				clog("apply CREATE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
+				//clog("apply CREATE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
 
 				assert(scale == svo.root->scale-1);
 
@@ -469,7 +472,7 @@ namespace svo {
 			} break;
 
 			case LoadOp::SPLIT: {
-				clog("apply SPLIT to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
+				//clog("apply SPLIT to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
 
 				// this chunk is done
 				chunk->flags |= LOCKED;
@@ -521,7 +524,7 @@ namespace svo {
 			} break;
 
 			case LoadOp::MERGE: {
-				clog("apply MERGE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
+				//clog("apply MERGE to %2d : %+7d,%+7d,%+7d", scale, pos.x,pos.y,pos.z);
 				
 				// delete children
 				for (int i=0; i<8; ++i) {
@@ -826,7 +829,7 @@ namespace svo {
 
 				if (i > 0 && (chunk->flags & MESH_DIRTY)) { // never mesh root
 					// queue remeshing
-					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen) );
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen.seed) );
 
 					float size = (float)(1 << chunk->scale);
 					debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, lrgba(1,0,0,1));

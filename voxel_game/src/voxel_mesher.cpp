@@ -9,7 +9,7 @@ struct ChunkRemesher {
 	Chunk* chunk;
 	svo::SVO& svo;
 	Graphics const& g;
-	WorldGenerator const& wg;
+	uint64_t world_seed;
 	std::vector<VoxelVertex>& opaque_mesh;
 	std::vector<VoxelVertex>& transparent_mesh;
 
@@ -159,7 +159,7 @@ struct ChunkRemesher {
 		auto& bti = g.tile_textures.block_tile_info[bid];
 
 		// get a 'random' but deterministic value based on block position
-		uint64_t h = hash(int3(x,y,z) + chunk->pos) ^ wg.seed;
+		uint64_t h = hash(int3(x,y,z) + chunk->pos) ^ world_seed;
 
 		// get a random determinisitc 2d offset
 		float rand_x = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
@@ -243,8 +243,8 @@ struct ChunkRemesher {
 	}
 };
 
-void remesh_chunk (Chunk* chunk, svo::SVO& svo, Graphics const& g, WorldGenerator const& wg,
+void remesh_chunk (Chunk* chunk, svo::SVO& svo, Graphics const& g, uint64_t world_seed,
 		std::vector<VoxelVertex>& opaque_mesh, std::vector<VoxelVertex>& transparent_mesh) {
 	
-	ChunkRemesher{ chunk, svo, g, wg, opaque_mesh, transparent_mesh }.remesh_chunk();
+	ChunkRemesher{ chunk, svo, g, world_seed, opaque_mesh, transparent_mesh }.remesh_chunk();
 }

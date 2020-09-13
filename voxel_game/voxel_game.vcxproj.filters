@@ -32,7 +32,6 @@
     <ClInclude Include="src\voxel_mesher.hpp" />
     <ClInclude Include="src\voxel_system.hpp" />
     <ClInclude Include="src\world.hpp" />
-    <ClInclude Include="src\world_generator.hpp" />
     <ClInclude Include="src\util\allocator.hpp">
       <Filter>util</Filter>
     </ClInclude>
@@ -234,11 +233,8 @@
     <ClInclude Include="src\audio\read_wav.hpp">
       <Filter>audio</Filter>
     </ClInclude>
-    <ClInclude Include="src\open_simplex_noise\open_simplex_noise.hpp">
-      <Filter>open_simplex_noise</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.hpp" />
-    <ClInclude Include="src\noise.hpp" />
+    <ClInclude Include="src\worldgen.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -271,7 +267,6 @@
     <ClCompile Include="src\time_of_day.cpp" />
     <ClCompile Include="src\voxel_mesher.cpp" />
     <ClCompile Include="src\world.cpp" />
-    <ClCompile Include="src\world_generator.cpp" />
     <ClCompile Include="src\util\allocator.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -350,11 +345,7 @@
     <ClCompile Include="src\audio\read_wav.cpp">
       <Filter>audio</Filter>
     </ClCompile>
-    <ClCompile Include="src\open_simplex_noise\open_simplex_noise.cpp">
-      <Filter>open_simplex_noise</Filter>
-    </ClCompile>
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="src\noise.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">
@@ -478,9 +469,6 @@
     </Filter>
     <Filter Include="glad">
       <UniqueIdentifier>{1847271f-a9df-43e4-9628-48a6e79317e5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="open_simplex_noise">
-      <UniqueIdentifier>{bcf11987-2db6-4a5f-8768-e9f29417b695}</UniqueIdentifier>
     </Filter>
     <Filter Include="dear_imgui">
       <UniqueIdentifier>{d5fe41fa-cc42-4217-b6e7-4d9d42e7bf08}</UniqueIdentifier>

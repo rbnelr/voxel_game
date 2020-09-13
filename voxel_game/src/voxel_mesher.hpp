@@ -3,7 +3,6 @@
 #include "util/allocator.hpp"
 #include "threading.hpp"
 #include "graphics/graphics.hpp"
-#include "world_generator.hpp"
 
 namespace svo {
 	struct Chunk;
@@ -23,5 +22,5 @@ struct VoxelVertex {
 	}
 };
 
-void remesh_chunk (svo::Chunk* chunk, svo::SVO& svo, Graphics const& g, WorldGenerator const& wg,
+void remesh_chunk (svo::Chunk* chunk, svo::SVO& svo, Graphics const& g, uint64_t world_seed,
 	std::vector<VoxelVertex>& opaque_mesh, std::vector<VoxelVertex>& transparent_mesh);

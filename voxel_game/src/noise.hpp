@@ -1,5 +1,4 @@
 #pragma once
-#include "stdafx.hpp"
 #include "kissmath.hpp"
 
 namespace noise {

@@ -4,6 +4,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.29613.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "voxel_game", "voxel_game\voxel_game.vcxproj", "{D216EA19-A9F5-46B3-A40A-7235E94160CF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{42B81674-C945-4579-B127-3B02E7257F29} = {42B81674-C945-4579-B127-3B02E7257F29}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "worldgen_dll", "worldgen_dll\worldgen_dll.vcxproj", "{42B81674-C945-4579-B127-3B02E7257F29}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,23 +18,30 @@ Global
 		Optimized|x86 = Optimized|x86
 		OptimizedTracy|x64 = OptimizedTracy|x64
 		OptimizedTracy|x86 = OptimizedTracy|x86
-		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Debug|x64.ActiveCfg = Debug|x64
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Debug|x64.Build.0 = Debug|x64
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Debug|x86.ActiveCfg = Debug|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x64.ActiveCfg = Release|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x64.Build.0 = Release|x64
+		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x64.ActiveCfg = Optimized|x64
+		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x64.Build.0 = Optimized|x64
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x86.ActiveCfg = OptimizedTracy|x64
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Optimized|x86.Build.0 = OptimizedTracy|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.OptimizedTracy|x64.ActiveCfg = OptimizedTracy|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.OptimizedTracy|x64.Build.0 = OptimizedTracy|x64
+		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.OptimizedTracy|x64.ActiveCfg = Optimized|x64
+		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.OptimizedTracy|x64.Build.0 = Optimized|x64
 		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.OptimizedTracy|x86.ActiveCfg = OptimizedTracy|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Release|x64.ActiveCfg = Release|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Release|x64.Build.0 = Release|x64
-		{D216EA19-A9F5-46B3-A40A-7235E94160CF}.Release|x86.ActiveCfg = Release|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.Debug|x64.ActiveCfg = Debug|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.Debug|x64.Build.0 = Debug|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.Debug|x86.ActiveCfg = Debug|Win32
+		{42B81674-C945-4579-B127-3B02E7257F29}.Debug|x86.Build.0 = Debug|Win32
+		{42B81674-C945-4579-B127-3B02E7257F29}.Optimized|x64.ActiveCfg = Optimized|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.Optimized|x64.Build.0 = Optimized|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.Optimized|x86.ActiveCfg = Optimized|Win32
+		{42B81674-C945-4579-B127-3B02E7257F29}.Optimized|x86.Build.0 = Optimized|Win32
+		{42B81674-C945-4579-B127-3B02E7257F29}.OptimizedTracy|x64.ActiveCfg = Optimized|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.OptimizedTracy|x64.Build.0 = Optimized|x64
+		{42B81674-C945-4579-B127-3B02E7257F29}.OptimizedTracy|x86.ActiveCfg = Optimized|Win32
+		{42B81674-C945-4579-B127-3B02E7257F29}.OptimizedTracy|x86.Build.0 = Optimized|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

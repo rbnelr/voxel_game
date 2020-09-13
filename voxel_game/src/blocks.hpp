@@ -1,20 +1,20 @@
 #pragma once
-#include "stdafx.hpp"
+#include "stdint.h"
 
-enum collision_mode : uint8 {
+enum collision_mode : uint8_t {
 	CM_GAS			=0, // fall/walk through
 	CM_SOLID		,   // cannot enter
 	CM_LIQUID		,   // swim in (water, etc.)
 	CM_BREAKABLE	,	// fall/walk through like gas, but breakable by interaction (breaking torches etc.)
 };
-enum transparency_mode : uint8 {
+enum transparency_mode : uint8_t {
 	TM_OPAQUE		=0, // normal blocks which are opaque						:  only opaque to non-opaque faces are rendered
 	TM_TRANSPARENT	,   // see-through blocks									:  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
 	TM_PARTIAL		,   // blocks that are see though because they have holes   :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
 	TM_BLOCK_MESH	,	// blocks with meshes									:  these blocks are rendered as meshes (torches, etc.)
 };
 
-enum tool_type : uint8 {
+enum tool_type : uint8_t {
 	NONE,
 	FISTS,
 	SWORD,
@@ -55,9 +55,9 @@ struct BlockTypes {
 	collision_mode		collision		[PSEUDO_BLOCK_IDS_COUNT]; // collision mode to determine 
 	transparency_mode	transparency	[PSEUDO_BLOCK_IDS_COUNT]; // transparency mode for meshing
 	tool_type			tool			[PSEUDO_BLOCK_IDS_COUNT]; // tool type to determine which tool should be used for mining
-	uint8				hardness		[PSEUDO_BLOCK_IDS_COUNT]; // hardness value to determine damage resistance
-	uint8				glow			[PSEUDO_BLOCK_IDS_COUNT]; // with what light level to glow with
-	uint8				absorb			[PSEUDO_BLOCK_IDS_COUNT]; // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
+	uint8_t				hardness		[PSEUDO_BLOCK_IDS_COUNT]; // hardness value to determine damage resistance
+	uint8_t				glow			[PSEUDO_BLOCK_IDS_COUNT]; // with what light level to glow with
+	uint8_t				absorb			[PSEUDO_BLOCK_IDS_COUNT]; // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
 
 	inline bool breakable (block_id id) {
 		auto& c = collision[id];
@@ -72,7 +72,7 @@ static BlockTypes load_block_types () {
 	BlockTypes bt;
 	int cur = 0;
 
-	auto block = [&] (const char* name, collision_mode cm, transparency_mode tm, tool_type tool, uint8 hard, uint8 glow, uint8 absorb) {
+	auto block = [&] (const char* name, collision_mode cm, transparency_mode tm, tool_type tool, uint8_t hard, uint8_t glow, uint8_t absorb) {
 		bt.name[cur] = name;
 		bt.collision[cur] = cm;
 		bt.transparency[cur] = tm;
@@ -85,19 +85,19 @@ static BlockTypes load_block_types () {
 	auto gas = [&] (const char* name="null") {
 		block(name, CM_GAS, TM_TRANSPARENT, NONE, 0, 0, 0);
 	};
-	auto liquid = [&] (const char* name, transparency_mode transparency=TM_TRANSPARENT, uint8 glow_level=0) {
+	auto liquid = [&] (const char* name, transparency_mode transparency=TM_TRANSPARENT, uint8_t glow_level=0) {
 		block(name, CM_LIQUID, transparency, NONE, 0, glow_level, transparency == TM_TRANSPARENT ? 3 : MAX_LIGHT_LEVEL);
 	};
-	auto solid = [&] (const char* name, uint8 hardness, tool_type tool=NONE, uint8 glow_level=0) {
+	auto solid = [&] (const char* name, uint8_t hardness, tool_type tool=NONE, uint8_t glow_level=0) {
 		block(name, CM_SOLID, TM_OPAQUE, tool, hardness, glow_level, MAX_LIGHT_LEVEL);
 	};
-	auto solid_alpha_test = [&] (const char* name, uint8 hardness, uint8 absorb_light_level=1, tool_type tool=NONE, uint8 glow_level=0) {
+	auto solid_alpha_test = [&] (const char* name, uint8_t hardness, uint8_t absorb_light_level=1, tool_type tool=NONE, uint8_t glow_level=0) {
 		block(name, CM_SOLID, TM_PARTIAL, tool, hardness, glow_level, absorb_light_level);
 	};
-	auto torch = [&] (const char* name, uint8 glow_level) {
+	auto torch = [&] (const char* name, uint8_t glow_level) {
 		block(name, CM_BREAKABLE, TM_BLOCK_MESH, NONE, 0, glow_level, 0);
 	};
-	auto plant = [&] (const char* name, uint8 absorb_light_level=1) {
+	auto plant = [&] (const char* name, uint8_t absorb_light_level=1) {
 		block(name, CM_BREAKABLE, TM_BLOCK_MESH, NONE, 0, 0, 1);
 	};
 

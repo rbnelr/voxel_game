@@ -2,34 +2,18 @@
 #include "stdafx.hpp"
 #include "blocks.hpp"
 #include "util/allocator.hpp"
-#include "world_generator.hpp"
 #include "graphics/graphics.hpp"
 #include "voxel_mesher.hpp"
+#include "worldgen_dll.hpp"
 
 #include "immintrin.h"
 
 class Voxels;
 class Player;
-struct WorldGenerator;
 
 struct WorldgenJob;
-
-
-static constexpr int CHUNK_SIZE = 64;
-static constexpr int CHUNK_SCALE = 6;
-
-// Calc 3d index into flattened [CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE] array because compiler sometimes does too much math
-static constexpr inline uintptr_t CHUNK_3D_INDEX (int x, int y, int z) {
-	 return  ((uintptr_t)z << CHUNK_SCALE*2) 
-			+((uintptr_t)y << CHUNK_SCALE  )
-			+((uintptr_t)x                 );
-}
-// i=1 -> + int3(1,0,0)  i=6 -> + int3(1,1,0) offs in 3d array etc.
-static constexpr inline uintptr_t CHUNK_3D_CHILD_OFFSET (int i) {
-	return   ((uintptr_t)((i&4) >> 2) << CHUNK_SCALE*2)
-			+((uintptr_t)((i&2) >> 1) << CHUNK_SCALE  )
-			+((uintptr_t)((i&1)     )                 );
-}
+namespace worldgen { struct WorldGenerator; }
+using worldgen::WorldGenerator;
 
 namespace svo {
 
@@ -547,9 +531,7 @@ namespace svo {
 			chunk{chunk}, svo{svo}, wg{wg}, load_type{load_type} {}
 		virtual ~ChunkLoadJob() = default;
 
-		virtual void execute () {
-			wg.generate_chunk(chunk, svo);
-		}
+		virtual void execute ();
 		virtual void finalize ();
 	};
 
@@ -558,13 +540,13 @@ namespace svo {
 		Chunk* chunk;
 		SVO& svo;
 		Graphics const& g;
-		WorldGenerator const& wg;
+		uint64_t world_seed;
 		// output
 		std::vector<VoxelVertex> opaque_mesh;
 		std::vector<VoxelVertex> transparent_mesh;
 
-		RemeshChunkJob (Chunk* chunk, SVO& svo, Graphics const& g, WorldGenerator const& wg):
-				chunk{chunk}, svo{svo}, g{g}, wg{wg} {
+		RemeshChunkJob (Chunk* chunk, SVO& svo, Graphics const& g, uint64_t world_seed):
+				chunk{chunk}, svo{svo}, g{g}, world_seed{world_seed} {
 			// reserve 16k x 3faces
 			opaque_mesh		.reserve(16 * 1024 * 3 * 6);
 			transparent_mesh.reserve(16 * 1024 * 3 * 6);
@@ -572,7 +554,7 @@ namespace svo {
 		virtual ~RemeshChunkJob() = default;
 
 		virtual void execute () {
-			remesh_chunk(chunk, svo, g, wg, opaque_mesh, transparent_mesh);
+			remesh_chunk(chunk, svo, g, world_seed, opaque_mesh, transparent_mesh);
 		}
 		virtual void finalize ();
 

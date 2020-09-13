@@ -50,6 +50,8 @@ void Game::frame () {
 	}
 
 	if (!dbg_pause) {
+		auto changed_files = directory_watcher.poll_changes();
+
 		{
 			ZoneScopedN("Imgui stuff");
 
@@ -62,12 +64,30 @@ void Game::frame () {
 			graphics.imgui(/*world->chunks*/);
 			debug_graphics->imgui();
 
-			if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
-		
-				if (ImGui::Button("Recreate")) { // TODO: not safe right now. doing this while chunks are still being generated async will crash or worse
-					world = std::make_unique<World>(world_gen);
+			bool world_open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
+
+				
+			// Reload world on button, worldgen hot-reload or intially
+			bool trigger_reload = changed_files.contains("hot_reload.txt", kiss::FILE_MODIFIED);
+
+			if (	(world_open && ImGui::Button("Recreate")) ||
+					worldgen_dll.h == NULL || trigger_reload) {
+				clog(INFO, "Recreating world%s", trigger_reload ? "" : " due to worldgen.dll recompile");
+				world = nullptr; // unload world before reloading dll, this shuts down the threadpool which might still be calling the worldgen function in the dll
+
+				// reload worldgen dll and get the function dynamically
+				worldgen_dll.reload();
+				world_gen.generate_chunk_dll = worldgen_dll.h ?
+					(worldgen::generate_chunk_dll_fp)GetProcAddress(worldgen_dll.h, "generate_chunk_dll") : nullptr;
+				if (world_gen.generate_chunk_dll == nullptr) {
+					clog(ERROR, "GetProcAddress failed");
 				}
 
+				// reload the world using the potentially new worldgen dll
+				world = std::make_unique<World>(world_gen);
+			}
+
+			if (world_open) {
 				world_gen.imgui();
 				world->imgui();
 				block_update.imgui();

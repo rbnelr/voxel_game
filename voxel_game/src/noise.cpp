@@ -1,4 +1,3 @@
-#include "stdafx.hpp"
 #include "noise.hpp"
 
 namespace noise {

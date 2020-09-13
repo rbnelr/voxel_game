@@ -3,7 +3,7 @@
 #include "voxel_system.hpp"
 #include "player.hpp"
 #include "audio/audio.hpp"
-#include "world_generator.hpp"
+#include "worldgen.hpp"
 #include "time_of_day.hpp"
 
 class World {
