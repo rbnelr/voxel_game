@@ -1,3 +1,6 @@
 [submodule "tracy"]
 	path = tracy
 	url = https://github.com/wolfpld/tracy
+[submodule "FastNoise"]
+	path = FastNoise
+	url = https://github.com/Auburn/FastNoise.git

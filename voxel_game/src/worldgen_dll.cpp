@@ -10,14 +10,26 @@ namespace worldgen {
 
 		//Random rand;
 
+		float lod_scale;
+		
 		inline block_id gen_block (float3 pos) {
-			float noise_val = noise::perlin(pos.x / 200) * 20;
+			float height = noise::vnoise((float2)pos / 13) * 20;
 
-			return pos.z + 0.5f <= noise_val ? B_GRASS : B_AIR;
+			float SDF = pos.z - height;
+			if (SDF > 0)
+				return B_AIR;
+
+			if (SDF > -lod_scale)
+				return B_GRASS;
+			if (SDF > -5)
+				return B_EARTH;
+			if (SDF > -14)
+				return B_PEBBLES;
+			return B_STONE;
 		}
 
 		void gen_terrain () {
-			float lod_scale = (float)(1u << chunk_lod);
+			lod_scale = (float)(1u << chunk_lod);
 
 			for (int z=0; z<CHUNK_SIZE; ++z) {
 				for (int y=0; y<CHUNK_SIZE; ++y) {

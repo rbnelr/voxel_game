@@ -3,6 +3,7 @@
 
 namespace noise {
 
-	float __vectorcall perlin (float x);
+	float __vectorcall vnoise (float x);
+	float __vectorcall vnoise (float2 x);
 
 }
