@@ -129,10 +129,14 @@ namespace svo {
 		Chunk (int3 pos, uint8_t scale): pos{pos}, scale{scale} {}
 
 		~Chunk () {
-			if (gl_svo_data)
+			if (gl_svo_data) {
 				glDeleteBuffers(1, &gl_svo_data);
-			if (gl_mesh)
+				gl_svo_data = 0;
+			}
+			if (gl_mesh) {
 				glDeleteBuffers(1, &gl_mesh);
+				gl_mesh = 0;
+			}
 		}
 	};
 	static constexpr auto _sz = sizeof(Chunk);

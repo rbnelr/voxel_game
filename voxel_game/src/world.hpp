@@ -22,11 +22,12 @@ public:
 		
 	}
 
-	~World () {
+	~World () { // this gets called before our members are destructed, so threads won't access freed memory from dtored svo
 		// shutdown threads so we don't crash when destructing voxels.svo.allocator
 		background_threadpool.flush();
 		parallelism_threadpool.flush();
 	}
+
 
 	void imgui () {
 		voxels.imgui();
