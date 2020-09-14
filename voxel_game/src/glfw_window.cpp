@@ -215,6 +215,7 @@ void glfw_error (int err, const char* msg) {
 
 void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
 	//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;
+	if (source == GL_DEBUG_SOURCE_APPLICATION) return;
 
 	// hiding irrelevant infos/warnings
 	switch (id) {
@@ -278,6 +279,8 @@ void glfw_init_gl () {
 	{
 		gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 	}
+
+	push_debug_names = push_debug_names && glfwExtensionSupported("GL_KHR_debug");
 
 #ifdef OPENGL_DEBUG
 	if (glfwExtensionSupported("GL_ARB_debug_output")) {

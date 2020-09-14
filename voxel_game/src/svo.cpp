@@ -593,9 +593,12 @@ namespace svo {
 		// reallocate buffer if size changed
 		if (old_size != new_size) {
 			if (new_size > 0) {
-				if (!chunk->gl_mesh)
+				if (!chunk->gl_mesh) {
 					glGenBuffers(1, &chunk->gl_mesh);
-		
+					glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+					gl_dbgname(GL_BUFFER, chunk->gl_mesh, prints("chunk %d mesh", svo.allocator.indexof(chunk)));
+				}
+
 				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
 				glBufferData(GL_ARRAY_BUFFER, new_size, nullptr, GL_DYNAMIC_DRAW);
 			}

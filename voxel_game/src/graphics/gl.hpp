@@ -5,10 +5,32 @@
 #include <vector>
 #include "assert.h"
 #include "../dear_imgui.hpp"
+#include "Tracy.hpp"
 
 /////
 // OpenGL abstractions
 ////
+
+// GL_KHR_debug usage for naming render passes / drawcalls and resources so I can acutally understand whats going on in Nsight & co.
+static inline bool push_debug_names = true;
+
+static inline void gl_dbgname (GLenum type, GLuint id, std::string_view name) {
+	if (push_debug_names)
+		glObjectLabel(type, id, (GLsizei)name.size(), name.data());
+}
+
+template <typename FUNC>
+struct _Scoped {
+	FUNC f;
+	_Scoped (FUNC f): f{f} {}
+	~_Scoped() { f(); }
+};
+#define GPU_SCOPE(name)	\
+	TracyGpuZone(name); \
+	if (push_debug_names)	glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name); \
+	auto __scoped_##__COUNTER__ = _Scoped([] () { \
+		if (push_debug_names)	glPopDebugGroup(); \
+	});
 
 //// GL specific stuff, don't use in user code
 namespace gl {

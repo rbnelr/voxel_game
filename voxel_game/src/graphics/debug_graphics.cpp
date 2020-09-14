@@ -94,7 +94,7 @@ void DebugGraphics::push_wire_frustrum (Camera_View const& view, lrgba col) {
 }
 
 void DebugGraphics::draw () {
-	TracyGpuZone("gpu DebugGraphics::draw");
+	GPU_SCOPE("gpu DebugGraphics::draw");
 
 	if (shader) {
 		shader.bind();

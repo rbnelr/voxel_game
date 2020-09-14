@@ -656,7 +656,7 @@ void TileTextures::load_block_meshes () {
 
 void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextures const& tile_textures, Sampler const& sampler) {
 	ZoneScoped;
-	TracyGpuZone("gpu draw_chunks");
+	GPU_SCOPE("gpu draw_chunks");
 	
 	if (shader) {
 		shader.bind();
@@ -679,7 +679,7 @@ void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextu
 			//	throw new std::runtime_error("blah");
 
 			if (chunk->opaque_vertex_count > 0) {
-				TracyGpuZone("gpu draw_chunk");
+				GPU_SCOPE("gpu draw_chunk");
 	
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
 				
@@ -699,7 +699,7 @@ void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextu
 }
 void VoxelGraphics::draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler) {
 	ZoneScoped;
-	TracyGpuZone("gpu draw_chunks_transparent");
+	GPU_SCOPE("gpu draw_chunks_transparent");
 
 	if (shader) {
 		shader.bind();
@@ -716,7 +716,7 @@ void VoxelGraphics::draw_transparent (Voxels& voxels, TileTextures const& tile_t
 		// Draw all transparent meshes
 		for (Chunk* chunk : voxels.svo.chunks) {
 			if (chunk->gl_mesh && chunk->transparent_vertex_count > 0) {
-				TracyGpuZone("gpu draw_chunk_transparent");
+				GPU_SCOPE("gpu draw_chunk_transparent");
 
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
 
@@ -753,13 +753,13 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	ZoneScopedN("Graphics::draw");
 	ZoneValue(frame_counter);
 
-	TracyGpuZone("Graphics::draw");
+	GPU_SCOPE("Graphics::draw");
 	
 	uint8 sky_light_reduce;
 	
 	{
 		ZoneScopedN("gpu setup");
-		TracyGpuZone("gpu setup");
+		GPU_SCOPE("gpu setup");
 
 		world.time_of_day.calc_sky_colors(&sky_light_reduce);
 
@@ -822,7 +822,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	{
-		TracyGpuZone("gpu viewport and clear");
+		GPU_SCOPE("gpu viewport and clear");
 
 		glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
 		glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
@@ -835,7 +835,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Opaque pass
 		ZoneScopedN("gpu Opaque pass");
-		TracyGpuZone("gpu Opaque pass");
+		GPU_SCOPE("gpu Opaque pass");
 
 		if (!raytracer.raytracer_draw || raytracer.overlay) {
 			voxel_graphics.draw(world.voxels, debug_frustrum_culling, tile_textures, sampler);
@@ -848,7 +848,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	{ //// Transparent pass
 		ZoneScopedN("gpu Transparent pass");
-		TracyGpuZone("gpu Transparent pass");
+		GPU_SCOPE("gpu Transparent pass");
 
 		if (activate_flycam || world.player.third_person)
 			player.draw(world.player, tile_textures, sampler);
@@ -869,7 +869,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 
 	if (raytracer.raytracer_draw) {
 		ZoneScopedN("gpu raytracer pass");
-		TracyGpuZone("gpu raytracer pass");
+		GPU_SCOPE("gpu raytracer pass");
 
 		raytracer.draw(world.voxels.svo, view, *this, world.time_of_day);
 	}
@@ -877,7 +877,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	debug_graphics->draw();
 
 	{ //// First person overlay pass
-		TracyGpuZone("gpu First Person pass");
+		GPU_SCOPE("gpu First Person pass");
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -895,7 +895,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	common_uniforms.set_debug_uniforms();
 
 	{ //// Overlay pass
-		TracyGpuZone("gpu Overlay pass");
+		GPU_SCOPE("gpu Overlay pass");
 
 		glDisable(GL_DEPTH_TEST);
 		glDepthMask(GL_FALSE);
