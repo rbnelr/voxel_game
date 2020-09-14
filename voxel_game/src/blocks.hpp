@@ -39,6 +39,12 @@ enum block_id : uint16_t {
 	B_TORCH				,
 	B_TALLGRASS			,
 
+	B_ICE1				,
+	B_DUST1				,
+	B_SHRUBS1			,
+	B_GREEN1			,
+	B_HOT_ROCK			,
+
 	BLOCK_IDS_COUNT		,
 
 	B_NO_CHUNK			=BLOCK_IDS_COUNT,
@@ -113,6 +119,12 @@ static BlockTypes load_block_types () {
 	/* B_LEAVES				*/ solid_alpha_test("leaves",    1, 2);
 	/* B_TORCH				*/ torch(			"torch", MAX_LIGHT_LEVEL - 1);
 	/* B_TALLGRASS			*/ plant(			"tallgrass");
+
+	/* B_ICE1				*/ solid(			"ice1"		,   20, PICKAXE);
+	/* B_DUST1				*/ solid(			"dust1"		,   20, PICKAXE);
+	/* B_SHRUBS1			*/ solid(			"shrubs1"	,   20, PICKAXE);
+	/* B_GREEN1				*/ solid(			"green1"	,   20, PICKAXE);
+	/* B_HOT_ROCK			*/ solid(			"hot_rock"	,   20, PICKAXE);
 
 	return bt;
 }

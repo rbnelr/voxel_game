@@ -61,6 +61,14 @@ struct ChunkRemesher {
 			float2(0, 1),
 			float2(1, 1),
 		};
+		static constexpr float3 NORMALS[6] {
+			float3(-1, 0, 0),
+			float3(+1, 0, 0),
+			float3(0, -1, 0),
+			float3(0, +1, 0),
+			float3(0, 0, -1),
+			float3(0, 0, +1),
+		};
 
 		int out = (int)buf.size();
 		buf.resize(out + 6);
@@ -80,6 +88,7 @@ struct ChunkRemesher {
 			vertices[i].pos_model.y = FACES[face][i].y * size + posy;
 			vertices[i].pos_model.z = FACES[face][i].z * size + posz;
 			vertices[i].uv = UVS[i] * size;
+			vertices[i].normal = NORMALS[face];
 			vertices[i].tex_indx = tex_indx;
 		}
 

@@ -223,18 +223,11 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\voxel_game\src\noise.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='OptimizedTracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Optimized|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Optimized|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="..\FastNoise\FastNoise.cpp" />
     <ClCompile Include="..\voxel_game\src\worldgen_dll.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\voxel_game\src\noise.hpp" />
+    <ClInclude Include="..\FastNoise\FastNoise.h" />
     <ClInclude Include="..\voxel_game\src\worldgen_dll.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,28 +1,62 @@
 #include "worldgen_dll.hpp"
-#include "noise.hpp"
+#include "../FastNoise/FastNoise.h"
+
+#define ARRLEN(arr) (sizeof(arr) / sizeof(arr[0]))
 
 namespace worldgen {
 	struct ChunkGenerator {
 		block_id* blocks;
 		int3 chunk_pos;
 		int chunk_lod;
-		uint64_t chunk_seed;
+		uint64_t world_seed;
 
 		//Random rand;
 
 		float lod_scale;
 		
-		inline block_id gen_block (float3 pos) {
-			float height = noise::vnoise((float2)pos / 13) * 20;
+		FastNoise noise;
+		FastNoise noise2;
 
-			float SDF = pos.z - height;
+		ChunkGenerator (block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t world_seed):
+				blocks{blocks}, chunk_pos{chunk_pos}, chunk_lod{chunk_lod}, world_seed{world_seed},
+				noise{(int)world_seed}, noise2{(int)world_seed+1} {
+
+		}
+
+		inline block_id gen_block (float3 pos) {
+			noise.SetFrequency(1.0f / 500);
+			float warp = noise.GetSimplex(pos.x, pos.y, pos.z) * 200;
+
+			noise2.SetFrequency(1.0f / 500);
+			noise2.SetCellularReturnType(FastNoise::CellularReturnType::Distance);
+			float SDF = -(noise2.GetCellular(pos.x + warp, pos.y, pos.z/10) - 0.3f) * 200;
+
+			noise2.SetFrequency(1.0f / 500);
+			noise2.SetCellularReturnType(FastNoise::CellularReturnType::Distance);
+			float SDF2 = -(noise2.GetCellular(pos.x + warp, pos.y, pos.z) - 0.3f) * 200;
+
+			noise.SetFrequency(1.0f / 30);
+			float jitter = noise.GetSimplexFractal(pos.x, pos.y, pos.z);
+
+			SDF = lerp(SDF, SDF2, 0.5f) + jitter * 2;
+
+			noise2.SetCellularReturnType(FastNoise::CellularReturnType::CellValue);
+			float cell = noise2.GetCellular(pos.x + warp, pos.y, pos.z);
+
+			block_id biome_blocks[] = {
+				B_ICE1, B_DUST1, B_GREEN1, B_SHRUBS1, B_SAND, B_HOT_ROCK,
+			};
+
+			int biome = roundi(cell * (float)ARRLEN(biome_blocks));
+
+			//float SDF = pos.z - height;
 			if (SDF > 0)
 				return B_AIR;
 
-			if (SDF > -lod_scale)
-				return B_GRASS;
+			//if (SDF > -lod_scale)
+			//	return B_GRASS;
 			if (SDF > -5)
-				return B_EARTH;
+				return biome_blocks[clamp(biome, 0, ARRLEN(biome_blocks)-1)];
 			if (SDF > -14)
 				return B_PEBBLES;
 			return B_STONE;
@@ -30,6 +64,8 @@ namespace worldgen {
 
 		void gen_terrain () {
 			lod_scale = (float)(1u << chunk_lod);
+
+			//auto chunk_seed = seed ^ hash(chunk->pos);
 
 			for (int z=0; z<CHUNK_SIZE; ++z) {
 				for (int y=0; y<CHUNK_SIZE; ++y) {
@@ -47,10 +83,10 @@ namespace worldgen {
 }
 
 extern "C" {
-	__declspec(dllexport) void generate_chunk_dll (block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t chunk_seed) {
+	__declspec(dllexport) void generate_chunk_dll (block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t world_seed) {
 		using namespace worldgen;
 
-		ChunkGenerator gen{blocks, chunk_pos, chunk_lod, chunk_seed};
+		ChunkGenerator gen{blocks, chunk_pos, chunk_lod, world_seed};
 		gen.gen_terrain();
 	}
 }

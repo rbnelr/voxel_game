@@ -43,11 +43,8 @@ namespace worldgen {
 				blocks = (block_id*)calloc(1, sizeof(block_id) * CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE);
 			}
 
-			auto chunk_seed = seed ^ hash(chunk->pos);
-			//auto rand = Random(chunk_seed);
-
 			if (generate_chunk_dll)
-				generate_chunk_dll(blocks, chunk->pos, chunk->scale - CHUNK_SCALE, chunk_seed);
+				generate_chunk_dll(blocks, chunk->pos, chunk->scale - CHUNK_SCALE, seed);
 
 			svo.chunk_to_octree(chunk, blocks);
 
