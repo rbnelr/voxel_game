@@ -10,71 +10,14 @@ struct ChunkRemesher {
 	svo::SVO& svo;
 	Graphics const& g;
 	uint64_t world_seed;
-	std::vector<VoxelVertex>& opaque_mesh;
-	std::vector<VoxelVertex>& transparent_mesh;
+	std::vector<VoxelInstance>& opaque_mesh;
+	std::vector<VoxelInstance>& transparent_mesh;
 
-	void push_face (std::vector<VoxelVertex>& buf, float size, int face, block_id bid, float posx, float posy, float posz) {
-		static constexpr int FACE_INDICES[6] {
-			1,3,0, 0,3,2
-		};
-		static constexpr float3 FACES[6][4] {
-			{ // X- face
-				float3(0,1,0),
-				float3(0,0,0),
-				float3(0,1,1),
-				float3(0,0,1),
-			},
-			{ // X+ face
-				float3(1,0,0),
-				float3(1,1,0),
-				float3(1,0,1),
-				float3(1,1,1),
-			},
-			{ // Y- face
-				float3(0,0,0),
-				float3(1,0,0),
-				float3(0,0,1),
-				float3(1,0,1),
-			},
-			{ // Y+ face
-				float3(1,1,0),
-				float3(0,1,0),
-				float3(1,1,1),
-				float3(0,1,1),
-			},
-			{ // Z- face
-				float3(0,1,0),
-				float3(1,1,0),
-				float3(0,0,0),
-				float3(1,0,0),
-			},
-			{ // Z+ face
-				float3(0,0,1),
-				float3(1,0,1),
-				float3(0,1,1),
-				float3(1,1,1),
-			},
-		};
-		static constexpr float2 UVS[4] {
-			float2(0, 0),
-			float2(1, 0),
-			float2(0, 1),
-			float2(1, 1),
-		};
-		static constexpr float3 NORMALS[6] {
-			float3(-1, 0, 0),
-			float3(+1, 0, 0),
-			float3(0, -1, 0),
-			float3(0, +1, 0),
-			float3(0, 0, -1),
-			float3(0, 0, +1),
-		};
+	int chunk_lod;
 
-		int out = (int)buf.size();
-		buf.resize(out + 6);
-
+	int calc_tex_index (block_id bid, int face) {
 		auto& bti = g.tile_textures.block_tile_info[bid];
-		
+
 		int tex_indx = bti.base_index;
 		switch (face) {
 			case 4:	tex_indx += bti.bottom;		break;
@@ -82,19 +25,22 @@ struct ChunkRemesher {
 			default: break;
 		}
 
-		VoxelVertex vertices[4];
-		for (int i=0; i<4; ++i) {
-			vertices[i].pos_model.x = FACES[face][i].x * size + posx;
-			vertices[i].pos_model.y = FACES[face][i].y * size + posy;
-			vertices[i].pos_model.z = FACES[face][i].z * size + posz;
-			vertices[i].uv = UVS[i] * size;
-			vertices[i].normal = NORMALS[face];
-			vertices[i].tex_indx = tex_indx;
-		}
+		return tex_indx;
+	}
 
-		for (int i=0; i<6; ++i) {
-			buf[out++] = vertices[ FACE_INDICES[i] ];
-		}
+	VoxelInstance* push_vertex (std::vector<VoxelInstance>& buf) {
+		size_t out = buf.size();
+		buf.emplace_back();
+		return &buf[out];
+	}
+
+	__forceinline void push_face (std::vector<VoxelInstance>& buf, int scale, int face, block_id bid, int posx, int posy, int posz) {
+		auto* v = push_vertex(buf);
+		v->posx = (int8_t)posx;
+		v->posy = (int8_t)posy;
+		v->posz = (int8_t)posz;
+		v->scale_face = (scale << 4) | face;
+		v->tex_indx = calc_tex_index(bid, face);
 	}
 
 	// should we render the face of block a facing to block b
@@ -117,23 +63,18 @@ struct ChunkRemesher {
 
 		int size = 1 << scale;
 
-		float posfx = (float)posx;
-		float posfy = (float)posy;
-		float posfz = (float)posz;
-		float sizef = (float)size;
-
-		int abs_posx = posx + chunk->pos.x;
-		int abs_posy = posy + chunk->pos.y;
-		int abs_posz = posz + chunk->pos.z;
-
 		auto tm = blocks.transparency[bid];
 
 		for (int face=0; face<6; ++face) {
-			int nb_posx = abs_posx + FACES[face].x * size;
-			int nb_posy = abs_posy + FACES[face].y * size;
-			int nb_posz = abs_posz + FACES[face].z * size;
+			int nb_posx = posx + FACES[face].x * size;
+			int nb_posy = posy + FACES[face].y * size;
+			int nb_posz = posz + FACES[face].z * size;
 			
-			auto nb = svo.octree_read(nb_posx, nb_posy, nb_posz, scale);
+			int abs_nb_posx = nb_posx + chunk->pos.x;
+			int abs_nb_posy = nb_posy + chunk->pos.y;
+			int abs_nb_posz = nb_posz + chunk->pos.z;
+
+			auto nb = svo.octree_read(abs_nb_posx, abs_nb_posy, abs_nb_posz, scale); // account for scales being relative to chunk
 			auto nb_bid = (block_id)nb.vox.value;
 
 			if (nb.size >= size) {
@@ -145,67 +86,65 @@ struct ChunkRemesher {
 				// only if neighbour is a voxel of same size or large (ie. not subdivided futher) because we would have to recurse further to generate the correct faces
 				if (should_render_face(bid, nb_bid, tm, nb_tm)) {
 					push_face(	tm == TM_TRANSPARENT ? transparent_mesh : opaque_mesh,
-						sizef, face, bid, posfx, posfy, posfz);
+						scale -chunk_lod, face, bid, posx >> chunk_lod, posy >> chunk_lod, posz >> chunk_lod);
 				}
 
 				// generate face of neighbour for it
 				// if it is larger than us (ie. it did not want to recurse further to find us as it's neightbour) like described above
 				if (nb.size > size && should_render_face(nb_bid, bid, nb_tm, tm)) {
-					float nb_posfx = posfx + FACESf[face].x * sizef;
-					float nb_posfy = posfy + FACESf[face].y * sizef;
-					float nb_posfz = posfz + FACESf[face].z * sizef;
-
 					// ^1 flips the -X face to +X and the inverse, since we need to generate the face the other way around
 					push_face(	nb_tm == TM_TRANSPARENT ? transparent_mesh : opaque_mesh,
-						sizef, face ^ 1, nb_bid,  nb_posfx, nb_posfy, nb_posfz); 
+						scale -chunk_lod, face ^ 1, nb_bid,  nb_posx >> chunk_lod, nb_posy >> chunk_lod, nb_posz >> chunk_lod); 
 				}
 			}
 		}
 	}
 
 	void block_mesh (int x, int y, int z, int scale, block_id bid) {
-		auto& bmi = g.tile_textures.block_meshes_info[bid];
-		auto& bti = g.tile_textures.block_tile_info[bid];
-
-		// get a 'random' but deterministic value based on block position
-		uint64_t h = hash(int3(x,y,z) + chunk->pos) ^ world_seed;
-
-		// get a random determinisitc 2d offset
-		float rand_x = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		float rand_y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-
-		// get a random deterministic variant
-		int tex_indx = bti.base_index;
-		tex_indx += bti.variants > 1 ? (int)(rand_x * (float)bti.variants) : 0; // [0, tile.variants)
-
-
-		int out = (int)opaque_mesh.size();
-		opaque_mesh.resize(out + bmi.size);
-
-		for (int i=0; i<bmi.size; ++i) {
-			auto& v = g.tile_textures.block_meshes[bmi.offset + i];
-
-			opaque_mesh[out].pos_model.x = v.pos_model.x + (float)x + 0.5f + (rand_x * 2 - 1) * 0.25f;
-			opaque_mesh[out].pos_model.y = v.pos_model.y + (float)y + 0.5f + (rand_y * 2 - 1) * 0.25f;
-			opaque_mesh[out].pos_model.z = v.pos_model.z + (float)z + 0.5f;
-
-			opaque_mesh[out].uv.x = v.uv.x * bti.uv_size.x + bti.uv_pos.x;
-			opaque_mesh[out].uv.y = v.uv.y * bti.uv_size.y + bti.uv_pos.y;
-
-			opaque_mesh[out].tex_indx = tex_indx;
-
-			out++;
-		}
-
+		//auto& bmi = g.tile_textures.block_meshes_info[bid];
+		//auto& bti = g.tile_textures.block_tile_info[bid];
+		//
+		//// get a 'random' but deterministic value based on block position
+		//uint64_t h = hash(int3(x,y,z) + chunk->pos) ^ wg.seed;
+		//
+		//// get a random determinisitc 2d offset
+		//float rand_x = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		//float rand_y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		//
+		//// get a random deterministic variant
+		//int tex_indx = bti.base_index;
+		//tex_indx += bti.variants > 1 ? (int)(rand_x * (float)bti.variants) : 0; // [0, tile.variants)
+		//
+		//
+		//int out = (int)opaque_mesh.size();
+		//opaque_mesh.resize(out + bmi.size);
+		//
+		//for (int i=0; i<bmi.size; ++i) {
+		//	auto& v = g.tile_textures.block_meshes[bmi.offset + i];
+		//
+		//	opaque_mesh[out].pos_model.x = v.pos_model.x + (float)x + 0.5f + (rand_x * 2 - 1) * 0.25f;
+		//	opaque_mesh[out].pos_model.y = v.pos_model.y + (float)y + 0.5f + (rand_y * 2 - 1) * 0.25f;
+		//	opaque_mesh[out].pos_model.z = v.pos_model.z + (float)z + 0.5f;
+		//
+		//	opaque_mesh[out].uv.x = v.uv.x * bti.uv_size.x + bti.uv_pos.x;
+		//	opaque_mesh[out].uv.y = v.uv.y * bti.uv_size.y + bti.uv_pos.y;
+		//
+		//	opaque_mesh[out].tex_indx = tex_indx;
+		//
+		//	out++;
+		//}
+	
 	}
 
 	void remesh_chunk () {
 		ZoneScoped;
 
-		StackNode stack[MAX_DEPTH];
-		stack[chunk->scale-1] = { &chunk->nodes[0], 0, 0 };
+		chunk_lod = chunk->scale - CHUNK_SCALE;
 
 		int scale = chunk->scale-1;
+
+		StackNode stack[MAX_DEPTH];
+		stack[scale] = { &chunk->nodes[0], 0, 0 };
 
 		while (scale < chunk->scale) {
 			assert(scale >= 0);
@@ -239,21 +178,25 @@ struct ChunkRemesher {
 					block_id bid = (block_id)vox.value;
 					auto tb = blocks.transparency[bid];
 
-					if (tb != TM_BLOCK_MESH) {
+					//if (tb != TM_BLOCK_MESH) {
 						block(child_x, child_y, child_z, scale, bid);
-					} else {
-						block_mesh(child_x, child_y, child_z, scale, bid);
-					}
+					//} else {
+					//	block_mesh(child_x, child_y, child_z, scale, bid);
+					//}
 				}
 			}
 
 			stack[scale].child_idx++;
 		}
+
+		ZoneValue((int)opaque_mesh.size());
+		ZoneValue((int)transparent_mesh.size());
 	}
 };
 
 void remesh_chunk (Chunk* chunk, svo::SVO& svo, Graphics const& g, uint64_t world_seed,
-		std::vector<VoxelVertex>& opaque_mesh, std::vector<VoxelVertex>& transparent_mesh) {
+		std::vector<VoxelInstance>& opaque_mesh,
+		std::vector<VoxelInstance>& transparent_mesh) {
 	
 	ChunkRemesher{ chunk, svo, g, world_seed, opaque_mesh, transparent_mesh }.remesh_chunk();
 }

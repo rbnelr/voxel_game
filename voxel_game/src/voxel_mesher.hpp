@@ -10,19 +10,19 @@ namespace svo {
 }
 
 struct VoxelVertex {
-	float3		pos_model;
-	float2		uv;
+	float3		pos;
 	float3		normal;
-	int			tex_indx;
+	float2		uv;
+};
 
-	static void bind (Attributes& a) {
-		int cur = 0;
-		a.add<decltype(pos_model  )>(cur++, "pos_model" ,  sizeof(VoxelVertex), offsetof(VoxelVertex, pos_model  ));
-		a.add<decltype(uv         )>(cur++, "uv",          sizeof(VoxelVertex), offsetof(VoxelVertex, uv         ));
-		a.add<decltype(normal     )>(cur++, "normal",      sizeof(VoxelVertex), offsetof(VoxelVertex, normal     ));
-		a.add<decltype(tex_indx   )>(cur++, "tex_indx",    sizeof(VoxelVertex), offsetof(VoxelVertex, tex_indx   ));
-	}
+struct VoxelInstance {
+	int8_t		posx;
+	int8_t		posy;
+	int8_t		posz;
+	uint8_t		scale_face; // [4bit scale][4bit face_id]
+	int			tex_indx;
 };
 
 void remesh_chunk (svo::Chunk* chunk, svo::SVO& svo, Graphics const& g, uint64_t world_seed,
-	std::vector<VoxelVertex>& opaque_mesh, std::vector<VoxelVertex>& transparent_mesh);
+	std::vector<VoxelInstance>& opaque_mesh,
+	std::vector<VoxelInstance>& transparent_mesh);

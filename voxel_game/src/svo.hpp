@@ -122,7 +122,7 @@ namespace svo {
 		uint32_t transparent_vertex_count = 0;
 
 		GLuint gl_svo_data = 0;
-		GLuint gl_mesh = 0;
+		GLuint gl_mesh = 0; // SSBO
 
 		GLuint64EXT gl_svo_data_ptr = 0;
 		
@@ -355,7 +355,7 @@ namespace svo {
 		int child_idx;
 	};
 
-	inline int set_root_scale = 9;
+	inline int set_root_scale = 16;
 
 	struct OctreeReadResult {
 		TypedVoxel	vox;
@@ -377,8 +377,8 @@ namespace svo {
 
 		Allocator				allocator;
 
-		float load_lod_start = 0.0f;
-		float load_lod_unit = 64.0f;
+		float load_lod_start = 200.0f;
+		float load_lod_unit = 300.0f;
 
 		// artifically limit both the size of the async queue and how many results to take from the results
 		int cap_chunk_load = 64;
@@ -437,7 +437,7 @@ namespace svo {
 				active_nodes += chunk->alloc_ptr;
 				commit_bytes += chunk->commit_ptr;
 				mesh_vertices += chunk->opaque_vertex_count + chunk->transparent_vertex_count;
-				mesh_bytes += (chunk->opaque_vertex_count + chunk->transparent_vertex_count) * sizeof(VoxelVertex);
+				mesh_bytes += (chunk->opaque_vertex_count + chunk->transparent_vertex_count) * sizeof(VoxelInstance);
 			}
 
 			uintptr_t active_bytes = active_nodes * sizeof(Node);
@@ -546,14 +546,13 @@ namespace svo {
 		Graphics const& g;
 		uint64_t world_seed;
 		// output
-		std::vector<VoxelVertex> opaque_mesh;
-		std::vector<VoxelVertex> transparent_mesh;
+		std::vector<VoxelInstance> opaque_mesh;
+		std::vector<VoxelInstance> transparent_mesh;
 
 		RemeshChunkJob (Chunk* chunk, SVO& svo, Graphics const& g, uint64_t world_seed):
 				chunk{chunk}, svo{svo}, g{g}, world_seed{world_seed} {
-			// reserve 16k x 3faces
-			opaque_mesh		.reserve(16 * 1024 * 3 * 6);
-			transparent_mesh.reserve(16 * 1024 * 3 * 6);
+			opaque_mesh		.reserve(6 * CHUNK_SIZE*CHUNK_SIZE);
+			transparent_mesh.reserve(6 * CHUNK_SIZE*CHUNK_SIZE);
 		}
 		virtual ~RemeshChunkJob() = default;
 
