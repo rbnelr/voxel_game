@@ -592,20 +592,20 @@ namespace svo {
 			if (new_size > 0) {
 				glGenBuffers(1, &chunk->gl_mesh);
 		
-				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
-				glBufferData(GL_ARRAY_BUFFER, new_size, nullptr, GL_DYNAMIC_DRAW);
+				glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_mesh);
+				glBufferData(GL_SHADER_STORAGE_BUFFER, new_size, nullptr, GL_DYNAMIC_DRAW);
 			}
 		
 			chunk->opaque_vertex_count = (uint32_t)opaque_mesh.size();
 			chunk->transparent_vertex_count = (uint32_t)transparent_mesh.size();
 		} else {
-			glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk->gl_mesh);
 		}
 		
 		if (opaque_mesh.size() > 0)
-			glBufferSubData(GL_ARRAY_BUFFER, 0										 , opaque_mesh.size()      * sizeof(VoxelVertex), opaque_mesh.data());
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0										    , opaque_mesh.size()      * sizeof(VoxelInstance), opaque_mesh.data());
 		if (transparent_mesh.size() > 0)
-			glBufferSubData(GL_ARRAY_BUFFER, opaque_mesh.size() * sizeof(VoxelVertex), transparent_mesh.size() * sizeof(VoxelVertex), transparent_mesh.data());
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, opaque_mesh.size() * sizeof(VoxelInstance), transparent_mesh.size() * sizeof(VoxelInstance), transparent_mesh.data());
 		
 		//glBindBuffer(GL_VERTEX_ARRAY, 0);
 	}

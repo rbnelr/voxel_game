@@ -657,7 +657,9 @@ void TileTextures::load_block_meshes () {
 void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextures const& tile_textures, Sampler const& sampler) {
 	ZoneScoped;
 	TracyGpuZone("gpu draw_chunks");
-	
+
+	glBindVertexArray(vao);
+
 	if (shader) {
 		shader.bind();
 
@@ -682,14 +684,12 @@ void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextu
 				TracyGpuZone("gpu draw_chunk");
 	
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
+				shader.set_uniform("chunk_lod_size", (float)(1 << (chunk->scale - CHUNK_SCALE)));
 				
 				assert(chunk->gl_mesh != 0);
-				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, chunk->gl_mesh);
 
-				Attributes a;
-				VoxelVertex::bind(a);
-
-				glDrawArrays(GL_TRIANGLES, 0, chunk->opaque_vertex_count);
+				glDrawArrays(GL_TRIANGLES, 0, chunk->opaque_vertex_count * 6);
 
 			}
 		}
@@ -700,36 +700,37 @@ void VoxelGraphics::draw (Voxels& voxels, bool debug_frustrum_culling, TileTextu
 void VoxelGraphics::draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler) {
 	ZoneScoped;
 	TracyGpuZone("gpu draw_chunks_transparent");
-
+	
 	if (shader) {
 		shader.bind();
-
+	
 		glBindVertexArray(vao);
-
+	
 		glActiveTexture(GL_TEXTURE0 + 0);
 		tile_textures.tile_textures.bind();
 		shader.set_texture_unit("tile_textures", 0);
 		sampler.bind(0);
-
+	
 		shader.set_uniform("alpha_test", false);
-
+	
 		// Draw all transparent meshes
 		for (Chunk* chunk : voxels.svo.chunks) {
 			if (chunk->gl_mesh && chunk->transparent_vertex_count > 0) {
 				TracyGpuZone("gpu draw_chunk_transparent");
 
 				shader.set_uniform("chunk_pos", (float3)chunk->pos);
-
+				shader.set_uniform("chunk_lod_size", (float)(1 << (chunk->scale - CHUNK_SCALE)));
+	
 				assert(chunk->gl_mesh != 0);
 				glBindBuffer(GL_ARRAY_BUFFER, chunk->gl_mesh);
 
-				Attributes a;
-				VoxelVertex::bind(a);
+				assert(chunk->gl_mesh != 0);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, chunk->gl_mesh);
 
-				glDrawArrays(GL_TRIANGLES, chunk->opaque_vertex_count, chunk->transparent_vertex_count);
+				glDrawArrays(GL_TRIANGLES, chunk->opaque_vertex_count * 6, chunk->transparent_vertex_count * 6);
 			}
 		}
-
+	
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 }

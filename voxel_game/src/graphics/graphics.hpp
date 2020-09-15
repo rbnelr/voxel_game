@@ -396,9 +396,10 @@ class Voxels;
 
 struct VoxelGraphics {
 
-	Shader shader = Shader("blocks", { FOG_UNIFORMS });
-
+	// empty vao because I don't use vertex arrays here
 	gl::Vao vao;
+	
+	Shader shader = Shader("blocks", { FOG_UNIFORMS });
 
 	void draw (Voxels& voxels, bool debug_frustrum_culling, TileTextures const& tile_textures, Sampler const& sampler);
 	void draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler);
