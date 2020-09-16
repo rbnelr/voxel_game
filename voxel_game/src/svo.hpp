@@ -355,7 +355,7 @@ namespace svo {
 		int child_idx;
 	};
 
-	inline int set_root_scale = 16;
+	inline int set_root_scale = 12;
 
 	struct OctreeReadResult {
 		TypedVoxel	vox;
@@ -377,8 +377,8 @@ namespace svo {
 
 		Allocator				allocator;
 
-		float load_lod_start = 200.0f;
-		float load_lod_unit = 300.0f;
+		float load_lod_start = 100.0f;
+		float load_lod_unit = 200.0f;
 
 		// artifically limit both the size of the async queue and how many results to take from the results
 		int cap_chunk_load = 64;
