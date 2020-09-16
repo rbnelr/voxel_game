@@ -58,8 +58,7 @@ struct FPS_Display {
 struct DLL {
 	HMODULE h = NULL;
 
-	std::string dll_filename;
-	std::string tmp_filename;
+	std::string dll_filename, pdb_filename, tmp_filename, tmp_pdb_filename;
 
 	static std::string get_exe_path () {
 		char path[1024];
@@ -70,8 +69,10 @@ struct DLL {
 	DLL () {
 		std::string exe_path = get_exe_path();
 
-		dll_filename = exe_path + "worldgen.dll";
-		tmp_filename = exe_path + "worldgen_tmp.dll";
+		dll_filename	 = exe_path + "worldgen.dll";
+		tmp_filename	 = exe_path + "worldgen_tmp.dll";
+		pdb_filename	 = exe_path + "worldgen.pdb";
+		tmp_pdb_filename = exe_path + "worldgen_tmp.pdb";
 	}
 
 	void reload () {
@@ -86,6 +87,8 @@ struct DLL {
 			auto err = GetLastError();
 			clog(ERROR, "Reload failed [%d]", err);
 		}
+
+		CopyFile(pdb_filename.c_str(), tmp_pdb_filename.c_str(), false);
 		
 		h = LoadLibrary(tmp_filename.c_str());
 	}
