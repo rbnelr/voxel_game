@@ -7,6 +7,7 @@
 #include "../time_of_day.hpp"
 #include "common.hpp"
 #include "raytracer.hpp"
+#include "worldgen_raymarch.hpp"
 
 // rotate from facing up to facing in a block face direction
 static inline constexpr float3x3 face_rotation[] = {
@@ -547,6 +548,7 @@ public:
 	Fog						fog;
 
 	Raytracer				raytracer;
+	WorldgenRaymarch		worldgen_raymarch;
 
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
@@ -576,6 +578,7 @@ public:
 			ImGui::Separator();
 
 			raytracer.imgui();
+			worldgen_raymarch.imgui();
 		}
 	}
 

@@ -235,6 +235,9 @@
     </ClInclude>
     <ClInclude Include="stdafx.hpp" />
     <ClInclude Include="src\worldgen.hpp" />
+    <ClInclude Include="src\graphics\worldgen_raymarch.hpp">
+      <Filter>graphics</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -461,6 +464,9 @@
     </None>
     <None Include="src\kissmath\uint8v4.inl">
       <Filter>kissmath</Filter>
+    </None>
+    <None Include="shaders\worldgen_raymarch.glsl">
+      <Filter>shaders</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

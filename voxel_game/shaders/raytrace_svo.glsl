@@ -9,14 +9,14 @@ $include "fog.glsl"
 
 $if vertex
 	// Fullscreen quad
-	const vec4[] pos_clip = vec4[] (
+	const vec4 pos_clip[6] = {
 		vec4(+1,-1, 0, 1),
 		vec4(+1,+1, 0, 1),
 		vec4(-1,-1, 0, 1),
 		vec4(-1,-1, 0, 1),
 		vec4(+1,+1, 0, 1),
-		vec4(-1,+1, 0, 1)
-	);
+		vec4(-1,+1, 0, 1),
+	};
 
 	void main () {
 		gl_Position = pos_clip[gl_VertexID];

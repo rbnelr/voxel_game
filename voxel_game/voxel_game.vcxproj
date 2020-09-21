@@ -179,6 +179,7 @@
     <ClInclude Include="src\graphics\raytracer.hpp" />
     <ClInclude Include="src\graphics\shaders.hpp" />
     <ClInclude Include="src\graphics\texture.hpp" />
+    <ClInclude Include="src\graphics\worldgen_raymarch.hpp" />
     <ClInclude Include="src\input.hpp" />
     <ClInclude Include="src\items.hpp" />
     <ClInclude Include="src\kissmath.hpp" />
@@ -388,6 +389,7 @@
     <None Include="shaders\raytrace_svo.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
+    <None Include="shaders\worldgen_raymarch.glsl" />
     <None Include="src\kissmath\bool2.inl" />
     <None Include="src\kissmath\bool3.inl" />
     <None Include="src\kissmath\bool4.inl" />

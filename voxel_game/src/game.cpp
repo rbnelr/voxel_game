@@ -52,6 +52,8 @@ void Game::frame () {
 	if (!dbg_pause) {
 		auto changed_files = directory_watcher.poll_changes();
 
+		shaders->reload_shaders_on_change();
+
 		{
 			ZoneScopedN("Imgui stuff");
 

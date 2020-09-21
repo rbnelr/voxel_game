@@ -27,8 +27,6 @@ struct ShaderManager {
 
 	std::unordered_map<std::string, bool> shader_windows;
 	void imgui () {
-		reload_shaders_on_change();
-
 		if (!imgui_push("ShaderManager")) return;
 
 		for (auto it=shaders.begin(); it!=shaders.end(); ++it) {
