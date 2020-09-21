@@ -63,6 +63,11 @@ $if fragment
 	uniform float sdf_fac = 1.0;
 	uniform float smin_k = 10.0;
 
+	uniform float nfreq[8];
+	uniform float namp[8];
+	uniform float param0[8];
+	uniform float param1[8];
+
 	vec3 sun_light = srgb(vec3(253,255,230));
 	vec3 sun_dir = normalize(vec3(3, -4, 9));
 	vec3 amb_light = srgb(vec3(145,201,255) / 8.0);
@@ -101,21 +106,21 @@ $if fragment
 		return max(max(v.x, v.y), v.z) - r;
 	}
 
-	float SDF (vec3 pos) {
-		//float x = (snoise(pos / 20.0) + 0.2) * 20.0;
-		
-		//return x;
-		//return smax(x, sphere(pos, vec3(0.0), 50.0), smin_k);
+	float noise (int i, vec3 pos) {
+		return snoise(pos * nfreq[i]) * namp[i] * 2.0;
+	}
 
-		//pos.x += snoise(pos / 5.0);
-		//pos.y += snoise(pos / 5.0 + 200.0);
+	float SDF (vec3 pos) {
+
+		vec3 p = pos;
+		p.x += noise(0, pos);
+		float x = noise(1, p) - param0[1];
 		
-		float x = sphere(pos, vec3(0.0), 50.0);
-		
-		x = smin(x, cylinderx(pos, vec3(0.0), 30.0), smin_k);
-		x = smax(x, -cylinderx(pos, vec3(0.0), 20.0), smin_k);
-		x = smax(x, -cylindery(pos, vec3(0.0), 20.0), smin_k);
-		x = smax(x, -cylinderz(pos, vec3(0.0), 20.0), smin_k);
+		p = pos;
+		p.z *= param0[3];
+		p.z += noise(2, pos);
+		x += max(noise(3, p), 0.0);
+
 		return x;
 	}
 
@@ -135,18 +140,16 @@ $if fragment
 		vec3 pos;
 
 		for (;;) {
-			if (iterations++ == max_iterations)
-				break;
 
 			pos = pos0 + dir * t;
 			dist = SDF(pos);
 
-			if (dist <= -0.0001)
+			if (dist <= min_step)
 				break;
-			if (t >= clip_dist)
+			if (iterations++ == max_iterations || t >= clip_dist)
 				return vec4(0.0);
 
-			t += clamp(dist * sdf_fac, min_step, max_step);
+			t += min(dist * sdf_fac, max_step);
 		}
 
 		vec3 normal = grad(pos, dist);
