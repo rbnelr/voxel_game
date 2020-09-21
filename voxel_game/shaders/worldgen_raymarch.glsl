@@ -24,6 +24,8 @@ $if vertex
 $endif
 
 $if fragment
+	$include "noise.glsl"
+
 //// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
 	// Gold Noise ©2015 dcerisano@standard3d.com
 	// - based on the Golden Ratio
@@ -87,7 +89,9 @@ $if fragment
 		return length(p.yz - center.yz) - r;
 	}
 	float cylindery (vec3 p, vec3 center, float r) {
-		return length(p.xz - center.xz) - r;
+		float rep = 30.0;
+		return length(vec2(mod(p.x + rep, rep*2) -rep - center.x, p.z - center.z)) - r;
+		//return length(p.xz - center.xz) - r;
 	}
 	float cylinderz (vec3 p, vec3 center, float r) {
 		return length(p.xy - center.xy) - r;
@@ -98,8 +102,17 @@ $if fragment
 	}
 
 	float SDF (vec3 pos) {
-		float x = sphere(pos, vec3(0.0), 50.0);
+		//float x = (snoise(pos / 20.0) + 0.2) * 20.0;
+		
+		//return x;
+		//return smax(x, sphere(pos, vec3(0.0), 50.0), smin_k);
 
+		//pos.x += snoise(pos / 5.0);
+		//pos.y += snoise(pos / 5.0 + 200.0);
+		
+		float x = sphere(pos, vec3(0.0), 50.0);
+		
+		x = smin(x, cylinderx(pos, vec3(0.0), 30.0), smin_k);
 		x = smax(x, -cylinderx(pos, vec3(0.0), 20.0), smin_k);
 		x = smax(x, -cylindery(pos, vec3(0.0), 20.0), smin_k);
 		x = smax(x, -cylinderz(pos, vec3(0.0), 20.0), smin_k);
@@ -107,7 +120,7 @@ $if fragment
 	}
 
 	vec3 grad (vec3 pos, float sdf0) {
-		float eps = 0.05;
+		float eps = 0.1;
 		vec3 sdfs = vec3(	SDF(pos + vec3(eps, 0.0, 0.0)),
 							SDF(pos + vec3(0.0, eps, 0.0)),
 							SDF(pos + vec3(0.0, 0.0, eps)) );
@@ -122,12 +135,13 @@ $if fragment
 		vec3 pos;
 
 		for (;;) {
-			iterations++;
+			if (iterations++ == max_iterations)
+				break;
 
 			pos = pos0 + dir * t;
 			dist = SDF(pos);
 
-			if (dist <= min_step)
+			if (dist <= -0.0001)
 				break;
 			if (t >= clip_dist)
 				return vec4(0.0);

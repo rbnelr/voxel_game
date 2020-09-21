@@ -23,11 +23,11 @@ public:
 	int max_iterations = 512;
 	bool visualize_iterations = false;
 
-	float clip_dist = 10000.0;
-	float max_step = 1000;
-	float min_step = 0.025;
-	float sdf_fac = 1.0;
-	float smin_k = 10.0;
+	float clip_dist = 10000;
+	float max_step = 10000;
+	float min_step = 0.025f;
+	float sdf_fac = 1;
+	float smin_k = 10;
 
 	void imgui () {
 		if (!imgui_push("WorldgenRaymarch")) {
@@ -49,10 +49,10 @@ public:
 		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
 
 		ImGui::DragFloat("clip_dist", &clip_dist, 10);
-		ImGui::DragFloat("max_step", &max_step, 10);
-		ImGui::DragFloat("min_step", &min_step, 0.1);
-		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.1);
-		ImGui::DragFloat("smin_k", &smin_k, 0.1);
+		ImGui::DragFloat("max_step", &max_step, 0.1f, 5, 1000, "%.2f", 2);
+		ImGui::DragFloat("min_step", &min_step, 0.1f, 1 / 1024, 1, "%.2f", 2);
+		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.005f, 0.1f, 2, "%.3f", 2);
+		ImGui::DragFloat("smin_k", &smin_k, 0.1f);
 
 		imgui_pop();
 	}

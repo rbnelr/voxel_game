@@ -67,7 +67,7 @@ struct BlockTypes {
 
 	inline bool breakable (block_id id) {
 		auto& c = collision[id];
-		return c == CM_SOLID || c == CM_BREAKABLE;
+		return id != B_NULL && (c == CM_SOLID || c == CM_BREAKABLE);
 	}
 	inline bool grass_can_live_below (block_id id) {
 		return id == B_AIR || transparency[id] == TM_PARTIAL;
