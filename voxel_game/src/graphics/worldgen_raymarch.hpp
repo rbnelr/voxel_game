@@ -10,10 +10,11 @@ public:
 
 	gl::Vao vao; // empty vao even though I generate a screen-filling quad in the vertex shader, no vao works but generates an error on my machine
 
-	Sampler trilinear_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
+	Sampler trilinear_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 	Sampler nearest_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR, gl::Enum::CLAMP_TO_EDGE);
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
-	Texture2D dbg_font = { "textures/consolas_ascii9x17.png" };
+
+	Texture2D env = { "textures/env/small_cave_1k.hdr" };
 
 	bool raytracer_draw = 1;
 	bool overlay = 0;
@@ -135,9 +136,9 @@ public:
 			heat_gradient.bind();
 
 			glActiveTexture(GL_TEXTURE0 + texunit);
-			shader.set_texture_unit("dbg_font", texunit);
-			nearest_sampler.bind(texunit++);
-			dbg_font.bind();
+			shader.set_texture_unit("env", texunit);
+			trilinear_sampler.bind(texunit++);
+			env.bind();
 
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 		}

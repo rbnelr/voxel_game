@@ -28,6 +28,8 @@ layout(std140) uniform Debug {
 	// bit 2 = colored
 };
 
+const float PI = 3.1415926535897932384626433832795;
+
 float map (float x, float a, float b) {
 	return (x - a) / (b - a);
 }

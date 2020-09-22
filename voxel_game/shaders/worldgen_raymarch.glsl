@@ -68,12 +68,23 @@ $if fragment
 	uniform float param0[8];
 	uniform float param1[8];
 
-	vec3 sun_light = srgb(vec3(253,255,230));
-	vec3 sun_dir = normalize(vec3(3, -4, 9));
-	vec3 amb_light = srgb(vec3(145,201,255) / 8.0);
+	uniform sampler2D env;
 
+	vec3 sun_dir = normalize(vec3(3, -4, 9));
+	vec3 sun_light = srgb(vec3(255,225,200)) * 1.2;
+	vec3 amb_light = srgb(vec3(185,221,255)) * 0.009;
+
+	vec2 equirectangular_from_dir (vec3 v) {
+		float phi = atan(v.x, v.y);
+		float theta = acos(-v.z);
+		return vec2(phi * (0.5 / PI) + 0.5, theta * (1.0 / PI));
+	}
 	vec4 shading (vec3 pos, vec3 normal) {
-		return vec4( max(dot(normal, sun_dir), 0.0) * sun_light + amb_light, 1.0 );
+		vec3 L =	max(dot(normal, sun_dir), 0.0) * sun_light;
+		L +=		max(normal.z + 0.9, 0.0) * amb_light;
+
+		return vec4(L, 1.0);
+		//return texture(env, equirectangular_from_dir(normal), +4.0);
 	}
 
 	// Based on https://www.iquilezles.org/www/articles/smin/smin.htm:
@@ -107,7 +118,7 @@ $if fragment
 	}
 
 	float noise (int i, vec3 pos) {
-		return snoise(pos * nfreq[i]) * namp[i] * 2.0;
+		return snoise3(pos * nfreq[i]) * namp[i] * 2.0;
 	}
 
 	float SDF (vec3 pos) {
@@ -178,6 +189,13 @@ $if fragment
 		ray_dir = normalize(ray_dir);
 	}
 
+	vec4 tonemap (vec4 col) { // from http://filmicworlds.com/blog/filmic-tonemapping-operators/
+		vec3 c = col.rgb * 1.0;
+		c = c / (c + 1);
+		//c = max(vec3(0.0), c -0.004);
+		//c = (c * (6.2 * c +.5)) / (c * (6.2 * c +1.7) +0.06);
+		return vec4(c, col.a);
+	}
 	void main () {
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
@@ -187,6 +205,6 @@ $if fragment
 		if (visualize_iterations)
 			col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 		
-		FRAG_COL(col);
+		FRAG_COL(tonemap(col));
 	}
 $endif
