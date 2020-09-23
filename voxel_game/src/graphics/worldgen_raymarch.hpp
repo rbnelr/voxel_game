@@ -24,10 +24,10 @@ public:
 	int max_iterations = 200;
 	bool visualize_iterations = false;
 
-	float clip_dist = 10000;
-	float max_step = 60;
+	float clip_dist = 50000;
+	float max_step = 100;
 	float min_step = 0.25f;
-	float sdf_fac = 0.25f;
+	float sdf_fac = 0.30f;
 	float smin_k = 10;
 
 	struct NoiseSetting {
@@ -65,7 +65,7 @@ public:
 
 		ImGui::DragFloat("clip_dist", &clip_dist, 10);
 		ImGui::DragFloat("max_step", &max_step, 0.1f, 5, 1000, "%.2f", 2);
-		ImGui::DragFloat("min_step", &min_step, 0.1f, 1 / 1024, 1, "%.5f", 2);
+		ImGui::DragFloat("min_step", &min_step, 0.1f, 1 / 1024, 20, "%.5f", 2);
 		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.005f, 0.1f, 2, "%.5f", 2);
 		ImGui::DragFloat("smin_k", &smin_k, 0.1f);
 

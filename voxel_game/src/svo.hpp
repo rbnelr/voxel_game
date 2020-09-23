@@ -387,7 +387,7 @@ namespace svo {
 
 		float3 root_move_hister = 0;
 
-		bool debug_draw_chunks = 1;//false;
+		bool debug_draw_chunks = false;
 		bool debug_draw_chunks_onlyz0 = 1;//false;
 
 		bool debug_draw_svo = false;

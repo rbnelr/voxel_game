@@ -146,8 +146,8 @@ $if fragment
 	int iterations = 0;
 
 	vec4 raymarch (vec3 pos0, vec3 dir) {
-		float t = 0.0;
-		float dist;
+		float prev_t = 0.0, t = 0.0;
+		float prev_dist, dist;
 		vec3 pos;
 
 		for (;;) {
@@ -160,8 +160,42 @@ $if fragment
 			if (iterations++ == max_iterations || t >= clip_dist)
 				return vec4(0.0);
 
+			prev_t = t;
+			prev_dist = dist;
+
 			t += min(dist * sdf_fac, max_step);
 		}
+
+		if (dist < -min_step && prev_t != t) {
+			float t0 = prev_t;
+			float t1 = t;
+			float d0 = prev_dist;
+			float d1 = dist;
+		
+			int iter = 0;
+			do {
+				t = mix(t0, t1, d0 / (d0 - d1));
+				//t = (t0 + t1) * 0.5;
+				pos = pos0 + dir * t;
+				dist = SDF(pos);
+		
+				if (dist > 0) {
+					t0 = t;
+					d0 = dist;
+				} else {
+					t1 = t;
+					d1 = dist;
+				}
+		
+				iterations++;
+		
+			} while (iter++ < 10 && abs(dist) > min_step);
+		
+			iterations += iter;
+			//DEBUG(vec3(float(iter) / float(10), 0,0));
+		}
+
+		//DEBUG(-dist / 10.0);
 
 		vec3 normal = grad(pos, dist);
 		//DEBUG(normal);

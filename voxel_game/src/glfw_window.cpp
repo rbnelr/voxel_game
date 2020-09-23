@@ -263,7 +263,7 @@ void APIENTRY ogl_debug (GLenum source, GLenum type, GLuint id, GLenum severity,
 	clog(severity == GL_DEBUG_SEVERITY_HIGH_ARB ? ERROR : WARNING,
 		"OpenGL debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
 
-	__debugbreak();
+	//__debugbreak();
 }
 
 #if _DEBUG || 1
