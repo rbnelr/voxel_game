@@ -14,7 +14,7 @@ public:
 	Sampler nearest_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR, gl::Enum::CLAMP_TO_EDGE);
 	Texture2D heat_gradient = { "textures/heat_gradient.png" };
 
-	Texture2D env = { "textures/env/small_cave_1k.hdr" };
+	Texture2D env = { "textures/env/blue_grotto_1k.hdr" };
 
 	bool raytracer_draw = 1;
 	bool overlay = 0;
@@ -26,7 +26,7 @@ public:
 
 	float clip_dist = 50000;
 	float max_step = 100;
-	float min_step = 0.25f;
+	float min_step = 0.01f;
 	float sdf_fac = 0.30f;
 	float smin_k = 10;
 

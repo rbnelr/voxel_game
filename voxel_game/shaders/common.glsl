@@ -1,4 +1,5 @@
-
+﻿
+////// Global UBOS
 layout(std140) uniform View {
 	// world space to cam space, ie. view transform
 	mat4 world_to_cam;
@@ -28,10 +29,76 @@ layout(std140) uniform Debug {
 	// bit 2 = colored
 };
 
+///// Utility
 const float PI = 3.1415926535897932384626433832795;
 
+// inverse lerp
 float map (float x, float a, float b) {
 	return (x - a) / (b - a);
+}
+
+// color
+vec3 hsl_to_rgb (vec3 hsl) { // hue is periodic since it represents the angle on the color wheel, so it can be out of the range [0,1]
+	float hue = hsl.x;
+	float sat = hsl.y;
+	float lht = hsl.z;
+
+	float hue6 = mod(hue, 1.0) * 6.0;
+
+	float c = sat*(1.0 -abs(2.0*lht -1.0));
+	float x = c * (1.0 -abs(mod(hue6, 2.0) -1.0));
+	float m = lht -(c/2.0);
+
+	vec3 rgb;
+	if (		hue6 < 1.0 )	rgb = vec3(c,x,0);
+	else if (	hue6 < 2.0 )	rgb = vec3(x,c,0);
+	else if (	hue6 < 3.0 )	rgb = vec3(0,c,x);
+	else if (	hue6 < 4.0 )	rgb = vec3(0,x,c);
+	else if (	hue6 < 5.0 )	rgb = vec3(x,0,c);
+	else						rgb = vec3(c,0,x);
+	rgb += vec3(m);
+
+	return rgb;
+}
+vec3 hsl_to_rgb (float hue, float saturation, float lightness) {
+	return hsl_to_rgb(vec3(hue, saturation, lightness));
+}
+
+$if fragment
+	//// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
+	// Gold Noise ©2015 dcerisano@standard3d.com
+	// - based on the Golden Ratio
+	// - uniform normalized distribution
+	// - fastest static noise generator function (also runs at low precision)
+
+	const float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
+
+	float gold_noise(in vec2 xy, in float seed){
+		return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
+	}
+	////
+	
+	float seed = 0.0;//time + 1.0;
+
+	float rand () {
+		return gold_noise(gl_FragCoord.xy, seed++);
+	}
+	vec2 rand2 () {
+		return vec2(rand(), rand());
+	}
+	vec3 rand3 () {
+		return vec3(rand(), rand(), rand());
+	}
+$endif
+
+vec2 equirectangular_from_dir (vec3 v) {
+	float phi = atan(v.x, v.y);
+	float theta = acos(-v.z);
+	return vec2(phi * (0.5 / PI) + 0.5, theta * (1.0 / PI));
+}
+
+vec3 fresnel (vec3 F0, float cos) {
+	return F0 + (1.0 - F0) * pow(clamp(1.0 - cos, 0.0, 1.0), 5.0);
 }
 
 //// Wireframe
