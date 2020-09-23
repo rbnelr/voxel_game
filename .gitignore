@@ -1,5 +1,5 @@
 ._*.txt # for ._need_potatomode.txt
-*/stb/
+*/screenshots/
 imgui.ini
 *.ini
 todo.txt

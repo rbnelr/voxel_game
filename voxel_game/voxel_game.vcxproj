@@ -70,7 +70,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -95,7 +95,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -126,7 +126,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -214,9 +214,8 @@
     <ClInclude Include="src\player.hpp" />
     <ClInclude Include="src\profiling.hpp" />
     <ClInclude Include="src\serialization.hpp" />
-    <ClInclude Include="src\stb\stb_image.h" />
     <ClInclude Include="src\stb\stb_image.hpp" />
-    <ClInclude Include="src\stb\stb_rect_pack.h" />
+    <ClInclude Include="src\stb\stb_image_write.hpp" />
     <ClInclude Include="src\stb\stb_rect_pack.hpp" />
     <ClInclude Include="src\svo.hpp" />
     <ClInclude Include="src\threading.hpp" />
@@ -320,6 +319,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="src\stb\stb_image_write.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\stb\stb_rect_pack.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>

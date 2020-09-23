@@ -465,9 +465,12 @@ struct Framebuffer {
 	float renderscale = 1.0f;
 
 	bool nearest = false;
+	bool screenshot = false;
 
 	void imgui () {
 		if (!imgui_push("Framebuffer")) return;
+
+		screenshot = ImGui::Button("Screenshot [F8]");
 
 		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 
@@ -480,6 +483,7 @@ struct Framebuffer {
 	}
 
 	void update () {
+
 		auto old_size = size;
 		size = max(1, roundi((float2)input.window_size * renderscale));
 
@@ -492,7 +496,7 @@ struct Framebuffer {
 			// create new (textures created with glTexStorage2D cannot be resized), shouldn't cause noticable lag i think
 			glGenTextures(1, &color);
 			glBindTexture(GL_TEXTURE_2D, color);
-			glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, size.x, size.y);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, size.x, size.y); // TODO: use float16 or something here to reduce banding and allow proper HDR?
 			glBindTexture(GL_TEXTURE_2D, 0);
 
 			glGenTextures(1, &depth);
@@ -509,11 +513,14 @@ struct Framebuffer {
 			if (status != GL_FRAMEBUFFER_COMPLETE) {
 				fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
 			}
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 	}
 
 	void blit () {
+		if (screenshot || input.buttons[GLFW_KEY_F8].went_down)
+			take_screenshot();
+		screenshot = false;
+
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // default FBO
 
@@ -521,8 +528,26 @@ struct Framebuffer {
 			0, 0, size.x, size.y,
 			0, 0, input.window_size.x, input.window_size.y,
 			GL_COLOR_BUFFER_BIT, nearest ? GL_NEAREST : GL_LINEAR);
+	}
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	void take_screenshot () {
+		Image<srgb8> img (size);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		glReadPixels(0,0, size.x, size.y, GL_RGB, GL_UNSIGNED_BYTE, img.data());
+
+		time_t t = time(0);   // get time now
+		struct tm* now = localtime(&t);
+
+		char timestr [80];
+		strftime(timestr, 80, "%g%m%d-%H%M%S", now); // yy-mm-dd_hh-mm-ss
+
+		auto filename = prints("screenshots/screen_%s_%d.jpg", timestr, random.uniform(0, 100));
+		
+		stbi_flip_vertically_on_write(true);
+		stbi_write_jpg(filename.c_str(), size.x, size.y, 3, img.data(), 95);
 	}
 };
 
@@ -556,10 +581,6 @@ public:
 	//void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
 	void imgui () {
-		if (frame_counter == 30) {
-			//raytracer.regen_data(chunks);
-		}
-
 		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
 			framebuffer.imgui();
 

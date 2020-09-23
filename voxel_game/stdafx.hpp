@@ -30,6 +30,7 @@
 
 #include "stb/stb_rect_pack.hpp"
 #include "stb/stb_image.hpp"
+#include "stb/stb_image_write.hpp"
 
 //
 #include "kissmath.hpp"

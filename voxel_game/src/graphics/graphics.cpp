@@ -886,8 +886,8 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			player.draw(world.player, tile_textures, sampler);
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	framebuffer.blit();
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glViewport(0,0, input.window_size.x, input.window_size.y);
 	glScissor(0,0, input.window_size.x, input.window_size.y);

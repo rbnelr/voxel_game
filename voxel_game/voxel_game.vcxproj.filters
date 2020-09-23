@@ -86,13 +86,7 @@
     <ClInclude Include="src\util\timer.hpp">
       <Filter>util</Filter>
     </ClInclude>
-    <ClInclude Include="src\stb\stb_image.h">
-      <Filter>stb</Filter>
-    </ClInclude>
     <ClInclude Include="src\stb\stb_image.hpp">
-      <Filter>stb</Filter>
-    </ClInclude>
-    <ClInclude Include="src\stb\stb_rect_pack.h">
       <Filter>stb</Filter>
     </ClInclude>
     <ClInclude Include="src\stb\stb_rect_pack.hpp">
@@ -238,6 +232,9 @@
     <ClInclude Include="src\graphics\worldgen_raymarch.hpp">
       <Filter>graphics</Filter>
     </ClInclude>
+    <ClInclude Include="src\stb\stb_image_write.hpp">
+      <Filter>stb</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\dear_imgui\imgui.cpp">
@@ -349,6 +346,9 @@
       <Filter>audio</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="src\stb\stb_image_write.cpp">
+      <Filter>stb</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\skybox.glsl">

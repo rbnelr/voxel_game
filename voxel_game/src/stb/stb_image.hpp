@@ -8,4 +8,4 @@
 #define STBI_ONLY_JPEG	1
 #define STBI_ONLY_HDR	1
 
-#include "stb/stb_image.h"
+#include "stb_image.h"
