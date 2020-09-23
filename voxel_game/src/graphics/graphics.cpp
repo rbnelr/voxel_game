@@ -886,6 +886,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 			player.draw(world.player, tile_textures, sampler);
 	}
 
+	if (trigger_screenshot && !screenshot_hud)
+		take_screenshot(framebuffer.size);
+
 	framebuffer.blit();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -909,4 +912,9 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 	}
 
 	glDisable(GL_BLEND);
+
+	if (trigger_screenshot && screenshot_hud)
+		take_screenshot(input.window_size);
+
+	trigger_screenshot = false;
 }

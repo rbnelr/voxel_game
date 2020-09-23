@@ -57,6 +57,14 @@ void Game::frame () {
 		{
 			ZoneScopedN("Imgui stuff");
 
+			ImGui::Separator();
+
+			graphics.trigger_screenshot = ImGui::Button("Screenshot [F8]") || input.buttons[GLFW_KEY_F8].went_down;
+			ImGui::SameLine();
+			ImGui::Checkbox("With HUD", &graphics.screenshot_hud);
+
+			ImGui::Separator();
+
 			if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 				fps_display.display_fps();
 			}

@@ -453,6 +453,25 @@ struct Fog {
 	}
 };
 
+// take screenshot of current bound framebuffer
+inline void take_screenshot (int2 size) {
+	Image<srgb8> img (size);
+
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0,0, size.x, size.y, GL_RGB, GL_UNSIGNED_BYTE, img.data());
+
+	time_t t = time(0);   // get time now
+	struct tm* now = localtime(&t);
+
+	char timestr [80];
+	strftime(timestr, 80, "%g%m%d-%H%M%S", now); // yy-mm-dd_hh-mm-ss
+
+	auto filename = prints("screenshots/screen_%s_%d.jpg", timestr, random.uniform(0, 100));
+
+	stbi_flip_vertically_on_write(true);
+	stbi_write_jpg(filename.c_str(), size.x, size.y, 3, img.data(), 95);
+}
+
 // framebuffer for rendering at different resolution and to make sure we get float depth buffer
 struct Framebuffer {
 	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
@@ -465,12 +484,9 @@ struct Framebuffer {
 	float renderscale = 1.0f;
 
 	bool nearest = false;
-	bool screenshot = false;
 
 	void imgui () {
 		if (!imgui_push("Framebuffer")) return;
-
-		screenshot = ImGui::Button("Screenshot [F8]");
 
 		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 
@@ -517,10 +533,6 @@ struct Framebuffer {
 	}
 
 	void blit () {
-		if (screenshot || input.buttons[GLFW_KEY_F8].went_down)
-			take_screenshot();
-		screenshot = false;
-
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // default FBO
 
@@ -528,26 +540,6 @@ struct Framebuffer {
 			0, 0, size.x, size.y,
 			0, 0, input.window_size.x, input.window_size.y,
 			GL_COLOR_BUFFER_BIT, nearest ? GL_NEAREST : GL_LINEAR);
-	}
-
-	void take_screenshot () {
-		Image<srgb8> img (size);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		glReadPixels(0,0, size.x, size.y, GL_RGB, GL_UNSIGNED_BYTE, img.data());
-
-		time_t t = time(0);   // get time now
-		struct tm* now = localtime(&t);
-
-		char timestr [80];
-		strftime(timestr, 80, "%g%m%d-%H%M%S", now); // yy-mm-dd_hh-mm-ss
-
-		auto filename = prints("screenshots/screen_%s_%d.jpg", timestr, random.uniform(0, 100));
-		
-		stbi_flip_vertically_on_write(true);
-		stbi_write_jpg(filename.c_str(), size.x, size.y, 3, img.data(), 95);
 	}
 };
 
@@ -574,6 +566,9 @@ public:
 
 	Raytracer				raytracer;
 	WorldgenRaymarch		worldgen_raymarch;
+
+	bool trigger_screenshot = false;
+	bool screenshot_hud = false;
 
 	bool debug_frustrum_culling = false;
 	bool debug_block_light = false;
