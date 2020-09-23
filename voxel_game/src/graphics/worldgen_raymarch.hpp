@@ -21,14 +21,22 @@ public:
 
 	float slider = 1.00f;
 
+	// max raymarch iterations, depending on scene and settings below this limit can be reached or not, when reached causes cutoff at distance
 	int max_iterations = 200;
 	bool visualize_iterations = false;
 
-	float clip_dist = 50000;
-	float max_step = 100;
-	float min_step = 0.01f;
+	// distance where to stop raymarch 'farplane'
+	float far_clip = 50000;
+	// multiplier to pseudo SDF step size, to allow tweaking of noise raymarch to look correct
+	// (higher= higher perf but warping artefacts because of pseudo SDF,  lower= lower perf but more correct)
 	float sdf_fac = 0.30f;
-	float smin_k = 10;
+	// max step size, lower to fix large scale warping
+	float max_step = 400;
+	// min step size, higher for better perf, but causes silluette to warp
+	float min_step = 2.0f;
+	// termination distance for surface binary search, lower = slightly lower perf, but less depth error for surface (visible as banding)
+	float surf_precision = 0.01f;
+
 
 	struct NoiseSetting {
 		float period = 10.0f; // inverse of frequency
@@ -63,11 +71,11 @@ public:
 
 		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
 
-		ImGui::DragFloat("clip_dist", &clip_dist, 10);
+		ImGui::DragFloat("far_clip", &far_clip, 10);
+		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.005f, 0.1f, 2, "%.5f", 2);
 		ImGui::DragFloat("max_step", &max_step, 0.1f, 5, 1000, "%.2f", 2);
 		ImGui::DragFloat("min_step", &min_step, 0.1f, 1 / 1024, 20, "%.5f", 2);
-		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.005f, 0.1f, 2, "%.5f", 2);
-		ImGui::DragFloat("smin_k", &smin_k, 0.1f);
+		ImGui::DragFloat("surf_precision", &surf_precision, 0.1f, 1 / 1024, 20, "%.5f", 2);
 
 		ImGui::Separator();
 		ImGui::TreeNode("Noise Layers");
@@ -115,11 +123,11 @@ public:
 			shader.set_uniform("max_iterations", max_iterations);
 			shader.set_uniform("visualize_iterations", visualize_iterations);
 
-			shader.set_uniform("clip_dist", clip_dist);
+			shader.set_uniform("far_clip", far_clip);
+			shader.set_uniform("sdf_fac", sdf_fac);
 			shader.set_uniform("max_step", max_step);
 			shader.set_uniform("min_step", min_step);
-			shader.set_uniform("sdf_fac", sdf_fac);
-			shader.set_uniform("smin_k", smin_k);
+			shader.set_uniform("surf_precision", surf_precision);
 
 			for (int i=0; i<ARRLEN(noises); ++i) {
 				glUniform1f(glGetUniformLocation(shader.shader->shad, prints("nfreq[%d]", i).c_str()), 1.0f / noises[i].period);

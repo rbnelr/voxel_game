@@ -38,6 +38,10 @@ float map (float x, float a, float b) {
 }
 
 // color
+vec3 srgb (vec3 c) {
+	return pow(c / 255.0, vec3(2.2));
+}
+
 vec3 hsl_to_rgb (vec3 hsl) { // hue is periodic since it represents the angle on the color wheel, so it can be out of the range [0,1]
 	float hue = hsl.x;
 	float sat = hsl.y;

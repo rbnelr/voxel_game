@@ -390,6 +390,7 @@
     <None Include="shaders\raytrace_svo.glsl" />
     <None Include="shaders\skybox.glsl" />
     <None Include="shaders\fog.glsl" />
+    <None Include="shaders\worldgen.glsl" />
     <None Include="shaders\worldgen_raymarch.glsl" />
     <None Include="src\kissmath\bool2.inl" />
     <None Include="src\kissmath\bool3.inl" />

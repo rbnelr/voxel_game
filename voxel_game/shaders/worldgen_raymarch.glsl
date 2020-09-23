@@ -2,7 +2,7 @@
 #extension GL_NV_gpu_shader5 : enable
 #extension GL_NV_shader_buffer_load : enable
 
-#define BIT_DEBUGGER 1
+#define BIT_DEBUGGER 0
 
 $include "common.glsl"
 $include "fog.glsl"
@@ -24,26 +24,23 @@ $if vertex
 $endif
 
 $if fragment
-	$include "noise.glsl"
+$include "worldgen.glsl"
 
-	vec3 srgb (vec3 c) { return pow(c / 255.0, vec3(2.2)); }
-
+//// Settings
 	uniform float slider = 1.0; // debugging
+	uniform sampler2D heat_gradient;
+	
+	// see worldgen_raymarch.hpp comments
 	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
-	uniform sampler2D heat_gradient;
 
-	uniform float clip_dist = 10000.0;
-	uniform float max_step = 1000;
-	uniform float min_step = 0.025;
-	uniform float sdf_fac = 1.0;
-	uniform float smin_k = 10.0;
+	uniform float clip_dist = 50000.0;
+	uniform float sdf_fac = 0.25;
+	uniform float max_step = 100;
+	uniform float min_step = 0.25;
+	uniform float surf_precision = 0.01;
 
-	uniform float nfreq[8];
-	uniform float namp[8];
-	uniform float param0[8];
-	uniform float param1[8];
-
+//// Shading
 	uniform sampler2D env;
 
 	const vec3 sun_dir = normalize(vec3(3, -4, 9));
@@ -95,7 +92,6 @@ $if fragment
 
 		return L;
 	}
-
 	vec4 shading (vec3 pos, vec3 dir, vec3 normal) {
 		const float linew = 0.03;
 		vec3 f = fract(pos);
@@ -119,68 +115,35 @@ $if fragment
 		return vec4(albedo * lights(pos, dir, normal), 1.0);
 	}
 
-	// Based on https://www.iquilezles.org/www/articles/smin/smin.htm:
-	// polynomial smooth min (k = 0.1);
-	float smin (float a, float b, float k)	{
-		float h = max(k - abs(a - b), 0.0) / k;
-		return min(a, b) - h*h*k * 0.25;
-	}
-	float smax (float a, float b, float k)	{
-		float h = max(k - abs(a - b), 0.0) / k;
-		return max(a, b) + h*h*k * 0.25;
-	}
-
-	float noise (int i, vec3 pos) {
-		return snoise3(pos * nfreq[i]) * namp[i] * 2.0;
-	}
-
-	float SDF (vec3 pos) {
-
-		vec3 p = pos;
-		p.x += noise(0, pos);
-		float x = noise(1, p) - param0[1];
-		
-		p = pos;
-		p.z *= param0[3];
-		p.z += noise(2, pos);
-		x += max(noise(3, p), 0.0);
-
-		return x;
-	}
-
-	vec3 grad (vec3 pos, float sdf0) {
-		float eps = 0.1;
-		vec3 sdfs = vec3(	SDF(pos + vec3(eps, 0.0, 0.0)),
-							SDF(pos + vec3(0.0, eps, 0.0)),
-							SDF(pos + vec3(0.0, 0.0, eps)) );
-		return normalize(sdfs - vec3(sdf0));
-	}
+//// Raymarching
 
 	int iterations = 0;
 
 	vec4 raymarch (vec3 pos0, vec3 dir) {
 		float prev_t = 0.0, t = 0.0;
-		float prev_dist, dist;
-		vec3 pos;
+		float prev_dist;
+	
+		vec3 pos = pos0;
+		float dist = SDF(pos0);
 
 		for (;;) {
+			prev_t = t;
+			prev_dist = dist;
+
+			t += clamp(dist * sdf_fac, min_step, max_step);
+
+			if (iterations++ == max_iterations || t >= clip_dist)
+				return vec4(0.0);
 
 			pos = pos0 + dir * t;
 			dist = SDF(pos);
 
-			if (dist <= min_step*20)
+			if (dist <= surf_precision)
 				break;
-			if (iterations++ == max_iterations || t >= clip_dist)
-				return vec4(0.0);
-
-			prev_t = t;
-			prev_dist = dist;
-
-			t += min(dist * sdf_fac, max_step);
 		}
 
 		// binary search for surface if ray happened to land in surface
-		if (dist < -min_step && prev_t != t) {
+		if (dist < -surf_precision) {
 			float t0 = prev_t;
 			float t1 = t;
 			float d0 = prev_dist;
@@ -192,7 +155,7 @@ $if fragment
 				//t = (t0 + t1) * 0.5;
 				pos = pos0 + dir * t;
 				dist = SDF(pos);
-		
+				
 				if (dist > 0) {
 					t0 = t;
 					d0 = dist;
@@ -201,9 +164,7 @@ $if fragment
 					d1 = dist;
 				}
 		
-				iterations++;
-		
-			} while (iter++ < 10 && abs(dist) > min_step);
+			} while (iter++ < 10 && abs(dist) > surf_precision);
 		
 			iterations += iter;
 			//DEBUG(vec3(float(iter) / float(10), 0,0));
