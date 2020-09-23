@@ -36,10 +36,11 @@ float SDF (vec3 pos) {
 	return x;
 }
 
+// numerical gradients
+const float grad_eps = 0.1;
 vec3 grad (vec3 pos, float sdf0) {
-	float eps = 0.1;
-	vec3 sdfs = vec3(	SDF(pos + vec3(eps, 0.0, 0.0)),
-		SDF(pos + vec3(0.0, eps, 0.0)),
-		SDF(pos + vec3(0.0, 0.0, eps)) );
+	vec3 sdfs = vec3(	SDF(pos + vec3(grad_eps, 0.0, 0.0)),
+						SDF(pos + vec3(0.0, grad_eps, 0.0)),
+						SDF(pos + vec3(0.0, 0.0, grad_eps)) );
 	return normalize(sdfs - vec3(sdf0));
 }

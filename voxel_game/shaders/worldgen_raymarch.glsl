@@ -122,7 +122,9 @@ $include "worldgen.glsl"
 	vec4 raymarch (vec3 pos0, vec3 dir) {
 		float prev_t = 0.0, t = 0.0;
 		float prev_dist;
-	
+
+		// raymarch the pseudo-SDF using standard raymarching
+		// with stepsize multiplier and min/max settings which can control the warping caused by the fact that the SDF is not a real correct SDF
 		vec3 pos = pos0;
 		float dist = SDF(pos0);
 
@@ -130,19 +132,23 @@ $include "worldgen.glsl"
 			prev_t = t;
 			prev_dist = dist;
 
-			t += clamp(dist * sdf_fac, min_step, max_step);
+			t += clamp(abs(dist) * sdf_fac, min_step, max_step);
 
+			// alpha 1 at max iterations or far clip
 			if (iterations++ == max_iterations || t >= clip_dist)
 				return vec4(0.0);
 
 			pos = pos0 + dir * t;
 			dist = SDF(pos);
 
-			if (dist <= surf_precision)
+			// raymarch until closer than surf_precision to a wall (or in wall due to warping)
+			if (prev_dist > surf_precision && dist < surf_precision)
 				break;
 		}
 
-		// binary search for surface if ray happened to land in surface
+		// get closer to surface if ray happened to land in surface
+		// via biased binary search (we know where approx the surface is based on the SDF values)
+		const int bsearch_iter = 10;
 		if (dist < -surf_precision) {
 			float t0 = prev_t;
 			float t1 = t;
@@ -151,8 +157,9 @@ $include "worldgen.glsl"
 		
 			int iter = 0;
 			do {
-				t = mix(t0, t1, d0 / (d0 - d1));
-				//t = (t0 + t1) * 0.5;
+				t = mix(t0, t1, d0 / (d0 - d1)); // biased binary search
+				//t = (t0 + t1) * 0.5; // normal binary search
+
 				pos = pos0 + dir * t;
 				dist = SDF(pos);
 				
@@ -164,10 +171,10 @@ $include "worldgen.glsl"
 					d1 = dist;
 				}
 		
-			} while (iter++ < 10 && abs(dist) > surf_precision);
+			} while (iter++ < bsearch_iter && abs(dist) > surf_precision);
 		
 			iterations += iter;
-			//DEBUG(vec3(float(iter) / float(10), 0,0));
+			//DEBUG(vec3(float(iter) / float(bsearch_iter), 0,0));
 		}
 
 		//DEBUG(-dist / 10.0);
@@ -179,11 +186,7 @@ $include "worldgen.glsl"
 
 	// get pixel ray in world space based on pixel coord and matricies
 	void get_ray (out vec3 ray_pos, out vec3 ray_dir) {
-
-		//vec2 px_jitter = rand2() - 0.5;
-		vec2 px_jitter = vec2(0.0);
-
-		vec2 ndc = (gl_FragCoord.xy + px_jitter) / viewport_size * 2.0 - 1.0;
+		vec2 ndc = gl_FragCoord.xy / viewport_size * 2.0 - 1.0;
 
 		if (ndc.x > (slider * 2 - 1))
 			discard;
@@ -198,11 +201,9 @@ $include "worldgen.glsl"
 		ray_dir = normalize(ray_dir);
 	}
 
-	vec4 tonemap (vec4 col) { // from http://filmicworlds.com/blog/filmic-tonemapping-operators/
+	vec4 tonemap (vec4 col) {
 		vec3 c = col.rgb * 1.0;
 		c = c / (c + 1);
-		//c = max(vec3(0.0), c -0.004);
-		//c = (c * (6.2 * c +.5)) / (c * (6.2 * c +1.7) +0.06);
 		return vec4(c, col.a);
 	}
 	void main () {
