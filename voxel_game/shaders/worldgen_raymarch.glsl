@@ -209,12 +209,13 @@ $include "worldgen.glsl"
 	void main () {
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
-
+	
 		vec4 col = raymarch(ray_pos, ray_dir);
-
+	
 		if (visualize_iterations)
 			col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 		
 		FRAG_COL(tonemap(col));
 	}
+
 $endif

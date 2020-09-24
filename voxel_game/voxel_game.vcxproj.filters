@@ -474,6 +474,9 @@
     <None Include="shaders\worldgen.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="shaders\CSG.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

@@ -78,33 +78,34 @@ public:
 		ImGui::DragFloat("surf_precision", &surf_precision, 0.1f, 1 / 1024, 20, "%.5f", 2);
 
 		ImGui::Separator();
-		ImGui::TreeNode("Noise Layers");
-		ImGui::Columns(5, "Noise Layers", false);
-		ImGui::Text("Noise");		ImGui::NextColumn();
-		ImGui::Text("period");		ImGui::NextColumn();
-		ImGui::Text("amplitude");	ImGui::NextColumn();
-		ImGui::Text("param0");		ImGui::NextColumn();
-		ImGui::Text("param1");		ImGui::NextColumn();
-		ImGui::Separator();
-		ImGui::SetColumnWidth(0, 50);
+		if (ImGui::TreeNode("Noise Layers")) {
+			ImGui::Columns(5, "Noise Layers", false);
+			ImGui::Text("Noise");		ImGui::NextColumn();
+			ImGui::Text("period");		ImGui::NextColumn();
+			ImGui::Text("amplitude");	ImGui::NextColumn();
+			ImGui::Text("param0");		ImGui::NextColumn();
+			ImGui::Text("param1");		ImGui::NextColumn();
+			ImGui::Separator();
+			ImGui::SetColumnWidth(0, 50);
 
-		for (int i=0; i<ARRLEN(noises); ++i) {
-			auto& n = noises[i];
-			ImGui::TreePush(&n);
-			ImGui::SetNextItemWidth(20);
-			ImGui::Text("[%d]", i); ImGui::NextColumn();
-			ImGui::SetNextItemWidth(100);
-			ImGui::DragFloat("##period", &n.period, 0.1f, 0.0001f, 10000, "%.2f", 2);	ImGui::NextColumn();
-			ImGui::SetNextItemWidth(100);
-			ImGui::DragFloat("##amplitude", &n.amplitude, 0.1f);						ImGui::NextColumn();
-			ImGui::SetNextItemWidth(100);
-			ImGui::DragFloat("##param0", &n.param0, 0.1f);								ImGui::NextColumn();
-			ImGui::SetNextItemWidth(100);
-			ImGui::DragFloat("##param1", &n.param1, 0.1f);								ImGui::NextColumn();
+			for (int i=0; i<ARRLEN(noises); ++i) {
+				auto& n = noises[i];
+				ImGui::TreePush(&n);
+				ImGui::SetNextItemWidth(20);
+				ImGui::Text("[%d]", i); ImGui::NextColumn();
+				ImGui::SetNextItemWidth(100);
+				ImGui::DragFloat("##period", &n.period, 0.1f, 0.0001f, 10000, "%.2f", 2);	ImGui::NextColumn();
+				ImGui::SetNextItemWidth(100);
+				ImGui::DragFloat("##amplitude", &n.amplitude, 0.1f);						ImGui::NextColumn();
+				ImGui::SetNextItemWidth(100);
+				ImGui::DragFloat("##param0", &n.param0, 0.1f);								ImGui::NextColumn();
+				ImGui::SetNextItemWidth(100);
+				ImGui::DragFloat("##param1", &n.param1, 0.1f);								ImGui::NextColumn();
+				ImGui::TreePop();
+			}
+			ImGui::Columns(1);
 			ImGui::TreePop();
 		}
-		ImGui::Columns(1);
-		ImGui::TreePop();
 
 		imgui_pop();
 	}

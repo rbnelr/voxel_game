@@ -384,6 +384,7 @@
     <None Include="shaders\blocks.glsl" />
     <None Include="shaders\block_highlight.glsl" />
     <None Include="shaders\common.glsl" />
+    <None Include="shaders\CSG.glsl" />
     <None Include="shaders\gui.glsl" />
     <None Include="shaders\generic.glsl" />
     <None Include="shaders\gui_item.glsl" />

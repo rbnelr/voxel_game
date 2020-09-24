@@ -1,5 +1,6 @@
 
 $include "noise.glsl"
+$include "CSG.glsl"
 
 // noise settings
 uniform float nfreq[8];
@@ -7,31 +8,23 @@ uniform float namp[8];
 uniform float param0[8];
 uniform float param1[8];
 
-// Based on https://www.iquilezles.org/www/articles/smin/smin.htm:
-// polynomial smooth min (k = 0.1);
-float smin (float a, float b, float k)	{
-	float h = max(k - abs(a - b), 0.0) / k;
-	return min(a, b) - h*h*k * 0.25;
-}
-float smax (float a, float b, float k)	{
-	float h = max(k - abs(a - b), 0.0) / k;
-	return max(a, b) + h*h*k * 0.25;
-}
-
 float noise (int i, vec3 pos) {
 	return snoise3(pos * nfreq[i]) * namp[i];
 }
 
 float SDF (vec3 pos) {
+	//return snoise3(pos / 20.0) * 20.0;
 
 	vec3 p = pos;
 	p.x += noise(0, pos);
 	float x = noise(1, p) - param0[1];
-
+	
 	p = pos;
 	p.z *= param0[3];
 	p.z += noise(2, pos);
 	x += max(noise(3, p), 0.0);
+	
+	x = min(x, ellipse(mod(pos, vec3(800)), vec3(400), vec3(50, 10, 20)));
 
 	return x;
 }
