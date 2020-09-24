@@ -545,8 +545,7 @@ struct Framebuffer {
 
 extern int frame_counter;
 
-class Graphics {
-public:
+struct Graphics {
 	Framebuffer				framebuffer;
 
 	CommonUniforms			common_uniforms;

@@ -1,6 +1,4 @@
 #pragma once
-#include "stdafx.hpp"
-
 #include "imgui.h"
 
 #include "misc/cpp/imgui_stdlib.h"
@@ -61,28 +59,32 @@ inline bool imgui_ColorEdit3 (const char* label, float col[3], ImGuiColorEditFla
 }
 
 enum LogLevel {
-	INFO	=0,
-	WARNING	=10,
-	ERROR	=15,
+	LOG,
+	INFO,
+	WARNING,
+	ERROR,
+};
+static inline const lrgba LOG_LEVEL_COLS[] = {
+	srgba(216, 216, 216, 120),
+	srgba(234, 234, 232),
+	srgba(255, 220, 80),
+	srgba(255, 100, 40),
 };
 
 class GuiConsole {
 	bool imgui_uncollapse = false;
 public:
 	struct Line {
-		char str[128 - sizeof(int)*3];
+		char str[128 - sizeof(int)*2];
 		LogLevel level;
 		int frame;
-		int counter;
 	};
 
-	circular_buffer<Line> unimportant_lines = circular_buffer<Line>(1024);
-	circular_buffer<Line> important_lines = circular_buffer<Line>(1024);
+	std::vector<Line> lines;
 	bool shown = true;
 
-	bool show_info = false;
-	bool show_warn = true;
-	bool show_err = true;
+	bool show_levels[4] = { 0,1,1,1 };
+	int max_display_lines = 5000;
 
 	int added_this_frame = 0;
 	int counter = 0;

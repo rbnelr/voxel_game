@@ -32,6 +32,8 @@
 #include "stb/stb_image.hpp"
 #include "stb/stb_image_write.hpp"
 
+#include "dear_imgui/dear_imgui.hpp"
+
 //
 #include "kissmath.hpp"
 
@@ -56,6 +58,5 @@
 using namespace kiss;
 using namespace kissmath;
 
-#include "dear_imgui.hpp"
 #include "profiling.hpp"
-//#include "serialization.hpp" // wierd identifier not found error??
+#include "serialization.hpp"

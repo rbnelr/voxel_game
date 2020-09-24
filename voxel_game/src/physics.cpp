@@ -3,6 +3,7 @@
 #include "blocks.hpp"
 #include "world.hpp"
 #include "player.hpp"
+#include "input.hpp"
 
 Physics physics;
 

@@ -1,18 +1,18 @@
 #pragma once
 #include "stdafx.hpp"
+
 #include "nlohmann/json_fwd.hpp"
 #include "nlohmann/json.hpp"
 #include "util/file_io.hpp"
 #include "kissmath.hpp"
-#include "dear_imgui.hpp"
-using nlohmann::json;
+using json = nlohmann::ordered_json;
 
 template <typename T>
 bool save (char const* filename, T const& obj) {
 	json json = obj;
 	std::string json_str;
 	try {
-		json.dump(1, '\t');
+		json_str = json.dump(1, '\t');
 	} catch (std::exception& ex) {
 		clog(ERROR, "Error when serializing something: %s", ex.what());
 		return true;
@@ -44,7 +44,7 @@ bool load (char const* filename, T* obj) {
 
 template <typename T>
 T load (char const* filename) {
-	T t = default(T);
+	T t = T();
 	load(filename, &t);
 	return t;
 }
@@ -69,21 +69,21 @@ T load (char const* filename) {
 #define _JSON_FROM(v1) if (j.contains(#v1)) j.at(#v1).get_to(t.v1); // try get value from json
 
 #define SERIALIZE(Type, ...)  \
-    friend void to_json(nlohmann::json& j, const Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_TO, __VA_ARGS__)) } \
-    friend void from_json(const nlohmann::json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
+    friend void to_json(nlohmann::ordered_json& j, const Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_TO, __VA_ARGS__)) } \
+    friend void from_json(const nlohmann::ordered_json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
 
 #define SERIALIZE_OUT_OF_CLASS(Type, ...)  \
-    void to_json(nlohmann::json& j, const Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_TO, __VA_ARGS__)) } \
-    void from_json(const nlohmann::json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
+    void to_json(nlohmann::ordered_json& j, const Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_TO, __VA_ARGS__)) } \
+    void from_json(const nlohmann::ordered_json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
 
 namespace nlohmann {
 	template <>
 	struct adl_serializer<float2> {
 		using type = float2;
-		static void to_json(json& j, const type& val) {
+		static void to_json(ordered_json& j, const type& val) {
 			j = { val.x, val.y };
 		}
-		static void from_json(const json& j, type& val) {
+		static void from_json(const ordered_json& j, type& val) {
 			j.at(0).get_to(val.x);
 			j.at(1).get_to(val.y);
 		}

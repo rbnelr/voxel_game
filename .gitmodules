@@ -1,6 +1,11 @@
 [submodule "tracy"]
 	path = tracy
-	url = https://github.com/wolfpld/tracy
-[submodule "FastNoise"]
-	path = FastNoise
-	url = https://github.com/Auburn/FastNoise.git
+	url = https://github.com/wolfpld/tracy.git
+[submodule "dear_imgui"]
+	path = dear_imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = tables
+[submodule "nlohmann_json"]
+	path = nlohmann_json
+	url = https://github.com/nlohmann/json.git
+	branch = develop

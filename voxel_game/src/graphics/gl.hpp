@@ -1,10 +1,9 @@
 #pragma once
 #include "stdafx.hpp"
-#include "../kissmath.hpp"
-#include "../glad/glad.h"
+#include "kissmath.hpp"
+#include "glad/glad.h"
 #include <vector>
 #include "assert.h"
-#include "../dear_imgui.hpp"
 #include "Tracy.hpp"
 
 /////

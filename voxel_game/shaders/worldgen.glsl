@@ -12,21 +12,25 @@ float noise (int i, vec3 pos) {
 	return snoise3(pos * nfreq[i]) * namp[i];
 }
 
+const float k = 40.0;
+
 float SDF (vec3 pos) {
 	//return snoise3(pos / 20.0) * 20.0;
 
-	vec3 p = pos;
-	p.x += noise(0, pos);
-	float x = noise(1, p) - param0[1];
+	float val;
+	val =          -sphere(pos, vec3(0), 1000.0);
+	val = smax(val, -sphere(pos, vec3(1900, 0, -700), 700.0), k);
+	val = smax(val, -capsule2(pos, vec3(0,0,-600), vec3(1900, 0, -800), 120.0), k);
+	val = smin(val, capsule2(pos, vec3(-1100,0,200), vec3(1100, 0, 500), 180.0), k);
+	val = smin(val, capsule2(pos, vec3(100,0,350), vec3(0, 1100, -200), 120.0), k);
 	
-	p = pos;
-	p.z *= param0[3];
-	p.z += noise(2, pos);
-	x += max(noise(3, p), 0.0);
-	
-	x = min(x, ellipse(mod(pos, vec3(800)), vec3(400), vec3(50, 10, 20)));
+	val += noise(0, pos);
+	val += noise(1, pos);
 
-	return x;
+	float warp2 = noise(2, pos);
+	val += noise(3, pos + vec3(warp2));
+
+	return val;
 }
 
 // numerical gradients

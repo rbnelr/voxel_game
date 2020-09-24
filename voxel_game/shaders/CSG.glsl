@@ -20,3 +20,15 @@ float ellipse (vec3 p, vec3 center, vec3 r) {
 	p /= r;
 	return (length(p) - 1.0) * min(min(r.x,r.y),r.z);
 }
+
+float capsule (vec3 p, vec3 base, vec3 dir, float h, float r) {
+	p -= base;
+	float t = dot(p, dir);
+	t = clamp(t, 0.0, h);
+
+	vec3 proj = dir * t;
+	return length(p - proj) - r;
+}
+float capsule2 (vec3 p, vec3 a, vec3 b, float r) {
+	return capsule(p, a, normalize(b-a), length(b-a), r);
+}

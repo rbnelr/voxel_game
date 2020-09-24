@@ -1,5 +1,5 @@
 #include "allocator.hpp"
-#include "windows.h"
+#include "clean_windows_h.hpp"
 
 uint32_t get_os_page_size () {
 	SYSTEM_INFO info;

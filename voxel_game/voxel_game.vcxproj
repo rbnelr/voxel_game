@@ -70,7 +70,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)dear_imgui\;$(SolutionDir)nlohmann_json\include\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -95,7 +95,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)dear_imgui\;$(SolutionDir)nlohmann_json\include\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -126,7 +126,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\dear_imgui;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;$(SolutionDir)..\nlohmann_json\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)src;$(SolutionDir)tracy\;$(SolutionDir)dear_imgui\;$(SolutionDir)nlohmann_json\include\;$(SolutionDir)..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\stb;$(SolutionDir)..\portaudio\include;$(SolutionDir)..\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
       <ShowIncludes>false</ShowIncludes>
@@ -159,7 +159,7 @@
     <ClInclude Include="src\audio\read_wav.hpp" />
     <ClInclude Include="src\blocks.hpp" />
     <ClInclude Include="src\block_update.hpp" />
-    <ClInclude Include="src\dear_imgui.hpp" />
+    <ClInclude Include="src\dear_imgui\dear_imgui.hpp" />
     <ClInclude Include="src\dear_imgui\imgui_impl_glfw.h" />
     <ClInclude Include="src\dear_imgui\imgui_impl_opengl3.h" />
     <ClInclude Include="src\game.hpp" />
@@ -245,30 +245,30 @@
     <ClInclude Include="stdafx.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\dear_imgui\imgui.cpp">
+    <ClCompile Include="..\dear_imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
+    <ClCompile Include="..\dear_imgui\imgui_demo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp">
+    <ClCompile Include="..\dear_imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp">
+    <ClCompile Include="..\dear_imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
+    <ClCompile Include="..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\tracy\TracyClient.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
@@ -278,16 +278,20 @@
     <ClCompile Include="src\audio\audio.cpp" />
     <ClCompile Include="src\audio\read_wav.cpp" />
     <ClCompile Include="src\block_update.cpp" />
-    <ClCompile Include="src\dear_imgui.cpp" />
+    <ClCompile Include="src\dear_imgui\dear_imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="src\dear_imgui\imgui_impl_glfw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\dear_imgui\imgui_impl_opengl3.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PDebug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimized|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='POptimizedTracy|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\game.cpp" />
     <ClCompile Include="src\glad\glad.c">

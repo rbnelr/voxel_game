@@ -2,19 +2,8 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\voxel_game\src\worldgen_dll.cpp" />
-    <ClCompile Include="..\FastNoise\FastNoise.cpp">
-      <Filter>FastNoise</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\voxel_game\src\worldgen_dll.hpp" />
-    <ClInclude Include="..\FastNoise\FastNoise.h">
-      <Filter>FastNoise</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="FastNoise">
-      <UniqueIdentifier>{861cce63-0557-4890-8956-77a97df97b4e}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
 </Project>

@@ -873,7 +873,7 @@ void Graphics::draw (World& world, Camera_View const& view, Camera_View const& p
 		raytracer.draw(world.voxels.svo, view, *this, world.time_of_day);
 	}
 
-	worldgen_raymarch.draw();
+	worldgen_raymarch.draw(world.world_gen);
 
 	debug_graphics->draw();
 

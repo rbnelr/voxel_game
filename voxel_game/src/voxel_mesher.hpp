@@ -2,7 +2,6 @@
 #include "stdafx.hpp"
 #include "util/allocator.hpp"
 #include "threading.hpp"
-#include "graphics/graphics.hpp"
 
 namespace svo {
 	struct Chunk;
@@ -23,6 +22,6 @@ struct VoxelInstance {
 	int			tex_indx;
 };
 
-void remesh_chunk (svo::Chunk* chunk, svo::SVO& svo, Graphics const& g, uint64_t world_seed,
+void remesh_chunk (svo::Chunk* chunk, svo::SVO& svo, struct Graphics const& g, uint64_t world_seed,
 	std::vector<VoxelInstance>& opaque_mesh,
 	std::vector<VoxelInstance>& transparent_mesh);

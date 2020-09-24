@@ -2,6 +2,7 @@
 #include "voxel_mesher.hpp"
 #include "svo.hpp"
 #include "blocks.hpp"
+#include "graphics/graphics.hpp"
 
 using namespace svo;
 

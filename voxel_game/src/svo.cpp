@@ -833,10 +833,10 @@ namespace svo {
 
 				if (i > 0 && (chunk->flags & MESH_DIRTY)) { // never mesh root
 					// queue remeshing
-					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen.seed) );
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen.get_seed()) );
 
-					float size = (float)(1 << chunk->scale);
-					debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, lrgba(1,0,0,1));
+					//float size = (float)(1 << chunk->scale);
+					//debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, lrgba(1,0,0,1));
 				}
 
 				chunk->flags &= ~(SVO_DIRTY|MESH_DIRTY);

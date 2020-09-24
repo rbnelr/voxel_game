@@ -168,11 +168,9 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\FastNoise\FastNoise.cpp" />
     <ClCompile Include="..\voxel_game\src\worldgen_dll.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\FastNoise\FastNoise.h" />
     <ClInclude Include="..\voxel_game\src\worldgen_dll.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

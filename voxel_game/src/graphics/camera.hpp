@@ -1,8 +1,6 @@
 #pragma once
 #include "stdafx.hpp"
-#include "../kissmath.hpp"
-#include "../dear_imgui.hpp"
-#include "../util/collision.hpp"
+#include "util/collision.hpp"
 
 enum perspective_mode {
 	PERSPECTIVE,

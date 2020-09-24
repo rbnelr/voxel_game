@@ -15,7 +15,6 @@
     </ClInclude>
     <ClInclude Include="src\block_update.hpp" />
     <ClInclude Include="src\blocks.hpp" />
-    <ClInclude Include="src\dear_imgui.hpp" />
     <ClInclude Include="src\game.hpp" />
     <ClInclude Include="src\glfw_window.hpp" />
     <ClInclude Include="src\input.hpp" />
@@ -215,12 +214,6 @@
     <ClInclude Include="src\glad\khrplatform.h">
       <Filter>glad</Filter>
     </ClInclude>
-    <ClInclude Include="src\dear_imgui\imgui_impl_glfw.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="src\dear_imgui\imgui_impl_opengl3.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
     <ClInclude Include="src\audio\audio.hpp">
       <Filter>audio</Filter>
     </ClInclude>
@@ -235,28 +228,21 @@
     <ClInclude Include="src\stb\stb_image_write.hpp">
       <Filter>stb</Filter>
     </ClInclude>
+    <ClInclude Include="src\dear_imgui\imgui_impl_glfw.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dear_imgui\imgui_impl_opengl3.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dear_imgui\dear_imgui.hpp">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\dear_imgui\imgui.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_draw.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_widgets.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\dear_imgui\imgui_demo.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
     <ClCompile Include="..\tracy\TracyClient.cpp">
       <Filter>tracy</Filter>
     </ClCompile>
     <ClCompile Include="src\block_update.cpp" />
-    <ClCompile Include="src\dear_imgui.cpp" />
     <ClCompile Include="src\game.cpp" />
     <ClCompile Include="src\glfw_window.cpp" />
     <ClCompile Include="src\input.cpp" />
@@ -333,12 +319,6 @@
     <ClCompile Include="src\glad\glad_wgl.c">
       <Filter>glad</Filter>
     </ClCompile>
-    <ClCompile Include="src\dear_imgui\imgui_impl_glfw.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="src\dear_imgui\imgui_impl_opengl3.cpp">
-      <Filter>dear_imgui</Filter>
-    </ClCompile>
     <ClCompile Include="src\audio\audio.cpp">
       <Filter>audio</Filter>
     </ClCompile>
@@ -348,6 +328,30 @@
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="src\stb\stb_image_write.cpp">
       <Filter>stb</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dear_imgui\imgui.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dear_imgui\imgui_demo.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dear_imgui\imgui_draw.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dear_imgui\imgui_widgets.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dear_imgui\imgui_impl_glfw.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dear_imgui\imgui_impl_opengl3.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dear_imgui\dear_imgui.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dear_imgui\misc\cpp\imgui_stdlib.cpp">
+      <Filter>dear_imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

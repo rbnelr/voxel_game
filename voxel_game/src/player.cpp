@@ -2,6 +2,7 @@
 #include "player.hpp"
 #include "world.hpp"
 #include "input.hpp"
+#include "graphics/graphics.hpp"
 #include "GLFW/glfw3.h"
 
 float3	player_spawn_point = float3(70,60,34);

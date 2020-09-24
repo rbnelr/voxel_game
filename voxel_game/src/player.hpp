@@ -10,8 +10,6 @@
 // Global for now, the world should store this if it is not randomized
 extern float3	player_spawn_point;
 
-class World;
-
 struct SelectedBlock {
 	int3		pos;
 	block_id	block;
@@ -45,7 +43,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, bool creative_mode, PlayerGraphics& graphics);
+	void update (class World& world, Player& player, bool creative_mode, struct PlayerGraphics& graphics);
 };
 
 struct InventorySlot {

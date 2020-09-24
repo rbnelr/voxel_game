@@ -78,48 +78,35 @@ void GuiConsole::imgui () {
 	ImGui::Begin("Console", &gui_console.shown);
 
 	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
-	int size = (int)unimportant_lines.capacity();
-	if (ImGui::DragInt("buffer size", &size, 0.5f, 1, 10000)) {
-		unimportant_lines.resize(size);
-		important_lines.resize(size);
-	}
+	
+	ImGui::DragInt("display lines", &max_display_lines, 0.5f, 1, 0, ".6d", ImGuiSliderFlags_Logarithmic);
+	ImGui::SameLine();
+	ImGui::Text("%6.2f KB", (float)lines.size() * sizeof(Line) / 1024);
+	ImGui::SameLine();
+	if (ImGui::Button("Clear"))
+		lines = std::vector<Line>();
+	ImGui::SameLine();
 
 	ImGui::SameLine();
-	ImGui::Checkbox("INFO", &show_info);
+	ImGui::Checkbox("LOG", &show_levels[LOG]);
 	ImGui::SameLine();
-	ImGui::Checkbox("WARN", &show_warn);
+	ImGui::Checkbox("INFO", &show_levels[INFO]);
 	ImGui::SameLine();
-	ImGui::Checkbox("ERR", &show_err);
+	ImGui::Checkbox("WARN", &show_levels[WARNING]);
+	ImGui::SameLine();
+	ImGui::Checkbox("ERR", &show_levels[ERROR]);
 
 	ImGui::BeginChild("Console lines", ImVec2(0, 0), true);
 
 	bool autoscroll = ImGui::GetScrollMaxY() == ImGui::GetScrollY();
 
-	int ai=0, bi=0;
-	auto get_line = [&] () -> Line* {
-		auto* a = ai < unimportant_lines.count() ? &unimportant_lines.get_oldest(ai) : nullptr;
-		auto* b = bi <   important_lines.count() ? &  important_lines.get_oldest(bi) : nullptr;
+	int first_line = max((int)lines.size() - max_display_lines, 0);
 
-		if (!a && !b) return nullptr;
+	for (int i=first_line; i<(int)lines.size(); ++i) {
+		if (!show_levels[lines[i].level]) continue;
 
-		if (!a) { ++bi; return b; }
-		if (!b) { ++ai; return a; }
-
-		if (a->counter < b->counter) { ++ai; return a; }
-		else {						   ++bi; return b; }
-	};
-
-	Line* line;
-	while ((line = get_line())) {
-		if (line->level == INFO    && !show_info) continue;
-		if (line->level == WARNING && !show_warn) continue;
-		if (line->level == ERROR   && !show_err ) continue;
-
-		lrgba col = srgba(250);
-		if (line->level == WARNING)		col = srgba(255, 220, 80);
-		else if (line->level == ERROR)	col = srgba(255, 100, 40);
-
-		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), line->str);
+		lrgba col = LOG_LEVEL_COLS[lines[i].level];
+		ImGui::TextColored(ImVec4(col.x, col.y, col.z, col.w), lines[i].str);
 	}
 
 	if (autoscroll) // keep scroll set to end of console buffer if it was at the end previously
@@ -135,14 +122,9 @@ void GuiConsole::imgui () {
 }
 
 void GuiConsole::add_line (Line const& line) {
-	//OPTICK_EVENT();
-
-	auto* ls = line.level == INFO ? &unimportant_lines : &important_lines;
-
-	ls->push(line);
+	lines.push_back(line);
 
 	added_this_frame++;
-	counter++;
 
 	if (line.level == ERROR) {
 		imgui_uncollapse = true;
@@ -160,7 +142,7 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 	vsnprintf(str, sizeof(str), new_format, vl);
 
 #if !NDEBUG
-	// puts() is too slow to use in a game!!, often taking >1.5ms to execute
+	// puts() is too slow to use in a game?, seen in profiler often taking >1.5ms to execute, not sure why
 	fputs(str, level == ERROR || level == WARNING ? stdout : stderr);
 #endif
 

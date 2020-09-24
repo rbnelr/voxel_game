@@ -1,8 +1,7 @@
 #pragma once
 #include "stdafx.hpp"
 #include "glshader.hpp"
-#include "../dear_imgui.hpp"
-#include "../util/string.hpp"
+#include "util/string.hpp"
 
 struct ShaderManager {
 

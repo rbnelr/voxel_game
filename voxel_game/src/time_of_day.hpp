@@ -19,8 +19,7 @@ struct SkyColors {
 	}
 };
 
-class TimeOfDay {
-public:
+struct TimeOfDay {
 	float time = 9.3f; // [0,24)
 
 	SkyColors day_colors = {

@@ -3,15 +3,9 @@
 #include "graphics_common.hpp"
 #include "../blocks.hpp"
 #include "../util/raw_array.hpp"
+#include "svo.hpp"
 
-class Graphics;
-class TimeOfDay;
-namespace svo {
-	struct SVO;
-}
-
-class Raytracer {
-public:
+struct Raytracer {
 
 	Shader shader = Shader("raytrace_svo", { FOG_UNIFORMS });
 
@@ -52,5 +46,5 @@ public:
 
 	void imgui ();
 
-	void draw (svo::SVO& octree, Camera_View const& view, Graphics& graphics, TimeOfDay& tod);
+	void draw (SVO& octree, Camera_View const& view, struct Graphics& graphics, struct TimeOfDay& tod);
 };

@@ -4,7 +4,6 @@
 #include "assert.h"
 #include <vector>
 #include <string>
-#include "dear_imgui.hpp"
 
 // set uninitialized stuff to 0xcc to either catch out of unitialized bugs or make viewing it in the debugger clearer
 #define DBG_MEMSET (!NDEBUG) 

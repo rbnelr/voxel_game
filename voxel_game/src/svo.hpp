@@ -2,7 +2,6 @@
 #include "stdafx.hpp"
 #include "blocks.hpp"
 #include "util/allocator.hpp"
-#include "graphics/graphics.hpp"
 #include "voxel_mesher.hpp"
 #include "worldgen_dll.hpp"
 
@@ -418,7 +417,7 @@ namespace svo {
 			ImGui::Checkbox("debug_draw_svo", &debug_draw_svo);
 			ImGui::Checkbox("debug_draw_air", &debug_draw_air);
 			
-			ImGui::SliderFloat("debug_draw_inset", &debug_draw_inset, 0, 10, "%7.5f", 3);
+			ImGui::SliderFloat("debug_draw_inset", &debug_draw_inset, 0, 10, "%7.5f", ImGuiSliderFlags_Logarithmic);
 			ImGui::SliderInt("debug_draw_octree_min", &debug_draw_octree_min, 0,20);
 			ImGui::SliderInt("debug_draw_octree_max", &debug_draw_octree_max, 0,20);
 			ImGui::SliderFloat("debug_draw_octree_range", &debug_draw_octree_range, 0,2048, "%f", 2);

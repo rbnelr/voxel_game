@@ -1,9 +1,7 @@
 #pragma once
 #include "stdafx.hpp"
-#include "../kissmath.hpp"
 #include "shaders.hpp"
 #include "camera.hpp"
-#include "../dear_imgui.hpp"
 
 struct DebugGraphics {
 	struct Vertex {
