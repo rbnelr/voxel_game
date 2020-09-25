@@ -32,3 +32,10 @@ float capsule (vec3 p, vec3 base, vec3 dir, float h, float r) {
 float capsule2 (vec3 p, vec3 a, vec3 b, float r) {
 	return capsule(p, a, normalize(b-a), length(b-a), r);
 }
+
+
+float sphereGrad (vec3 p, vec3 center, float r, out vec3 grad) {
+	p -= center;
+	grad = normalize(p);
+	return length(p) - r;
+}
