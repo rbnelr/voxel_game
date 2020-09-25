@@ -72,7 +72,6 @@ void Game::frame () {
 			input.imgui();
 			audio_manager.imgui();
 			graphics.imgui(/*world->chunks*/);
-			debug_graphics->imgui();
 
 			bool world_open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
 
@@ -85,20 +84,21 @@ void Game::frame () {
 				clog(INFO, "Recreating world%s", trigger_reload ? "" : " due to worldgen.dll recompile");
 				world = nullptr; // unload world before reloading dll, this shuts down the threadpool which might still be calling the worldgen function in the dll
 
+				world = std::make_unique<World>( WorldGenerator::load("test_world") );
+
 				// reload worldgen dll and get the function dynamically
 				worldgen_dll.reload();
-				world_gen.generate_chunk_dll = worldgen_dll.h ?
-					(worldgen::generate_chunk_dll_fp)GetProcAddress(worldgen_dll.h, "generate_chunk_dll") : nullptr;
-				if (world_gen.generate_chunk_dll == nullptr) {
+				world->world_gen.generate_chunk_dll = worldgen_dll.h ?
+					(generate_chunk_dll_fp)GetProcAddress(worldgen_dll.h, "generate_chunk_dll") : nullptr;
+				if (world->world_gen.generate_chunk_dll == nullptr) {
 					clog(ERROR, "GetProcAddress failed");
 				}
 
 				// reload the world using the potentially new worldgen dll
-				world = std::make_unique<World>(world_gen);
 			}
 
 			if (world_open) {
-				world_gen.imgui();
+				world->world_gen.imgui();
 				world->imgui();
 				block_update.imgui();
 			}
@@ -164,7 +164,7 @@ void Game::frame () {
 
 		//block_update.update_blocks(world->chunks);
 
-		world->voxels.svo.update_chunk_loading_and_meshing(world->player, world_gen, graphics);
+		world->voxels.svo.update_chunk_loading_and_meshing(*world, graphics);
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);

@@ -2,17 +2,33 @@
 	"seed_str": "test",
 	"noises": [
 		{
-			"name": "a",
-			"period": 10.0,
-			"strength": 100.0,
+			"name": "noise0",
+			"period": 500.0,
+			"strength": 40.0,
 			"octaves": [],
 			"param0": 0.0,
 			"param1": 0.0
 		},
 		{
-			"name": "b",
+			"name": "warp",
+			"period": 120.0,
+			"strength": 80.0,
+			"octaves": [],
+			"param0": 0.0,
+			"param1": 0.0
+		},
+		{
+			"name": "noise1",
+			"period": 100.0,
+			"strength": 39.599998474121094,
+			"octaves": [],
+			"param0": 0.0,
+			"param1": 0.0
+		},
+		{
+			"name": "",
 			"period": 10.0,
-			"strength": 100.0,
+			"strength": 0.0,
 			"octaves": [],
 			"param0": 0.0,
 			"param1": 0.0

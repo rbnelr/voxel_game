@@ -25,10 +25,9 @@ float SDF (vec3 pos) {
 	val = smin(val, capsule2(pos, vec3(100,0,350), vec3(0, 1100, -200), 120.0), k);
 	
 	val += noise(0, pos);
-	val += noise(1, pos);
 
-	float warp2 = noise(2, pos);
-	val += noise(3, pos + vec3(warp2));
+	float warp2 = noise(1, pos);
+	val += noise(2, pos + vec3(warp2));
 
 	return val;
 }

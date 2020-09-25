@@ -18,9 +18,8 @@ static constexpr inline uintptr_t CHUNK_3D_CHILD_OFFSET (int i) {
 			+((uintptr_t)((i&1)     )                 );
 }
 
-namespace worldgen {
-	typedef void (* generate_chunk_dll_fp)(block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t world_seed);
-}
+typedef void (* generate_chunk_dll_fp)(block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t world_seed);
+
 
 extern "C" {
 	__declspec(dllexport) void generate_chunk_dll (block_id* blocks, int3 chunk_pos, int chunk_lod, uint64_t world_seed);

@@ -4,6 +4,7 @@
 #include "worldgen.hpp"
 #include "player.hpp"
 #include "graphics/debug_graphics.hpp"
+#include "world.hpp"
 
 namespace svo {
 #if 0
@@ -617,7 +618,7 @@ namespace svo {
 		//glBindBuffer(GL_VERTEX_ARRAY, 0);
 	}
 
-	void SVO::update_chunk_loading (Player& player, WorldGenerator& world_gen) {
+	void SVO::update_chunk_loading (World& world) {
 		ZoneScoped;
 
 		std::vector<LoadOp> ops_to_queue;
@@ -639,7 +640,7 @@ namespace svo {
 			auto calc_lod = [&] (int3 pos, int scale, float* out_dist) {
 				float size = (float)(1 << scale);
 
-				float3 pos_rel = player.pos - (float3)pos;
+				float3 pos_rel = world.player.pos - (float3)pos;
 
 				float3 clamped = clamp(pos_rel, 0, size);
 				float dist = length(clamped - pos_rel);
@@ -715,7 +716,7 @@ namespace svo {
 						pending_chunks.insert(op.pos, op.scale, chunk);
 
 						//clog("queue CREATE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
-						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
+						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world.world_gen, op.type) );
 					} break;
 
 					case LoadOp::SPLIT: {
@@ -731,7 +732,7 @@ namespace svo {
 							pending_chunks.insert(child_pos, child_scale, chunk);
 
 							//clog("queue SPLIT for %2d : %+7d,%+7d,%+7d", child_scale, child_pos.x,child_pos.y,child_pos.z);
-							jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
+							jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world.world_gen, op.type) );
 						}
 					} break;
 
@@ -751,7 +752,7 @@ namespace svo {
 						}
 
 						//clog("queue MERGE for %2d : %+7d,%+7d,%+7d", op.scale, op.pos.x,op.pos.y,op.pos.z);
-						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world_gen, op.type) );
+						jobs.emplace_back( std::make_unique<ChunkLoadJob>(chunk, *this, world.world_gen, op.type) );
 					} break;
 				}
 			}
@@ -760,7 +761,7 @@ namespace svo {
 		}
 	}
 
-	void SVO::update_chunk_gpu_data (Graphics& graphics, WorldGenerator& world_gen) {
+	void SVO::update_chunk_gpu_data (World& world, Graphics& graphics) {
 		ZoneScoped;
 
 		std::vector<std::unique_ptr<ThreadingJob>> remeshing_jobs;
@@ -833,7 +834,7 @@ namespace svo {
 
 				if (i > 0 && (chunk->flags & MESH_DIRTY)) { // never mesh root
 					// queue remeshing
-					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world_gen.get_seed()) );
+					remeshing_jobs.emplace_back( std::make_unique<RemeshChunkJob>(chunk, *this, graphics, world.world_gen.get_seed()) );
 
 					//float size = (float)(1 << chunk->scale);
 					//debug_graphics->push_wire_cube((float3)chunk->pos + 0.5f * size, size * 0.995f, lrgba(1,0,0,1));
@@ -870,10 +871,10 @@ namespace svo {
 		}
 	}
 
-	void SVO::update_chunk_loading_and_meshing (Player& player, WorldGenerator& world_gen, Graphics& graphics) {
+	void SVO::update_chunk_loading_and_meshing (World& world, Graphics& graphics) {
 		ZoneScoped;
 
-		update_root_move(*this, player);
+		update_root_move(*this, world.player);
 
 		{ // finish first, so that pending_chunks becomes smaller before we cap the newly queued ones to limit this size
 			ZoneScopedN("finish chunkgen jobs");
@@ -888,13 +889,13 @@ namespace svo {
 			}
 		}
 
-		update_chunk_loading(player, world_gen);
-		update_chunk_gpu_data(graphics, world_gen);
+		update_chunk_loading(world);
+		update_chunk_gpu_data(world, graphics);
 
 		if (debug_draw_svo) {
 			ZoneScopedN("SVO::debug_draw");
 		
-			recurse_draw(*this, root, { NODE_PTR, 0 }, root->pos, root->scale, player.pos);
+			recurse_draw(*this, root, { NODE_PTR, 0 }, root->pos, root->scale, world.player.pos);
 		}
 
 		if (debug_draw_chunks) {

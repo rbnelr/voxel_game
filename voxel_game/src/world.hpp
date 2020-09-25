@@ -6,9 +6,7 @@
 #include "worldgen.hpp"
 #include "time_of_day.hpp"
 
-class World {
-
-public:
+struct World {
 	WorldGenerator world_gen;
 	Voxels voxels;
 

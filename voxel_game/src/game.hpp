@@ -105,9 +105,6 @@ class Game {
 
 	FPS_Display fps_display;
 
-	// Global world gen I can tweak (changes are only visible on world recreate)
-	WorldGenerator world_gen = WorldGenerator::load("test_world");
-
 	// World gets world gen copy on create 
 	std::unique_ptr<World> world;
 

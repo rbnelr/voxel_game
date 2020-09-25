@@ -23,8 +23,7 @@ struct SelectedBlock {
 	}
 };
 
-class BreakBlock {
-public:
+struct BreakBlock {
 	float anim_speed = 4;
 	float damage = 0.25f;
 	float reach = 4.5f;
@@ -43,7 +42,7 @@ public:
 
 		imgui_pop();
 	}
-	void update (class World& world, Player& player, bool creative_mode, struct PlayerGraphics& graphics);
+	void update (struct World& world, Player& player, bool creative_mode, struct PlayerGraphics& graphics);
 };
 
 struct InventorySlot {
@@ -53,8 +52,7 @@ struct InventorySlot {
 	Item item = {};
 };
 
-class Inventory {
-public:
+struct Inventory {
 	bool is_open = false;
 
 	struct Quickbar {
@@ -89,9 +87,7 @@ public:
 	void update ();
 };
 
-class BlockPlace {
-public:
-
+struct BlockPlace {
 	float repeat_speed = 5.5f;
 	float anim_speed = 4;
 	float reach = 4.5f;
@@ -109,9 +105,7 @@ public:
 	void update (World& world, Player& player);
 };
 
-class Player {
-public:
-
+struct Player {
 	Player () {
 		respawn();
 	}
@@ -214,7 +208,7 @@ public:
 		vel = 0;
 	}
 
-	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
+	float3 calc_third_person_cam_pos (struct World& world, float3x3 body_rotation, float3x3 head_elevation);
 };
 
-void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode);
+void update_block_edits (struct World& world, Camera_View& view, PlayerGraphics& graphics, bool creative_mode);

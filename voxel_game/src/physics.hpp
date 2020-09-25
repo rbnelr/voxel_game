@@ -37,11 +37,7 @@ struct PhysicsObject {
 	CollisionResponse coll;
 };
 
-class Player;
-class World;
-
-class Physics {
-public:
+struct Physics {
 
 	float3 grav_accel = float3(0, 0, -DEFAULT_GRAVITY);
 
@@ -58,9 +54,9 @@ public:
 		return sqrt( 2.0f * jump_height * grav_mag );
 	}
 
-	void update_object (World& world, PhysicsObject& obj);
+	void update_object (struct World& world, PhysicsObject& obj);
 
-	void update_player (World& world, Player& player);
+	void update_player (struct World& world, struct Player& player);
 };
 
 // Global physics

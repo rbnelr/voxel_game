@@ -77,9 +77,6 @@ struct BlockHighlightGraphics {
 	void draw (float3 pos, BlockFace face);
 };
 
-class Player;
-struct TileTextures;
-
 struct BlockVertex {
 	float3 pos;
 	float3 normal;
@@ -211,16 +208,16 @@ struct GuiGraphics {
 	void draw_texture (AtlasedTexture const& tex, float2 pos_px, float2 size_px, lrgba col=1);
 	void draw_color_quad (float2 pos_px, float2 size_px, lrgba col);
 
-	void draw_item_tile (item_id id, float2 pos_px, float2 size_px, TileTextures const& tile_textures);
+	void draw_item_tile (item_id id, float2 pos_px, float2 size_px, struct TileTextures const& tile_textures);
 
 	float2 get_quickbar_slot_center (int slot_index);
 
 	void draw_crosshair ();
 	void draw_quickbar_slot (AtlasedTexture tex, int index);
-	void draw_quickbar_item (item_id id, int index, TileTextures const& tile_textures);
-	void draw_quickbar (Player const& player, TileTextures const& tile_textures);
+	void draw_quickbar_item (item_id id, int index, struct TileTextures const& tile_textures);
+	void draw_quickbar (struct Player const& player, struct TileTextures const& tile_textures);
 
-	void draw (Player const& player, TileTextures const& tile_textures, Sampler const& sampler);
+	void draw (struct Player const& player, struct TileTextures const& tile_textures, Sampler const& sampler);
 };
 
 struct GenericVertex {
@@ -259,11 +256,15 @@ struct PlayerGraphics {
 	float tool_scale = 0.8f;
 
 	void imgui () {
+		if (!imgui_push("PlayerGraphics")) return;
+		
 		ImGui::SliderAngle("tool_euler_X", &tool_euler_angles.x, -180, +180);
 		ImGui::SliderAngle("tool_euler_Y", &tool_euler_angles.y, -180, +180);
 		ImGui::SliderAngle("tool_euler_Z", &tool_euler_angles.z, -180, +180);
 		ImGui::DragFloat3("tool_offset", &tool_offset.x, 0.005f);
 		ImGui::DragFloat("tool_scale", &tool_scale, 0.005f);
+
+		imgui_pop();
 	}
 
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
@@ -406,9 +407,6 @@ struct VoxelGraphics {
 	void draw_transparent (Voxels& voxels, TileTextures const& tile_textures, Sampler const& sampler);
 };
 
-class World;
-struct SelectedBlock;
-
 struct FogUniforms {
 	float3 sky_col;
 	float _pad0;
@@ -432,10 +430,13 @@ struct Fog {
 	SharedUniforms<FogUniforms> fog_uniforms = FOG_UNIFORMS;
 
 	void imgui () {
+		if (!imgui_push("Fog")) return;
 
 		ImGui::DragFloat("fog_base_coeff", &fog_base_coeff, 0.05f);
 
 		ImGui::Checkbox("fog_enable", &enable);
+
+		imgui_pop();
 	}
 
 	void set (float max_view_dist, SkyColors colors) {
@@ -486,16 +487,17 @@ struct Framebuffer {
 	bool nearest = false;
 
 	void imgui () {
-		if (!imgui_push("Framebuffer")) return;
+		//if (!imgui_push("Framebuffer")) return;
 
 		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 
 		ImGui::SameLine();
 		ImGui::Text("= %4d x %4d px", size.x, size.y);
 
+		ImGui::SameLine();
 		ImGui::Checkbox("blit nearest", &nearest);
 
-		imgui_pop();
+		//imgui_pop();
 	}
 
 	void update () {
@@ -570,7 +572,6 @@ struct Graphics {
 	bool screenshot_hud = false;
 
 	bool debug_frustrum_culling = false;
-	bool debug_block_light = false;
 
 	//void frustrum_cull_chunks (Chunks& chunks, Camera_View const& view);
 
@@ -588,14 +589,15 @@ struct Graphics {
 			tile_textures.imgui("tile_textures");
 
 			ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
-			ImGui::Checkbox("debug_block_light", &debug_block_light);
 
 			ImGui::Separator();
 
 			raytracer.imgui();
 			worldgen_raymarch.imgui();
+
+			debug_graphics->imgui();
 		}
 	}
 
-	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, SelectedBlock highlighted_block);
+	void draw (World& world, Camera_View const& view, Camera_View const& player_view, bool activate_flycam, bool creative_mode, struct SelectedBlock highlighted_block);
 };

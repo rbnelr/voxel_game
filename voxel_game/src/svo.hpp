@@ -7,12 +7,8 @@
 
 #include "immintrin.h"
 
-class Voxels;
-class Player;
-
-struct WorldgenJob;
-namespace worldgen { struct WorldGenerator; }
-using worldgen::WorldGenerator;
+struct World;
+struct WorldGenerator;
 
 namespace svo {
 
@@ -493,13 +489,13 @@ namespace svo {
 			*root_node = { ONLY_BLOCK_IDS }; // clear to all B_NULL block ids
 		}
 
-		void update_chunk_loading (Player& player, WorldGenerator& world_gen);
+		void update_chunk_loading (World& world);
 
-		void update_chunk_gpu_data (Graphics& graphics, WorldGenerator& world_gen);
+		void update_chunk_gpu_data (World& world, Graphics& graphics);
 
-		void update_chunk_loading_and_meshing (Player& player, WorldGenerator& world_gen, Graphics& graphics);
+		void update_chunk_loading_and_meshing (World& world, Graphics& graphics);
 
-		void chunk_to_octree (Chunk* chunk, block_id* blocks);
+		void chunk_to_octree (struct Chunk* chunk, block_id* blocks);
 
 		// octree write, writes a single voxel at a desired pos, scale to be a particular leaf val
 		// this decends the octree from the root and inserts or deletes nodes when needed
