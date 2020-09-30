@@ -9,7 +9,10 @@ uniform float nparam0[8];
 uniform float nparam1[8];
 
 float noise (int i, vec3 pos) {
-	return snoise3(pos * nfreq[i]) * namp[i];
+	return snoise(pos * nfreq[i]) * namp[i];
+}
+float noise (int i, vec3 pos, out vec3 grad) {
+	return snoise(pos * nfreq[i], grad) * namp[i];
 }
 
 const float k = 40.0;
@@ -26,19 +29,21 @@ float SDF (vec3 pos) {
 
 	float val;
 	vec3 grad;
-	val =          -sphereGrad(pos, vec3(0), 1000.0, grad);
+	val =          -sphereGrad(pos, vec3(0,1000.0,0), 1000.0, grad);
 	grad = -grad;
 
-	//val = min(val, max(-grad.z, 0.0));
+	//vec3 grad;
+	//float val = noise(0, pos, grad) + nparam0[0];
 
-	float t = map(abs(grad.z), 0.0, nparam1[2]);
-	val = mix(val, val - nparam0[2], smoothstep(0.0, 1.0, t));
-	//val = smin(val, -pow(max(grad.z, 0.0), nparam1[3]) * nparam0[3], k);
-
-	val += noise(0, pos);
+	vec3 center = grad * (1000.0 - val); // reconstructed sphere center
+	float plane_z = center.z -1000.0 + nparam0[2];
 	
-	float warp2 = noise(1, pos);
-	val += noise(2, pos + vec3(warp2));
+	val = min(val, pos.z - plane_z);
+
+	//val += noise(0, pos);
+	//
+	//float warp2 = noise(1, pos);
+	//val += noise(2, pos + vec3(warp2));
 
 	return val;
 }

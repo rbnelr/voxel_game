@@ -10,22 +10,22 @@
 //               https://github.com/stegu/webgl-noise
 // 
 
-vec3 mod289(vec3 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 mod289(vec4 x) {
-  return x - floor(x * (1.0 / 289.0)) * 289.0;
-}
-
-vec4 permute(vec4 x) {
-     return mod289(((x*34.0)+1.0)*x);
-}
-
-vec4 taylorInvSqrt(vec4 r)
-{
-  return 1.79284291400159 - 0.85373472095314 * r;
-}
+//vec3 mod289(vec3 x) {
+//  return x - floor(x * (1.0 / 289.0)) * 289.0;
+//}
+//
+//vec4 mod289(vec4 x) {
+//  return x - floor(x * (1.0 / 289.0)) * 289.0;
+//}
+//
+//vec4 permute(vec4 x) {
+//     return mod289(((x*34.0)+1.0)*x);
+//}
+//
+//vec4 taylorInvSqrt(vec4 r)
+//{
+//  return 1.79284291400159 - 0.85373472095314 * r;
+//}
 
 float snoise(vec3 v, out vec3 gradient)
 {
@@ -96,7 +96,7 @@ float snoise(vec3 v, out vec3 gradient)
   p3 *= norm.w;
 
 // Mix final noise value
-  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+  vec4 m = max(0.5 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
   vec4 m2 = m * m;
   vec4 m4 = m2 * m2;
   vec4 pdotx = vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3));

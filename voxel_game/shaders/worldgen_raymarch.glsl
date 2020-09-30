@@ -28,11 +28,12 @@ $include "worldgen.glsl"
 
 //// Settings
 	uniform float slider = 1.0; // debugging
-	uniform sampler2D heat_gradient;
+	uniform sampler2D gradients;
 	
 	// see worldgen_raymarch.hpp comments
-	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
+	uniform bool visualize_iterations = false;
+	uniform bool visualize_sdf = false;
 
 	uniform float clip_dist = 50000.0;
 	uniform float sdf_fac = 0.25;
@@ -108,7 +109,7 @@ $include "worldgen.glsl"
 		vec3 fw = fwidth(pos);
 		float fwm = clamp(max(max(fw.x, fw.y), fw.z) * 2.0, 0.0, 1.0);
 
-		vec3 col = hsl_to_rgb(snoise3(pos / 7000.0), 1.0, 0.7);
+		vec3 col = hsl_to_rgb(snoise(pos / 7000.0), 1.0, 0.7);
 
 		vec3 albedo = mix(col, vec3(0.1), mix(lines, 0.0, fwm));
 
@@ -119,7 +120,7 @@ $include "worldgen.glsl"
 
 	int iterations = 0;
 
-	vec4 raymarch (vec3 pos0, vec3 dir) {
+	vec4 raymarch (vec3 pos0, vec3 dir, out float hit_t) {
 		float prev_t = 0.0, t = 0.0;
 		float prev_dist;
 
@@ -135,8 +136,10 @@ $include "worldgen.glsl"
 			t += clamp(abs(dist) * sdf_fac, min_step, max_step);
 
 			// alpha 1 at max iterations or far clip
-			if (iterations++ == max_iterations || t >= clip_dist)
+			if (iterations++ == max_iterations || t >= clip_dist) {
+				hit_t = 1000000000.0;
 				return vec4(0.0);
+			}
 
 			pos = pos0 + dir * t;
 			dist = SDF(pos);
@@ -177,6 +180,8 @@ $include "worldgen.glsl"
 			//DEBUG(vec3(float(iter) / float(bsearch_iter), 0,0));
 		}
 
+		hit_t = t;
+
 		//DEBUG(-dist / 10.0);
 
 		vec3 normal = grad(pos, dist);
@@ -201,6 +206,16 @@ $include "worldgen.glsl"
 		ray_dir = normalize(ray_dir);
 	}
 
+	float intersect_plane (vec3 plane_pos, vec3 plane_normal, vec3 ray_pos, vec3 ray_dir) {
+		ray_pos -= plane_pos;
+
+		float normal_dir = dot(ray_dir, -plane_normal);
+		if (normal_dir == 0.0)
+			return -1.0;
+
+		return dot(ray_pos, plane_normal) / normal_dir;
+	}
+
 	vec4 tonemap (vec4 col) {
 		vec3 c = col.rgb * 1.0;
 		c = c / (c + 1);
@@ -209,13 +224,29 @@ $include "worldgen.glsl"
 	void main () {
 		vec3 ray_pos, ray_dir;
 		get_ray(ray_pos, ray_dir);
-	
-		vec4 col = raymarch(ray_pos, ray_dir);
-	
-		if (visualize_iterations)
-			col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 		
-		FRAG_COL(tonemap(col));
+		float hit_t;
+		vec4 col = raymarch(ray_pos, ray_dir, hit_t);
+		
+		//col = tonemap(col);
+
+		if (visualize_sdf) {
+			float t = intersect_plane(vec3(0), vec3(1,0,0), ray_pos, ray_dir);
+			if (t >= 0.01) {
+				float val = SDF(ray_pos + ray_dir * t) / 100.0;
+				val = fract(val) - (val < 0.0 ? 1.0 : 0.0);
+
+				vec4 tex = texture(gradients, vec2(val * 0.5 + 0.5, 0.75));
+				if (t <= hit_t)
+					col = mix(col, tex, 0.5);
+				else
+					col = mix(tex, col, 0.99);
+			}
+		} else if (visualize_iterations) {
+			col = texture(gradients, vec2(float(iterations) / float(max_iterations), 0.25));
+		}
+
+		FRAG_COL(col);
 	}
 
 $endif

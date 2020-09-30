@@ -12,7 +12,7 @@ public:
 
 	Sampler trilinear_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::REPEAT);
 	Sampler nearest_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR, gl::Enum::CLAMP_TO_EDGE);
-	Texture2D heat_gradient = { "textures/heat_gradient.png" };
+	Texture2D gradients = { "textures/gradients.png" };
 
 	Texture2D env = { "textures/env/blue_grotto_1k.hdr" };
 
@@ -24,6 +24,7 @@ public:
 	// max raymarch iterations, depending on scene and settings below this limit can be reached or not, when reached causes cutoff at distance
 	int max_iterations = 200;
 	bool visualize_iterations = false;
+	bool visualize_sdf = false;
 
 	// distance where to stop raymarch 'farplane'
 	float far_clip = 50000;
@@ -55,6 +56,7 @@ public:
 		max_iterations = (int)max_iterationsf;
 
 		ImGui::Checkbox("visualize_iterations", &visualize_iterations);
+		ImGui::Checkbox("visualize_sdf", &visualize_sdf);
 
 		ImGui::DragFloat("far_clip", &far_clip, 10);
 		ImGui::DragFloat("sdf_fac", &sdf_fac, 0.005f, 0.1f, 2, "%.5f", ImGuiSliderFlags_Logarithmic);
@@ -78,6 +80,7 @@ public:
 
 			shader.set_uniform("max_iterations", max_iterations);
 			shader.set_uniform("visualize_iterations", visualize_iterations);
+			shader.set_uniform("visualize_sdf", visualize_sdf);
 
 			shader.set_uniform("far_clip", far_clip);
 			shader.set_uniform("sdf_fac", sdf_fac);
@@ -90,9 +93,9 @@ public:
 			GLint texunit = 0;
 
 			glActiveTexture(GL_TEXTURE0 + texunit);
-			shader.set_texture_unit("heat_gradient", texunit);
+			shader.set_texture_unit("gradients", texunit);
 			trilinear_sampler.bind(texunit++);
-			heat_gradient.bind();
+			gradients.bind();
 
 			glActiveTexture(GL_TEXTURE0 + texunit);
 			shader.set_texture_unit("env", texunit);

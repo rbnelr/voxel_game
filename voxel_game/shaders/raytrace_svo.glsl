@@ -77,7 +77,7 @@ $if fragment
 	uniform float slider = 1.0; // debugging
 	uniform bool visualize_iterations = false;
 	uniform int max_iterations = 100; // iteration limiter for debugging
-	uniform sampler2D heat_gradient;
+	uniform sampler2D gradients;
 
 	uniform vec3 sun_col = vec3(1.0);
 	uniform vec3 sun_dir = normalize(vec3(3, 4, 6));
@@ -566,7 +566,7 @@ $if fragment
 		vec4 col = vec4(accum_col, 1.0);
 		
 		if (visualize_iterations)
-			col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+			col = texture(gradients, vec2(float(iterations) / float(max_iterations), 0.25));
 
 		FRAG_COL(col);
 

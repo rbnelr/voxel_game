@@ -18,7 +18,7 @@ struct Raytracer {
 	
 	Sampler trilinear_sampler = Sampler(gl::Enum::LINEAR, gl::Enum::LINEAR_MIPMAP_LINEAR, gl::Enum::CLAMP_TO_EDGE);
 	Sampler nearest_sampler = Sampler(gl::Enum::NEAREST, gl::Enum::LINEAR, gl::Enum::CLAMP_TO_EDGE);
-	Texture2D heat_gradient = { "textures/heat_gradient.png" };
+	Texture2D gradients = { "textures/gradients.png" };
 	Texture2D dbg_font = { "textures/consolas_ascii9x17.png" };
 
 	Texture2D water_normal = { "textures/water_normal.jpg", false, true };

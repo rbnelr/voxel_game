@@ -102,9 +102,9 @@ void Raytracer::draw (svo::SVO& svo, Camera_View const& view, Graphics& graphics
 		water_normal.bind();
 
 		glActiveTexture(GL_TEXTURE0 + texunit);
-		shader.set_texture_unit("heat_gradient", texunit);
+		shader.set_texture_unit("gradients", texunit);
 		trilinear_sampler.bind(texunit++);
-		heat_gradient.bind();
+		gradients.bind();
 
 		glActiveTexture(GL_TEXTURE0 + texunit);
 		shader.set_texture_unit("dbg_font", texunit);
