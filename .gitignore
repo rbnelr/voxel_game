@@ -1,4 +1,4 @@
-._*.txt # for ._need_potatomode.txt
+*/screenshots/
 */stb/
 imgui.ini
 *.ini
