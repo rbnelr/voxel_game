@@ -8,4 +8,6 @@
 [submodule "nlohmann_json"]
 	path = nlohmann_json
 	url = https://github.com/nlohmann/json.git
-	branch = develop
+[submodule "kisslib"]
+	path = kisslib
+	url = https://github.com/rbnelr/kisslib.git

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{47dc811c-2740-4248-ad93-c0199f8679ec}</ProjectGuid>
+    <RootNamespace>voxelgame</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)..\..\</OutDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <OutDir>$(SolutionDir)..\..\..\</OutDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\;$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\vulkan_sdk\Include\;$(SolutionDir)..\..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\vulkan_sdk\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\vulkan_sdk\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\dear_imgui\imgui.h" />
+    <ClInclude Include="..\..\..\dear_imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
+    <ClInclude Include="..\..\..\kisslib\allocator.hpp" />
+    <ClInclude Include="..\..\..\kisslib\animation.hpp" />
+    <ClInclude Include="..\..\..\kisslib\bit_twiddling.hpp" />
+    <ClInclude Include="..\..\..\kisslib\circular_buffer.hpp" />
+    <ClInclude Include="..\..\..\kisslib\clean_windows_h.hpp" />
+    <ClInclude Include="..\..\..\kisslib\collision.hpp" />
+    <ClInclude Include="..\..\..\kisslib\file_io.hpp" />
+    <ClInclude Include="..\..\..\kisslib\geometry.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2x2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2x3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3x3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3x4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\float4x4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\transform2d.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\transform3d.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v2.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v3.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v4.hpp" />
+    <ClInclude Include="..\..\..\kisslib\kissmath_colors.hpp" />
+    <ClInclude Include="..\..\..\kisslib\macros.hpp" />
+    <ClInclude Include="..\..\..\kisslib\random.hpp" />
+    <ClInclude Include="..\..\..\kisslib\raw_array.hpp" />
+    <ClInclude Include="..\..\..\kisslib\read_directory.hpp" />
+    <ClInclude Include="..\..\..\kisslib\running_average.hpp" />
+    <ClInclude Include="..\..\..\kisslib\string.hpp" />
+    <ClInclude Include="..\..\..\kisslib\threadpool.hpp" />
+    <ClInclude Include="..\..\..\kisslib\threadsafe_queue.hpp" />
+    <ClInclude Include="..\..\..\kisslib\timer.hpp" />
+    <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
+    <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="..\..\..\src\imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="..\..\..\src\input.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
+    <ClInclude Include="..\..\..\src\window.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\dear_imgui\imgui.cpp" />
+    <ClCompile Include="..\..\..\dear_imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\dear_imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\dear_imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
+    <ClCompile Include="..\..\..\kisslib\allocator.cpp" />
+    <ClCompile Include="..\..\..\kisslib\collision.cpp" />
+    <ClCompile Include="..\..\..\kisslib\file_io.cpp" />
+    <ClCompile Include="..\..\..\kisslib\random.cpp" />
+    <ClCompile Include="..\..\..\kisslib\read_directory.cpp" />
+    <ClCompile Include="..\..\..\kisslib\string.cpp" />
+    <ClCompile Include="..\..\..\kisslib\threadpool.cpp" />
+    <ClCompile Include="..\..\..\kisslib\timer.cpp" />
+    <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
+    <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\..\..\src\imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\..\..\src\input.cpp" />
+    <ClCompile Include="..\..\..\src\vulkan\vulkan.cpp" />
+    <ClCompile Include="..\..\..\src\window.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\kisslib\kissmath\output\bool2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\bool3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\bool4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float2x2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float2x3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float3x3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float3x4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\float4x4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int64.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int64v2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int64v3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\int64v4.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\transform2d.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\transform3d.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\uint8.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\uint8v2.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\uint8v3.inl" />
+    <None Include="..\..\..\kisslib\kissmath\output\uint8v4.inl" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
