@@ -6,7 +6,7 @@
 #include "kisslib/kissmath_colors.hpp"
 using namespace kissmath;
 
-void DearImgui::init (vk::Renderer& renderer) {
+void DearImgui::init (vk::Renderer& renderer, int msaa) {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -29,7 +29,7 @@ void DearImgui::init (vk::Renderer& renderer) {
 	info.DescriptorPool		= renderer.descriptor_pool;
 	info.MinImageCount		= vk::SWAP_CHAIN_SIZE;
 	info.ImageCount			= vk::SWAP_CHAIN_SIZE;
-	info.MSAASamples		= renderer.max_msaa_samples;
+	info.MSAASamples		= (VkSampleCountFlagBits)msaa;
 	info.Allocator			= nullptr;
 	info.CheckVkResultFn	= nullptr;
 	ImGui_ImplVulkan_Init(&info, renderer.render_pass);
@@ -55,11 +55,12 @@ void DearImgui::frame_start () {
 	}
 
 	ImGui::NewFrame();
-}
-void DearImgui::frame_end (VkCommandBuffer buf) {
-	if (show_demo_window)
+
+	if (true || show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
+}
+void DearImgui::draw (VkCommandBuffer buf) {
 	if (enabled) {
 		ImGui::Render();
 

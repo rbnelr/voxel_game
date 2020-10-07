@@ -1,5 +1,6 @@
 #pragma once
 #include "vulkan/vulkan.h"
+#include "shaderc/shaderc.h"
 #include "../../kisslib/macros.hpp"
 #include "../../kisslib/kissmath.hpp"
 #include <vector>
@@ -26,6 +27,7 @@ namespace vk {
 ////
 	#define VK_CHECK_RESULT(expr) if ((expr) != VK_SUCCESS) { \
 		throw std::runtime_error("[Vulkan] Fatal error: " TO_STRING(expr)); \
+		__debugbreak(); \
 	}
 
 	inline VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback (VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
@@ -37,6 +39,10 @@ namespace vk {
 		fprintf(stderr, "[Vulkan] %s\n", pCallbackData->pMessage);
 		//clog(ERROR, "[Vulkan] %s\n", pCallbackData->pMessage);
 
+	#ifndef NDEBUG
+		if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+			__debugbreak();
+	#endif
 		return VK_FALSE;
 	}
 
@@ -51,6 +57,34 @@ namespace vk {
 
 		return vec;
 	}
+
+	enum class AttribFormat : int {
+		FLOAT1		= VK_FORMAT_R32_SFLOAT,
+		FLOAT2		= VK_FORMAT_R32G32_SFLOAT,
+		FLOAT3		= VK_FORMAT_R32G32B32_SFLOAT,
+		FLOAT4		= VK_FORMAT_R32G32B32A32_SFLOAT,
+	};
+
+	struct VertexAttributes {
+		VkVertexInputBindingDescription descr;
+		std::vector<VkVertexInputAttributeDescription> attribs;
+
+		void init (size_t vertex_size) {
+			descr = {};
+			descr.binding = 0;
+			descr.stride = (uint32_t)vertex_size;
+			descr.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		}
+
+		void add (int location, char const* name, AttribFormat format, size_t offset) {
+			VkVertexInputAttributeDescription a = {};
+			a.binding = 0;
+			a.location = (uint32_t)location;
+			a.format = VK_FORMAT_R32G32B32_SFLOAT;
+			a.offset = (uint32_t)offset;
+			attribs.push_back(a);
+		}
+	};
 
 	struct VulkanQueuesFamilies {
 		// graphics, compute and transfer queue (if graphics are supported there has to be one 'universal' queue)
@@ -202,6 +236,34 @@ namespace vk {
 		VK_CHECK_RESULT(vkAllocateMemory(device, &alloc_info, nullptr, &memory));
 
 		return memory;
+	}
+
+	inline VkBuffer create_buffer (VkDevice device, VkPhysicalDevice pdev, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkDeviceMemory* out_memory) {
+		VkBufferCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		info.size = size;
+		info.usage = usage;
+		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+		VkBuffer buffer;
+		VkDeviceMemory memory;
+
+		VK_CHECK_RESULT(vkCreateBuffer(device, &info, nullptr, &buffer));
+
+		VkMemoryRequirements mem_req;
+		vkGetBufferMemoryRequirements(device, buffer, &mem_req);
+
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req.memoryTypeBits, props);
+
+		VK_CHECK_RESULT(vkAllocateMemory(device, &alloc_info, nullptr, &memory));
+
+		vkBindBufferMemory(device, buffer, memory, 0);
+
+		*out_memory = memory;
+		return buffer;
 	}
 
 	inline VkImage create_image (VkDevice device, VkPhysicalDevice pdev, int2 size, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props,

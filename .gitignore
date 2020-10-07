@@ -3,5 +3,8 @@ screenshots/
 
 *.exe
 *.dll
-*.ilk
 *.pdb
+
+*.ilk
+*.iobj
+*.ipdb

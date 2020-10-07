@@ -19,10 +19,10 @@ struct DearImgui {
 
 	int tree_depth = 0;
 
-	void init (vk::Renderer& renderer);
+	void init (vk::Renderer& renderer, int msaa);
 
 	void frame_start ();
-	void frame_end (VkCommandBuffer buf);
+	void draw (VkCommandBuffer buf);
 
 	void destroy (vk::Renderer& renderer);
 };

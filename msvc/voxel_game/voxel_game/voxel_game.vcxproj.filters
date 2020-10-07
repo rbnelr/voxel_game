@@ -232,6 +232,9 @@
     <Filter Include="dear_imgui">
       <UniqueIdentifier>{e628587c-5b14-4171-9f6a-aa30bd077d16}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{960f946d-0205-46ec-a8de-4db684b5c0de}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\kisslib\kissmath\output\bool2.inl">

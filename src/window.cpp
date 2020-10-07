@@ -106,14 +106,14 @@ void frameloop () {
 
 	glfw_input_pre_gameloop(window);
 
-	imgui.init(r);
+	imgui.init(r, r.msaa);
 
 	window.input.dt = 0; // dt zero on first frame
 	uint64_t prev = get_timestamp();
 
 	for (;;) {
 		{
-			//input.clear_frame_input();
+			window.input.clear_frame_input();
 			glfwPollEvents();
 
 			if (glfwWindowShouldClose(window.window))
@@ -123,22 +123,11 @@ void frameloop () {
 		}
 
 		{
-			if (!r.frame_begin(window.window))
-				continue;
-
-			auto buf = r.render_begin();
-
 			imgui.frame_start();
-
-			ImGui::ShowDemoWindow();
 
 			//game->frame();
 
-			imgui.frame_end(buf);
-
-			r.render_end();
-
-			r.frame_end(window.window, buf);
+			r.render_frame(window.window, imgui);
 		}
 
 		{ // Calc dt based on prev frame duration
