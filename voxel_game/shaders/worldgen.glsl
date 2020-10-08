@@ -27,13 +27,13 @@ float SDF (vec3 pos) {
 	//val = smin(val, capsule2(pos, vec3(-1100,0,200), vec3(1100, 0, 500), 180.0), k);
 	//val = smin(val, capsule2(pos, vec3(100,0,350), vec3(0, 1100, -200), 120.0), k);
 
-	float val;
-	vec3 grad;
-	val =          -sphereGrad(pos, vec3(0,1000.0,0), 1000.0, grad);
-	grad = -grad;
-
+	//float val;
 	//vec3 grad;
-	//float val = noise(0, pos, grad) + nparam0[0];
+	//val =          -sphereGrad(pos, vec3(0,1000.0,0), 1000.0, grad);
+	//grad = -grad;
+
+	vec3 grad;
+	float val = noise(0, pos, grad) + nparam0[0];
 
 	vec3 center = grad * (1000.0 - val); // reconstructed sphere center
 	float plane_z = center.z -1000.0 + nparam0[2];
