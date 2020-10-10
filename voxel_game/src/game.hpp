@@ -6,6 +6,7 @@
 #include "graphics/camera.hpp"
 #include "graphics/graphics.hpp"
 #include "util/running_average.hpp"
+#include "wang_tiles.hpp"
 
 #include "serialization.hpp"
 extern bool _use_potatomode;
@@ -110,14 +111,20 @@ class Game {
 
 	BlockUpdate block_update;
 
-	bool activate_flycam = false;
 	bool creative_mode = false;
-
+#if 0
+	bool activate_flycam = false;
 	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
+#else
+	bool activate_flycam = true;
+	Flycam flycam = load<Flycam>("wang_tiles_flycam.json");
+#endif
 
 	bool trigger_place_block = false;
 
 	Graphics graphics;
+
+	WangTiles wang_tiles;
 	
 public:
 	Game ();

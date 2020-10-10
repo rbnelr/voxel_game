@@ -73,6 +73,12 @@ void Game::frame () {
 			audio_manager.imgui();
 			graphics.imgui(/*world->chunks*/);
 
+			wang_tiles.imgui();
+
+			if (ImGui::Button("Flycam Load")) load("wang_tiles_flycam.json", &flycam);
+			ImGui::SameLine();
+			if (ImGui::Button("Save")) save("wang_tiles_flycam.json", flycam);
+
 			bool world_open = ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen);
 
 				
@@ -165,6 +171,8 @@ void Game::frame () {
 		//block_update.update_blocks(world->chunks);
 
 		world->voxels.svo.update_chunk_loading_and_meshing(*world, graphics);
+
+		wang_tiles.update();
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);

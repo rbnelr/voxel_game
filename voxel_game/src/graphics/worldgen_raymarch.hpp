@@ -3,8 +3,7 @@
 #include "graphics_common.hpp"
 #include "worldgen.hpp"
 
-class WorldgenRaymarch {
-public:
+struct WorldgenRaymarch {
 
 	Shader shader = Shader("worldgen_raymarch");
 
@@ -16,7 +15,7 @@ public:
 
 	Texture2D env = { "textures/env/blue_grotto_1k.hdr" };
 
-	bool raytracer_draw = 1;
+	bool raytracer_draw = 0;
 	bool overlay = 0;
 
 	float slider = 1.00f;

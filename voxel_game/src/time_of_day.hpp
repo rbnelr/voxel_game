@@ -2,18 +2,18 @@
 #include "stdafx.hpp"
 
 struct SkyColors {
-	float3 sky_col;
-	float3 horiz_col;
-	float3 ambient_col;
-	float3 sun_col;
+	lrgb sky_col;
+	lrgb horiz_col;
+	lrgb ambient_col;
+	lrgb sun_col;
 
 	void imgui (char const* name) {
 		if (!imgui_push("SkyColors", name)) return;
 
-		imgui_ColorEdit3("sky_col", &sky_col.x, ImGuiColorEditFlags_DisplayHSV);
-		imgui_ColorEdit3("horiz_col", &horiz_col.x, ImGuiColorEditFlags_DisplayHSV);
-		imgui_ColorEdit3("ambient_col", &ambient_col.x, ImGuiColorEditFlags_DisplayHSV);
-		imgui_ColorEdit3("sun_col", &sun_col.x, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit("sky_col", &sky_col, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit("horiz_col", &horiz_col, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit("ambient_col", &ambient_col, ImGuiColorEditFlags_DisplayHSV);
+		imgui_ColorEdit("sun_col", &sun_col, ImGuiColorEditFlags_DisplayHSV);
 
 		imgui_pop();
 	}

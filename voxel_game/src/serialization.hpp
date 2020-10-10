@@ -63,7 +63,7 @@ T load (char const* filename) {
 #define _JSON_PASTE8(func,  v1, v2, v3, v4, v5, v6, v7)              _JSON_PASTE2(func, v1) _JSON_PASTE7(func, v2, v3, v4, v5, v6, v7)
 #define _JSON_PASTE9(func,  v1, v2, v3, v4, v5, v6, v7, v8)          _JSON_PASTE2(func, v1) _JSON_PASTE8(func, v2, v3, v4, v5, v6, v7, v8)
 #define _JSON_PASTE10(func, v1, v2, v3, v4, v5, v6, v7, v8, v9)      _JSON_PASTE2(func, v1) _JSON_PASTE8(func, v2, v3, v4, v5, v6, v7, v8, v9)
-#define _JSON_PASTE11(func, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) _JSON_PASTE2(func, v1)_JSON_PASTE8(func, v2, v3, v4, v5, v6, v7, v8, v9, v10)
+#define _JSON_PASTE11(func, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10) _JSON_PASTE2(func, v1) _JSON_PASTE8(func, v2, v3, v4, v5, v6, v7, v8, v9, v10)
 
 #define _JSON_TO(v1) j[#v1] = t.v1;
 #define _JSON_FROM(v1) if (j.contains(#v1)) j.at(#v1).get_to(t.v1); // try get value from json
@@ -77,8 +77,7 @@ T load (char const* filename) {
     void from_json(const nlohmann::ordered_json& j, Type& t) { _JSON_EXPAND(_JSON_PASTE(_JSON_FROM, __VA_ARGS__)) }
 
 namespace nlohmann {
-	template <>
-	struct adl_serializer<float2> {
+	template <>	struct adl_serializer<float2> {
 		using type = float2;
 		static void to_json(ordered_json& j, const type& val) {
 			j = { val.x, val.y };
@@ -86,6 +85,55 @@ namespace nlohmann {
 		static void from_json(const ordered_json& j, type& val) {
 			j.at(0).get_to(val.x);
 			j.at(1).get_to(val.y);
+		}
+	};
+
+	template <>	struct adl_serializer<float3> {
+		using type = float3;
+		static void to_json(ordered_json& j, const type& val) {
+			j = { val.x, val.y, val.z };
+		}
+		static void from_json(const ordered_json& j, type& val) {
+			j.at(0).get_to(val.x);
+			j.at(1).get_to(val.y);
+			j.at(2).get_to(val.z);
+		}
+	};
+
+	template <>	struct adl_serializer<float4> {
+		using type = float4;
+		static void to_json(ordered_json& j, const type& val) {
+			j = { val.x, val.y, val.z, val.w };
+		}
+		static void from_json(const ordered_json& j, type& val) {
+			j.at(0).get_to(val.x);
+			j.at(1).get_to(val.y);
+			j.at(2).get_to(val.z);
+			j.at(3).get_to(val.w);
+		}
+	};
+
+	template <>	struct adl_serializer<srgb8> {
+		using type = srgb8;
+		static void to_json(ordered_json& j, const type& val) {
+			j = { val.x, val.y, val.z };
+		}
+		static void from_json(const ordered_json& j, type& val) {
+			j.at(0).get_to(val.x);
+			j.at(1).get_to(val.y);
+			j.at(2).get_to(val.z);
+		}
+	};
+	template <>	struct adl_serializer<srgba8> {
+		using type = srgba8;
+		static void to_json(ordered_json& j, const type& val) {
+			j = { val.x, val.y, val.z, val.w };
+		}
+		static void from_json(const ordered_json& j, type& val) {
+			j.at(0).get_to(val.x);
+			j.at(1).get_to(val.y);
+			j.at(2).get_to(val.z);
+			j.at(3).get_to(val.w);
 		}
 	};
 }

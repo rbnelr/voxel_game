@@ -36,6 +36,8 @@ struct DebugGraphics {
 
 	void push_point (float3 pos, float3 size, lrgba col);
 
+	void push_quad (float3 pos, float3 side0, float3 side1, lrgba col);
+
 	void push_arrow (float3 pos, float3 dir, lrgba col);
 
 	void push_wire_cube (float3 center, float3 size, lrgba col);

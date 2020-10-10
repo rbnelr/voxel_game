@@ -4,6 +4,7 @@
 #include "misc/cpp/imgui_stdlib.h"
 #include "dear_imgui/imgui_impl_glfw.h"
 #include "dear_imgui/imgui_impl_opengl3.h"
+#include "imgui_internal.h" // for rendering custom widgets in imgui
 
 #include "util/circular_buffer.hpp"
 #include "kissmath.hpp"
@@ -49,12 +50,29 @@ inline void imgui_pop () {
 // Imgui is not srgb correct, ColorEdit3 assume srgb (since color pickers are usually in srgb and should display srgb values as ints because that is more convinient than floats)
 //  but the values its displays are the same as are passed to the shader, which assumes linear values, so it's impossible to both have the color picker be in srgb and the color be correct on screen
 //  solution -> fix the shader to manually convert srgb to linear??
-inline bool imgui_ColorEdit3 (const char* label, float col[3], ImGuiColorEditFlags flags) {
-	float3 srgbf = float3( to_srgb(col[0]), to_srgb(col[1]), to_srgb(col[2]) );
+inline bool imgui_ColorEdit (const char* label, lrgb* col, ImGuiColorEditFlags flags=ImGuiColorEditFlags_PickerHueWheel|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_HSV) {
+	float3 srgbf = float3( to_srgb(col->x), to_srgb(col->y), to_srgb(col->z) );
 	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);
-	col[0] = to_linear(srgbf.x);
-	col[1] = to_linear(srgbf.y);
-	col[2] = to_linear(srgbf.z);
+	if (ret) {
+		col->x = to_linear(srgbf.x);
+		col->y = to_linear(srgbf.y);
+		col->z = to_linear(srgbf.z);
+	}
+	return ret;
+}
+
+inline bool imgui_ColorEdit (const char* label, srgb8* col, ImGuiColorEditFlags flags=ImGuiColorEditFlags_PickerHueWheel|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_HSV) {
+	float3 srgbf = (float3)*col / 255.0f;
+	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);
+	if (ret)
+		*col = (srgb8)clamp(roundi(srgbf * 255.0f), 0, 255);
+	return ret;
+}
+inline bool imgui_ColorEdit (const char* label, srgba8* col, ImGuiColorEditFlags flags=ImGuiColorEditFlags_PickerHueWheel|ImGuiColorEditFlags_NoInputs|ImGuiColorEditFlags_HSV) {
+	float4 srgbaf = (float4)*col / 255.0f;
+	bool ret = ImGui::ColorEdit4(label, &srgbaf.x, flags);
+	if (ret)
+		*col = (srgba8)clamp(roundi(srgbaf * 255.0f), 0, 255);
 	return ret;
 }
 

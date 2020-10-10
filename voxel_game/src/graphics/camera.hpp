@@ -1,6 +1,7 @@
 #pragma once
 #include "stdafx.hpp"
 #include "util/collision.hpp"
+#include "serialization.hpp"
 
 enum perspective_mode {
 	PERSPECTIVE,
@@ -69,6 +70,25 @@ public:
 	// [mode == ORTHOGRAPHIC] vertical size (horizontal size depends on render target aspect ratio)
 	float				ortho_vsize = 10;
 
+	friend void to_json (nlohmann::ordered_json& j, const Camera& t) {
+		j["pos"				] = t.pos				;
+		j["rot_aer"			] = t.rot_aer			;
+		j["mode"			] = t.mode				;
+		j["clip_near"		] = t.clip_near			;
+		j["clip_far"		] = t.clip_far			;
+		j["vfov"			] = t.vfov				;
+		j["ortho_vsize"		] = t.ortho_vsize		;
+	}
+	friend void from_json (const nlohmann::ordered_json& j, Camera& t) {
+		if (j.contains("pos"				)) j.at("pos"				).get_to(t.pos				);
+		if (j.contains("rot_aer"			)) j.at("rot_aer"			).get_to(t.rot_aer			);
+		if (j.contains("mode"				)) j.at("mode"				).get_to(t.mode				);
+		if (j.contains("clip_near"			)) j.at("clip_near"			).get_to(t.clip_near		);
+		if (j.contains("clip_far"			)) j.at("clip_far"			).get_to(t.clip_far			);
+		if (j.contains("vfov"				)) j.at("vfov"				).get_to(t.vfov				);
+		if (j.contains("ortho_vsize"		)) j.at("ortho_vsize"		).get_to(t.ortho_vsize		);
+	}
+
 	Camera (float3 pos=0, float3 rot_aer=0): pos{pos}, rot_aer{rot_aer} {}
 
 	virtual ~Camera () = default;
@@ -120,6 +140,21 @@ public:
 
 	float cur_speed = 0;
 
+	friend void to_json(nlohmann::ordered_json& j, const Flycam& t) {
+		j["base_speed"		] = t.base_speed		;
+		j["max_speed"		] = t.max_speed			;
+		j["speedup_factor"	] = t.speedup_factor	;
+		j["fast_multiplier"	] = t.fast_multiplier	;
+		to_json(j, *(Camera*)&t);
+	}
+	friend void from_json(const nlohmann::ordered_json& j, Flycam& t) {
+		if (j.contains("base_speed"			)) j.at("base_speed"		).get_to(t.base_speed		);
+		if (j.contains("max_speed"			)) j.at("max_speed"			).get_to(t.max_speed		);
+		if (j.contains("speedup_factor"		)) j.at("speedup_factor"	).get_to(t.speedup_factor	);
+		if (j.contains("fast_multiplier"	)) j.at("fast_multiplier"	).get_to(t.fast_multiplier	);
+		from_json(j, *(Camera*)&t);
+	}
+
 	// TODO: configurable input bindings
 
 	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): Camera(pos, rot_aer), base_speed{base_speed} {}
@@ -141,4 +176,5 @@ public:
 	float3x3 calc_world_to_cam_rot (float3x3* cam_to_world_rot);
 
 	Camera_View update ();
+
 };

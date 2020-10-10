@@ -151,6 +151,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\dear_imgui\imgui.h" />
     <ClInclude Include="..\tracy\Tracy.hpp" />
     <ClInclude Include="..\tracy\TracyC.h" />
     <ClInclude Include="..\tracy\TracyOpenGL.hpp" />
@@ -243,6 +244,7 @@
     <ClInclude Include="src\world.hpp" />
     <ClInclude Include="src\worldgen.hpp" />
     <ClInclude Include="stdafx.hpp" />
+    <ClInclude Include="wang_tiles.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\dear_imgui\imgui.cpp">

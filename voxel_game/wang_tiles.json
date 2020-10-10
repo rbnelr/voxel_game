@@ -1,0 +1,80 @@
+{
+	"tiles": [
+		{
+			"name": "earth",
+			"color": [
+				195,
+				151,
+				119
+			],
+			"input_layouts": [
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"earth",
+						"earth",
+						"earth",
+						"earth",
+						"earth",
+						"earth",
+						"earth",
+						"earth"
+					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"earth",
+						"earth",
+						"earth",
+						"earth"
+					]
+				}
+			]
+		},
+		{
+			"name": "lake",
+			"color": [
+				151,
+				194,
+				255
+			],
+			"input_layouts": [
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake"
+					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"earth",
+						"earth"
+					]
+				}
+			]
+		}
+	]
+}

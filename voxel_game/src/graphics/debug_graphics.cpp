@@ -11,6 +11,15 @@ void DebugGraphics::push_point (float3 pos, float3 size, lrgba col) {
 	lines.push_back({ pos + float3(0, 0, size.z/2), col });
 }
 
+void DebugGraphics::push_quad (float3 pos, float3 side0, float3 side1, lrgba col) {
+	faces.push_back({ pos +side0       , col });
+	faces.push_back({ pos +side0 +side1, col });
+	faces.push_back({ pos              , col });
+	faces.push_back({ pos              , col });
+	faces.push_back({ pos +side0 +side1, col });
+	faces.push_back({ pos        +side1, col });
+}
+
 void DebugGraphics::push_arrow (float3 pos, float3 dir, lrgba col) {
 	lines.push_back({ pos, col });
 	lines.push_back({ pos + dir, col });
