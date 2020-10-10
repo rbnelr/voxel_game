@@ -1,6 +1,16 @@
 #pragma once
 #include "dear_imgui/dear_imgui.hpp"
 #include "serialization.hpp"
+#include <algorithm>
+
+template <typename T, typename EQUAL>
+bool contains (std::vector<T>& vec, T& r, EQUAL are_equal) {
+	for (auto& i : vec) {
+		if (are_equal(i, r))
+			return true;
+	}
+	return false;
+}
 
 struct WangTiles {
 
@@ -19,6 +29,7 @@ struct WangTiles {
 	struct Tile {
 		std::string name;
 		srgb8 color;
+		float prob = 100; // probability weight
 
 		// valid neighbour tile configurations
 		struct LayoutConfig {
@@ -34,12 +45,10 @@ struct WangTiles {
 
 		std::vector<std::array<int, 8>> layouts;
 
-		SERIALIZE(Tile, name, color, input_layouts)
+		SERIALIZE(Tile, name, color, prob, input_layouts)
 	};
 
 	bool enable = 1;
-
-	int gen_per_frame = 1;
 
 	std::vector<Tile> tiles;
 
@@ -48,7 +57,6 @@ struct WangTiles {
 	static constexpr int SIZE = 64;
 	int world[SIZE][SIZE]; // tile ids
 
-	int counter = 0;
 	bool regen = 1;
 	int selected_tile = -1;
 	std::string painting_tile = "";
@@ -75,6 +83,121 @@ struct WangTiles {
 		return layouts;
 	}
 
+	int gen_per_frame = 5;
+	std::vector<int2> decided_tiles;
+	std::vector<int2> undecided_tiles;
+
+	int decide_tile (int2 pos) {
+		int neighb[8];
+		for (int n=0; n<8; ++n) {
+			int2 npos = pos + neighb_pos[n];
+			if (npos.x >= 0 && npos.x < SIZE && npos.y >= 0 && npos.y < SIZE)
+				neighb[n] = world[npos.y][npos.x];
+			else
+				neighb[n] = -1;
+		}
+
+		std::vector<float> tile_probs;
+		tile_probs.resize(tiles.size(), 0);
+
+		for (int tid=0; tid<(int)tiles.size(); ++tid) {
+			auto& t = tiles[tid];
+
+			bool layout_match;
+			
+			for (auto& l : t.layouts) {
+				layout_match = true;
+				for (int n=0; n<8; ++n) {
+					bool match = neighb[n] < 0 || l[n] < 0 || neighb[n] == l[n]; // layout has -1 (which means any tile) or neighbour is undecided or neighbour matches layout
+					if (!match) {
+						layout_match = false;
+						break;
+					}
+				}
+
+				if (layout_match)
+					break;
+			}
+
+			tile_probs[tid] = layout_match ? t.prob : 0;
+		}
+
+		// pick tile randomly from all tiles weighted by the calculated probability weights
+		// (random tile if all equal probs, 0 prob are never picked)
+		return random.weighted_choice(tile_probs);
+	}
+
+	void update () {
+		if (!enable) return;
+
+		static bool init = true;
+		if (init) load("wang_tiles.json", this);
+		init = false;
+
+		for (int id=0; id<(int)tiles.size(); ++id) {
+			if (tiles[id].recompile_layout) {
+				tiles[id].layouts = compile_layouts(tiles[id].input_layouts);
+				tiles[id].recompile_layout = false;
+
+				regen = true;
+			}
+		}
+
+		if (regen) {
+			memset(world, -1, sizeof(world));
+			decided_tiles.clear();
+			undecided_tiles.clear();
+
+			undecided_tiles.push_back(SIZE / 2);
+
+			regen = false;
+		}
+
+		if (tiles.size() > 1) {
+			int counter = 0;
+			while (counter < gen_per_frame && !undecided_tiles.empty()) {
+				int i = random.uniform(0, (int)undecided_tiles.size());
+
+				int2 pos = undecided_tiles[i];
+
+				for (int j=0; j<8; ++j) {
+					int2 npos = pos + neighb_pos[j];
+					if (npos.x >= 0 && npos.x < SIZE && npos.y >= 0 && npos.y < SIZE &&
+						!contains(undecided_tiles, npos, [] (int2 l, int2 r) { return l.x==r.x && l.y==r.y; }) &&
+						!contains(decided_tiles  , npos, [] (int2 l, int2 r) { return l.x==r.x && l.y==r.y; }))
+						undecided_tiles.push_back(npos);
+				}
+
+				int tile = decide_tile(pos);
+
+				if (tile >= 0) {
+					// remove undecided_tiles by overwriting with last
+					undecided_tiles[i] = undecided_tiles.back();
+					undecided_tiles.pop_back();
+
+					decided_tiles.push_back(pos);
+
+					world[pos.y][pos.x] = tile;
+				}
+
+				counter++;
+			}
+		}
+		
+		for (int y=0; y<SIZE; ++y) {
+			for (int x=0; x<SIZE; ++x) {
+				int id = world[y][x];
+				if (id < 0)
+					continue;
+				auto& t = tiles[id];
+
+				debug_graphics->push_quad(float3((float)x, (float)y, 0), float3(1,0,0), float3(0,1,0), lrgba(to_linear(t.color), 1));
+			}
+		}
+	}
+
+
+	//// Imgui
 	static constexpr int IMGUI_TILE_SZ = 28;
 
 	bool colored_button (srgba8 col, char const* label="##") {
@@ -107,6 +230,7 @@ struct WangTiles {
 
 			InputText("name", &t.name);
 			imgui_ColorEdit("color", &t.color);
+			DragFloat("prob", &t.prob, 1);
 
 			auto wndsz = GetContentRegionAvail();
 
@@ -170,13 +294,13 @@ struct WangTiles {
 									PushID(id);
 
 									bool clicked = colored_button(srgba8(tiles[id].color, 255));
-									
+
 									if (ImGui::IsItemHovered()) {
 										ImGui::BeginTooltip();
 										ImGui::Text(tiles[id].name.c_str());
 										ImGui::EndTooltip();
 									}
-									
+
 									if (clicked) {
 										painting_tile = tiles[id].name;
 										CloseCurrentPopup();
@@ -278,48 +402,4 @@ struct WangTiles {
 		imgui_pop();
 	}
 
-	void update () {
-		if (!enable) return;
-
-		static bool init = true;
-		if (init) load("wang_tiles.json", this);
-		init = false;
-
-		for (int id=0; id<(int)tiles.size(); ++id) {
-			if (tiles[id].recompile_layout) {
-				tiles[id].layouts = compile_layouts(tiles[id].input_layouts);
-				tiles[id].recompile_layout = false;
-
-				regen = true;
-			}
-		}
-
-		if (regen) {
-			memset(world, -1, sizeof(world));
-			counter = 0;
-			regen = false;
-		}
-
-		if (tiles.size() > 1) {
-			for (int i=counter; i<min(counter+gen_per_frame, SIZE*SIZE); ++i) {
-				int x = i % SIZE;
-				int y = i / SIZE;
-
-				world[y][x] = random.uniform(0, (int)tiles.size());
-				
-				counter++;
-			}
-		}
-		
-		for (int y=0; y<SIZE; ++y) {
-			for (int x=0; x<SIZE; ++x) {
-				int id = world[y][x];
-				if (id < 0)
-					continue;
-				auto& t = tiles[id];
-
-				debug_graphics->push_quad(float3((float)x, (float)y, 0), float3(1,0,0), float3(0,1,0), lrgba(to_linear(t.color), 1));
-			}
-		}
-	}
 };

@@ -79,6 +79,36 @@ struct _Random {
 	inline float3 uniform_vector (float min_magnitude=0, float max_magnitude=1) {
 		return uniform_direction() * uniform(min_magnitude, max_magnitude);
 	}
+
+	// get random index of array of probability weights
+	// numbers are assumed to be >= 0
+	// returns -1 if probabilities are all 0s and 0s are never picked 
+	// array is scanned to get total probability weight, then RNG is called to get random num in [0, total prob weight]
+	// then array is scanned again to find index where random num crosses the cumulative probability
+	template <typename ARRAY>
+	inline int weighted_choice (ARRAY const& probabilities) {
+		float total_prob = 0;
+		for (auto p : probabilities) {
+			total_prob += p;
+		}
+
+		if (total_prob == 0.0f)
+			return -1; // all 0 prob
+
+		float rand = uniform(0.0f, total_prob);
+
+		// pick index by comparing cumulative weight against random num
+		float accum = 0.0f;
+
+		int i;
+		for (i=0; i<(int)probabilities.size(); ++i) {
+			accum += probabilities[i];
+			if (rand < accum)
+				break;
+		}
+
+		return i;
+	}
 };
 
 typedef _Random<std::default_random_engine> Random;
