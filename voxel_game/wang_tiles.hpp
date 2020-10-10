@@ -11,19 +11,52 @@ bool contains (std::vector<T>& vec, T& r, EQUAL are_equal) {
 	}
 	return false;
 }
+template <typename T, typename EQUAL>
+int indexof (std::vector<T>& vec, T& r, EQUAL are_equal) {
+	for (int i=0; i<(int)vec.size(); ++i) {
+		if (are_equal(vec[i], r))
+			return i;
+	}
+	return -1;
+}
 
 struct WangTiles {
 
+	/*
+		0 1 2
+		3   4
+		5 6 7
+	*/
 	static constexpr int2 neighb_pos[8] = {
-		int2(-1,-1),
-		int2( 0,-1),
-		int2(+1,-1),
-		int2(-1, 0),
-		//int2( 0, 0),
-		int2(+1, 0),
-		int2(-1,+1),
-		int2( 0,+1),
-		int2(+1,+1),
+		int2(-1,+1), int2( 0,+1), int2(+1,+1),
+		int2(-1, 0),              int2(+1, 0),
+		int2(-1,-1), int2( 0,-1), int2(+1,-1),
+	};
+
+	static constexpr int rotations[3][8] = {
+		//       rot 180 deg
+		{ 7, 6, 5,
+		  4,    3,
+		  2, 1, 0 },
+		// right rot  90 deg
+		{ 2, 4, 7,
+		  1,    6,
+		  0, 3, 5 },
+		// left  rot  90 deg
+		{ 5, 3, 0,
+		  6,    1,
+		  7, 4, 2 },
+	};
+
+	static constexpr int mirrors[2][8] = {
+		// horiz mirror
+		{ 2, 1, 0,
+		  4,    3,
+		  7, 6, 5 },
+		// vert  mirror
+		{ 5, 6, 7,
+		  3,    4,
+		  0, 1, 2 },
 	};
 
 	struct Tile {
@@ -33,8 +66,8 @@ struct WangTiles {
 
 		// valid neighbour tile configurations
 		struct LayoutConfig {
-			uint8_t rotate_sym = 0;
-			uint8_t mirror_sym = 0;
+			uint8_t rotate_sym = 0; // 0: no rot    1: all rot     2: 180 rot
+			uint8_t mirror_sym = 0; // 0: no mirror 1: v/h mirror
 
 			std::string neighb[8] = {};
 
@@ -77,7 +110,29 @@ struct WangTiles {
 				neighb[i] = name_to_id(il.neighb[i]);
 			}
 
-			layouts.push_back(std::move(neighb));
+			layouts.push_back(neighb);
+
+			if (il.rotate_sym != 0) {
+				std::array<int, 8> neighb2;
+
+				for (int rot=0; rot < (il.rotate_sym == 2 ? 1 : 3); ++rot) {
+					for (int i=0; i<8; ++i)
+						neighb2[i] = neighb[rotations[rot][i]];
+
+					layouts.push_back(neighb2);
+				}
+			}
+
+			if (il.mirror_sym != 0) {
+				std::array<int, 8> neighb2;
+
+				for (int mir=0; mir<2; ++mir) {
+					for (int i=0; i<8; ++i)
+						neighb2[i] = neighb[mirrors[mir][i]];
+
+					layouts.push_back(neighb2);
+				}
+			}
 		}
 
 		return layouts;
@@ -155,7 +210,7 @@ struct WangTiles {
 
 		if (tiles.size() > 1) {
 			int counter = 0;
-			while (counter < gen_per_frame && !undecided_tiles.empty()) {
+			while (counter++ < gen_per_frame && !undecided_tiles.empty()) {
 				int i = random.uniform(0, (int)undecided_tiles.size());
 
 				int2 pos = undecided_tiles[i];
@@ -163,24 +218,45 @@ struct WangTiles {
 				for (int j=0; j<8; ++j) {
 					int2 npos = pos + neighb_pos[j];
 					if (npos.x >= 0 && npos.x < SIZE && npos.y >= 0 && npos.y < SIZE &&
-						!contains(undecided_tiles, npos, [] (int2 l, int2 r) { return l.x==r.x && l.y==r.y; }) &&
-						!contains(decided_tiles  , npos, [] (int2 l, int2 r) { return l.x==r.x && l.y==r.y; }))
+						!contains(undecided_tiles, npos, [](int2 l, int2 r) { return equal(l,r); }) &&
+						!contains(decided_tiles  , npos, [](int2 l, int2 r) { return equal(l,r); }))
 						undecided_tiles.push_back(npos);
 				}
 
 				int tile = decide_tile(pos);
 
 				if (tile >= 0) {
-					// remove undecided_tiles by overwriting with last
+					// tile could be decided
+
+					// remove from undecided_tiles by overwriting with last
 					undecided_tiles[i] = undecided_tiles.back();
 					undecided_tiles.pop_back();
 
 					decided_tiles.push_back(pos);
 
 					world[pos.y][pos.x] = tile;
-				}
+				} else {
+					// tile is undecideable
 
-				counter++;
+					// revert all neighbours to be undecided
+					for (int j=0; j<8; ++j) {
+						int2 npos = pos + neighb_pos[j];
+						if (npos.x >= 0 && npos.x < SIZE && npos.y >= 0 && npos.y < SIZE) {
+							if (world[npos.y][npos.x] >= 0) {
+								int idx = indexof(decided_tiles, npos, [](int2 l, int2 r) { return equal(l,r); });
+								assert(idx >= 0);
+
+								// remove from decided_tiles by overwriting with last
+								decided_tiles[idx] = decided_tiles.back();
+								decided_tiles.pop_back();
+
+								undecided_tiles.push_back(npos);
+
+								world[npos.y][npos.x] = -1;
+							}
+						}
+					}
+				}
 			}
 		}
 		
@@ -250,11 +326,15 @@ struct WangTiles {
 
 					auto& l = t.input_layouts[i];
 
-					if (ImGui::Button(prints("R(%d)###R", l.rotate_sym).c_str()))
+					if (ImGui::Button(prints("R(%d)###R", l.rotate_sym).c_str())) {
 						l.rotate_sym = (l.rotate_sym + 1) % 3;
+						t.recompile_layout = true;
+					}
 					SameLine();
-					if (ImGui::Button(prints("M(%d)###M", l.mirror_sym).c_str()))
+					if (ImGui::Button(prints("M(%d)###M", l.mirror_sym).c_str())) {
 						l.mirror_sym = (l.mirror_sym + 1) % 2;
+						t.recompile_layout = true;
+					}
 
 					PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
 					BeginTable("##neighbours", 3);
@@ -272,6 +352,7 @@ struct WangTiles {
 						auto nid = name_to_id(l.neighb[j]);
 						if (colored_button(nid >= 0 ? srgba8(tiles[nid].color, 255) : srgba8(0))) {
 							l.neighb[j] = painting_tile;
+							t.recompile_layout = true;
 						}
 						if (BeginPopupContextWindow("Select Tile")) {
 							//// Tile select for changing layouts
@@ -284,7 +365,6 @@ struct WangTiles {
 
 								if (colored_button(srgba8(0), "NUL")) {
 									painting_tile = "";
-									t.recompile_layout = true;
 									CloseCurrentPopup();
 								}
 								PopID();
@@ -322,10 +402,14 @@ struct WangTiles {
 				}
 
 				TableNextCell();
-				if (ImGui::Button("+"))
+				if (ImGui::Button("+")) {
 					t.input_layouts.emplace_back();
-				if (ImGui::Button("-") && !t.input_layouts.empty())
+					t.recompile_layout = true;
+				}
+				if (ImGui::Button("-") && !t.input_layouts.empty()) {
 					t.input_layouts.pop_back();
+					t.recompile_layout = true;
+				}
 
 				EndTable();
 			}
@@ -394,6 +478,9 @@ struct WangTiles {
 				if (is_selected)					selected_tile = id;
 				if (was_selected && !is_selected)	selected_tile = -1;
 			}
+			if (ImGui::Button("+"))
+				tiles.emplace_back();
+
 			ImGui::TreePop();
 		}
 

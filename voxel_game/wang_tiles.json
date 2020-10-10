@@ -7,6 +7,7 @@
 				151,
 				119
 			],
+			"prob": 100.0,
 			"input_layouts": [
 				{
 					"rotate_sym": 0,
@@ -35,6 +36,34 @@
 						"earth",
 						"earth"
 					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"lake",
+						"earth",
+						"earth",
+						"earth"
+					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"earth",
+						"earth",
+						"earth"
+					]
 				}
 			]
 		},
@@ -45,6 +74,7 @@
 				194,
 				255
 			],
+			"prob": 100.0,
 			"input_layouts": [
 				{
 					"rotate_sym": 0,
@@ -72,6 +102,34 @@
 						"earth",
 						"earth",
 						"earth"
+					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"earth"
+					]
+				},
+				{
+					"rotate_sym": 0,
+					"mirror_sym": 0,
+					"neighb": [
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"lake",
+						"earth",
+						"earth",
+						"lake"
 					]
 				}
 			]
