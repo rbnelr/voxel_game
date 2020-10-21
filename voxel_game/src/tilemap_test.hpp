@@ -4,55 +4,122 @@
 #include <algorithm>
 
 struct TilemapTest {
-
+	SERIALIZE(TilemapTest, tilemap_filename, pattern_N, patterns_inc_border)
+	
 	bool enable = 1;
 
 	std::string tilemap_filename;
-	int pattern_N = 3;
 
-	Image<srgb8> tilemap;
+	Image<srgb8> tilemap_raw; // color image
+	Image<uint8_t> tilemap; // paletized color image where palette is tiles
 
-	SERIALIZE(TilemapTest, tilemap_filename, pattern_N)
+	static constexpr uint8_t NULLID = (uint8_t)-1;
 
 	struct Tile {
+		SERIALIZE(Tile, name, color)
+
 		std::string	name;
 		srgb8		color;
 		int			count = 0;
-
-		SERIALIZE(Tile, name, color)
 	};
 	std::vector<Tile> tiles;
 
 	void gather_tiles () {
 		load(prints("%s.tiles.json", tilemap_filename.c_str()).c_str(), &tiles);
 
-		for (int y=0; y<tilemap.size.y; ++y) {
-			for (int x=0; x<tilemap.size.x; ++x) {
-				auto col = tilemap.get(x,y);
+		tilemap = Image<uint8_t>(tilemap_raw.size);
+
+		for (int y=0; y<tilemap_raw.size.y; ++y) {
+			for (int x=0; x<tilemap_raw.size.x; ++x) {
+				auto col = tilemap_raw.get(x,y);
 
 				int i = indexof(tiles, col, [] (Tile& l, srgb8 r) { return l.color == r; });
 				if (i < 0) { // new tile, create tile in list
+					assert(tiles.size() < 254);
 					tiles.push_back({ "", col, 1 });
 				} else { // existing tile, count occurance
 					tiles[i].count++;
 				}
+
+				tilemap.set(x,y, (uint8_t)i);
 			}
 		}
+	}
+
+	int pattern_N = 3;
+	bool patterns_inc_border = false;
+
+	struct Pattern {
+		int count = 0;
+	};
+	std::vector<Pattern> patterns;
+	std::vector<uint8_t> patterns_data;
+
+	void gather_patterns () {
+		patterns.clear();
+		patterns_data.clear();
+
+		// either include all NxN patterns that are completely on the image or
+		//  all NxN patterns that touch the image with at least one pixel overlap
+		int start = patterns_inc_border ? 1 - pattern_N				: 0;
+		int2 end  = patterns_inc_border ? tilemap.size : tilemap.size - pattern_N;
+
+		for (int y=start; y<end.y; ++y) {
+			for (int x=start; x<end.x; ++x) {
+
+				// alloc pattern
+				size_t offs = patterns_data.size();
+				patterns_data.resize( offs + pattern_N*pattern_N );
+				uint8_t* data = &patterns_data[offs];
+
+				// extract pattern from tilemap
+				for (int py=0; py<pattern_N; ++py) {
+					for (int px=0; px<pattern_N; ++px) {
+						uint8_t id = NULLID;
+						if (	x+px >= 0 && x+px < tilemap.size.x &&
+								y+py >= 0 && y+py < tilemap.size.y ) {
+							id = tilemap.get(x+px, y+py);
+						}
+						data[py * pattern_N + px] = id;
+					}
+				}
+
+				// scan patterns to see if pattern is unique
+				bool unique = true;
+				for (int i=0; i<(int)patterns.size(); ++i) {
+					int cmp = memcmp(data, &patterns_data[i * pattern_N*pattern_N], pattern_N*pattern_N * sizeof(uint8_t));
+					if (cmp == 0) {
+						unique = false;
+						patterns[i].count++; // count pattern
+						break;
+					}
+				}
+
+				if (unique) {
+					// register pattern
+					patterns.push_back({ 1 });
+				} else {
+					// delete duplicate pattern data
+					patterns_data.resize(offs);
+				}
+			}
+		}
+	}
+
+	void load_tilemap () {
+		if (!Image<srgb8>::load_from_file(tilemap_filename.c_str(), &tilemap_raw)) {
+			clog("[TilemapTest] Could not load tilemap from file!");
+			return;
+		}
+
+		gather_tiles();
+		gather_patterns();
 	}
 
 	bool regen = 1;
 
 	static constexpr int SIZE = 64;
 	int world[SIZE][SIZE]; // tile ids
-
-	void load_tilemap () {
-		if (!Image<srgb8>::load_from_file(tilemap_filename.c_str(), &tilemap)) {
-			clog("[TilemapTest] Could not load tilemap from file!");
-			return;
-		}
-
-		gather_tiles();
-	}
 
 	bool init = true;
 	void update () {
@@ -83,8 +150,6 @@ struct TilemapTest {
 	}
 
 	//// Imgui
-	static constexpr int IMGUI_TILE_SZ = 28;
-
 	bool colored_button (srgba8 col, int size, char const* label="##") {
 		auto c = (float4)col / 255.0f;
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.x,c.y,c.z,c.w));
@@ -100,6 +165,7 @@ struct TilemapTest {
 		return ret;
 	}
 	
+	bool show_patterns = false;
 	void imgui () {
 		ImGui::Checkbox("TilemapTest enable", &enable);
 
@@ -117,8 +183,11 @@ struct TilemapTest {
 			ImGui::Text("Size: %d x %d px", tilemap.size.x, tilemap.size.y);
 
 			ImGui::SliderInt("pattern_N", &pattern_N, 2, 8);
+			ImGui::Checkbox("patterns_inc_border", &patterns_inc_border);
 
 			regen = ImGui::Button("Regen");
+
+			static constexpr int IMGUI_TILE_SZ = 28;
 
 			if (	ImGui::TreeNodeEx("Tiles", ImGuiTreeNodeFlags_NoTreePushOnOpen) &&
 					ImGui::BeginTable("tiles", 3, ImGuiTableFlags_Borders|ImGuiTableFlags_Resizable)) {
@@ -136,6 +205,57 @@ struct TilemapTest {
 					ImGui::PopID();
 				}
 				ImGui::EndTable();
+			}
+
+			ImGui::Checkbox("Show Patterns", &show_patterns);
+			if (show_patterns) {
+				ImGui::Begin("Patterns", &show_patterns);
+
+				auto wndsz = ImGui::GetContentRegionAvail();
+
+				float cw = IMGUI_TILE_SZ*pattern_N + ImGui::GetStyle().CellPadding.x*2;
+				int w = max(1, floori(wndsz.x / cw));
+
+				if (ImGui::BeginTable("patterns", w, ImGuiTableFlags_Borders|ImGuiTableFlags_SizingPolicyFixedX)) {
+					for (int i=0; i<(int)patterns.size(); ++i) {
+						ImGui::PushID(i);
+						ImGui::TableNextCell();
+						ImGui::Text("%6d", patterns[i].count);
+
+						ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
+						if (ImGui::BeginTable("patterns", pattern_N)) {
+
+							int j=0;
+							for (int py=0; py<pattern_N; ++py) {
+								for (int px=0; px<pattern_N; ++px) {
+									ImGui::PushID(j++);
+
+									auto id = patterns_data[i * pattern_N*pattern_N + (pattern_N-1 -py) * pattern_N + px];
+									srgba8 col = id != NULLID ? srgba8(tiles[id].color, 255) : srgba8(0,0,0,0);
+
+									ImGui::TableNextCell();
+									colored_button(col, IMGUI_TILE_SZ);
+
+									if (ImGui::IsItemHovered()) {
+										ImGui::BeginTooltip();
+										ImGui::Text(id != NULLID ? tiles[id].name.c_str() : "null");
+										ImGui::EndTooltip();
+									}
+
+									ImGui::PopID();
+								}
+							}
+
+							ImGui::EndTable();
+						}
+						ImGui::PopStyleVar();
+
+						ImGui::PopID();
+					}
+					ImGui::EndTable();
+				}
+
+				ImGui::End();
 			}
 
 			ImGui::End();
