@@ -54,6 +54,7 @@
 #include "util/threadsafe_queue.hpp"
 #include "util/timer.hpp"
 #include "util/allocator.hpp"
+#include "util/stl_extensions.hpp"
 
 using namespace kiss;
 using namespace kissmath;

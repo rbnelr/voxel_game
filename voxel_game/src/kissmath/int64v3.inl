@@ -2,12 +2,12 @@
 
 ////// Inline definitions
 
-#include "bool3.hpp"
-#include "uint8v3.hpp"
 #include "float3.hpp"
-#include "int64v2.hpp"
-#include "int3.hpp"
+#include "uint8v3.hpp"
+#include "bool3.hpp"
 #include "int64v4.hpp"
+#include "int3.hpp"
+#include "int64v2.hpp"
 
 namespace kissmath {
 	//// forward declarations
@@ -191,19 +191,24 @@ namespace kissmath {
 		return bool3(l.x >= r.x, l.y >= r.y, l.z >= r.z);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool3 operator== (int64v3 l, int64v3 r) {
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool3 equal (int64v3 l, int64v3 r) {
 		return bool3(l.x == r.x, l.y == r.y, l.z == r.z);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool3 operator!= (int64v3 l, int64v3 r) {
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool3 nequal (int64v3 l, int64v3 r) {
 		return bool3(l.x != r.x, l.y != r.y, l.z != r.z);
 	}
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (int64v3 l, int64v3 r) {
-		return all(l == r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (int64v3 l, int64v3 r) {
+		return (l.x == r.x) && (l.y == r.y) && (l.z == r.z);
+	}
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (int64v3 l, int64v3 r) {
+		return (l.x != r.x) || (l.y != r.y) || (l.z != r.z);
 	}
 	
 	// componentwise ternary (c ? l : r)

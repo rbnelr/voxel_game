@@ -505,7 +505,7 @@ struct Framebuffer {
 		auto old_size = size;
 		size = max(1, roundi((float2)input.window_size * renderscale));
 
-		if (!equal(old_size, size)) {
+		if (old_size != size) {
 			// delete old
 			glDeleteTextures(1, &color);
 			glDeleteTextures(1, &depth);

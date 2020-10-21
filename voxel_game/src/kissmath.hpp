@@ -34,52 +34,82 @@
 
 namespace kissmath {
 	// round up x to y, assume y is power of two
-	template <typename T> inline constexpr T round_up_pot (T x, T y) {
+	template <typename T> inline constexpr T align_up (T x, T y) {
 		return (x + y - 1) & ~(y - 1);
 	}
 	// check if power of two
 	template <typename T> inline constexpr T is_pot (T x) {
 		return (x & (x - 1)) == 0;
 	}
-
-	inline size_t hash (int3 v) {
+	
+	template <typename X, typename Y>
+	inline size_t hash (X x, Y y) {
 		size_t h;
-		h  = ::std::hash<int>()(v.x);
+		h  = ::std::hash<X>()(x);
 		h = 53ull * (h + 53ull);
-		h += ::std::hash<int>()(v.y);
-		h = 53ull * (h + 53ull);
-		h += ::std::hash<int>()(v.z);
+		h += ::std::hash<Y>()(y);
 		return h;
-	};
-	inline size_t hash (int4 v) {
+	}
+	template <typename X, typename Y, typename Z>
+	inline size_t hash (X x, Y y, Z z) {
 		size_t h;
-		h  = ::std::hash<int>()(v.x);
+		h  = ::std::hash<X>()(x);
 		h = 53ull * (h + 53ull);
-		h += ::std::hash<int>()(v.y);
+		h += ::std::hash<Y>()(y);
 		h = 53ull * (h + 53ull);
-		h += ::std::hash<int>()(v.z);
-		h = 53ull * (h + 53ull);
-		h += ::std::hash<int>()(v.w);
+		h += ::std::hash<Z>()(z);
 		return h;
-	};
-
-	// Hashmap key type for vectors
-	template <typename VEC>
-	struct vector_key {
-		VEC v;
-
-		vector_key (VEC const& v): v{v} {}
-		bool operator== (vector_key<VEC> const& r) const {
-			return equal(v, r.v);
-		}
-	};
+	}
+	template <typename X, typename Y, typename Z, typename W>
+	inline size_t hash (X x, Y y, Z z, W w) {
+		size_t h;
+		h  = ::std::hash<X>()(x);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<Y>()(y);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<Z>()(z);
+		h = 53ull * (h + 53ull);
+		h += ::std::hash<W>()(w);
+		return h;
+	}
+	
+	inline size_t hash (int2 v) { return hash(v.x, v.y); };
+	inline size_t hash (int3 v) { return hash(v.x, v.y, v.z); };
+	inline size_t hash (int4 v) { return hash(v.x, v.y, v.z, v.w); };
+	
+	inline size_t hash (uint8v3 v) { return hash(v.x, v.y, v.z); };
+	inline size_t hash (uint8v4 v) { return hash(v.x, v.y, v.z, v.w); };
 }
 
 namespace std {
-	template <typename VEC>
-	struct hash<kissmath::vector_key<VEC>> {
-		size_t operator() (kissmath::vector_key<VEC> const& v) const {
-			return kissmath::hash(v.v);
+	template<>
+	struct hash<kissmath::int2> {
+		size_t operator() (kissmath::int2 const& x) const {
+			return kissmath::hash(x);
+		}
+	};
+	template<>
+	struct hash<kissmath::int3> {
+		size_t operator() (kissmath::int3 const& x) const {
+			return kissmath::hash(x);
+		}
+	};
+	template<>
+	struct hash<kissmath::int4> {
+		size_t operator() (kissmath::int4 const& x) const {
+			return kissmath::hash(x);
+		}
+	};
+	template<>
+	struct hash<kissmath::uint8v3> {
+		size_t operator() (kissmath::uint8v3 const& x) const {
+			return kissmath::hash(x);
+		}
+	};
+	template<>
+	struct hash<kissmath::uint8v4> {
+		size_t operator() (kissmath::uint8v4 const& x) const {
+			return kissmath::hash(x);
 		}
 	};
 }

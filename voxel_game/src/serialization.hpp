@@ -43,6 +43,23 @@ bool load (char const* filename, T* obj) {
 }
 
 template <typename T>
+bool load_overwrite (char const* filename, T* obj) {
+	std::string str;
+	if (!kiss::load_text_file(filename, &str)) {
+		clog(WARNING, "Can't load file \"%s\", using defaults.", filename);
+		return false;
+	}
+	try {
+		json json = json::parse(str);
+		json.get_to<T>(*obj);
+	} catch (std::exception& ex) {
+		clog(ERROR, "Error when deserializing something: %s", ex.what());
+		return false;
+	}
+	return true;
+}
+
+template <typename T>
 T load (char const* filename) {
 	T t = T();
 	load(filename, &t);

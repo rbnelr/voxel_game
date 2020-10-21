@@ -2,11 +2,11 @@
 
 ////// Inline definitions
 
+#include "int2.hpp"
 #include "uint8v3.hpp"
 #include "bool2.hpp"
 #include "int64v2.hpp"
 #include "float2.hpp"
-#include "int2.hpp"
 #include "uint8v4.hpp"
 
 namespace kissmath {
@@ -178,19 +178,24 @@ namespace kissmath {
 		return bool2(l.x >= r.x, l.y >= r.y);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator== (uint8v2 l, uint8v2 r) {
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool2 equal (uint8v2 l, uint8v2 r) {
 		return bool2(l.x == r.x, l.y == r.y);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator!= (uint8v2 l, uint8v2 r) {
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool2 nequal (uint8v2 l, uint8v2 r) {
 		return bool2(l.x != r.x, l.y != r.y);
 	}
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (uint8v2 l, uint8v2 r) {
-		return all(l == r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (uint8v2 l, uint8v2 r) {
+		return (l.x == r.x) && (l.y == r.y);
+	}
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (uint8v2 l, uint8v2 r) {
+		return (l.x != r.x) || (l.y != r.y);
 	}
 	
 	// componentwise ternary (c ? l : r)

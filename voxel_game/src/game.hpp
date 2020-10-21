@@ -6,7 +6,7 @@
 #include "graphics/camera.hpp"
 #include "graphics/graphics.hpp"
 #include "util/running_average.hpp"
-#include "wang_tiles.hpp"
+#include "tilemap_test.hpp"
 
 #include "serialization.hpp"
 extern bool _use_potatomode;
@@ -124,7 +124,7 @@ class Game {
 
 	Graphics graphics;
 
-	WangTiles wang_tiles;
+	TilemapTest tilemap_test;
 	
 public:
 	Game ();

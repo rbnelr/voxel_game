@@ -241,10 +241,10 @@
     <ClInclude Include="src\util\timer.hpp" />
     <ClInclude Include="src\voxel_mesher.hpp" />
     <ClInclude Include="src\voxel_system.hpp" />
+    <ClInclude Include="src\tilemap_test.hpp" />
     <ClInclude Include="src\world.hpp" />
     <ClInclude Include="src\worldgen.hpp" />
     <ClInclude Include="stdafx.hpp" />
-    <ClInclude Include="wang_tiles.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\dear_imgui\imgui.cpp">

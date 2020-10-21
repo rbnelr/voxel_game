@@ -1,0 +1,158 @@
+[
+	{
+		"name": "Ocean",
+		"color": [
+			95,
+			205,
+			228
+		]
+	},
+	{
+		"name": "Ocean Deep",
+		"color": [
+			50,
+			156,
+			172
+		]
+	},
+	{
+		"name": "Beach",
+		"color": [
+			251,
+			244,
+			105
+		]
+	},
+	{
+		"name": "Grass",
+		"color": [
+			153,
+			229,
+			80
+		]
+	},
+	{
+		"name": "Forest",
+		"color": [
+			75,
+			105,
+			47
+		]
+	},
+	{
+		"name": "River",
+		"color": [
+			74,
+			225,
+			225
+		]
+	},
+	{
+		"name": "Lake",
+		"color": [
+			94,
+			188,
+			255
+		]
+	},
+	
+	{
+		"name": "Town House",
+		"color": [
+			252,
+			118,
+			113
+		]
+	},
+	{
+		"name": "Road",
+		"color": [
+			168,
+			181,
+			183
+		]
+	},
+	
+	{
+		"name": "Desert",
+		"color": [
+			238,
+			237,
+			164
+		]
+	},
+	{
+		"name": "Desert Oasis",
+		"color": [
+			54,
+			218,
+			224
+		]
+	},
+	
+	{
+		"name": "Mountain",
+		"color": [
+			217,
+			160,
+			102
+		]
+	},
+	{
+		"name": "Mountain Peak",
+		"color": [
+			138,
+			101,
+			52
+		]
+	},
+	
+	{
+		"name": "Volcano Ravine",
+		"color": [
+			113,
+			69,
+			72
+		]
+	},
+	{
+		"name": "Volcano Border",
+		"color": [
+			102,
+			57,
+			49
+		]
+	},
+	{
+		"name": "Volcano",
+		"color": [
+			143,
+			89,
+			60
+		]
+	},
+	{
+		"name": "Volcano Caldera",
+		"color": [
+			34,
+			32,
+			52
+		]
+	},
+	{
+		"name": "Volcano Lava 1",
+		"color": [
+			172,
+			50,
+			50
+		]
+	},
+	{
+		"name": "Volcano Lava 2",
+		"color": [
+			223,
+			113,
+			38
+		]
+	}
+]

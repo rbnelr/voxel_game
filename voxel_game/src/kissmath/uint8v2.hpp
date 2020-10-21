@@ -8,11 +8,11 @@
 namespace kissmath {
 	//// forward declarations
 	
+	struct int2;
 	struct uint8v3;
 	struct bool2;
 	struct int64v2;
 	struct float2;
-	struct int2;
 	struct uint8v4;
 	
 	struct uint8v2 {
@@ -122,14 +122,17 @@ namespace kissmath {
 	// componentwise comparison returns a bool vector
 	inline constexpr bool2 operator>= (uint8v2 l, uint8v2 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator== (uint8v2 l, uint8v2 r);
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool2 equal (uint8v2 l, uint8v2 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator!= (uint8v2 l, uint8v2 r);
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool2 nequal (uint8v2 l, uint8v2 r);
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (uint8v2 l, uint8v2 r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (uint8v2 l, uint8v2 r);
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (uint8v2 l, uint8v2 r);
 	
 	// componentwise ternary (c ? l : r)
 	inline constexpr uint8v2 select (bool2 c, uint8v2 l, uint8v2 r);

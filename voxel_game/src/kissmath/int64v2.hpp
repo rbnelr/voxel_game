@@ -9,11 +9,11 @@ namespace kissmath {
 	//// forward declarations
 	
 	struct int64v3;
-	struct bool2;
-	struct float2;
-	struct uint8v2;
 	struct int2;
+	struct bool2;
 	struct int64v4;
+	struct uint8v2;
+	struct float2;
 	
 	struct int64v2 {
 		union { // Union with named members and array members to allow vector[] operator, not 100% sure that this is not undefined behavoir, but I think all compilers definitely don't screw up this use case
@@ -124,14 +124,17 @@ namespace kissmath {
 	// componentwise comparison returns a bool vector
 	inline constexpr bool2 operator>= (int64v2 l, int64v2 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator== (int64v2 l, int64v2 r);
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool2 equal (int64v2 l, int64v2 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator!= (int64v2 l, int64v2 r);
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool2 nequal (int64v2 l, int64v2 r);
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (int64v2 l, int64v2 r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (int64v2 l, int64v2 r);
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (int64v2 l, int64v2 r);
 	
 	// componentwise ternary (c ? l : r)
 	inline constexpr int64v2 select (bool2 c, int64v2 l, int64v2 r);

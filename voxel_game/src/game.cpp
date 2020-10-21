@@ -73,7 +73,7 @@ void Game::frame () {
 			audio_manager.imgui();
 			graphics.imgui(/*world->chunks*/);
 
-			wang_tiles.imgui();
+			tilemap_test.imgui();
 
 			if (ImGui::Button("Flycam Load")) load("wang_tiles_flycam.json", &flycam);
 			ImGui::SameLine();
@@ -172,7 +172,7 @@ void Game::frame () {
 
 		world->voxels.svo.update_chunk_loading_and_meshing(*world, graphics);
 
-		wang_tiles.update();
+		tilemap_test.update();
 
 		//// Draw
 		graphics.draw(*world, view, player_view, activate_flycam, creative_mode, sel);

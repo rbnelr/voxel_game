@@ -2,20 +2,20 @@
 
 ////// Inline definitions
 
-#include "bool4.hpp"
-#include "bool3.hpp"
+#include "int2.hpp"
 #include "bool2.hpp"
+#include "bool3.hpp"
+#include "uint8v2.hpp"
 #include "int64v2.hpp"
 #include "float2.hpp"
-#include "uint8v2.hpp"
-#include "int2.hpp"
+#include "bool4.hpp"
 
 namespace kissmath {
 	//// forward declarations
 	// typedef these because the _t suffix is kinda unwieldy when using these types often
 	
-	typedef int64_t int64;
 	typedef uint8_t uint8;
+	typedef int64_t int64;
 	
 	// Component indexing operator
 	inline constexpr bool& bool2::operator[] (int i) {
@@ -107,19 +107,24 @@ namespace kissmath {
 	//// comparison ops
 	
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator== (bool2 l, bool2 r) {
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool2 equal (bool2 l, bool2 r) {
 		return bool2(l.x == r.x, l.y == r.y);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool2 operator!= (bool2 l, bool2 r) {
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool2 nequal (bool2 l, bool2 r) {
 		return bool2(l.x != r.x, l.y != r.y);
 	}
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (bool2 l, bool2 r) {
-		return all(l == r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (bool2 l, bool2 r) {
+		return (l.x == r.x) && (l.y == r.y);
+	}
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (bool2 l, bool2 r) {
+		return (l.x != r.x) || (l.y != r.y);
 	}
 	
 	// componentwise ternary (c ? l : r)

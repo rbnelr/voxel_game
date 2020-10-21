@@ -329,12 +329,12 @@ public:
 
 	// Upload new image to mipmap
 	inline void upload (int index, Image<uint8> const& img) {
-		assert(equal(img.size, size));
+		assert(img.size == size);
 		upload(index, (void*)img.data(), GL_RED, GL_UNSIGNED_BYTE);
 	}
 	// Upload new image to mipmap
 	inline void upload (int index, Image<uint8v4> const& img) {
-		assert(equal(img.size, size));
+		assert(img.size == size);
 		upload(index, (void*)img.data(), GL_RGBA, GL_UNSIGNED_BYTE);
 	}
 

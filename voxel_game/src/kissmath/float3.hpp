@@ -8,12 +8,12 @@
 namespace kissmath {
 	//// forward declarations
 	
-	struct bool3;
 	struct int64v3;
 	struct float4;
 	struct uint8v3;
-	struct float2;
+	struct bool3;
 	struct int3;
+	struct float2;
 	
 	struct float3 {
 		union { // Union with named members and array members to allow vector[] operator, not 100% sure that this is not undefined behavoir, but I think all compilers definitely don't screw up this use case
@@ -115,14 +115,17 @@ namespace kissmath {
 	// componentwise comparison returns a bool vector
 	inline constexpr bool3 operator>= (float3 l, float3 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool3 operator== (float3 l, float3 r);
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool3 equal (float3 l, float3 r);
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool3 operator!= (float3 l, float3 r);
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool3 nequal (float3 l, float3 r);
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (float3 l, float3 r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (float3 l, float3 r);
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (float3 l, float3 r);
 	
 	// componentwise ternary (c ? l : r)
 	inline constexpr float3 select (bool3 c, float3 l, float3 r);

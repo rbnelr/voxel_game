@@ -2,20 +2,20 @@
 
 ////// Inline definitions
 
-#include "bool4.hpp"
 #include "int64v3.hpp"
 #include "float4.hpp"
-#include "uint8v4.hpp"
-#include "int64v2.hpp"
 #include "int4.hpp"
+#include "int64v2.hpp"
+#include "bool4.hpp"
+#include "uint8v4.hpp"
 
 namespace kissmath {
 	//// forward declarations
 	// typedef these because the _t suffix is kinda unwieldy when using these types often
 	
 	typedef int64_t int64;
-	typedef uint8_t uint8;
 	typedef int64_t int64;
+	typedef uint8_t uint8;
 	
 	// Component indexing operator
 	inline constexpr int64& int64v4::operator[] (int i) {
@@ -200,19 +200,24 @@ namespace kissmath {
 		return bool4(l.x >= r.x, l.y >= r.y, l.z >= r.z, l.w >= r.w);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool4 operator== (int64v4 l, int64v4 r) {
+	// componentwise equality comparison, returns a bool vector
+	inline constexpr bool4 equal (int64v4 l, int64v4 r) {
 		return bool4(l.x == r.x, l.y == r.y, l.z == r.z, l.w == r.w);
 	}
 	
-	// componentwise comparison returns a bool vector
-	inline constexpr bool4 operator!= (int64v4 l, int64v4 r) {
+	// componentwise inequality comparison, returns a bool vector
+	inline constexpr bool4 nequal (int64v4 l, int64v4 r) {
 		return bool4(l.x != r.x, l.y != r.y, l.z != r.z, l.w != r.w);
 	}
 	
-	// vectors are equal, equivalent to all(l == r)
-	inline constexpr bool equal (int64v4 l, int64v4 r) {
-		return all(l == r);
+	// full equality comparison, returns true only if all components are equal
+	inline constexpr bool operator== (int64v4 l, int64v4 r) {
+		return (l.x == r.x) && (l.y == r.y) && (l.z == r.z) && (l.w == r.w);
+	}
+	
+	// full inequality comparison, returns true if any components are inequal
+	inline constexpr bool operator!= (int64v4 l, int64v4 r) {
+		return (l.x != r.x) || (l.y != r.y) || (l.z != r.z) || (l.w != r.w);
 	}
 	
 	// componentwise ternary (c ? l : r)

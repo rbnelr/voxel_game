@@ -558,8 +558,8 @@ namespace svo {
 		uintptr_t old_count = (uintptr_t)chunk->opaque_vertex_count   + chunk->transparent_vertex_count;
 		uintptr_t new_count = opaque_mesh.size() + transparent_mesh.size();
 
-		uintptr_t old_size = round_up_pot((uintptr_t)old_count * sizeof(VoxelVertex), MESH_PAGING);
-		uintptr_t new_size = round_up_pot((uintptr_t)new_count * sizeof(VoxelVertex), MESH_PAGING);
+		uintptr_t old_size = align_up((uintptr_t)old_count * sizeof(VoxelVertex), MESH_PAGING);
+		uintptr_t new_size = align_up((uintptr_t)new_count * sizeof(VoxelVertex), MESH_PAGING);
 
 		//// reallocate buffer if size changed
 		//if (old_size != new_size) {
@@ -657,8 +657,8 @@ namespace svo {
 			for (auto& it : chunks.chunks) {
 				if (it.second->flags & LOCKED) continue;
 
-				int3 pos = (int3)it.first.v;
-				int scale = it.first.v.w;
+				int3 pos = (int3)it.first;
+				int scale = it.first.w;
 
 				float dist;
 				int lod = calc_lod(pos, scale, &dist);
@@ -673,8 +673,8 @@ namespace svo {
 				assert(it.second >= 0 && it.second <= 8);
 				if (it.second != 8) continue;
 
-				int3 pos = (int3)it.first.v;
-				int scale = it.first.v.w;
+				int3 pos = (int3)it.first;
+				int scale = it.first.w;
 
 				float dist;
 				int lod = calc_lod(pos, scale, &dist);

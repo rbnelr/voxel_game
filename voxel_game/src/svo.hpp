@@ -136,7 +136,7 @@ namespace svo {
 	};
 	static constexpr auto _sz = sizeof(Chunk);
 
-	typedef vector_key<int4> ChunkKey; // xyz: pos, w: scale
+	typedef int4 ChunkKey; // xyz: pos, w: scale
 
 	template <typename VALT>
 	struct ChunkHashmap {

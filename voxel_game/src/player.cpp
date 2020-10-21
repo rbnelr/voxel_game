@@ -266,7 +266,7 @@ void update_block_edits (World& world, Camera_View& view, PlayerGraphics& graphi
 	
 	calc_selected_block(block, world, view, world.player.break_block.reach, creative_mode);
 
-	if (!was_selected || !block.is_selected || !equal(old_pos, block.pos)) {
+	if (!was_selected || !block.is_selected || old_pos != block.pos) {
 		block.damage = 0;
 	}
 
