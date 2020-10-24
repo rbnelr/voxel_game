@@ -1,3 +1,4 @@
 {
-	"tilemap_filename": "island_tilemap.png"
+	"enable": true,
+	"input_filename": "red_maze"
 }

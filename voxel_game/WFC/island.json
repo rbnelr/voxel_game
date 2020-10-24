@@ -1,4 +1,11 @@
-[
+{
+	"sample_filename": "island.png",
+	"N": 3,
+	"periodic_x": false,
+	"periodic_y": false,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
 	{
 		"name": "Ocean",
 		"color": [
@@ -156,3 +163,4 @@
 		]
 	}
 ]
+}

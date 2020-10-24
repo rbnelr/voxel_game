@@ -1,0 +1,47 @@
+{
+	"sample_filename": "mxgmn/flowers.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 2,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": false,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "Ground",
+			"color": [
+				185,
+				122,
+				87
+			]
+		},
+		{
+			"name": "Stem",
+			"color": [
+				0,
+				170,
+				0
+			]
+		},
+		{
+			"name": "BG",
+			"color": [
+				191,
+				232,
+				242
+			]
+		},
+		{
+			"name": "Flower",
+			"color": [
+				255,
+				242,
+				0
+			]
+		}
+	]
+}
