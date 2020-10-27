@@ -88,7 +88,7 @@ struct TilemapTest {
 		// number of patterns that are compatible when at an offset in the four directions
 		int compatible_count[4];
 
-		std::vector<int> _compatible_patterns[4]; // not needed in algo, only for debugging visualization
+		std::vector<int> compatible_patterns[4];
 	};
 
 	std::string input_filename;
@@ -218,6 +218,7 @@ struct TilemapTest {
 					if (unique) {
 						// register pattern
 						patterns.push_back({ 1 });
+						pattern_total++;
 
 						// alloc pattern_data
 						size_t offs = patterns_data.size();
@@ -238,7 +239,7 @@ struct TilemapTest {
 				for (int b=0; b<(int)patterns.size(); ++b) {
 					if (pattern_compatible(a, b, dirs[d])) {
 						patterns[a].compatible_count[d]++;
-						patterns[a]._compatible_patterns[d].push_back(b);
+						patterns[a].compatible_patterns[d].push_back(b);
 					}
 				}
 			}
@@ -281,20 +282,201 @@ struct TilemapTest {
 	}
 
 	struct Cell {
-		
+		// sigh if I wanted std::vector<bool> to be a bitset I would use a type called bitset and not a vector, what 'genius' had the idea to make a vector that does not work like a vector?
+		struct fake_bool {
+			bool b;
+			fake_bool () {}
+			fake_bool (bool b): b{b} {}
+			operator bool () { return b; }
+		};
+
+		std::vector<fake_bool> wave;
+
+		int wave_count; // number of still valid patterns
+
+		std::vector<int> compat[4];
+	};
+
+	struct RemovedPattern {
+		int2	pos;
+		int		pat;
 	};
 
 	std::vector<Cell> output;
 
-	void generate () {
-		output.resize(I.size.x * I.size.y);
+	std::vector<RemovedPattern> propagate_stack;
 
+	bool contradiction;
+
+	void ban_pattern (Cell& c, int2 pos, int pat) {
+		assert(c.wave[pat] == true);
+		c.wave[pat] = false;
+		c.wave_count--;
+
+		for (int d=0; d<4; ++d)
+			c.compat[d][pat] = 0;
+
+		if (c.wave_count == 0) {
+			contradiction = true;
+			return;
+		}
+
+		propagate_stack.push_back({ pos, pat });
+	}
+
+	void collapse_wave (int2 pos) {
+		auto& c = output[pos.y * I.size.x + pos.x];
+
+		float total_weight = 0;
+		for (int p=0; p<(int)c.wave.size(); ++p) {
+			if (!c.wave[p]) continue;
+			total_weight += (float)patterns[p].count;
+		}
+
+		int choice = random.weighted_choice((int)c.wave.size(), [&] (int i) {
+			return c.wave[i] ? (float)patterns[i].count : 0.0f;
+		}, total_weight);
+		assert(c.wave[choice] == true);
+
+		for (int p=0; p<(int)c.wave.size(); ++p) {
+			if (!c.wave[p] || p == choice) continue;
+			ban_pattern(c, pos, p);
+		}
+	}
+
+	float clac_entropy (Cell& c) {
+		float sum = 0, sum_log = 0;
+		for (int p=0; p<(int)c.wave.size(); ++p) {
+			if (!c.wave[p]) continue;
+			float w = (float)patterns[p].count;
+			sum += w;
+			sum_log += w * log2f(w);
+		}
+
+		return log2f(sum) - sum_log / sum;
+	}
+
+	//// Init
+	void clear () {
+		output.resize(I.size.x * I.size.y);
+		for (int i=0; i<I.size.x * I.size.y; ++i) {
+			output[i].wave_count = (int)patterns.size();
+
+			output[i].wave.resize(patterns.size());
+			memset(output[i].wave.data(), 1, output[i].wave.size());
+
+			for (int d=0; d<4; ++d) {
+				output[i].compat[d].resize(patterns.size());
+				for (int p=0; p<(int)patterns.size(); ++p) {
+					output[i].compat[d][p] = patterns[p].compatible_count[d];
+				}
+			}
+		}
+
+		contradiction = false;
+	}
+
+	void generate () {
+
+		{ //// Observe
+			float min_entropy = INF;
+			int2 min_cell;
+
+			// find lowest entropy
+			for (int y=0; y<I.size.y; ++y) {
+				for (int x=0; x<I.size.x; ++x) {
+					auto& c = output[y * I.size.x + x];
+
+					if (c.wave_count == 0) {
+						contradiction = true;
+						return; // contradiction
+					}
+					
+					float e = clac_entropy(c);
+
+					if (noisy_entropy)
+						e += random.uniform(-0.001f, +0.001f);
+					
+					if (c.wave_count > 1 && e < min_entropy) {
+						min_entropy = e;
+						min_cell = int2(x,y);
+					}
+				}
+			}
+
+			if (min_entropy == INF) {
+				return; // done
+			}
+
+			collapse_wave(min_cell);
+		}
+
+		//// Propagate
+		while (!propagate_stack.empty() && !contradiction) {
+
+			int2 pos = propagate_stack.back().pos;
+			int pat = propagate_stack.back().pat;
+			propagate_stack.pop_back();
+
+			for (int d=0; d<4; ++d) {
+				int2 npos = pos + dirs[d];
+
+				if (	npos.x < 0 || npos.x >= I.size.x ||
+						npos.y < 0 || npos.y >= I.size.y )
+					continue;
+
+				auto& nc = output[npos.y * I.size.x + npos.x];
+
+				// for all patterns that are valid in direction d for the pattern pat that was banned
+				for (auto p : patterns[pat].compatible_patterns[d]) {
+
+					int& compat_count = nc.compat[d ^ 1][p]; // ^1 flips the direction
+					if (--compat_count == 0)
+						ban_pattern(nc, npos, p);
+				}
+			}
+		}
+	}
+
+	void render () {
+		for (int y=0; y<I.size.y; ++y) {
+			for (int x=0; x<I.size.x; ++x) {
+				auto& c = output[y * I.size.x + x];
+
+				lrgb color = 0;
+
+				if (visualize_entropy) {
+					color = lerp(lrgb(1,0,0), lrgb(0,0,0), clac_entropy(c) / visualize_max_entropy);
+
+				} else {
+					if (c.wave_count == 0) continue;
+
+					for (int p=0; p<(int)c.wave.size(); ++p) {
+						if (!c.wave[p]) continue;
+						uint8_t t = patterns_data[p * N*N];
+						color += to_linear( I.tiles[t].color );
+					}
+
+					color /= (float)c.wave_count;
+				}
+
+				debug_graphics->push_quad(float3((float)x, (float)y, 0), float3(1,0,0), float3(0,1,0), lrgba(color, 1));
+			}
+		}
 	}
 
 	bool init = true;
 	bool reload = true; // reload input config from json
 	bool recompile = true; // regenerate tile lists and patterns
 	bool regenerate = true; // regenerate new output
+
+	bool manual_step = false;
+	bool step = false;
+
+	bool visualize_entropy = false;
+	float visualize_max_entropy = 200;
+
+	bool noisy_entropy = true;
 
 	void update () {
 		if (!enable) return;
@@ -316,23 +498,18 @@ struct TilemapTest {
 		if (recompile) {
 			compile();
 			recompile = false;
+			regenerate = true;
 		}
 
 		if (regenerate) {
-			generate();
+			clear();
 			regenerate = false;
 		}
 
-		//for (int y=0; y<SIZE; ++y) {
-		//	for (int x=0; x<SIZE; ++x) {
-		//		int id = world[y][x];
-		//		if (id < 0)
-		//			continue;
-		//		auto& t = tiles[id];
-		//
-		//		debug_graphics->push_quad(float3((float)x, (float)y, 0), float3(1,0,0), float3(0,1,0), lrgba(to_linear(t.color), 1));
-		//	}
-		//}
+		if (!manual_step || step)
+			generate();
+
+		render();
 	}
 
 	//// Imgui
@@ -397,9 +574,19 @@ struct TilemapTest {
 				ImGui::TreePop();
 			}
 
+			ImGui::Checkbox("Use noisy entropy", &noisy_entropy);
+
 			recompile = ImGui::Button("Recomp") || recompile;
 			regenerate = ImGui::Button("Regen") || regenerate;
 
+			ImGui::Checkbox("Manual Step", &manual_step);
+			ImGui::SameLine();
+			step = ImGui::Button("Step");
+
+			ImGui::Checkbox("visualize_entropy", &visualize_entropy);
+			ImGui::SameLine();
+			ImGui::DragFloat("visualize_max_entropy", &visualize_max_entropy);
+			
 			if (	ImGui::TreeNodeEx("Tiles", ImGuiTreeNodeFlags_NoTreePushOnOpen) &&
 					ImGui::BeginTable("tiles", 3, ImGuiTableFlags_Borders|ImGuiTableFlags_Resizable)) {
 				ImGui::TableSetupColumn("Tile Color", ImGuiTableColumnFlags_WidthFixed, IMGUI_TILE_SZ);
@@ -438,7 +625,7 @@ struct TilemapTest {
 							prints("Compatible Patterns with offset (%+d,%+d) [%d]###compat[%d]", dirs[d].x,dirs[d].y, pat.compatible_count[d], d).c_str(),
 							ImGuiTreeNodeFlags_DefaultOpen)) {
 
-							imgui_pattern_list(false, &pat._compatible_patterns[d], (int)pat._compatible_patterns[d].size());
+							imgui_pattern_list(false, &pat.compatible_patterns[d], (int)pat.compatible_patterns[d].size());
 
 							ImGui::TreePop();
 						}

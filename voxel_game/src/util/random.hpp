@@ -100,14 +100,29 @@ struct _Random {
 		// pick index by comparing cumulative weight against random num
 		float accum = 0.0f;
 
-		int i;
-		for (i=0; i<(int)probabilities.size(); ++i) {
+		int count = (int)probabilities.size();
+		for (int i=0;; i++) {
 			accum += probabilities[i];
-			if (rand < accum)
-				break;
+			if (rand < accum || i+1 == count)
+				return i;
 		}
+	}
 
-		return i;
+	template <typename FUNC>
+	inline int weighted_choice (int count, FUNC get_prob, float total_prob) {
+		if (total_prob == 0.0f)
+			return -1; // all 0 prob
+
+		float rand = uniform(0.0f, total_prob);
+
+		// pick index by comparing cumulative weight against random num
+		float accum = 0.0f;
+
+		for (int i=0;; i++) {
+			accum += get_prob(i);
+			if (rand < accum || i+1 == count)
+				return i;
+		}
 	}
 };
 
