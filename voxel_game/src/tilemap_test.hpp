@@ -431,7 +431,7 @@ struct TilemapTest {
 				for (auto p : patterns[pat].compatible_patterns[d]) {
 
 					int& compat_count = nc.compat[d ^ 1][p]; // ^1 flips the direction
-					if (--compat_count == 0)
+					if (compat_count > 0 && --compat_count == 0)
 						ban_pattern(nc, npos, p);
 				}
 			}

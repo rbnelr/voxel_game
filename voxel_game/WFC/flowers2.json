@@ -1,11 +1,11 @@
 {
-	"sample_filename": "mxgmn/flowers.png",
+	"sample_filename": "flowers_fix.png",
 	"size": [
 		64,
 		64
 	],
 	"N": 3,
-	"symmetrize": false,
+	"symmetrize": true,
 	"periodic_x": true,
 	"periodic_y": true,
 	"border_x": false,
@@ -40,6 +40,14 @@
 			"color": [
 				255,
 				242,
+				0
+			]
+		},
+		{
+			"name": "Flower-stem",
+			"color": [
+				204,
+				255,
 				0
 			]
 		}
