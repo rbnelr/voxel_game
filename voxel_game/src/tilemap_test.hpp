@@ -295,6 +295,8 @@ struct TilemapTest {
 		int wave_count; // number of still valid patterns
 
 		std::vector<int> compat[4];
+
+		lrgb output_color; // cached output color to speed up render of in-progress outputs
 	};
 
 	struct RemovedPattern {
@@ -371,6 +373,8 @@ struct TilemapTest {
 					output[i].compat[d][p] = patterns[p].compatible_count[d];
 				}
 			}
+
+			update_cell_color(output[i]);
 		}
 
 		contradiction = false;
@@ -409,6 +413,8 @@ struct TilemapTest {
 			}
 
 			collapse_wave(min_cell);
+
+			update_cell_color(output[min_cell.y * I.size.x + min_cell.x]);
 		}
 
 		//// Propagate
@@ -434,8 +440,27 @@ struct TilemapTest {
 					if (compat_count > 0 && --compat_count == 0)
 						ban_pattern(nc, npos, p);
 				}
+
+				update_cell_color(nc);
 			}
 		}
+	}
+
+	void update_cell_color (Cell& c) {
+		if (c.wave_count == 0) {
+			c.output_color = lrgb(1,1,0);
+			return;
+		}
+
+		lrgb col = 0;
+
+		for (int p=0; p<(int)c.wave.size(); ++p) {
+			if (!c.wave[p]) continue;
+			uint8_t t = patterns_data[p * N*N];
+			col += to_linear( I.tiles[t].color );
+		}
+
+		c.output_color = col / (float)c.wave_count;
 	}
 
 	void render () {
@@ -443,21 +468,12 @@ struct TilemapTest {
 			for (int x=0; x<I.size.x; ++x) {
 				auto& c = output[y * I.size.x + x];
 
-				lrgb color = 0;
+				lrgb color;
 
 				if (visualize_entropy) {
 					color = lerp(lrgb(1,0,0), lrgb(0,0,0), clac_entropy(c) / visualize_max_entropy);
-
 				} else {
-					if (c.wave_count == 0) continue;
-
-					for (int p=0; p<(int)c.wave.size(); ++p) {
-						if (!c.wave[p]) continue;
-						uint8_t t = patterns_data[p * N*N];
-						color += to_linear( I.tiles[t].color );
-					}
-
-					color /= (float)c.wave_count;
+					color = c.output_color;
 				}
 
 				debug_graphics->push_quad(float3((float)x, (float)y, 0), float3(1,0,0), float3(0,1,0), lrgba(color, 1));
