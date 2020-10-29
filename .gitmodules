@@ -1,13 +1,7 @@
-[submodule "tracy"]
-	path = tracy
-	url = https://github.com/wolfpld/tracy.git
 [submodule "dear_imgui"]
 	path = dear_imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = tables
-[submodule "nlohmann_json"]
-	path = nlohmann_json
-	url = https://github.com/nlohmann/json.git
 [submodule "kisslib"]
 	path = kisslib
 	url = https://github.com/rbnelr/kisslib.git
