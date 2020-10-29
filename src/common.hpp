@@ -18,16 +18,10 @@
 #include <algorithm>
 
 //
-//#include "glad/glad.h"
-//#include "glad/glad_wgl.h"
-
 #include "vulkan/vulkan.hpp" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
 #include "GLFW/glfw3.h"
 
-//#include "Tracy.hpp"
-//#include "TracyOpenGL.hpp"
-//
 //#include "stb/stb_rect_pack.hpp"
 //#include "stb/stb_image.hpp"
 //#include "stb/stb_image_write.hpp"
@@ -54,8 +48,9 @@
 #include "kisslib/timer.hpp"
 #include "kisslib/allocator.hpp"
 
+#include "kisslib/profiling.hpp"
+#include "kisslib/serialization.hpp"
+
 using namespace kiss;
 using namespace kissmath;
 
-//#include "profiling.hpp"
-//#include "serialization.hpp"

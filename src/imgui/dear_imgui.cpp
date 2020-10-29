@@ -1,7 +1,7 @@
 #include "dear_imgui.hpp"
-#include "../window.hpp"
-#include "../input.hpp"
-#include "../vulkan/vulkan.hpp"
+#include "window.hpp"
+#include "input.hpp"
+#include "vulkan/vulkan.hpp"
 #include "kisslib/string.hpp"
 #include "kisslib/kissmath_colors.hpp"
 using namespace kissmath;

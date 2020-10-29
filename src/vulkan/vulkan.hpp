@@ -1,8 +1,9 @@
 #pragma once
 #include "vulkan_helper.hpp"
+#include "vulkan_shaders.hpp"
 #include "GLFW/glfw3.h"
 #include "assert.h"
-#include "../imgui/dear_imgui.hpp"
+#include "imgui/dear_imgui.hpp"
 
 namespace vk {
 	inline std::vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
@@ -54,7 +55,7 @@ namespace vk {
 
 		// Passes
 		VkRenderPass				render_pass;
-		RenderBuffer				color_buffer;
+		//RenderBuffer				color_buffer;
 		RenderBuffer				depth_buffer;
 
 		VkPipelineLayout			pipeline_layout;
@@ -97,11 +98,17 @@ namespace vk {
 
 		VkDeviceMemory mesh_mem;
 
+		char const* verti = R"_SHAD(
+			layout(location = 0) in vec2 a_pos;
+			layout(location = 1) in vec3 a_col;
+		)_SHAD";
+
 		char const* vert = R"_SHAD(
 			#version 450
 			
-			layout(location = 0) in vec2 a_pos;
-			layout(location = 1) in vec3 a_col;
+			//layout(location = 0) in vec2 a_pos;
+			//layout(location = 1) in vec3 a_col;
+			#include "verti"
 
 			layout(location = 0) out vec3 vs_color;
 			
@@ -127,43 +134,8 @@ namespace vk {
 		void compile_shaders () {
 			shaderc_compiler_t shaderc = shaderc_compiler_initialize();
 
-			auto vert_res = shaderc_compile_into_spv(shaderc, vert, strlen(vert), shaderc_vertex_shader, "vert", "main", nullptr);
-			auto frag_res = shaderc_compile_into_spv(shaderc, frag, strlen(frag), shaderc_fragment_shader, "frag", "main", nullptr);
-
-			{
-				auto res = shaderc_result_get_compilation_status(vert_res);
-				auto errors = shaderc_result_get_error_message(vert_res);
-				if (res != shaderc_compilation_status_success)
-					fprintf(stderr, "vertex shader compilation error:\n%s\n", errors);
-			}
-			auto vert_length = shaderc_result_get_length(vert_res);
-			auto vert_bytes = shaderc_result_get_bytes(vert_res);
-
-			{
-				auto res = shaderc_result_get_compilation_status(frag_res);
-				auto errors = shaderc_result_get_error_message(frag_res);
-				if (res != shaderc_compilation_status_success)
-					fprintf(stderr, "fragment shader compilation error:\n%s\n", errors);
-			}
-			auto frag_length = shaderc_result_get_length(frag_res);
-			auto frag_bytes = shaderc_result_get_bytes(frag_res);
-
-			VkShaderModuleCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			info.codeSize = vert_length;
-			info.pCode = (uint32_t*)vert_bytes;
-			if (vkCreateShaderModule(device, &info, nullptr, &vert_module) != VK_SUCCESS) {
-				fprintf(stderr, "vkCreateShaderModule failed!\n");
-			}
-
-			info.codeSize = frag_length;
-			info.pCode = (uint32_t*)frag_bytes;
-			if (vkCreateShaderModule(device, &info, nullptr, &frag_module) != VK_SUCCESS) {
-				fprintf(stderr, "vkCreateShaderModule failed!\n");
-			}
-
-			shaderc_result_release(vert_res);
-			shaderc_result_release(frag_res);
+			vert_module = compile_shader_stage(device, shaderc, shaderc_vertex_shader, vert);
+			frag_module = compile_shader_stage(device, shaderc, shaderc_fragment_shader, frag);
 
 			shaderc_compiler_release(shaderc);
 		}
@@ -447,11 +419,11 @@ namespace vk {
 
 				std::vector<VkImageView> attachments;
 				if (msaa > 1) {
-					attachments = {
-						color_buffer.image_view,
-						depth_buffer.image_view,
-						img.image_view,
-					};
+					//attachments = {
+					//	color_buffer.image_view,
+					//	depth_buffer.image_view,
+					//	img.image_view,
+					//};
 				} else {
 					attachments = {
 						img.image_view,
@@ -533,18 +505,18 @@ namespace vk {
 
 		//// Framebuffer creation
 		void create_framebuffers (int2 size, VkFormat color_format, int msaa) {
-			color_buffer = create_render_buffer(size, color_format,
-				VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-				VK_IMAGE_ASPECT_COLOR_BIT, msaa);
+			//color_buffer = create_render_buffer(size, color_format,
+			//	VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			//	VK_IMAGE_ASPECT_COLOR_BIT, msaa);
 
 			depth_buffer = create_render_buffer(size, depth_format,
 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				VK_IMAGE_ASPECT_DEPTH_BIT, msaa);
 		}
 		void destroy_framebuffers () {
-			vkDestroyImageView(device, color_buffer.image_view, nullptr);
-			vkDestroyImage(device, color_buffer.image, nullptr);
-			vkFreeMemory(device, color_buffer.memory, nullptr);
+			//vkDestroyImageView(device, color_buffer.image_view, nullptr);
+			//vkDestroyImage(device, color_buffer.image, nullptr);
+			//vkFreeMemory(device, color_buffer.memory, nullptr);
 
 			vkDestroyImageView(device, depth_buffer.image_view, nullptr);
 			vkDestroyImage(device, depth_buffer.image, nullptr);

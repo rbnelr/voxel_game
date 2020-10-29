@@ -1,8 +1,8 @@
 #pragma once
 #include "vulkan/vulkan.h"
 #include "shaderc/shaderc.h"
-#include "../../kisslib/macros.hpp"
-#include "../../kisslib/kissmath.hpp"
+#include "kisslib/macros.hpp"
+#include "kisslib/kissmath.hpp"
 #include <vector>
 #include <stdexcept>
 

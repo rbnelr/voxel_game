@@ -60,7 +60,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\;$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\vulkan_sdk\Include\;$(SolutionDir)..\..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\vulkan_sdk\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -78,7 +78,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\;$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\vulkan_sdk\Include\;$(SolutionDir)..\..\dear_imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\..\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\vulkan_sdk\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -89,111 +89,68 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\dear_imgui\imgui.h" />
-    <ClInclude Include="..\..\..\dear_imgui\imgui_internal.h" />
-    <ClInclude Include="..\..\..\dear_imgui\misc\cpp\imgui_stdlib.h" />
-    <ClInclude Include="..\..\..\kisslib\allocator.hpp" />
-    <ClInclude Include="..\..\..\kisslib\animation.hpp" />
-    <ClInclude Include="..\..\..\kisslib\bit_twiddling.hpp" />
-    <ClInclude Include="..\..\..\kisslib\circular_buffer.hpp" />
-    <ClInclude Include="..\..\..\kisslib\clean_windows_h.hpp" />
-    <ClInclude Include="..\..\..\kisslib\collision.hpp" />
-    <ClInclude Include="..\..\..\kisslib\file_io.hpp" />
-    <ClInclude Include="..\..\..\kisslib\geometry.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\bool4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2x2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float2x3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3x3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float3x4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\float4x4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\int64v4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\transform2d.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\transform3d.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v2.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v3.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath\output\uint8v4.hpp" />
-    <ClInclude Include="..\..\..\kisslib\kissmath_colors.hpp" />
-    <ClInclude Include="..\..\..\kisslib\macros.hpp" />
-    <ClInclude Include="..\..\..\kisslib\random.hpp" />
-    <ClInclude Include="..\..\..\kisslib\raw_array.hpp" />
-    <ClInclude Include="..\..\..\kisslib\read_directory.hpp" />
-    <ClInclude Include="..\..\..\kisslib\running_average.hpp" />
-    <ClInclude Include="..\..\..\kisslib\string.hpp" />
-    <ClInclude Include="..\..\..\kisslib\threadpool.hpp" />
-    <ClInclude Include="..\..\..\kisslib\threadsafe_queue.hpp" />
-    <ClInclude Include="..\..\..\kisslib\timer.hpp" />
     <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imconfig.h" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imgui.h" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imgui_internal.h" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imstb_textedit.h" />
+    <ClInclude Include="..\..\..\src\dear_imgui\imstb_truetype.h" />
     <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="..\..\..\src\input.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\allocator.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\animation.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\bit_twiddling.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\circular_buffer.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\clean_windows_h.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\collision.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\file_io.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\geometry.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\profiling.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\random.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\raw_array.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\running_average.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\serialization.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\stb_image.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\stb_image_write.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\stb_rect_pack.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\stl_extensions.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\string.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\threadpool.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\threadsafe_queue.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\timer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
     <ClInclude Include="..\..\..\src\window.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\dear_imgui\imgui.cpp" />
-    <ClCompile Include="..\..\..\dear_imgui\imgui_demo.cpp" />
-    <ClCompile Include="..\..\..\dear_imgui\imgui_draw.cpp" />
-    <ClCompile Include="..\..\..\dear_imgui\imgui_widgets.cpp" />
-    <ClCompile Include="..\..\..\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
-    <ClCompile Include="..\..\..\kisslib\allocator.cpp" />
-    <ClCompile Include="..\..\..\kisslib\collision.cpp" />
-    <ClCompile Include="..\..\..\kisslib\file_io.cpp" />
-    <ClCompile Include="..\..\..\kisslib\random.cpp" />
-    <ClCompile Include="..\..\..\kisslib\read_directory.cpp" />
-    <ClCompile Include="..\..\..\kisslib\string.cpp" />
-    <ClCompile Include="..\..\..\kisslib\threadpool.cpp" />
-    <ClCompile Include="..\..\..\kisslib\timer.cpp" />
+    <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp" />
+    <ClCompile Include="..\..\..\src\dear_imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\src\dear_imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\src\dear_imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\..\..\src\input.cpp" />
-    <ClCompile Include="..\..\..\src\vulkan\vulkan.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\allocator.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\collision.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\file_io.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\random.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\read_directory.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\stb_image.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\stb_image_write.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\stb_rect_pack.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\string.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
     <ClCompile Include="..\..\..\src\window.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\kisslib\kissmath\output\bool2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\bool3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\bool4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float2x2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float2x3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float3x3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float3x4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\float4x4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int64.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int64v2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int64v3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\int64v4.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\transform2d.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\transform3d.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\uint8.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\uint8v2.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\uint8v3.inl" />
-    <None Include="..\..\..\kisslib\kissmath\output\uint8v4.inl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
