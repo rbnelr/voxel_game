@@ -152,6 +152,11 @@
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
     <ClCompile Include="..\..\..\src\window.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\shaders\frag.glsl" />
+    <None Include="..\..\..\shaders\inc.glsl" />
+    <None Include="..\..\..\shaders\vert.glsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

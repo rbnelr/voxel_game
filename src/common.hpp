@@ -49,6 +49,8 @@
 #include "kisslib/allocator.hpp"
 
 #include "kisslib/profiling.hpp"
+
+#define SERIALIZE_LOG(type, ...) clog(type, __VA_ARGS__)
 #include "kisslib/serialization.hpp"
 
 using namespace kiss;

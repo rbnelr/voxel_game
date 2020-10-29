@@ -191,4 +191,15 @@
       <UniqueIdentifier>{56090962-0d1d-4389-97f8-e82e14f8a451}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\shaders\vert.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders\frag.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders\inc.glsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
 </Project>

@@ -1,0 +1,32 @@
+{
+	"shaders_dir": "shaders/",
+	"shaders": [
+		{
+			"name": "test",
+			"valid": true,
+			"stages": [
+				{
+					"stage": "vertex",
+					"override_src": "vert.glsl",
+					"compiler_msg": ""
+				},
+				{
+					"stage": "fragment",
+					"override_src": "frag.glsl",
+					"compiler_msg": ""
+				}
+			],
+			"src_files": [
+				{
+					"filename": "shaders/vert.glsl"
+				},
+				{
+					"filename": "shaders/sub/inc.glsl"
+				},
+				{
+					"filename": "shaders/frag.glsl"
+				}
+			]
+		}
+	]
+}

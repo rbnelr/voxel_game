@@ -19,6 +19,8 @@ namespace vk {
 		VkDevice					device;
 		Queues						queues;
 
+		ShaderManager				shaders;
+
 		std::vector<char const*>	enabled_layers;
 		VkFormat					color_format;
 		VkFormat					depth_format;
@@ -98,53 +100,6 @@ namespace vk {
 
 		VkDeviceMemory mesh_mem;
 
-		char const* verti = R"_SHAD(
-			layout(location = 0) in vec2 a_pos;
-			layout(location = 1) in vec3 a_col;
-		)_SHAD";
-
-		char const* vert = R"_SHAD(
-			#version 450
-			
-			//layout(location = 0) in vec2 a_pos;
-			//layout(location = 1) in vec3 a_col;
-			#include "verti"
-
-			layout(location = 0) out vec3 vs_color;
-			
-			void main () {
-				gl_Position = vec4(a_pos, 0.0, 1.0);
-				vs_color = a_col;
-			}
-		)_SHAD";
-		char const* frag = R"_SHAD(
-			#version 450
-			
-			layout(location = 0) in vec3 vs_color;
-			layout(location = 0) out vec4 frag_color;
-
-			void main () {
-				frag_color = vec4(vs_color, 1.0);
-			}
-		)_SHAD";
-
-		VkShaderModule vert_module;
-		VkShaderModule frag_module;
-
-		void compile_shaders () {
-			shaderc_compiler_t shaderc = shaderc_compiler_initialize();
-
-			vert_module = compile_shader_stage(device, shaderc, shaderc_vertex_shader, vert);
-			frag_module = compile_shader_stage(device, shaderc, shaderc_fragment_shader, frag);
-
-			shaderc_compiler_release(shaderc);
-		}
-		void destroy_shaders () {
-
-			vkDestroyShaderModule(device, vert_module, nullptr);
-			vkDestroyShaderModule(device, frag_module, nullptr);
-		}
-
 		bool frame_begin (GLFWwindow* window) {
 			auto frame = frame_data[cur_frame];
 
@@ -212,7 +167,7 @@ namespace vk {
 				vkCmdSetScissor(buf, 0, 1, &scissor);
 			}
 			
-			{
+			if (pipeline) {
 				vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 			
 				VkBuffer vertex_bufs[] = { bufs[0].vkbuf };
@@ -307,9 +262,9 @@ namespace vk {
 			descriptor_pool = create_descriptor_pool(device, SWAP_CHAIN_SIZE);
 
 			render_pass = create_renderpass(device, color_format, depth_format, msaa);
-			compile_shaders();
+			shaders.init(device);
 			create_pipeline_layout();
-			create_pipeline(msaa);
+			create_pipeline(msaa, shaders.get(device, "test"));
 
 			upload_meshes();
 
@@ -324,7 +279,7 @@ namespace vk {
 
 			destroy_pipeline();
 			destroy_pipeline_layout();
-			destroy_shaders();
+			shaders.destroy(device);
 
 			vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 			vkDestroyRenderPass(device, render_pass, nullptr);
@@ -704,19 +659,20 @@ namespace vk {
 			vkFreeMemory(device, mesh_mem, nullptr);
 		}
 
-		void create_pipeline (int msaa) {
+		void create_pipeline (int msaa, Shader* shader) {
+			pipeline = VK_NULL_HANDLE;
 
-			VkPipelineShaderStageCreateInfo shader_stages[2] = {};
+			if (!shader->valid)
+				return;
 
-			shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			shader_stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-			shader_stages[0].module = vert_module;
-			shader_stages[0].pName = "main";
+			VkPipelineShaderStageCreateInfo shader_stages[16] = {};
 
-			shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			shader_stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-			shader_stages[1].module = frag_module;
-			shader_stages[1].pName = "main";
+			for (int i=0; i<(int)shader->stages.size(); ++i) {
+				shader_stages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+				shader_stages[i].stage = SHADERC_STAGE_BITS_MAP[ shader->stages[i].stage ];
+				shader_stages[i].module = shader->stages[i].module;
+				shader_stages[i].pName = "main";
+			}
 
 			VertexAttributes attribs;
 			Vertex::attributes(attribs);
@@ -820,7 +776,7 @@ namespace vk {
 
 			VkGraphicsPipelineCreateInfo info = {};
 			info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-			info.stageCount				= ARRLEN(shader_stages);
+			info.stageCount				= (uint32_t)shader->stages.size();
 			info.pStages				= shader_stages;
 			info.pVertexInputState		= &vertex_input;
 			info.pInputAssemblyState	= &input_assembly;
@@ -839,7 +795,8 @@ namespace vk {
 			VK_CHECK_RESULT(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline));
 		}
 		void destroy_pipeline () {
-			vkDestroyPipeline(device, pipeline, nullptr);
+			if (pipeline)
+				vkDestroyPipeline(device, pipeline, nullptr);
 		}
 
 		//// One time commands
