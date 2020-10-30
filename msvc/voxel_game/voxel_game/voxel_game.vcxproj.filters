@@ -192,13 +192,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\shaders\vert.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="..\..\..\shaders\frag.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="..\..\..\shaders\inc.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders.json" />
+    <None Include="..\..\..\shaders\test.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

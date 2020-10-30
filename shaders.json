@@ -7,24 +7,24 @@
 			"stages": [
 				{
 					"stage": "vertex",
-					"override_src": "vert.glsl",
+					"override_src": "",
 					"compiler_msg": ""
 				},
 				{
 					"stage": "fragment",
-					"override_src": "frag.glsl",
+					"override_src": "",
 					"compiler_msg": ""
 				}
 			],
 			"src_files": [
 				{
-					"filename": "shaders/vert.glsl"
+					"filename": "shaders/test.glsl"
 				},
 				{
 					"filename": "shaders/sub/inc.glsl"
 				},
 				{
-					"filename": "shaders/frag.glsl"
+					"filename": "shaders/test.glsl"
 				}
 			]
 		}

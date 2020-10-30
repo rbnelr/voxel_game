@@ -121,12 +121,6 @@ namespace vk {
 
 			return shader->valid;
 		}
-		static void destroy_shader (VkDevice dev, Shader* s) {
-			for (auto& s : s->stages) {
-				if (s.module)
-					vkDestroyShaderModule(dev, s.module, nullptr);
-			}
-		}
 		
 		struct IncludeResult {
 			shaderc_include_result res;
@@ -166,8 +160,7 @@ namespace vk {
 				res->res.content_length = res->source_code.size();
 			}
 
-
-			return (shaderc_include_result*)res; // this should be safe
+			return (shaderc_include_result*)res;
 		}
 		static void shaderc_include_result_release (void* user_data, shaderc_include_result* include_result) {
 			delete ((IncludeResult*)include_result);
@@ -233,5 +226,12 @@ namespace vk {
 				return false;
 			}
 		}
+		static void destroy_shader (VkDevice dev, Shader* s) {
+			for (auto& s : s->stages) {
+				if (s.module)
+					vkDestroyShaderModule(dev, s.module, nullptr);
+			}
+		}
+		
 	};
 }
