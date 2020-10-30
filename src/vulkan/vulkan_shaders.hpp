@@ -132,7 +132,7 @@ namespace vk {
 			shaderc_include_result res;
 
 			std::string filepath;
-			std::string source;
+			std::string source_code;
 		};
 
 		static shaderc_include_result* shaderc_include_resolve (
@@ -148,15 +148,24 @@ namespace vk {
 
 			shader->src_files.push_back({ res->filepath });
 
-			bool file_found = kiss::load_text_file(res->filepath.c_str(), &res->source);
+			bool file_found = kiss::load_text_file(res->filepath.c_str(), &res->source_code);
 
-			if (!file_found) // TODO: how to signal api that inclusion failed?
-				res->source = prints("Source file \"%s\" could not be loaded!", res->filepath.c_str());
+			if (file_found) {
+				res->res.source_name = res->filepath.data();
+				res->res.source_name_length = file_found ? res->filepath.size() : 0; // empty source_name signals include failure
+				res->res.content = res->source_code.data();
+				res->res.content_length = res->source_code.size();
+			} else {
+				res->source_code = prints("Source file \"%s\" could not be loaded!", res->filepath.c_str()); // error message instead of source code in failure case
+				
+				// empty source name signals include failure
+				res->res.source_name = nullptr;
+				res->res.source_name_length = 0;
 
-			res->res.source_name = res->filepath.data();
-			res->res.source_name_length = res->filepath.size();
-			res->res.content = res->source.data();
-			res->res.content_length = res->source.size();
+				res->res.content = res->source_code.data();
+				res->res.content_length = res->source_code.size();
+			}
+
 
 			return (shaderc_include_result*)res; // this should be safe
 		}
