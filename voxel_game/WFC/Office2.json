@@ -1,0 +1,47 @@
+{
+	"sample_filename": "mxgmn/Office2.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": true,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "",
+			"color": [
+				0,
+				0,
+				0
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				255,
+				255,
+				255
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				226,
+				226,
+				226
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				181,
+				230,
+				29
+			]
+		}
+	]
+}

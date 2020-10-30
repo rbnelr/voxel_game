@@ -1,0 +1,55 @@
+{
+	"sample_filename": "mxgmn/Platformer.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": false,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "",
+			"color": [
+				185,
+				122,
+				87
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				63,
+				72,
+				204
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				153,
+				217,
+				234
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				181,
+				230,
+				29
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				127,
+				127,
+				127
+			]
+		}
+	]
+}

@@ -1,0 +1,39 @@
+{
+	"sample_filename": "mxgmn/Village.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": true,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "",
+			"color": [
+				0,
+				0,
+				0
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				170,
+				85,
+				0
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				170,
+				0,
+				0
+			]
+		}
+	]
+}

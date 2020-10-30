@@ -1,0 +1,39 @@
+{
+	"sample_filename": "mxgmn/MagicOffice.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": true,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "",
+			"color": [
+				66,
+				69,
+				80
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				255,
+				0,
+				114
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				89,
+				112,
+				195
+			]
+		}
+	]
+}

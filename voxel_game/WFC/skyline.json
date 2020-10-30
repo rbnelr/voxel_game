@@ -1,0 +1,55 @@
+{
+	"sample_filename": "mxgmn/Skyline.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": true,
+	"periodic_y": false,
+	"border_x": false,
+	"border_y": false,
+	"tiles": [
+		{
+			"name": "",
+			"color": [
+				108,
+				108,
+				0
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				127,
+				127,
+				127
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				255,
+				242,
+				0
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				5,
+				88,
+				88
+			]
+		},
+		{
+			"name": "",
+			"color": [
+				0,
+				0,
+				0
+			]
+		}
+	]
+}
