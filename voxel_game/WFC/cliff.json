@@ -1,0 +1,14 @@
+{
+	"sample_filename": "cliff2.png",
+	"size": [
+		64,
+		64
+	],
+	"N": 3,
+	"symmetrize": false,
+	"periodic_x": false,
+	"periodic_y": false,
+	"border_x": false,
+	"border_y": false,
+	"tiles": []
+}
