@@ -1,30 +1,28 @@
 #pragma once
-#include "kissmath.hpp"
+#include "common.hpp"
 #include "chunks.hpp"
-#include "graphics/camera.hpp"
+#include "engine/camera.hpp"
 #include "physics.hpp"
 #include "items.hpp"
 #include "audio/audio.hpp"
 
-// Global for now, the world should store this if it is not randomized
-extern float3	player_spawn_point;
-
 struct Block;
-class World;
+struct World;
 
 struct SelectedBlock {
-	bool		valid = false;
-	Block		block;
-	bpos		pos;
+	int3		pos;
+	block_id	block;
 	BlockFace	face = (BlockFace)-1; // -1 == no face
+	bool		is_selected = false;
+
+	float		damage = 0; // damage is accumulated from prev frame if was_selected then and is_selected now and if pos is the same
 
 	operator bool () const {
-		return valid;
+		return is_selected;
 	}
 };
 
-class BreakBlock {
-public:
+struct BreakBlock {
 
 	float anim_speed = 4;
 	float damage = 0.25f;
@@ -44,7 +42,26 @@ public:
 
 		imgui_pop();
 	}
-	void update (World& world, Player& player, PlayerGraphics const& graphics, SelectedBlock const& selected_block);
+	void update (Input& I, World& world, Player& player, bool creative_mode);
+};
+
+struct BlockPlace {
+
+	float repeat_speed = 5.5f;
+	float anim_speed = 4;
+	float reach = 4.5f;
+
+	float anim_t = 0;
+
+	void imgui (const char* name=nullptr) {
+		if (!imgui_push("BlockPlace", name)) return;
+
+		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
+		ImGui::DragFloat("reach", &reach, 0.05f);
+
+		imgui_pop();
+	}
+	void update (Input& I, World& world, Player const& player);
 };
 
 struct InventorySlot {
@@ -54,8 +71,7 @@ struct InventorySlot {
 	Item item = {};
 };
 
-class Inventory {
-public:
+struct Inventory {
 	bool is_open = false;
 
 	struct Quickbar {
@@ -86,41 +102,18 @@ public:
 
 	Quickbar quickbar;
 
-	void update ();
+	void update (Input& I);
 };
 
-class BlockPlace {
-public:
+struct Player {
 
-	float repeat_speed = 5.5f;
-	float anim_speed = 4;
-	float reach = 4.5f;
-
-	float anim_t = 0;
-
-	void imgui (const char* name=nullptr) {
-		if (!imgui_push("BlockPlace", name)) return;
-
-		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
-		ImGui::DragFloat("reach", &reach, 0.05f);
-
-		imgui_pop();
-	}
-	void update (World& world, Player const& player, SelectedBlock const& selected_block);
-};
-
-class Player {
-public:
-
-	Player () {
-		respawn();
-	}
+	Player (float3 pos): pos{pos} {}
 
 	// Player ground position
 	float3	pos;
 
 	// Player velocity
-	float3	vel;
+	float3	vel = 0;
 
 	// Player look rotation
 	float2	rot_ae =		float2(deg(0), deg(-10)); // azimuth elevation
@@ -129,9 +122,10 @@ public:
 	bool third_person = false;
 
 	////
-	BreakBlock	break_block;
-	BlockPlace	block_place;
-	Inventory	inventory;
+	BreakBlock		break_block;
+	BlockPlace		block_place;
+	Inventory		inventory;
+	SelectedBlock	selected_block;
 
 	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
 
@@ -202,17 +196,12 @@ public:
 
 	bool calc_ground_contact (World& world, bool* stuck);
 
-	void update_movement_controls (World& world);
+	void update_movement_controls (Input& I, World& world);
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (World& world, PlayerGraphics const& graphics, bool active, SelectedBlock* highlighted_block);
+	Camera_View update_post_physics (Input& I, World& world);
 
-	void respawn () {
-		pos = player_spawn_point;
-		vel = 0;
-	}
-
-	SelectedBlock calc_selected_block (World& world);
+	void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view, float reach, bool creative_mode);
 	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
 };

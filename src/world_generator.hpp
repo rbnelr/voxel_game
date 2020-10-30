@@ -1,10 +1,5 @@
 #pragma once
-#include "dear_imgui.hpp"
-#include "kissmath.hpp"
-#include "util/random.hpp"
-#include "util/string.hpp"
-#include <vector>
-#include <string>
+#include "common.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);
@@ -46,7 +41,8 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
-class Chunk;
+struct Chunk;
+struct Chunks;
 
 struct WorldGenerator {
 	std::string seed_str = "test2";
@@ -108,6 +104,16 @@ struct WorldGenerator {
 		ImGui::PopItemWidth();
 		imgui_pop();
 	}
+};
 
-	void generate_chunk (Chunk& chunk) const;
+struct WorldgenJob : ThreadingJob {
+	Chunk* chunk;
+	Chunks* chunks;
+	WorldGenerator const* wg;
+
+	WorldgenJob (Chunk* chunk, Chunks* chunks, WorldGenerator const* wg): chunk{chunk}, chunks{chunks}, wg{wg} {}
+	virtual ~WorldgenJob() = default;
+
+	virtual void execute ();
+	virtual void finalize ();
 };

@@ -4,6 +4,7 @@
 #include "GLFW/glfw3.h"
 #include "assert.h"
 #include "imgui/dear_imgui.hpp"
+#include "kisslib/profiling.hpp"
 
 namespace vk {
 	inline std::vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
@@ -235,6 +236,8 @@ namespace vk {
 		}
 
 		Renderer (char const* app_name, GLFWwindow* window) {
+			ZoneScoped;
+
 			auto request_extensions = glfwGetRequiredInstanceExtensions_vec();
 
 			instance = create_instance(app_name, debug_callback, request_extensions, &enabled_layers);
@@ -271,6 +274,8 @@ namespace vk {
 			recreate_swap_chain(window, msaa);
 		}
 		~Renderer () {
+			ZoneScoped;
+
 			vkQueueWaitIdle(queues.graphics_queue);
 
 			//vkFreeMemory(device, static_memory.memory, nullptr);

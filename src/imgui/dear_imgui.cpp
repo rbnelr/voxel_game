@@ -1,12 +1,14 @@
 #include "dear_imgui.hpp"
-#include "window.hpp"
-#include "input.hpp"
+#include "engine/window.hpp"
+#include "engine/input.hpp"
 #include "vulkan/vulkan.hpp"
 #include "kisslib/string.hpp"
 #include "kisslib/kissmath_colors.hpp"
 using namespace kissmath;
 
 void DearImgui::init (vk::Renderer& renderer, int msaa) {
+	ZoneScoped;
+
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -42,6 +44,8 @@ void DearImgui::init (vk::Renderer& renderer, int msaa) {
 }
 
 void DearImgui::frame_start () {
+	ZoneScoped;
+
 	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame(enabled && window.input.cursor_enabled);
 
@@ -56,12 +60,14 @@ void DearImgui::frame_start () {
 
 	ImGui::NewFrame();
 
-	if (true || show_demo_window)
+	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
 }
 void DearImgui::draw (VkCommandBuffer buf) {
 	if (enabled) {
+		ZoneScoped;
+
 		ImGui::Render();
 
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), buf);
@@ -69,6 +75,8 @@ void DearImgui::draw (VkCommandBuffer buf) {
 }
 
 void DearImgui::destroy (vk::Renderer& renderer) {
+	ZoneScoped;
+
 	vkQueueWaitIdle(renderer.queues.graphics_queue);
 
 	ImGui_ImplVulkan_Shutdown();
@@ -81,6 +89,8 @@ GuiConsole gui_console;
 
 void GuiConsole::imgui () {
 	if (!gui_console.shown) return;
+
+	ZoneScoped;
 
 	if (imgui_uncollapse)
 		ImGui::SetNextWindowCollapsed(false);

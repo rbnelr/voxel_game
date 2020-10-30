@@ -1,7 +1,6 @@
 #include "audio.hpp"
 #include "read_wav.hpp"
-#include "../input.hpp"
-#include "../kissmath/float.hpp"
+#include "kisslib/kissmath.hpp"
 using namespace kissmath;
 
 #include "portaudio.h"
@@ -44,7 +43,8 @@ void AudioManager::play_sound (Sound* sound, float volume, float speed) {
 		playing_sounds[playing_sounds_count] = { sound, volume * sound->volume, speed * sound->speed, 0 };
 		playing_sounds_count++;
 	}
-	_timescale = input.time_scale;
+	//_timescale = input.time_scale;
+	_timescale = 1; // fix 
 }
 
 audio::AudioSample mix_sounds () {

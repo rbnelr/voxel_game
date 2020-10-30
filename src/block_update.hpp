@@ -1,5 +1,7 @@
 #pragma once
+#include "common.hpp"
 #include "chunks.hpp"
+#include "engine/input.hpp"
 
 class BlockUpdate {
 
@@ -56,6 +58,6 @@ public:
 	}
 
 	bool update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world);
-	void update_blocks (Chunks& chunks);
+	void update_blocks (Input& I, Chunks& chunks);
 };
 

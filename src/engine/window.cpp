@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "window.hpp"
+#include "game.hpp"
 
 //// vsync and fullscreen mode
 void Window::set_vsync (bool on) {
@@ -60,7 +61,7 @@ bool select_monitor_from_window_pos (Rect window_positioning, Monitor* selected_
 }
 
 bool Window::switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
-	//ZoneScopedN("switch_fullscreen");
+	ZoneScoped;
 
 	if (!this->fullscreen) {
 		// store windowed window placement
@@ -102,17 +103,31 @@ bool Window::toggle_fullscreen () {
 //// gameloop
 
 void frameloop () {
-	Renderer r(APPNAME, window.window);
+	std::unique_ptr<Renderer> renderer;
+	std::unique_ptr<Game> game;
+
+	{
+		ZoneScopedN("Renderer::Renderer()");
+		renderer = std::make_unique<Renderer>(APPNAME, window.window);
+	}
+	{
+		ZoneScopedN("Game::Game()");
+		game = std::make_unique<Game>();
+	}
 
 	glfw_input_pre_gameloop(window);
 
-	imgui.init(r, r.msaa);
+	imgui.init(*renderer, renderer->msaa);
 
 	window.input.dt = 0; // dt zero on first frame
 	uint64_t prev = get_timestamp();
 
 	for (;;) {
+		FrameMark;
+
 		{
+			ZoneScopedN("sample_input");
+
 			window.input.clear_frame_input();
 			glfwPollEvents();
 
@@ -125,9 +140,9 @@ void frameloop () {
 		{
 			imgui.frame_start();
 
-			//game->frame();
+			game->frame();
 
-			r.render_frame(window.window, imgui);
+			renderer->render_frame(window.window, imgui);
 		}
 
 		{ // Calc dt based on prev frame duration
@@ -143,7 +158,7 @@ void frameloop () {
 		window.frame_counter++;
 	}
 
-	imgui.destroy(r);
+	imgui.destroy(*renderer);
 }
 
 void glfw_error (int err, const char* msg) {
@@ -155,15 +170,23 @@ int main () {
 	glfwSetErrorCallback(glfw_error);
 #endif
 
-	if (!glfwInit()) {
-		fprintf(stderr, "glfwInit failed!\n");
-		return 1;
+	{
+		ZoneScopedN("glfwInit");
+		if (!glfwInit()) {
+			fprintf(stderr, "glfwInit failed!\n");
+			return 1;
+		}
 	}
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
+	{
+		ZoneScopedN("glfwCreateWindow");
 
-	window.window = glfwCreateWindow(1920, 1080, APPNAME, NULL, NULL);
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
+
+		window.window = glfwCreateWindow(1920, 1080, APPNAME, NULL, NULL);
+	}
+
 	if (window.window) {
 
 		if (glfwRawMouseMotionSupported())
@@ -173,12 +196,18 @@ int main () {
 
 		frameloop();
 
-		glfwDestroyWindow(window.window);
+		{
+			ZoneScopedN("glfwDestroyWindow");
+			glfwDestroyWindow(window.window);
+		}
 
 	} else {
 		fprintf(stderr, "glfwCreateWindow failed!\n");
 	}
 
-	glfwTerminate();
+	{
+		ZoneScopedN("glfwTerminate");
+		glfwTerminate();
+	}
 	return 0;
 }

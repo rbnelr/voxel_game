@@ -1,9 +1,10 @@
 #pragma once
-#include "../util/string.hpp"
+#include "kisslib/string.hpp"
 using namespace kiss;
 
 #include <string>
 #include <unordered_map>
+#include <memory>
 #include "assert.h"
 
 namespace audio {

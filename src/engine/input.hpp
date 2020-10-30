@@ -106,7 +106,6 @@ struct Input {
 };
 
 ////
-void glfw_get_non_callback_input (Window& window);
 void glfw_input_pre_gameloop (Window& window);
 void glfw_sample_non_callback_input (Window& window);
 

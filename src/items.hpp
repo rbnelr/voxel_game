@@ -1,7 +1,6 @@
 #pragma once
+#include "common.hpp"
 #include "blocks.hpp"
-#include "stdint.h"
-#include "assert.h"
 
 enum item_id : uint32_t {
 	I_NULL			=0, // No item
@@ -61,32 +60,10 @@ struct Item {
 		return get_item_props(id);
 	}
 
-	Item () {
-		memset(this, 0, sizeof(Item));
-	}
-	Item (item_id id) {
-		// zero potential unused memory
-		memset(this, 0, sizeof(Item));
-		// set id
-		this->id = id;
-		// init correct part of union
+	Item () {}
+	Item (item_id id): id{id} {
 		if (id >= MAX_BLOCK_ID) {
 			tool = Tool();
 		}
-	}
-
-	Item (Item const& other) {
-		memcpy(this, &other, sizeof(Item));
-	}
-	Item (Item&& other) {
-		memcpy(this, &other, sizeof(Item));
-	}
-	Item& operator= (Item const& other) {
-		memcpy(this, &other, sizeof(Item));
-		return *this;
-	}
-	Item& operator= (Item&& other) {
-		memcpy(this, &other, sizeof(Item));
-		return *this;
 	}
 };

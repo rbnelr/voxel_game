@@ -1,17 +1,6 @@
 #pragma once
-#include "kissmath.hpp"
+#include "common.hpp"
 #include "blocks.hpp"
-#include "util/move_only_class.hpp"
-#include "util/string.hpp"
-#include "util/running_average.hpp"
-#include "util/threadpool.hpp"
-#include "util/raw_array.hpp"
-#include "util/block_allocator.hpp"
-#include "graphics/graphics.hpp" // for ChunkMesh
-using namespace kiss;
-
-#include "stdint.h"
-#include <unordered_map>
 
 typedef int		bpos_t;
 typedef int2	bpos2;
@@ -52,38 +41,11 @@ inline chunk_coord get_chunk_from_block_pos (bpos pos_world, bpos* bpos_in_chunk
 	return chunk_pos;
 }
 
-// Hashmap key type for chunk_pos
-struct chunk_coord_hashmap {
-	chunk_coord v;
-
-	bool operator== (chunk_coord_hashmap const& r) const { // for hash map
-		return v.x == r.v.x && v.y == r.v.y && v.z == r.v.z;
-	}
-};
-
-inline size_t hash (chunk_coord v) {
-	size_t h;
-	h  = std::hash<bpos_t>()(v.x);
-	h = 53ull * (h + 53ull);
-
-	h += std::hash<bpos_t>()(v.y);
-	h = 53ull * (h + 53ull);
-
-	h += std::hash<bpos_t>()(v.z);
-	return h;
-};
-
-namespace std {
-	template<> struct hash<chunk_coord_hashmap> { // for hash map
-		size_t operator() (chunk_coord_hashmap const& v) const {
-			return ::hash(v.v);
-		}
-	};
-}
-
-class World;
+struct World;
 struct WorldGenerator;
-class Player;
+struct Player;
+struct Graphics;
+struct Chunks;
 
 static inline constexpr int _block_count (int lod_levels) {
 	int count = 0;
@@ -135,6 +97,33 @@ struct ChunkData {
 	void init_border ();
 };
 
+struct ChunkMesh {
+	struct Vertex {
+		float3	pos_model;
+		float2	uv;
+		uint8	tex_indx;
+		uint8	block_light;
+		uint8	sky_light;
+		uint8	hp;
+
+		//static void bind (Attributes& a) {
+		//	int cur = 0;
+		//	a.add    <decltype(pos_model  )>(cur++, "pos_model" ,  sizeof(Vertex), offsetof(Vertex, pos_model  ));
+		//	a.add    <decltype(uv         )>(cur++, "uv",          sizeof(Vertex), offsetof(Vertex, uv         ));
+		//	a.add_int<decltype(tex_indx   )>(cur++, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
+		//	a.add    <decltype(block_light)>(cur++, "block_light", sizeof(Vertex), offsetof(Vertex, block_light), true);
+		//	a.add    <decltype(sky_light  )>(cur++, "sky_light",   sizeof(Vertex), offsetof(Vertex, sky_light  ), true);
+		//	a.add    <decltype(hp         )>(cur++, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ), true);
+		//}
+	};
+
+	//std::vector<Vertex> opaque_faces;
+	//std::vector<Vertex> transparent_faces;
+
+	//Mesh<Vertex> opaque_mesh;
+	//Mesh<Vertex> transparent_mesh;
+};
+
 static constexpr uint64_t MESHING_BLOCK_BYTESIZE = (1024 * 1024);
 static constexpr uint64_t MESHING_BLOCK_COUNT = MESHING_BLOCK_BYTESIZE / sizeof(ChunkMesh::Vertex);
 
@@ -145,8 +134,104 @@ union MeshingBlock {
 	char _padding[MESHING_BLOCK_BYTESIZE];
 };
 
+// Custom memory allocator that allocates in fixed blocks using a freelist
+// used to avoid malloc and free overhead
+template <typename T>
+class BlockAllocator {
+	union Block {
+		Block*	next; // link to next block in linked list of free blocks
+		T		data; // data if allocated
+	};
+
+	Block* freelist = nullptr;
+
+	mutable std::mutex m;
+
+public:
+	// allocate a T (not threadsafe)
+	Block* _alloc () {
+		if (!freelist)
+			return nullptr;
+
+		// remove first Block of freelist
+		Block* block = freelist;
+		freelist = block->next;
+
+		return block;
+	}
+
+	T* alloc () {
+		Block* block = _alloc();
+		if (!block) {
+			ZoneScopedN("malloc BlockAllocator::alloc");
+			// allocate new blocks as needed
+			block = (Block*)malloc(sizeof(Block));
+		}
+		return &block->data;
+	}
+
+	// free a ptr (not threadsafe)
+	void free (T* ptr) {
+		// blocks are never freed for now
+
+		Block* block = (Block*)ptr;
+
+		// add block to freelist
+		block->next = freelist;
+		freelist = block;
+	}
+
+	T* alloc_threadsafe () {
+		Block* block;
+		{
+			ZoneScopedN("mutex BlockAllocator::alloc_threadsafe");
+
+			std::lock_guard<std::mutex> lock(m);
+			block = _alloc();
+		}
+		// Do the malloc outside the block because malloc can take a long time, which can catastrophically block an entire threadpool
+		if (!block) {
+			ZoneScopedN("malloc BlockAllocator::alloc_threadsafe");
+
+			// allocate new blocks as needed
+			block = (Block*)malloc(sizeof(Block)); // NOTE: malloc itself mutexes, so there is little point to putting this outside of the lock
+		}
+		return &block->data;
+	}
+
+	void free_threadsafe (T* ptr) {
+		ZoneScopedN("mutex BlockAllocator::free_threadsafe");
+
+		std::lock_guard<std::mutex> lock(m);
+		free(ptr);
+	}
+
+	~BlockAllocator () {
+		while (freelist) {
+			ZoneScopedN("free() ~BlockAllocator");
+
+			Block* block = freelist;
+			freelist = block->next;
+
+			::free(block);
+		}
+	}
+
+	int count () {
+		int count = 0;
+
+		Block* block = freelist;
+		while (block) {
+			block = block->next;
+			count++;
+		}
+
+		return count;
+	}
+};
+
 // one for each thread (also gets initialized for the threads that don't need it I think, but thats ok, does not do anything reall on construction)
-extern BlockAllocator<MeshingBlock> meshing_allocator;
+inline BlockAllocator<MeshingBlock> meshing_allocator;
 
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
 //  we output the mesh data into blocks, which can be allocated by BlockAllocator, which reuses freed blocks
@@ -187,7 +272,7 @@ struct MeshingData {
 	}
 
 	// upload (and free data in this structure)
-	void upload (Mesh<ChunkMesh::Vertex>& mesh) {
+	void upload (/*Mesh<ChunkMesh::Vertex>& mesh*/) {
 		//mesh._alloc(vertex_count);
 		//mesh.vertex_count = vertex_count;
 
@@ -215,9 +300,7 @@ struct MeshingResult {
 	MeshingData tranparent_vertices;
 };
 
-class Chunk {
-	NO_MOVE_COPY_CLASS(Chunk)
-public:
+struct Chunk {
 	const chunk_coord coord;
 
 	Chunk (chunk_coord coord);
@@ -251,7 +334,6 @@ public:
 	// true: invisible to player -> don't draw
 	bool culled;
 
-private:
 	friend struct Chunk_Mesher;
 	friend struct ChunkGenerator;
 	friend void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk);
@@ -259,7 +341,6 @@ private:
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
 	std::unique_ptr<ChunkData> blocks = nullptr;
-public:
 
 	// Gpu mesh data
 	ChunkMesh mesh;
@@ -269,37 +350,20 @@ public:
 };
 
 ////////////// Chunks
-struct BackgroundJob { // Chunk gen
-	// input
-	Chunk* chunk;
-	WorldGenerator const* world_gen;
-	// output
-	float time;
+inline const int logical_cores = std::thread::hardware_concurrency();
 
-	BackgroundJob execute ();
-};
+// as many background threads as there are logical cores to allow background threads to use even the main threats time when we are gpu bottlenecked or at an fps cap
+inline const int background_threads  = max(logical_cores, 1);
 
-struct ParallelismJob { // Chunk remesh
-	// input
-	Chunk* chunk;
-	Chunks* chunks; // not modfied
-	Graphics const* graphics;
-	WorldGenerator const* wg; 
-	// output
-	MeshingResult meshing_result;
-	float time;
+// main thread + parallelism_threads = logical cores to allow the main thread to join up with the rest of the cpu to work on parallel work that needs to be done immidiately
+inline const int parallelism_threads = max(logical_cores >= 4 ? logical_cores - 1 : logical_cores, 1); // leave one thread for system and background apps, but not on dual core systems
 
-	ParallelismJob execute ();
-};
+inline Threadpool background_threadpool  = Threadpool{ background_threads , ThreadPriority::LOW, ">> background threadpool"  };
+inline Threadpool parallelism_threadpool = Threadpool{ parallelism_threads - 1, ThreadPriority::HIGH,   ">> parallelism threadpool" }; // parallelism_threads - 1 to let main thread contribute work too
 
-extern const int background_threads;
-extern const int parallelism_threads;
-
-extern Threadpool<BackgroundJob > background_threadpool ;
-extern Threadpool<ParallelismJob> parallelism_threadpool;
 
 struct ChunkHashmap {
-	typedef std::unordered_map<chunk_coord_hashmap, std::unique_ptr<Chunk>> hashmap_t; 
+	typedef std::unordered_map<int3, std::unique_ptr<Chunk>> hashmap_t; 
 
 	// avoid hash map lookup most of the time, since a lot of query_chunk's are going to end up in the same chunk (in query_block of clustered blocks)
 	// I did profile this at some point and it was measurably faster than just doing to hashmap lookup all the time
@@ -358,8 +422,7 @@ struct ChunkHashmap {
 	Iterator erase_chunk (Iterator it);
 };
 
-class Chunks {
-public:
+struct Chunks {
 	ChunkHashmap pending_chunks;
 	ChunkHashmap chunks;
 
@@ -376,14 +439,6 @@ public:
 
 	float active_radius = 200.0f;
 
-	// artifically limit (delay) meshing of chunks to prevent complete freeze of main thread at the cost of some visual artefacts
-	int max_chunk_gens_processed_per_frame = 64; // limit both queueing and finalizing, since (at least for now) the queuing takes too long (causing all chunks to be generated in the first frame, not like I imagined...)
-	int max_chunks_meshed_per_frame = max(parallelism_threads*2, 4); // max is 2 meshings per cpu core per frame
-
-	RunningAverage<float> chunk_gen_time = { 64 };
-	RunningAverage<float> block_light_time = { 64 };
-	RunningAverage<float> meshing_time = { 64 };
-
 	void imgui () {
 		if (!imgui_push("Chunks")) return;
 
@@ -391,21 +446,19 @@ public:
 		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
 		ImGui::DragFloat("active_radius", &active_radius, 1);
 
-		ImGui::DragInt("max_chunks_meshed_per_frame", &max_chunks_meshed_per_frame, 0.02f);
-
 		int chunk_count = chunks.count();
 		uint64_t block_count = chunk_count * (uint64_t)CHUNK_DIM * CHUNK_DIM * CHUNK_DIM;
 		uint64_t block_mem = chunk_count * sizeof(ChunkData);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)", chunk_count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunk_count);
 
-		uint64_t face_count = 0;
-		for (Chunk& c : chunks) {
-			face_count += c.face_count;
-		}
-		uint64_t mesh_mem = face_count * 6 * sizeof(ChunkMesh::Vertex);
-
-		ImGui::Text("Mesh data:  %11s faces (%5.0f MB  %5.0f KB avg / chunk)", format_thousands(face_count).c_str(), (float)mesh_mem/1024/1024, (float)mesh_mem/1024 / chunk_count);
+		//uint64_t face_count = 0;
+		//for (Chunk& c : chunks) {
+		//	face_count += c.face_count;
+		//}
+		//uint64_t mesh_mem = face_count * 6 * sizeof(ChunkMesh::Vertex);
+		//
+		//ImGui::Text("Mesh data:  %11s faces (%5.0f MB  %5.0f KB avg / chunk)", format_thousands(face_count).c_str(), (float)mesh_mem/1024/1024, (float)mesh_mem/1024 / chunk_count);
 
 		imgui_pop();
 	}
@@ -414,7 +467,9 @@ public:
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
 	Chunk* query_chunk (chunk_coord coord);
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
-	Block query_block (bpos p, Chunk** out_chunk=nullptr, bpos* out_block_pos_chunk=nullptr);
+	Block query_block (bpos pos, Chunk** out_chunk=nullptr, bpos* out_block_pos_chunk=nullptr);
+
+	void set_block (bpos pos, Block& b);
 
 	// unload chunk at coord (invalidates iterators, so dont call this in a loop)
 	ChunkHashmap::Iterator unload_chunk (ChunkHashmap::Iterator it);
@@ -422,9 +477,8 @@ public:
 	void remesh_all ();
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (World const& world, WorldGenerator const& world_gen, Player const& player);
+	void update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player);
 
 	// chunk meshing to prepare for drawing
-	void update_chunks (Graphics const& graphics, WorldGenerator const& wg, Player const& player);
+	void update_chunks (Graphics const& g, WorldGenerator const& wg, Player const& player);
 };
-

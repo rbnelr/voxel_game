@@ -12,18 +12,9 @@ void Input::set_cursor_mode (Window& window, bool enabled) {
 }
 
 ////
-void glfw_get_non_callback_input (Window& window) {
-	glfwGetFramebufferSize(window.window, &window.input.window_size.x, &window.input.window_size.y);
-
-	double x, y;
-	glfwGetCursorPos(window.window, &x, &y);
-
-	window.input.cursor_pos = float2((float)x, (float)y);
-	window.input.cursor_pos.y = window.input.window_size.y - 1 - window.input.cursor_pos.y;
-
-	//logf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
-}
 void glfw_input_pre_gameloop (Window& window) {
+	ZoneScoped;
+
 	// Get initial mouse position
 	glfwGetCursorPos(window.window, &window.input._prev_mouse_pos_x, &window.input._prev_mouse_pos_y);
 
@@ -32,6 +23,8 @@ void glfw_input_pre_gameloop (Window& window) {
 	window.input._prev_cursor_enabled = window.input.cursor_enabled;
 }
 void glfw_sample_non_callback_input (Window& window) {
+	ZoneScoped;
+
 	glfwGetFramebufferSize(window.window, &window.input.window_size.x, &window.input.window_size.y);
 
 	double x, y;

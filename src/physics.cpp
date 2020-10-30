@@ -1,12 +1,11 @@
+#include "common.hpp"
 #include "physics.hpp"
 #include "blocks.hpp"
 #include "world.hpp"
 #include "player.hpp"
 
-Physics physics;
-
 CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
-	OPTICK_EVENT();
+	ZoneScoped;
 
 	CollisionHit closest_hit;
 	closest_hit.dist = +INF;
@@ -96,15 +95,15 @@ void handle_collison (PhysicsObject& obj, CollisionHit const& hit) {
 
 extern int frame_counter;
 
-void Physics::update_object (World& world, PhysicsObject& obj) {
-	OPTICK_EVENT();
+void Physics::update_object (float dt, World& world, PhysicsObject& obj) {
+	ZoneScoped;
 
 	//// gravity
-	obj.vel += physics.grav_accel * input.dt;
+	obj.vel += physics.grav_accel * dt;
 
 	////
 
-	float t_remain = input.dt;
+	float t_remain = dt;
 
 	while (t_remain > 0) {
 
@@ -136,8 +135,8 @@ void Physics::update_object (World& world, PhysicsObject& obj) {
 	//logf("%5d: pos.z: %7.4f vel.z: %7.4f", frame_counter, obj.pos.z, obj.vel.z);
 }
 
-void Physics::update_player (World& world, Player& player) {
-	OPTICK_EVENT();
+void Physics::update_player (float dt, World& world, Player& player) {
+	ZoneScoped;
 
 	PhysicsObject obj;
 	
@@ -149,7 +148,7 @@ void Physics::update_player (World& world, Player& player) {
 	
 	obj.coll = player.collison_response;
 	
-	update_object(world, obj);
+	update_object(dt, world, obj);
 	
 	player.pos = obj.pos;
 	player.vel = obj.vel;

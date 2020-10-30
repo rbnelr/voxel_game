@@ -14,11 +14,11 @@ struct Window {
 
 	Input	input;
 
-	bool	vsync;
+	bool	vsync; // readonly
 	int		_vsync_on_interval = 1; // handle vsync interval allowing -1 or not depending on extension
 
-	bool	fullscreen = false;
-	bool	borderless_fullscreen = true; // use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
+	bool	fullscreen = false; // readonly
+	bool	borderless_fullscreen = true; // readonly, use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
 	Rect	window_positioning;
 	
 	int		frame_counter = 0;

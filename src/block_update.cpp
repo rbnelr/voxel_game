@@ -1,6 +1,6 @@
+#include "common.hpp"
 #include "block_update.hpp"
 #include "chunks.hpp"
-#include "util/random.hpp"
 
 bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world) {
 	auto above = chunks.query_block(pos_world +bpos(0,0,+1));
@@ -69,21 +69,21 @@ uint16_t block_pattern (uint16_t i) {
 	return i;
 }
 
-void BlockUpdate::update_blocks (Chunks& chunks) {
-	OPTICK_EVENT();
+void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
+	ZoneScoped;
 
 	float tmp = ceil((float)CHUNK_BLOCK_COUNT * block_update_fraction);
 
 	bpos_t blocks_to_update = (bpos_t)tmp;
 	float rounded_fraction = tmp / (float)CHUNK_BLOCK_COUNT;
 
-	effective_frequency = rounded_fraction / input.dt;
+	effective_frequency = rounded_fraction / I.dt;
 
 	recalc_probs();
 	
 	for (Chunk& chunk : chunks.chunks) {
 		if (chunk.active) {
-			OPTICK_EVENT("update_blocks chunk");
+			ZoneScopedN("update_blocks chunk");
 
 			for (bpos_t i=0; i<blocks_to_update; ++i) {
 				uint32_t indx = cur_chunk_update_block_i++;

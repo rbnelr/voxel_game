@@ -1,10 +1,10 @@
 
 layout(std140) uniform Fog {
-	vec3 sky_col;
-	vec3 horiz_col;
-	vec3 ambient_col;
-
-	float coeff;
+	vec3 sky_col		= pow(vec3(121,192,255), 2.2);
+	vec3 horiz_col		= pow(vec3(199,211,219), 2.2);
+	vec3 ambient_col	= pow(vec3(41,49,52), 2.2);
+	
+	float coeff = 1.0;
 } fog;
 
 vec3 fog_color (vec3 dir_world) {

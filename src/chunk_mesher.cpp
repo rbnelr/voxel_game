@@ -1,7 +1,7 @@
+#include "common.hpp"
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
-#include "util/timer.hpp"
-#include "dear_imgui.hpp"
+#include "graphics.hpp"
 
 static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
@@ -21,7 +21,7 @@ struct Chunk_Mesher {
 	float3 block_pos;
 
 	BlockTileInfo tile;
-	std::vector<BlockMeshVertex> const* block_meshes;
+	//std::vector<BlockMeshVertex> const* block_meshes;
 
 	bool bt_is_opaque (block_id id) {
 		auto t = blocks.transparency[id];
@@ -149,6 +149,8 @@ struct Chunk_Mesher {
 				face(tranparent_vertices, (BlockFace)i);
 		}
 	}
+
+#if 0
 	void block_mesh (BlockMeshInfo info, int3 block_pos_world, uint64_t world_seed) {
 		//OPTICK_EVENT();
 
@@ -180,11 +182,12 @@ struct Chunk_Mesher {
 			ptr->hp = chunk_data->hp[cur];
 		}
 	}
+#endif
 
-	void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
-		alpha_test = graphics.alpha_test;
-
-		block_meshes = &tile_textures.block_meshes;
+	void mesh_chunk (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+		ZoneScoped;
+		
+		//block_meshes = &graphics.tile_textures.block_meshes;
 
 		chunk_data = chunk->blocks.get();
 
@@ -215,18 +218,18 @@ struct Chunk_Mesher {
 
 						block_pos = (float3)i;
 
-						tile = tile_textures.block_tile_info[id];
-						auto mesh_info = tile_textures.block_meshes_info[id];
+						tile = graphics.block_tile_info[id];
+						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];
 
-						if (mesh_info.offset < 0) {
+						//if (mesh_info.offset < 0) {
 							if (blocks.transparency[id] == TM_TRANSPARENT)
 								cube_transperant();
 							else
 								cube_opaque();
-						} else {
-
-							block_mesh(mesh_info, i + chunk->chunk_pos_world(), wg.seed);
-						}
+						//} else {
+						//
+						//	block_mesh(mesh_info, i + chunk->chunk_pos_world(), wg.seed);
+						//}
 
 						//sum += get_timestamp() - _b;
 					}
@@ -242,9 +245,7 @@ struct Chunk_Mesher {
 	}
 };
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
-	OPTICK_EVENT();
-
+void RemeshChunkJob::execute () {
 	Chunk_Mesher cm;
-	return cm.mesh_chunk(chunks, graphics, tile_textures, wg, chunk, res);
+	return cm.mesh_chunk(*chunks, *graphics, *wg, chunk, &meshing_result);
 }

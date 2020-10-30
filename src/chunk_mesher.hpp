@@ -1,6 +1,23 @@
 #pragma once
+#include "common.hpp"
 #include "chunks.hpp"
 
 struct WorldGenerator;
+struct Graphics;
 
-void mesh_chunk (Chunks& chunks, ChunkGraphics const& graphics, TileTextures const& tile_textures, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res);
+struct RemeshChunkJob : ThreadingJob { // Chunk remesh
+	// input
+	Chunk* chunk;
+	Chunks* chunks; // not modfied
+	Graphics const* graphics;
+	WorldGenerator const* wg;
+	// output
+	MeshingResult meshing_result;
+
+	RemeshChunkJob (Chunk* chunk, Chunks* chunks, Graphics const* graphics, WorldGenerator const* wg):
+		chunk{chunk}, chunks{chunks}, graphics{graphics}, wg{wg} {}
+	virtual ~RemeshChunkJob() = default;
+
+	virtual void execute ();
+	virtual void finalize ();
+};
