@@ -105,6 +105,7 @@
     <ClInclude Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="..\..\..\src\engine\camera.hpp" />
     <ClInclude Include="..\..\..\src\engine\input.hpp" />
+    <ClInclude Include="..\..\..\src\engine\input_buttons.hpp" />
     <ClInclude Include="..\..\..\src\engine\window.hpp" />
     <ClInclude Include="..\..\..\src\game.hpp" />
     <ClInclude Include="..\..\..\src\graphics.hpp" />
@@ -141,7 +142,7 @@
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
     <ClInclude Include="..\..\..\src\voxel_light.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
     <ClInclude Include="..\..\..\src\world.hpp" />

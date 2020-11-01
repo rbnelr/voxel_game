@@ -10,7 +10,9 @@ Game::Game () {
 	set_thread_description(">> gameloop");
 }
 
-void Game::imgui () {
+// try to do all debug guis in here,
+// but don't call ImGui::End() yet so we can quickly display values from inside algorithms if we want
+void Game::imgui (Window& window, Input& I) {
 	ZoneScoped;
 
 	ImGui::Begin("Debug");
@@ -36,14 +38,13 @@ void Game::imgui () {
 		}
 
 		ImGui::SameLine();
-		if (ImGui::Button("exit")) {
-			glfwSetWindowShouldClose(window.window, 1);
-		}
+		if (ImGui::Button("exit"))
+			window.close();
 
-		ImGui::Checkbox("Console", &gui_console.shown);
+		ImGui::Checkbox("Logger", &g_logger.shown);
 
 		ImGui::SameLine();
-		ImGui::Checkbox("ImGui Demo", &::imgui.show_demo_window);
+		ImGui::Checkbox("ImGui Demo", &g_imgui.show_demo_window);
 	}
 
 	{
@@ -71,7 +72,7 @@ void Game::imgui () {
 			bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
 
 			if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
-			if (window.input.buttons[GLFW_KEY_P].went_down) {
+			if (window.input.buttons[KEY_P].went_down) {
 				activate_flycam = !activate_flycam;
 
 				if (activate_flycam) {
@@ -82,7 +83,7 @@ void Game::imgui () {
 				}
 			}
 
-			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[GLFW_KEY_Q].went_down) {
+			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
 				world->player.pos = flycam.pos;
 			}
 
@@ -95,52 +96,38 @@ void Game::imgui () {
 		}
 
 	}
-
-	ImGui::PopItemWidth();
-	ImGui::End();
 }
 
-void Game::frame () {
-	imgui();
+RenderData Game::update (Window& window, Input& I) {
+	world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
-	ImGui::Begin("Debug");
-	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-
-	auto& I = window.input;
-
-	{
-		world->chunks.update_chunk_loading(*world, world_gen, world->player);
-
-		if (!activate_flycam) {
-			world->player.update_movement_controls(I, *world);
-		}
-
-		physics.update_player(I.dt, *world, world->player);
-
-		SelectedBlock selected_block;
-		Camera_View player_view = world->player.update_post_physics(I, *world);
-
-		if (selected_block)
-			ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block]);
-		else
-			ImGui::Text("Selected Block: None");
-
-		Camera_View view;
-		if (activate_flycam) {
-			view = flycam.update(I);
-		} else {
-			view = player_view;
-		}
-
-		block_update.update_blocks(I, world->chunks);
-
-		world->chunks.update_chunks(graphics, world->world_gen, world->player);
-
-		//// Draw
-		//graphics.draw(*world, view, player_view, activate_flycam, selected_block);
+	if (!activate_flycam) {
+		world->player.update_movement_controls(I, *world);
 	}
-	ImGui::PopItemWidth();
-	ImGui::End();
 
-	gui_console.imgui();
+	physics.update_player(I.dt, *world, world->player);
+
+	SelectedBlock selected_block;
+	Camera_View player_view = world->player.update_post_physics(I, *world);
+
+	if (selected_block)
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block]);
+	else
+		ImGui::Text("Selected Block: None");
+
+	Camera_View view;
+	if (activate_flycam) {
+		view = flycam.update(I);
+	} else {
+		view = player_view;
+	}
+
+	block_update.update_blocks(I, world->chunks);
+
+	world->chunks.update_chunks(graphics, world->world_gen, world->player);
+
+	RenderData rd;
+	rd.view = view;
+	rd.window_size = I.window_size;
+	return rd;
 }

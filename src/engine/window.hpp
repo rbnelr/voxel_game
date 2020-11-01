@@ -9,6 +9,8 @@ struct Rect {
 	int2	 dim;
 };
 
+struct GLFWwindow;
+
 struct Window {
 	GLFWwindow* window = nullptr;
 
@@ -27,7 +29,8 @@ struct Window {
 
 	bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
 	bool toggle_fullscreen ();
+
+	void close ();
 };
 
-// Global window
-inline Window window;
+inline Window* g_window; // global window, needed to allow Logger to be global, which needs frame_counter, prefer to pass window along if possible

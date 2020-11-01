@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "engine/camera.hpp"
 
 struct BlockTileInfo {
 	int base_index;
@@ -30,7 +31,11 @@ struct BlockTileInfo {
 
 struct Graphics {
 
-
 	BlockTileInfo block_tile_info[BLOCK_IDS_COUNT];
 
+};
+
+struct RenderData {
+	Camera_View		view;
+	int2			window_size;
 };

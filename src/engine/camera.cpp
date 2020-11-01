@@ -90,9 +90,9 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 	if (clip_to_cam) {
 		*clip_to_cam = float4x4(
 			1.0f/x,      0,      0,       0,
-			0, 1.0f/y,      0,       0,
-			0,      0,      0,      -1,
-			0,      0, 1.0f/b,     a/b
+			     0, 1.0f/y,      0,       0,
+			     0,      0,      0,      -1,
+			     0,      0, 1.0f/b,     a/b
 		);
 	}
 	return float4x4(
@@ -192,12 +192,12 @@ Camera_View Flycam::update (Input& I) {
 
 	{ //// movement
 		float3 move_dir = 0;
-		if (I.buttons[GLFW_KEY_A]           .is_down) move_dir.x -= 1;
-		if (I.buttons[GLFW_KEY_D]           .is_down) move_dir.x += 1;
-		if (I.buttons[GLFW_KEY_W]           .is_down) move_dir.z -= 1;
-		if (I.buttons[GLFW_KEY_S]           .is_down) move_dir.z += 1;
-		if (I.buttons[GLFW_KEY_LEFT_CONTROL].is_down) move_dir.y -= 1;
-		if (I.buttons[GLFW_KEY_SPACE]       .is_down) move_dir.y += 1;
+		if (I.buttons[KEY_A]           .is_down) move_dir.x -= 1;
+		if (I.buttons[KEY_D]           .is_down) move_dir.x += 1;
+		if (I.buttons[KEY_W]           .is_down) move_dir.z -= 1;
+		if (I.buttons[KEY_S]           .is_down) move_dir.z += 1;
+		if (I.buttons[KEY_LEFT_CONTROL].is_down) move_dir.y -= 1;
+		if (I.buttons[KEY_SPACE]       .is_down) move_dir.y += 1;
 
 		move_dir = normalizesafe(move_dir);
 		float move_speed = length(move_dir); // could be analog with gamepad
@@ -205,7 +205,7 @@ Camera_View Flycam::update (Input& I) {
 		if (move_speed == 0.0f)
 			cur_speed = base_speed; // no movement ticks down speed
 
-		if (I.buttons[GLFW_KEY_LEFT_SHIFT].is_down) {
+		if (I.buttons[KEY_LEFT_SHIFT].is_down) {
 			move_speed *= fast_multiplier;
 
 			cur_speed += base_speed * speedup_factor * I.unscaled_dt;
@@ -219,7 +219,7 @@ Camera_View Flycam::update (Input& I) {
 	}
 
 	{ //// fov change
-		if (!I.buttons[GLFW_KEY_F].is_down) {
+		if (!I.buttons[KEY_F].is_down) {
 			float delta_log = 0.1f * I.mouse_wheel_delta;
 			base_speed = powf(2, log2f(base_speed) +delta_log );
 		} else {

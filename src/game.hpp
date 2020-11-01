@@ -6,6 +6,8 @@
 #include "engine/camera.hpp"
 #include "graphics.hpp"
 
+struct Renderer;
+
 class Game {
 	bool dbg_pause = false;
 
@@ -29,6 +31,6 @@ class Game {
 public:
 	Game ();
 
-	void imgui ();
-	void frame ();
+	void imgui (Window& window, Input& I);
+	RenderData update (Window& window, Input& I);
 };

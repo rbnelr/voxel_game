@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\vulkan\vulkan.hpp">
-      <Filter>vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
@@ -171,6 +168,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.h">
       <Filter>dear_imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\input_buttons.hpp">
+      <Filter>engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

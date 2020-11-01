@@ -3,7 +3,7 @@
 #include "world.hpp"
 
 void BreakBlock::update (Input& I, World& world, Player& player, bool creative_mode) {
-	auto& button = I.buttons[GLFW_MOUSE_BUTTON_LEFT];
+	auto& button = I.buttons[MOUSE_BUTTON_LEFT];
 	bool inp = player.selected_block ? button.is_down : button.went_down;
 
 	float anim_hit_t = 0;
@@ -29,7 +29,7 @@ void BlockPlace::update (Input& I, World& world, Player const& player) {
 	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;
 
-	bool inp = I.buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down && player.selected_block && is_block;
+	bool inp = I.buttons[MOUSE_BUTTON_RIGHT].is_down && player.selected_block && is_block;
 	if (inp && anim_t >= anim_speed / repeat_speed) {
 		anim_t = 0;
 	}
@@ -64,7 +64,7 @@ void Inventory::update (Input& I) {
 	quickbar.selected = wrap(quickbar.selected, 0, 10);
 
 	for (int i=0; i<10; ++i) {
-		if (I.buttons[GLFW_KEY_0 + i].went_down) {
+		if (I.buttons[KEY_0 + i].went_down) {
 			quickbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
 			break; // lowest key counts
 		}
@@ -143,7 +143,7 @@ void Player::update_movement_controls (Input& I, World& world) {
 	bool grounded = calc_ground_contact(world, &stuck);
 
 	//// toggle camera view
-	if (I.buttons[GLFW_KEY_F].went_down)
+	if (I.buttons[KEY_F].went_down)
 		third_person = !third_person;
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
@@ -156,13 +156,13 @@ void Player::update_movement_controls (Input& I, World& world) {
 
 	{
 		float2 input_dir = 0;
-		if (I.buttons[GLFW_KEY_A].is_down) input_dir.x -= 1;
-		if (I.buttons[GLFW_KEY_D].is_down) input_dir.x += 1;
-		if (I.buttons[GLFW_KEY_S].is_down) input_dir.y -= 1;
-		if (I.buttons[GLFW_KEY_W].is_down) input_dir.y += 1;
+		if (I.buttons[KEY_A].is_down) input_dir.x -= 1;
+		if (I.buttons[KEY_D].is_down) input_dir.x += 1;
+		if (I.buttons[KEY_S].is_down) input_dir.y -= 1;
+		if (I.buttons[KEY_W].is_down) input_dir.y += 1;
 		input_dir = normalizesafe(input_dir);
 
-		bool input_fast = I.buttons[GLFW_KEY_LEFT_SHIFT].is_down;
+		bool input_fast = I.buttons[KEY_LEFT_SHIFT].is_down;
 
 		float target_speed = input_fast ? run_speed : walk_speed;
 		float2 target_vel = body_rotation * (input_dir * target_speed);
@@ -200,7 +200,7 @@ void Player::update_movement_controls (Input& I, World& world) {
 	
 	//// jumping
 	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
-	if (I.buttons[GLFW_KEY_SPACE].is_down/*went_down*/ && grounded)
+	if (I.buttons[KEY_SPACE].is_down/*went_down*/ && grounded)
 		vel += jump_impulse;
 }
 

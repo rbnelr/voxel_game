@@ -1,9 +1,10 @@
 #pragma once
 #include "common.hpp"
+#include "input_buttons.hpp"
 
 struct Window;
 
-struct Button {
+struct ButtonState {
 	bool is_down   : 1; // button is down
 	bool went_down : 1; // button was pressed this frame
 	bool went_up   : 1; // button was released this frame
@@ -30,7 +31,7 @@ struct Input {
 	float2 mouse_delta;
 	int mouse_wheel_delta; // in "clicks"
 
-	Button buttons[GLFW_KEY_LAST +1];
+	ButtonState buttons[BUTTONS_COUNT];
 
 	//// Input Settings
 	// Max dt to prevent large physics time steps
@@ -50,7 +51,7 @@ struct Input {
 	bool _prev_cursor_enabled;
 
 	void imgui () {
-		if (buttons[GLFW_KEY_SEMICOLON].went_down)
+		if (buttons[KEY_SEMICOLON].went_down)
 			pause_time = !pause_time;
 
 		if (!ImGui::CollapsingHeader("Input")) return;
@@ -78,13 +79,13 @@ struct Input {
 
 	// used to ignore inputs that imgui has already captured
 	void disable_keyboard () {
-		for (int i=GLFW_MOUSE_BUTTON_LAST+1; i<GLFW_KEY_LAST; ++i)
+		for (int i=MOUSE_BUTTONS_COUNT+1; i<BUTTONS_COUNT; ++i)
 			buttons[i] = {};
 	}
 	void disable_mouse () {
 		mouse_delta = 0;
 		mouse_wheel_delta = 0;
-		for (int i=GLFW_MOUSE_BUTTON_1; i<GLFW_MOUSE_BUTTON_LAST; ++i)
+		for (int i=MOUSE_BUTTON_1; i<BUTTONS_COUNT; ++i)
 			buttons[i] = {};
 	}
 
@@ -93,7 +94,7 @@ struct Input {
 	//  if cursor is enabled and rmb down
 	float2 get_mouselook_delta () {
 		float2 delta = 0;
-		if (!cursor_enabled || buttons[GLFW_MOUSE_BUTTON_RIGHT].is_down) {
+		if (!cursor_enabled || buttons[MOUSE_BUTTON_RIGHT].is_down) {
 			delta = mouse_delta;
 		}
 		return delta;

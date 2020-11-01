@@ -6,89 +6,8 @@
 #include "kisslib/kissmath_colors.hpp"
 using namespace kissmath;
 
-void DearImgui::init (vk::Renderer& renderer, int msaa) {
-	ZoneScoped;
-
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-
-	ImGuiIO& io = ImGui::GetIO(); (void)io;
-	// imgui steals keyboard by default, do not like
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-	// Setup Platform/Renderer bindings
-	ImGui_ImplGlfw_InitForVulkan(window.window, true);
-
-	ImGui_ImplVulkan_InitInfo info = {};
-	info.Instance			= renderer.instance;
-	info.PhysicalDevice		= renderer.physical_device;
-	info.Device				= renderer.device;
-	info.QueueFamily		= renderer.queues.families.graphics_family;
-	info.Queue				= renderer.queues.graphics_queue;
-	info.PipelineCache		= VK_NULL_HANDLE;
-	info.DescriptorPool		= renderer.descriptor_pool;
-	info.MinImageCount		= vk::SWAP_CHAIN_SIZE;
-	info.ImageCount			= vk::SWAP_CHAIN_SIZE;
-	info.MSAASamples		= (VkSampleCountFlagBits)msaa;
-	info.Allocator			= nullptr;
-	info.CheckVkResultFn	= nullptr;
-	ImGui_ImplVulkan_Init(&info, renderer.render_pass);
-
-	auto cmd_buf = renderer.begin_one_time_commands();
-
-	ImGui_ImplVulkan_CreateFontsTexture(cmd_buf);
-
-	renderer.end_one_time_commands(cmd_buf);
-}
-
-void DearImgui::frame_start () {
-	ZoneScoped;
-
-	ImGui_ImplVulkan_NewFrame();
-	ImGui_ImplGlfw_NewFrame(enabled && window.input.cursor_enabled);
-
-	{
-		auto& io = ImGui::GetIO();
-		// imgui steals keyboard by default, do not like
-		if (io.WantCaptureKeyboard)
-			window.input.disable_keyboard();
-		if (io.WantCaptureMouse)
-			window.input.disable_mouse();
-	}
-
-	ImGui::NewFrame();
-
-	if (show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);
-
-}
-void DearImgui::draw (VkCommandBuffer buf) {
-	if (enabled) {
-		ZoneScoped;
-
-		ImGui::Render();
-
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), buf);
-	}
-}
-
-void DearImgui::destroy (vk::Renderer& renderer) {
-	ZoneScoped;
-
-	vkQueueWaitIdle(renderer.queues.graphics_queue);
-
-	ImGui_ImplVulkan_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
-}
-
-////
-GuiConsole gui_console;
-
-void GuiConsole::imgui () {
-	if (!gui_console.shown) return;
+void Logger::imgui () {
+	if (!shown) return;
 
 	ZoneScoped;
 
@@ -96,7 +15,7 @@ void GuiConsole::imgui () {
 		ImGui::SetNextWindowCollapsed(false);
 	imgui_uncollapse = false;
 
-	ImGui::Begin("Console", &gui_console.shown);
+	ImGui::Begin("Logger", &shown);
 
 	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.3f);
 
@@ -117,7 +36,7 @@ void GuiConsole::imgui () {
 	ImGui::SameLine();
 	ImGui::Checkbox("ERR", &show_levels[ERROR]);
 
-	ImGui::BeginChild("Console lines", ImVec2(0, 0), true);
+	ImGui::BeginChild("Log lines", ImVec2(0, 0), true);
 
 	bool autoscroll = ImGui::GetScrollMaxY() == ImGui::GetScrollY();
 
@@ -142,7 +61,7 @@ void GuiConsole::imgui () {
 	added_this_frame = 0;
 }
 
-void GuiConsole::add_line (Line const& line) {
+void Logger::add_line (Line const& line) {
 	lines.push_back(line);
 
 	added_this_frame++;
@@ -155,7 +74,7 @@ void GuiConsole::add_line (Line const& line) {
 
 void vlogf (LogLevel level, char const* format, va_list vl) {
 	char new_format[1024];
-	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", window.frame_counter, format);
+	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", g_window->frame_counter, format);
 
 	char str[4096];
 	vsnprintf(str, sizeof(str), new_format, vl);
@@ -165,9 +84,9 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 	fputs(str, level == ERROR || level == WARNING ? stdout : stderr);
 #endif
 
-	GuiConsole::Line l;
+	Logger::Line l;
 	l.level = level;
-	l.frame = window.frame_counter;
+	l.frame = g_window->frame_counter;
 
 	char* cur = str;
 	while (*cur != '\0') {
@@ -180,7 +99,7 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 
 		cur += len + (*end == '\0' ? 0 : 1); // skip newline
 
-		gui_console.add_line(l);
+		g_logger.add_line(l);
 	}
 }
 void clog (char const* format, ...) {

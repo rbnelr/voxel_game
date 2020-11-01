@@ -2,8 +2,6 @@
 #include "imgui.h"
 
 #include "misc/cpp/imgui_stdlib.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_vulkan.h"
 
 #include "kisslib/kissmath.hpp"
 #include "kisslib/running_average.hpp"
@@ -11,40 +9,31 @@
 #include <string>
 #include <vector>
 
-namespace vk { struct Renderer; }
-
 struct DearImgui {
 	bool enabled = true;
 
 	bool show_demo_window = false;
 
 	int tree_depth = 0;
-
-	void init (vk::Renderer& renderer, int msaa);
-
-	void frame_start ();
-	void draw (VkCommandBuffer buf);
-
-	void destroy (vk::Renderer& renderer);
 };
 
-inline DearImgui imgui;
+inline DearImgui g_imgui;
 
 // root level is closed by default, sublevels are open by default
 //  for printing inherited baseclasses in their derived classes
 inline bool imgui_push (const char* class_name, const char* instance_name=nullptr, bool inner_default_open=true) {
 	bool ret;
 	if (instance_name)
-		ret = ImGui::TreeNodeEx(instance_name, imgui.tree_depth != 0 && inner_default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0, "%s <%s>", instance_name, class_name);
+		ret = ImGui::TreeNodeEx(instance_name, g_imgui.tree_depth != 0 && inner_default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0, "%s <%s>", instance_name, class_name);
 	else
-		ret = ImGui::TreeNodeEx(class_name, imgui.tree_depth != 0 && inner_default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0, "<%s>", class_name);
+		ret = ImGui::TreeNodeEx(class_name, g_imgui.tree_depth != 0 && inner_default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0, "<%s>", class_name);
 
-	if (ret) imgui.tree_depth++;
+	if (ret) g_imgui.tree_depth++;
 	return ret;
 }
 inline void imgui_pop () {
 	ImGui::TreePop();
-	imgui.tree_depth--;
+	g_imgui.tree_depth--;
 }
 
 // Imgui is not srgb correct, ColorEdit3 assume srgb (since color pickers are usually in srgb and should display srgb values as ints because that is more convinient than floats)
@@ -72,7 +61,7 @@ static inline const lrgba LOG_LEVEL_COLS[] = {
 	srgba(255, 100, 40),
 };
 
-class GuiConsole {
+class Logger {
 	bool imgui_uncollapse = false;
 public:
 	struct Line {
@@ -138,7 +127,7 @@ struct FPS_Display {
 };
 
 // Global GuiConsole
-extern GuiConsole gui_console;
+inline Logger g_logger;
 
 // log() function name is already taken by <cmath>
 

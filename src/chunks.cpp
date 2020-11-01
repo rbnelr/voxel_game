@@ -183,10 +183,11 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 void Chunk::reupload (MeshingResult& result) {
 	ZoneScoped;
 
+
 	//result.opaque_vertices.upload(mesh.opaque_mesh);
 	//result.tranparent_vertices.upload(mesh.transparent_mesh);
 	//
-	//face_count = (result.opaque_vertices.vertex_count + result.tranparent_vertices.vertex_count) / 6;
+	face_count = (result.opaque_vertices.vertex_count + result.tranparent_vertices.vertex_count) / 6;
 }
 
 //// Chunks

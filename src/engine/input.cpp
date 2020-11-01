@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "input.hpp"
 #include "window.hpp"
+#include "GLFW/glfw3.h"
 
 void Input::set_cursor_mode (Window& window, bool enabled) {
 	cursor_enabled = enabled;
@@ -55,7 +56,7 @@ void glfw_key_event (GLFWwindow* wnd, int key, int scancode, int action, int mod
 
 	// Toggle Imgui visibility with F1
 	if (key == GLFW_KEY_F1) {
-		if (went_down) imgui.enabled = !imgui.enabled;
+		if (went_down) g_imgui.enabled = !g_imgui.enabled;
 		return;
 	}
 
@@ -65,6 +66,7 @@ void glfw_key_event (GLFWwindow* wnd, int key, int scancode, int action, int mod
 		return;
 	}
 
+	// only process keys after GLFW_KEY_SPACE (32) to allow me to pack mouse buttons into the same array
 	if ((went_down || went_up) && key >= GLFW_KEY_SPACE && key <= GLFW_KEY_LAST) {
 		input.buttons[key].is_down = went_down;
 		input.buttons[key].went_down = went_down;

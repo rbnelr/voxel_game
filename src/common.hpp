@@ -17,15 +17,6 @@
 #include <queue>
 #include <algorithm>
 
-//
-#include "vulkan/vulkan.hpp" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
-
-#include "GLFW/glfw3.h"
-
-//#include "stb/stb_rect_pack.hpp"
-//#include "stb/stb_image.hpp"
-//#include "stb/stb_image_write.hpp"
-
 #include "imgui/dear_imgui.hpp"
 
 //
