@@ -9,6 +9,10 @@
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Tracy|x64">
+      <Configuration>Tracy</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -31,6 +35,13 @@
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
@@ -40,6 +51,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
@@ -52,6 +66,11 @@
     <TargetName>$(ProjectName)_$(Configuration)</TargetName>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">
+    <OutDir>$(SolutionDir)..\..\</OutDir>
+    <TargetName>$(ProjectName)_$(Configuration)</TargetName>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -60,7 +79,7 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -78,7 +97,27 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -106,6 +145,7 @@
     <ClInclude Include="..\..\..\src\engine\camera.hpp" />
     <ClInclude Include="..\..\..\src\engine\input.hpp" />
     <ClInclude Include="..\..\..\src\engine\input_buttons.hpp" />
+    <ClInclude Include="..\..\..\src\engine\threading.hpp" />
     <ClInclude Include="..\..\..\src\engine\window.hpp" />
     <ClInclude Include="..\..\..\src\game.hpp" />
     <ClInclude Include="..\..\..\src\graphics.hpp" />
@@ -124,7 +164,6 @@
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\profiling.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\random.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\raw_array.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
@@ -138,6 +177,9 @@
     <ClInclude Include="..\..\..\src\kisslib\threadpool.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\threadsafe_queue.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\timer.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h" />
+    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
@@ -155,25 +197,33 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\chunks.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\chunk_mesher.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\common.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp" />
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_demo.cpp" />
@@ -187,7 +237,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
@@ -203,36 +255,47 @@
     <ClCompile Include="..\..\..\src\kisslib\string.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
     <ClCompile Include="..\..\..\src\physics.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\player.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\voxel_light.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\world.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\world_generator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

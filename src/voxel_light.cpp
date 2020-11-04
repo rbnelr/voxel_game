@@ -2,7 +2,7 @@
 #include "voxel_light.hpp"
 
 struct LitBlock {
-	bpos bp;
+	int3 bp;
 	unsigned block_light : 8;
 };
 
@@ -10,8 +10,8 @@ bool operator< (LitBlock const& l, LitBlock const& r) {
 	return l.block_light < r.block_light;
 }
 
-std::vector<bpos> dbg_block_light_add_list;
-std::vector<bpos> dbg_block_light_remove_list;
+std::vector<int3> dbg_block_light_add_list;
+std::vector<int3> dbg_block_light_remove_list;
 
 void light_propagate (Chunks& chunks, std::priority_queue<LitBlock>& q) {
 	while (!q.empty()) {
@@ -29,7 +29,7 @@ void light_propagate (Chunks& chunks, std::priority_queue<LitBlock>& q) {
 			int3 pos = n.bp + dir;
 
 			Chunk* chunk;
-			bpos pos_in_chunk;
+			int3 pos_in_chunk;
 			auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
 			unsigned l = (unsigned)max((int)n.block_light - (int)blocks.absorb[blk.id] - 1, 0);
 
@@ -45,7 +45,7 @@ void light_propagate (Chunks& chunks, std::priority_queue<LitBlock>& q) {
 	}
 }
 
-void update_block_light_add (Chunks& chunks, bpos bp, unsigned new_light_level) {
+void update_block_light_add (Chunks& chunks, int3 bp, unsigned new_light_level) {
 	std::priority_queue<LitBlock> q;
 
 	q.push({ bp, new_light_level });
@@ -53,7 +53,7 @@ void update_block_light_add (Chunks& chunks, bpos bp, unsigned new_light_level) 
 	light_propagate(chunks, q);
 }
 
-void update_block_light_remove (Chunks& chunks, bpos bp, unsigned old_light_level) {
+void update_block_light_remove (Chunks& chunks, int3 bp, unsigned old_light_level) {
 	std::priority_queue<LitBlock> remove_q;
 	std::priority_queue<LitBlock> add_q;
 	
@@ -74,7 +74,7 @@ void update_block_light_remove (Chunks& chunks, bpos bp, unsigned old_light_leve
 			int3 pos = n.bp + dir;
 
 			Chunk* chunk;
-			bpos pos_in_chunk;
+			int3 pos_in_chunk;
 			auto blk = chunks.query_block(pos, &chunk, &pos_in_chunk);
 
 			if (blk.block_light > 0) {
@@ -99,7 +99,7 @@ void update_block_light_remove (Chunks& chunks, bpos bp, unsigned old_light_leve
 	light_propagate(chunks, add_q);
 }
 
-unsigned calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_block) {
+unsigned calc_block_light_level (Chunk* chunk, int3 pos_in_chunk, Block new_block) {
 	// The light levels of the neighbours of this block are either the result of:
 	//  A: the light coming in at that neighbour (still valid after placing this block)
 	//  B: the light was the result of the light from A (this might not be valid anymore)
@@ -121,7 +121,7 @@ unsigned calc_block_light_level (Chunk* chunk, bpos pos_in_chunk, Block new_bloc
 	
 	return (unsigned)max((int)l, (int)(neighbour_light - blocks.absorb[new_block.id] - 1));
 }
-void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, unsigned new_light_level) {
+void update_block_light (Chunks& chunks, int3 pos, unsigned old_light_level, unsigned new_light_level) {
 	ZoneScoped;
 
 	if (new_light_level != old_light_level) {
@@ -138,11 +138,11 @@ void update_block_light (Chunks& chunks, bpos pos, unsigned old_light_level, uns
 	}
 }
 
-void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
+void update_sky_light_column (Chunk* chunk, int3 pos_in_chunk) {
 	//ZoneScoped;
 
-	int sky_light = pos_in_chunk.z >= CHUNK_DIM-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + bpos(0,0,1)).sky_light;
-	bpos pos = pos_in_chunk;
+	int sky_light = pos_in_chunk.z >= CHUNK_SIZE-1 ? MAX_LIGHT_LEVEL : chunk->get_block(pos_in_chunk + int3(0,0,1)).sky_light;
+	int3 pos = pos_in_chunk;
 
 	for (; pos.z>=0 && sky_light>0; --pos.z) {
 		auto indx = ChunkData::pos_to_index(pos);
@@ -162,14 +162,14 @@ void update_sky_light_column (Chunk* chunk, bpos pos_in_chunk) {
 		*sl = 0;
 	}
 
-	chunk->needs_remesh = true;
+	chunk->flags |= Chunk::REMESH;
 }
 void update_sky_light_chunk (Chunk* chunk) {
 	ZoneScoped;
 
-	for (int y=0; y<CHUNK_DIM; ++y) {
-		for (int x=0; x<CHUNK_DIM; ++x) {
-			update_sky_light_column(chunk, bpos(x,y, CHUNK_DIM-1));
+	for (int y=0; y<CHUNK_SIZE; ++y) {
+		for (int x=0; x<CHUNK_SIZE; ++x) {
+			update_sky_light_column(chunk, int3(x,y, CHUNK_SIZE-1));
 		}
 	}
 }

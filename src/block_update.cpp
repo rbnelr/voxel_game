@@ -2,8 +2,8 @@
 #include "block_update.hpp"
 #include "chunks.hpp"
 
-bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world) {
-	auto above = chunks.query_block(pos_world +bpos(0,0,+1));
+bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos_world) {
+	auto above = chunks.query_block(pos_world +int3(0,0,+1));
 
 	bool changed = false;
 
@@ -21,29 +21,29 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos
 	if (b.id == B_EARTH && blocks.grass_can_live_below(above.id)) {
 		float prob = 0;
 
-		bpos2 sides[4] = {
-			bpos2(-1,0),
-			bpos2(+1,0),
-			bpos2(0,-1),
-			bpos2(0,+1),
+		int2 sides[4] = {
+			int2(-1,0),
+			int2(+1,0),
+			int2(0,-1),
+			int2(0,+1),
 		};
-		bpos2 diagonals[4] = {
-			bpos2(-1,-1),
-			bpos2(+1,-1),
-			bpos2(-1,+1),
-			bpos2(+1,+1),
+		int2 diagonals[4] = {
+			int2(-1,-1),
+			int2(+1,-1),
+			int2(-1,+1),
+			int2(+1,+1),
 		};
 
-		for (bpos2 v : sides) {
-			if (	 chunks.query_block(pos_world +bpos(v,+1)).id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
-			else if (chunks.query_block(pos_world +bpos(v, 0)).id == B_GRASS) prob += grass_grow_side_prob;
-			else if (chunks.query_block(pos_world +bpos(v,-1)).id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
+		for (int2 v : sides) {
+			if (	 chunks.query_block(pos_world +int3(v,+1)).id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_down_multipiler;
+			else if (chunks.query_block(pos_world +int3(v, 0)).id == B_GRASS) prob += grass_grow_side_prob;
+			else if (chunks.query_block(pos_world +int3(v,-1)).id == B_GRASS) prob += grass_grow_side_prob * grass_grow_step_up_multipiler;
 		}
 
-		for (bpos2 v : diagonals) {
-			if (	 chunks.query_block(pos_world +bpos(v,+1)).id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
-			else if (chunks.query_block(pos_world +bpos(v, 0)).id == B_GRASS) prob += grass_grow_diagonal_prob;
-			else if (chunks.query_block(pos_world +bpos(v,-1)).id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
+		for (int2 v : diagonals) {
+			if (	 chunks.query_block(pos_world +int3(v,+1)).id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_down_multipiler;
+			else if (chunks.query_block(pos_world +int3(v, 0)).id == B_GRASS) prob += grass_grow_diagonal_prob;
+			else if (chunks.query_block(pos_world +int3(v,-1)).id == B_GRASS) prob += grass_grow_diagonal_prob * grass_grow_step_up_multipiler;
 		}
 
 		if (prob > random.uniform()) {
@@ -74,36 +74,37 @@ void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
 
 	float tmp = ceil((float)CHUNK_BLOCK_COUNT * block_update_fraction);
 
-	bpos_t blocks_to_update = (bpos_t)tmp;
+	size_t blocks_to_update = (size_t)tmp;
 	float rounded_fraction = tmp / (float)CHUNK_BLOCK_COUNT;
 
 	effective_frequency = rounded_fraction / I.dt;
 
 	recalc_probs();
-	
-	for (Chunk& chunk : chunks.chunks) {
-		if (chunk.active) {
-			ZoneScopedN("update_blocks chunk");
 
-			for (bpos_t i=0; i<blocks_to_update; ++i) {
-				uint32_t indx = cur_chunk_update_block_i++;
-				if (cur_chunk_update_block_i == CHUNK_BLOCK_COUNT)
-					cur_chunk_update_block_i = 0;
+	for (chunk_id id=0; id<chunks.chunks.max_id; ++id) {
+		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+		
+		ZoneScopedN("update_blocks chunk");
+		auto& chunk = chunks[id];
 
-				//indx = block_pattern(indx);
+		for (size_t i=0; i<blocks_to_update; ++i) {
+			size_t indx = cur_chunk_update_block_i++;
+			if (cur_chunk_update_block_i == CHUNK_BLOCK_COUNT)
+				cur_chunk_update_block_i = 0;
 
-				// reconstruct 3d index from flat index
-				bpos bp;
-				bp.z =  indx / (CHUNK_DIM * CHUNK_DIM);
-				bp.y = (indx % (CHUNK_DIM * CHUNK_DIM)) / CHUNK_DIM;
-				bp.x = (indx % (CHUNK_DIM * CHUNK_DIM)) % CHUNK_DIM;
+			//indx = block_pattern(indx);
 
-				// get block with flat index
-				Block b = chunk.get_block(bp);
+			// reconstruct 3d index from flat index
+			int3 bp;
+			bp.z = (int)(  indx / (CHUNK_SIZE * CHUNK_SIZE)               );
+			bp.y = (int)( (indx % (CHUNK_SIZE * CHUNK_SIZE)) / CHUNK_SIZE );
+			bp.x = (int)( (indx % (CHUNK_SIZE * CHUNK_SIZE)) % CHUNK_SIZE );
 
-				if (update_block(chunks, chunk, b, bp + chunk.chunk_pos_world())) {
-					chunk.set_block(chunks, bp, b);
-				}
+			// get block with flat index
+			Block b = chunk.get_block(bp);
+
+			if (update_block(chunks, chunk, b, bp + chunk.pos * CHUNK_SIZE)) {
+				chunk.set_block(chunks, bp, b);
 			}
 		}
 	}

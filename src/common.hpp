@@ -39,7 +39,9 @@
 #include "kisslib/timer.hpp"
 #include "kisslib/allocator.hpp"
 
-#include "kisslib/profiling.hpp"
+#include "Tracy.hpp"
+//#include "TracyOpenGL.hpp"
+#include "TracyVulkan.hpp"
 
 #define SERIALIZE_LOG(type, ...) clog(type, __VA_ARGS__)
 #include "kisslib/serialization.hpp"
@@ -47,3 +49,4 @@
 using namespace kiss;
 using namespace kissmath;
 
+#include "engine/threading.hpp"

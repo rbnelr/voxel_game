@@ -151,8 +151,6 @@ void frameloop (Window& window) {
 	uint64_t prev = get_timestamp();
 
 	for (;;) {
-		FrameMark;
-
 		{ // Input sampling
 			ZoneScopedN("sample_input");
 
@@ -191,6 +189,8 @@ void frameloop (Window& window) {
 		}
 
 		window.frame_counter++;
+
+		FrameMark;
 	}
 }
 

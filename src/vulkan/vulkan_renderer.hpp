@@ -2,9 +2,10 @@
 #include "common.hpp"
 #include "vulkan_helper.hpp"
 #include "vulkan_shaders.hpp"
-#include "GLFW/glfw3.h"
-#include "assert.h"
 #include "engine/camera.hpp"
+#include "chunk_mesher.hpp"
+
+#include "GLFW/glfw3.h"
 
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
@@ -50,12 +51,32 @@ inline std::vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
 	return std::vector<char const*>(names, names + count);
 }
 
+struct ChunkMeshManager {
+
+	template <typename T>
+	struct Allocator {
+		BitsetAllocator allocated_blocks;
+
+
+	};
+
+	struct FrameData {
+		
+	};
+
+	void upload_meshes (std::vector<RemeshChunkJob>& results) {
+		
+	}
+};
+
 struct Renderer {
 	VkInstance					instance;
 	VkSurfaceKHR				surface;
 	VkPhysicalDevice			physical_device;
 	VkDevice					device;
 	Queues						queues;
+
+	//TracyVkCtx					tracy_ctx;
 
 	ShaderManager				shaders;
 
@@ -287,6 +308,8 @@ struct Renderer {
 		}
 
 		cur_frame = (cur_frame + 1) % FRAMES_IN_FLIGHT;
+
+		//TracyVkCollect();
 	}
 
 	Renderer (char const* app_name, GLFWwindow* window) {
@@ -332,9 +355,9 @@ struct Renderer {
 	~Renderer () {
 		ZoneScoped;
 
-		imgui_renderer_destroy();
-
 		vkQueueWaitIdle(queues.graphics_queue);
+
+		imgui_renderer_destroy();
 
 		destroy_meshes();
 		destroy_ubo_buffers();

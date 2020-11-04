@@ -51,7 +51,7 @@ void Game::imgui (Window& window, Input& I) {
 		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 			fps_display.display_fps(window.input.real_dt, window.input.dt);
 
-			ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
+			//ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 		}
 
 		window.input.imgui();
@@ -99,7 +99,6 @@ void Game::imgui (Window& window, Input& I) {
 }
 
 RenderData Game::update (Window& window, Input& I) {
-	world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
 	if (!activate_flycam) {
 		world->player.update_movement_controls(I, *world);
@@ -124,7 +123,7 @@ RenderData Game::update (Window& window, Input& I) {
 
 	block_update.update_blocks(I, world->chunks);
 
-	world->chunks.update_chunks(graphics, world->world_gen, world->player);
+	world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
 	RenderData rd;
 	rd.view = view;

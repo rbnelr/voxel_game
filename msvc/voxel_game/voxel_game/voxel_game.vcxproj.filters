@@ -67,9 +67,6 @@
     <ClInclude Include="..\..\..\src\kisslib\macros.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\profiling.hpp">
-      <Filter>kisslib</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\random.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -174,6 +171,18 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\engine\input_buttons.hpp">
       <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\threading.hpp">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp">
+      <Filter>kisslib\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h">
+      <Filter>kisslib\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
+      <Filter>kisslib\tracy</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -282,6 +291,9 @@
     <ClCompile Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp">
+      <Filter>kisslib\tracy</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -310,6 +322,9 @@
     </Filter>
     <Filter Include="open_simplex_noise">
       <UniqueIdentifier>{8d450617-2b10-4cf0-a1af-fddbb74dfb4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="kisslib\tracy">
+      <UniqueIdentifier>{a672effb-40fc-4f0f-9862-ca77221319c5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

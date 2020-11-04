@@ -113,145 +113,159 @@ float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_no
 
 void gen (Chunk* chunk, WorldGenerator const& wg) {
 
-	bpos chunk_origin = chunk->coord * CHUNK_DIM;
+	int3 chunk_origin = chunk->pos * CHUNK_SIZE;
 
-	bpos_t water_level = 21 - chunk_origin.z;
+	int water_level = 21 - chunk_origin.z;
 
-	bpos i; // position in chunk
-	for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-		for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
-			for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
-				block_id b;
+	int3 i; // position in chunk
+	{
+		ZoneScopedN("Init blocks");
 
-				if (i.z <= water_level) {
-					b = B_WATER;
-				} else {
-					b = B_AIR;
+		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+					block_id b;
+
+					if (i.z <= water_level) {
+						b = B_WATER;
+					} else {
+						b = B_AIR;
+					}
+
+					chunk->set_block_unchecked(i, b);
 				}
-
-				chunk->set_block_unchecked(i, b);
 			}
 		}
 	}
 
-	uint64_t chunk_seed = wg.seed ^ hash(chunk->coord);
+	uint64_t chunk_seed = wg.seed ^ hash(chunk->pos);
 
 	OSN::Noise<2> noise(wg.seed);
 	Random rand = Random(chunk_seed);
 
-	std::vector<bpos> tree_poss;
+	std::vector<int3> tree_poss;
 
-	auto find_min_tree_dist = [&] (bpos2 new_tree_pos) {
+	auto find_min_tree_dist = [&] (int2 new_tree_pos) {
 		float min_dist = +INF;
-		for (bpos p : tree_poss)
-			min_dist = min(min_dist, length((float2)(bpos2)p -(float2)new_tree_pos));
+		for (int3 p : tree_poss)
+			min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
 		return min_dist;
 	};
 
-	for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
-		for (i.x=0; i.x<CHUNK_DIM; ++i.x) {
+	{
+		ZoneScopedN("Generate blocks");
 
-			bpos pos_world = bpos(i,0) + chunk_origin;
+		for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+			for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
 
-			float earth_layer;
-			float height = heightmap(wg, noise, (float2)(int2)pos_world, &earth_layer);
-			int highest_block = (int)floor(height -1 +0.5f) - pos_world.z; // -1 because height 1 means the highest block is z=0
+				int3 pos_world = int3(i,0) + chunk_origin;
 
-			float tree_density = noise_tree_density(wg, noise, (float2)(int2)pos_world);
+				float earth_layer;
+				float height = heightmap(wg, noise, (float2)(int2)pos_world, &earth_layer);
+				int highest_block = (int)floor(height -1 +0.5f) - pos_world.z; // -1 because height 1 means the highest block is z=0
 
-			float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world);
+				float tree_density = noise_tree_density(wg, noise, (float2)(int2)pos_world);
 
-			float tree_prox_prob = gradient<float>( find_min_tree_dist((bpos2)i), {
-				{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
-				{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
-				{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
-				{ 4,		0.75f },
-				{ 6,		1 },
-				});
-			float effective_tree_prob = tree_density * tree_prox_prob;
-			//float effective_tree_prob = tree_density;
+				float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world);
 
-			for (i.z=0; i.z <= min(highest_block, CHUNK_DIM-1); ++i.z) {
-				auto indx = ChunkData::pos_to_index(i);
-				auto* bid = &chunk->blocks->id[ indx ];
+				float tree_prox_prob = gradient<float>( find_min_tree_dist((int2)i), {
+					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
+					{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
+					{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
+					{ 4,		0.75f },
+					{ 6,		1 },
+					});
+				float effective_tree_prob = tree_density * tree_prox_prob;
+				//float effective_tree_prob = tree_density;
 
-				if (i.z <= highest_block - earth_layer) {
-					*bid = B_STONE;
-				} else {
-					if (i.z == highest_block && i.z >= water_level) {
-						*bid = B_GRASS;
+				for (i.z=0; i.z <= min(highest_block, CHUNK_SIZE-1); ++i.z) {
+					auto indx = ChunkData::pos_to_index(i);
+					auto* bid = &chunk->blocks->id[ indx ];
+
+					if (i.z <= highest_block - earth_layer) {
+						*bid = B_STONE;
 					} else {
-						*bid = B_EARTH;
+						if (i.z == highest_block && i.z >= water_level) {
+							*bid = B_GRASS;
+						} else {
+							*bid = B_EARTH;
+						}
 					}
 				}
-			}
 
-			auto indx = ChunkData::pos_to_index(i);
-			auto* bid			= &chunk->blocks->id[ indx ];
-			auto* block_light	= &chunk->blocks->block_light[ indx ];
+				auto indx = ChunkData::pos_to_index(i);
+				auto* bid			= &chunk->blocks->id[ indx ];
+				auto* block_light	= &chunk->blocks->block_light[ indx ];
 
-			bool block_free = highest_block >= 0 && highest_block < CHUNK_DIM && *bid != B_WATER;
+				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != B_WATER;
 
-			if (block_free) {
-				float tree_chance = rand.uniform();
-				float grass_chance = rand.uniform();
+				if (block_free) {
+					float tree_chance = rand.uniform();
+					float grass_chance = rand.uniform();
 
-				if (rand.uniform() < effective_tree_prob) {
-					tree_poss.push_back( bpos((bpos2)i, highest_block +1) );
-				} else if (rand.uniform() < grass_density) {
-					*bid = B_TALLGRASS;
-				} else if (rand.uniform() < 0.0005f) {
-					*bid = B_TORCH;
-					*block_light = blocks.glow[B_TORCH];
+					if (rand.uniform() < effective_tree_prob) {
+						tree_poss.push_back( int3((int2)i, highest_block +1) );
+					} else if (rand.uniform() < grass_density) {
+						*bid = B_TALLGRASS;
+					} else if (rand.uniform() < 0.0005f) {
+						*bid = B_TORCH;
+						*block_light = blocks.glow[B_TORCH];
+					}
 				}
 			}
 		}
 	}
 
-	auto place_tree = [&] (bpos pos_chunk) {
-		auto indx = ChunkData::pos_to_index(pos_chunk - bpos(0,0,1));
-		auto* bid = &chunk->blocks->id[ indx ];
+	{
+		ZoneScopedN("Place structures");
 
-		if (*bid == B_GRASS) {
-			*bid = B_EARTH;
-		}
-
-		auto place_block = [&] (bpos pos_chunk, block_id bt) {
-			if (any(pos_chunk < 0 || pos_chunk >= CHUNK_DIM)) return;
-			auto indx = ChunkData::pos_to_index(pos_chunk);
+		auto place_tree = [&] (int3 pos_chunk) {
+			auto indx = ChunkData::pos_to_index(pos_chunk - int3(0,0,1));
 			auto* bid = &chunk->blocks->id[ indx ];
 
-			if (*bid == B_AIR || *bid == B_WATER || (bt == B_TREE_LOG && *bid == B_LEAVES)) {
-				*bid = bt;
+			if (*bid == B_GRASS) {
+				*bid = B_EARTH;
 			}
-		};
-		auto place_block_sphere = [&] (bpos pos_chunk, float3 r, block_id bt) {
-			bpos start = (bpos)floor((float3)pos_chunk +0.5f -r);
-			bpos end = (bpos)ceil((float3)pos_chunk +0.5f +r);
 
-			bpos i; // position in chunk
-			for (i.z=start.z; i.z<end.z; ++i.z) {
-				for (i.y=start.y; i.y<end.y; ++i.y) {
-					for (i.x=start.x; i.x<end.x; ++i.x) {
-						if (length_sqr((float3)(i -pos_chunk) / r) <= 1) place_block(i, bt);
+			auto place_block = [&] (int3 pos_chunk, block_id bt) {
+				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_SIZE)) return;
+				auto indx = ChunkData::pos_to_index(pos_chunk);
+				auto* bid = &chunk->blocks->id[ indx ];
+
+				if (*bid == B_AIR || *bid == B_WATER || (bt == B_TREE_LOG && *bid == B_LEAVES)) {
+					*bid = bt;
+				}
+			};
+			auto place_block_sphere = [&] (int3 pos_chunk, float3 r, block_id bt) {
+				int3 start = (int3)floor((float3)pos_chunk +0.5f -r);
+				int3 end = (int3)ceil((float3)pos_chunk +0.5f +r);
+
+				int3 i; // position in chunk
+				for (i.z=start.z; i.z<end.z; ++i.z) {
+					for (i.y=start.y; i.y<end.y; ++i.y) {
+						for (i.x=start.x; i.x<end.x; ++i.x) {
+							if (length_sqr((float3)(i -pos_chunk) / r) <= 1) place_block(i, bt);
+						}
 					}
 				}
-			}
+			};
+
+			int tree_height = 6;
+
+			for (int i=0; i<tree_height; ++i)
+				place_block(pos_chunk +int3(0,0,i), B_TREE_LOG);
+
+			place_block_sphere(pos_chunk +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
 		};
 
-		bpos_t tree_height = 6;
-
-		for (bpos_t i=0; i<tree_height; ++i)
-			place_block(pos_chunk +bpos(0,0,i), B_TREE_LOG);
-
-		place_block_sphere(pos_chunk +bpos(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
-	};
-
-	for (bpos p : tree_poss)
-		place_tree(p);
+		for (int3 p : tree_poss)
+			place_tree(p);
+	}
 }
 
 void WorldgenJob::execute () {
+	ZoneScoped;
+
 	chunk->init_blocks();
 
 	gen(chunk, *wg);

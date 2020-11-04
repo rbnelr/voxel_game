@@ -12,10 +12,10 @@ CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
 
 	if (length_sqr(obj.vel) != 0) {
 		// for all blocks we could be touching during movement by at most one block on each axis
-		bpos start =	(bpos)floor(obj.pos -float3(obj.r,obj.r,0)) -1;
-		bpos end =		(bpos)ceil(obj.pos +float3(obj.r,obj.r,obj.h)) +1;
+		int3 start =	(int3)floor(obj.pos -float3(obj.r,obj.r,0)) -1;
+		int3 end =		(int3)ceil(obj.pos +float3(obj.r,obj.r,obj.h)) +1;
 
-		bpos bp;
+		int3 bp;
 		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
 			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {

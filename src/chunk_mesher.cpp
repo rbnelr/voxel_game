@@ -2,6 +2,7 @@
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
 #include "graphics.hpp"
+#include "player.hpp"
 
 static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
@@ -10,10 +11,8 @@ static constexpr int offs (int3 offset) {
 struct Chunk_Mesher {
 	bool alpha_test;
 
-	MeshingData* opaque_vertices;
-	MeshingData* tranparent_vertices;
-
 	ChunkData* chunk_data;
+	ChunkMesh* mesh;
 
 	uint64_t cur;
 
@@ -104,9 +103,9 @@ struct Chunk_Mesher {
 		+CHUNK_LAYER_OFFS,
 	};
 
-	void face (MeshingData* out, BlockFace facei) {
+	void face (MeshData* out, BlockFace facei) {
 
-		ChunkMesh::Vertex vert[4];
+		ChunkVertex vert[4];
 
 		float3 const* pf = posf[facei];
 		int3 const* p = pos[facei];
@@ -138,7 +137,7 @@ struct Chunk_Mesher {
 		for (int i=0; i<6; ++i) {
 			block_id n = chunk_data->id[cur + offsets[i]];
 			if (!bt_is_opaque(n))
-				face(opaque_vertices, (BlockFace)i);
+				face(&mesh->opaque_vertices, (BlockFace)i);
 		}
 	}
 	void cube_transperant () {
@@ -146,7 +145,7 @@ struct Chunk_Mesher {
 			block_id n = chunk_data->id[cur + offsets[i]];
 			block_id b = chunk_data->id[cur];
 			if (!bt_is_opaque(n) && n != b)
-				face(tranparent_vertices, (BlockFace)i);
+				face(&mesh->tranparent_vertices, (BlockFace)i);
 		}
 	}
 
@@ -184,32 +183,27 @@ struct Chunk_Mesher {
 	}
 #endif
 
-	void mesh_chunk (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg, Chunk* chunk, MeshingResult* res) {
+	void mesh_chunk (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh) {
 		ZoneScoped;
 		
 		//block_meshes = &graphics.tile_textures.block_meshes;
 
 		chunk_data = chunk->blocks.get();
+		this->mesh = mesh;
 
-		opaque_vertices		= &res->opaque_vertices;
-		tranparent_vertices	= &res->tranparent_vertices;
-
-		opaque_vertices->init();
-		tranparent_vertices->init();
-
-		bpos chunk_pos_world = chunk->chunk_pos_world();
+		int3 chunk_pos_world = chunk->pos * CHUNK_SIZE;
 
 		//auto _a = get_timestamp();
 		//uint64_t sum = 0;
 
 		int3 i = 0;
-		for (i.z=0; i.z<CHUNK_DIM; ++i.z) {
-			for (i.y=0; i.y<CHUNK_DIM; ++i.y) {
+		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
+			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
 
 				i.x = 0;
 				cur = ChunkData::pos_to_index(i);
 
-				for (; i.x<CHUNK_DIM; ++i.x) {
+				for (; i.x<CHUNK_SIZE; ++i.x) {
 
 					auto id = chunk_data->id[cur];
 
@@ -247,5 +241,45 @@ struct Chunk_Mesher {
 
 void RemeshChunkJob::execute () {
 	Chunk_Mesher cm;
-	return cm.mesh_chunk(*chunks, *graphics, *wg, chunk, &meshing_result);
+	return cm.mesh_chunk(*chunks, *graphics, *wg, chunk, &mesh);
+}
+
+void ChunkRemesher::queue_remeshing (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg) {
+	ZoneScoped;
+
+	std::vector< std::unique_ptr<ThreadingJob> > remesh_jobs;
+	{
+		ZoneScopedN("chunks_to_remesh iterate all chunks");
+		for (chunk_id id=0; id<chunks.chunks.max_id; ++id) {
+			if ((chunks[id].flags & Chunk::REMESH) == 0) continue;
+			remesh_jobs.push_back( std::make_unique<RemeshChunkJob>(&chunks[id], &chunks, &graphics, &wg) );
+		}
+	}
+
+	// remesh all chunks in parallel
+	parallelism_threadpool.jobs.push_n(remesh_jobs.data(), remesh_jobs.size());
+
+	remesh_chunks_count = remesh_jobs.size();
+}
+
+void ChunkRemesher::finish_remeshing () {
+	ZoneScoped;
+
+	for (size_t result_count=0; result_count < remesh_chunks_count; ) {
+		std::unique_ptr<ThreadingJob> results[64];
+		size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+
+		for (size_t i=0; i<count; ++i)
+			results[i]->finalize();
+
+		result_count += count;
+	}
+}
+
+void RemeshChunkJob::finalize () {
+	//chunk->reupload(meshing_result);
+	chunk->flags &= ~Chunk::REMESH;
+
+	mesh.opaque_vertices.free_preallocated();
+	mesh.tranparent_vertices.free_preallocated();
 }

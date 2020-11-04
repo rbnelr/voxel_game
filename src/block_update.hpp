@@ -8,7 +8,7 @@ class BlockUpdate {
 public:
 	// how many blocks (fraction of total blocks) get updated per frame
 	float block_update_fraction = 0.0002f;
-	bpos_t cur_chunk_update_block_i = 0;
+	size_t cur_chunk_update_block_i = 0;
 
 	float grass_die_mtth = 5; // seconds
 	float grass_grow_min_mtth = 10; // seconds
@@ -57,7 +57,7 @@ public:
 		imgui_pop();
 	}
 
-	bool update_block (Chunks& chunks, Chunk& chunk, Block& b, bpos pos_world);
+	bool update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos_world);
 	void update_blocks (Input& I, Chunks& chunks);
 };
 
