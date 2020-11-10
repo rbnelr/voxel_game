@@ -255,7 +255,7 @@ void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view,
 	world.raycast_breakable_blocks(block, ray, reach, creative_mode);
 }
 
-void update_block_edits (Input& I, World& world, Camera_View& view, Graphics& graphics, bool creative_mode) {
+void update_block_edits (Input& I, World& world, Camera_View& view, bool creative_mode) {
 	auto& block = world.player.selected_block;
 
 	bool was_selected = block.is_selected;

@@ -1,6 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "engine/camera.hpp"
+#include "chunks.hpp"
 
 struct ChunkVertex {
 	float3	pos_model;
@@ -20,6 +21,7 @@ struct ChunkVertex {
 	//	a.add    <decltype(hp         )>(cur++, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ), true);
 	//}
 };
+
 
 struct BlockTileInfo {
 	int base_index;
@@ -48,13 +50,16 @@ struct BlockTileInfo {
 	}
 };
 
-struct Graphics {
-
+struct Assets {
 	BlockTileInfo block_tile_info[BLOCK_IDS_COUNT];
-
 };
 
 struct RenderData {
 	Camera_View		view;
 	int2			window_size;
+
+	Chunks&			chunks;
+
+	Assets			const& assets;
+	WorldGenerator	const& wg;
 };

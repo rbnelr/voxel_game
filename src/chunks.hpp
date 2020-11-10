@@ -1,7 +1,6 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
-#include "graphics.hpp"
 
 #define CHUNK_SIZE			32
 #define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
@@ -10,8 +9,6 @@
 #define CHUNK_LAYER_OFFS	((CHUNK_SIZE+2)*(CHUNK_SIZE+2))
 
 #define CHUNK_BLOCK_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
-
-
 
 // get world chunk position from world block position
 inline int3 to_chunk_pos (int3 pos) {
@@ -40,7 +37,7 @@ inline int3 to_chunk_pos (int3 pos, int3* block_pos) {
 struct World;
 struct WorldGenerator;
 struct Player;
-struct Graphics;
+struct Assets;
 struct Chunks;
 
 static inline constexpr int _block_count (int lod_levels) {
@@ -50,8 +47,6 @@ static inline constexpr int _block_count (int lod_levels) {
 	}
 	return count;
 };
-
-////////////// Chunk
 
 struct ChunkData {
 	static constexpr uint64_t COUNT = (CHUNK_SIZE+2) * (CHUNK_SIZE+2) * (CHUNK_SIZE+2);
@@ -109,6 +104,8 @@ struct Chunk {
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
 	std::unique_ptr<ChunkData> blocks = nullptr;
 	
+	std::vector<int> mesh_slices;
+
 	Chunk (int3 pos): pos{pos} {
 		flags = ALLOCATED;
 	}
@@ -135,26 +132,32 @@ ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 typedef uint16_t chunk_id;
 static constexpr uint16_t MAX_CHUNKS = (1<<16) - 2; // -2 to fit max_id in 16 bit int
 
-struct ChunkAllocator {
+inline float chunk_dist_sq (int3 pos, float3 dist_to) {
+	int3 chunk_origin = pos * CHUNK_SIZE;
+	return point_box_nearest_dist((float3)chunk_origin, CHUNK_SIZE, dist_to);
+}
+
+struct Chunks {
 	Chunk* chunks;
 	chunk_id max_id = 0; // max chunk id needed to iterate chunks
 	chunk_id count = 0; // number of ALLOCATED chunks
+
+	char* commit_ptr; // end of committed chunk memory
+	BitsetAllocator id_alloc;
+	BitsetAllocator slices_alloc;
+
+	std::unordered_map<int3, chunk_id> pos_to_id;
 
 	Chunk& operator[] (chunk_id id) {
 		assert(id < max_id);
 		return chunks[id];
 	}
 
-	BitsetAllocator id_alloc;
-	char* commit_ptr; // end of committed chunk memory
-
-	std::unordered_map<int3, chunk_id> pos_to_id;
-
-	ChunkAllocator () {
+	Chunks () {
 		chunks = (Chunk*)reserve_address_space(sizeof(Chunk) * MAX_CHUNKS);
 		commit_ptr = (char*)chunks;
 	}
-	~ChunkAllocator () {
+	~Chunks () {
 		for (chunk_id id=0; id<max_id; ++id) {
 			if ((chunks[id].flags & Chunk::ALLOCATED) == 0) continue;
 			free_chunk(id);
@@ -193,35 +196,20 @@ struct ChunkAllocator {
 	void free_chunk (chunk_id id) {
 		pos_to_id.erase(chunks[id].pos);
 
+		id_alloc.free(id);
+
+		for (auto& s : chunks[id].mesh_slices)
+			slices_alloc.free(s);
+
 		chunks[id].~Chunk();
 
-		id_alloc.free(id);
-		
-		auto last = id_alloc.scan_reverse_allocated();
-		while ((char*)&chunks[last+1] <= commit_ptr - os_page_size) { // free pages one by one when needed
+		while ((char*)&chunks[id_alloc.alloc_end] <= commit_ptr - os_page_size) { // free pages one by one when needed
 			commit_ptr -= os_page_size;
 			decommit_pages(commit_ptr, os_page_size);
 		}
 
-		max_id = (chunk_id)(last+1);
+		max_id = (chunk_id)id_alloc.alloc_end;
 		count--;
-	}
-};
-
-inline float chunk_dist_sq (int3 pos, float3 dist_to) {
-	int3 chunk_origin = pos * CHUNK_SIZE;
-	return point_box_nearest_dist((float3)chunk_origin, CHUNK_SIZE, dist_to);
-}
-
-////////////// Chunks
-struct Chunks {
-	ChunkAllocator chunks;
-
-	int count_culled;
-
-	Chunk& operator[] (chunk_id id) {
-		assert(id < chunks.max_id);
-		return chunks.chunks[id];
 	}
 
 	// load chunks in this radius in order of distance to the player 
@@ -247,11 +235,11 @@ struct Chunks {
 		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
 		ImGui::DragFloat("active_radius", &active_radius, 1);
 
-		uint64_t block_count = chunks.count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-		uint64_t block_mem = chunks.count * sizeof(ChunkData);
+		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+		uint64_t block_mem = count * sizeof(ChunkData);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)",
-			chunks.count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / chunks.count);
+			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / count);
 
 		//uint64_t face_count = 0;
 		//for (Chunk& c : chunks) {
@@ -264,11 +252,10 @@ struct Chunks {
 		imgui_pop();
 	}
 
-	// in chunks
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
 	Chunk* query_chunk (int3 coord) {
-		auto it = chunks.pos_to_id.find(coord);
-		if (it == chunks.pos_to_id.end())
+		auto it = pos_to_id.find(coord);
+		if (it == pos_to_id.end())
 			return nullptr;
 		return &this->operator[](it->second);
 	}

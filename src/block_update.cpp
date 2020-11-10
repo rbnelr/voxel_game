@@ -81,7 +81,7 @@ void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
 
 	recalc_probs();
 
-	for (chunk_id id=0; id<chunks.chunks.max_id; ++id) {
+	for (chunk_id id=0; id<chunks.max_id; ++id) {
 		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 		
 		ZoneScopedN("update_blocks chunk");

@@ -184,6 +184,7 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
       <Filter>kisslib\tracy</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -294,6 +295,13 @@
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp">
       <Filter>kisslib\tracy</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\vulkan\vulkan_renderer.cpp">
+      <Filter>vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\vulkan\vulkan_helper.cpp">
+      <Filter>vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">

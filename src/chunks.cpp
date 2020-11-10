@@ -213,12 +213,12 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 		float unload_dist = generation_radius + deletion_hysteresis;
 		float unload_dist_sqr = unload_dist * unload_dist;
 
-		for (chunk_id id=0; id<chunks.max_id; ++id) {
+		for (chunk_id id=0; id<max_id; ++id) {
 			if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 			
 			float dist_sqr = chunk_dist_sq(chunks[id].pos, player.pos);
 			if (dist_sqr > unload_dist_sqr)
-				chunks.free_chunk(id);
+				free_chunk(id);
 		}
 	}
 
@@ -266,7 +266,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			for (int i=0; i<count; ++i) {
 				auto cp = chunks_to_generate[i];
 
-				auto id = chunks.alloc_chunk(cp);
+				auto id = alloc_chunk(cp);
 				float dist = chunk_dist_sq(cp, player.pos);
 
 				chunks[id].blocks = std::make_unique<ChunkData>();

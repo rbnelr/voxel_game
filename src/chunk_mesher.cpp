@@ -8,7 +8,7 @@ static constexpr int offs (int3 offset) {
 	return offset.z * CHUNK_LAYER_OFFS + offset.y * CHUNK_ROW_OFFS + offset.x;
 }
 
-struct Chunk_Mesher {
+struct ThreadChunkMesher {
 	bool alpha_test;
 
 	ChunkData* chunk_data;
@@ -183,7 +183,7 @@ struct Chunk_Mesher {
 	}
 #endif
 
-	void mesh_chunk (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh) {
+	void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh) {
 		ZoneScoped;
 		
 		//block_meshes = &graphics.tile_textures.block_meshes;
@@ -212,7 +212,7 @@ struct Chunk_Mesher {
 
 						block_pos = (float3)i;
 
-						tile = graphics.block_tile_info[id];
+						tile = assets.block_tile_info[id];
 						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];
 
 						//if (mesh_info.offset < 0) {
@@ -239,47 +239,7 @@ struct Chunk_Mesher {
 	}
 };
 
-void RemeshChunkJob::execute () {
-	Chunk_Mesher cm;
-	return cm.mesh_chunk(*chunks, *graphics, *wg, chunk, &mesh);
-}
-
-void ChunkRemesher::queue_remeshing (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg) {
-	ZoneScoped;
-
-	std::vector< std::unique_ptr<ThreadingJob> > remesh_jobs;
-	{
-		ZoneScopedN("chunks_to_remesh iterate all chunks");
-		for (chunk_id id=0; id<chunks.chunks.max_id; ++id) {
-			if ((chunks[id].flags & Chunk::REMESH) == 0) continue;
-			remesh_jobs.push_back( std::make_unique<RemeshChunkJob>(&chunks[id], &chunks, &graphics, &wg) );
-		}
-	}
-
-	// remesh all chunks in parallel
-	parallelism_threadpool.jobs.push_n(remesh_jobs.data(), remesh_jobs.size());
-
-	remesh_chunks_count = remesh_jobs.size();
-}
-
-void ChunkRemesher::finish_remeshing () {
-	ZoneScoped;
-
-	for (size_t result_count=0; result_count < remesh_chunks_count; ) {
-		std::unique_ptr<ThreadingJob> results[64];
-		size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
-
-		for (size_t i=0; i<count; ++i)
-			results[i]->finalize();
-
-		result_count += count;
-	}
-}
-
-void RemeshChunkJob::finalize () {
-	//chunk->reupload(meshing_result);
-	chunk->flags &= ~Chunk::REMESH;
-
-	mesh.opaque_vertices.free_preallocated();
-	mesh.tranparent_vertices.free_preallocated();
+void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh) {
+	ThreadChunkMesher cm;
+	return cm.mesh_chunk(assets, wg, chunk, mesh);
 }

@@ -125,8 +125,8 @@ RenderData Game::update (Window& window, Input& I) {
 
 	world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
-	RenderData rd;
-	rd.view = view;
-	rd.window_size = I.window_size;
-	return rd;
+	return {
+		view, I.window_size,
+		world->chunks, assets, world->world_gen
+	};
 }

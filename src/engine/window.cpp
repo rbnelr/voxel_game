@@ -2,7 +2,11 @@
 #include "window.hpp"
 #include "game.hpp"
 #include "vulkan/vulkan_renderer.hpp"
+
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
+
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_vulkan.h"
 
 //// vsync and fullscreen mode
 void Window::set_vsync (bool on) {
@@ -138,7 +142,7 @@ void frameloop (Window& window) {
 
 	{
 		ZoneScopedN("Renderer::Renderer()");
-		renderer = std::make_unique<Renderer>(APPNAME, window.window);
+		renderer = std::make_unique<Renderer>(window.window, APPNAME);
 	}
 	{
 		ZoneScopedN("Game::Game()");
@@ -151,6 +155,8 @@ void frameloop (Window& window) {
 	uint64_t prev = get_timestamp();
 
 	for (;;) {
+		FrameMark;
+
 		{ // Input sampling
 			ZoneScopedN("sample_input");
 
@@ -189,8 +195,6 @@ void frameloop (Window& window) {
 		}
 
 		window.frame_counter++;
-
-		FrameMark;
 	}
 }
 

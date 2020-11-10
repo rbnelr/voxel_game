@@ -6,9 +6,7 @@
 #include "engine/camera.hpp"
 #include "graphics.hpp"
 
-struct Renderer;
-
-class Game {
+struct Game {
 	bool dbg_pause = false;
 
 	FPS_Display fps_display;
@@ -26,9 +24,8 @@ class Game {
 	bool activate_flycam = false;
 	bool trigger_place_block = false;
 
-	Graphics graphics;
+	Assets assets;
 	
-public:
 	Game ();
 
 	void imgui (Window& window, Input& I);

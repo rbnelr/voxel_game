@@ -1,15 +1,16 @@
 #pragma once
 #include "common.hpp"
 #include "chunks.hpp"
+#include "graphics.hpp"
 
 struct WorldGenerator;
-struct Graphics;
+struct Assets;
 
-static constexpr uint64_t MESHING_BLOCK_BYTESIZE = 1 * (1024 * 1024);
-static constexpr uint64_t MESHING_BLOCK_COUNT = MESHING_BLOCK_BYTESIZE / sizeof(ChunkVertex);
+static constexpr uint64_t CHUNK_SLICE_BYTESIZE = 1 * (1024 * 1024);
+static constexpr uint64_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(ChunkVertex);
 
-struct MeshingBlock {
-	ChunkVertex verts[MESHING_BLOCK_COUNT];
+struct ChunkSliceData {
+	ChunkVertex verts[CHUNK_SLICE_LENGTH];
 };
 
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
@@ -17,24 +18,24 @@ struct MeshingBlock {
 struct MeshData {
 	NO_MOVE_COPY_CLASS(MeshData) public:
 
-	static constexpr int PREALLOC_BLOCKS = 0;
+	static constexpr int PREALLOC_SLICES = 1;
 
 	ChunkVertex* next_ptr = nullptr;
 	ChunkVertex* alloc_end = nullptr;
 
-	int used_blocks = 0;
-	std::vector<MeshingBlock*> blocks;
+	int used_slices = 0;
+	std::vector<ChunkSliceData*> slices;
 
 	MeshData () {
 		// Preallocate before pushing job to threadpool so there is less calls of malloc in threads
 		// past experience has shown rapid calls to malloc can be bottleneck (presumably because of mutex contention in malloc)
-		for (int i=0; i<PREALLOC_BLOCKS; ++i)
-			alloc_block();
+		for (int i=0; i<PREALLOC_SLICES; ++i)
+			alloc_slice();
 	}
 	~MeshData () {
-		for (auto* b : blocks) {
-			ZoneScopedNC("MeshData::free_block", tracy::Color::Crimson);
-			free(b);
+		for (auto* s : slices) {
+			ZoneScopedC(tracy::Color::Crimson);
+			free(s);
 		}
 	}
 
@@ -42,25 +43,35 @@ struct MeshData {
 	// TODO: If malloc still shows to be a significant performance bottleneck adjust PREALLOC_BLOCKS
 	//       I would like to avoid reusing blocks across frames to avoid the problem of persistent memory use while no remeshing actually happens
 	void free_preallocated () {
-		for (int i=used_blocks; i<(int)blocks.size(); ++i)
-			free(blocks[i]);
-		blocks.resize(used_blocks);
+		ZoneScopedC(tracy::Color::Crimson);
+		for (int i=used_slices; i<(int)slices.size(); ++i) {
+			ZoneScopedC(tracy::Color::Crimson);
+			free(slices[i]);
+		}
+		slices.resize(used_slices);
 	}
 
-	void alloc_block () {
+	void alloc_slice () {
 		ZoneScopedC(tracy::Color::Crimson);
-		blocks.push_back( (MeshingBlock*)malloc(MESHING_BLOCK_BYTESIZE) );
+		slices.push_back( (ChunkSliceData*)malloc(CHUNK_SLICE_BYTESIZE) );
 	}
 
 	ChunkVertex* push () {
 		if (next_ptr == alloc_end) {
-			if (used_blocks == (int)blocks.size())
-				alloc_block();
+			if (used_slices == (int)slices.size())
+				alloc_slice();
+			used_slices++;
 
-			next_ptr  = blocks.back()->verts;
-			alloc_end = blocks.back()->verts + MESHING_BLOCK_COUNT;
+			next_ptr  = slices.back()->verts;
+			alloc_end = slices.back()->verts + CHUNK_SLICE_LENGTH;
 		}
 		return next_ptr++;
+	}
+
+	size_t get_vertex_count (int slice_i) {
+		if (slice_i < used_slices-1)
+			return CHUNK_SLICE_LENGTH;
+		return next_ptr - slices[used_slices-1]->verts;
 	}
 };
 
@@ -69,26 +80,4 @@ struct ChunkMesh {
 	MeshData tranparent_vertices;
 };
 
-struct RemeshChunkJob : ThreadingJob { // Chunk remesh
-	// input
-	Chunk* chunk;
-	Chunks* chunks; // not modfied
-	Graphics const* graphics;
-	WorldGenerator const* wg;
-	// output
-	ChunkMesh mesh;
-
-	RemeshChunkJob (Chunk* chunk, Chunks* chunks, Graphics const* graphics, WorldGenerator const* wg):
-		chunk{chunk}, chunks{chunks}, graphics{graphics}, wg{wg}, mesh{} {}
-	virtual ~RemeshChunkJob() = default;
-
-	virtual void execute ();
-	virtual void finalize ();
-};
-
-struct ChunkRemesher {
-	size_t remesh_chunks_count;
-
-	void queue_remeshing (Chunks& chunks, Graphics const& graphics, WorldGenerator const& wg);
-	void finish_remeshing ();
-};
+void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh);
