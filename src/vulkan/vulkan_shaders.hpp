@@ -3,6 +3,7 @@
 #include "kisslib/stl_extensions.hpp"
 #include "kisslib/serialization.hpp"
 #include "kisslib/string.hpp"
+#include "imgui/dear_imgui.hpp"
 using kiss::prints;
 using kiss::indexof;
 
@@ -189,7 +190,8 @@ namespace vk {
 				std::string source;
 				if (!kiss::load_text_file(src_filepath.c_str(), &source)) {
 					stage->compiler_msg = prints("Shader file not found \"%s\"!", src_filepath.c_str());
-					fprintf(stderr, stage->compiler_msg.c_str());
+					fprintf(stderr, "[SHADER] %s\n", stage->compiler_msg.c_str());
+					clog(ERROR, "[SHADER] %s", stage->compiler_msg.c_str());
 					return false;
 				}
 
@@ -201,8 +203,13 @@ namespace vk {
 				auto message = shaderc_result_get_error_message(res);
 				if (status != shaderc_compilation_status_success) {
 					stage->compiler_msg = prints("Compiler error:\n%s", message);
-					fprintf(stderr, stage->compiler_msg.c_str());
+					fprintf(stderr, "[SHADER] %s\n", stage->compiler_msg.c_str());
+					clog(ERROR, "[SHADER] %s", stage->compiler_msg.c_str());
 					return false;
+				} else if (message && *message != '\0') {
+					stage->compiler_msg = prints("Compiler message:\n%s", message);
+					fprintf(stderr, "[SHADER] %s\n", stage->compiler_msg.c_str());
+					clog(WARNING, "[SHADER] %s", stage->compiler_msg.c_str());
 				}
 
 				stage->compiler_msg = message;
@@ -212,7 +219,8 @@ namespace vk {
 
 				if (vkCreateShaderModule(dev, &info, nullptr, &stage->module) != VK_SUCCESS) {
 					stage->compiler_msg = prints("vkCreateShaderModule failed!");
-					fprintf(stderr, stage->compiler_msg.c_str());
+					fprintf(stderr, "%s\n", stage->compiler_msg.c_str());
+					clog(ERROR, stage->compiler_msg.c_str());
 					return false;
 				}
 

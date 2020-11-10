@@ -31,11 +31,10 @@ void Renderer::frame_begin (GLFWwindow* window) {
 void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 	ZoneScoped;
 	
-	//auto remesh_chunks_count = queue_meshing(*this, data);
+	chunk_renderer.queue_remeshing(*this, data);
 
 	auto cmds = frame_data[cur_frame].command_buffer;
 	auto framebuffer = ctx.swap_chain.images[ctx.image_index].framebuffer;
-
 
 	set_view_uniforms(data.view, data.window_size);
 
@@ -46,6 +45,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		begin_info.pInheritanceInfo = nullptr;
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmds, &begin_info));
 	}
+
+	chunk_renderer.upload_remeshed();
 
 	{
 		VkClearValue clear_vales[2] = {};
@@ -88,24 +89,12 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 				&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
 		}
 
-		//chunk_renderer.start(cur_frame, cmds);
-		//finish_meshing(remesh_chunks_count);
-		//chunk_renderer.end(cur_frame, cmds);
-
-		if (pipeline) {
-			TracyVkZone(ctx.tracy_ctx, cmds, "draw gradient_indices");
-
+		{
+			TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
+		
 			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-			VkBuffer vertex_bufs[] = { meshes[0].vkbuf };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
-
-			vkCmdBindIndexBuffer(cmds, meshes[1].vkbuf, 0, VK_INDEX_TYPE_UINT16);
-
-			//vkCmdBindDescriptorSets(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline_layout, 0, 1, &vk_descriptor_sets[cur_frame], 0, nullptr);
-
-			vkCmdDrawIndexed(cmds, (uint32_t)ARRLEN(gradient_indices), 1, 0, 0, 0);
+			
+			chunk_renderer.draw_chunks(cmds);
 		}
 
 		ctx.imgui_draw(cmds);
@@ -165,7 +154,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_n
 
 	create_frame_data();
 
-	//chunk_renderer.create(ctx.dev, physical_device);
+	chunk_renderer.create(ctx.dev, ctx.pdev, FRAMES_IN_FLIGHT);
 	shaders.init(ctx.dev);
 	
 	create_descriptor_pool();
@@ -174,8 +163,13 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_n
 
 	render_pass = create_renderpass(color_format, depth_format, msaa);
 	create_pipeline_layout();
-	create_pipeline(msaa, shaders.get(ctx.dev, "test"));
-	
+	{
+		VertexAttributes attribs;
+		ChunkVertex::attributes(attribs);
+
+		create_pipeline(msaa, shaders.get(ctx.dev, "chunks"), attribs);
+	}
+
 	upload_static_data();
 }
 Renderer::~Renderer () {
@@ -197,7 +191,7 @@ Renderer::~Renderer () {
 	vkDestroyDescriptorPool(ctx.dev, descriptor_pool, nullptr);
 
 	shaders.destroy(ctx.dev);
-	//chunk_renderer.destroy(ctx.dev);
+	chunk_renderer.destroy(ctx.dev);
 
 	for (auto& frame : frame_data) {
 		vkDestroyCommandPool(ctx.dev, frame.command_pool, nullptr);
@@ -220,7 +214,7 @@ void Renderer::upload_static_data () {
 	auto cmds = begin_init_cmds();
 	uploader.cmds = cmds;
 
-	mesh_mem = uploader.upload(ctx.dev, ctx.pdev, meshes);
+	//mesh_mem = uploader.upload(ctx.dev, ctx.pdev, meshes);
 
 	ctx.imgui_create(cmds, FRAMES_IN_FLIGHT);
 
@@ -229,9 +223,9 @@ void Renderer::upload_static_data () {
 	uploader.end(ctx.dev);
 }
 void Renderer::destroy_static_data () {
-	for (auto& b : meshes)
-		vkDestroyBuffer(ctx.dev, b.vkbuf, nullptr);
-	vkFreeMemory(ctx.dev, mesh_mem, nullptr);
+	//for (auto& b : meshes)
+	//	vkDestroyBuffer(ctx.dev, b.vkbuf, nullptr);
+	//vkFreeMemory(ctx.dev, mesh_mem, nullptr);
 
 	ctx.imgui_destroy();
 }
@@ -365,7 +359,7 @@ void Renderer::create_pipeline_layout () {
 	VK_CHECK_RESULT(vkCreatePipelineLayout(ctx.dev, &info, nullptr, &pipeline_layout));
 }
 
-void Renderer::create_pipeline (int msaa, Shader* shader) {
+void Renderer::create_pipeline (int msaa, Shader* shader, VertexAttributes& attribs) {
 	pipeline = VK_NULL_HANDLE;
 
 	if (!shader->valid)
@@ -379,9 +373,6 @@ void Renderer::create_pipeline (int msaa, Shader* shader) {
 		shader_stages[i].module = shader->stages[i].module;
 		shader_stages[i].pName = "main";
 	}
-
-	VertexAttributes attribs;
-	Vertex::attributes(attribs);
 
 	VkPipelineVertexInputStateCreateInfo vertex_input = {};
 	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;

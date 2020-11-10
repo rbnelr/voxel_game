@@ -185,6 +185,9 @@
       <Filter>kisslib\tracy</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp">
+      <Filter>vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -302,6 +305,9 @@
       <Filter>vulkan</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp" />
+    <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
+      <Filter>vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -336,17 +342,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\shaders\inc.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="..\..\..\shaders.json" />
-    <None Include="..\..\..\shaders\test.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="..\..\..\shaders\block_highlight.glsl">
-      <Filter>shaders</Filter>
-    </None>
-    <None Include="..\..\..\shaders\blocks.glsl">
       <Filter>shaders</Filter>
     </None>
     <None Include="..\..\..\shaders\common.glsl">
@@ -374,6 +371,9 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="..\..\..\shaders\skybox.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders\chunks.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

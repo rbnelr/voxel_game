@@ -92,6 +92,8 @@ VkDeviceMemory alloc_memory (VkDevice device, VkPhysicalDevice pdevice,
 
 Allocation allocate_buffer (VkDevice device, VkPhysicalDevice pdev,
 		VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props) {
+	ZoneScoped;
+
 	Allocation a;
 
 	VkBufferCreateInfo info = {};
@@ -105,12 +107,16 @@ Allocation allocate_buffer (VkDevice device, VkPhysicalDevice pdev,
 	VkMemoryRequirements mem_req;
 	vkGetBufferMemoryRequirements(device, a.buf, &mem_req);
 
-	VkMemoryAllocateInfo alloc_info = {};
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = mem_req.size;
-	alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req.memoryTypeBits, props);
+	{
+		ZoneScopedN("vkAllocateMemory");
+		
+		VkMemoryAllocateInfo alloc_info = {};
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.allocationSize = mem_req.size;
+		alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req.memoryTypeBits, props);
 
-	VK_CHECK_RESULT(vkAllocateMemory(device, &alloc_info, nullptr, &a.mem));
+		VK_CHECK_RESULT(vkAllocateMemory(device, &alloc_info, nullptr, &a.mem));
+	}
 
 	vkBindBufferMemory(device, a.buf, a.mem, 0);
 

@@ -2,7 +2,7 @@
 	"shaders_dir": "shaders/",
 	"shaders": [
 		{
-			"name": "test",
+			"name": "chunks",
 			"valid": true,
 			"stages": [
 				{
@@ -18,13 +18,16 @@
 			],
 			"src_files": [
 				{
-					"filename": "shaders/test.glsl"
+					"filename": "shaders/chunks.glsl"
 				},
 				{
-					"filename": "shaders/sub/inc.glsl"
+					"filename": "shaders/common.glsl"
 				},
 				{
-					"filename": "shaders/test.glsl"
+					"filename": "shaders/chunks.glsl"
+				},
+				{
+					"filename": "shaders/common.glsl"
 				}
 			]
 		}

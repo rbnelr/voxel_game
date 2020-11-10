@@ -3,6 +3,21 @@
 #include "chunks.hpp"
 #include "graphics.hpp"
 
+struct ChunkVertex {
+	float3	pos;
+	float2	uv;
+	int		tex_indx;
+
+	template <typename ATTRIBS>
+	static void attributes (ATTRIBS& a) {
+		int loc = 0;
+		a.init(sizeof(ChunkVertex));
+		a.template add<AttribMode::FLOAT, decltype(pos     )>(loc++, "pos"     , offsetof(ChunkVertex, pos     )); // ugh templates
+		a.template add<AttribMode::FLOAT, decltype(uv      )>(loc++, "uv"      , offsetof(ChunkVertex, uv      ));
+		a.template add<AttribMode::SINT,  decltype(tex_indx)>(loc++, "tex_indx", offsetof(ChunkVertex, tex_indx));
+	}
+};
+
 struct WorldGenerator;
 struct Assets;
 
@@ -33,7 +48,11 @@ struct MeshData {
 			alloc_slice();
 	}
 	~MeshData () {
-		for (auto* s : slices) {
+		for (auto* s : slices)
+			free_slice(s);
+	}
+	static void free_slice (ChunkSliceData* s) {
+		if (s) {
 			ZoneScopedC(tracy::Color::Crimson);
 			free(s);
 		}
@@ -44,10 +63,8 @@ struct MeshData {
 	//       I would like to avoid reusing blocks across frames to avoid the problem of persistent memory use while no remeshing actually happens
 	void free_preallocated () {
 		ZoneScopedC(tracy::Color::Crimson);
-		for (int i=used_slices; i<(int)slices.size(); ++i) {
-			ZoneScopedC(tracy::Color::Crimson);
-			free(slices[i]);
-		}
+		for (int i=used_slices; i<(int)slices.size(); ++i)
+			free_slice(slices[i]);
 		slices.resize(used_slices);
 	}
 
@@ -68,10 +85,10 @@ struct MeshData {
 		return next_ptr++;
 	}
 
-	size_t get_vertex_count (int slice_i) {
+	uint32_t get_vertex_count (int slice_i) {
 		if (slice_i < used_slices-1)
-			return CHUNK_SLICE_LENGTH;
-		return next_ptr - slices[used_slices-1]->verts;
+			return (uint32_t)CHUNK_SLICE_LENGTH;
+		return (uint32_t)(next_ptr - slices[used_slices-1]->verts);
 	}
 };
 

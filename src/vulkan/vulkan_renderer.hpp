@@ -3,7 +3,8 @@
 #include "vulkan_helper.hpp"
 #include "vulkan_shaders.hpp"
 #include "vulkan_window.hpp"
-#include "chunk_mesher.hpp"
+#include "chunk_renderer.hpp"
+#include "graphics.hpp"
 #include "engine/camera.hpp"
 
 #include "TracyVulkan.hpp"
@@ -44,131 +45,6 @@ struct ViewUniforms {
 		this->viewport_size = (float2)viewport_size;
 	}
 };
-
-struct ChunkMeshSlice {
-	size_t		vertices;
-};
-
-/*
-struct ChunkRenderer {
-	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull*1024); // size of vulkan allocations
-
-	struct FrameData {
-		Allocation staging_buf;
-	};
-
-	std::vector<Allocation>	allocs;
-	std::vector<FrameData>	frames;
-
-	void create (VkDevice dev, VkPhysicalDevice pdev) {
-		for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
-			frames[i].staging_buf = allocate_buffer(dev, pdev, ALLOC_SIZE,
-				VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		}
-		allocs.push_back(allocate_buffer(dev, pdev, ALLOC_SIZE,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-	}
-	void destroy (VkDevice dev) {
-		for (auto& f : frames) {
-			vkDestroyBuffer(dev, f.staging_buf.buf, nullptr);
-			vkFreeMemory(dev, f.staging_buf.mem, nullptr);
-		}
-		for (auto& a : allocs) {
-			vkDestroyBuffer(dev, a.buf, nullptr);
-			vkFreeMemory(dev, a.mem, nullptr);
-		}
-	}
-
-	bool stop;
-	size_t total_count;
-
-	void start (int cur_frame, VkCommandBuffer cmds) {
-		stop = false;
-		total_count = 0;
-	}
-
-	void upload_slices (Chunks& chunks, Chunk* chunk, MeshData& mesh, Renderer& r) {
-		ZoneScoped;
-
-		if (stop)
-			return;
-
-		for (auto slice_id : chunk->mesh_slices)
-			chunks.slices_alloc.free(slice_id);
-		chunk->mesh_slices.clear();
-
-		size_t total_count = 0;
-
-		for (int slice=0; slice < mesh.used_slices; ++slice) {
-			size_t count = mesh.get_vertex_count(slice);
-
-			auto slice_id = chunks.slices_alloc.alloc();
-			chunk->mesh_slices.push_back(slice_id);
-
-			total_count += count;
-
-			stop = true;
-			break;
-		}
-
-		if (total_count > 0) {
-			this->total_count = total_count;
-
-			auto& frame = frames[r.cur_frame];
-			auto& cmds = r.frame_data[r.cur_frame].command_buffer;
-
-			void* ptr;
-			vkMapMemory(r.device, frame.staging_buf.mem, 0, sizeof(ViewUniforms), 0, &ptr);
-			memcpy(ptr, mesh.slices[0]->verts, sizeof(mesh.slices[0]));
-			vkUnmapMemory(r.device, frame.staging_buf.mem);
-
-			VkBufferCopy copy_region = {};
-			copy_region.srcOffset = 0;
-			copy_region.dstOffset = 0;
-			copy_region.size = sizeof(mesh.slices[0]);
-			vkCmdCopyBuffer(cmds, frame.staging_buf.buf, allocs[0].buf, 1, &copy_region);
-		}
-	}
-
-	void end (int cur_frame, VkCommandBuffer cmds) {
-
-	}
-
-	size_t queue_meshing (RenderData& data) {
-		ZoneScoped;
-
-		std::vector<std::unique_ptr<ThreadingJob>> remesh_jobs;
-		{
-			ZoneScopedN("chunks_to_remesh iterate all chunks");
-			for (chunk_id id=0; id<data.chunks.max_id; ++id) {
-				if ((data.chunks[id].flags & Chunk::REMESH) == 0) continue;
-				remesh_jobs.push_back( std::make_unique<RemeshChunkJob>(&data.chunks[id], data.chunks, data.assets, data.wg, this) );
-			}
-		}
-
-		// remesh all chunks in parallel
-		parallelism_threadpool.jobs.push_n(remesh_jobs.data(), remesh_jobs.size());
-
-		return remesh_jobs.size();
-	}
-
-	void finish_meshing (size_t remesh_chunks_count) {
-		ZoneScoped;
-
-		for (size_t result_count=0; result_count < remesh_chunks_count; ) {
-			std::unique_ptr<ThreadingJob> results[64];
-			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
-
-			for (size_t i=0; i<count; ++i)
-				results[i]->finalize();
-
-			result_count += count;
-		}
-	}
-};
-*/
 
 struct UploadData {
 	void* data;
@@ -310,33 +186,7 @@ struct Renderer {
 	VkPipelineLayout			pipeline_layout;
 	VkPipeline					pipeline;
 
-	//ChunkRenderer				chunk_renderer;
-
-	struct Vertex {
-		float2	pos;
-		lrgb	col;
-		
-		static void attributes (VertexAttributes& a) {
-			int loc = 0;
-			a.init(sizeof(Vertex));
-			a.add(loc++, "pos", AttribFormat::FLOAT2, offsetof(Vertex, pos));
-			a.add(loc++, "col", AttribFormat::FLOAT3, offsetof(Vertex, col));
-		}
-	};
-	Vertex gradient_vertices[4] = {
-		{ float2(-0.8f, -0.8f), lrgb(0,0,0) },
-		{ float2(+0.8f, -0.8f), lrgb(1,1,1) },
-		{ float2(+0.8f, +0.8f), lrgb(1,1,1) },
-		{ float2(-0.8f, +0.8f), lrgb(0,0,0) },
-	};
-	uint16_t gradient_indices[6] = {
-		1,2,0, 0,2,3,
-	};
-
-	std::vector<UploadData> meshes = {
-		{ gradient_vertices, sizeof(gradient_vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT },
-		{ gradient_indices , sizeof(gradient_indices) , VK_BUFFER_USAGE_INDEX_BUFFER_BIT },
-	};
+	ChunkRenderer				chunk_renderer;
 
 	Renderer (GLFWwindow* window, char const* app_name);
 	~Renderer ();
@@ -360,7 +210,7 @@ struct Renderer {
 
 	void create_pipeline_layout ();
 
-	void create_pipeline (int msaa, Shader* shader);
+	void create_pipeline (int msaa, Shader* shader, VertexAttributes& attribs);
 	
 	//// Create per-frame data
 	void create_frame_data ();
@@ -378,34 +228,6 @@ struct Renderer {
 	VkCommandBuffer begin_init_cmds ();
 	void end_init_cmds (VkCommandBuffer buf);
 };
-
-/*
-struct RemeshChunkJob : ThreadingJob { // Chunk remesh
-	// input
-	Chunk*			chunk;
-	Chunks&			chunks;
-	Assets			const& assets;
-	WorldGenerator	const& wg;
-	Renderer&		renderer;
-	// output
-	ChunkMesh		mesh;
-
-	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, Renderer& renderer):
-		chunk{chunk}, chunks{chunks}, assets{assets}, wg{wg}, renderer{renderer}, mesh{} {}
-	virtual ~RemeshChunkJob() = default;
-
-	virtual void execute () {
-		mesh_chunk(assets, wg, chunk, &mesh);
-	}
-	virtual void finalize () {
-		mesh.opaque_vertices.free_preallocated();
-		mesh.tranparent_vertices.free_preallocated();
-
-		renderer.chunk_renderer.upload_slices(chunks, chunk, mesh.opaque_vertices, renderer);
-
-		chunk->flags &= ~Chunk::REMESH;
-	}
-};*/
 
 } // namespace vk
 

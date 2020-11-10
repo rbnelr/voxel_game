@@ -3,25 +3,15 @@
 #include "engine/camera.hpp"
 #include "chunks.hpp"
 
-struct ChunkVertex {
-	float3	pos_model;
-	float2	uv;
-	uint8	tex_indx;
-	uint8	block_light;
-	uint8	sky_light;
-	uint8	hp;
-
-	//static void bind (Attributes& a) {
-	//	int cur = 0;
-	//	a.add    <decltype(pos_model  )>(cur++, "pos_model" ,  sizeof(Vertex), offsetof(Vertex, pos_model  ));
-	//	a.add    <decltype(uv         )>(cur++, "uv",          sizeof(Vertex), offsetof(Vertex, uv         ));
-	//	a.add_int<decltype(tex_indx   )>(cur++, "tex_indx",    sizeof(Vertex), offsetof(Vertex, tex_indx   ));
-	//	a.add    <decltype(block_light)>(cur++, "block_light", sizeof(Vertex), offsetof(Vertex, block_light), true);
-	//	a.add    <decltype(sky_light  )>(cur++, "sky_light",   sizeof(Vertex), offsetof(Vertex, sky_light  ), true);
-	//	a.add    <decltype(hp         )>(cur++, "hp",          sizeof(Vertex), offsetof(Vertex, hp         ), true);
-	//}
+enum class AttribMode {
+	FLOAT,		// simply pass float to shader
+	SINT,		// simply pass sint to shader
+	UINT,		// simply pass uint to shader
+	SINT2FLT,	// convert sint to float 
+	UINT2FLT,	// convert uint to float
+	SNORM,		// sint turns into [-1, 1] float (ex. from [-127, +127], note that -127 instead of -128)
+	UNORM,		// uint turns into [0, 1] float (ex. from [0, 255])
 };
-
 
 struct BlockTileInfo {
 	int base_index;

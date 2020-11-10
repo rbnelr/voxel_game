@@ -89,9 +89,9 @@ struct ThreadChunkMesher {
 
 	static constexpr float2 uv[4]   = { {0,0}, {1,0}, {1,1}, {0,1} };
 
-	static constexpr int tri_oder[2][6] = {
+	static constexpr int tri_oder[1][6] = {
 		{ 0,1,3, 3,1,2 },
-		{ 1,2,0, 0,2,3 },
+	//	{ 1,2,0, 0,2,3 },
 	};
 
 	static constexpr int offsets[6] = {
@@ -110,24 +110,17 @@ struct ThreadChunkMesher {
 		float3 const* pf = posf[facei];
 		int3 const* p = pos[facei];
 
-		auto hp = chunk_data->hp[cur];
+		int tex_indx = tile.calc_texture_index(facei);
 
 		for (int i=0; i<4; ++i)
-			vert[i].pos_model	= block_pos + pf[i];
+			vert[i].pos			= block_pos + pf[i];
 		for (int i=0; i<4; ++i)
 			vert[i].uv			= uv[i];
 		for (int i=0; i<4; ++i)
-			vert[i].tex_indx	= (uint8)tile.calc_texture_index(facei);
-		for (int i=0; i<4; ++i)
-			vert[i].block_light	= calc_block_light(facei, p[i]);
-		for (int i=0; i<4; ++i)
-			vert[i].sky_light	= calc_sky_light(facei, p[i]);
-		for (int i=0; i<4; ++i)
-			vert[i].hp			= hp;
+			vert[i].tex_indx	= tex_indx;
 
-		bool b = vert[0].sky_light + vert[2].sky_light >= vert[1].sky_light + vert[3].sky_light;
-
-		int const* order = tri_oder[(int)b];
+		//int const* order = tri_oder[(int)b];
+		int const* order = tri_oder[0];
 		for (int i=0; i<6; ++i) {
 			*out->push() = vert[order[i]];
 		}

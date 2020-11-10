@@ -3,6 +3,7 @@
 #include "shaderc/shaderc.h"
 #include "kisslib/macros.hpp"
 #include "kisslib/kissmath.hpp"
+#include "graphics.hpp" // for AttribMode
 #include <vector>
 #include <stdexcept>
 
@@ -36,12 +37,28 @@ inline std::vector<T> get_vector (FUNC func, ARGS... args) {
 }
 
 ////
-enum class AttribFormat : int {
-	FLOAT1		= VK_FORMAT_R32_SFLOAT,
-	FLOAT2		= VK_FORMAT_R32G32_SFLOAT,
-	FLOAT3		= VK_FORMAT_R32G32B32_SFLOAT,
-	FLOAT4		= VK_FORMAT_R32G32B32A32_SFLOAT,
-};
+template <AttribMode M, typename T>
+inline constexpr VkFormat get_format ();
+
+template<> inline VkFormat get_format<AttribMode::FLOAT, float > () { return VK_FORMAT_R32_SFLOAT; }
+template<> inline VkFormat get_format<AttribMode::FLOAT, float2> () { return VK_FORMAT_R32G32_SFLOAT; }
+template<> inline VkFormat get_format<AttribMode::FLOAT, float3> () { return VK_FORMAT_R32G32B32_SFLOAT; }
+template<> inline VkFormat get_format<AttribMode::FLOAT, float4> () { return VK_FORMAT_R32G32B32A32_SFLOAT; }
+
+template<> inline VkFormat get_format<AttribMode::SINT, int > () { return VK_FORMAT_R32_SINT; }
+template<> inline VkFormat get_format<AttribMode::SINT, int2> () { return VK_FORMAT_R32G32_SINT; }
+template<> inline VkFormat get_format<AttribMode::SINT, int3> () { return VK_FORMAT_R32G32B32_SINT; }
+template<> inline VkFormat get_format<AttribMode::SINT, int4> () { return VK_FORMAT_R32G32B32A32_SINT; }
+
+template<> inline VkFormat get_format<AttribMode::UINT, uint8 > () { return VK_FORMAT_R8_UINT; }
+template<> inline VkFormat get_format<AttribMode::UINT, uint8v2> () { return VK_FORMAT_R8G8_UINT; }
+template<> inline VkFormat get_format<AttribMode::UINT, uint8v3> () { return VK_FORMAT_R8G8B8_UINT; }
+template<> inline VkFormat get_format<AttribMode::UINT, uint8v4> () { return VK_FORMAT_R8G8B8A8_UINT; }
+
+template<> inline VkFormat get_format<AttribMode::UNORM, uint8  > () { return VK_FORMAT_R8_UNORM; }
+template<> inline VkFormat get_format<AttribMode::UNORM, uint8v2> () { return VK_FORMAT_R8G8_UNORM; }
+template<> inline VkFormat get_format<AttribMode::UNORM, uint8v3> () { return VK_FORMAT_R8G8B8_UNORM; }
+template<> inline VkFormat get_format<AttribMode::UNORM, uint8v4> () { return VK_FORMAT_R8G8B8A8_UNORM; }
 
 struct VertexAttributes {
 	VkVertexInputBindingDescription descr;
@@ -54,13 +71,18 @@ struct VertexAttributes {
 		descr.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 	}
 
-	void add (int location, char const* name, AttribFormat format, size_t offset) {
+	void add (VkFormat format, int location, char const* name, size_t offset) {
 		VkVertexInputAttributeDescription a = {};
 		a.binding = 0;
 		a.location = (uint32_t)location;
-		a.format = VK_FORMAT_R32G32B32_SFLOAT;
+		a.format = format;
 		a.offset = (uint32_t)offset;
 		attribs.push_back(a);
+	}
+
+	template <AttribMode M, typename T>
+	void add (int location, char const* name, size_t offset) {
+		add(get_format<M,T>(), location, name, offset);
 	}
 };
 
