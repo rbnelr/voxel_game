@@ -46,7 +46,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmds, &begin_info));
 	}
 
-	chunk_renderer.upload_remeshed();
+	chunk_renderer.upload_remeshed(ctx.dev, ctx.pdev, cur_frame, cmds);
 
 	{
 		VkClearValue clear_vales[2] = {};
@@ -89,13 +89,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 				&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
 		}
 
-		{
-			TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
-		
-			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-			
-			chunk_renderer.draw_chunks(cmds);
-		}
+		chunk_renderer.draw_chunks(cmds, data.chunks, pipeline, pipeline_layout);
 
 		ctx.imgui_draw(cmds);
 	}
@@ -349,12 +343,19 @@ void Renderer::destroy_ubo_buffers () {
 }
 
 void Renderer::create_pipeline_layout () {
+	VkDescriptorSetLayout sets[] = { descriptor_layout };
+
+	VkPushConstantRange pcs[1] = {};
+	pcs[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	pcs[0].offset = 0;
+	pcs[0].size = sizeof(float3);
+
 	VkPipelineLayoutCreateInfo info{};
 	info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	info.setLayoutCount = 1;
-	info.pSetLayouts = &descriptor_layout;
-	info.pushConstantRangeCount = 0;
-	info.pPushConstantRanges = nullptr;
+	info.setLayoutCount = ARRLEN(sets);
+	info.pSetLayouts = sets;
+	info.pushConstantRangeCount = ARRLEN(pcs);
+	info.pPushConstantRanges = pcs;
 
 	VK_CHECK_RESULT(vkCreatePipelineLayout(ctx.dev, &info, nullptr, &pipeline_layout));
 }

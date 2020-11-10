@@ -26,14 +26,9 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 void ChunkRenderer::upload_slices (Chunks& chunks, Chunk* chunk, MeshData& mesh, Renderer& r) {
 	ZoneScoped;
 
-	if (stop)
-		return;
-
 	for (auto slice_id : chunk->mesh_slices)
 		chunks.slices_alloc.free(slice_id);
 	chunk->mesh_slices.clear();
-
-	std::vector<UploadSlice> uploads;
 
 	for (int slice = 0; slice < mesh.used_slices; ++slice) {
 		auto count = mesh.get_vertex_count(slice);
@@ -41,34 +36,10 @@ void ChunkRenderer::upload_slices (Chunks& chunks, Chunk* chunk, MeshData& mesh,
 		auto slice_id = chunks.slices_alloc.alloc();
 		chunk->mesh_slices.push_back(slice_id);
 
-		uploads.push_back({ mesh.slices[slice], count });
+		uploads.push_back({ slice_id, mesh.slices[slice], count });
 		mesh.slices[slice] = nullptr;
 
 		slices.push_back({ count });
-
-		stop = true;
-		break;
-	}
-
-	if (uploads.size() > 0) {
-		auto& frame = frames[r.cur_frame];
-		auto& cmds = r.frame_data[r.cur_frame].command_buffer;
-
-		auto* vertices = uploads[0].data->verts;
-		size_t size = sizeof(vertices[0]) * uploads[0].vertex_count;
-
-		void* ptr;
-		vkMapMemory(r.ctx.dev, frame.staging_buf.mem, 0, ALLOC_SIZE, 0, &ptr);
-		memcpy(ptr, vertices, size);
-		vkUnmapMemory(r.ctx.dev, frame.staging_buf.mem);
-
-		MeshData::free_slice(uploads[0].data);
-
-		VkBufferCopy copy_region = {};
-		copy_region.srcOffset = 0;
-		copy_region.dstOffset = 0;
-		copy_region.size = size;
-		vkCmdCopyBuffer(cmds, frame.staging_buf.buf, allocs[0].buf, 1, &copy_region);
 	}
 }
 
@@ -81,10 +52,8 @@ void RemeshChunkJob::finalize () {
 	chunk->flags &= ~Chunk::REMESH;
 }
 
-void ChunkRenderer::upload_remeshed () {
+void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cur_frame, VkCommandBuffer cmds) {
 	ZoneScoped;
-
-	//stop = false;
 
 	for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
 		std::unique_ptr<ThreadingJob> results[64];
@@ -95,18 +64,84 @@ void ChunkRenderer::upload_remeshed () {
 
 		result_count += count;
 	}
+
+	{
+		auto& frame = frames[cur_frame];
+
+		int buf = 0; // staging buffer
+		int slicei = 0;
+
+		// for staging buffers
+		for (; slicei < (int)uploads.size(); ++buf) {
+
+			if (buf >= (int)frame.staging_bufs.size())
+				frame.staging_bufs.push_back( new_staging_buffer(dev, pdev) );
+			auto& staging_buf = frame.staging_bufs[buf];
+
+			char* ptr;
+			vkMapMemory(dev, staging_buf.mem, 0, ALLOC_SIZE, 0, (void**)&ptr);
+
+			size_t offs = 0;
+
+			// for staging buffers
+			for (; slicei < (int)uploads.size(); ++slicei) {
+				auto& upload = uploads[slicei];
+
+				auto* vertices = upload.data->verts;
+				size_t size = sizeof(ChunkVertex) * upload.vertex_count;
+
+				if (offs + size > ALLOC_SIZE)
+					break; // staging buffer would overflow, put this into next one
+
+				memcpy(ptr + offs, vertices, size);
+
+				MeshData::free_slice(upload.data);
+
+				if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
+					allocs.push_back( new_alloc(dev, pdev) );
+
+				uint32_t dst_offset;
+				VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
+
+				VkBufferCopy copy_region = {};
+				copy_region.srcOffset = offs;
+				copy_region.dstOffset = dst_offset * sizeof(ChunkVertex);
+				copy_region.size = size;
+				vkCmdCopyBuffer(cmds, staging_buf.buf, dst_buf, 1, &copy_region);
+
+				offs += size;
+			}
+
+			vkUnmapMemory(dev, staging_buf.mem);
+		}
+
+		uploads.clear();
+	}
 }
 
-void ChunkRenderer::draw_chunks (VkCommandBuffer cmds) {
+void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipeline pipeline, VkPipelineLayout layout) {
 	ZoneScoped;
+	TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
 
-	for (uint32_t id=0; id < (uint32_t)slices.size(); ++id) {
+	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-		VkBuffer vertex_bufs[] = { allocs[0].buf };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+		if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
 
-		vkCmdDraw(cmds, slices[id].vertex_count, 1, 0, 0);
+		for (auto& sid : chunks[cid].mesh_slices) {
+			uint32_t offset;
+			VkBuffer buf = calc_slice_buf(sid, &offset);
+
+			VkBuffer vertex_bufs[] = { buf };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+
+			float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
+
+			vkCmdPushConstants(cmds, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
+			
+			vkCmdDraw(cmds, slices[cid].vertex_count, 1, offset, 0);
+		}
 	}
 }
 

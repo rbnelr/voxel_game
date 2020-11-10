@@ -6,6 +6,10 @@
 	layout(location = 1) in vec2	uv;
 	layout(location = 2) in int		tex_indx;
 
+	layout(push_constant) uniform PC {
+		vec3 chunk_pos;
+	};
+
 	//uniform vec3 chunk_pos;
 	//uniform float sky_light_reduce;
 
@@ -20,7 +24,7 @@
 	}
 
 	void main () {
-		gl_Position =		world_to_clip * vec4(pos_model/* + chunk_pos*/, 1);
+		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
 
 		vs.uv =		        uv;
 		vs.tex_indx =		float(tex_indx);
