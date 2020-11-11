@@ -47,10 +47,10 @@ layout(location = 0) vs2fs VS {
 		
 	#ifdef ALPHA_TEST
 		if (col.a <= ALPHA_TEST_THRES / 255.0)
-			DISCARD();
+			discard;
 		col.a = 1.0;
 	#endif
 
-		FRAG_COL(col);
+		frag_col = col;
 	}
 #endif

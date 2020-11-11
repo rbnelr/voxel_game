@@ -80,7 +80,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		{
 			VkClearValue clear_vales[2] = {};
 			clear_vales[0].color = { .01f, .011f, .012f, 1 };
-			clear_vales[1].depthStencil = { 1.0f, 0 };
+			clear_vales[1].depthStencil = { 0.0f, 0 }; // use reverse depth
 
 			VkRenderPassBeginInfo render_pass_info = {};
 			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -513,7 +513,7 @@ VkPipeline Renderer::create_main_pipeline (Shader* shader, VkRenderPass renderpa
 	VkPipelineRasterizationStateCreateInfo rasterizer = {};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE; // TODO: enable for alpha test
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
@@ -534,9 +534,9 @@ VkPipeline Renderer::create_main_pipeline (Shader* shader, VkRenderPass renderpa
 
 	VkPipelineDepthStencilStateCreateInfo depth_stencil = {};
 	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depth_stencil.depthTestEnable = 0;//VK_TRUE;
-	depth_stencil.depthWriteEnable = 0;//VK_TRUE;
-	depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depth_stencil.depthTestEnable = VK_TRUE;
+	depth_stencil.depthWriteEnable = VK_TRUE;
+	depth_stencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL; // use reverse depth
 	depth_stencil.depthBoundsTestEnable = VK_FALSE;
 	depth_stencil.minDepthBounds = 0.0f;
 	depth_stencil.maxDepthBounds = 1.0f;
