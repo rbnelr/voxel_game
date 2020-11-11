@@ -173,7 +173,9 @@ void frameloop (Window& window) {
 			renderer->frame_begin(window.window);
 			imgui_begin_frame(window);
 
-			game->imgui(window, window.input);
+			game->imgui(window, window.input,
+				std::bind(&Renderer::renderscale_imgui, renderer.get()
+			));
 
 			if (g_imgui.show_demo_window)
 				ImGui::ShowDemoWindow(&g_imgui.show_demo_window);

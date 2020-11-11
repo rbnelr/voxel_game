@@ -56,14 +56,6 @@ VkFormat find_supported_format (VkPhysicalDevice device, std::initializer_list<V
 	throw std::runtime_error("[Vulkan] Fatal error: No suitable format found");
 }
 
-VkFormat find_depth_format (VkPhysicalDevice device) {
-	return find_supported_format(device,
-		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-	);
-}
-
 VkCommandPool create_one_time_command_pool (VkDevice device, uint32_t queue_family) {
 	VkCommandPool pool;
 

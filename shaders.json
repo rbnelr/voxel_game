@@ -30,6 +30,36 @@
 					"filename": "shaders/common.glsl"
 				}
 			]
+		},
+		{
+			"name": "rescale",
+			"valid": true,
+			"stages": [
+				{
+					"stage": "vertex",
+					"override_src": "",
+					"compiler_msg": ""
+				},
+				{
+					"stage": "fragment",
+					"override_src": "",
+					"compiler_msg": ""
+				}
+			],
+			"src_files": [
+				{
+					"filename": "shaders/rescale.glsl"
+				},
+				{
+					"filename": "shaders/common.glsl"
+				},
+				{
+					"filename": "shaders/rescale.glsl"
+				},
+				{
+					"filename": "shaders/common.glsl"
+				}
+			]
 		}
 	]
 }

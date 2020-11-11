@@ -26,15 +26,43 @@ void Renderer::frame_begin (GLFWwindow* window) {
 	vkResetCommandPool(ctx.dev, frame.command_pool, 0);
 
 	ctx.aquire_image(frame.image_available_semaphore);
+
+	if (ctx.swap_chain.format.format != wnd_color_format) {
+		// swapchain recreation could possibly change swap chain image format
+		wnd_color_format = ctx.swap_chain.format.format;
+		// recreate final renderpass (pipelines can be kept because they only care about compatible renderpasses)
+		vkDestroyRenderPass(ctx.dev, ui_renderpass, nullptr);
+		ui_renderpass = create_ui_renderpass(wnd_color_format);
+	}
+
+	recreate_main_framebuffer(ctx.wnd_size);
+}
+
+void set_viewport (VkCommandBuffer cmds, int2 size) {
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width  = (float)size.x;
+	viewport.height = (float)size.y;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 };
+	scissor.extent = { (uint32_t)size.x, (uint32_t)size.y };
+
+	vkCmdSetViewport(cmds, 0, 1, &viewport);
+	vkCmdSetScissor(cmds, 0, 1, &scissor);
 }
 
 void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 	ZoneScoped;
 	
+	////
 	chunk_renderer.queue_remeshing(*this, data);
 
 	auto cmds = frame_data[cur_frame].command_buffer;
-	auto framebuffer = ctx.swap_chain.images[ctx.image_index].framebuffer;
+	auto wnd_framebuffer = ctx.swap_chain.images[ctx.image_index].framebuffer;
 
 	set_view_uniforms(data.view, data.window_size);
 
@@ -48,55 +76,68 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 
 	chunk_renderer.upload_remeshed(ctx.dev, ctx.pdev, cur_frame, cmds);
 
-	{
-		VkClearValue clear_vales[2] = {};
-		clear_vales[0].color = { .01f, .011f, .012f, 1 };
-		clear_vales[1].depthStencil = { 1.0f, 0 };
-
-		VkRenderPassBeginInfo render_pass_info = {};
-		render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		render_pass_info.renderPass = render_pass;
-		render_pass_info.framebuffer = framebuffer;
-		render_pass_info.renderArea.offset = { 0, 0 };
-		render_pass_info.renderArea.extent = ctx.swap_chain.extent;
-		render_pass_info.clearValueCount = ARRLEN(clear_vales);
-		render_pass_info.pClearValues = clear_vales;
-		vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-	}
-
-	{
-		TracyVkZone(ctx.tracy_ctx, cmds, "render pass 1");
-
+	{ // main render pass
 		{
-			VkViewport viewport = {};
-			viewport.x = 0.0f;
-			viewport.y = 0.0f;
-			viewport.width  = (float)ctx.swap_chain.extent.width;
-			viewport.height = (float)ctx.swap_chain.extent.height;
-			viewport.minDepth = 0.0f;
-			viewport.maxDepth = 1.0f;
+			VkClearValue clear_vales[2] = {};
+			clear_vales[0].color = { .01f, .011f, .012f, 1 };
+			clear_vales[1].depthStencil = { 1.0f, 0 };
 
-			VkRect2D scissor = {};
-			scissor.offset = { 0, 0 };
-			scissor.extent = ctx.swap_chain.extent;
-
-			vkCmdSetViewport(cmds, 0, 1, &viewport);
-			vkCmdSetScissor(cmds, 0, 1, &scissor);
+			VkRenderPassBeginInfo render_pass_info = {};
+			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			render_pass_info.renderPass = main_renderpass;
+			render_pass_info.framebuffer = main_framebuffer;
+			render_pass_info.renderArea.offset = { 0, 0 };
+			render_pass_info.renderArea.extent = { (uint32_t)renderscale_size.x, (uint32_t)renderscale_size.y };
+			render_pass_info.clearValueCount = ARRLEN(clear_vales);
+			render_pass_info.pClearValues = clear_vales;
+			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
+		TracyVkZone(ctx.tracy_ctx, cmds, "main_renderpass");
+
+		set_viewport(cmds, renderscale_size);
+
 		{
-			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1,
+			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, main_pipeline_layout, 0, 1,
 				&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
 		}
 
-		chunk_renderer.draw_chunks(cmds, data.chunks, pipeline, pipeline_layout);
+		chunk_renderer.draw_chunks(cmds, data.chunks, main_pipeline, main_pipeline_layout);
+	}
+	vkCmdEndRenderPass(cmds);
+
+	{ // ui render pass
+		{
+			VkRenderPassBeginInfo render_pass_info = {};
+			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			render_pass_info.renderPass = ui_renderpass;
+			render_pass_info.framebuffer = wnd_framebuffer;
+			render_pass_info.renderArea.offset = { 0, 0 };
+			render_pass_info.renderArea.extent = { (uint32_t)ctx.wnd_size.x, (uint32_t)ctx.wnd_size.y };
+			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+		}
+		TracyVkZone(ctx.tracy_ctx, cmds, "ui_renderpass");
+
+		set_viewport(cmds, ctx.wnd_size);
+
+		{
+			TracyVkZone(ctx.tracy_ctx, cmds, "rescale draw");
+
+			{
+				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 0, 1,
+					&rescale_descriptor_set, 0, nullptr);
+			}
+
+			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline);
+
+			vkCmdDraw(cmds, 3, 1, 0, 0);
+		}
 
 		ctx.imgui_draw(cmds);
 	}
+	vkCmdEndRenderPass(cmds);
 
 	TracyVkCollect(ctx.tracy_ctx, cmds);
-
-	vkCmdEndRenderPass(cmds);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(cmds));
 
@@ -133,8 +174,10 @@ void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
 	ZoneScoped;
 
-	color_format = ctx.swap_chain.format.format;
-	depth_format = find_depth_format(ctx.pdev);
+	wnd_color_format = ctx.swap_chain.format.format;
+
+	fb_color_format = find_color_format();
+	fb_depth_format = find_depth_format();
 
 	max_msaa_samples = get_max_usable_multisample_count(ctx.pdev);
 	msaa = 1;
@@ -153,15 +196,29 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_n
 	
 	create_descriptor_pool();
 	create_ubo_buffers();
-	create_descriptors();
-
-	render_pass = create_renderpass(color_format, depth_format, msaa);
-	create_pipeline_layout();
+	
 	{
-		VertexAttributes attribs;
-		ChunkVertex::attributes(attribs);
+		create_main_descriptors();
 
-		create_pipeline(msaa, shaders.get(ctx.dev, "chunks"), attribs);
+		main_renderpass = create_main_renderpass(fb_color_format, fb_depth_format, msaa);
+
+		main_pipeline_layout = create_pipeline_layout(ctx.dev,
+			{ main_descriptor_layout },
+			{{ VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3) }});
+
+		main_pipeline = create_main_pipeline(shaders.get(ctx.dev, "chunks"),
+			main_renderpass, main_pipeline_layout, msaa, make_attribs<ChunkVertex>());
+	}
+
+	{
+		create_rescale_descriptors();
+
+		ui_renderpass = create_ui_renderpass(wnd_color_format);
+
+		rescale_pipeline_layout = create_pipeline_layout(ctx.dev,
+			{ rescale_descriptor_layout }, {});
+		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
+			ui_renderpass, rescale_pipeline_layout);
 	}
 
 	upload_static_data();
@@ -176,12 +233,21 @@ Renderer::~Renderer () {
 
 	destroy_ubo_buffers();
 
-	if (pipeline)
-		vkDestroyPipeline(ctx.dev, pipeline, nullptr);
-	vkDestroyPipelineLayout(ctx.dev, pipeline_layout, nullptr);
-	vkDestroyRenderPass(ctx.dev, render_pass, nullptr);
+	if (rescale_pipeline)
+		vkDestroyPipeline(ctx.dev, rescale_pipeline, nullptr);
+	vkDestroyPipelineLayout(ctx.dev, rescale_pipeline_layout, nullptr);
+	vkDestroyDescriptorSetLayout(ctx.dev, rescale_descriptor_layout, nullptr);
 
-	vkDestroyDescriptorSetLayout(ctx.dev, descriptor_layout, nullptr);
+	if (main_pipeline)
+		vkDestroyPipeline(ctx.dev, main_pipeline, nullptr);
+	vkDestroyPipelineLayout(ctx.dev, main_pipeline_layout, nullptr);
+	vkDestroyDescriptorSetLayout(ctx.dev, main_descriptor_layout, nullptr);
+
+	destroy_main_framebuffer();
+
+	vkDestroyRenderPass(ctx.dev, main_renderpass, nullptr);
+	vkDestroyRenderPass(ctx.dev, ui_renderpass, nullptr);
+
 	vkDestroyDescriptorPool(ctx.dev, descriptor_pool, nullptr);
 
 	shaders.destroy(ctx.dev);
@@ -225,79 +291,6 @@ void Renderer::destroy_static_data () {
 }
 
 ////
-void Renderer::create_descriptor_pool () {
-	VkDescriptorPoolSize pool_sizes[2] = {};
-	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_sizes[0].descriptorCount = (uint32_t)SWAP_CHAIN_SIZE; // for imgui TODO: FRAMES_IN_FLIGHT instead, or even just 1? imgui won't change the image sampler per frame
-
-	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT;
-
-	VkDescriptorPoolCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	info.poolSizeCount = ARRLEN(pool_sizes);
-	info.pPoolSizes = pool_sizes;
-	info.maxSets = (uint32_t)(
-		SWAP_CHAIN_SIZE // for imgui
-		+ FRAMES_IN_FLIGHT); // for ubo
-
-	VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
-}
-
-void Renderer::create_descriptors () {
-	{ // create descriptor layout
-		VkDescriptorSetLayoutBinding binding = {};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding.descriptorCount = 1;
-		binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		//binding.pImmutableSamplers = nullptr;
-
-		VkDescriptorSetLayoutCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		info.bindingCount = 1;
-		info.pBindings = &binding;
-
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &descriptor_layout));
-	}
-
-	{ // create descriptor sets
-		VkDescriptorSetLayout layouts[FRAMES_IN_FLIGHT];
-		for (auto& l : layouts)
-			l = descriptor_layout;
-
-		VkDescriptorSetAllocateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		info.descriptorPool = descriptor_pool;
-		info.descriptorSetCount = FRAMES_IN_FLIGHT;
-		info.pSetLayouts = layouts;
-
-		VkDescriptorSet sets[FRAMES_IN_FLIGHT]; // TODO: this code would prefer array of sets (SOA) to current FrameData AOS
-		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, sets));
-
-		for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
-			frame_data[i].ubo_descriptor_set = sets[i];
-
-			VkDescriptorBufferInfo buf_info = {};
-			buf_info.buffer = frame_data[i].ubo_buffer;
-			buf_info.offset = 0;
-			buf_info.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
-
-			VkWriteDescriptorSet write = {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = sets[i];
-			write.dstBinding = 0;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.descriptorCount = 1;
-			write.pBufferInfo = &buf_info;
-			//write.pImageInfo = nullptr;
-			//write.pTexelBufferView = nullptr;
-			vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
-		}
-	}
-}
-
 void Renderer::create_ubo_buffers () {
 	ZoneScoped;
 
@@ -342,29 +335,139 @@ void Renderer::destroy_ubo_buffers () {
 	vkFreeMemory(ctx.dev, ubo_memory, nullptr);
 }
 
-void Renderer::create_pipeline_layout () {
-	VkDescriptorSetLayout sets[] = { descriptor_layout };
+void Renderer::create_descriptor_pool () {
+	VkDescriptorPoolSize pool_sizes[2] = {};
+	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	pool_sizes[0].descriptorCount = 1; // for rescale
 
-	VkPushConstantRange pcs[1] = {};
-	pcs[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-	pcs[0].offset = 0;
-	pcs[0].size = sizeof(float3);
+	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT; // for ubo
 
-	VkPipelineLayoutCreateInfo info{};
-	info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	info.setLayoutCount = ARRLEN(sets);
-	info.pSetLayouts = sets;
-	info.pushConstantRangeCount = ARRLEN(pcs);
-	info.pPushConstantRanges = pcs;
+	VkDescriptorPoolCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	info.poolSizeCount = ARRLEN(pool_sizes);
+	info.pPoolSizes = pool_sizes;
+	info.maxSets = (uint32_t)(
+		FRAMES_IN_FLIGHT // for ubo
+		+1); // for rescale
 
-	VK_CHECK_RESULT(vkCreatePipelineLayout(ctx.dev, &info, nullptr, &pipeline_layout));
+	VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
 }
 
-void Renderer::create_pipeline (int msaa, Shader* shader, VertexAttributes& attribs) {
-	pipeline = VK_NULL_HANDLE;
+void Renderer::create_main_descriptors () {
+	{ // create descriptor layout
+		VkDescriptorSetLayoutBinding binding = {};
+		binding.binding = 0;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding.descriptorCount = 1;
+		binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		//binding.pImmutableSamplers = nullptr;
 
+		VkDescriptorSetLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		info.bindingCount = 1;
+		info.pBindings = &binding;
+
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &main_descriptor_layout));
+	}
+
+	{ // create descriptor sets
+		VkDescriptorSetLayout layouts[FRAMES_IN_FLIGHT];
+		for (auto& l : layouts)
+			l = main_descriptor_layout;
+
+		VkDescriptorSetAllocateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		info.descriptorPool = descriptor_pool;
+		info.descriptorSetCount = FRAMES_IN_FLIGHT;
+		info.pSetLayouts = layouts;
+
+		VkDescriptorSet sets[FRAMES_IN_FLIGHT]; // TODO: this code would prefer array of sets (SOA) to current FrameData AOS
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, sets));
+
+		for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
+			frame_data[i].ubo_descriptor_set = sets[i];
+
+			VkDescriptorBufferInfo buf_info = {};
+			buf_info.buffer = frame_data[i].ubo_buffer;
+			buf_info.offset = 0;
+			buf_info.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
+
+			VkWriteDescriptorSet write = {};
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = sets[i];
+			write.dstBinding = 0;
+			write.dstArrayElement = 0;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.descriptorCount = 1;
+			write.pBufferInfo = &buf_info;
+			//write.pImageInfo = nullptr;
+			//write.pTexelBufferView = nullptr;
+			vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
+		}
+	}
+}
+
+void Renderer::create_rescale_descriptors () {
+	{ // create descriptor layout
+		VkSamplerCreateInfo sampler_info = {};
+		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_info.magFilter = VK_FILTER_LINEAR;
+		sampler_info.minFilter = VK_FILTER_LINEAR;
+		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.anisotropyEnable = VK_FALSE;
+		sampler_info.minLod = 0;
+		sampler_info.maxLod = 0;
+		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &rescale_sampler);
+
+		VkDescriptorSetLayoutBinding binding = {};
+		binding.binding = 0;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding.descriptorCount = 1;
+		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding.pImmutableSamplers = &rescale_sampler;
+
+		VkDescriptorSetLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		info.bindingCount = 1;
+		info.pBindings = &binding;
+
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &rescale_descriptor_layout));
+	}
+
+	{ // create descriptor sets
+		VkDescriptorSetAllocateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		info.descriptorPool = descriptor_pool;
+		info.descriptorSetCount = 1;
+		info.pSetLayouts = &rescale_descriptor_layout;
+
+		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, &rescale_descriptor_set));
+	}
+}
+void Renderer::update_rescale_img_descr () {
+	VkDescriptorImageInfo img = {};
+	img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	img.imageView = main_color.image_view;
+	//img.sampler = nullptr; // set in pImmutableSamplers
+
+	VkWriteDescriptorSet write = {};
+	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	write.dstSet = rescale_descriptor_set;
+	write.dstBinding = 0;
+	write.dstArrayElement = 0;
+	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	write.descriptorCount = 1;
+	write.pImageInfo = &img;
+	vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
+}
+
+VkPipeline Renderer::create_main_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout, int msaa, VertexAttributes attribs) {
 	if (!shader->valid)
-		return;
+		return VK_NULL_HANDLE;
 
 	VkPipelineShaderStageCreateInfo shader_stages[16] = {};
 
@@ -484,13 +587,143 @@ void Renderer::create_pipeline (int msaa, Shader* shader, VertexAttributes& attr
 	info.pDepthStencilState		= &depth_stencil;
 	info.pColorBlendState		= &color_blending;
 	info.pDynamicState			= &dynamic_state;
-	info.layout					= pipeline_layout;
-	info.renderPass				= render_pass;
+	info.layout					= layout;
+	info.renderPass				= renderpass;
 	info.subpass				= 0;
 	info.basePipelineHandle		= VK_NULL_HANDLE;
 	info.basePipelineIndex		= -1;
 
+	VkPipeline pipeline = VK_NULL_HANDLE;
 	VK_CHECK_RESULT(vkCreateGraphicsPipelines(ctx.dev, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline));
+	return pipeline;
+}
+VkPipeline Renderer::create_rescale_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout) {
+	if (!shader->valid)
+		return VK_NULL_HANDLE;
+
+	VkPipelineShaderStageCreateInfo shader_stages[16] = {};
+
+	for (int i=0; i<(int)shader->stages.size(); ++i) {
+		shader_stages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stages[i].stage = SHADERC_STAGE_BITS_MAP[ shader->stages[i].stage ];
+		shader_stages[i].module = shader->stages[i].module;
+		shader_stages[i].pName = "main";
+	}
+
+	VkPipelineVertexInputStateCreateInfo vertex_input = {};
+	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+	VkPipelineInputAssemblyStateCreateInfo input_assembly = {};
+	input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	input_assembly.primitiveRestartEnable = VK_FALSE;
+
+	// fake viewport and scissor, actually set dynamically
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width  = (float)1920;//cur_size.x;
+	viewport.height = (float)1080;//cur_size.y;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 };
+	scissor.extent = { 1920, 1080 };//swap_chain.extent;
+
+	VkPipelineViewportStateCreateInfo viewport_state = {};
+	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state.viewportCount = 1;
+	viewport_state.pViewports = &viewport;
+	viewport_state.scissorCount = 1;
+	viewport_state.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_NONE;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
+	rasterizer.depthBiasConstantFactor = 0.0f;
+	rasterizer.depthBiasClamp = 0.0f;
+	rasterizer.depthBiasSlopeFactor = 0.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = (VkSampleCountFlagBits)msaa;
+	multisampling.minSampleShading = 1.0f;
+	multisampling.pSampleMask = nullptr;
+	multisampling.alphaToCoverageEnable = VK_FALSE;
+	multisampling.alphaToOneEnable = VK_FALSE;
+
+	VkPipelineDepthStencilStateCreateInfo depth_stencil = {};
+	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_stencil.depthTestEnable = VK_FALSE;
+	depth_stencil.depthWriteEnable = VK_FALSE;
+	depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+	depth_stencil.depthBoundsTestEnable = VK_FALSE;
+	depth_stencil.minDepthBounds = 0.0f;
+	depth_stencil.maxDepthBounds = 1.0f;
+	depth_stencil.stencilTestEnable = VK_FALSE;
+	depth_stencil.front = {};
+	depth_stencil.back = {};
+
+	VkPipelineColorBlendAttachmentState color_blend_attachment = {};
+	color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	color_blend_attachment.blendEnable = VK_FALSE;
+	color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+	color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+	color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+	VkPipelineColorBlendStateCreateInfo color_blending = {};
+	color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	color_blending.logicOpEnable = VK_FALSE;
+	color_blending.logicOp = VK_LOGIC_OP_COPY;
+	color_blending.attachmentCount = 1;
+	color_blending.pAttachments = &color_blend_attachment;
+	color_blending.blendConstants[0] = 0.0f;
+	color_blending.blendConstants[1] = 0.0f;
+	color_blending.blendConstants[2] = 0.0f;
+	color_blending.blendConstants[3] = 0.0f;
+
+	VkDynamicState dynamic_states[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_SCISSOR,
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamic_state = {};
+	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+	dynamic_state.dynamicStateCount = ARRLEN(dynamic_states);
+	dynamic_state.pDynamicStates = dynamic_states;
+
+	VkGraphicsPipelineCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	info.stageCount				= (uint32_t)shader->stages.size();
+	info.pStages				= shader_stages;
+	info.pVertexInputState		= &vertex_input;
+	info.pInputAssemblyState	= &input_assembly;
+	info.pViewportState			= &viewport_state;
+	info.pRasterizationState	= &rasterizer;
+	info.pMultisampleState		= &multisampling;
+	info.pDepthStencilState		= &depth_stencil;
+	info.pColorBlendState		= &color_blending;
+	info.pDynamicState			= &dynamic_state;
+	info.layout					= layout;
+	info.renderPass				= renderpass;
+	info.subpass				= 0;
+	info.basePipelineHandle		= VK_NULL_HANDLE;
+	info.basePipelineIndex		= -1;
+
+	VkPipeline pipeline = VK_NULL_HANDLE;
+	VK_CHECK_RESULT(vkCreateGraphicsPipelines(ctx.dev, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline));
+	return pipeline;
 }
 
 //// Create per-frame data
@@ -523,23 +756,54 @@ void Renderer::create_frame_data () {
 }
 
 //// Framebuffer creation
-void Renderer::create_framebuffers (int2 size, VkFormat color_format, int msaa) {
-	//color_buffer = create_render_buffer(size, color_format,
-	//	VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-	//	VK_IMAGE_ASPECT_COLOR_BIT, msaa);
+void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkFormat depth_format, int msaa) {
+	main_color = create_render_buffer(size, color_format,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		VK_IMAGE_ASPECT_COLOR_BIT, msaa);
 
-	depth_buffer = create_render_buffer(size, depth_format,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+	main_depth = create_render_buffer(size, depth_format,
+		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_IMAGE_ASPECT_DEPTH_BIT, msaa);
-}
-void Renderer::destroy_framebuffers () {
-	//vkDestroyImageView(ctx.dev, color_buffer.image_view, nullptr);
-	//vkDestroyImage(ctx.dev, color_buffer.image, nullptr);
-	//vkFreeMemory(ctx.dev, color_buffer.memory, nullptr);
 
-	vkDestroyImageView(ctx.dev, depth_buffer.image_view, nullptr);
-	vkDestroyImage(ctx.dev, depth_buffer.image, nullptr);
-	vkFreeMemory(ctx.dev, depth_buffer.memory, nullptr);
+	VkImageView attachments[] = { main_color.image_view, main_depth.image_view };
+
+	VkFramebufferCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	info.renderPass = main_renderpass;
+	info.attachmentCount = ARRLEN(attachments);
+	info.pAttachments = attachments;
+	info.width  = size.x;
+	info.height = size.y;
+	info.layers = 1;
+	VK_CHECK_RESULT(vkCreateFramebuffer(ctx.dev, &info, nullptr, &main_framebuffer));
+
+	update_rescale_img_descr();
+}
+void Renderer::destroy_main_framebuffer () {
+	vkDestroyFramebuffer(ctx.dev, main_framebuffer, nullptr);
+
+	vkDestroyImageView(ctx.dev, main_color.image_view, nullptr);
+	vkDestroyImage(ctx.dev, main_color.image, nullptr);
+	vkFreeMemory(ctx.dev, main_color.memory, nullptr);
+
+	vkDestroyImageView(ctx.dev, main_depth.image_view, nullptr);
+	vkDestroyImage(ctx.dev, main_depth.image, nullptr);
+	vkFreeMemory(ctx.dev, main_depth.memory, nullptr);
+}
+
+void Renderer::recreate_main_framebuffer (int2 wnd_size) {
+	int2 cur_size = max(roundi((float2)wnd_size * renderscale), 1);
+	if (cur_size == renderscale_size) return;
+
+	vkQueueWaitIdle(ctx.queues.graphics_queue);
+
+	if (renderscale_size.x > 0)
+		destroy_main_framebuffer();
+
+	renderscale_size = cur_size;
+	create_main_framebuffer(renderscale_size, fb_color_format, fb_depth_format, msaa);
 }
 
 //// Renderpass creation
@@ -550,36 +814,36 @@ RenderBuffer Renderer::create_render_buffer (int2 size, VkFormat format, VkImage
 	return buf;
 }
 
-VkRenderPass Renderer::create_renderpass (VkFormat color_format, VkFormat depth_format, int msaa) {
-	VkAttachmentDescription color_attachment = {};
-	color_attachment.format = color_format;
-	color_attachment.samples = (VkSampleCountFlagBits)msaa;
-	color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	color_attachment.finalLayout = msaa > 1 ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat depth_format, int msaa) {
+	VkAttachmentDescription attachments[2] = {};
+	// color_attachment
+	attachments[0].format = color_format;
+	attachments[0].samples = (VkSampleCountFlagBits)msaa;
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// depth_attachment
+	attachments[1].format = depth_format;
+	attachments[1].samples = (VkSampleCountFlagBits)msaa;
+	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	VkAttachmentDescription depth_attachment = {};
-	depth_attachment.format = depth_format;
-	depth_attachment.samples = (VkSampleCountFlagBits)msaa;
-	depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depth_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depth_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depth_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depth_attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentDescription color_attachment_resolve = {};
-	color_attachment_resolve.format = color_format;
-	color_attachment_resolve.samples = VK_SAMPLE_COUNT_1_BIT;
-	color_attachment_resolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	color_attachment_resolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	color_attachment_resolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	color_attachment_resolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	color_attachment_resolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	color_attachment_resolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	//VkAttachmentDescription color_attachment_resolve = {};
+	//color_attachment_resolve.format = color_format;
+	//color_attachment_resolve.samples = VK_SAMPLE_COUNT_1_BIT;
+	//color_attachment_resolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	//color_attachment_resolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	//color_attachment_resolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	//color_attachment_resolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	//color_attachment_resolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	//color_attachment_resolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 	VkAttachmentReference color_attachment_ref = {};
 	color_attachment_ref.attachment = 0;
@@ -589,16 +853,54 @@ VkRenderPass Renderer::create_renderpass (VkFormat color_format, VkFormat depth_
 	depth_attachment_ref.attachment = 1;
 	depth_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-	VkAttachmentReference color_attachment_resolve_ref = {};
-	color_attachment_resolve_ref.attachment = 2;
-	color_attachment_resolve_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &color_attachment_ref;
+	subpass.pResolveAttachments = nullptr;
+	subpass.pDepthStencilAttachment = &depth_attachment_ref;
+
+	//VkSubpassDependency depen = {};
+	//depen.srcSubpass = VK_SUBPASS_EXTERNAL;
+	//depen.dstSubpass = 0;
+	//depen.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	//depen.srcAccessMask = 0;
+	//depen.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	//depen.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+	VkRenderPassCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	info.attachmentCount = ARRLEN(attachments);
+	info.pAttachments = attachments;
+	info.subpassCount = 1;
+	info.pSubpasses = &subpass;
+	info.dependencyCount = 0;
+	info.pDependencies = nullptr;
+
+	VkRenderPass renderpass;
+	VK_CHECK_RESULT(vkCreateRenderPass(ctx.dev, &info, nullptr, &renderpass));
+	return renderpass;
+}
+VkRenderPass Renderer::create_ui_renderpass (VkFormat color_format) {
+	VkAttachmentDescription attachments[1] = {};
+	// color_attachment
+	attachments[0].format = color_format;
+	attachments[0].samples = (VkSampleCountFlagBits)1;
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference color_attachment_ref = {};
+	color_attachment_ref.attachment = 0;
+	color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_ref;
-	subpass.pResolveAttachments = msaa > 1 ? &color_attachment_resolve_ref : nullptr;
-	subpass.pDepthStencilAttachment = nullptr;//&depth_attachment_ref;
 
 	VkSubpassDependency depen = {};
 	depen.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -608,11 +910,9 @@ VkRenderPass Renderer::create_renderpass (VkFormat color_format, VkFormat depth_
 	depen.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	depen.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-	VkAttachmentDescription attachments[] = { color_attachment, depth_attachment, color_attachment_resolve };
-
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	info.attachmentCount = 1;//msaa > 1 ? 3 : 2;
+	info.attachmentCount = ARRLEN(attachments);
 	info.pAttachments = attachments;
 	info.subpassCount = 1;
 	info.pSubpasses = &subpass;
@@ -620,9 +920,7 @@ VkRenderPass Renderer::create_renderpass (VkFormat color_format, VkFormat depth_
 	info.pDependencies = &depen;
 
 	VkRenderPass renderpass;
-
 	VK_CHECK_RESULT(vkCreateRenderPass(ctx.dev, &info, nullptr, &renderpass));
-
 	return renderpass;
 }
 

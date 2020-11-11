@@ -1,6 +1,12 @@
 #version 450
 #include "common.glsl"
 
+layout(location = 0) vs2fs VS {
+	vec2	uv;
+	float	tex_indx;
+	//float	brightness;
+} vs;
+
 #ifdef _VERTEX
 	layout(location = 0) in vec3	pos_model;
 	layout(location = 1) in vec2	uv;
@@ -12,12 +18,6 @@
 
 	//uniform vec3 chunk_pos;
 	//uniform float sky_light_reduce;
-
-	layout(location = 0) out VS {
-		vec2	uv;
-		float	tex_indx;
-		//float	brightness;
-	} vs;
 
 	float brightness_function (float light) {
 		return light * pow(1.0 / (2.0 - light), 4.0); 
@@ -33,12 +33,6 @@
 #endif
 
 #ifdef _FRAGMENT
-	layout(location = 0) in VS {
-		vec2	uv;
-		float	tex_indx;
-		//float	brightness;
-	} vs;
-
 	//uniform	sampler2DArray tile_textures;
 
 	#define ALPHA_TEST

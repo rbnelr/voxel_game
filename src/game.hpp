@@ -28,6 +28,6 @@ struct Game {
 	
 	Game ();
 
-	void imgui (Window& window, Input& I);
+	void imgui (Window& window, Input& I, std::function<void()> renderscale_imgui);
 	RenderData update (Window& window, Input& I);
 };

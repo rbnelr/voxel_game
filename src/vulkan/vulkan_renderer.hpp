@@ -148,9 +148,11 @@ struct Renderer {
 
 	ShaderManager				shaders;
 
+	VkFormat					wnd_color_format;
+
 	// Intermediary frame buffer formats
-	VkFormat					color_format;
-	VkFormat					depth_format;
+	VkFormat					fb_color_format;
+	VkFormat					fb_depth_format;
 
 	int							max_msaa_samples;
 	int							msaa = 1;
@@ -177,15 +179,46 @@ struct Renderer {
 	VkDeviceMemory				ubo_memory;
 	VkDeviceMemory				mesh_mem;
 
-	// Passes
-	VkRenderPass				render_pass;
-	//RenderBuffer				color_buffer;
-	RenderBuffer				depth_buffer;
+	//// Renderpasses
+	// Main renderpass (skybox, 3d world and 3d first person)
+	// cleared with skybox, rendered at window_res * renderscale
+	VkRenderPass				main_renderpass;
+	RenderBuffer				main_color;
+	RenderBuffer				main_depth;
+	VkFramebuffer				main_framebuffer;
+	
+	VkDescriptorSetLayout		main_descriptor_layout;
+	VkPipelineLayout			main_pipeline_layout;
+	VkPipeline					main_pipeline;
 
-	VkDescriptorSetLayout		descriptor_layout;
-	VkPipelineLayout			pipeline_layout;
-	VkPipeline					pipeline;
+	// UI renderpass (game ui + imgui)
+	// initial image is main_color rescaled, rendered at window_res
+	VkRenderPass				ui_renderpass;
 
+	VkDescriptorSetLayout		rescale_descriptor_layout;
+	VkPipelineLayout			rescale_pipeline_layout;
+	VkPipeline					rescale_pipeline;
+
+	VkDescriptorSet				rescale_descriptor_set;
+	VkSampler					rescale_sampler;
+
+	float						renderscale = 1.0f;
+	int2						renderscale_size = -1;
+	bool						renderscale_nearest = false;
+
+	void renderscale_imgui () {
+		if (!imgui_push("Renderscale")) return;
+
+		ImGui::SliderFloat("scale", &renderscale, 0.02f, 2.0f);
+		ImGui::SameLine();
+		ImGui::Text("= %4d x %4d px", renderscale_size.x, renderscale_size.y);
+
+		ImGui::Checkbox("renderscale nearest", &renderscale_nearest);
+
+		imgui_pop();
+	}
+
+	//
 	ChunkRenderer				chunk_renderer;
 
 	Renderer (GLFWwindow* window, char const* app_name);
@@ -203,26 +236,43 @@ struct Renderer {
 	////
 	void create_descriptor_pool ();
 
-	void create_descriptors ();
-
 	void create_ubo_buffers ();
 	void destroy_ubo_buffers ();
 
-	void create_pipeline_layout ();
+	void create_main_descriptors ();
+	void create_rescale_descriptors ();
+	void update_rescale_img_descr ();
 
-	void create_pipeline (int msaa, Shader* shader, VertexAttributes& attribs);
+	VkPipeline create_main_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout, int msaa, VertexAttributes attribs);
+	VkPipeline create_rescale_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout);
 	
 	//// Create per-frame data
 	void create_frame_data ();
 
 	//// Framebuffer creation
-	void create_framebuffers (int2 size, VkFormat color_format, int msaa);
-	void destroy_framebuffers ();
+	VkFormat find_color_format () {
+		return find_supported_format(ctx.pdev,
+			{ VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8B8A8_SRGB },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+		);
+	}
+	VkFormat find_depth_format () {
+		return find_supported_format(ctx.pdev,
+			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+		);
+	}
 
-	//// Renderpass creation
 	RenderBuffer create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa);
 
-	VkRenderPass create_renderpass (VkFormat color_format, VkFormat depth_format, int msaa);
+	VkRenderPass create_main_renderpass (VkFormat color_format, VkFormat depth_format, int msaa);
+	VkRenderPass create_ui_renderpass (VkFormat color_format);
+
+	void create_main_framebuffer (int2 size, VkFormat color_format, VkFormat depth_format, int msaa);
+	void destroy_main_framebuffer ();
+	void recreate_main_framebuffer (int2 wnd_size);
 
 	//// One time commands
 	VkCommandBuffer begin_init_cmds ();

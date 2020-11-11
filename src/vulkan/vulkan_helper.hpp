@@ -7,10 +7,6 @@
 #include <vector>
 #include <stdexcept>
 
-#ifndef NDEBUG
-	#define VK_VALIDATION_LAYERS
-#endif
-
 namespace vk {
 
 ////
@@ -86,6 +82,13 @@ struct VertexAttributes {
 	}
 };
 
+template <typename T>
+inline VertexAttributes make_attribs () {
+	VertexAttributes attribs;
+	T::attributes(attribs);
+	return attribs;
+}
+
 struct RenderBuffer {
 	VkImage						image;
 	VkImageView					image_view;
@@ -107,8 +110,6 @@ uint32_t find_memory_type (VkPhysicalDevice device, uint32_t type_filter, VkMemo
 VkFormat find_supported_format (VkPhysicalDevice device, std::initializer_list<VkFormat> const& candidates,
 	VkImageTiling tiling, VkFormatFeatureFlags features);
 
-VkFormat find_depth_format (VkPhysicalDevice device);
-
 inline bool has_stencil_component (VkFormat format) {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
@@ -126,5 +127,21 @@ VkImage create_image (VkDevice device, VkPhysicalDevice pdev,
 	VkDeviceMemory* out_image_memory, int mip_levels = 1, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
 
 VkImageView create_image_view (VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect);
+
+inline VkPipelineLayout create_pipeline_layout (VkDevice dev,
+		std::initializer_list<VkDescriptorSetLayout> descriptor_sets,
+		std::initializer_list<VkPushConstantRange> push_constants) {
+
+	VkPipelineLayoutCreateInfo info = {};
+	info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	info.setLayoutCount = (uint32_t)descriptor_sets.size();
+	info.pSetLayouts = descriptor_sets.begin();
+	info.pushConstantRangeCount = (uint32_t)push_constants.size();
+	info.pPushConstantRanges = push_constants.begin();
+
+	VkPipelineLayout layout;
+	VK_CHECK_RESULT(vkCreatePipelineLayout(dev, &info, nullptr, &layout));
+	return layout;
+}
 
 } // namespace vk
