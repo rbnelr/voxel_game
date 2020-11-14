@@ -31,15 +31,18 @@ void ChunkRenderer::upload_slices (Chunks& chunks, Chunk* chunk, MeshData& mesh,
 	chunk->mesh_slices.clear();
 
 	for (int slice = 0; slice < mesh.used_slices; ++slice) {
-		auto count = mesh.get_vertex_count(slice);
-
 		auto slice_id = chunks.slices_alloc.alloc();
 		chunk->mesh_slices.push_back(slice_id);
+
+		auto count = mesh.get_vertex_count(slice);
 
 		uploads.push_back({ slice_id, mesh.slices[slice], count });
 		mesh.slices[slice] = nullptr;
 
-		slices.push_back({ count });
+		if (slice_id >= (int)slices.size())
+			slices.resize(slice_id+1);
+
+		slices[slice_id].vertex_count = count;
 	}
 }
 
@@ -121,14 +124,14 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 
 void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipeline pipeline, VkPipelineLayout layout) {
 	ZoneScoped;
-	TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
-
+	
 	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
-		if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
+		auto& chunk = chunks[cid];
+		if ((chunk.flags & Chunk::LOADED) == 0) continue;
 
-		for (auto& sid : chunks[cid].mesh_slices) {
+		for (auto& sid : chunk.mesh_slices) {
 			uint32_t offset;
 			VkBuffer buf = calc_slice_buf(sid, &offset);
 
@@ -136,11 +139,11 @@ void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipelin
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
 
-			float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
+			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 
 			vkCmdPushConstants(cmds, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 			
-			vkCmdDraw(cmds, slices[cid].vertex_count, 1, offset, 0);
+			vkCmdDraw(cmds, slices[sid].vertex_count, 1, offset, 0);
 		}
 	}
 }

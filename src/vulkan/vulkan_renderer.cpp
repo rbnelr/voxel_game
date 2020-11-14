@@ -102,11 +102,21 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 				&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
 		}
 
-		chunk_renderer.draw_chunks(cmds, data.chunks, main_pipeline, main_pipeline_layout);
+		{
+			TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
+			chunk_renderer.draw_chunks(cmds, data.chunks, main_pipeline, main_pipeline_layout);
+		}
 	}
 	vkCmdEndRenderPass(cmds);
 
 	{ // ui render pass
+		
+		//VkImageMemoryBarrier ;
+		vkCmdPipelineBarrier(cmds,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0, 0, nullptr, 0, nullptr, 0, nullptr);
+		
 		{
 			VkRenderPassBeginInfo render_pass_info = {};
 			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
