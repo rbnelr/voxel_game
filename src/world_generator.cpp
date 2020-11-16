@@ -209,7 +209,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 						*bid = B_TALLGRASS;
 					} else if (rand.uniform() < 0.0005f) {
 						*bid = B_TORCH;
-						*block_light = blocks.glow[B_TORCH];
+						*block_light = g_blocks.blocks[B_TORCH].glow;
 					}
 				}
 			}

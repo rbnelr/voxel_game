@@ -23,7 +23,7 @@ struct ThreadChunkMesher {
 	//std::vector<BlockMeshVertex> const* block_meshes;
 
 	bool bt_is_opaque (block_id id) {
-		auto t = blocks.transparency[id];
+		auto t = g_blocks.blocks[id].transparency;
 		if (t == TM_OPAQUE)
 			return true;
 
@@ -42,7 +42,7 @@ struct ThreadChunkMesher {
 		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3( 0,-1, 0)) },
 	};
 
-	inline uint8 calc_block_light (BlockFace face, int3 vert_pos) {
+	inline uint8_t calc_block_light (BlockFace face, int3 vert_pos) {
 		auto* block_light = &chunk_data->block_light[cur + offs(vert_pos)];
 		
 		int total = 0;
@@ -53,7 +53,7 @@ struct ThreadChunkMesher {
 		
 		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
 	}
-	inline uint8 calc_sky_light (BlockFace face, int3 vert_pos) {
+	inline uint8_t calc_sky_light (BlockFace face, int3 vert_pos) {
 		auto* sky_light = &chunk_data->sky_light[cur + offs(vert_pos)];
 
 		int total = 0;
@@ -209,7 +209,7 @@ struct ThreadChunkMesher {
 						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];
 
 						//if (mesh_info.offset < 0) {
-							if (blocks.transparency[id] == TM_TRANSPARENT)
+							if (g_blocks.blocks[id].transparency == TM_TRANSPARENT)
 								cube_transperant();
 							else
 								cube_opaque();

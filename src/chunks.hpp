@@ -52,9 +52,9 @@ struct ChunkData {
 	static constexpr uint64_t COUNT = (CHUNK_SIZE+2) * (CHUNK_SIZE+2) * (CHUNK_SIZE+2);
 
 	block_id	id[COUNT];
-	uint8		block_light[COUNT];
-	uint8		sky_light[COUNT];
-	uint8		hp[COUNT];
+	uint8_t		block_light[COUNT];
+	uint8_t		sky_light[COUNT];
+	uint8_t		hp[COUNT];
 
 	static constexpr uint64_t pos_to_index (int3 pos) {
 		return (pos.z + 1) * (CHUNK_SIZE+2) * (CHUNK_SIZE+2) + (pos.y + 1) * (CHUNK_SIZE+2) + (pos.x + 1);

@@ -43,7 +43,7 @@ void BlockPlace::update (Input& I, World& world, Player const& player) {
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
-		if (!block_place_is_inside_player || blocks.collision[(block_id)item] != CM_SOLID) {
+		if (!block_place_is_inside_player || g_blocks.blocks[(block_id)item].collision != CM_SOLID) {
 			world.try_place_block(block_place_pos, (block_id)item);
 		} else {
 			trigger = false;
@@ -84,7 +84,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
 
 					auto b = world.chunks.query_block(bp);
-					bool block_solid = blocks.collision[b.id] == CM_SOLID;
+					bool block_solid = g_blocks.blocks[b.id].collision == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
 
@@ -127,7 +127,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 
 					auto b = world.chunks.query_block(bp);
 
-					bool block_solid = blocks.collision[b.id] == CM_SOLID;
+					bool block_solid = g_blocks.blocks[b.id].collision == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)(int2)bp, radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}

@@ -1,20 +1,23 @@
 #pragma once
 #include "common.hpp"
 
-enum collision_mode : uint8 {
-	CM_GAS			=0, // fall/walk through
-	CM_SOLID		,   // cannot enter
-	CM_LIQUID		,   // swim in (water, etc.)
-	CM_BREAKABLE	,	// fall/walk through like gas, but breakable by interaction (breaking torches etc.)
+enum collision_mode : uint8_t {
+	CM_GAS			, // fall/walk through
+	CM_BREAKABLE	, // fall/walk through like gas, but breakable by interaction (breaking torches etc.)
+	CM_LIQUID		, // swim in (water, etc.)
+	CM_SOLID		, // cannot enter
 };
-enum transparency_mode : uint8 {
-	TM_OPAQUE		=0, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
-	TM_TRANSPARENT	,   // see-through blocks              :  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
-	TM_ALPHA_TEST	,   // blocks with holes               :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
-	TM_PARTIAL		,	// objects not filling the voxel   :  all faces of these blocks are rendered (like leaves)
-};
+NLOHMANN_JSON_SERIALIZE_ENUM(collision_mode, {{CM_GAS, "gas"}, {CM_BREAKABLE, "breakable"}, {CM_LIQUID, "liquid"}, {CM_SOLID, "solid"}})
 
-enum tool_type : uint8 {
+enum transparency_mode : uint8_t {
+	TM_TRANSPARENT	, // see-through blocks              :  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
+	TM_ALPHA_TEST	, // blocks with holes               :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
+	TM_PARTIAL		, // objects not filling the voxel   :  all faces of these blocks are rendered (like leaves)
+	TM_OPAQUE		, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
+};
+NLOHMANN_JSON_SERIALIZE_ENUM(transparency_mode, {{TM_TRANSPARENT, "transparent"}, {TM_ALPHA_TEST, "alpha_test"}, {TM_PARTIAL, "partial"}, {TM_OPAQUE, "opaque"}})
+
+enum class ToolType : uint8_t {
 	NONE,
 	FISTS,
 	SWORD,
@@ -22,6 +25,51 @@ enum tool_type : uint8 {
 	AXE,
 	SHOVEL,
 };
+NLOHMANN_JSON_SERIALIZE_ENUM(ToolType, {{ToolType::NONE, nullptr}, {ToolType::FISTS, "fists"}, {ToolType::SWORD, "sword"}, {ToolType::PICKAXE, "pickaxe"}, {ToolType::AXE, "axe"}, {ToolType::SHOVEL, "shovel"}})
+
+inline constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
+inline constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
+inline constexpr int MAX_LIGHT_LEVEL = 18;
+
+enum class BlockMeshType : uint8_t {
+	BLOCK, // normal 1^3 block
+	BOX, // non 1^3 sized box shape (size is the size in 1/16th)
+	X, // X shaped sprite plant
+};
+NLOHMANN_JSON_SERIALIZE_ENUM(BlockMeshType, {{BlockMeshType::BLOCK, nullptr}, {BlockMeshType::BOX, "box"}, {BlockMeshType::X, "X"}})
+
+enum class TexType : uint8_t {
+	NORMAL,
+	TOP_SIDE,
+	TOP_SIDE_BOTTOM,
+};
+NLOHMANN_JSON_SERIALIZE_ENUM(TexType, {{TexType::NORMAL, nullptr}, {TexType::TOP_SIDE, "top-side"}, {TexType::TOP_SIDE_BOTTOM, "top-side-bottom"}})
+
+struct BlockType {
+	std::string			name = "null";
+
+	uint8v3				size = 16;
+	BlockMeshType		mesh_type = BlockMeshType::BLOCK;
+	TexType				tex_type = TexType::NORMAL;
+	uint8_t				variations = 1;
+
+	collision_mode		collision;                  // collision mode for physics
+	transparency_mode	transparency;               // transparency mode for meshing
+	ToolType			tool = ToolType::NONE;      // tool type to determine which tool should be used for mining
+	uint8_t				hardness = 0;               // hardness value to determine damage resistance
+	uint8_t				glow = 0;                   // with what light level to glow with
+	uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
+
+};
+
+struct BlockTypes {
+	
+	std::vector<BlockType> blocks;
+};
+
+BlockTypes load_blocks ();
+
+inline BlockTypes g_blocks;
 
 enum block_id : uint16_t {
 #define MAX_BLOCK_ID (1u << (sizeof(block_id)*8))
@@ -39,83 +87,18 @@ enum block_id : uint16_t {
 
 	BLOCK_IDS_COUNT		,
 
-	B_NO_CHUNK			=BLOCK_IDS_COUNT,
-
 	PSEUDO_BLOCK_IDS_COUNT,
 };
 
-static constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
-static constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
-#define MAX_LIGHT_LEVEL 18
-
-struct BlockTypes {
-	const char*			name			[PSEUDO_BLOCK_IDS_COUNT]; // name for texture and ui
-	collision_mode		collision		[PSEUDO_BLOCK_IDS_COUNT]; // collision mode to determine 
-	transparency_mode	transparency	[PSEUDO_BLOCK_IDS_COUNT]; // transparency mode for meshing
-	tool_type			tool			[PSEUDO_BLOCK_IDS_COUNT]; // tool type to determine which tool should be used for mining
-	uint8				hardness		[PSEUDO_BLOCK_IDS_COUNT]; // hardness value to determine damage resistance
-	uint8				glow			[PSEUDO_BLOCK_IDS_COUNT]; // with what light level to glow with
-	uint8				absorb			[PSEUDO_BLOCK_IDS_COUNT]; // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
-
-	inline bool breakable (block_id id) {
-		auto& c = collision[id];
-		return c == CM_SOLID || c == CM_BREAKABLE;
-	}
-	inline bool grass_can_live_below (block_id id) {
-		return id == B_AIR || transparency[id] == TM_PARTIAL;
-	}
-};
-
-static BlockTypes load_block_types () {
-	BlockTypes bt;
-	int cur = 0;
-
-	auto block = [&] (const char* name, collision_mode cm, transparency_mode tm, tool_type tool, uint8 hard, uint8 glow, uint8 absorb) {
-		bt.name[cur] = name;
-		bt.collision[cur] = cm;
-		bt.transparency[cur] = tm;
-		bt.tool[cur] = tool;
-		bt.hardness[cur] = hard;
-		bt.glow[cur] = glow;
-		bt.absorb[cur] = absorb;
-		cur++;
-	};
-	auto gas = [&] (const char* name="null") {
-		block(name, CM_GAS, TM_TRANSPARENT, NONE, 0, 0, 0);
-	};
-	auto liquid = [&] (const char* name, transparency_mode transparency=TM_TRANSPARENT, uint8 glow_level=0) {
-		block(name, CM_LIQUID, transparency, NONE, 0, glow_level, transparency == TM_TRANSPARENT ? 3 : MAX_LIGHT_LEVEL);
-	};
-	auto solid = [&] (const char* name, uint8 hardness, tool_type tool=NONE, uint8 glow_level=0) {
-		block(name, CM_SOLID, TM_OPAQUE, tool, hardness, glow_level, MAX_LIGHT_LEVEL);
-	};
-	auto solid_alpha_test = [&] (const char* name, uint8 hardness, uint8 absorb_light_level=1, tool_type tool=NONE, uint8 glow_level=0) {
-		block(name, CM_SOLID, TM_ALPHA_TEST, tool, hardness, glow_level, absorb_light_level);
-	};
-	auto torch = [&] (const char* name, uint8 glow_level) {
-		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, glow_level, 0);
-	};
-	auto plant = [&] (const char* name, uint8 absorb_light_level=1) {
-		block(name, CM_BREAKABLE, TM_PARTIAL, NONE, 0, 0, 1);
-	};
-
-	/* B_NULL				*/ solid("null", 1);
-	/* B_AIR				*/ gas();
-	/* B_WATER				*/ liquid("water");
-	/* B_EARTH				*/ solid(			"earth"	,    3, SHOVEL );
-	/* B_GRASS				*/ solid(			"grass"	,    3, SHOVEL );
-	/* B_STONE				*/ solid(			"stone"	,   20, PICKAXE);
-	/* B_TREE_LOG			*/ solid(			"tree_log",  7, AXE	 );
-	/* B_LEAVES				*/ solid_alpha_test("leaves",    12);
-	/* B_TORCH				*/ torch("torch", MAX_LIGHT_LEVEL - 1);
-	/* B_TALLGRASS			*/ plant("tallgrass");
-
-	/* B_NO_CHUNK			*/ block("null", CM_SOLID, TM_TRANSPARENT, NONE, 0, 0, 0);
-
-	return bt;
+inline bool grass_can_live_below (block_id id) {
+	auto& b = g_blocks.blocks[id];
+	return b.transparency != TM_OPAQUE && b.collision <= CM_LIQUID;
 }
 
-static inline BlockTypes blocks = load_block_types();
+inline bool block_breakable (block_id id) {
+	auto& b = g_blocks.blocks[id];
+	return b.collision == CM_SOLID || b.collision == CM_BREAKABLE;
+}
 
 // Block instance
 struct Block {
@@ -127,14 +110,11 @@ struct Block {
 	Block () = default;
 
 	Block (block_id id): id{id} {
-		block_light = blocks.glow[id];
+		block_light = g_blocks.blocks[id].glow;
 		sky_light = 0;
 		hp = 255;
 	}
 };
-
-// global block instances for pseudo blocks to allow returning Block* to these for out of chunk queries
-static inline Block _NO_CHUNK      = B_NO_CHUNK     ;
 
 enum BlockFace {
 	BF_NULL		=1,

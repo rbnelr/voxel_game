@@ -10,7 +10,7 @@
 void ChunkData::init_border () {
 
 	for (int i=0; i<COUNT; ++i)
-		id[i] = B_NO_CHUNK;
+		id[i] = B_NULL;
 
 	memset(block_light, 0, sizeof(block_light));
 	//memset(sky_light, 0, sizeof(sky_light)); // always inited by update sky light after chunk gen
@@ -78,9 +78,9 @@ void Chunk::set_block (Chunks& chunks, int3 pos_in_chunk, Block b) {
 		blocks->set(pos_in_chunk, b);
 		flags |= REMESH;
 	} else {
-		uint8 old_block_light = blk.block_light;
+		uint8_t old_block_light = blk.block_light;
 
-		uint8 new_block_light = calc_block_light_level(this, pos_in_chunk, b);
+		uint8_t new_block_light = calc_block_light_level(this, pos_in_chunk, b);
 		int3 world_pos = pos_in_chunk + pos * CHUNK_SIZE;
 
 		b.block_light = new_block_light;
@@ -186,7 +186,7 @@ Block Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {
 
 	Chunk* chunk = query_chunk(chunk_pos);
 	if (!chunk)
-		return _NO_CHUNK;
+		return B_NULL;
 
 	if (out_chunk)
 		*out_chunk = chunk;

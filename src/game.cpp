@@ -8,6 +8,8 @@ Game::Game () {
 	//set_thread_high_priority();
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
+
+	g_blocks = load_blocks();
 }
 
 // try to do all debug guis in here,
@@ -114,7 +116,7 @@ RenderData Game::update (Window& window, Input& I) {
 	Camera_View player_view = world->player.update_post_physics(I, *world);
 
 	if (selected_block)
-		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, blocks.name[selected_block.block]);
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, g_blocks.blocks[selected_block.block].name);
 	else
 		ImGui::Text("Selected Block: None");
 

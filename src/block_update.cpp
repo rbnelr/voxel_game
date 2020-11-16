@@ -8,17 +8,17 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos
 	bool changed = false;
 
 	if (/*block_props[b->type].does_autoheal &&*/ b.hp < 255) {
-		b.hp += min((uint8)ceili(1.0f/25 / effective_frequency * 255), 255u - b.hp);
+		b.hp += min((uint8_t)ceili(1.0f/25 / effective_frequency * 255), 255u - b.hp);
 		changed = true;
 	}
-	if (b.id == B_GRASS && !blocks.grass_can_live_below(above.id)) {
+	if (b.id == B_GRASS && !grass_can_live_below(above.id)) {
 		if (grass_die_prob > random.uniform()) {
 			b.id = B_EARTH;
 			b.hp = 255;
 			changed = true;
 		}
 	}
-	if (b.id == B_EARTH && blocks.grass_can_live_below(above.id)) {
+	if (b.id == B_EARTH && grass_can_live_below(above.id)) {
 		float prob = 0;
 
 		int2 sides[4] = {

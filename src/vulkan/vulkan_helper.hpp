@@ -46,12 +46,12 @@ template<> inline VkFormat get_format<AttribMode::SINT, int2> () { return VK_FOR
 template<> inline VkFormat get_format<AttribMode::SINT, int3> () { return VK_FORMAT_R32G32B32_SINT; }
 template<> inline VkFormat get_format<AttribMode::SINT, int4> () { return VK_FORMAT_R32G32B32A32_SINT; }
 
-template<> inline VkFormat get_format<AttribMode::UINT, uint8 > () { return VK_FORMAT_R8_UINT; }
+template<> inline VkFormat get_format<AttribMode::UINT, uint8_t> () { return VK_FORMAT_R8_UINT; }
 template<> inline VkFormat get_format<AttribMode::UINT, uint8v2> () { return VK_FORMAT_R8G8_UINT; }
 template<> inline VkFormat get_format<AttribMode::UINT, uint8v3> () { return VK_FORMAT_R8G8B8_UINT; }
 template<> inline VkFormat get_format<AttribMode::UINT, uint8v4> () { return VK_FORMAT_R8G8B8A8_UINT; }
 
-template<> inline VkFormat get_format<AttribMode::UNORM, uint8  > () { return VK_FORMAT_R8_UNORM; }
+template<> inline VkFormat get_format<AttribMode::UNORM, uint8_t> () { return VK_FORMAT_R8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v2> () { return VK_FORMAT_R8G8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v3> () { return VK_FORMAT_R8G8B8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v4> () { return VK_FORMAT_R8G8B8A8_UNORM; }

@@ -234,6 +234,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
     <ClCompile Include="..\..\..\src\audio\read_wav.cpp" />
+    <ClCompile Include="..\..\..\src\blocks.cpp" />
     <ClCompile Include="..\..\..\src\block_update.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -386,6 +387,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
     <None Include="..\..\..\shaders\chunks.glsl" />
     <None Include="..\..\..\shaders\block_highlight.glsl" />

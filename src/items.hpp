@@ -22,21 +22,21 @@ static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 };
 
 struct ItemProperties {
-	tool_type	tool : 4;
-	uint8		damage;
-	uint8		hardness;
+	ToolType	tool : 4;
+	uint8_t		damage;
+	uint8_t		hardness;
 };
 
-static constexpr ItemProperties FISTS_PROPS		 = { FISTS, 32, 4 };
+static constexpr ItemProperties FISTS_PROPS		 = { ToolType::FISTS, 32, 4 };
 
 static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_SWORD		*/	{ SWORD		, 32, 4 },
-	/* I_WOOD_PICKAXE	*/	{ PICKAXE	, 32, 4 },
-	/* I_WOOD_SHOVEL	*/	{ SHOVEL	, 32, 4 },
+	/* I_WOOD_SWORD		*/	{ ToolType::SWORD		, 32, 4 },
+	/* I_WOOD_PICKAXE	*/	{ ToolType::PICKAXE	, 32, 4 },
+	/* I_WOOD_SHOVEL	*/	{ ToolType::SHOVEL	, 32, 4 },
 };
 
 static inline constexpr const char* get_item_name (item_id id) {
-	if (id < MAX_BLOCK_ID)	return blocks.name[(block_id)id];
+	if (id < MAX_BLOCK_ID)	return g_blocks.blocks[(block_id)id].name.c_str();
 	else					return ITEM_NAMES[id - MAX_BLOCK_ID];
 }
 static inline constexpr ItemProperties get_item_props (item_id id) {
@@ -45,7 +45,7 @@ static inline constexpr ItemProperties get_item_props (item_id id) {
 }
 
 struct Tool {
-	uint8 hp = 255;
+	uint8_t hp = 255;
 };
 
 struct Item {

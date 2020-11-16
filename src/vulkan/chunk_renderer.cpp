@@ -68,15 +68,16 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 		result_count += count;
 	}
 
-	{
+	{ // upload data via mapped staging buffer and vkCmdCopyBuffer
 		auto& frame = frames[cur_frame];
 
 		int buf = 0; // staging buffer
 		int slicei = 0;
 
-		// for staging buffers
+		// foreach staging buffer
 		for (; slicei < (int)uploads.size(); ++buf) {
 
+			// alloc new staging buffer as required
 			if (buf >= (int)frame.staging_bufs.size())
 				frame.staging_bufs.push_back( new_staging_buffer(dev, pdev) );
 			auto& staging_buf = frame.staging_bufs[buf];
@@ -86,7 +87,7 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 
 			size_t offs = 0;
 
-			// for staging buffers
+			// foreach slice to upload
 			for (; slicei < (int)uploads.size(); ++slicei) {
 				auto& upload = uploads[slicei];
 

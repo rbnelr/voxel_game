@@ -308,6 +308,9 @@
     <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\blocks.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -379,5 +382,6 @@
     <None Include="..\..\..\shaders\rescale.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="..\..\..\blocks.json" />
   </ItemGroup>
 </Project>
