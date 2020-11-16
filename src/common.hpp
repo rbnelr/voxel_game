@@ -34,6 +34,7 @@
 #include "kisslib/read_directory.hpp"
 #include "kisslib/running_average.hpp"
 #include "kisslib/string.hpp"
+#include "kisslib/stl_extensions.hpp"
 #include "kisslib/threadpool.hpp"
 #include "kisslib/threadsafe_queue.hpp"
 #include "kisslib/timer.hpp"

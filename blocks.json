@@ -1,6 +1,5 @@
 {
 	"blocks" : {
-		"null"		: { "class": "solid", "hardness": 1 },
 		"air"		: { "class": "gas" },
 		"water"		: { "class": "liquid",					"tex-type": "top-side" },
 		"earth"		: { "hardness":  3, "tool": "shovel" },
@@ -9,8 +8,6 @@
 		"tree_log"	: { "hardness":  7, "tool": "axe",		"tex-type": "top-side" },
 		"leaves"	: { "hardness":  2, "alpha-test": true },
 		"torch"		: { "class": "deco", "mesh": "box", "glow": 18, "size": [2,2,10], "tex-type": "top-side-bottom"  },
-		"tallgrass"	: { "class": "deco", "mesh": "X", "variations": 4 },
-		
-		"tallgrass"	: { "class": "deco", "mesh": "X", "variations": 5 }
+		"tallgrass"	: { "class": "deco", "mesh": "X", "variations": 4 }
 	}
 }

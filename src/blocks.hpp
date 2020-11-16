@@ -1,6 +1,11 @@
 #pragma once
 #include "common.hpp"
 
+typedef uint16_t block_id;
+
+static constexpr block_id B_NULL = (uint16_t)0;
+static constexpr uint32_t MAX_BLOCK_ID = 1u << 16;
+
 enum collision_mode : uint8_t {
 	CM_GAS			, // fall/walk through
 	CM_BREAKABLE	, // fall/walk through like gas, but breakable by interaction (breaking torches etc.)
@@ -65,30 +70,21 @@ struct BlockType {
 struct BlockTypes {
 	
 	std::vector<BlockType> blocks;
+
+	block_id air_id;
+
+	block_id map_id (std::string_view name) {
+		int id = kiss::indexof(blocks, name, [this] (BlockType const& l, std::string_view r) {
+			return l.name == r;
+		});
+		if (id == -1) return B_NULL;
+		return (block_id)id;
+	}
 };
 
 BlockTypes load_blocks ();
 
 inline BlockTypes g_blocks;
-
-enum block_id : uint16_t {
-#define MAX_BLOCK_ID (1u << (sizeof(block_id)*8))
-
-	B_NULL				=0,
-	B_AIR				,
-	B_WATER				,
-	B_EARTH				,
-	B_GRASS				,
-	B_STONE				,
-	B_TREE_LOG			,
-	B_LEAVES			,
-	B_TORCH				,
-	B_TALLGRASS			,
-
-	BLOCK_IDS_COUNT		,
-
-	PSEUDO_BLOCK_IDS_COUNT,
-};
 
 inline bool grass_can_live_below (block_id id) {
 	auto& b = g_blocks.blocks[id];

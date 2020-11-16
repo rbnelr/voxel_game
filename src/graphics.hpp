@@ -41,7 +41,7 @@ struct BlockTileInfo {
 };
 
 struct Assets {
-	BlockTileInfo block_tile_info[BLOCK_IDS_COUNT];
+	BlockTileInfo block_tile_info[50];
 
 	void load_block_textures () {
 		

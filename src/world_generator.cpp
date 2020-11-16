@@ -112,6 +112,15 @@ float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_no
 	}
 
 void gen (Chunk* chunk, WorldGenerator const& wg) {
+	const auto AIR			= g_blocks.map_id("air");
+	const auto WATER		= g_blocks.map_id("water");
+	const auto STONE		= g_blocks.map_id("stone");
+	const auto EARTH		= g_blocks.map_id("earth");
+	const auto GRASS		= g_blocks.map_id("grass");
+	const auto TREE_LOG		= g_blocks.map_id("tree_log");
+	const auto LEAVES		= g_blocks.map_id("leaves");
+	const auto TALLGRASS	= g_blocks.map_id("tallgrass");
+	const auto TORCH		= g_blocks.map_id("torch");
 
 	int3 chunk_origin = chunk->pos * CHUNK_SIZE;
 
@@ -127,9 +136,9 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					block_id b;
 
 					if (i.z <= water_level) {
-						b = B_WATER;
+						b = WATER;
 					} else {
-						b = B_AIR;
+						b = AIR;
 					}
 
 					chunk->set_block_unchecked(i, b);
@@ -183,12 +192,12 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					auto* bid = &chunk->blocks->id[ indx ];
 
 					if (i.z <= highest_block - earth_layer) {
-						*bid = B_STONE;
+						*bid = STONE;
 					} else {
 						if (i.z == highest_block && i.z >= water_level) {
-							*bid = B_GRASS;
+							*bid = GRASS;
 						} else {
-							*bid = B_EARTH;
+							*bid = EARTH;
 						}
 					}
 				}
@@ -197,7 +206,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				auto* bid			= &chunk->blocks->id[ indx ];
 				auto* block_light	= &chunk->blocks->block_light[ indx ];
 
-				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != B_WATER;
+				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
 
 				if (block_free) {
 					float tree_chance = rand.uniform();
@@ -206,10 +215,10 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					if (rand.uniform() < effective_tree_prob) {
 						tree_poss.push_back( int3((int2)i, highest_block +1) );
 					} else if (rand.uniform() < grass_density) {
-						*bid = B_TALLGRASS;
+						*bid = TALLGRASS;
 					} else if (rand.uniform() < 0.0005f) {
-						*bid = B_TORCH;
-						*block_light = g_blocks.blocks[B_TORCH].glow;
+						*bid = TORCH;
+						*block_light = g_blocks.blocks[TORCH].glow;
 					}
 				}
 			}
@@ -223,8 +232,8 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 			auto indx = ChunkData::pos_to_index(pos_chunk - int3(0,0,1));
 			auto* bid = &chunk->blocks->id[ indx ];
 
-			if (*bid == B_GRASS) {
-				*bid = B_EARTH;
+			if (*bid == GRASS) {
+				*bid = EARTH;
 			}
 
 			auto place_block = [&] (int3 pos_chunk, block_id bt) {
@@ -232,7 +241,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				auto indx = ChunkData::pos_to_index(pos_chunk);
 				auto* bid = &chunk->blocks->id[ indx ];
 
-				if (*bid == B_AIR || *bid == B_WATER || (bt == B_TREE_LOG && *bid == B_LEAVES)) {
+				if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
 					*bid = bt;
 				}
 			};
@@ -253,9 +262,9 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 			int tree_height = 6;
 
 			for (int i=0; i<tree_height; ++i)
-				place_block(pos_chunk +int3(0,0,i), B_TREE_LOG);
+				place_block(pos_chunk +int3(0,0,i), TREE_LOG);
 
-			place_block_sphere(pos_chunk +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), B_LEAVES);
+			place_block_sphere(pos_chunk +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), LEAVES);
 		};
 
 		for (int3 p : tree_poss)

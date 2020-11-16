@@ -3,14 +3,16 @@
 #include "chunks.hpp"
 
 bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos_world) {
+	bool changed = false;
+#if 0
 	auto above = chunks.query_block(pos_world +int3(0,0,+1));
 
-	bool changed = false;
 
 	if (/*block_props[b->type].does_autoheal &&*/ b.hp < 255) {
 		b.hp += min((uint8_t)ceili(1.0f/25 / effective_frequency * 255), 255u - b.hp);
 		changed = true;
 	}
+
 	if (b.id == B_GRASS && !grass_can_live_below(above.id)) {
 		if (grass_die_prob > random.uniform()) {
 			b.id = B_EARTH;
@@ -54,6 +56,7 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos
 		}
 	}
 
+#endif
 	return changed;
 };
 

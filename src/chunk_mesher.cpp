@@ -200,7 +200,7 @@ struct ThreadChunkMesher {
 
 					auto id = chunk_data->id[cur];
 
-					if (id != B_AIR) {
+					if (g_blocks.blocks[id].collision != CM_GAS) {
 						//auto _b = get_timestamp();
 
 						block_pos = (float3)i;

@@ -3,6 +3,17 @@
 
 void from_json (json const& j, BlockTypes& t) {
 	
+	{ // B_NULL
+		BlockType b;
+
+		b.name = "null";
+		b.hardness = 1;
+		b.collision = CM_SOLID;
+		b.transparency = TM_OPAQUE;
+
+		t.blocks.push_back(std::move(b));
+	}
+
 	for (auto kv : j["blocks"].items()) {
 		BlockType b;
 
@@ -49,6 +60,8 @@ void from_json (json const& j, BlockTypes& t) {
 
 		t.blocks.push_back(std::move(b));
 	}
+
+	t.air_id = t.map_id("air");
 }
 
 BlockTypes load_blocks () {

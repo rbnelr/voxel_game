@@ -55,7 +55,7 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	if (block.damage >= 1) {
 		break_sound.play();
 
-		auto b = Block(B_AIR);
+		auto b = Block(g_blocks.air_id);
 		chunks.set_block(block.pos, b);
 	}
 }
