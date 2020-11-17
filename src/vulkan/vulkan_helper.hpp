@@ -51,6 +51,13 @@ template<> inline VkFormat get_format<AttribMode::UINT, uint8v2> () { return VK_
 template<> inline VkFormat get_format<AttribMode::UINT, uint8v3> () { return VK_FORMAT_R8G8B8_UINT; }
 template<> inline VkFormat get_format<AttribMode::UINT, uint8v4> () { return VK_FORMAT_R8G8B8A8_UINT; }
 
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8_t> () { return VK_FORMAT_R8_USCALED; }
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v2> () { return VK_FORMAT_R8G8_USCALED; }
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v3> () { return VK_FORMAT_R8G8B8_USCALED; }
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v4> () { return VK_FORMAT_R8G8B8A8_USCALED; }
+
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint16_t> () { return VK_FORMAT_R16_USCALED; }
+
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8_t> () { return VK_FORMAT_R8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v2> () { return VK_FORMAT_R8G8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v3> () { return VK_FORMAT_R8G8B8_UNORM; }
@@ -60,11 +67,11 @@ struct VertexAttributes {
 	VkVertexInputBindingDescription descr;
 	std::vector<VkVertexInputAttributeDescription> attribs;
 
-	void init (size_t vertex_size) {
+	void init (size_t vertex_size, bool instanced=false) {
 		descr = {};
 		descr.binding = 0;
 		descr.stride = (uint32_t)vertex_size;
-		descr.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		descr.inputRate = instanced ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
 	}
 
 	void add (VkFormat format, int location, char const* name, size_t offset) {

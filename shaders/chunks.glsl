@@ -7,26 +7,37 @@ layout(location = 0) vs2fs VS {
 } vs;
 
 #ifdef _VERTEX
-	layout(location = 0) in vec3	pos_model;
-	layout(location = 1) in vec2	uv;
-	layout(location = 2) in int		tex_indx;
+	layout(location = 0) in vec3	v_pos; // pos of voxel instance in chunk
+	layout(location = 1) in uint	v_meshid;
+	layout(location = 2) in float	v_texid;
 
 	layout(push_constant) uniform PC {
 		vec3 chunk_pos;
 	};
 
-	//uniform vec3 chunk_pos;
-	//uniform float sky_light_reduce;
 
-	float brightness_function (float light) {
-		return light * pow(1.0 / (2.0 - light), 4.0); 
-	}
+	const vec3 pos[6][4] = {
+		{ vec3(0,1,0), vec3(0,0,0), vec3(0,0,1), vec3(0,1,1) },
+		{ vec3(1,0,0), vec3(1,1,0), vec3(1,1,1), vec3(1,0,1) },
+		{ vec3(0,0,0), vec3(1,0,0), vec3(1,0,1), vec3(0,0,1) },
+		{ vec3(1,1,0), vec3(0,1,0), vec3(0,1,1), vec3(1,1,1) },
+		{ vec3(0,1,0), vec3(1,1,0), vec3(1,0,0), vec3(0,0,0) },
+		{ vec3(0,0,1), vec3(1,0,1), vec3(1,1,1), vec3(0,1,1) }
+	};
+	const vec2 uv[4] = { vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0) };
+
+	const int indices[6] = {
+		0,1,3, 3,1,2,
+	};
 
 	void main () {
-		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
+		int idx = indices[gl_VertexIndex % 6];
+		vec3 pos_model	= pos[v_meshid][idx];
+		vec2 uv			= uv[idx];
 
-		vs.uvi =		    vec3(uv, float(tex_indx));
-		//vs.brightness =		brightness_function( max(block_light, sky_light - sky_light_reduce) );
+		gl_Position =		world_to_clip * vec4(pos_model + v_pos + chunk_pos, 1);
+
+		vs.uvi =		    vec3(uv, v_texid);
 	}
 #endif
 

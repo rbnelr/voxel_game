@@ -3,29 +3,14 @@
 #include "chunks.hpp"
 #include "graphics.hpp"
 
-struct ChunkVertex {
-	float3	pos;
-	float2	uv;
-	int		tex_indx;
-
-	template <typename ATTRIBS>
-	static void attributes (ATTRIBS& a) {
-		int loc = 0;
-		a.init(sizeof(ChunkVertex));
-		a.template add<AttribMode::FLOAT, decltype(pos     )>(loc++, "pos"     , offsetof(ChunkVertex, pos     )); // ugh templates
-		a.template add<AttribMode::FLOAT, decltype(uv      )>(loc++, "uv"      , offsetof(ChunkVertex, uv      ));
-		a.template add<AttribMode::SINT,  decltype(tex_indx)>(loc++, "tex_indx", offsetof(ChunkVertex, tex_indx));
-	}
-};
-
 struct WorldGenerator;
 struct Assets;
 
-static constexpr uint64_t CHUNK_SLICE_BYTESIZE = 1 * (1024 * 1024);
-static constexpr uint64_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(ChunkVertex);
+static constexpr uint64_t CHUNK_SLICE_BYTESIZE = 1024 * 16;//1 * (1024 * 1024);
+static constexpr uint64_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
 
 struct ChunkSliceData {
-	ChunkVertex verts[CHUNK_SLICE_LENGTH];
+	BlockMeshInstance verts[CHUNK_SLICE_LENGTH];
 };
 
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
@@ -35,8 +20,8 @@ struct MeshData {
 
 	static constexpr int PREALLOC_SLICES = 1;
 
-	ChunkVertex* next_ptr = nullptr;
-	ChunkVertex* alloc_end = nullptr;
+	BlockMeshInstance* next_ptr = nullptr;
+	BlockMeshInstance* alloc_end = nullptr;
 
 	int used_slices = 0;
 	std::vector<ChunkSliceData*> slices;
@@ -73,7 +58,7 @@ struct MeshData {
 		slices.push_back( (ChunkSliceData*)malloc(CHUNK_SLICE_BYTESIZE) );
 	}
 
-	ChunkVertex* push () {
+	BlockMeshInstance* push () {
 		if (next_ptr == alloc_end) {
 			if (used_slices == (int)slices.size())
 				alloc_slice();

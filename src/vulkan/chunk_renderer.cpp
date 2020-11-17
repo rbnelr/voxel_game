@@ -92,7 +92,7 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 				auto& upload = uploads[slicei];
 
 				auto* vertices = upload.data->verts;
-				size_t size = sizeof(ChunkVertex) * upload.vertex_count;
+				size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
 
 				if (offs + size > ALLOC_SIZE)
 					break; // staging buffer would overflow, put this into next one
@@ -109,7 +109,7 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 
 				VkBufferCopy copy_region = {};
 				copy_region.srcOffset = offs;
-				copy_region.dstOffset = dst_offset * sizeof(ChunkVertex);
+				copy_region.dstOffset = dst_offset * sizeof(BlockMeshInstance);
 				copy_region.size = size;
 				vkCmdCopyBuffer(cmds, staging_buf.buf, dst_buf, 1, &copy_region);
 
@@ -144,7 +144,12 @@ void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipelin
 
 			vkCmdPushConstants(cmds, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 			
-			vkCmdDraw(cmds, slices[sid].vertex_count, 1, offset, 0);
+			assert(slices[sid].vertex_count > 0);
+
+			vkCmdDraw(cmds,
+				BlockMeshes::MERGE_INSTANCE_FACTOR, // repeat MERGE_INSTANCE_FACTOR vertices
+				slices[sid].vertex_count, // for each instance in the mesh
+				0, offset);
 		}
 	}
 }

@@ -9,90 +9,20 @@ static constexpr int offs (int3 offset) {
 }
 
 struct ThreadChunkMesher {
-	bool alpha_test;
-
 	ChunkData* chunk_data;
 	ChunkMesh* mesh;
 
 	uint64_t cur;
 
 	// per block
-	float3 block_pos;
+	uint8v3 block_pos;
 
 	BlockTile tile;
 	//std::vector<BlockMeshVertex> const* block_meshes;
 
-	bool bt_is_opaque (block_id id) {
-		auto t = g_blocks.blocks[id].transparency;
-		if (t == TM_OPAQUE)
-			return true;
-
-		if (!alpha_test)
-			return t == TM_ALPHA_TEST;
-
-		return false;
+	bool is_opaque (block_id id) {
+		return g_blocks.blocks[id].transparency == TM_OPAQUE;
 	}
-
-	static constexpr int face_offsets[6][4] = {
-		{ offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3(-1, 0,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3( 0,-1, 0)), offs(int3( 0,-1,-1)), offs(int3( 0, 0,-1)) },
-		{ offs(int3( 0,-1, 0)), offs(int3(-1,-1, 0)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1, 0,-1)), offs(int3( 0, 0,-1)) },
-		{ offs(int3( 0, 0,-1)), offs(int3(-1, 0,-1)), offs(int3(-1,-1,-1)), offs(int3( 0,-1,-1)) },
-		{ offs(int3( 0, 0, 0)), offs(int3(-1, 0, 0)), offs(int3(-1,-1, 0)), offs(int3( 0,-1, 0)) },
-	};
-
-	inline uint8_t calc_block_light (BlockFace face, int3 vert_pos) {
-		auto* block_light = &chunk_data->block_light[cur + offs(vert_pos)];
-		
-		int total = 0;
-
-		for (auto offset : face_offsets[face]) {
-			total += block_light[offset];
-		}
-		
-		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
-	}
-	inline uint8_t calc_sky_light (BlockFace face, int3 vert_pos) {
-		auto* sky_light = &chunk_data->sky_light[cur + offs(vert_pos)];
-
-		int total = 0;
-
-		for (auto offset : face_offsets[face]) {
-			total += sky_light[offset];
-		}
-
-		return (total * 255) / (4 * MAX_LIGHT_LEVEL);
-	}
-
-	// float3	pos_model;
-	// float2	uv;
-	// uint8	tex_indx;
-	// uint8	block_light;
-	// uint8	sky_light;
-	// uint8	hp;
-
-#define VERT(x,y,z, u,v, face) \
-		{ block_pos + float3(x,y,z), float2(u,v), (uint8)tile.calc_texture_index(face), \
-		  calc_block_light(face, int3(x,y,z)), calc_sky_light(face, int3(x,y,z)), cur->hp }
-
-#define POS \
-	{ {0,1,0}, {0,0,0}, {0,0,1}, {0,1,1} }, \
-	{ {1,0,0}, {1,1,0}, {1,1,1}, {1,0,1} }, \
-	{ {0,0,0}, {1,0,0}, {1,0,1}, {0,0,1} }, \
-	{ {1,1,0}, {0,1,0}, {0,1,1}, {1,1,1} }, \
-	{ {0,1,0}, {1,1,0}, {1,0,0}, {0,0,0} }, \
-	{ {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1} }, \
-
-	static constexpr float3 posf[6][4] = { POS };
-	static constexpr int3   pos[6][4]  = { POS };
-
-	static constexpr float2 uv[4]   = { {0,1}, {1,1}, {1,0}, {0,0} };
-
-	static constexpr int tri_oder[1][6] = {
-		{ 0,1,3, 3,1,2 },
-	//	{ 1,2,0, 0,2,3 },
-	};
 
 	static constexpr int offsets[6] = {
 		-1,
@@ -104,32 +34,16 @@ struct ThreadChunkMesher {
 	};
 
 	void face (MeshData* out, BlockFace facei) {
-
-		ChunkVertex vert[4];
-
-		float3 const* pf = posf[facei];
-		int3 const* p = pos[facei];
-
-		int tex_indx = tile.calc_tex_index(facei, 0);
-
-		for (int i=0; i<4; ++i)
-			vert[i].pos			= block_pos + pf[i];
-		for (int i=0; i<4; ++i)
-			vert[i].uv			= uv[i];
-		for (int i=0; i<4; ++i)
-			vert[i].tex_indx	= tex_indx;
-
-		//int const* order = tri_oder[(int)b];
-		int const* order = tri_oder[0];
-		for (int i=0; i<6; ++i) {
-			*out->push() = vert[order[i]];
-		}
+		auto* v = out->push();
+		v->pos = block_pos;
+		v->texid = tile.calc_tex_index(facei, 0);
+		v->meshid = facei;
 	}
 
 	void cube_opaque () {
 		for (int i=0; i<6; ++i) {
 			block_id n = chunk_data->id[cur + offsets[i]];
-			if (!bt_is_opaque(n))
+			if (!is_opaque(n))
 				face(&mesh->opaque_vertices, (BlockFace)i);
 		}
 	}
@@ -137,7 +51,7 @@ struct ThreadChunkMesher {
 		for (int i=0; i<6; ++i) {
 			block_id n = chunk_data->id[cur + offsets[i]];
 			block_id b = chunk_data->id[cur];
-			if (!bt_is_opaque(n) && n != b)
+			if (!is_opaque(n) && n != b)
 				face(&mesh->tranparent_vertices, (BlockFace)i);
 		}
 	}
@@ -203,7 +117,7 @@ struct ThreadChunkMesher {
 					if (g_blocks.blocks[id].collision != CM_GAS) {
 						//auto _b = get_timestamp();
 
-						block_pos = (float3)i;
+						block_pos = (uint8v3)i;
 
 						tile = assets.block_tiles[id];
 						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];

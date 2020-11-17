@@ -26,11 +26,95 @@ struct BlockTile {
 	}
 };
 
+// Vertex for rendering chunks via merge instancing
+// one vertex is expanded to a set (6 tris) of block mesh data
+struct BlockMeshInstance {
+	uint8v3		pos; // pos in chunk
+	uint8_t		meshid; // index for merge instancing, this is used to index block meshes
+	uint16_t	texid; // texture array id based on block id
+
+	template <typename ATTRIBS>
+	static void attributes (ATTRIBS& a) {
+		int loc = 0;
+		a.init(sizeof(BlockMeshInstance), true);
+		a.template add<AttribMode::UINT2FLT, decltype(pos   )>(loc++, "pos"   , offsetof(BlockMeshInstance, pos   ));
+		a.template add<AttribMode::UINT,     decltype(meshid)>(loc++, "meshid", offsetof(BlockMeshInstance, meshid));
+		a.template add<AttribMode::UINT2FLT, decltype(texid )>(loc++, "texid" , offsetof(BlockMeshInstance, texid ));
+	}
+};
+// Vertex for block meshes which are used when rendering chunks via merge instancing
+struct BlockMeshVertex {
+	float3		pos;
+	float3		normal;
+	float2		uv;
+
+	template <typename ATTRIBS>
+	static void attributes (ATTRIBS& a) {
+		int loc = 0;
+		a.init(sizeof(BlockMeshVertex));
+		a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(BlockMeshVertex, pos   ));
+		a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(BlockMeshVertex, normal));
+		a.template add<AttribMode::FLOAT, decltype(uv    )>(loc++, "uv"    , offsetof(BlockMeshVertex, uv    ));
+	}
+};
+
+
+struct BlockMeshes {
+	static constexpr int MERGE_INSTANCE_FACTOR = 6; // how many vertices are emitted per input vertex (how big is one slice of block mesh)
+
+	struct Mesh {
+		int offset;
+		int length; // number of mesh slices
+	};
+	struct MeshSlice {
+		BlockMeshVertex vertices[MERGE_INSTANCE_FACTOR];
+	};
+
+	std::vector<MeshSlice>	slices;
+	std::vector<Mesh>		meshes;
+};
+
 struct Assets {
 	
 	std::vector<BlockTile> block_tiles;
 
-	inline void load_block_textures (json const& blocks_json) {
+	BlockMeshes generate_block_meshes (json const& blocks_json) {
+		BlockMeshes bm;
+
+		static constexpr float3 pos[6][4] = {
+			{ {0,1,0}, {0,0,0}, {0,0,1}, {0,1,1} },
+			{ {1,0,0}, {1,1,0}, {1,1,1}, {1,0,1} },
+			{ {0,0,0}, {1,0,0}, {1,0,1}, {0,0,1} },
+			{ {1,1,0}, {0,1,0}, {0,1,1}, {1,1,1} },
+			{ {0,1,0}, {1,1,0}, {1,0,0}, {0,0,0} },
+			{ {0,0,1}, {1,0,1}, {1,1,1}, {0,1,1} } };
+		static constexpr float3 normals[6] = { {-1,0,0}, {+1,0,0}, {0,-1,0}, {0,+1,0}, {0,0,-1}, {0,0,+1} };
+		static constexpr float2 uv[4] = { {0,1}, {1,1}, {1,0}, {0,0} };
+
+		static constexpr int indices[6] = {
+			0,1,3, 3,1,2,
+			// 1,2,0, 0,2,3,
+		};
+
+		bm.slices.resize(6);
+
+		for (int face=0; face<6; ++face) {
+			for (int vert=0; vert<6; ++vert) {
+				int idx = indices[vert];
+
+				auto& v = bm.slices[face].vertices[vert];
+				v.pos		= pos[face][idx];
+				v.normal	= normals[face];
+				v.uv		= uv[idx];
+			}
+
+			block_tiles.push_back({ face, 1 });
+		}
+
+		return bm;
+	}
+
+	void load_block_textures (json const& blocks_json) {
 		{ // B_NULL
 			block_tiles.push_back({});
 		}

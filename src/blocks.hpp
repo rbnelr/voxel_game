@@ -15,10 +15,10 @@ enum collision_mode : uint8_t {
 NLOHMANN_JSON_SERIALIZE_ENUM(collision_mode, {{CM_GAS, "gas"}, {CM_BREAKABLE, "breakable"}, {CM_LIQUID, "liquid"}, {CM_SOLID, "solid"}})
 
 enum transparency_mode : uint8_t {
+	TM_OPAQUE		, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
 	TM_TRANSPARENT	, // see-through blocks              :  all faces facing non-opaque blocks except faces facing blocks of the same type are rendered (like water where only the surface is visible)
 	TM_ALPHA_TEST	, // blocks with holes               :  all faces facing non-opaque blocks of these blocks are rendered (like leaves)
-	TM_PARTIAL		, // objects not filling the voxel   :  all faces of these blocks are rendered (like leaves)
-	TM_OPAQUE		, // normal blocks which are opaque  :  only opaque to non-opaque faces are rendered
+	TM_PARTIAL		, // objects not filling the voxel   :  all faces of these blocks are rendered
 };
 NLOHMANN_JSON_SERIALIZE_ENUM(transparency_mode, {{TM_TRANSPARENT, "transparent"}, {TM_ALPHA_TEST, "alpha_test"}, {TM_PARTIAL, "partial"}, {TM_OPAQUE, "opaque"}})
 

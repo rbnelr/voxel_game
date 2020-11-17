@@ -74,7 +74,10 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		VK_CHECK_RESULT(vkBeginCommandBuffer(cmds, &begin_info));
 	}
 
-	chunk_renderer.upload_remeshed(ctx.dev, ctx.pdev, cur_frame, cmds);
+	{
+		TracyVkZone(ctx.tracy_ctx, cmds, "upload_remeshed");
+		chunk_renderer.upload_remeshed(ctx.dev, ctx.pdev, cur_frame, cmds);
+	}
 
 	{ // main render pass
 		{
@@ -128,24 +131,27 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 			render_pass_info.renderArea.extent = { (uint32_t)ctx.wnd_size.x, (uint32_t)ctx.wnd_size.y };
 			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 		}
-		TracyVkZone(ctx.tracy_ctx, cmds, "ui_renderpass");
-
-		set_viewport(cmds, ctx.wnd_size);
 
 		{
-			TracyVkZone(ctx.tracy_ctx, cmds, "rescale draw");
+			TracyVkZone(ctx.tracy_ctx, cmds, "ui_renderpass");
+
+			set_viewport(cmds, ctx.wnd_size);
 
 			{
-				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 0, 1,
-					&rescale_descriptor_set, 0, nullptr);
+				TracyVkZone(ctx.tracy_ctx, cmds, "rescale draw");
+
+				{
+					vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 0, 1,
+						&rescale_descriptor_set, 0, nullptr);
+				}
+
+				vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline);
+
+				vkCmdDraw(cmds, 3, 1, 0, 0);
 			}
 
-			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline);
-
-			vkCmdDraw(cmds, 3, 1, 0, 0);
+			ctx.imgui_draw(cmds);
 		}
-
-		ctx.imgui_draw(cmds);
 	}
 	vkCmdEndRenderPass(cmds);
 
@@ -223,7 +229,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 			{{ VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3) }});
 
 		main_pipeline = create_main_pipeline(shaders.get(ctx.dev, "chunks"),
-			main_renderpass, main_pipeline_layout, msaa, make_attribs<ChunkVertex>());
+			main_renderpass, main_pipeline_layout, msaa, make_attribs<BlockMeshInstance>());
 	}
 
 	{
@@ -594,7 +600,7 @@ VkPipeline Renderer::create_main_pipeline (Shader* shader, VkRenderPass renderpa
 	VkPipelineRasterizationStateCreateInfo rasterizer = {};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE; // TODO: enable for alpha test
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
