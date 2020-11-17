@@ -200,6 +200,7 @@
     <ClInclude Include="..\..\..\src\kisslib\collision.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\file_io.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\geometry.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\image.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />

@@ -1,27 +1,31 @@
 #include "common.hpp"
 #include "blocks.hpp"
 
-void from_json (json const& j, BlockTypes& t) {
+void BlockTypes::from_json (json const& blocks_json) {
+	ZoneScoped;
 	
 	{ // B_NULL
-		BlockType b;
+		Block b;
 
 		b.name = "null";
 		b.hardness = 1;
 		b.collision = CM_SOLID;
 		b.transparency = TM_OPAQUE;
 
-		t.blocks.push_back(std::move(b));
+		//name_map.emplace(b.name, (block_id)blocks.size());
+		blocks.push_back(std::move(b));
 	}
 
-	for (auto kv : j["blocks"].items()) {
-		BlockType b;
+	for (auto& kv : blocks_json["blocks"].items()) {
+		Block b;
 
 		b.name = kv.key();
 		auto val = kv.value();
 
 		// get block 'class' which eases the block config by setting block parameter defaults depending on class
 		std::string cls = "solid";
+
+	#define GET(val, member) if ((val).contains(member)) (val).at(member)
 
 		if (val.contains("class")) val.at("class").get_to(cls);
 
@@ -42,28 +46,17 @@ void from_json (json const& j, BlockTypes& t) {
 			b.absorb = 1;
 		}
 
-		if (val.contains("size")) val.at("size").get_to(b.size);
-		if (val.contains("mesh")) val.at("mesh").get_to(b.mesh_type);
-		if (val.contains("tex-type")) val.at("tex-type").get_to(b.tex_type);
-		if (val.contains("variations")) val.at("variations").get_to(b.variations);
+		GET(val, "size")		.get_to(b.size);
+		GET(val, "collision")	.get_to(b.collision);
+		GET(val, "transparency").get_to(b.transparency);
+		GET(val, "tool")		.get_to(b.tool);
+		GET(val, "hardness")	.get_to(b.hardness);
+		GET(val, "glow")		.get_to(b.glow);
+		GET(val, "absorb")		.get_to(b.absorb);
 
-		if (val.contains("alpha-test") && val.at("alpha-test").get<bool>()) {
-			b.transparency = TM_ALPHA_TEST;
-		}
-
-		if (val.contains("collision")) val.at("collision").get_to(b.collision);
-		if (val.contains("transparency")) val.at("transparency").get_to(b.transparency);
-		if (val.contains("tool")) val.at("tool").get_to(b.tool);
-		if (val.contains("hardness")) val.at("hardness").get_to(b.hardness);
-		if (val.contains("glow")) val.at("glow").get_to(b.glow);
-		if (val.contains("absorb")) val.at("absorb").get_to(b.absorb);
-
-		t.blocks.push_back(std::move(b));
+		//name_map.emplace(b.name, (block_id)blocks.size());
+		blocks.push_back(std::move(b));
 	}
 
-	t.air_id = t.map_id("air");
-}
-
-BlockTypes load_blocks () {
-	return load<BlockTypes>("blocks.json");
+	air_id = map_id("air");
 }

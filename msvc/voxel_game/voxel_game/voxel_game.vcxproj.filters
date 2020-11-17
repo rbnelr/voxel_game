@@ -188,6 +188,9 @@
     <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\image.hpp">
+      <Filter>kisslib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">

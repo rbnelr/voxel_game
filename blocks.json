@@ -1,13 +1,56 @@
 {
-	"blocks" : {
-		"air"		: { "class": "gas" },
-		"water"		: { "class": "liquid",					"tex-type": "top-side" },
-		"earth"		: { "hardness":  3, "tool": "shovel" },
-		"grass"		: { "hardness":  3, "tool": "shovel",	"tex-type": "top-side-bottom" },
-		"stone"		: { "hardness": 20, "tool": "pickaxe" },
-		"tree_log"	: { "hardness":  7, "tool": "axe",		"tex-type": "top-side" },
-		"leaves"	: { "hardness":  2, "alpha-test": true },
-		"torch"		: { "class": "deco", "mesh": "box", "glow": 18, "size": [2,2,10], "tex-type": "top-side-bottom"  },
-		"tallgrass"	: { "class": "deco", "mesh": "X", "variations": 4 }
+	"blocks": {
+
+		"air": {
+			"class": "gas"
+		},
+
+		"water": {
+			"class": "liquid",
+			"tex": { "top-bottom": [0,5], "side": [0,6] }
+		},
+
+		"earth": {
+			"hardness": 3,
+			"tool": "shovel",
+			"tex": [1,2]
+		},
+		"grass": {
+			"hardness": 3,
+			"tool": "shovel",
+			"tex": { "top": [1,0], "side": [1,1], "bottom": [1,2] }
+		},
+
+		"stone": {
+			"tex": [2,0],
+			"tool": "pickaxe",
+			"hardness": 20
+		},
+
+		"tree_log": {
+			"hardness": 7,
+			"tool": "axe",
+			"tex": { "top-bottom": [0,1], "side": [0,2] }
+		},
+		"leaves": {
+			"hardness": 2,
+			"tex": [2,1],
+			"transparency": "alpha_test"
+		},
+
+		"torch": {
+			"class": "deco",
+			"glow": 18,
+			"mesh": "box",
+			"size": [2,2,10],
+			"tex": { "top": [0,4, 7,6], "side": [0,4, 7,6], "bottom": [0,4, 7,17] }
+		},
+
+		"tallgrass": {
+			"class": "deco",
+			"mesh": "X",
+			"tex": [2,2],
+			"variants": 4
+		}
 	}
 }

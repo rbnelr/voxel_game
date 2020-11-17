@@ -19,7 +19,7 @@ struct ThreadChunkMesher {
 	// per block
 	float3 block_pos;
 
-	BlockTileInfo tile;
+	BlockTile tile;
 	//std::vector<BlockMeshVertex> const* block_meshes;
 
 	bool bt_is_opaque (block_id id) {
@@ -87,7 +87,7 @@ struct ThreadChunkMesher {
 	static constexpr float3 posf[6][4] = { POS };
 	static constexpr int3   pos[6][4]  = { POS };
 
-	static constexpr float2 uv[4]   = { {0,0}, {1,0}, {1,1}, {0,1} };
+	static constexpr float2 uv[4]   = { {0,1}, {1,1}, {1,0}, {0,0} };
 
 	static constexpr int tri_oder[1][6] = {
 		{ 0,1,3, 3,1,2 },
@@ -110,7 +110,7 @@ struct ThreadChunkMesher {
 		float3 const* pf = posf[facei];
 		int3 const* p = pos[facei];
 
-		int tex_indx = tile.calc_texture_index(facei);
+		int tex_indx = tile.calc_tex_index(facei, 0);
 
 		for (int i=0; i<4; ++i)
 			vert[i].pos			= block_pos + pf[i];
@@ -205,7 +205,7 @@ struct ThreadChunkMesher {
 
 						block_pos = (float3)i;
 
-						tile = assets.block_tile_info[id];
+						tile = assets.block_tiles[id];
 						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];
 
 						//if (mesh_info.offset < 0) {

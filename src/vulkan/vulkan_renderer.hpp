@@ -46,103 +46,6 @@ struct ViewUniforms {
 	}
 };
 
-struct UploadData {
-	void* data;
-	size_t size;
-	VkBufferUsageFlags usage;
-
-	VkBuffer vkbuf;
-	VkMemoryRequirements mem_req;
-	size_t vkoffset;
-};
-
-struct StaticDataUploader {
-
-	struct StagingAllocation {
-		Allocation staging_buf;
-		VkBuffer staging_target_buf;
-	};
-
-	VkCommandBuffer cmds;
-	std::vector<StagingAllocation> allocs;
-	
-	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, std::vector<UploadData>& data) {
-		// Create buffers and calculate offets into memory block
-		size_t size = 0;
-		uint32_t mem_req_bits = (uint32_t)-1;
-
-		for (auto& b : data) {
-			VkBufferCreateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			info.size = b.size;
-			info.usage = b.usage;
-			info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-			VK_CHECK_RESULT(vkCreateBuffer(dev, &info, nullptr, &b.vkbuf));
-
-			vkGetBufferMemoryRequirements(dev, b.vkbuf, &b.mem_req);
-
-			size = align_up(size, b.mem_req.alignment);
-			b.vkoffset = size;
-			size += b.mem_req.size;
-
-			mem_req_bits &= b.mem_req.memoryTypeBits;
-		}
-
-		// alloc cpu-visible staging buffer
-		auto staging_buf = allocate_buffer(dev, pdev, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-		// alloc gpu-resident memory and create a temporary target buffer for batching the upload of all buffers (vkCmdCopyBuffer cannot deal with VkDeviceMemory)
-		VkBuffer staging_target_buf;
-		VkDeviceMemory mem;
-
-		VkBufferCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		info.size = size;
-		info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		VK_CHECK_RESULT(vkCreateBuffer(dev, &info, nullptr, &staging_target_buf));
-
-		VkMemoryAllocateInfo alloc_info = {};
-		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		alloc_info.allocationSize = size;
-		alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-		VK_CHECK_RESULT(vkAllocateMemory(dev, &alloc_info, nullptr, &mem));
-
-		vkBindBufferMemory(dev, staging_target_buf, mem, 0);
-
-		// upload buffers and bind buffers to memory
-		void* ptr = nullptr;
-		vkMapMemory(dev, staging_buf.mem, 0, size, 0, &ptr);
-
-		for (auto& b : data) {
-			memcpy((char*)ptr + b.vkoffset, b.data, b.size);
-
-			vkBindBufferMemory(dev, b.vkbuf, mem, b.vkoffset);
-		}
-
-		vkUnmapMemory(dev, staging_buf.mem);
-
-		// upload data by copying staging buffer to gpu
-		VkBufferCopy copy_region = {};
-		copy_region.srcOffset = 0;
-		copy_region.dstOffset = 0;
-		copy_region.size = size;
-		vkCmdCopyBuffer(cmds, staging_buf.buf, staging_target_buf, 1, &copy_region);
-
-		return mem;
-	}
-
-	void end (VkDevice dev) {
-		for (auto& a : allocs) {
-			vkDestroyBuffer(dev, a.staging_buf.buf   , nullptr);
-			vkDestroyBuffer(dev, a.staging_target_buf, nullptr);
-			vkFreeMemory   (dev, a.staging_buf.mem   , nullptr);
-		}
-	}
-};
-
 struct Renderer {
 	VulkanWindowContext			ctx;
 
@@ -178,6 +81,7 @@ struct Renderer {
 
 	VkDeviceMemory				ubo_memory;
 	VkDeviceMemory				mesh_mem;
+	VkDeviceMemory				tex_mem;
 
 	//// Renderpasses
 	// Main renderpass (skybox, 3d world and 3d first person)
@@ -191,6 +95,9 @@ struct Renderer {
 	VkPipelineLayout			main_pipeline_layout;
 	VkPipeline					main_pipeline;
 
+	VkSampler					main_sampler;
+	Texture						tilemap_img;
+
 	// UI renderpass (game ui + imgui)
 	// initial image is main_color rescaled, rendered at window_res
 	VkRenderPass				ui_renderpass;
@@ -201,6 +108,10 @@ struct Renderer {
 
 	VkDescriptorSet				rescale_descriptor_set;
 	VkSampler					rescale_sampler;
+
+	ChunkRenderer				chunk_renderer;
+
+	Assets						assets;
 
 	float						renderscale = 1.0f;
 	int2						renderscale_size = -1;
@@ -218,10 +129,7 @@ struct Renderer {
 		imgui_pop();
 	}
 
-	//
-	ChunkRenderer				chunk_renderer;
-
-	Renderer (GLFWwindow* window, char const* app_name);
+	Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json);
 	~Renderer ();
 
 	void set_view_uniforms (Camera_View& view, int2 viewport_size);

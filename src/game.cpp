@@ -8,8 +8,6 @@ Game::Game () {
 	//set_thread_high_priority();
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
-
-	g_blocks = load_blocks();
 }
 
 // try to do all debug guis in here,
@@ -133,6 +131,6 @@ RenderData Game::update (Window& window, Input& I) {
 
 	return {
 		view, I.window_size,
-		world->chunks, assets, world->world_gen
+		world->chunks, world->world_gen
 	};
 }

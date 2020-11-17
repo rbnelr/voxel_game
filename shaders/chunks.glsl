@@ -2,8 +2,7 @@
 #include "common.glsl"
 
 layout(location = 0) vs2fs VS {
-	vec2	uv;
-	float	tex_indx;
+	vec3	uvi; // uv + tex_index
 	//float	brightness;
 } vs;
 
@@ -26,22 +25,20 @@ layout(location = 0) vs2fs VS {
 	void main () {
 		gl_Position =		world_to_clip * vec4(pos_model + chunk_pos, 1);
 
-		vs.uv =		        uv;
-		vs.tex_indx =		float(tex_indx);
+		vs.uvi =		    vec3(uv, float(tex_indx));
 		//vs.brightness =		brightness_function( max(block_light, sky_light - sky_light_reduce) );
 	}
 #endif
 
 #ifdef _FRAGMENT
-	//uniform	sampler2DArray tile_textures;
+	layout(set = 0, binding = 1) uniform sampler2DArray textures;
 
 	#define ALPHA_TEST
 
 	#define ALPHA_TEST_THRES 127.0
 
 	void main () {
-		vec4 col = vec4(vs.uv, 0.0, 1.0);
-		//vec4 col = texture(tile_textures, vec3(vs.uv, vs.tex_indx));
+		vec4 col = texture(textures, vs.uvi);
 		
 		//col.rgb *= vec3(vs.brightness);
 		

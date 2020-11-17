@@ -126,7 +126,60 @@ VkImage create_image (VkDevice device, VkPhysicalDevice pdev,
 	VkImageLayout initial_layout, VkMemoryPropertyFlags props,
 	VkDeviceMemory* out_image_memory, int mip_levels = 1, VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT);
 
-VkImageView create_image_view (VkDevice device, VkImage image, VkFormat format, VkImageAspectFlags aspect);
+VkImageView create_image_view (VkDevice device, VkImage image, VkFormat format, int layers=1, VkImageAspectFlags aspect=VK_IMAGE_ASPECT_COLOR_BIT);
+
+////
+struct UploadBuffer {
+	void*					data = nullptr;
+	size_t					size;
+	VkBufferUsageFlags		usage;
+
+	VkBuffer				vkbuf;
+	size_t					vkoffset;
+	VkMemoryRequirements	mem_req;
+};
+
+struct Texture {
+	VkImage		img;
+	VkImageView	img_view;
+};
+
+struct UploadTexture {
+	void*					data = nullptr;
+	int2					size;
+	int						layers = 1;
+	int						mip_levels = 1;
+	VkFormat				format = VK_FORMAT_R8G8B8A8_SRGB;
+	VkBufferUsageFlags		usage = VK_IMAGE_USAGE_SAMPLED_BIT;
+	VkImageLayout			layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // initial layout
+	VkSampleCountFlagBits	samples = (VkSampleCountFlagBits)1;
+
+	Texture					vkimg;
+	size_t					vkoffset;
+	VkMemoryRequirements	mem_req;
+};
+
+struct StaticDataUploader {
+	VkCommandBuffer cmds;
+
+	struct StagingAllocation {
+		Allocation staging_buf;
+		VkBuffer staging_target_buf = VK_NULL_HANDLE;
+	};
+	std::vector<StagingAllocation> staging_allocs;
+
+	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadBuffer* uploads, int uploads_count);
+	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadTexture* uploads, int uploads_count);
+
+	void end (VkDevice dev) {
+		for (auto& a : staging_allocs) {
+			vkDestroyBuffer(dev, a.staging_buf.buf   , nullptr);
+			if (a.staging_target_buf)
+				vkDestroyBuffer(dev, a.staging_target_buf, nullptr);
+			vkFreeMemory   (dev, a.staging_buf.mem   , nullptr);
+		}
+	}
+};
 
 inline VkPipelineLayout create_pipeline_layout (VkDevice dev,
 		std::initializer_list<VkDescriptorSetLayout> descriptor_sets,

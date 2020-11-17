@@ -134,7 +134,7 @@ static constexpr uint16_t MAX_CHUNKS = (1<<16) - 2; // -2 to fit max_id in 16 bi
 
 inline float chunk_dist_sq (int3 pos, float3 dist_to) {
 	int3 chunk_origin = pos * CHUNK_SIZE;
-	return point_box_nearest_dist((float3)chunk_origin, CHUNK_SIZE, dist_to);
+	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
 }
 
 struct Chunks {

@@ -141,12 +141,17 @@ void frameloop (Window& window) {
 	std::unique_ptr<Game> game;
 
 	{
-		ZoneScopedN("Renderer::Renderer()");
-		renderer = std::make_unique<Renderer>(window.window, APPNAME);
-	}
-	{
-		ZoneScopedN("Game::Game()");
-		game = std::make_unique<Game>();
+		json blocks_json = load_json("blocks.json");
+		g_blocks.from_json(blocks_json);
+
+		{
+			ZoneScopedN("Game::Game()");
+			game = std::make_unique<Game>();
+		}
+		{
+			ZoneScopedN("Renderer::Renderer()");
+			renderer = std::make_unique<Renderer>(window.window, APPNAME, blocks_json);
+		}
 	}
 
 	glfw_input_pre_gameloop(window);

@@ -13,7 +13,7 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
 		for (chunk_id id = 0; id < data.chunks.max_id; ++id) {
 			if ((data.chunks[id].flags & Chunk::REMESH) == 0) continue;
-			remesh_jobs.push_back(std::make_unique<RemeshChunkJob>(&data.chunks[id], data.chunks, data.assets, data.wg, r));
+			remesh_jobs.push_back(std::make_unique<RemeshChunkJob>(&data.chunks[id], data.chunks, r.assets, data.wg, r));
 		}
 	}
 

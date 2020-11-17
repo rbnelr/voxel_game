@@ -111,6 +111,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 
 	{ // ui render pass
 		
+		// TODO: Do I need VkImageMemoryBarrier here or is the barrier itself enough if I don't need a layout transition?
+		// (layout is transitioned in the renderpass)
 		//VkImageMemoryBarrier ;
 		vkCmdPipelineBarrier(cmds,
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -181,7 +183,7 @@ void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 	cur_frame = (cur_frame + 1) % FRAMES_IN_FLIGHT;
 }
 
-Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
+Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json): ctx{window, app_name} {
 	ZoneScoped;
 
 	wnd_color_format = ctx.swap_chain.format.format;
@@ -201,11 +203,15 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_n
 
 	create_frame_data();
 
+	assets.load_block_textures(blocks_json);
+
 	chunk_renderer.create(ctx.dev, ctx.pdev, FRAMES_IN_FLIGHT);
 	shaders.init(ctx.dev);
 	
 	create_descriptor_pool();
 	create_ubo_buffers();
+
+	upload_static_data();
 	
 	{
 		create_main_descriptors();
@@ -230,8 +236,6 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name): ctx{window, app_n
 		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
 			ui_renderpass, rescale_pipeline_layout);
 	}
-
-	upload_static_data();
 }
 Renderer::~Renderer () {
 	ZoneScoped;
@@ -247,11 +251,13 @@ Renderer::~Renderer () {
 		vkDestroyPipeline(ctx.dev, rescale_pipeline, nullptr);
 	vkDestroyPipelineLayout(ctx.dev, rescale_pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(ctx.dev, rescale_descriptor_layout, nullptr);
+	vkDestroySampler(ctx.dev, rescale_sampler, nullptr);
 
 	if (main_pipeline)
 		vkDestroyPipeline(ctx.dev, main_pipeline, nullptr);
 	vkDestroyPipelineLayout(ctx.dev, main_pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(ctx.dev, main_descriptor_layout, nullptr);
+	vkDestroySampler(ctx.dev, main_sampler, nullptr);
 
 	destroy_main_framebuffer();
 
@@ -280,22 +286,55 @@ void Renderer::upload_static_data () {
 	ZoneScoped;
 	
 	StaticDataUploader uploader;
-
 	auto cmds = begin_init_cmds();
 	uploader.cmds = cmds;
 
-	//mesh_mem = uploader.upload(ctx.dev, ctx.pdev, meshes);
+	{
+		//mesh_mem = uploader.upload(ctx.dev, ctx.pdev, meshes);
+	}
+
+	{
+		Image<srgba8> img;
+		img.load_from_file("textures/atlas.png", &img);
+		assert(img.size == int2(16*TILEMAP_SIZE));
+
+		// place layers at y dir so ot make the memory contiguous
+		Image<srgba8> img_arr (int2(16, 16 * TILEMAP_SIZE.x * TILEMAP_SIZE.y));
+		{ // convert texture atlas/tilemap into texture array for proper sampling in shader
+			for (int y=0; y<TILEMAP_SIZE.y; ++y) {
+				for (int x=0; x<TILEMAP_SIZE.x; ++x) {
+					Image<srgba8>::blit_rect(
+						img, int2(x,y)*16,
+						img_arr, int2(0, (y * TILEMAP_SIZE.x + x) * 16),
+						16);
+				}
+			}
+		}
+
+		UploadTexture texs[1];
+		texs[0].data = img_arr.pixels;
+		texs[0].size = int2(16, 16);
+		texs[0].layers = TILEMAP_SIZE.x * TILEMAP_SIZE.y;
+		texs[0].format = VK_FORMAT_R8G8B8A8_SRGB;
+		tex_mem = uploader.upload(ctx.dev, ctx.pdev, texs, ARRLEN(texs));
+
+		tilemap_img = { texs[0].vkimg };
+	}
 
 	ctx.imgui_create(cmds, FRAMES_IN_FLIGHT);
 
 	end_init_cmds(cmds);
-
 	uploader.end(ctx.dev);
 }
 void Renderer::destroy_static_data () {
 	//for (auto& b : meshes)
 	//	vkDestroyBuffer(ctx.dev, b.vkbuf, nullptr);
 	//vkFreeMemory(ctx.dev, mesh_mem, nullptr);
+
+	vkFreeMemory(ctx.dev, tex_mem, nullptr);
+
+	vkDestroyImageView(ctx.dev, tilemap_img.img_view, nullptr);
+	vkDestroyImage(ctx.dev, tilemap_img.img, nullptr);
 
 	ctx.imgui_destroy();
 }
@@ -348,7 +387,9 @@ void Renderer::destroy_ubo_buffers () {
 void Renderer::create_descriptor_pool () {
 	VkDescriptorPoolSize pool_sizes[2] = {};
 	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_sizes[0].descriptorCount = 1; // for rescale
+	pool_sizes[0].descriptorCount = (uint32_t)(
+		1 + // for rescale
+		FRAMES_IN_FLIGHT); // for main image
 
 	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT; // for ubo
@@ -358,7 +399,7 @@ void Renderer::create_descriptor_pool () {
 	info.poolSizeCount = ARRLEN(pool_sizes);
 	info.pPoolSizes = pool_sizes;
 	info.maxSets = (uint32_t)(
-		FRAMES_IN_FLIGHT // for ubo
+		FRAMES_IN_FLIGHT // for main
 		+1); // for rescale
 
 	VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
@@ -366,17 +407,35 @@ void Renderer::create_descriptor_pool () {
 
 void Renderer::create_main_descriptors () {
 	{ // create descriptor layout
-		VkDescriptorSetLayoutBinding binding = {};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding.descriptorCount = 1;
-		binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		//binding.pImmutableSamplers = nullptr;
+		VkSamplerCreateInfo sampler_info = {};
+		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_info.magFilter = VK_FILTER_NEAREST;
+		sampler_info.minFilter = VK_FILTER_LINEAR;
+		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT; // could in theory create multiple samplers and select them in the shader to avoid ugly wrapping for blocks like grass that show a sliver of grass at the bottom
+		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+		sampler_info.anisotropyEnable = VK_FALSE;
+		sampler_info.minLod = 0;
+		sampler_info.maxLod = 0;
+		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &main_sampler);
+		
+		VkDescriptorSetLayoutBinding bindings[2] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		bindings[1].pImmutableSamplers = &main_sampler;
 
 		VkDescriptorSetLayoutCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		info.bindingCount = 1;
-		info.pBindings = &binding;
+		info.bindingCount = ARRLEN(bindings);
+		info.pBindings = bindings;
 
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &main_descriptor_layout));
 	}
@@ -398,22 +457,34 @@ void Renderer::create_main_descriptors () {
 		for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
 			frame_data[i].ubo_descriptor_set = sets[i];
 
-			VkDescriptorBufferInfo buf_info = {};
-			buf_info.buffer = frame_data[i].ubo_buffer;
-			buf_info.offset = 0;
-			buf_info.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
+			VkWriteDescriptorSet writes[2] = {};
+			
+			VkDescriptorBufferInfo buf = {};
+			buf.buffer = frame_data[i].ubo_buffer;
+			buf.offset = 0;
+			buf.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
 
-			VkWriteDescriptorSet write = {};
-			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			write.dstSet = sets[i];
-			write.dstBinding = 0;
-			write.dstArrayElement = 0;
-			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			write.descriptorCount = 1;
-			write.pBufferInfo = &buf_info;
-			//write.pImageInfo = nullptr;
-			//write.pTexelBufferView = nullptr;
-			vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
+			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[0].dstSet = sets[i];
+			writes[0].dstBinding = 0;
+			writes[0].dstArrayElement = 0;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writes[0].descriptorCount = 1;
+			writes[0].pBufferInfo = &buf;
+
+			VkDescriptorImageInfo img = {};
+			img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			img.imageView = tilemap_img.img_view;
+
+			writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[1].dstSet = sets[i];
+			writes[1].dstBinding = 1;
+			writes[1].dstArrayElement = 0;
+			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[1].descriptorCount = 1;
+			writes[1].pImageInfo = &img;
+
+			vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
 		}
 	}
 }
@@ -820,7 +891,7 @@ void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 RenderBuffer Renderer::create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa) {
 	RenderBuffer buf;
 	buf.image = create_image(ctx.dev, ctx.pdev, size, format, VK_IMAGE_TILING_OPTIMAL, usage, initial_layout, props, &buf.memory, 1, (VkSampleCountFlagBits)msaa);
-	buf.image_view = create_image_view(ctx.dev, buf.image, format, aspect);
+	buf.image_view = create_image_view(ctx.dev, buf.image, format, 1, aspect);
 	return buf;
 }
 

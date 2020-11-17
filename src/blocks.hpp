@@ -36,53 +36,43 @@ inline constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
 inline constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
 inline constexpr int MAX_LIGHT_LEVEL = 18;
 
-enum class BlockMeshType : uint8_t {
-	BLOCK, // normal 1^3 block
-	BOX, // non 1^3 sized box shape (size is the size in 1/16th)
-	X, // X shaped sprite plant
-};
-NLOHMANN_JSON_SERIALIZE_ENUM(BlockMeshType, {{BlockMeshType::BLOCK, nullptr}, {BlockMeshType::BOX, "box"}, {BlockMeshType::X, "X"}})
-
-enum class TexType : uint8_t {
-	NORMAL,
-	TOP_SIDE,
-	TOP_SIDE_BOTTOM,
-};
-NLOHMANN_JSON_SERIALIZE_ENUM(TexType, {{TexType::NORMAL, nullptr}, {TexType::TOP_SIDE, "top-side"}, {TexType::TOP_SIDE_BOTTOM, "top-side-bottom"}})
-
-struct BlockType {
-	std::string			name = "null";
-
-	uint8v3				size = 16;
-	BlockMeshType		mesh_type = BlockMeshType::BLOCK;
-	TexType				tex_type = TexType::NORMAL;
-	uint8_t				variations = 1;
-
-	collision_mode		collision;                  // collision mode for physics
-	transparency_mode	transparency;               // transparency mode for meshing
-	ToolType			tool = ToolType::NONE;      // tool type to determine which tool should be used for mining
-	uint8_t				hardness = 0;               // hardness value to determine damage resistance
-	uint8_t				glow = 0;                   // with what light level to glow with
-	uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
-
-};
-
 struct BlockTypes {
-	
-	std::vector<BlockType> blocks;
+	struct Block {
+		std::string			name = "null";
+
+		uint8v3				size = 16;
+
+		collision_mode		collision;                  // collision mode for physics
+		transparency_mode	transparency;               // transparency mode for meshing
+		ToolType			tool = ToolType::NONE;      // tool type to determine which tool should be used for mining
+		uint8_t				hardness = 0;               // hardness value to determine damage resistance
+		uint8_t				glow = 0;                   // with what light level to glow with
+		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
+	};
+
+	std::vector<Block> blocks;
+
+	//std::unordered_map<std::string, block_id> name_map;
 
 	block_id air_id;
 
+	void from_json (json const& blocks_json);
+
 	block_id map_id (std::string_view name) {
-		int id = kiss::indexof(blocks, name, [this] (BlockType const& l, std::string_view r) {
+	#if 1
+		int id = kiss::indexof(blocks, name, [this] (Block const& l, std::string_view r) {
 			return l.name == r;
 		});
 		if (id == -1) return B_NULL;
 		return (block_id)id;
+	#else
+		// unordered_map with std::string is bad because you can't lookup without constructing a std::string (fixed in C++20)
+		auto it = name_map.find(name);
+		if (it == name_map.end()) return B_NULL;
+		return it->second;
+	#endif
 	}
 };
-
-BlockTypes load_blocks ();
 
 inline BlockTypes g_blocks;
 
@@ -113,8 +103,6 @@ struct Block {
 };
 
 enum BlockFace {
-	BF_NULL		=1,
-
 	BF_NEG_X	=0,
 	BF_POS_X	,
 	BF_NEG_Y	,

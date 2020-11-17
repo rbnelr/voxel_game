@@ -31,6 +31,7 @@
 #include "kisslib/macros.hpp"
 #include "kisslib/random.hpp"
 #include "kisslib/raw_array.hpp"
+#include "kisslib/image.hpp"
 #include "kisslib/read_directory.hpp"
 #include "kisslib/running_average.hpp"
 #include "kisslib/string.hpp"

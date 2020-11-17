@@ -14,7 +14,7 @@ struct Game {
 	// Global world gen I can tweak (changes are only visible on world recreate)
 	WorldGenerator world_gen;
 
-	// World gets world gen copy on create 
+	// World gets world gen copy on create
 	std::unique_ptr<World> world = std::make_unique<World>(world_gen);
 
 	BlockUpdate block_update;
@@ -24,8 +24,6 @@ struct Game {
 	bool activate_flycam = false;
 	bool trigger_place_block = false;
 
-	Assets assets;
-	
 	Game ();
 
 	void imgui (Window& window, Input& I, std::function<void()> renderscale_imgui);
