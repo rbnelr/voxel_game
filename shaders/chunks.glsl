@@ -31,7 +31,7 @@ layout(location = 0) vs2fs VS {
 	};
 
 	void main () {
-		int idx = indices[gl_VertexIndex % 6];
+		int idx = indices[gl_VertexIndex];
 		vec3 pos_model	= pos[v_meshid][idx];
 		vec2 uv			= uv[idx];
 

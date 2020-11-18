@@ -33,6 +33,86 @@ inline std::vector<T> get_vector (FUNC func, ARGS... args) {
 }
 
 ////
+struct DebugMarker {
+	PFN_vkDebugMarkerSetObjectTagEXT  vkDebugMarkerSetObjectTagEXT  = nullptr;
+	PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT = nullptr;
+	PFN_vkCmdDebugMarkerBeginEXT      vkCmdDebugMarkerBeginEXT      = nullptr;
+	PFN_vkCmdDebugMarkerEndEXT        vkCmdDebugMarkerEndEXT        = nullptr;
+	PFN_vkCmdDebugMarkerInsertEXT     vkCmdDebugMarkerInsertEXT     = nullptr;
+
+	void load (VkDevice dev) {
+		vkDebugMarkerSetObjectTagEXT  = (PFN_vkDebugMarkerSetObjectTagEXT )vkGetDeviceProcAddr(dev, "vkDebugMarkerSetObjectTagEXT");
+		vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetDeviceProcAddr(dev, "vkDebugMarkerSetObjectNameEXT");
+		vkCmdDebugMarkerBeginEXT      = (PFN_vkCmdDebugMarkerBeginEXT     )vkGetDeviceProcAddr(dev, "vkCmdDebugMarkerBeginEXT");
+		vkCmdDebugMarkerEndEXT        = (PFN_vkCmdDebugMarkerEndEXT       )vkGetDeviceProcAddr(dev, "vkCmdDebugMarkerEndEXT");
+		vkCmdDebugMarkerInsertEXT     = (PFN_vkCmdDebugMarkerInsertEXT    )vkGetDeviceProcAddr(dev, "vkCmdDebugMarkerInsertEXT");
+	}
+
+	void set_name (VkDevice dev, VkDebugReportObjectTypeEXT type, uint64_t obj, const char* name) {
+		if (!vkDebugMarkerSetObjectNameEXT) return;
+		VkDebugMarkerObjectNameInfoEXT info = {};
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+		info.objectType = type;
+		info.object = obj;
+		info.pObjectName = name;
+		vkDebugMarkerSetObjectNameEXT(dev, &info);
+	}
+
+	void set_name (VkDevice dev, VkDeviceMemory obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkCommandBuffer obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkBuffer obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkSampler obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_SAMPLER_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkImage obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkImageView obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkFramebuffer obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkPipelineLayout obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkPipeline obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkRenderPass obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkDescriptorSetLayout obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkDescriptorSet obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT, (uint64_t)obj, name);
+	}
+	void set_name (VkDevice dev, VkShaderModule obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, (uint64_t)obj, name);
+	}
+
+	void begin_marker (VkDevice dev, VkCommandBuffer cmds, char const* name) {
+		if (!vkCmdDebugMarkerBeginEXT) return;
+		VkDebugMarkerMarkerInfoEXT info = {};
+		info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+		//info.color[4]
+		info.pMarkerName = name;
+		vkCmdDebugMarkerBeginEXT(cmds, &info);
+	}
+	void end_marker (VkDevice dev, VkCommandBuffer cmds) {
+		if (!vkCmdDebugMarkerEndEXT) return;
+		vkCmdDebugMarkerEndEXT(cmds);
+	}
+};
+
+////
 template <AttribMode M, typename T>
 inline constexpr VkFormat get_format ();
 

@@ -99,6 +99,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -117,6 +118,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -137,6 +139,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -157,6 +160,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

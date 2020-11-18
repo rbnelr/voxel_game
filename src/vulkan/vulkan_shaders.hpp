@@ -15,6 +15,10 @@ namespace nlohmann {
 }
 
 namespace vk {
+	static constexpr const char* SHADERC_STAGE_NAME[] = {
+		"vertex", // shaderc_vertex_shader
+		"fragment", // shaderc_fragment_shader
+	};
 	static constexpr const char* SHADERC_STAGE_MACRO[] = {
 		"_VERTEX", // shaderc_vertex_shader
 		"_FRAGMENT", // shaderc_fragment_shader
