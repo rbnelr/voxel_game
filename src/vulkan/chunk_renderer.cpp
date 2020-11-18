@@ -55,7 +55,7 @@ void RemeshChunkJob::finalize () {
 	chunk->flags &= ~Chunk::REMESH;
 }
 
-void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cur_frame, VkCommandBuffer cmds) {
+void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, VkCommandBuffer cmds) {
 	ZoneScoped;
 
 	for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
@@ -79,11 +79,11 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 
 			// alloc new staging buffer as required
 			if (buf >= (int)frame.staging_bufs.size())
-				frame.staging_bufs.push_back( new_staging_buffer(dev, pdev) );
+				frame.staging_bufs.push_back( new_staging_buffer(ctx, cur_frame) );
 			auto& staging_buf = frame.staging_bufs[buf];
 
 			char* ptr;
-			vkMapMemory(dev, staging_buf.mem, 0, ALLOC_SIZE, 0, (void**)&ptr);
+			vkMapMemory(ctx.dev, staging_buf.mem, 0, ALLOC_SIZE, 0, (void**)&ptr);
 
 			size_t offs = 0;
 
@@ -102,7 +102,7 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 				MeshData::free_slice(upload.data);
 
 				if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
-					allocs.push_back( new_alloc(dev, pdev) );
+					allocs.push_back( new_alloc(ctx) );
 
 				uint32_t dst_offset;
 				VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
@@ -116,7 +116,14 @@ void ChunkRenderer::upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cu
 				offs += size;
 			}
 
-			vkUnmapMemory(dev, staging_buf.mem);
+			vkUnmapMemory(ctx.dev, staging_buf.mem);
+		}
+
+		if (uploads.size() > 0) {
+			vkCmdPipelineBarrier(cmds,
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+				0, 0, nullptr, 0, nullptr, 0, nullptr);
 		}
 
 		uploads.clear();

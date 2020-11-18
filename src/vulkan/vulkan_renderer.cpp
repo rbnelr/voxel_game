@@ -75,8 +75,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 	}
 
 	{
-		TracyVkZone(ctx.tracy_ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(ctx.dev, ctx.pdev, cur_frame, cmds);
+		GPU_TRACE(ctx, cmds, "upload_remeshed");
+		chunk_renderer.upload_remeshed(ctx, cur_frame, cmds);
 	}
 
 	{ // main render pass
@@ -96,7 +96,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
-		TracyVkZone(ctx.tracy_ctx, cmds, "main_renderpass");
+		GPU_TRACE(ctx, cmds, "main_renderpass");
 
 		set_viewport(cmds, renderscale_size);
 
@@ -106,7 +106,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		}
 
 		{
-			TracyVkZone(ctx.tracy_ctx, cmds, "draw chunks");
+			GPU_TRACE(ctx, cmds, "draw chunks");
 			chunk_renderer.draw_chunks(cmds, data.chunks, main_pipeline, main_pipeline_layout);
 		}
 	}
@@ -133,12 +133,12 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		}
 
 		{
-			TracyVkZone(ctx.tracy_ctx, cmds, "ui_renderpass");
+			GPU_TRACE(ctx, cmds, "ui_renderpass");
 
 			set_viewport(cmds, ctx.wnd_size);
 
 			{
-				TracyVkZone(ctx.tracy_ctx, cmds, "rescale draw");
+				GPU_TRACE(ctx, cmds, "rescale draw");
 
 				{
 					vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 0, 1,
@@ -211,7 +211,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 
 	assets.load_block_textures(blocks_json);
 
-	chunk_renderer.create(ctx.dev, ctx.pdev, FRAMES_IN_FLIGHT);
+	chunk_renderer.create(ctx, FRAMES_IN_FLIGHT);
 	shaders.init(ctx.dev);
 	
 	create_descriptor_pool();
@@ -230,6 +230,14 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 
 		main_pipeline = create_main_pipeline(shaders.get(ctx.dev, "chunks"),
 			main_renderpass, main_pipeline_layout, msaa, make_attribs<BlockMeshInstance>());
+
+		GPU_DBG_NAME(ctx, main_sampler, "main_sampler");
+		GPU_DBG_NAME(ctx, main_descriptor_layout, "main_descriptor_layout");
+		for (int i=0; i<FRAMES_IN_FLIGHT; ++i)
+			GPU_DBG_NAMEI(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
+		GPU_DBG_NAME(ctx, main_renderpass, "main_renderpass");
+		GPU_DBG_NAME(ctx, main_pipeline_layout, "main_pipeline_layout");
+		GPU_DBG_NAME(ctx, main_pipeline, "main_pipeline");
 	}
 
 	{
@@ -241,6 +249,13 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 			{ rescale_descriptor_layout }, {});
 		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
 			ui_renderpass, rescale_pipeline_layout);
+
+		GPU_DBG_NAME(ctx, rescale_sampler, "rescale_sampler");
+		GPU_DBG_NAME(ctx, rescale_descriptor_layout, "rescale_descriptor_layout");
+		GPU_DBG_NAME(ctx, rescale_descriptor_set, "rescale_descriptor_set");
+		GPU_DBG_NAME(ctx, ui_renderpass, "ui_renderpass");
+		GPU_DBG_NAME(ctx, rescale_pipeline_layout, "rescale_pipeline_layout");
+		GPU_DBG_NAME(ctx, rescale_pipeline, "rescale_pipeline");
 	}
 }
 Renderer::~Renderer () {
@@ -323,8 +338,12 @@ void Renderer::upload_static_data () {
 		texs[0].layers = TILEMAP_SIZE.x * TILEMAP_SIZE.y;
 		texs[0].format = VK_FORMAT_R8G8B8A8_SRGB;
 		tex_mem = uploader.upload(ctx.dev, ctx.pdev, texs, ARRLEN(texs));
+		GPU_DBG_NAME(ctx, tex_mem, "tex_mem");
 
 		tilemap_img = { texs[0].vkimg };
+
+		GPU_DBG_NAME(ctx, tilemap_img.img, "tilemap_img.img");
+		GPU_DBG_NAME(ctx, tilemap_img.img_view, "tilemap_img.img_view");
 	}
 
 	ctx.imgui_create(cmds, FRAMES_IN_FLIGHT);
@@ -353,7 +372,9 @@ void Renderer::create_ubo_buffers () {
 	size_t size = 0;
 	uint32_t mem_req_bits = (uint32_t)-1;
 
-	for (auto& f : frame_data) {
+	for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
+		auto& f = frame_data[i];
+
 		VkBufferCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		info.size = sizeof(ViewUniforms);
@@ -361,6 +382,7 @@ void Renderer::create_ubo_buffers () {
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VK_CHECK_RESULT(vkCreateBuffer(ctx.dev, &info, nullptr, &f.ubo_buffer));
+		GPU_DBG_NAMEI(ctx, f.ubo_buffer, "ubo_buffer[%d]", i);
 
 		VkMemoryRequirements mem_req;
 		vkGetBufferMemoryRequirements(ctx.dev, f.ubo_buffer, &mem_req);
@@ -379,6 +401,7 @@ void Renderer::create_ubo_buffers () {
 		info.memoryTypeIndex = find_memory_type(ctx.pdev, mem_req_bits,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		VK_CHECK_RESULT(vkAllocateMemory(ctx.dev, &info, nullptr, &ubo_memory));
+		GPU_DBG_NAME(ctx, ubo_memory, "ubo_memory");
 
 		for (auto& f : frame_data)
 			vkBindBufferMemory(ctx.dev, f.ubo_buffer, ubo_memory, f.ubo_mem_offset);
@@ -815,7 +838,9 @@ VkPipeline Renderer::create_rescale_pipeline (Shader* shader, VkRenderPass rende
 
 //// Create per-frame data
 void Renderer::create_frame_data () {
-	for (auto& frame : frame_data) {
+	for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
+		auto& frame = frame_data[i];
+
 		VkCommandPoolCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		info.queueFamilyIndex = ctx.queues.families.graphics_family;
@@ -828,6 +853,8 @@ void Renderer::create_frame_data () {
 		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		alloc_info.commandBufferCount  = 1;
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(ctx.dev, &alloc_info, &frame.command_buffer));
+
+		GPU_DBG_NAMEI(ctx, frame.command_buffer, "cmds[%d]", i);
 
 		VkSemaphoreCreateInfo semaphore_info = {};
 		semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -848,11 +875,17 @@ void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkForm
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_IMAGE_ASPECT_COLOR_BIT, msaa);
+	GPU_DBG_NAME(ctx, main_color.image, "main_color");
+	GPU_DBG_NAME(ctx, main_color.image_view, "main_color.img_view");
+	GPU_DBG_NAME(ctx, main_color.memory, "main_color.mem");
 
 	main_depth = create_render_buffer(size, depth_format,
 		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_IMAGE_ASPECT_DEPTH_BIT, msaa);
+	GPU_DBG_NAME(ctx, main_depth.image, "main_depth");
+	GPU_DBG_NAME(ctx, main_depth.image_view, "main_depth.img_view");
+	GPU_DBG_NAME(ctx, main_depth.memory, "main_depth.mem");
 
 	VkImageView attachments[] = { main_color.image_view, main_depth.image_view };
 
@@ -865,6 +898,8 @@ void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkForm
 	info.height = size.y;
 	info.layers = 1;
 	VK_CHECK_RESULT(vkCreateFramebuffer(ctx.dev, &info, nullptr, &main_framebuffer));
+
+	GPU_DBG_NAME(ctx, main_framebuffer, "main_framebuffer");
 
 	update_rescale_img_descr();
 }
@@ -1028,6 +1063,8 @@ VkCommandBuffer Renderer::begin_init_cmds () {
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	vkBeginCommandBuffer(buf, &begin_info);
+
+	GPU_DBG_NAME(ctx, buf, "init_cmds");
 
 	return buf;
 }

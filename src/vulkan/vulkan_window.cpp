@@ -52,7 +52,7 @@ VulkanWindowContext::VulkanWindowContext (GLFWwindow* window, char const* app_na
 	VK_CHECK_RESULT(glfwCreateWindowSurface(instance, window, nullptr, &surface));
 
 	pdev = select_device(instance, surface, &queues.families);
-	dev = create_logical_device(pdev, enabled_layers, &queues);
+	dev = create_logical_device(pdev, enabled_layers, &queues, &dbgmarker);
 
 	create_swap_chain(SWAP_CHAIN_SIZE);
 }
@@ -270,24 +270,20 @@ QueueFamilies pick_queue_families (VkPhysicalDevice device, VkSurfaceKHR surface
 	return families;
 }
 
+bool contains_ext (std::vector<VkExtensionProperties> const& avail_extensions, char const* ext) {
+	for (auto& avail : avail_extensions)
+		if (strcmp(ext, avail.extensionName) == 0)
+			return true;
+	return false;
+}
+
 bool check_device_extensions (VkPhysicalDevice device) {
-
 	auto avail_extensions = get_vector<VkExtensionProperties>(vkEnumerateDeviceExtensionProperties, device, nullptr);
-
 	// Check if any of the desired extensions is not suppored
-	bool all_found = true;
-	for (auto ext : DEVICE_EXTENSIONS) {
-		bool found = false;
-		for (auto avail : avail_extensions) {
-			if (strcmp(ext, avail.extensionName) == 0) {
-				found = true;
-				break;
-			}
-		}
-		all_found = all_found && found;
-	}
-
-	return all_found;
+	for (auto ext : DEVICE_EXTENSIONS)
+		if (!contains_ext(avail_extensions, ext))
+			return false;
+	return true;
 }
 
 SwapChainSupport query_swap_chain_support (VkPhysicalDevice device, VkSurfaceKHR surface) {
@@ -345,7 +341,7 @@ VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, Queue
 	return selected;
 }
 
-VkDevice create_logical_device (VkPhysicalDevice physical_device, std::vector<char const*> const& enabled_layers, Queues* queues) {
+VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker) {
 	ZoneScoped;
 	
 	// make sure we only specifiy unique queues (We pretend that the present queue is a seperate queue, even though it is usually just the graphics queue)
@@ -372,6 +368,19 @@ VkDevice create_logical_device (VkPhysicalDevice physical_device, std::vector<ch
 		q_infos[i].pQueuePriorities = &queue_prios[i];
 	}
 
+	auto avail_extensions = get_vector<VkExtensionProperties>(vkEnumerateDeviceExtensionProperties, pdev, nullptr);
+
+	std::vector<const char*> enabled_extensions;
+	for (auto e : DEVICE_EXTENSIONS)
+		enabled_extensions.push_back(e);
+
+	bool enable_dbg_marker = false;
+#if GPU_DEBUG_MARKERS
+	enable_dbg_marker = contains_ext(avail_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+	if (enable_dbg_marker)
+		enabled_extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
+#endif
+
 	VkPhysicalDeviceFeatures features = {};
 	features.samplerAnisotropy = VK_TRUE;
 
@@ -379,12 +388,9 @@ VkDevice create_logical_device (VkPhysicalDevice physical_device, std::vector<ch
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	info.queueCreateInfoCount = (uint32_t)count;
 	info.pQueueCreateInfos = q_infos;
-
 	info.pEnabledFeatures = &features;
-
-	info.enabledExtensionCount = ARRLEN(DEVICE_EXTENSIONS);
-	info.ppEnabledExtensionNames = DEVICE_EXTENSIONS;
-
+	info.enabledExtensionCount = (uint32_t)enabled_extensions.size();
+	info.ppEnabledExtensionNames = enabled_extensions.data();
 	info.enabledLayerCount	= (uint32_t)enabled_layers.size();
 	info.ppEnabledLayerNames = enabled_layers.data();
 
@@ -392,7 +398,7 @@ VkDevice create_logical_device (VkPhysicalDevice physical_device, std::vector<ch
 
 	{
 		ZoneScopedN("vkCreateDevice");
-		VK_CHECK_RESULT(vkCreateDevice(physical_device, &info, nullptr, &device));
+		VK_CHECK_RESULT(vkCreateDevice(pdev, &info, nullptr, &device));
 	}
 
 	{
@@ -401,6 +407,11 @@ VkDevice create_logical_device (VkPhysicalDevice physical_device, std::vector<ch
 		vkGetDeviceQueue(device, queues->families.async_compute_family,  0, &queues->async_compute_queue);
 		vkGetDeviceQueue(device, queues->families.async_transfer_family, 0, &queues->async_transfer_queue);
 		vkGetDeviceQueue(device, queues->families.present_family,        0, &queues->present_queue);
+	}
+
+	if (enable_dbg_marker) {
+		clog(INFO, "[VulkanWindowContext] Loaded vk debug markers");
+		dbg_marker->load(device);
 	}
 
 	return device;
@@ -647,7 +658,7 @@ void VulkanWindowContext::imgui_destroy () {
 void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds) {
 	if (g_imgui.enabled) {
 		ZoneScoped;
-		TracyVkZone(tracy_ctx, cmds, "VulkanWindowContext::imgui_draw");
+		GPU_TRACE(*this, cmds, "imgui_draw");
 
 		ImGui::Render();
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmds);

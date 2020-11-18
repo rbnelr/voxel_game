@@ -1,7 +1,6 @@
 #pragma once
 #include "common.hpp"
 #include "vulkan_helper.hpp"
-
 #include "TracyVulkan.hpp"
 
 struct GLFWwindow;
@@ -24,6 +23,8 @@ inline constexpr const char* DEVICE_EXTENSIONS[] = {
 #endif
 
 };
+
+#define GPU_DEBUG_MARKERS 1
 
 //// Vulkan Window Context to encapsulate most of the initialization
 struct QueueFamilies {
@@ -70,6 +71,9 @@ struct SwapChain {
 };
 
 struct VulkanWindowContext {
+	NO_MOVE_COPY_CLASS(VulkanWindowContext)
+	public:
+
 	VkInstance					instance;
 	VkPhysicalDevice			pdev;
 	VkDevice					dev;
@@ -79,6 +83,7 @@ struct VulkanWindowContext {
 #ifdef VK_VALIDATION_LAYERS
 	VkDebugUtilsMessengerEXT	debug_messenger;
 #endif
+	DebugMarker					dbgmarker;
 
 	std::vector<char const*>	enabled_layers;
 	std::vector<char const*>	enabled_extensions;
@@ -124,6 +129,30 @@ struct VulkanWindowContext {
 	void recreate_swap_chain (int swap_chain_size);
 };
 
+#if GPU_DEBUG_MARKERS
+	struct _ScopedGpuTrace {
+		VulkanWindowContext& ctx;
+		VkCommandBuffer cmds;
+		_ScopedGpuTrace (VulkanWindowContext& ctx, VkCommandBuffer cmds, char const* name): ctx{ctx}, cmds{cmds} {
+			ctx.dbgmarker.begin_marker(ctx.dev, cmds, name);
+		}
+		~_ScopedGpuTrace () {
+			ctx.dbgmarker.end_marker(ctx.dev, cmds);
+		}
+	};
+
+	#define GPU_TRACE(wndctx, cmds, name) \
+		_ScopedGpuTrace __scoped_##__COUNTER__ (wndctx, cmds, name); \
+		TracyVkZone(wndctx.tracy_ctx, cmds, name)
+
+	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), (name))
+	#define GPU_DBG_NAMEI(wndctx, obj, name, idx) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), prints((name), (idx)).c_str())
+#else
+	#define GPU_TRACE(wndctx, cmds, name) TracyVkZone(wndctx.tracy_ctx, cmds, name)
+	#define GPU_DBG_NAME(wndctx, obj, name)
+	#define GPU_DBG_NAMEI(wndctx, obj, name, idx)
+#endif
+
 //// Instance creation
 void set_debug_utils_messenger_create_info_ext (VkDebugUtilsMessengerCreateInfoEXT* info, PFN_vkDebugUtilsMessengerCallbackEXT callback);
 
@@ -143,7 +172,7 @@ SwapChainSupport query_swap_chain_support (VkPhysicalDevice device, VkSurfaceKHR
 VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, QueueFamilies* out_queue_families);
 
 VkDevice create_logical_device (
-	VkPhysicalDevice physical_device, std::vector<char const*> const& enabled_layers, Queues* queues);
+	VkPhysicalDevice physical_device, std::vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker);
 
 //// Swap chain creation
 VkSurfaceFormatKHR choose_swap_surface_format (std::vector<VkSurfaceFormatKHR> const& formats);

@@ -1,6 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "vulkan_helper.hpp"
+#include "vulkan_window.hpp"
 #include "chunk_mesher.hpp"
 #include "graphics.hpp"
 
@@ -38,18 +39,24 @@ struct ChunkRenderer {
 		return allocs[bufi].buf;
 	}
 
-	Allocation new_alloc (VkDevice dev, VkPhysicalDevice pdev) {
-		return allocate_buffer(dev, pdev, ALLOC_SIZE,
+	Allocation new_alloc (VulkanWindowContext& ctx) {
+		auto buf = allocate_buffer(ctx.dev, ctx.pdev, ALLOC_SIZE,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		GPU_DBG_NAME(ctx, buf.buf, "chunk_slice_buf");
+		GPU_DBG_NAME(ctx, buf.mem, "chunk_slice_alloc");
+		return buf;
 	}
-	Allocation new_staging_buffer (VkDevice dev, VkPhysicalDevice pdev) {
-		return allocate_buffer(dev, pdev, ALLOC_SIZE,
+	Allocation new_staging_buffer (VulkanWindowContext& ctx, int cur_frame) {
+		auto buf = allocate_buffer(ctx.dev, ctx.pdev, ALLOC_SIZE,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+		GPU_DBG_NAMEI(ctx, buf.buf, "chunk_staging_buf[%d]", cur_frame);
+		GPU_DBG_NAMEI(ctx, buf.mem, "chunk_staging_alloc[%d]", cur_frame);
+		return buf;
 	}
 
-	void create (VkDevice dev, VkPhysicalDevice pdev, int frames_in_flight) {
+	void create (VulkanWindowContext& ctx, int frames_in_flight) {
 		frames.resize(frames_in_flight);
 	}
 	void destroy (VkDevice dev) {
@@ -71,7 +78,7 @@ struct ChunkRenderer {
 	void queue_remeshing (Renderer& r, RenderData& data);
 
 	std::vector<UploadSlice> uploads;
-	void upload_remeshed (VkDevice dev, VkPhysicalDevice pdev, int cur_frame, VkCommandBuffer cmds);
+	void upload_remeshed (VulkanWindowContext& ctx, int cur_frame, VkCommandBuffer cmds);
 
 	void draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipeline pipeline, VkPipelineLayout layout);
 };
