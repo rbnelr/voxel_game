@@ -6,7 +6,7 @@
 struct WorldGenerator;
 struct Assets;
 
-static constexpr uint64_t CHUNK_SLICE_BYTESIZE = 1024 * 16;//1 * (1024 * 1024);
+static constexpr uint64_t CHUNK_SLICE_BYTESIZE = 1 * (1024 * 1024);
 static constexpr uint64_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
 
 struct ChunkSliceData {

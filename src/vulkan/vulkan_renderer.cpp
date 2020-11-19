@@ -114,14 +114,28 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 
 	{ // ui render pass
 		
-		// TODO: Do I need VkImageMemoryBarrier here or is the barrier itself enough if I don't need a layout transition?
-		// (layout is transitioned in the renderpass)
-		//VkImageMemoryBarrier ;
-		vkCmdPipelineBarrier(cmds,
-			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			0, 0, nullptr, 0, nullptr, 0, nullptr);
-		
+		{ // sync up/downscaling to wait for main color rendering
+			VkImageMemoryBarrier img = {};
+			img.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			img.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			img.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			img.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			img.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			img.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			img.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			img.image = main_color.image;
+			img.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			img.subresourceRange.baseMipLevel = 0;
+			img.subresourceRange.levelCount = 1;
+			img.subresourceRange.baseArrayLayer = 0;
+			img.subresourceRange.layerCount = 1;
+
+			vkCmdPipelineBarrier(cmds,
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &img);
+		}
+
 		{
 			VkRenderPassBeginInfo render_pass_info = {};
 			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -169,14 +183,18 @@ void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 	
 	{
 		ZoneScopedN("vkQueueSubmit");
-		
-		VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
 		VkSubmitInfo submit_info = {};
 		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		// see https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples - Swapchain Image Acquire and Present
+		// Any color attachment output in the cmdbuf will wait for image_available_semaphore
+		// TODO: is this sync to strict? only the final renderpass actually writes to the img, but all renderpasses are affected by this
 		submit_info.waitSemaphoreCount = 1;
 		submit_info.pWaitSemaphores = &frame.image_available_semaphore;
+		VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		submit_info.pWaitDstStageMask = &wait_stage;
+
 		submit_info.commandBufferCount = 1;
 		submit_info.pCommandBuffers = &frame.command_buffer;
 		submit_info.signalSemaphoreCount = 1;
@@ -946,7 +964,7 @@ VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat d
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	// depth_attachment
 	attachments[1].format = depth_format;
 	attachments[1].samples = (VkSampleCountFlagBits)msaa;
@@ -982,22 +1000,12 @@ VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat d
 	subpass.pResolveAttachments = nullptr;
 	subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
-	//VkSubpassDependency depen = {};
-	//depen.srcSubpass = VK_SUBPASS_EXTERNAL;
-	//depen.dstSubpass = 0;
-	//depen.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	//depen.srcAccessMask = 0;
-	//depen.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	//depen.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	info.attachmentCount = ARRLEN(attachments);
 	info.pAttachments = attachments;
 	info.subpassCount = 1;
 	info.pSubpasses = &subpass;
-	info.dependencyCount = 0;
-	info.pDependencies = nullptr;
 
 	VkRenderPass renderpass;
 	VK_CHECK_RESULT(vkCreateRenderPass(ctx.dev, &info, nullptr, &renderpass));
@@ -1024,12 +1032,13 @@ VkRenderPass Renderer::create_ui_renderpass (VkFormat color_format) {
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &color_attachment_ref;
 
+	// see https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples - Swapchain Image Acquire and Present
 	VkSubpassDependency depen = {};
 	depen.srcSubpass = VK_SUBPASS_EXTERNAL;
 	depen.dstSubpass = 0;
 	depen.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	depen.srcAccessMask = 0;
 	depen.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	depen.srcAccessMask = 0;
 	depen.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
 	VkRenderPassCreateInfo info = {};
