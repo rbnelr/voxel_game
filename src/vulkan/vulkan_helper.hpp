@@ -249,21 +249,15 @@ struct UploadTexture {
 struct StaticDataUploader {
 	VkCommandBuffer cmds;
 
-	struct StagingAllocation {
-		Allocation staging_buf;
-		VkBuffer staging_target_buf = VK_NULL_HANDLE;
-	};
-	std::vector<StagingAllocation> staging_allocs;
+	std::vector<Allocation> staging_allocs;
 
 	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadBuffer* uploads, int uploads_count);
 	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadTexture* uploads, int uploads_count);
 
 	void end (VkDevice dev) {
 		for (auto& a : staging_allocs) {
-			vkDestroyBuffer(dev, a.staging_buf.buf   , nullptr);
-			if (a.staging_target_buf)
-				vkDestroyBuffer(dev, a.staging_target_buf, nullptr);
-			vkFreeMemory   (dev, a.staging_buf.mem   , nullptr);
+			vkDestroyBuffer(dev, a.buf, nullptr);
+			vkFreeMemory   (dev, a.mem, nullptr);
 		}
 	}
 };

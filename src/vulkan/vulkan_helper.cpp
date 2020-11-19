@@ -187,7 +187,7 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 		VkBufferCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 		info.size = bufs[i].size;
-		info.usage = bufs[i].usage;
+		info.usage = bufs[i].usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 		VK_CHECK_RESULT(vkCreateBuffer(dev, &info, nullptr, &bufs[i].vkbuf));
@@ -205,24 +205,14 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 	auto staging_buf = allocate_buffer(dev, pdev, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-	// alloc gpu-resident memory and create a temporary target buffer for batching the upload of all buffers (vkCmdCopyBuffer cannot deal with VkDeviceMemory)
-	VkBuffer staging_target_buf;
+	// alloc gpu-resident memory
 	VkDeviceMemory mem;
-
-	VkBufferCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	info.size = size;
-	info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VK_CHECK_RESULT(vkCreateBuffer(dev, &info, nullptr, &staging_target_buf));
 
 	VkMemoryAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.allocationSize = size;
 	alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	VK_CHECK_RESULT(vkAllocateMemory(dev, &alloc_info, nullptr, &mem));
-
-	vkBindBufferMemory(dev, staging_target_buf, mem, 0);
 
 	// upload buffers and bind buffers to memory
 	void* ptr = nullptr;
@@ -232,18 +222,18 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 		memcpy((char*)ptr + bufs[i].vkoffset, bufs[i].data, bufs[i].size);
 
 		vkBindBufferMemory(dev, bufs[i].vkbuf, mem, bufs[i].vkoffset);
+
+		// upload data by copying staging buffer to gpu
+		VkBufferCopy copy_region = {};
+		copy_region.srcOffset = bufs[i].vkoffset;
+		copy_region.dstOffset = 0;
+		copy_region.size = bufs[i].size;
+		vkCmdCopyBuffer(cmds, staging_buf.buf, bufs[i].vkbuf, 1, &copy_region);
 	}
 
 	vkUnmapMemory(dev, staging_buf.mem);
 
-	// upload data by copying staging buffer to gpu
-	VkBufferCopy copy_region = {};
-	copy_region.srcOffset = 0;
-	copy_region.dstOffset = 0;
-	copy_region.size = size;
-	vkCmdCopyBuffer(cmds, staging_buf.buf, staging_target_buf, 1, &copy_region);
-
-	staging_allocs.push_back({ staging_buf, staging_target_buf });
+	staging_allocs.push_back(staging_buf);
 	return mem;
 }
 
@@ -305,7 +295,7 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 
 	//vkBindBufferMemory(dev, staging_target_buf, mem, 0);
 
-	// upload buffers and bind buffers to memory
+	// upload buffers, bind buffers to memory and queue copy operations
 	void* ptr = nullptr;
 	vkMapMemory(dev, staging_buf.mem, 0, size, 0, &ptr);
 	
@@ -316,11 +306,7 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 		vkBindImageMemory(dev, texs[i].vkimg.img, mem, texs[i].vkoffset);
 
 		texs[i].vkimg.img_view = create_image_view(dev, texs[i].vkimg.img, texs[i].format, texs[i].layers, VK_IMAGE_ASPECT_COLOR_BIT);
-	}
-	
-	vkUnmapMemory(dev, staging_buf.mem);
-	
-	for (int i=0; i<count; ++i) { // upload data by copying image
+		
 		VkImageMemoryBarrier barrier = {};
 		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -354,7 +340,7 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 		region.imageExtent = { (uint32_t)texs[i].size.x, (uint32_t)texs[i].size.y, 1 };
 
 		vkCmdCopyBufferToImage(cmds, staging_buf.buf, texs[i].vkimg.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-	
+
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		barrier.newLayout = texs[i].layout;
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -364,8 +350,10 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // TODO: handle other usages of images
 			0, 0, nullptr, 0, nullptr, 1, &barrier);
 	}
-	
-	staging_allocs.push_back({ staging_buf });
+
+	vkUnmapMemory(dev, staging_buf.mem);
+
+	staging_allocs.push_back(staging_buf);
 	return mem;
 }
 
