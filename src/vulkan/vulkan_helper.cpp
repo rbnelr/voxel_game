@@ -357,4 +357,45 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 	return mem;
 }
 
+// Only for debugging! Remove in real code!
+void dbg_full_barrier (VkCommandBuffer cmds) {
+	VkMemoryBarrier mem = {};
+	mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	mem.srcAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+	                    VK_ACCESS_INDEX_READ_BIT |
+	                    VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+	                    VK_ACCESS_UNIFORM_READ_BIT |
+	                    VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_SHADER_READ_BIT |
+	                    VK_ACCESS_SHADER_WRITE_BIT |
+	                    VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+	                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+	                    VK_ACCESS_TRANSFER_READ_BIT |
+	                    VK_ACCESS_TRANSFER_WRITE_BIT |
+	                    VK_ACCESS_HOST_READ_BIT |
+	                    VK_ACCESS_HOST_WRITE_BIT;
+	mem.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+	                    VK_ACCESS_INDEX_READ_BIT |
+	                    VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+	                    VK_ACCESS_UNIFORM_READ_BIT |
+	                    VK_ACCESS_INPUT_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_SHADER_READ_BIT |
+	                    VK_ACCESS_SHADER_WRITE_BIT |
+	                    VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+	                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+	                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+	                    VK_ACCESS_TRANSFER_READ_BIT |
+	                    VK_ACCESS_TRANSFER_WRITE_BIT |
+	                    VK_ACCESS_HOST_READ_BIT |
+	                    VK_ACCESS_HOST_WRITE_BIT;
+
+	vkCmdPipelineBarrier(cmds,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+		0, 1, &mem, 0, nullptr, 0, nullptr);
+}
+
 } // namespace vk

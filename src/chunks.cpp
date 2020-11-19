@@ -76,7 +76,6 @@ void Chunk::set_block (Chunks& chunks, int3 pos_in_chunk, Block b) {
 	bool only_texture_changed = blk.id == b.id && blk.block_light == b.block_light;
 	if (only_texture_changed) {
 		blocks->set(pos_in_chunk, b);
-		flags |= REMESH;
 	} else {
 		uint8_t old_block_light = blk.block_light;
 
@@ -91,6 +90,8 @@ void Chunk::set_block (Chunks& chunks, int3 pos_in_chunk, Block b) {
 
 		update_sky_light_column(this, pos_in_chunk);
 	}
+
+	flags |= Chunk::REMESH;
 }
 
 void set_neighbour_blocks_nx (Chunk const& src, Chunk& dst) {
@@ -140,34 +141,34 @@ void Chunk::update_neighbour_blocks (Chunks& chunks) {
 	ZoneScoped;
 
 	Chunk* chunk;
-	if ((chunk = chunks.query_chunk(pos + int3(-1, 0, 0)))) {
+	if ((chunk = chunks.query_chunk(pos + int3(-1, 0, 0))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_nx(*this, *chunk);
 		set_neighbour_blocks_px(*chunk, *this);
 		chunk->flags |= REMESH;
 	}
-	if ((chunk = chunks.query_chunk(pos + int3(+1, 0, 0)))) {
+	if ((chunk = chunks.query_chunk(pos + int3(+1, 0, 0))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_px(*this, *chunk);
 		set_neighbour_blocks_nx(*chunk, *this);
 		chunk->flags |= REMESH;
 	}
 
-	if ((chunk = chunks.query_chunk(pos + int3( 0,-1, 0)))) {
+	if ((chunk = chunks.query_chunk(pos + int3( 0,-1, 0))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_ny(*this, *chunk);
 		set_neighbour_blocks_py(*chunk, *this);
 		chunk->flags |= REMESH;
 	}
-	if ((chunk = chunks.query_chunk(pos + int3( 0,+1, 0)))) {
+	if ((chunk = chunks.query_chunk(pos + int3( 0,+1, 0))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_py(*this, *chunk);
 		set_neighbour_blocks_ny(*chunk, *this);
 		chunk->flags |= REMESH;
 	}
 
-	if ((chunk = chunks.query_chunk(pos + int3( 0, 0,-1)))) {
+	if ((chunk = chunks.query_chunk(pos + int3( 0, 0,-1))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_nz(*this, *chunk);
 		set_neighbour_blocks_pz(*chunk, *this);
 		chunk->flags |= REMESH;
 	}
-	if ((chunk = chunks.query_chunk(pos + int3( 0, 0,+1)))) {
+	if ((chunk = chunks.query_chunk(pos + int3( 0, 0,+1))) && (chunk->flags & Chunk::LOADED)) {
 		set_neighbour_blocks_pz(*this, *chunk);
 		set_neighbour_blocks_nz(*chunk, *this);
 		chunk->flags |= REMESH;
@@ -303,6 +304,6 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 void WorldgenJob::finalize () {
 	ZoneScoped;
 
+	chunk->flags |= Chunk::LOADED|Chunk::REMESH;
 	chunk->update_neighbour_blocks(*chunks);
-	chunk->flags |= Chunk::LOADED;
 }

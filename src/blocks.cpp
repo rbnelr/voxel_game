@@ -10,7 +10,8 @@ void BlockTypes::from_json (json const& blocks_json) {
 		b.name = "null";
 		b.hardness = 1;
 		b.collision = CM_SOLID;
-		b.transparency = TM_OPAQUE;
+		//b.transparency = TM_OPAQUE; // don't render edges of world
+		b.transparency = TM_TRANSPARENT; // render edges of world
 
 		//name_map.emplace(b.name, (block_id)blocks.size());
 		blocks.push_back(std::move(b));

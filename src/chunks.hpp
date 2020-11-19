@@ -113,6 +113,11 @@ struct Chunk {
 		flags = (Flags)0;
 	}
 
+	void _validate_flags () {
+		if (flags & LOADED) assert(flags & ALLOCATED);
+		if (flags & REMESH) assert(flags & LOADED);
+	}
+
 	void init_blocks ();
 
 	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
@@ -259,7 +264,9 @@ struct Chunks {
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return nullptr;
-		return &this->operator[](it->second);
+		Chunk* c = &this->operator[](it->second);
+		c->_validate_flags();
+		return c;
 	}
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
 	Block query_block (int3 pos, Chunk** out_chunk=nullptr, int3* out_block_pos=nullptr);

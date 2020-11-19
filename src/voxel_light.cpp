@@ -161,8 +161,6 @@ void update_sky_light_column (Chunk* chunk, int3 pos_in_chunk) {
 
 		*sl = 0;
 	}
-
-	chunk->flags |= Chunk::REMESH;
 }
 void update_sky_light_chunk (Chunk* chunk) {
 	ZoneScoped;

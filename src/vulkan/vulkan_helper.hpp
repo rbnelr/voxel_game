@@ -278,4 +278,7 @@ inline VkPipelineLayout create_pipeline_layout (VkDevice dev,
 	return layout;
 }
 
+// Only for debugging! Remove in real code!
+void dbg_full_barrier (VkCommandBuffer cmds);
+
 } // namespace vk

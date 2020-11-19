@@ -11,8 +11,10 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	std::vector<std::unique_ptr<ThreadingJob>> remesh_jobs;
 	{
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
+		auto should_remesh = Chunk::REMESH|Chunk::LOADED|Chunk::ALLOCATED;
 		for (chunk_id id = 0; id < data.chunks.max_id; ++id) {
-			if ((data.chunks[id].flags & Chunk::REMESH) == 0) continue;
+			data.chunks[id]._validate_flags();
+			if ((data.chunks[id].flags & should_remesh) != should_remesh) continue;
 			remesh_jobs.push_back(std::make_unique<RemeshChunkJob>(&data.chunks[id], data.chunks, r.assets, data.wg, r));
 		}
 	}
