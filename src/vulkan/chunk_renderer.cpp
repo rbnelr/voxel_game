@@ -77,24 +77,10 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 		size_t offs_in_sbuf = 0;
 
 		// foreach staging buffer
-<<<<<<< HEAD
 		for (auto& upload : uploads) {
 			
 			auto* vertices = upload.data->verts;
 			size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
-=======
-		for (; slicei < (int)uploads.size(); ++buf) {
-
-			// alloc new staging buffer as required
-			if (buf >= (int)frame.staging_bufs.size())
-				frame.staging_bufs.push_back( new_staging_buffer(ctx, cur_frame) );
-			auto& staging_buf = frame.staging_bufs[buf];
-
-			char* ptr;
-			vkMapMemory(ctx.dev, staging_buf.mem, 0, ALLOC_SIZE, 0, (void**)&ptr);
-
-			size_t offs = 0;
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 
 			if (used_sbufs == 0 || offs_in_sbuf + size > ALLOC_SIZE) {
 				// staging buffer would overflow, switch to next one
@@ -114,13 +100,8 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 			if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
 				allocs.push_back( new_alloc(ctx) );
 
-<<<<<<< HEAD
 			uint32_t dst_offset;
 			VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
-=======
-				if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
-					allocs.push_back( new_alloc(ctx) );
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 
 			VkBufferCopy copy_region = {};
 			copy_region.srcOffset = offs_in_sbuf;
@@ -138,7 +119,6 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 			frame.staging_bufs.pop_back();
 		}
 
-<<<<<<< HEAD
 		if (uploads.size() > 0) {
 			VkMemoryBarrier mem = {};
 			mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -148,16 +128,6 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
 				0, 1, &mem, 0, nullptr, 0, nullptr);
-=======
-			vkUnmapMemory(ctx.dev, staging_buf.mem);
-		}
-
-		if (uploads.size() > 0) {
-			vkCmdPipelineBarrier(cmds,
-				VK_PIPELINE_STAGE_TRANSFER_BIT,
-				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-				0, 0, nullptr, 0, nullptr, 0, nullptr);
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 		}
 
 		uploads.clear();

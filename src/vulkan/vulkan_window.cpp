@@ -374,14 +374,8 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> 
 	for (auto e : DEVICE_EXTENSIONS)
 		enabled_extensions.push_back(e);
 
-<<<<<<< HEAD
 #if GPU_DEBUG_MARKERS
 	bool enable_dbg_marker = contains_ext(avail_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-=======
-	bool enable_dbg_marker = false;
-#if GPU_DEBUG_MARKERS
-	enable_dbg_marker = contains_ext(avail_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 	if (enable_dbg_marker)
 		enabled_extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
 #endif
@@ -414,18 +408,12 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> 
 		vkGetDeviceQueue(device, queues->families.present_family,        0, &queues->present_queue);
 	}
 
-<<<<<<< HEAD
 #if GPU_DEBUG_MARKERS
-=======
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 	if (enable_dbg_marker) {
 		clog(INFO, "[VulkanWindowContext] Loaded vk debug markers");
 		dbg_marker->load(device);
 	}
-<<<<<<< HEAD
 #endif
-=======
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 
 	return device;
 }

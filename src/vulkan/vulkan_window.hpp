@@ -87,13 +87,9 @@ struct VulkanWindowContext {
 #ifdef VK_VALIDATION_LAYERS
 	VkDebugUtilsMessengerEXT	debug_messenger;
 #endif
-<<<<<<< HEAD
 #if GPU_DEBUG_MARKERS
 	DebugMarker					dbgmarker;
 #endif
-=======
-	DebugMarker					dbgmarker;
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 
 	std::vector<char const*>	enabled_layers;
 	std::vector<char const*>	enabled_extensions;
@@ -152,13 +148,8 @@ struct VulkanWindowContext {
 	};
 
 	#define GPU_TRACE(wndctx, cmds, name) \
-<<<<<<< HEAD
 		_ScopedGpuTrace __scoped_##__COUNTER__ ((wndctx), (cmds), (name)); \
 		TracyVkZone((wndctx).tracy_ctx, (cmds), (name))
-=======
-		_ScopedGpuTrace __scoped_##__COUNTER__ (wndctx, cmds, name); \
-		TracyVkZone(wndctx.tracy_ctx, cmds, name)
->>>>>>> e23da88abbef911d650508a418b94af69ab8ad7e
 
 	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), (name))
 	#define GPU_DBG_NAMEI(wndctx, obj, name, idx) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), prints((name), (idx)).c_str())
