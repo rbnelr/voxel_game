@@ -162,6 +162,10 @@ void frameloop (Window& window) {
 	for (;;) {
 		FrameMark;
 
+		// Begin frame (aquire image in vk)
+		renderer->frame_begin(window.window);
+		imgui_begin_frame(window);
+
 		{ // Input sampling
 			ZoneScopedN("sample_input");
 
@@ -174,22 +178,19 @@ void frameloop (Window& window) {
 			glfw_sample_non_callback_input(window);
 		}
 
-		{ // Frame
-			renderer->frame_begin(window.window);
-			imgui_begin_frame(window);
+		// Update
+		game->imgui(window, window.input,
+			std::bind(&Renderer::renderscale_imgui, renderer.get()
+		));
 
-			game->imgui(window, window.input,
-				std::bind(&Renderer::renderscale_imgui, renderer.get()
-			));
+		if (g_imgui.show_demo_window)
+			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
 
-			if (g_imgui.show_demo_window)
-				ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
-
-			auto render_data = game->update(window, window.input);
+		auto render_data = game->update(window, window.input);
 			
-			imgui_end_frame();
-			renderer->render_frame(window.window, render_data);
-		}
+		// Render
+		imgui_end_frame();
+		renderer->render_frame(window.window, render_data);
 
 		{ // Calc next frame dt based on this frame duration
 			auto& i = window.input;
