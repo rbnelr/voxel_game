@@ -239,73 +239,73 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 
 VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, UploadTexture* texs, int count) {
 	// Create textures and calculate offets into memory block
-	size_t size = 0;
+	size_t gpu_size = 0, cpu_size = 0;
 	uint32_t mem_req_bits = (uint32_t)-1;
 
 	for (int i=0; i<count; ++i) {
+		auto& tex = texs[i];
+
+		tex.clac_mip_sizes();
+
 		VkImageCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
 		info.imageType = VK_IMAGE_TYPE_2D;
-		info.extent.width = (uint32_t)texs[i].size.x;
-		info.extent.height = (uint32_t)texs[i].size.y;
+		info.extent.width = (uint32_t)tex.size.x;
+		info.extent.height = (uint32_t)tex.size.y;
 		info.extent.depth = 1;
-		info.mipLevels = (uint32_t)texs[i].mip_levels;
-		info.arrayLayers = (uint32_t)texs[i].layers;
-		info.format = texs[i].format;
+		info.mipLevels = (uint32_t)tex.mip_levels;
+		info.arrayLayers = (uint32_t)tex.layers;
+		info.format = tex.format;
 		info.tiling = VK_IMAGE_TILING_OPTIMAL;
 		info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		info.usage = texs[i].usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		info.usage = tex.usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		info.samples = texs[i].samples;
+		info.samples = tex.samples;
 		info.flags = 0;
 
-		VK_CHECK_RESULT(vkCreateImage(dev, &info, nullptr, &texs[i].vkimg.img));
+		VK_CHECK_RESULT(vkCreateImage(dev, &info, nullptr, &tex.vkimg.img));
 
-		vkGetImageMemoryRequirements(dev, texs[i].vkimg.img, &texs[i].mem_req);
+		vkGetImageMemoryRequirements(dev, tex.vkimg.img, &tex.mem_req);
 
-		assert(texs[i].mem_req.size == sizeof(srgba8) * texs[i].size.x * texs[i].size.y * texs[i].layers);
+		gpu_size = align_up(gpu_size, tex.mem_req.alignment);
+		tex.vkoffset = gpu_size;
+		gpu_size += tex.mem_req.size;
 
-		size = align_up(size, texs[i].mem_req.alignment);
-		texs[i].vkoffset = size;
-		size += texs[i].mem_req.size;
+		cpu_size += sizeof(srgba8) * tex.size.x * tex.size.y * tex.layers;
 
-		mem_req_bits &= texs[i].mem_req.memoryTypeBits;
+		mem_req_bits &= tex.mem_req.memoryTypeBits;
 	}
 
 	// alloc cpu-visible staging buffer
-	auto staging_buf = allocate_buffer(dev, pdev, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+	auto staging_buf = allocate_buffer(dev, pdev, cpu_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
 	// alloc gpu-resident memory and create a temporary target buffer for batching the upload of all textures
-	//VkBuffer staging_target_buf;
 	VkDeviceMemory mem;
-
-	//VkBufferCreateInfo info = {};
-	//info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	//info.size = size;
-	//info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	//info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	//VK_CHECK_RESULT(vkCreateBuffer(dev, &info, nullptr, &staging_target_buf));
 
 	VkMemoryAllocateInfo alloc_info = {};
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.allocationSize = size;
+	alloc_info.allocationSize = gpu_size;
 	alloc_info.memoryTypeIndex = find_memory_type(pdev, mem_req_bits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	VK_CHECK_RESULT(vkAllocateMemory(dev, &alloc_info, nullptr, &mem));
 
-	//vkBindBufferMemory(dev, staging_target_buf, mem, 0);
-
 	// upload buffers, bind buffers to memory and queue copy operations
 	void* ptr = nullptr;
-	vkMapMemory(dev, staging_buf.mem, 0, size, 0, &ptr);
+	vkMapMemory(dev, staging_buf.mem, 0, cpu_size, 0, &ptr);
 	
+	size_t cpu_offs = 0;
+
 	for (int i=0; i<count; ++i) {
-		memcpy((char*)ptr + texs[i].vkoffset, texs[i].data,
-			sizeof(srgba8) * texs[i].size.x * texs[i].size.y * texs[i].layers);
+		auto& tex = texs[i];
 
-		vkBindImageMemory(dev, texs[i].vkimg.img, mem, texs[i].vkoffset);
+		memcpy((char*)ptr + cpu_offs, tex.data,
+			sizeof(srgba8) * tex.size.x * tex.size.y * tex.layers);
 
-		texs[i].vkimg.img_view = create_image_view(dev, texs[i].vkimg.img, texs[i].format, texs[i].layers, VK_IMAGE_ASPECT_COLOR_BIT);
+		cpu_offs += sizeof(srgba8) * tex.size.x * tex.size.y * tex.layers;
+
+		vkBindImageMemory(dev, tex.vkimg.img, mem, tex.vkoffset);
+
+		tex.vkimg.img_view = create_image_view(dev, tex.vkimg.img, tex.format, tex.layers, VK_IMAGE_ASPECT_COLOR_BIT);
 		
 		VkImageMemoryBarrier barrier = {};
 		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -313,12 +313,12 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 		barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-		barrier.image = texs[i].vkimg.img;
+		barrier.image = tex.vkimg.img;
 		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.levelCount = (uint32_t)tex.mip_levels;
 		barrier.subresourceRange.baseArrayLayer = 0;
-		barrier.subresourceRange.layerCount = (uint32_t)texs[i].layers;
+		barrier.subresourceRange.layerCount = (uint32_t)tex.layers;
 		barrier.srcAccessMask = 0;
 		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		vkCmdPipelineBarrier(cmds,
@@ -327,28 +327,64 @@ VkDeviceMemory StaticDataUploader::upload (VkDevice dev, VkPhysicalDevice pdev, 
 			0, 0, nullptr, 0, nullptr, 1, &barrier);
 
 		VkBufferImageCopy region = {};
-		region.bufferOffset = texs[i].vkoffset;
-		region.bufferRowLength = 0; // no row padding
-		region.bufferImageHeight = 0;
-
+		region.bufferOffset = tex.vkoffset;
 		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = 0;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = (uint32_t)texs[i].layers;
+		region.imageSubresource.layerCount = (uint32_t)tex.layers;
+		region.imageExtent = { (uint32_t)tex.size.x, (uint32_t)tex.size.y, 1 };
 
-		region.imageOffset = { 0,0,0 };
-		region.imageExtent = { (uint32_t)texs[i].size.x, (uint32_t)texs[i].size.y, 1 };
+		vkCmdCopyBufferToImage(cmds, staging_buf.buf, tex.vkimg.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-		vkCmdCopyBufferToImage(cmds, staging_buf.buf, texs[i].vkimg.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+		VkImageBlit blit = {};
+		blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.srcSubresource.layerCount = tex.layers;
+		blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		blit.dstSubresource.layerCount = tex.layers;
 
+		barrier.subresourceRange.levelCount = 1;
+
+		for (int mip=1; mip<tex.mip_levels; ++mip) {
+
+			barrier.subresourceRange.baseMipLevel = mip -1;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			vkCmdPipelineBarrier(cmds,
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+			blit.srcOffsets[1] = { tex.mip_sizes[mip-1].x, tex.mip_sizes[mip-1].y, 1 };
+			blit.srcSubresource.mipLevel = mip -1;
+			blit.dstOffsets[1] = { tex.mip_sizes[mip].x, tex.mip_sizes[mip].y, 1 };
+			blit.dstSubresource.mipLevel = mip;
+
+			vkCmdBlitImage(cmds,
+				tex.vkimg.img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				tex.vkimg.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &blit,
+				VK_FILTER_LINEAR);
+
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.newLayout = tex.layout;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			vkCmdPipelineBarrier(cmds,
+				VK_PIPELINE_STAGE_TRANSFER_BIT,
+				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				0, 0, nullptr, 0, nullptr, 1, &barrier);
+		}
+
+		barrier.subresourceRange.baseMipLevel = (uint32_t)(tex.mip_levels -1);
 		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		barrier.newLayout = texs[i].layout;
+		barrier.newLayout = tex.layout;
 		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		vkCmdPipelineBarrier(cmds,
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // TODO: handle other usages of images
+			tex.stage_mask,
 			0, 0, nullptr, 0, nullptr, 1, &barrier);
+
 	}
 
 	vkUnmapMemory(dev, staging_buf.mem);

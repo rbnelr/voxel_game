@@ -164,7 +164,6 @@ void frameloop (Window& window) {
 
 		// Begin frame (aquire image in vk)
 		renderer->frame_begin(window.window);
-		imgui_begin_frame(window);
 
 		{ // Input sampling
 			ZoneScopedN("sample_input");
@@ -178,7 +177,10 @@ void frameloop (Window& window) {
 			glfw_sample_non_callback_input(window);
 		}
 
+		imgui_begin_frame(window);
+
 		// Update
+
 		game->imgui(window, window.input,
 			std::bind(&Renderer::renderscale_imgui, renderer.get()
 		));

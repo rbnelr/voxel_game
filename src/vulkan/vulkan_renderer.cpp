@@ -353,6 +353,7 @@ void Renderer::upload_static_data () {
 		UploadTexture texs[1];
 		texs[0].data = img_arr.pixels;
 		texs[0].size = int2(16, 16);
+		texs[0].mip_levels = -1;
 		texs[0].layers = TILEMAP_SIZE.x * TILEMAP_SIZE.y;
 		texs[0].format = VK_FORMAT_R8G8B8A8_SRGB;
 		tex_mem = uploader.upload(ctx.dev, ctx.pdev, texs, ARRLEN(texs));
@@ -458,13 +459,13 @@ void Renderer::create_main_descriptors () {
 		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		sampler_info.magFilter = VK_FILTER_NEAREST;
 		sampler_info.minFilter = VK_FILTER_LINEAR;
-		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT; // could in theory create multiple samplers and select them in the shader to avoid ugly wrapping for blocks like grass that show a sliver of grass at the bottom
 		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sampler_info.anisotropyEnable = VK_FALSE;
 		sampler_info.minLod = 0;
-		sampler_info.maxLod = 0;
+		sampler_info.maxLod = 1000;
 		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &main_sampler);
 		
 		VkDescriptorSetLayoutBinding bindings[2] = {};

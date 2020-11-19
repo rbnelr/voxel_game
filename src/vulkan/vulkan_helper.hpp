@@ -235,15 +235,32 @@ struct UploadTexture {
 	void*					data = nullptr;
 	int2					size;
 	int						layers = 1;
-	int						mip_levels = 1;
+	int						mip_levels = 1; // special value -1 means all mips (ie. as many size halvings until 1x1 is reached)
 	VkFormat				format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkBufferUsageFlags		usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 	VkImageLayout			layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // initial layout
 	VkSampleCountFlagBits	samples = (VkSampleCountFlagBits)1;
+	VkPipelineStageFlags	stage_mask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
 	Texture					vkimg;
 	size_t					vkoffset;
 	VkMemoryRequirements	mem_req;
+	std::vector<int2>		mip_sizes;
+
+	void clac_mip_sizes () {
+		mip_sizes.reserve(16);
+
+		int2 sz = size;
+		int mip = 0;
+		for (mip=0; mip_levels <= 0 || mip < mip_levels; ++mip) {
+			mip_sizes.push_back(sz);
+			if (sz.x == 1 && sz.y == 1)
+				break;
+			sz.x = max(sz.x / 2, 1);
+			sz.y = max(sz.y / 2, 1);
+		}
+		mip_levels = mip+1;
+	}
 };
 
 struct StaticDataUploader {
