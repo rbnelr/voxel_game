@@ -87,7 +87,7 @@ void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
 	for (chunk_id id=0; id<chunks.max_id; ++id) {
 		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 		
-		ZoneScopedN("update_blocks chunk");
+		//ZoneScopedN("update_blocks chunk");
 		auto& chunk = chunks[id];
 
 		for (size_t i=0; i<blocks_to_update; ++i) {

@@ -231,6 +231,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 
 		{
 			ZoneScopedN("chunks_to_generate iterate all chunks");
+			ZoneValue((end.x-start.x)*(end.y-start.y)*(end.z-start.z));
+
 			int3 cp;
 			for (cp.z = start.z; cp.z<end.z; ++cp.z) {
 				for (cp.y = start.y; cp.y<end.y; ++cp.y) {
@@ -251,6 +253,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 
 		{
 			ZoneScopedN("std::sort(chunks_to_generate)");
+			ZoneValue(chunks_to_generate.size());
 			// load chunks nearest to player first
 			std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
 				[&] (int3 l, int3 r) { return chunk_dist_sq(l, player.pos) < chunk_dist_sq(r, player.pos); }
@@ -258,11 +261,25 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 		}
 
 		{
-			ZoneScopedN("chunks_to_generate push jobs");
-			
-			std::unique_ptr<ThreadingJob> jobs[64];
+			ZoneScopedN("chunks_to_generate finalize jobs");
 
-			size_t count = std::min(chunks_to_generate.size(), ARRLEN(jobs));
+			static constexpr int LOAD_LIMIT = 64;
+			std::unique_ptr<ThreadingJob> jobs[LOAD_LIMIT];
+
+			int count = (int)background_threadpool.results.pop_n(jobs, ARRLEN(jobs));
+			for (int i=0; i<count; ++i)
+				jobs[i]->finalize();
+
+			background_queued_count -= (int)count;
+		}
+
+		{
+			ZoneScopedN("chunks_to_generate push jobs");
+
+			static constexpr int QUEUE_LIMIT = 256;
+			std::unique_ptr<ThreadingJob> jobs[QUEUE_LIMIT];
+
+			int count = std::min((int)chunks_to_generate.size(), (int)ARRLEN(jobs) - background_queued_count);
 			for (int i=0; i<count; ++i) {
 				auto cp = chunks_to_generate[i];
 
@@ -275,18 +292,10 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			}
 
 			background_threadpool.jobs.push_n(jobs, count);
+			background_queued_count += (int)count;
+
+			TracyPlot("background_queued_count", (int64_t)background_queued_count);
 		}
-
-		{
-			ZoneScopedN("chunks_to_generate finalize jobs");
-			
-			std::unique_ptr<ThreadingJob> jobs[64];
-
-			size_t count = background_threadpool.results.pop_n(jobs, ARRLEN(jobs));
-			for (size_t i=0; i<count; ++i)
-				jobs[i]->finalize();
-		}
-
 	}
 
 }

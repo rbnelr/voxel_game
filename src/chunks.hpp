@@ -223,6 +223,8 @@ struct Chunks {
 
 	float active_radius = 200.0f;
 
+	int background_queued_count = 0;
+
 	// distance of chunk to player
 	int chunk_lod (float dist) {
 		return clamp(floori(log2f(dist / generation_radius * 16)), 0,3);

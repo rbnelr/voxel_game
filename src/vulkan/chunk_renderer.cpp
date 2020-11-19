@@ -68,62 +68,66 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 		result_count += count;
 	}
 
+	ZoneValue(uploads.size());
+
 	{ // upload data via mapped staging buffer and vkCmdCopyBuffer
 		auto& frame = frames[cur_frame];
 
-		int buf = 0; // staging buffer
-		int slicei = 0;
+		int used_sbufs = 0; // how many staging buffers were needed this frame to upload
+		size_t offs_in_sbuf = 0;
 
 		// foreach staging buffer
-		for (; slicei < (int)uploads.size(); ++buf) {
+		for (auto& upload : uploads) {
+			
+			auto* vertices = upload.data->verts;
+			size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
 
-			// alloc new staging buffer as required
-			if (buf >= (int)frame.staging_bufs.size())
-				frame.staging_bufs.push_back( new_staging_buffer(ctx, cur_frame) );
-			auto& staging_buf = frame.staging_bufs[buf];
+			if (used_sbufs == 0 || offs_in_sbuf + size > ALLOC_SIZE) {
+				// staging buffer would overflow, switch to next one
+				++used_sbufs;
+				offs_in_sbuf = 0;
 
-			char* ptr;
-			vkMapMemory(ctx.dev, staging_buf.mem, 0, ALLOC_SIZE, 0, (void**)&ptr);
-
-			size_t offs = 0;
-
-			// foreach slice to upload
-			for (; slicei < (int)uploads.size(); ++slicei) {
-				auto& upload = uploads[slicei];
-
-				auto* vertices = upload.data->verts;
-				size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
-
-				if (offs + size > ALLOC_SIZE)
-					break; // staging buffer would overflow, put this into next one
-
-				memcpy(ptr + offs, vertices, size);
-
-				MeshData::free_slice(upload.data);
-
-				if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
-					allocs.push_back( new_alloc(ctx) );
-
-				uint32_t dst_offset;
-				VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
-
-				VkBufferCopy copy_region = {};
-				copy_region.srcOffset = offs;
-				copy_region.dstOffset = dst_offset * sizeof(BlockMeshInstance);
-				copy_region.size = size;
-				vkCmdCopyBuffer(cmds, staging_buf.buf, dst_buf, 1, &copy_region);
-
-				offs += size;
+				// alloc new staging buffer as required
+				if (used_sbufs > (int)frame.staging_bufs.size())
+					frame.staging_bufs.push_back( new_staging_buffer(ctx, cur_frame) );
 			}
+			auto& staging_buf = frame.staging_bufs[used_sbufs-1];
 
-			vkUnmapMemory(ctx.dev, staging_buf.mem);
+			memcpy((char*)staging_buf.mapped_ptr + offs_in_sbuf, vertices, size);
+
+			MeshData::free_slice(upload.data);
+
+			if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
+				allocs.push_back( new_alloc(ctx) );
+
+			uint32_t dst_offset;
+			VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
+
+			VkBufferCopy copy_region = {};
+			copy_region.srcOffset = offs_in_sbuf;
+			copy_region.dstOffset = dst_offset * sizeof(BlockMeshInstance);
+			copy_region.size = size;
+			vkCmdCopyBuffer(cmds, staging_buf.buf.buf, dst_buf, 1, &copy_region);
+
+			offs_in_sbuf += size;
+		}
+
+		// free staging buffers when no longer needed
+		int min_staging_bufs = 0;
+		while ((int)frame.staging_bufs.size() > max(used_sbufs, min_staging_bufs)) {
+			free_staging_buffer(ctx.dev, frame.staging_bufs.back());
+			frame.staging_bufs.pop_back();
 		}
 
 		if (uploads.size() > 0) {
+			VkMemoryBarrier mem = {};
+			mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+			mem.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+			mem.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 			vkCmdPipelineBarrier(cmds,
 				VK_PIPELINE_STAGE_TRANSFER_BIT,
 				VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-				0, 0, nullptr, 0, nullptr, 0, nullptr);
+				0, 1, &mem, 0, nullptr, 0, nullptr);
 		}
 
 		uploads.clear();

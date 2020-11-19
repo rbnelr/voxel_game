@@ -23,8 +23,13 @@ struct ChunkRenderer {
 		uint32_t		vertex_count;
 	};
 
+	struct StagingBuf {
+		Allocation	buf;
+		void*		mapped_ptr;
+	};
+
 	struct FrameData {
-		std::vector<Allocation> staging_bufs;
+		std::vector<StagingBuf> staging_bufs;
 	};
 
 	std::vector<Allocation>	allocs;
@@ -40,6 +45,8 @@ struct ChunkRenderer {
 	}
 
 	Allocation new_alloc (VulkanWindowContext& ctx) {
+		ZoneScopedC(tracy::Color::Crimson);
+		
 		auto buf = allocate_buffer(ctx.dev, ctx.pdev, ALLOC_SIZE,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -47,13 +54,27 @@ struct ChunkRenderer {
 		GPU_DBG_NAME(ctx, buf.mem, "chunk_slice_alloc");
 		return buf;
 	}
-	Allocation new_staging_buffer (VulkanWindowContext& ctx, int cur_frame) {
+	StagingBuf new_staging_buffer (VulkanWindowContext& ctx, int cur_frame) {
+		ZoneScopedC(tracy::Color::Crimson);
+		
 		auto buf = allocate_buffer(ctx.dev, ctx.pdev, ALLOC_SIZE,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 		GPU_DBG_NAMEI(ctx, buf.buf, "chunk_staging_buf[%d]", cur_frame);
 		GPU_DBG_NAMEI(ctx, buf.mem, "chunk_staging_alloc[%d]", cur_frame);
-		return buf;
+
+		void* ptr;
+		vkMapMemory(ctx.dev, buf.mem, 0, ALLOC_SIZE, 0, &ptr);
+
+		return { buf, ptr };
+	}
+	void free_staging_buffer (VkDevice dev, StagingBuf& buf) {
+		ZoneScopedC(tracy::Color::Crimson);
+		
+		vkUnmapMemory(dev, buf.buf.mem);
+
+		vkDestroyBuffer(dev, buf.buf.buf, nullptr);
+		vkFreeMemory(dev, buf.buf.mem, nullptr);
 	}
 
 	void create (VulkanWindowContext& ctx, int frames_in_flight) {
@@ -61,10 +82,8 @@ struct ChunkRenderer {
 	}
 	void destroy (VkDevice dev) {
 		for (auto& f : frames) {
-			for (auto& buf : f.staging_bufs) {
-				vkDestroyBuffer(dev, buf.buf, nullptr);
-				vkFreeMemory(dev, buf.mem, nullptr);
-			}
+			for (auto& buf : f.staging_bufs)
+				free_staging_buffer(dev, buf);
 		}
 		for (auto& a : allocs) {
 			vkDestroyBuffer(dev, a.buf, nullptr);

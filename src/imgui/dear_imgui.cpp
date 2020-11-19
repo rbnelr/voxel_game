@@ -79,7 +79,7 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 	char str[4096];
 	vsnprintf(str, sizeof(str), new_format, vl);
 
-#if !NDEBUG
+#if DEBUGLEVEL >= 2 && defined(CONSOLE_SUBSYS)
 	// puts() is too slow to use in a game?, seen in profiler often taking >1.5ms to execute, not sure why
 	fputs(str, level == ERROR || level == WARNING ? stdout : stderr);
 #endif

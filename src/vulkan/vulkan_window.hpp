@@ -5,6 +5,10 @@
 
 struct GLFWwindow;
 
+#if DEBUGLEVEL >= 2
+	#define VK_VALIDATION_LAYERS
+#endif
+
 namespace vk {
 
 static constexpr int SWAP_CHAIN_SIZE = 3;
@@ -83,7 +87,9 @@ struct VulkanWindowContext {
 #ifdef VK_VALIDATION_LAYERS
 	VkDebugUtilsMessengerEXT	debug_messenger;
 #endif
+#if GPU_DEBUG_MARKERS
 	DebugMarker					dbgmarker;
+#endif
 
 	std::vector<char const*>	enabled_layers;
 	std::vector<char const*>	enabled_extensions;

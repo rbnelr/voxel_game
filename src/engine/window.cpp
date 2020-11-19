@@ -210,8 +210,15 @@ void glfw_error (int err, const char* msg) {
 	fprintf(stderr, "GLFW Error! [0x%x] '%s'\n", err, msg);
 }
 
-int main () {
-#ifndef NDEBUG
+#ifdef WIN32
+	#ifdef CONSOLE_SUBSYS
+int main ()
+	#else
+int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
+	#endif
+#endif
+{
+#if DEBUGLEVEL >= 2
 	glfwSetErrorCallback(glfw_error);
 #endif
 
