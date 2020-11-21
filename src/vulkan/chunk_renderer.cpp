@@ -84,7 +84,7 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 			auto* vertices = upload.data->verts;
 			size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
 
-			if (used_sbufs == 0 || offs_in_sbuf + size > ALLOC_SIZE) {
+			if (used_sbufs == 0 || offs_in_sbuf + size > STAGING_SIZE) {
 				// staging buffer would overflow, switch to next one
 				++used_sbufs;
 				offs_in_sbuf = 0;
@@ -115,7 +115,7 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 		}
 
 		// free staging buffers when no longer needed
-		int min_staging_bufs = 0;
+		int min_staging_bufs = 1;
 		while ((int)frame.staging_bufs.size() > max(used_sbufs, min_staging_bufs)) {
 			free_staging_buffer(ctx.dev, frame.staging_bufs.back());
 			frame.staging_bufs.pop_back();
@@ -141,6 +141,8 @@ void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipelin
 	
 	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
+	VkBuffer prev_buf = VK_NULL_HANDLE;
+
 	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
 		auto& chunk = chunks[cid];
 		if ((chunk.flags & Chunk::LOADED) == 0) continue;
@@ -149,9 +151,11 @@ void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipelin
 			uint32_t offset;
 			VkBuffer buf = calc_slice_buf(sid, &offset);
 
-			VkBuffer vertex_bufs[] = { buf };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+			if (buf != prev_buf) {
+				VkBuffer vertex_bufs[] = { buf };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+			}
 
 			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 

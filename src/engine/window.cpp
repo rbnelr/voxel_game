@@ -2,6 +2,7 @@
 #include "window.hpp"
 #include "game.hpp"
 #include "vulkan/vulkan_renderer.hpp"
+#include "vulkan/chunk_renderer.hpp"
 
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
@@ -182,8 +183,9 @@ void frameloop (Window& window) {
 		// Update
 
 		game->imgui(window, window.input,
-			std::bind(&Renderer::renderscale_imgui, renderer.get()
-		));
+			[&] () { renderer->renderscale_imgui(); },
+			[&] () { renderer->chunk_renderer.imgui(game->world->chunks); }
+		);
 
 		if (g_imgui.show_demo_window)
 			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);

@@ -24,10 +24,6 @@ struct World {
 		parallelism_threadpool.flush();
 	}
 
-	void imgui () {
-		chunks.imgui();
-	}
-
 	void raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_dist, bool hit_at_max_dist=false, float* hit_dist=nullptr);
 
 	void apply_damage (SelectedBlock& block, Item& item, bool creative_mode);

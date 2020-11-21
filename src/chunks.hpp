@@ -218,7 +218,7 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius = 250.0f;
+	float generation_radius = 500.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
@@ -235,7 +235,7 @@ struct Chunks {
 		return clamp(floori(log2f(dist / generation_radius * 16)), 0,3);
 	}
 
-	void imgui () {
+	void imgui (std::function<void()> chunk_renderer) {
 		if (!imgui_push("Chunks")) return;
 
 		ImGui::DragFloat("generation_radius", &generation_radius, 1);
@@ -245,7 +245,7 @@ struct Chunks {
 		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 		uint64_t block_mem = count * sizeof(ChunkData);
 
-		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB",
+		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB RAM",
 			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024);
 
 		if (ImGui::TreeNode("chunks")) {
@@ -263,13 +263,7 @@ struct Chunks {
 			ImGui::TreePop();
 		}
 
-		//uint64_t face_count = 0;
-		//for (Chunk& c : chunks) {
-		//	face_count += c.face_count;
-		//}
-		//uint64_t mesh_mem = face_count * 6 * sizeof(ChunkMesh::Vertex);
-		//
-		//ImGui::Text("Mesh data:  %11s faces (%5.0f MB  %5.0f KB avg / chunk)", format_thousands(face_count).c_str(), (float)mesh_mem/1024/1024, (float)mesh_mem/1024 / chunk_count);
+		chunk_renderer();
 
 		imgui_pop();
 	}
