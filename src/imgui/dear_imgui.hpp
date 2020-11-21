@@ -5,6 +5,7 @@
 
 #include "kisslib/kissmath.hpp"
 #include "kisslib/running_average.hpp"
+#include "kisslib/allocator.hpp"
 
 #include <string>
 #include <vector>
@@ -125,6 +126,44 @@ struct FPS_Display {
 		}
 	}
 };
+
+inline void print_bitset_allocator (BitsetAllocator& bits, size_t sz=0, size_t pagesz=1) {
+	constexpr char chars[2] = {'#', '-'};
+	ImVec4 colors[2] = { ImVec4(1,1,1,1), ImVec4(0.7f, 0.7f, 0.7f, 1) };
+
+	char str[64+1];
+
+	size_t cur = 0;
+	int cur_col = 0;
+
+	for (size_t b : bits.bits) {
+
+		int ci = 0;
+		int i = 0;
+
+		while (i < 64) {
+			int col = cur_col;
+
+			for (; i<64; ++i) {
+				if (cur >= pagesz) {
+					cur -= pagesz;
+					cur_col++;
+					break;
+				}
+
+				str[ci++] = chars[(b >> i) & 1];
+				cur += sz;
+			}
+
+			str[ci] = '\0';
+			ci = 0;
+
+			ImGui::TextColored(colors[col & 1], str);
+			if (i < 64)
+				ImGui::SameLine(0, 0);
+		}
+	}
+}
 
 // Global GuiConsole
 inline Logger g_logger;

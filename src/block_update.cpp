@@ -60,6 +60,7 @@ bool BlockUpdate::update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos
 	return changed;
 };
 
+#if 0
 static_assert(CHUNK_BLOCK_COUNT == (1 << 15), "");
 
 uint16_t block_pattern (uint16_t i) {
@@ -111,4 +112,9 @@ void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
 			}
 		}
 	}
+}
+#endif
+
+void BlockUpdate::update_blocks (Input& I, Chunks& chunks) {
+
 }

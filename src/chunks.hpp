@@ -2,8 +2,8 @@
 #include "common.hpp"
 #include "blocks.hpp"
 
-#define CHUNK_SIZE			32
-#define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
+#define CHUNK_SIZE			64
+#define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		((1 << CHUNK_SIZE_SHIFT) -1)
 #define CHUNK_ROW_OFFS		(CHUNK_SIZE+2)
 #define CHUNK_LAYER_OFFS	((CHUNK_SIZE+2)*(CHUNK_SIZE+2))
@@ -245,8 +245,23 @@ struct Chunks {
 		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 		uint64_t block_mem = count * sizeof(ChunkData);
 
-		ImGui::Text("Voxel data: %4d chunks %11s blocks (%5.0f MB  %5.0f KB avg / chunk)",
-			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024, (float)block_mem/1024 / count);
+		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB",
+			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024);
+
+		if (ImGui::TreeNode("chunks")) {
+			for (chunk_id id=0; id<max_id; ++id) {
+				if ((chunks[id].flags & Chunk::ALLOCATED) == 0)
+					ImGui::Text("<not allocated>");
+				else
+					ImGui::Text("%+4d,%+4d,%+4d  %2d slices", chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z, chunks[id].mesh_slices.size());
+			}
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNode("chunks alloc")) {
+			print_bitset_allocator(id_alloc, sizeof(Chunk), os_page_size);
+			ImGui::TreePop();
+		}
 
 		//uint64_t face_count = 0;
 		//for (Chunk& c : chunks) {
