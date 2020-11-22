@@ -264,7 +264,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 		{
 			ZoneScopedN("chunks_to_generate finalize jobs");
 
-			static constexpr int LOAD_LIMIT = 64;
+			static constexpr int LOAD_LIMIT = 32;
 			std::unique_ptr<ThreadingJob> jobs[LOAD_LIMIT];
 
 			int count = (int)background_threadpool.results.pop_n(jobs, ARRLEN(jobs));

@@ -82,6 +82,8 @@ struct Renderer {
 	VkDeviceMemory				ubo_memory;
 	void*						ubo_mem_ptr;
 
+	VkBuffer					block_meshes_buf;
+
 	VkDeviceMemory				mesh_mem;
 	VkDeviceMemory				tex_mem;
 
@@ -142,7 +144,7 @@ struct Renderer {
 	void frame_begin (GLFWwindow* window);
 	void submit (GLFWwindow* window, VkCommandBuffer buf);
 
-	void upload_static_data ();
+	void upload_static_data (json const& blocks_json);
 	void destroy_static_data ();
 
 	////

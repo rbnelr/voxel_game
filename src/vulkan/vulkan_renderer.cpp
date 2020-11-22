@@ -227,8 +227,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 
 	create_frame_data();
 
-	assets.load_block_textures(blocks_json);
-	upload_static_data();
+	upload_static_data(blocks_json);
 
 	create_descriptor_pool();
 	create_ubo_buffers();
@@ -318,15 +317,24 @@ Renderer::~Renderer () {
 	TracyVkDestroy(ctx.tracy_ctx);
 }
 
-void Renderer::upload_static_data () {
+void Renderer::upload_static_data (json const& blocks_json) {
 	ZoneScoped;
 	
+	assets.load_block_textures(blocks_json);
+	auto block_meshes = assets.generate_block_meshes(blocks_json);
+
 	StaticDataUploader uploader;
 	auto cmds = begin_init_cmds();
 	uploader.cmds = cmds;
 
 	{
-		//mesh_mem = uploader.upload(ctx.dev, ctx.pdev, meshes);
+		UploadBuffer bufs[1];
+		bufs[0].data = block_meshes.slices.data();
+		bufs[0].size = block_meshes.slices.size() * sizeof(block_meshes.slices[0]);
+		bufs[0].usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		mesh_mem = uploader.upload(ctx.dev, ctx.pdev, bufs, ARRLEN(bufs));
+
+		block_meshes_buf = bufs[0].vkbuf;
 	}
 
 	{
@@ -368,14 +376,14 @@ void Renderer::upload_static_data () {
 	uploader.end(ctx.dev);
 }
 void Renderer::destroy_static_data () {
-	//for (auto& b : meshes)
-	//	vkDestroyBuffer(ctx.dev, b.vkbuf, nullptr);
-	//vkFreeMemory(ctx.dev, mesh_mem, nullptr);
+	vkDestroyBuffer(ctx.dev, block_meshes_buf, nullptr);
 
-	vkFreeMemory(ctx.dev, tex_mem, nullptr);
+	vkFreeMemory(ctx.dev, mesh_mem, nullptr);
 
 	vkDestroyImageView(ctx.dev, tilemap_img.img_view, nullptr);
 	vkDestroyImage(ctx.dev, tilemap_img.img, nullptr);
+
+	vkFreeMemory(ctx.dev, tex_mem, nullptr);
 
 	ctx.imgui_destroy();
 }
@@ -441,7 +449,7 @@ void Renderer::create_descriptor_pool () {
 		FRAMES_IN_FLIGHT); // for main image
 
 	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT; // for ubo
+	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT * 2; // for view ubo + block meshes ubo
 
 	VkDescriptorPoolCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -469,18 +477,27 @@ void Renderer::create_common_descriptors () {
 		sampler_info.minLod = 0;
 		sampler_info.maxLod = 1000;
 		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &main_sampler);
-		
-		VkDescriptorSetLayoutBinding bindings[2] = {};
-		bindings[0].binding = 0;
-		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		bindings[0].descriptorCount = 1;
-		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-		bindings[1].binding = 1;
-		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		bindings[1].descriptorCount = 1;
-		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		bindings[1].pImmutableSamplers = &main_sampler;
+		int idx = 0;
+		VkDescriptorSetLayoutBinding bindings[3] = {};
+		bindings[idx].binding = idx;
+		bindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[idx].descriptorCount = 1;
+		bindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		idx++;
+
+		bindings[idx].binding = idx;
+		bindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[idx].descriptorCount = 1;
+		bindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		idx++;
+
+		bindings[idx].binding = idx;
+		bindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[idx].descriptorCount = 1;
+		bindings[idx].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		bindings[idx].pImmutableSamplers = &main_sampler;
+		idx++;
 
 		VkDescriptorSetLayoutCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -507,32 +524,49 @@ void Renderer::create_common_descriptors () {
 		for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
 			frame_data[i].ubo_descriptor_set = sets[i];
 
-			VkWriteDescriptorSet writes[2] = {};
+			int idx = 0;
+			VkWriteDescriptorSet writes[3] = {};
 			
 			VkDescriptorBufferInfo buf = {};
 			buf.buffer = frame_data[i].ubo_buf;
 			buf.offset = 0;
-			buf.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
+			buf.range = VK_WHOLE_SIZE;
 
-			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writes[0].dstSet = sets[i];
-			writes[0].dstBinding = 0;
-			writes[0].dstArrayElement = 0;
-			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			writes[0].descriptorCount = 1;
-			writes[0].pBufferInfo = &buf;
+			writes[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[idx].dstSet = sets[i];
+			writes[idx].dstBinding = idx;
+			writes[idx].dstArrayElement = 0;
+			writes[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writes[idx].descriptorCount = 1;
+			writes[idx].pBufferInfo = &buf;
+			idx++;
+
+			VkDescriptorBufferInfo buf2 = {};
+			buf2.buffer = block_meshes_buf;
+			buf2.offset = 0;
+			buf2.range = VK_WHOLE_SIZE;
+
+			writes[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[idx].dstSet = sets[i];
+			writes[idx].dstBinding = idx;
+			writes[idx].dstArrayElement = 0;
+			writes[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			writes[idx].descriptorCount = 1;
+			writes[idx].pBufferInfo = &buf2;
+			idx++;
 
 			VkDescriptorImageInfo img = {};
 			img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			img.imageView = tilemap_img.img_view;
 
-			writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writes[1].dstSet = sets[i];
-			writes[1].dstBinding = 1;
-			writes[1].dstArrayElement = 0;
-			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			writes[1].descriptorCount = 1;
-			writes[1].pImageInfo = &img;
+			writes[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[idx].dstSet = sets[i];
+			writes[idx].dstBinding = idx;
+			writes[idx].dstArrayElement = 0;
+			writes[idx].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[idx].descriptorCount = 1;
+			writes[idx].pImageInfo = &img;
+			idx++;
 
 			vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
 		}

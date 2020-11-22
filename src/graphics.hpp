@@ -44,20 +44,20 @@ struct BlockMeshInstance {
 };
 // Vertex for block meshes which are used when rendering chunks via merge instancing
 struct BlockMeshVertex {
-	float3		pos;
-	float3		normal;
-	float2		uv;
+	// all as float4 to avoid std140 layout problems
+	float4		pos;
+	float4		normal;
+	float4		uv;
 
-	template <typename ATTRIBS>
-	static void attributes (ATTRIBS& a) {
-		int loc = 0;
-		a.init(sizeof(BlockMeshVertex));
-		a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(BlockMeshVertex, pos   ));
-		a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(BlockMeshVertex, normal));
-		a.template add<AttribMode::FLOAT, decltype(uv    )>(loc++, "uv"    , offsetof(BlockMeshVertex, uv    ));
-	}
+	//template <typename ATTRIBS>
+	//static void attributes (ATTRIBS& a) {
+	//	int loc = 0;
+	//	a.init(sizeof(BlockMeshVertex));
+	//	a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(BlockMeshVertex, pos   ));
+	//	a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(BlockMeshVertex, normal));
+	//	a.template add<AttribMode::FLOAT, decltype(uv    )>(loc++, "uv"    , offsetof(BlockMeshVertex, uv    ));
+	//}
 };
-
 
 struct BlockMeshes {
 	static constexpr int MERGE_INSTANCE_FACTOR = 6; // how many vertices are emitted per input vertex (how big is one slice of block mesh)
@@ -71,12 +71,11 @@ struct BlockMeshes {
 	};
 
 	std::vector<MeshSlice>	slices;
-	std::vector<Mesh>		meshes;
 };
 
 struct Assets {
 	
-	std::vector<BlockTile> block_tiles;
+	std::vector<BlockMeshes::Mesh> block_meshes;
 
 	BlockMeshes generate_block_meshes (json const& blocks_json) {
 		BlockMeshes bm;
@@ -99,20 +98,23 @@ struct Assets {
 		bm.slices.resize(6);
 
 		for (int face=0; face<6; ++face) {
+
 			for (int vert=0; vert<6; ++vert) {
 				int idx = indices[vert];
 
 				auto& v = bm.slices[face].vertices[vert];
-				v.pos		= pos[face][idx];
-				v.normal	= normals[face];
-				v.uv		= uv[idx];
+				v.pos		= float4(pos[face][idx], 1.0f);
+				v.normal	= float4(normals[face], 1.0f);
+				v.uv		= float4(uv[idx], 0.0f, 1.0f);
 			}
 
-			block_tiles.push_back({ face, 1 });
+			block_meshes.push_back({ face, 1 });
 		}
 
 		return bm;
 	}
+
+	std::vector<BlockTile> block_tiles;
 
 	void load_block_textures (json const& blocks_json) {
 		{ // B_NULL
