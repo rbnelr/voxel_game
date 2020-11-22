@@ -14,7 +14,7 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-	layout(set = 0, binding = 0) uniform sampler2D src_image;
+	layout(set = 1, binding = 0) uniform sampler2D src_image;
 	void main () {
 		frag_col = texture(src_image, vs.uv);
 	}

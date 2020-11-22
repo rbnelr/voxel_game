@@ -9,10 +9,7 @@ void Renderer::set_view_uniforms (Camera_View& view, int2 viewport_size) {
 	ViewUniforms ubo;
 	ubo.set(view, viewport_size);
 
-	void* data;
-	vkMapMemory(ctx.dev, ubo_memory, 0, sizeof(ViewUniforms), 0, &data);
-	memcpy((char*)data + frame_data[cur_frame].ubo_mem_offset, &ubo, sizeof(ViewUniforms));
-	vkUnmapMemory(ctx.dev, ubo_memory);
+	memcpy((char*)ubo_mem_ptr + frame_data[cur_frame].ubo_mem_offs, &ubo, sizeof(ViewUniforms));
 }
 
 void Renderer::frame_begin (GLFWwindow* window) {
@@ -76,7 +73,13 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 
 	{
 		GPU_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(ctx, cur_frame, cmds);
+		chunk_renderer.upload_remeshed(ctx, cmds, data.chunks, cur_frame);
+	}
+
+	{ // set 0
+		// TODO: why do we need to specify a PipelineLayout here even though a the set0 is used in all pipelines?
+		vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, main_pipeline_layout, 0, 1,
+			&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
 	}
 
 	{ // main render pass
@@ -101,13 +104,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 		set_viewport(cmds, renderscale_size);
 
 		{
-			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, main_pipeline_layout, 0, 1,
-				&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
-		}
-
-		{
 			GPU_TRACE(ctx, cmds, "draw chunks");
-			chunk_renderer.draw_chunks(cmds, data.chunks, main_pipeline, main_pipeline_layout);
+			chunk_renderer.draw_chunks(ctx, cmds, data.chunks, cur_frame, main_pipeline, main_pipeline_layout);
 		}
 	}
 	vkCmdEndRenderPass(cmds);
@@ -154,8 +152,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 			{
 				GPU_TRACE(ctx, cmds, "rescale draw");
 
-				{
-					vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 0, 1,
+				{ // set 1
+					vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 1, 1,
 						&rescale_descriptor_set, 0, nullptr);
 				}
 
@@ -225,54 +223,53 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	ctx.init_vk_tracy(init_cmd_pool);
 #endif
 
+	shaders.init(ctx.dev);
+
 	create_frame_data();
 
 	assets.load_block_textures(blocks_json);
+	upload_static_data();
 
-	chunk_renderer.create(ctx, FRAMES_IN_FLIGHT);
-	shaders.init(ctx.dev);
-	
 	create_descriptor_pool();
 	create_ubo_buffers();
 
-	upload_static_data();
+	chunk_renderer.create(ctx, FRAMES_IN_FLIGHT);
 	
-	{
-		create_main_descriptors();
+	create_common_descriptors();
+	GPU_DBG_NAME(ctx, main_sampler, "main_sampler");
+	GPU_DBG_NAME(ctx, main_descriptor_layout, "main_descriptor_layout");
+	for (int i=0; i<FRAMES_IN_FLIGHT; ++i)
+		GPU_DBG_NAMEf(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
 
+	{
 		main_renderpass = create_main_renderpass(fb_color_format, fb_depth_format, msaa);
+		GPU_DBG_NAME(ctx, main_renderpass, "main_renderpass");
 
 		main_pipeline_layout = create_pipeline_layout(ctx.dev,
-			{ main_descriptor_layout },
-			{{ VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3) }});
+			{ main_descriptor_layout, chunk_renderer.descriptor_layout }, {});
+		GPU_DBG_NAME(ctx, main_pipeline_layout, "main_pipeline_layout");
 
 		main_pipeline = create_main_pipeline(shaders.get(ctx.dev, "chunks"),
 			main_renderpass, main_pipeline_layout, msaa, make_attribs<BlockMeshInstance>());
-
-		GPU_DBG_NAME(ctx, main_sampler, "main_sampler");
-		GPU_DBG_NAME(ctx, main_descriptor_layout, "main_descriptor_layout");
-		for (int i=0; i<FRAMES_IN_FLIGHT; ++i)
-			GPU_DBG_NAMEI(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
-		GPU_DBG_NAME(ctx, main_renderpass, "main_renderpass");
-		GPU_DBG_NAME(ctx, main_pipeline_layout, "main_pipeline_layout");
 		GPU_DBG_NAME(ctx, main_pipeline, "main_pipeline");
+
 	}
 
 	{
 		create_rescale_descriptors();
-
-		ui_renderpass = create_ui_renderpass(wnd_color_format);
-
-		rescale_pipeline_layout = create_pipeline_layout(ctx.dev,
-			{ rescale_descriptor_layout }, {});
-		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
-			ui_renderpass, rescale_pipeline_layout);
-
 		GPU_DBG_NAME(ctx, rescale_sampler, "rescale_sampler");
 		GPU_DBG_NAME(ctx, rescale_descriptor_layout, "rescale_descriptor_layout");
 		GPU_DBG_NAME(ctx, rescale_descriptor_set, "rescale_descriptor_set");
+
+		ui_renderpass = create_ui_renderpass(wnd_color_format);
 		GPU_DBG_NAME(ctx, ui_renderpass, "ui_renderpass");
+
+		rescale_pipeline_layout = create_pipeline_layout(ctx.dev,
+			{ main_descriptor_layout, rescale_descriptor_layout }, {});
 		GPU_DBG_NAME(ctx, rescale_pipeline_layout, "rescale_pipeline_layout");
+
+		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
+			ui_renderpass, rescale_pipeline_layout);
 		GPU_DBG_NAME(ctx, rescale_pipeline, "rescale_pipeline");
 	}
 }
@@ -400,14 +397,14 @@ void Renderer::create_ubo_buffers () {
 		info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VK_CHECK_RESULT(vkCreateBuffer(ctx.dev, &info, nullptr, &f.ubo_buffer));
-		GPU_DBG_NAMEI(ctx, f.ubo_buffer, "ubo_buffer[%d]", i);
+		VK_CHECK_RESULT(vkCreateBuffer(ctx.dev, &info, nullptr, &f.ubo_buf));
+		GPU_DBG_NAMEf(ctx, f.ubo_buf, "ubo_buffer[%d]", i);
 
 		VkMemoryRequirements mem_req;
-		vkGetBufferMemoryRequirements(ctx.dev, f.ubo_buffer, &mem_req);
+		vkGetBufferMemoryRequirements(ctx.dev, f.ubo_buf, &mem_req);
 
 		size = align_up(size, mem_req.alignment);
-		f.ubo_mem_offset = size;
+		f.ubo_mem_offs = size;
 		size += mem_req.size;
 
 		mem_req_bits &= mem_req.memoryTypeBits;
@@ -422,13 +419,17 @@ void Renderer::create_ubo_buffers () {
 		VK_CHECK_RESULT(vkAllocateMemory(ctx.dev, &info, nullptr, &ubo_memory));
 		GPU_DBG_NAME(ctx, ubo_memory, "ubo_memory");
 
+		vkMapMemory(ctx.dev, ubo_memory, 0, size, 0, &ubo_mem_ptr);
+
 		for (auto& f : frame_data)
-			vkBindBufferMemory(ctx.dev, f.ubo_buffer, ubo_memory, f.ubo_mem_offset);
+			vkBindBufferMemory(ctx.dev, f.ubo_buf, ubo_memory, f.ubo_mem_offs);
 	}
 }
 void Renderer::destroy_ubo_buffers () {
+	vkUnmapMemory(ctx.dev, ubo_memory);
+
 	for (auto& f : frame_data)
-		vkDestroyBuffer(ctx.dev, f.ubo_buffer, nullptr);
+		vkDestroyBuffer(ctx.dev, f.ubo_buf, nullptr);
 	vkFreeMemory(ctx.dev, ubo_memory, nullptr);
 }
 
@@ -451,9 +452,10 @@ void Renderer::create_descriptor_pool () {
 		+1); // for rescale
 
 	VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
+	GPU_DBG_NAME(ctx, descriptor_pool, "descriptor_pool");
 }
 
-void Renderer::create_main_descriptors () {
+void Renderer::create_common_descriptors () {
 	{ // create descriptor layout
 		VkSamplerCreateInfo sampler_info = {};
 		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -508,7 +510,7 @@ void Renderer::create_main_descriptors () {
 			VkWriteDescriptorSet writes[2] = {};
 			
 			VkDescriptorBufferInfo buf = {};
-			buf.buffer = frame_data[i].ubo_buffer;
+			buf.buffer = frame_data[i].ubo_buf;
 			buf.offset = 0;
 			buf.range = sizeof(ViewUniforms); // or VK_WHOLE_SIZE
 
@@ -873,7 +875,7 @@ void Renderer::create_frame_data () {
 		alloc_info.commandBufferCount  = 1;
 		VK_CHECK_RESULT(vkAllocateCommandBuffers(ctx.dev, &alloc_info, &frame.command_buffer));
 
-		GPU_DBG_NAMEI(ctx, frame.command_buffer, "cmds[%d]", i);
+		GPU_DBG_NAMEf(ctx, frame.command_buffer, "cmds[%d]", i);
 
 		VkSemaphoreCreateInfo semaphore_info = {};
 		semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;

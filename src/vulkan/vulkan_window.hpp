@@ -26,6 +26,7 @@ inline constexpr const char* DEVICE_EXTENSIONS[] = {
 	"VK_EXT_calibrated_timestamps",
 #endif
 
+	"VK_KHR_shader_draw_parameters", // needed for multidraw to be useful
 };
 
 #define GPU_DEBUG_MARKERS 1
@@ -152,11 +153,11 @@ struct VulkanWindowContext {
 		TracyVkZone((wndctx).tracy_ctx, (cmds), (name))
 
 	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), (name))
-	#define GPU_DBG_NAMEI(wndctx, obj, name, idx) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), prints((name), (idx)).c_str())
+	#define GPU_DBG_NAMEf(wndctx, obj, name, ...) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), prints((name), __VA_ARGS__).c_str())
 #else
 	#define GPU_TRACE(wndctx, cmds, name) TracyVkZone(wndctx.tracy_ctx, cmds, name)
 	#define GPU_DBG_NAME(wndctx, obj, name)
-	#define GPU_DBG_NAMEI(wndctx, obj, name, idx)
+	#define GPU_DBG_NAMEf(wndctx, obj, name, ...)
 #endif
 
 //// Instance creation

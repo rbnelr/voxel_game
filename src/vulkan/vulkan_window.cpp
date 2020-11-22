@@ -381,7 +381,9 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> 
 #endif
 
 	VkPhysicalDeviceFeatures features = {};
-	features.samplerAnisotropy = VK_TRUE;
+	// Just fail if these are not supported
+	features.samplerAnisotropy = VK_TRUE; // 99.3% support  https://vulkan.gpuinfo.org/listdevicescoverage.php?feature=samplerAnisotropy&platform=windows&option=not
+	features.multiDrawIndirect = VK_TRUE; // 99.5% support  https://vulkan.gpuinfo.org/listdevicescoverage.php?feature=multiDrawIndirect&platform=windows&option=not
 
 	VkDeviceCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

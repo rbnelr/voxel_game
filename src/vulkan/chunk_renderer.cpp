@@ -57,7 +57,7 @@ void RemeshChunkJob::finalize () {
 	chunk->flags &= ~Chunk::REMESH;
 }
 
-void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, VkCommandBuffer cmds) {
+void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame) {
 	ZoneScoped;
 
 	for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
@@ -81,10 +81,9 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 		// foreach staging buffer
 		for (auto& upload : uploads) {
 			
-			auto* vertices = upload.data->verts;
 			size_t size = sizeof(BlockMeshInstance) * upload.vertex_count;
 
-			if (used_sbufs == 0 || offs_in_sbuf + size > STAGING_SIZE) {
+			if (used_sbufs == 0 || (offs_in_sbuf + size) > STAGING_SIZE) {
 				// staging buffer would overflow, switch to next one
 				++used_sbufs;
 				offs_in_sbuf = 0;
@@ -95,32 +94,52 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 			}
 			auto& staging_buf = frame.staging_bufs[used_sbufs-1];
 
-			memcpy((char*)staging_buf.mapped_ptr + offs_in_sbuf, vertices, size);
+			size_t vert_data_offs = offs_in_sbuf;
+			offs_in_sbuf += size;
+
+			memcpy((char*)staging_buf.mapped_ptr + vert_data_offs, upload.data->verts, size);
 
 			MeshData::free_slice(upload.data);
 
 			if (upload.slice_id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
-				allocs.push_back( new_alloc(ctx) );
+				new_alloc(ctx);
 
-			uint32_t dst_offset;
-			VkBuffer dst_buf = calc_slice_buf(upload.slice_id, &dst_offset);
+
+			uint32_t alloci =  upload.slice_id / SLICES_PER_ALLOC;
+			uint32_t slicei = (upload.slice_id % SLICES_PER_ALLOC);
 
 			VkBufferCopy copy_region = {};
-			copy_region.srcOffset = offs_in_sbuf;
-			copy_region.dstOffset = dst_offset * sizeof(BlockMeshInstance);
+			copy_region.srcOffset = vert_data_offs;
+			copy_region.dstOffset = slicei * CHUNK_SLICE_LENGTH * sizeof(BlockMeshInstance);
 			copy_region.size = size;
-			vkCmdCopyBuffer(cmds, staging_buf.buf.buf, dst_buf, 1, &copy_region);
-
-			offs_in_sbuf += size;
+			vkCmdCopyBuffer(cmds, staging_buf.buf.buf, allocs[alloci].mesh_data.buf, 1, &copy_region);
 		}
 
-		// free staging buffers when no longer needed
-		int min_staging_bufs = 1;
-		while ((int)frame.staging_bufs.size() > max(used_sbufs, min_staging_bufs)) {
-			free_staging_buffer(ctx.dev, frame.staging_bufs.back());
-			frame.staging_bufs.pop_back();
+		{ // free staging buffers when no longer needed
+			int min_staging_bufs = 1;
+			while ((int)frame.staging_bufs.size() > max(used_sbufs, min_staging_bufs)) {
+				free_staging_buffer(ctx.dev, frame.staging_bufs.back());
+				frame.staging_bufs.pop_back();
+			}
 		}
 
+		{ // free allocation blocks if they are no longer needed by any of the frames in flight
+			frame.slices_end = chunks.slices_alloc.alloc_end;
+			int slices_end = 0;
+			for (auto& f : frames)
+				slices_end = max(slices_end, f.slices_end);
+
+			while (slices_end < ((int)allocs.size()-1) * (int)SLICES_PER_ALLOC) {
+				free_alloc(ctx.dev, allocs.back());
+				allocs.pop_back();
+			}
+		}
+
+		while (frame.indirect_draw.size() > allocs.size())
+			free_indirect_draw_buffer(ctx.dev, frame.indirect_draw.back());
+		while (frame.indirect_draw.size() < allocs.size())
+			frame.indirect_draw.push_back( new_indirect_draw_buffer(ctx, cur_frame, (int)frame.indirect_draw.size()) );
+		
 		if (uploads.size() > 0) {
 			VkMemoryBarrier mem = {};
 			mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -136,38 +155,91 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, int cur_frame, Vk
 	}
 }
 
-void ChunkRenderer::draw_chunks (VkCommandBuffer cmds, Chunks& chunks, VkPipeline pipeline, VkPipelineLayout layout) {
+void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame,
+		VkPipeline pipeline, VkPipelineLayout layout) {
 	ZoneScoped;
 	
 	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-	VkBuffer prev_buf = VK_NULL_HANDLE;
+	auto frame = frames[cur_frame];
+
+	for (auto& draw : frame.indirect_draw)
+		draw.draw_count = 0;
 
 	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
-		auto& chunk = chunks[cid];
-		if ((chunk.flags & Chunk::LOADED) == 0) continue;
+		if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
 
-		for (auto& sid : chunk.mesh_slices) {
-			uint32_t offset;
-			VkBuffer buf = calc_slice_buf(sid, &offset);
+		float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
 
-			if (buf != prev_buf) {
-				VkBuffer vertex_bufs[] = { buf };
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
-			}
-
-			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
-
-			vkCmdPushConstants(cmds, layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
-			
+		for (auto& sid : chunks[cid].mesh_slices) {
 			assert(slices[sid].vertex_count > 0);
 
-			vkCmdDraw(cmds,
-				BlockMeshes::MERGE_INSTANCE_FACTOR, // repeat MERGE_INSTANCE_FACTOR vertices
-				slices[sid].vertex_count, // for each instance in the mesh
-				0, offset);
+			uint32_t alloci =  sid / SLICES_PER_ALLOC;
+			uint32_t slicei = (sid % SLICES_PER_ALLOC);
+
+			VkDrawIndirectCommand draw_data;
+			draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
+			draw_data.instanceCount = slices[sid].vertex_count; // for each instance in the mesh
+			draw_data.firstVertex = 0;
+			draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
+
+			auto& draw = frame.indirect_draw[alloci];
+
+			draw.draw_data_ptr[draw.draw_count] = draw_data;
+			draw.per_draw_ubo_ptr[draw.draw_count] = { float4(chunk_pos, 1.0f) };
+
+			draw.draw_count++;
 		}
+	}
+
+	for (int i=0; i<(int)frame.indirect_draw.size(); ++i) {
+		auto& draw = frame.indirect_draw[i];
+		if (draw.draw_count > 0) {
+			GPU_TRACE(ctx, cmds, "draw alloc");
+
+			VkBuffer vertex_bufs[] = { allocs[i].mesh_data.buf };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+
+			// set 1
+			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 1, 1, &draw.descriptor_set, 0, nullptr);
+
+			vkCmdDrawIndirect(cmds, draw.draw_data.buf, 0, draw.draw_count, sizeof(VkDrawIndirectCommand));
+		}
+	}
+}
+
+void ChunkRenderer::create_descriptor_layout (VulkanWindowContext& ctx, int frames_in_flight) {
+	{ // descriptor_pool
+		VkDescriptorPoolSize pool_sizes[1] = {};
+		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		pool_sizes[0].descriptorCount = MAX_ALLOCS * frames_in_flight; // for per draw data ubo
+
+		VkDescriptorPoolCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		info.poolSizeCount = ARRLEN(pool_sizes);
+		info.pPoolSizes = pool_sizes;
+		info.maxSets = (uint32_t)(MAX_ALLOCS * frames_in_flight); // for per draw data ubo
+
+		VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
+		GPU_DBG_NAME(ctx, descriptor_pool, "ChunkRenderer.descriptor_pool");
+	}
+
+	{ // descriptor_layout
+		VkDescriptorSetLayoutBinding bindings[1] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		VkDescriptorSetLayoutCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		info.bindingCount = ARRLEN(bindings);
+		info.pBindings = bindings;
+
+		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &descriptor_layout));
+		GPU_DBG_NAME(ctx, descriptor_layout, "ChunkRenderer.descriptor_layout");
 	}
 }
 

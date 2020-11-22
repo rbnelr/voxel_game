@@ -88,6 +88,9 @@ struct DebugMarker {
 	void set_name (VkDevice dev, VkRenderPass obj, const char* name) {
 		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT, (uint64_t)obj, name);
 	}
+	void set_name (VkDevice dev, VkDescriptorPool obj, const char* name) {
+		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_POOL_EXT, (uint64_t)obj, name);
+	}
 	void set_name (VkDevice dev, VkDescriptorSetLayout obj, const char* name) {
 		set_name(dev, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT, (uint64_t)obj, name);
 	}
@@ -187,6 +190,11 @@ struct RenderBuffer {
 struct Allocation {
 	VkDeviceMemory	mem;
 	VkBuffer		buf;
+
+	void free (VkDevice dev) {
+		vkDestroyBuffer(dev, buf, nullptr);
+		vkFreeMemory(dev, mem, nullptr);
+	}
 };
 
 //// Resource creation

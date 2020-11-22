@@ -74,14 +74,18 @@ struct Renderer {
 		VkFence						fence;
 
 		VkDescriptorSet				ubo_descriptor_set;
-		VkBuffer					ubo_buffer;
-		size_t						ubo_mem_offset;
+		VkBuffer					ubo_buf;
+		size_t						ubo_mem_offs;
 	};
 	FrameData					frame_data[FRAMES_IN_FLIGHT];
 
 	VkDeviceMemory				ubo_memory;
+	void*						ubo_mem_ptr;
+
 	VkDeviceMemory				mesh_mem;
 	VkDeviceMemory				tex_mem;
+
+	VkDescriptorSetLayout		common_descriptor_layout; // set 0
 
 	//// Renderpasses
 	// Main renderpass (skybox, 3d world and 3d first person)
@@ -91,7 +95,7 @@ struct Renderer {
 	RenderBuffer				main_depth;
 	VkFramebuffer				main_framebuffer;
 	
-	VkDescriptorSetLayout		main_descriptor_layout;
+	VkDescriptorSetLayout		main_descriptor_layout; // set 1
 	VkPipelineLayout			main_pipeline_layout;
 	VkPipeline					main_pipeline;
 
@@ -102,7 +106,7 @@ struct Renderer {
 	// initial image is main_color rescaled, rendered at window_res
 	VkRenderPass				ui_renderpass;
 
-	VkDescriptorSetLayout		rescale_descriptor_layout;
+	VkDescriptorSetLayout		rescale_descriptor_layout; // set 1
 	VkPipelineLayout			rescale_pipeline_layout;
 	VkPipeline					rescale_pipeline;
 
@@ -147,7 +151,7 @@ struct Renderer {
 	void create_ubo_buffers ();
 	void destroy_ubo_buffers ();
 
-	void create_main_descriptors ();
+	void create_common_descriptors ();
 	void create_rescale_descriptors ();
 	void update_rescale_img_descr ();
 
