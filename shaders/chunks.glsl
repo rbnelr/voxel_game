@@ -1,4 +1,4 @@
-#version 450
+#version 460 // for GL_ARB_shader_draw_parameters
 
 #include "common.glsl"
 
@@ -8,7 +8,6 @@ layout(location = 0) vs2fs VS {
 } vs;
 
 #ifdef _VERTEX
-#extension GL_ARB_shader_draw_parameters : enable
 	
 	layout(location = 0) in vec3	v_pos; // pos of voxel instance in chunk
 	layout(location = 1) in uint	v_meshid;
@@ -48,7 +47,7 @@ layout(location = 0) vs2fs VS {
 		vec3 mesh_pos_model	= v.pos.xyz;
 		vec2 uv				= v.uv.xy;
 
-		vec3 chunk_pos = per_draw[gl_DrawIDARB + drawid_offs].chunk_pos.xyz;
+		vec3 chunk_pos = per_draw[gl_DrawID + drawid_offs].chunk_pos.xyz;
 
 		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos + chunk_pos, 1);
 		vs.uvi =		    vec3(uv, v_texid);
