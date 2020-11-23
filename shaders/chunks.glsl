@@ -17,6 +17,10 @@ layout(location = 0) vs2fs VS {
 #define MAX_UBO_SIZE (64*1024)
 
 	//
+	layout(push_constant) uniform PC {
+		int drawid_offs;
+	};
+
 	struct PerDraw {
 		vec4 chunk_pos;
 	};
@@ -44,7 +48,7 @@ layout(location = 0) vs2fs VS {
 		vec3 mesh_pos_model	= v.pos.xyz;
 		vec2 uv				= v.uv.xy;
 
-		vec3 chunk_pos = per_draw[gl_DrawIDARB].chunk_pos.xyz;
+		vec3 chunk_pos = per_draw[gl_DrawIDARB + drawid_offs].chunk_pos.xyz;
 
 		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos + chunk_pos, 1);
 		vs.uvi =		    vec3(uv, v_texid);
@@ -52,8 +56,6 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-	#define ALPHA_TEST
-
 	#define ALPHA_TEST_THRES 127.0
 
 	layout(set = 0, binding = 2) uniform sampler2DArray textures;
@@ -63,7 +65,7 @@ layout(location = 0) vs2fs VS {
 		
 		//col.rgb *= vec3(vs.brightness);
 		
-	#ifdef ALPHA_TEST
+	#if ALPHA_TEST
 		if (col.a <= ALPHA_TEST_THRES / 255.0)
 			discard;
 		col.a = 1.0;

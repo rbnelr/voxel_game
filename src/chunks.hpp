@@ -88,6 +88,8 @@ struct ChunkData {
 	void init_border ();
 };
 
+inline constexpr uint16_t U16_NULL = (uint16_t)-1;
+
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED = 1, // identify non-allocated chunks in chunk array, default true so that this get's set 
@@ -99,13 +101,14 @@ struct Chunk {
 
 	Flags flags;
 
+	std::vector<uint16_t> opaque_slices;
+	std::vector<uint16_t> transparent_slices;
+
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
 	//  border gets automatically kept in sync if only set_block() is used to update blocks
 	std::unique_ptr<ChunkData> blocks = nullptr;
 	
-	std::vector<int> mesh_slices;
-
 	Chunk (int3 pos): pos{pos} {
 		flags = ALLOCATED;
 	}
@@ -203,7 +206,9 @@ struct Chunks {
 
 		id_alloc.free(id);
 
-		for (auto& s : chunks[id].mesh_slices)
+		for (auto& s : chunks[id].opaque_slices)
+			slices_alloc.free(s);
+		for (auto& s : chunks[id].transparent_slices)
 			slices_alloc.free(s);
 
 		chunks[id].~Chunk();
@@ -218,7 +223,7 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius = 200;//700.0f;
+	float generation_radius = 700.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
@@ -253,7 +258,8 @@ struct Chunks {
 				if ((chunks[id].flags & Chunk::ALLOCATED) == 0)
 					ImGui::Text("<not allocated>");
 				else
-					ImGui::Text("%+4d,%+4d,%+4d  %2d slices", chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z, chunks[id].mesh_slices.size());
+					ImGui::Text("%+4d,%+4d,%+4d  %2d, %2d slices", chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
+						chunks[id].opaque_slices.size(), chunks[id].transparent_slices.size());
 			}
 			ImGui::TreePop();
 		}

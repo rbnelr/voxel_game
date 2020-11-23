@@ -96,10 +96,6 @@ struct Renderer {
 	RenderBuffer				main_color;
 	RenderBuffer				main_depth;
 	VkFramebuffer				main_framebuffer;
-	
-	VkDescriptorSetLayout		main_descriptor_layout; // set 1
-	VkPipelineLayout			main_pipeline_layout;
-	VkPipeline					main_pipeline;
 
 	VkSampler					main_sampler;
 	Texture						tilemap_img;

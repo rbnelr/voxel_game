@@ -77,13 +77,13 @@ namespace vk {
 		}
 
 		void init (VkDevice dev) {
-			load(shaders_file.c_str(), this);
-
-			for (auto& s : shaders) {
-				load_shader(dev, s.get());
-			}
-
-			save_json(); // cache potentially compiled shaders
+			//load(shaders_file.c_str(), this);
+			//
+			//for (auto& s : shaders) {
+			//	load_shader(dev, s.get(), );
+			//}
+			//
+			//save_json(); // cache potentially compiled shaders
 		}
 		void destroy (VkDevice dev) {
 			for (auto& s : shaders) {
@@ -95,16 +95,30 @@ namespace vk {
 				shaderc_compiler_release(shaderc);
 		}
 
-		Shader* get (VkDevice dev, std::string_view name) {
-			int i = indexof(shaders, name, [] (std::unique_ptr<Shader>& l, std::string_view r) { return l->name == r; });
+		typedef std::initializer_list<std::pair<char const*, char const*>> macro_list;
+		std::string decorate_name (std::string_view name, macro_list macros) {
+			std::string s;
+			s = name;
+
+			for (auto& m : macros) {
+				s += prints(", %s:%s", m.first, m.second);
+			}
+
+			return s;
+		}
+
+		Shader* get (VkDevice dev, std::string_view name, macro_list macros={}) {
+			std::string dname = decorate_name(name, macros);
+
+			int i = indexof(shaders, dname, [] (std::unique_ptr<Shader>& l, std::string& r) { return l->name == r; });
 			if (i >= 0)
 				return shaders[i].get();
 
 			// create default configured shader object if a unknown shader is requested
 			auto ptr = std::make_unique<Shader>();
-			ptr->name = name;
+			ptr->name = std::move(name);
 
-			load_shader(dev, ptr.get());
+			load_shader(dev, ptr.get(), macros);
 
 			auto* s = ptr.get();
 			shaders.push_back(std::move(ptr));
@@ -114,14 +128,14 @@ namespace vk {
 		}
 
 		////
-		bool load_shader (VkDevice dev, Shader* shader) {
+		bool load_shader (VkDevice dev, Shader* shader, macro_list macros) {
 			std::string default_src = prints("%s.glsl", shader->name.c_str());
 
 			shader->src_files.clear();
 
 			shader->valid = true;
 			for (auto& stage : shader->stages) {
-				shader->valid = load_shader_stage(dev, shader, &stage, default_src.c_str()) && shader->valid;
+				shader->valid = load_shader_stage(dev, shader, &stage, default_src.c_str(), macros) && shader->valid;
 			}
 
 			return shader->valid;
@@ -171,7 +185,7 @@ namespace vk {
 			delete ((IncludeResult*)include_result);
 		}
 
-		bool load_shader_stage (VkDevice dev, Shader* shader, Shader::Stage* stage, char const* default_src) {
+		bool load_shader_stage (VkDevice dev, Shader* shader, Shader::Stage* stage, char const* default_src, macro_list macros) {
 			stage->module = VK_NULL_HANDLE;
 
 			VkShaderModuleCreateInfo info = {};
@@ -185,6 +199,10 @@ namespace vk {
 				shaderc_compile_options_t opt = shaderc_compile_options_initialize();
 				shaderc_compile_options_set_optimization_level(opt, shaderc_optimization_level_performance);
 				shaderc_compile_options_add_macro_definition(opt, SHADERC_STAGE_MACRO[stage->stage], strlen(SHADERC_STAGE_MACRO[stage->stage]), "", 0);
+
+				for (auto& m : macros) {
+					shaderc_compile_options_add_macro_definition(opt, m.first, strlen(m.first), m.second, strlen(m.second));
+				}
 
 				shaderc_compile_options_set_include_callbacks(opt, shaderc_include_resolve, shaderc_include_result_release, shader);
 

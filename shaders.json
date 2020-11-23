@@ -32,6 +32,36 @@
 			]
 		},
 		{
+			"name": "chunks",
+			"valid": true,
+			"stages": [
+				{
+					"stage": "vertex",
+					"override_src": "",
+					"compiler_msg": ""
+				},
+				{
+					"stage": "fragment",
+					"override_src": "",
+					"compiler_msg": ""
+				}
+			],
+			"src_files": [
+				{
+					"filename": "shaders/chunks.glsl"
+				},
+				{
+					"filename": "shaders/common.glsl"
+				},
+				{
+					"filename": "shaders/chunks.glsl"
+				},
+				{
+					"filename": "shaders/common.glsl"
+				}
+			]
+		},
+		{
 			"name": "rescale",
 			"valid": true,
 			"stages": [

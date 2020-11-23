@@ -2,6 +2,7 @@
 #include "common.hpp"
 #include "vulkan_helper.hpp"
 #include "vulkan_window.hpp"
+#include "vulkan_shaders.hpp"
 #include "chunk_mesher.hpp"
 #include "graphics.hpp"
 
@@ -49,7 +50,8 @@ struct ChunkRenderer {
 		PerDrawData*			per_draw_ubo_ptr;
 
 		VkDescriptorSet			descriptor_set;
-		int						draw_count; // used in drawing
+		int						opaque_draw_count;
+		int						transparent_draw_count;
 	};
 
 	struct FrameData {
@@ -66,6 +68,8 @@ struct ChunkRenderer {
 
 	VkDescriptorPool		descriptor_pool;
 	VkDescriptorSetLayout	descriptor_layout;
+	VkPipelineLayout		pipeline_layout;
+	VkPipeline				opaque_pipeline, transparent_pipeline;
 
 	void imgui (Chunks& chunks) {
 
@@ -205,13 +209,7 @@ struct ChunkRenderer {
 		vkFreeDescriptorSets(dev, descriptor_pool, 1, &buf.descriptor_set);
 	}
 
-	void create_descriptor_layout (VulkanWindowContext& ctx, int frames_in_flight);
-
-	void create (VulkanWindowContext& ctx, int frames_in_flight) {
-		frames.resize(frames_in_flight);
-		
-		create_descriptor_layout(ctx, frames_in_flight);
-	}
+	void create (VulkanWindowContext& ctx, ShaderManager& shaders, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight);
 	void destroy (VkDevice dev) {
 		for (auto& f : frames) {
 			for (auto& buf : f.staging_bufs)
@@ -221,18 +219,25 @@ struct ChunkRenderer {
 		}
 		for (auto& a : allocs)
 			free_alloc(dev, a);
+
+		if (opaque_pipeline)
+			vkDestroyPipeline(dev, opaque_pipeline, nullptr);
+		if (transparent_pipeline)
+			vkDestroyPipeline(dev, transparent_pipeline, nullptr);
+		vkDestroyPipelineLayout(dev, pipeline_layout, nullptr);
+		vkDestroyDescriptorPool(dev, descriptor_pool, nullptr);
+		vkDestroyDescriptorSetLayout(dev, descriptor_layout, nullptr);
 	}
 
 	size_t remesh_chunks_count;
-	void upload_slices (Chunks& chunks, Chunk* chunk, MeshData& mesh, Renderer& r);
+	void upload_slices (Chunks& chunks, std::vector<uint16_t>& chunk_slices, MeshData& mesh, Renderer& r);
 
 	void queue_remeshing (Renderer& r, RenderData& data);
 
 	std::vector<UploadSlice> uploads;
 	void upload_remeshed (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
 
-	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame,
-		VkPipeline pipeline, VkPipelineLayout layout);
+	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
 
 };
 
