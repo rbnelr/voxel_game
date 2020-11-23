@@ -98,13 +98,13 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -118,15 +118,15 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -140,15 +140,15 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -162,15 +162,15 @@
       <LanguageStandard>stdcpp17</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -243,7 +243,16 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
     <ClCompile Include="..\..\..\src\audio\read_wav.cpp" />
-    <ClCompile Include="..\..\..\src\blocks.cpp" />
+    <ClCompile Include="..\..\..\src\blocks.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\block_update.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -289,9 +298,36 @@
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
-    <ClCompile Include="..\..\..\src\engine\camera.cpp" />
-    <ClCompile Include="..\..\..\src\engine\input.cpp" />
-    <ClCompile Include="..\..\..\src\engine\window.cpp" />
+    <ClCompile Include="..\..\..\src\engine\camera.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\input.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\window.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\game.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -301,6 +337,16 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
@@ -348,7 +394,16 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp" />
+    <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\vulkan\vulkan_helper.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

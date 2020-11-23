@@ -47,7 +47,6 @@ void BlockTypes::from_json (json const& blocks_json) {
 			b.absorb = 1;
 		}
 
-		GET(val, "size")		.get_to(b.size);
 		GET(val, "collision")	.get_to(b.collision);
 		GET(val, "transparency").get_to(b.transparency);
 		GET(val, "tool")		.get_to(b.tool);

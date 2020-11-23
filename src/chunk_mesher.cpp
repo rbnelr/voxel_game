@@ -56,39 +56,44 @@ struct ThreadChunkMesher {
 		}
 	}
 
-#if 0
-	void block_mesh (BlockMeshInfo info, int3 block_pos_world, uint64_t world_seed) {
-		//OPTICK_EVENT();
+	void block_mesh (BlockMeshes::Mesh& info, uint64_t world_seed) {
+		//// get a 'random' but deterministic value based on block position
+		//uint64_t h = hash(block_pos_world) ^ world_seed;
+		//
+		//// get a random determinisitc 2d offset
+		//float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		//
+		//float2 rand_offs;
+		//rand_offs.x = rand_val;
+		//rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		//rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
+		//
+		//							   // get a random deterministic variant
+		//int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
+		//
+		//for (int i=0; i<info.size; ++i) {
+		//	auto v = (*block_meshes)[info.offset + i];
+		//
+		//	auto ptr = opaque_vertices->push();
+		//
+		//	ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
+		//	ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
+		//
+		//	ptr->tex_indx = tile.base_index + variant;
+		//	ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
+		//	ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
+		//	ptr->hp = chunk_data->hp[cur];
+		//}
 
-		// get a 'random' but deterministic value based on block position
-		uint64_t h = hash(block_pos_world) ^ world_seed;
+		int texid = tile.calc_tex_index((BlockFace)0, 0);
 
-		// get a random determinisitc 2d offset
-		float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-
-		float2 rand_offs;
-		rand_offs.x = rand_val;
-		rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
-
-									   // get a random deterministic variant
-		int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
-
-		for (int i=0; i<info.size; ++i) {
-			auto v = (*block_meshes)[info.offset + i];
-
-			auto ptr = opaque_vertices->push();
-
-			ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
-			ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
-
-			ptr->tex_indx = tile.base_index + variant;
-			ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
-			ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
-			ptr->hp = chunk_data->hp[cur];
+		for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
+			auto* v = mesh->opaque_vertices.push();
+			v->pos = block_pos;
+			v->texid = texid;
+			v->meshid = meshid;
 		}
 	}
-#endif
 
 	void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh) {
 		ZoneScoped;
@@ -115,24 +120,22 @@ struct ThreadChunkMesher {
 					auto id = chunk_data->id[cur];
 
 					if (g_blocks.blocks[id].collision != CM_GAS) {
-						//auto _b = get_timestamp();
 
 						block_pos = (uint8v3)i;
 
 						tile = assets.block_tiles[id];
-						//auto mesh_info = graphics.tile_textures.block_meshes_info[id];
+						auto mesh_idx = assets.block_meshes[id];
 
-						//if (mesh_info.offset < 0) {
+						if (mesh_idx < 0) {
 							if (g_blocks.blocks[id].transparency == TM_TRANSPARENT)
 								cube_transperant();
 							else
 								cube_opaque();
-						//} else {
-						//
-						//	block_mesh(mesh_info, i + chunk->chunk_pos_world(), wg.seed);
-						//}
+						} else {
+							auto mesh_info = assets.block_mesh_info[mesh_idx];
+							block_mesh(mesh_info, wg.seed);
+						}
 
-						//sum += get_timestamp() - _b;
 					}
 
 					cur++;
@@ -140,9 +143,6 @@ struct ThreadChunkMesher {
 			}
 		}
 
-		//auto total = get_timestamp() - _a;
-
-		//logf("mesh_chunk total: %7.3f vs %7.3f = %7.3f", (float)total, (float)sum, (float)sum / (float)total);
 	}
 };
 

@@ -49,4 +49,7 @@
 using namespace kiss;
 using namespace kissmath;
 
+#include "audio/audio.hpp"
 #include "engine/threading.hpp"
+#include "engine/input_buttons.hpp"
+#include "engine/input.hpp"

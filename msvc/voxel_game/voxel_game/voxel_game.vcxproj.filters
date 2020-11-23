@@ -314,6 +314,9 @@
     <ClCompile Include="..\..\..\src\blocks.cpp">
       <Filter>game</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\graphics.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
