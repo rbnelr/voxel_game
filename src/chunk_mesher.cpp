@@ -15,7 +15,8 @@ struct ThreadChunkMesher {
 	uint64_t cur;
 
 	// per block
-	uint8v3 block_pos;
+	int3 block_pos;
+	int3 chunk_origin;
 
 	BlockTile tile;
 	//std::vector<BlockMeshVertex> const* block_meshes;
@@ -35,7 +36,14 @@ struct ThreadChunkMesher {
 
 	void face (MeshData* out, BlockFace facei) {
 		auto* v = out->push();
-		v->pos = block_pos;
+
+		int16_t fixd_posx = (int16_t)(block_pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
+		int16_t fixd_posy = (int16_t)(block_pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
+		int16_t fixd_posz = (int16_t)(block_pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
+
+		v->posx = fixd_posx;
+		v->posy = fixd_posy;
+		v->posz = fixd_posz;
 		v->texid = tile.calc_tex_index(facei, 0);
 		v->meshid = facei;
 	}
@@ -57,39 +65,34 @@ struct ThreadChunkMesher {
 	}
 
 	void block_mesh (BlockMeshes::Mesh& info, uint64_t world_seed) {
-		//// get a 'random' but deterministic value based on block position
-		//uint64_t h = hash(block_pos_world) ^ world_seed;
-		//
-		//// get a random determinisitc 2d offset
-		//float rand_val = (float)(h & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		//
-		//float2 rand_offs;
-		//rand_offs.x = rand_val;
-		//rand_offs.y = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		//rand_offs = rand_offs * 2 - 1; // [0,1] -> [-1,+1]
-		//
-		//							   // get a random deterministic variant
-		//int variant = tile.variants > 1 ? (int)(rand_val * (float)tile.variants) : 0; // [0, tile.variants)
-		//
-		//for (int i=0; i<info.size; ++i) {
-		//	auto v = (*block_meshes)[info.offset + i];
-		//
-		//	auto ptr = opaque_vertices->push();
-		//
-		//	ptr->pos_model = v.pos_model + block_pos + 0.5f + float3(rand_offs * 0.25f, 0);
-		//	ptr->uv = v.uv * tile.uv_size + tile.uv_pos;
-		//
-		//	ptr->tex_indx = tile.base_index + variant;
-		//	ptr->block_light = chunk_data->block_light[cur] * 255 / MAX_LIGHT_LEVEL;
-		//	ptr->sky_light = chunk_data->sky_light[cur] * 255 / MAX_LIGHT_LEVEL;
-		//	ptr->hp = chunk_data->hp[cur];
-		//}
+		// get a 'random' but deterministic value based on block position
+		uint64_t h = hash(block_pos + chunk_origin) ^ world_seed;
+		
+		// get a random determinisitc 2d offset
+		float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
+		
+		float rand_offsx = rand1;
+		float rand_offsy = rand2;
+		
+		// get a random deterministic variant
+		int variant = (int)(rand1 * (float)tile.variants); // [0, tile.variants)
+		
+		int texid = tile.calc_tex_index((BlockFace)0, variant);
 
-		int texid = tile.calc_tex_index((BlockFace)0, 0);
+		float posx = (float)block_pos.x + (rand_offsx * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
+		float posy = (float)block_pos.y + (rand_offsy * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
+		float posz = (float)block_pos.z;
+
+		int16_t fixd_posx = (int16_t)roundi(posx * BlockMeshInstance::FIXEDPOINT_FAC);
+		int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance::FIXEDPOINT_FAC);
+		int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance::FIXEDPOINT_FAC);
 
 		for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
 			auto* v = mesh->opaque_vertices.push();
-			v->pos = block_pos;
+			v->posx = fixd_posx;
+			v->posy = fixd_posy;
+			v->posz = fixd_posz;
 			v->texid = texid;
 			v->meshid = meshid;
 		}
@@ -103,25 +106,22 @@ struct ThreadChunkMesher {
 		chunk_data = chunk->blocks.get();
 		this->mesh = mesh;
 
-		int3 chunk_pos_world = chunk->pos * CHUNK_SIZE;
+		chunk_origin = chunk->pos * CHUNK_SIZE;
 
 		//auto _a = get_timestamp();
 		//uint64_t sum = 0;
 
-		int3 i = 0;
-		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
-			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
+		for (block_pos.z=0; block_pos.z<CHUNK_SIZE; ++block_pos.z) {
+			for (block_pos.y=0; block_pos.y<CHUNK_SIZE; ++block_pos.y) {
 
-				i.x = 0;
-				cur = ChunkData::pos_to_index(i);
+				block_pos.x = 0;
+				cur = ChunkData::pos_to_index(block_pos);
 
-				for (; i.x<CHUNK_SIZE; ++i.x) {
+				for (; block_pos.x<CHUNK_SIZE; ++block_pos.x) {
 
 					auto id = chunk_data->id[cur];
 
 					if (g_blocks.blocks[id].collision != CM_GAS) {
-
-						block_pos = (uint8v3)i;
 
 						tile = assets.block_tiles[id];
 						auto mesh_idx = assets.block_meshes[id];

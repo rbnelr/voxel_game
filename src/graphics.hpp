@@ -29,7 +29,9 @@ struct BlockTile {
 // Vertex for rendering chunks via merge instancing
 // one vertex is expanded to a set (6 tris) of block mesh data
 struct BlockMeshInstance {
-	uint8v3		pos; // pos in chunk
+	static constexpr int FIXEDPOINT_FAC = 256;
+
+	int16_t		posx, posy, posz; // pos in chunk
 	uint8_t		meshid; // index for merge instancing, this is used to index block meshes
 	uint16_t	texid; // texture array id based on block id
 
@@ -37,9 +39,9 @@ struct BlockMeshInstance {
 	static void attributes (ATTRIBS& a) {
 		int loc = 0;
 		a.init(sizeof(BlockMeshInstance), true);
-		a.template add<AttribMode::UINT2FLT, decltype(pos   )>(loc++, "pos"   , offsetof(BlockMeshInstance, pos   ));
-		a.template add<AttribMode::UINT,     decltype(meshid)>(loc++, "meshid", offsetof(BlockMeshInstance, meshid));
-		a.template add<AttribMode::UINT2FLT, decltype(texid )>(loc++, "texid" , offsetof(BlockMeshInstance, texid ));
+		a.template addv<AttribMode::SINT2FLT, decltype(posx), 3>(loc++, "pos"   , offsetof(BlockMeshInstance, posx)); // fixed point
+		a.template add <AttribMode::UINT,     decltype(meshid) >(loc++, "meshid", offsetof(BlockMeshInstance, meshid));
+		a.template add <AttribMode::UINT2FLT, decltype(texid ) >(loc++, "texid" , offsetof(BlockMeshInstance, texid ));
 	}
 };
 // Vertex for block meshes which are used when rendering chunks via merge instancing

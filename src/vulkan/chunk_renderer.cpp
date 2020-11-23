@@ -136,8 +136,10 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, VkCommandBuffer c
 			}
 		}
 
-		while (frame.indirect_draw.size() > allocs.size())
+		while (frame.indirect_draw.size() > allocs.size()) {
 			free_indirect_draw_buffer(ctx.dev, frame.indirect_draw.back());
+			frame.indirect_draw.pop_back();
+		}
 		while (frame.indirect_draw.size() < allocs.size())
 			frame.indirect_draw.push_back( new_indirect_draw_buffer(ctx, cur_frame, (int)frame.indirect_draw.size()) );
 		

@@ -118,6 +118,8 @@ struct DebugMarker {
 ////
 template <AttribMode M, typename T>
 inline constexpr VkFormat get_format ();
+template <AttribMode M, typename T, int VECN>
+inline constexpr VkFormat get_formatv ();
 
 template<> inline VkFormat get_format<AttribMode::FLOAT, float > () { return VK_FORMAT_R32_SFLOAT; }
 template<> inline VkFormat get_format<AttribMode::FLOAT, float2> () { return VK_FORMAT_R32G32_SFLOAT; }
@@ -139,12 +141,22 @@ template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v2> () { return
 template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v3> () { return VK_FORMAT_R8G8B8_USCALED; }
 template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint8v4> () { return VK_FORMAT_R8G8B8A8_USCALED; }
 
-template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint16_t> () { return VK_FORMAT_R16_USCALED; }
-
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8_t> () { return VK_FORMAT_R8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v2> () { return VK_FORMAT_R8G8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v3> () { return VK_FORMAT_R8G8B8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v4> () { return VK_FORMAT_R8G8B8A8_UNORM; }
+
+template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint16_t> () { return VK_FORMAT_R16_USCALED; }
+template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 1> () { return VK_FORMAT_R16_USCALED; }
+template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 2> () { return VK_FORMAT_R16G16_USCALED; }
+template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 3> () { return VK_FORMAT_R16G16B16_USCALED; }
+template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 4> () { return VK_FORMAT_R16G16B16A16_USCALED; }
+
+template<> inline VkFormat get_format<AttribMode::SINT2FLT, int16_t> () { return VK_FORMAT_R16_SSCALED; }
+template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 1> () { return VK_FORMAT_R16_SSCALED; }
+template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 2> () { return VK_FORMAT_R16G16_SSCALED; }
+template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 3> () { return VK_FORMAT_R16G16B16_SSCALED; }
+template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 4> () { return VK_FORMAT_R16G16B16A16_SSCALED; }
 
 struct VertexAttributes {
 	VkVertexInputBindingDescription descr;
@@ -169,6 +181,11 @@ struct VertexAttributes {
 	template <AttribMode M, typename T>
 	void add (int location, char const* name, size_t offset) {
 		add(get_format<M,T>(), location, name, offset);
+	}
+
+	template <AttribMode M, typename T, int VECN>
+	void addv (int location, char const* name, size_t offset) {
+		add(get_formatv<M,T,VECN>(), location, name, offset);
 	}
 };
 

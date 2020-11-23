@@ -8,7 +8,9 @@ layout(location = 0) vs2fs VS {
 } vs;
 
 #ifdef _VERTEX
-	
+
+#define FIXEDPOINT_FAC (1.0 / 256.0)
+
 	layout(location = 0) in vec3	v_pos; // pos of voxel instance in chunk
 	layout(location = 1) in uint	v_meshid;
 	layout(location = 2) in float	v_texid;
@@ -49,7 +51,7 @@ layout(location = 0) vs2fs VS {
 
 		vec3 chunk_pos = per_draw[gl_DrawID + drawid_offs].chunk_pos.xyz;
 
-		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos + chunk_pos, 1);
+		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =		    vec3(uv, v_texid);
 	}
 #endif
