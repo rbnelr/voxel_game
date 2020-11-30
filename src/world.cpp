@@ -6,7 +6,7 @@ void World::raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_d
 
 	float _dist;
 	auto hit_block = [&] (int3 bp, int face, float dist, bool force_hit) {
-		block_id bid = chunks.query_block(bp).id;
+		block_id bid = chunks.query_block(bp);
 		if ((block_breakable(bid) || force_hit)) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			block.is_selected = true;
@@ -55,17 +55,15 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	if (block.damage >= 1) {
 		break_sound.play();
 
-		auto b = Block(g_blocks.air_id);
-		chunks.set_block(block.pos, b);
+		chunks.set_block(block.pos, g_blocks.air_id);
 	}
 }
 
 bool World::try_place_block (int3 pos, block_id id) {
-	auto b = chunks.query_block(pos);
+	auto oldb = chunks.query_block(pos);
 
-	if (!block_breakable(b.id)) { // non-breakable blocks are solids and gasses
-		b = Block(id);
-		chunks.set_block(pos, b);
+	if (!block_breakable(oldb)) { // non-breakable blocks are solids and gasses
+		chunks.set_block(pos, id);
 		return true;
 	}
 	return false;

@@ -243,20 +243,20 @@ struct ChunkRenderer {
 
 struct RemeshChunkJob : ThreadingJob { // Chunk remesh
 	// input
-	Chunk* chunk;
-	Chunks& chunks;
-	Assets			const& assets;
-	WorldGenerator	const& wg;
-	Renderer& renderer;
+	Chunk*					chunk;
+	Chunks&					chunks;
+	Assets const&			assets;
+	WorldGenerator const&	wg;
+	Renderer&				renderer;
 	// output
-	ChunkMesh		mesh;
+	ChunkMesh				mesh;
 
 	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, Renderer& renderer) :
 		chunk{ chunk }, chunks{ chunks }, assets{ assets }, wg{ wg }, renderer{ renderer }, mesh{} {}
 	virtual ~RemeshChunkJob() = default;
 
 	virtual void execute () {
-		mesh_chunk(assets, wg, chunk, &mesh);
+		mesh_chunk(assets, wg, chunks, chunk, &mesh);
 	}
 	virtual void finalize ();
 };

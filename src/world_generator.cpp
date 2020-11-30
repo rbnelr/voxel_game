@@ -141,7 +141,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 						b = AIR;
 					}
 
-					chunk->set_block_unchecked(i, b);
+					chunk->set_block(i, b);
 				}
 			}
 		}
@@ -188,8 +188,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				//float effective_tree_prob = tree_density;
 
 				for (i.z=0; i.z <= min(highest_block, CHUNK_SIZE-1); ++i.z) {
-					auto indx = ChunkData::pos_to_index(i);
-					auto* bid = &chunk->blocks->id[ indx ];
+					auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(i)];
 
 					if (i.z <= highest_block - earth_layer) {
 						*bid = STONE;
@@ -202,9 +201,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					}
 				}
 
-				auto indx = ChunkData::pos_to_index(i);
-				auto* bid			= &chunk->blocks->id[ indx ];
-				auto* block_light	= &chunk->blocks->block_light[ indx ];
+				auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(i)];
 
 				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
 
@@ -218,7 +215,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 						*bid = TALLGRASS;
 					} else if (rand.uniform() < 0.0005f) {
 						*bid = TORCH;
-						*block_light = g_blocks.blocks[TORCH].glow;
+						//*block_light = g_blocks.blocks[TORCH].glow;
 					}
 				}
 			}
@@ -229,8 +226,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		ZoneScopedN("Place structures");
 
 		auto place_tree = [&] (int3 pos_chunk) {
-			auto indx = ChunkData::pos_to_index(pos_chunk - int3(0,0,1));
-			auto* bid = &chunk->blocks->id[ indx ];
+			auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(pos_chunk - int3(0,0,1))];
 
 			if (*bid == GRASS) {
 				*bid = EARTH;
@@ -238,8 +234,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 			auto place_block = [&] (int3 pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_SIZE)) return;
-				auto indx = ChunkData::pos_to_index(pos_chunk);
-				auto* bid = &chunk->blocks->id[ indx ];
+				auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(pos_chunk)];
 
 				if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
 					*bid = bt;
@@ -275,9 +270,5 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 void WorldgenJob::execute () {
 	ZoneScoped;
 
-	chunk->init_blocks();
-
 	gen(chunk, *wg);
-
-	update_sky_light_chunk(chunk);
 }

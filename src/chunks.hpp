@@ -4,9 +4,9 @@
 
 #define CHUNK_SIZE			64
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
-#define CHUNK_SIZE_MASK		((1 << CHUNK_SIZE_SHIFT) -1)
-#define CHUNK_ROW_OFFS		(CHUNK_SIZE+2)
-#define CHUNK_LAYER_OFFS	((CHUNK_SIZE+2)*(CHUNK_SIZE+2))
+#define CHUNK_SIZE_MASK		63
+#define CHUNK_ROW_OFFS		CHUNK_SIZE
+#define CHUNK_LAYER_OFFS	(CHUNK_SIZE * CHUNK_SIZE)
 
 #define CHUNK_BLOCK_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
 
@@ -49,43 +49,11 @@ static inline constexpr int _block_count (int lod_levels) {
 };
 
 struct ChunkData {
-	static constexpr uint64_t COUNT = (CHUNK_SIZE+2) * (CHUNK_SIZE+2) * (CHUNK_SIZE+2);
-
-	block_id	id[COUNT];
-	uint8_t		block_light[COUNT];
-	uint8_t		sky_light[COUNT];
-	uint8_t		hp[COUNT];
+	block_id	ids[CHUNK_BLOCK_COUNT];
 
 	static constexpr uint64_t pos_to_index (int3 pos) {
-		return (pos.z + 1) * (CHUNK_SIZE+2) * (CHUNK_SIZE+2) + (pos.y + 1) * (CHUNK_SIZE+2) + (pos.x + 1);
+		return pos.z * CHUNK_SIZE * CHUNK_SIZE + pos.y * CHUNK_SIZE + pos.x;
 	}
-
-	Block get (int3 pos) {
-		assert(all(pos >= -1 && pos <= CHUNK_SIZE+1));
-
-		Block b;
-
-		auto indx = pos_to_index(pos);
-
-		b.id			= id[indx];
-		b.block_light	= block_light[indx];
-		b.sky_light		= sky_light[indx];
-		b.hp			= hp[indx];
-
-		return b;
-	}
-	void set (int3 pos, Block b) {
-		assert(all(pos >= -1 && pos <= CHUNK_SIZE+1));
-
-		auto indx = pos_to_index(pos);
-
-		id[indx]			= b.id;
-		block_light[indx]	= b.block_light;
-		sky_light[indx]		= b.sky_light;
-		hp[indx]			= b.hp;
-	}
-
-	void init_border ();
 };
 
 inline constexpr uint16_t U16_NULL = (uint16_t)-1;
@@ -121,24 +89,14 @@ struct Chunk {
 		if (flags & REMESH) assert(flags & LOADED);
 	}
 
-	void init_blocks ();
-
-	// access blocks raw, only use in World Generator since neighbours are not notified of block changed with these!
-	void set_block_unchecked (int3 pos, Block b); // only use in World Generator
-
-	// get block
-	Block get_block (int3 pos) const;
-	// set block (used in light updater)
-	void _set_block_no_light_update (Chunks& chunks, int3 pos, Block b);
-	// set block (expensive, -> potentially updates light and copies block data to neighbours if block is at the border of a chunk)
-	void set_block (Chunks& chunks, int3 pos, Block b);
-
-	void update_neighbour_blocks(Chunks& chunks);
+	void set_block (int3 pos, block_id b);
+	block_id get_block (int3 pos) const;
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
 typedef uint16_t chunk_id;
 static constexpr uint16_t MAX_CHUNKS = (1<<16) - 2; // -2 to fit max_id in 16 bit int
+static constexpr int MAX_SLICES = 32;
 
 inline float chunk_dist_sq (int3 pos, float3 dist_to) {
 	int3 chunk_origin = pos * CHUNK_SIZE;
@@ -284,9 +242,9 @@ struct Chunks {
 		return c;
 	}
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
-	Block query_block (int3 pos, Chunk** out_chunk=nullptr, int3* out_block_pos=nullptr);
+	block_id query_block (int3 pos, Chunk** out_chunk=nullptr, int3* out_block_pos=nullptr);
 
-	void set_block (int3 pos, Block& b);
+	void set_block (int3 pos, block_id b);
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player);

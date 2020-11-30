@@ -21,7 +21,7 @@ struct BlockTile {
 	int anim_frames = 1;
 	int variants = 1;
 
-	int calc_tex_index (int face, int variant) { // anim_frame would be selected in shader
+	int calc_tex_index (int face, int variant) const { // anim_frame would be selected in shader
 		return sides[face] + variant * anim_frames;
 	}
 };

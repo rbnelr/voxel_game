@@ -82,4 +82,4 @@ struct ChunkMesh {
 	MeshData tranparent_vertices;
 };
 
-void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunk* chunk, ChunkMesh* mesh);
+void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks, Chunk* chunk, ChunkMesh* mesh);
