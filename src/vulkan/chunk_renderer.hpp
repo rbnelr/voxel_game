@@ -71,11 +71,19 @@ struct ChunkRenderer {
 	VkPipelineLayout		pipeline_layout;
 	VkPipeline				opaque_pipeline, transparent_pipeline;
 
+	bool is_slice_allocated (Chunks& chunks, slice_id id) {
+		auto i = id / 64;
+		auto j = id % 64;
+		if (i >= chunks.slices_alloc.bits.size())
+			return false;
+		return ((chunks.slices_alloc.bits[i] >> j) & 1) == 0;
+	}
+
 	void imgui (Chunks& chunks) {
 
 		size_t vertices = 0;
 		for (size_t i=0; i<slices.size(); ++i) {
-			if (((chunks.slices_alloc.bits[i/64] >> (i%64)) & 1) == 0) {
+			if (is_slice_allocated(chunks, (slice_id)i)) {
 				vertices += slices[i].vertex_count;
 			}
 		}
@@ -95,7 +103,7 @@ struct ChunkRenderer {
 
 		if (ImGui::TreeNode("slices")) {
 			for (size_t i=0; i<slices.size(); ++i) {
-				if (((chunks.slices_alloc.bits[i/64] >> (i%64)) & 1) != 0) {
+				if (!is_slice_allocated(chunks, (slice_id)i)) {
 					ImGui::Text("<not allocated>");
 				} else {
 					ImGui::Text("vertices: %7d  (%3.0f%%)", slices[i].vertex_count,

@@ -4,15 +4,6 @@
 #include "graphics.hpp"
 #include "player.hpp"
 
-static constexpr int OFFSETS[6] = {
-	-1,
-	+1,
-	-CHUNK_ROW_OFFS,
-	+CHUNK_ROW_OFFS,
-	-CHUNK_LAYER_OFFS,
-	+CHUNK_LAYER_OFFS,
-};
-
 void face (ChunkMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockTile const& tile) {
 	auto& b = g_blocks.blocks[id];
 	if (id == B_NULL || b.collision == CM_GAS) return;

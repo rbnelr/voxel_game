@@ -10,6 +10,20 @@
 
 #define CHUNK_BLOCK_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
 
+static constexpr int3 OFFSETS[6] = {
+	int3(-1,0,0), int3(+1,0,0),
+	int3(0,-1,0), int3(0,+1,0),
+	int3(0,0,-1), int3(0,0,+1),
+};
+static constexpr int BLOCK_OFFSETS[6] = {
+	-1,
+	+1,
+	-CHUNK_ROW_OFFS,
+	+CHUNK_ROW_OFFS,
+	-CHUNK_LAYER_OFFS,
+	+CHUNK_LAYER_OFFS,
+};
+
 // get world chunk position from world block position
 inline int3 to_chunk_pos (int3 pos) {
 
@@ -51,12 +65,13 @@ static inline constexpr int _block_count (int lod_levels) {
 struct ChunkData {
 	block_id	ids[CHUNK_BLOCK_COUNT];
 
-	static constexpr uint64_t pos_to_index (int3 pos) {
-		return pos.z * CHUNK_SIZE * CHUNK_SIZE + pos.y * CHUNK_SIZE + pos.x;
+	static constexpr size_t pos_to_index (int3 pos) {
+		return (size_t)pos.z * CHUNK_SIZE * CHUNK_SIZE + (size_t)pos.y * CHUNK_SIZE + (size_t)pos.x;
 	}
 };
 
 inline constexpr uint16_t U16_NULL = (uint16_t)-1;
+typedef uint16_t slice_id;
 
 struct Chunk {
 	enum Flags : uint32_t {
@@ -69,6 +84,8 @@ struct Chunk {
 
 	Flags flags;
 
+	uint16_t neighbours[6];
+
 	std::vector<uint16_t> opaque_slices;
 	std::vector<uint16_t> transparent_slices;
 
@@ -79,6 +96,7 @@ struct Chunk {
 	
 	Chunk (int3 pos): pos{pos} {
 		flags = ALLOCATED;
+		memset(neighbours, -1, sizeof(neighbours));
 	}
 	~Chunk () {
 		flags = (Flags)0;
@@ -95,7 +113,7 @@ struct Chunk {
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
 typedef uint16_t chunk_id;
-static constexpr uint16_t MAX_CHUNKS = (1<<16) - 2; // -2 to fit max_id in 16 bit int
+static constexpr uint16_t MAX_CHUNKS = (1<<16) - 1;
 static constexpr int MAX_SLICES = 32;
 
 inline float chunk_dist_sq (int3 pos, float3 dist_to) {
@@ -103,16 +121,44 @@ inline float chunk_dist_sq (int3 pos, float3 dist_to) {
 	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
 }
 
+struct alignas(16) ChunkKey {
+	alignas(16) __m128i sse;
+
+	ChunkKey (int3 const& pos) {
+		sse = _mm_set_epi32(0, pos.z, pos.y, pos.x);
+	}
+	operator int3 () { return int3(sse.m128i_i32[0], sse.m128i_i32[1], sse.m128i_i32[2]); }
+};
+struct ChunkKey_Hasher {
+	size_t operator() (ChunkKey const& key) const {
+		return std::hash<int3>()(*(int3*)key.sse.m128i_i32);
+	}
+};
+struct ChunkKey_Comparer {
+	bool operator() (ChunkKey const& l, ChunkKey const& r) const {
+	#if 0
+		return l.pos == r.pos;
+	#elif 0
+		return memcmp(&l.pos, &r.pos, sizeof(int4)) == 0;
+	#else
+		auto x = _mm_xor_si128(l.sse, r.sse);
+		auto mask = _mm_set_epi32(0,-1,-1,-1);
+		return _mm_test_all_zeros(x, mask) != 0;
+	#endif
+	}
+};
+typedef std::unordered_map<ChunkKey, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
+
 struct Chunks {
 	Chunk* chunks;
-	chunk_id max_id = 0; // max chunk id needed to iterate chunks
-	chunk_id count = 0; // number of ALLOCATED chunks
+	uint32_t max_id = 0; // max chunk id needed to iterate chunks
+	uint32_t count = 0; // number of ALLOCATED chunks
 
 	char* commit_ptr; // end of committed chunk memory
 	BitsetAllocator id_alloc;
 	BitsetAllocator slices_alloc;
 
-	std::unordered_map<int3, chunk_id> pos_to_id;
+	chunk_pos_to_id_map pos_to_id;
 
 	Chunk& operator[] (chunk_id id) {
 		assert(id < max_id);
@@ -136,16 +182,19 @@ struct Chunks {
 		release_address_space(chunks, sizeof(Chunk) * MAX_CHUNKS);
 	}
 
-	chunk_id alloc_chunk (int3 pos) {
+	PROFILE_NOINLINE chunk_id alloc_chunk (int3 pos) {
+		ZoneScoped;
+
 		if (count >= MAX_CHUNKS)
 			throw std::runtime_error("MAX_CHUNKS reached!");
 
 		auto id = (chunk_id)id_alloc.alloc();
 
-		max_id = max(max_id, id+1);
+		max_id = std::max(max_id, (uint32_t)id +1);
 		count++;
 
 		if ((char*)&chunks[id+1] > commit_ptr) { // commit pages one at a time when needed
+			ZoneScopedNC("commit_pages", tracy::Color::Crimson);
 			commit_pages(commit_ptr, os_page_size);
 			memset(commit_ptr, 0, os_page_size); // zero new chunks to init flags
 			commit_ptr += os_page_size;
@@ -157,9 +206,29 @@ struct Chunks {
 		assert(pos_to_id.find(pos) == pos_to_id.end());
 		pos_to_id.emplace(pos, id);
 
+		for (int i=0; i<6; ++i) {
+			chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]);
+			if (chunks[id].neighbours[i] != U16_NULL) {
+				assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
+				chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id;
+			}
+		}
+
+		chunks[id].blocks = std::make_unique<ChunkData>();
+
 		return id;
 	}
-	void free_chunk (chunk_id id) {
+	PROFILE_NOINLINE void free_chunk (chunk_id id) {
+		ZoneScoped;
+
+		for (int i=0; i<6; ++i) {
+			auto* n = query_chunk(chunks[id].pos + OFFSETS[i]);
+			if (n) {
+				assert(n->neighbours[i^1] == id); // i^1 flips direction
+				n->neighbours[i^1] = U16_NULL;
+			}
+		}
+
 		pos_to_id.erase(chunks[id].pos);
 
 		id_alloc.free(id);
@@ -172,6 +241,7 @@ struct Chunks {
 		chunks[id].~Chunk();
 
 		while ((char*)&chunks[id_alloc.alloc_end] <= commit_ptr - os_page_size) { // free pages one by one when needed
+			ZoneScopedNC("decommit_pages", tracy::Color::Crimson);
 			commit_ptr -= os_page_size;
 			decommit_pages(commit_ptr, os_page_size);
 		}
@@ -181,29 +251,26 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float generation_radius = 700.0f;
+	float load_radius = 700.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float deletion_hysteresis = CHUNK_SIZE*1.5f;
-
-	float active_radius = 200.0f;
+	float unload_hyster = CHUNK_SIZE*1.5f;
 
 	int background_queued_count = 0;
 
 	// distance of chunk to player
 	int chunk_lod (float dist) {
-		return clamp(floori(log2f(dist / generation_radius * 16)), 0,3);
+		return clamp(floori(log2f(dist / load_radius * 16)), 0,3);
 	}
 
 	void imgui (std::function<void()> chunk_renderer) {
 		if (!imgui_push("Chunks")) return;
 
-		ImGui::DragFloat("generation_radius", &generation_radius, 1);
-		ImGui::DragFloat("deletion_hysteresis", &deletion_hysteresis, 1);
-		ImGui::DragFloat("active_radius", &active_radius, 1);
+		ImGui::DragFloat("load_radius", &load_radius, 1);
+		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
 		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 		uint64_t block_mem = count * sizeof(ChunkData);
@@ -233,7 +300,15 @@ struct Chunks {
 	}
 
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
-	Chunk* query_chunk (int3 coord) {
+	PROFILE_NOINLINE chunk_id query_chunk_id (int3 coord) {
+		auto it = pos_to_id.find(coord);
+		if (it == pos_to_id.end())
+			return U16_NULL;
+		return it->second;
+	}
+	PROFILE_NOINLINE Chunk* query_chunk (int3 coord) {
+		ZoneScoped;
+
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return nullptr;

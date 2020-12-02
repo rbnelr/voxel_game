@@ -49,55 +49,58 @@ void Chunks::set_block (int3 pos, block_id b) {
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player) {
 	ZoneScoped;
 
-	{ // chunk unloading
-		float unload_dist = generation_radius + deletion_hysteresis;
-		float unload_dist_sqr = unload_dist * unload_dist;
-
-		for (chunk_id id=0; id<max_id; ++id) {
-			if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
-			
-			float dist_sqr = chunk_dist_sq(chunks[id].pos, player.pos);
-			if (dist_sqr > unload_dist_sqr)
-				free_chunk(id);
-		}
-	}
-
-	{ // chunk loading
-		int3 start =	(int3)floor(	((float3)player.pos - generation_radius) / (float3)CHUNK_SIZE );
-		int3 end =	(int3)ceil(	((float3)player.pos + generation_radius) / (float3)CHUNK_SIZE );
+	{ // chunk loading/unloading
+		constexpr float BUCKET_FAC = 1.0f / (CHUNK_SIZE*CHUNK_SIZE * 4);
 
 		// check all chunk positions within a square of chunk_generation_radius
-		std::vector<int3> chunks_to_generate;
-
+		std::vector< std::vector<int3> > chunks_to_generate;
+		chunks_to_generate.resize((int)(load_radius*load_radius * BUCKET_FAC) + 1);
+		
 		{
 			ZoneScopedN("chunks_to_generate iterate all chunks");
-			ZoneValue((end.x-start.x)*(end.y-start.y)*(end.z-start.z));
 
-			int3 cp;
-			for (cp.z = start.z; cp.z<end.z; ++cp.z) {
-				for (cp.y = start.y; cp.y<end.y; ++cp.y) {
-					for (cp.x = start.x; cp.x<end.x; ++cp.x) {
-						auto* chunk = query_chunk(cp);
-						float dist_sqr = chunk_dist_sq(cp, player.pos);
+			{
+				// queue first chunk explicitly, so that we can queue the rest via the neighbour refs
+				int3 player_pos = floori(player.pos / CHUNK_SIZE);
+				if (pos_to_id.find(player_pos) == pos_to_id.end()) {
+					chunks_to_generate[0].push_back(player_pos);
+				}
+			}
 
-						if (!chunk) {
-							if (dist_sqr <= generation_radius*generation_radius) {
-								// chunk is within chunk_generation_radius and not yet generated
-								chunks_to_generate.push_back(cp);
+			float load_dist_sqr = load_radius * load_radius;
+			float unload_dist = load_radius + unload_hyster;
+			float unload_dist_sqr = unload_dist * unload_dist;
+
+			for (chunk_id id=0; id<max_id; ++id) {
+				chunks[id]._validate_flags();
+				if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+
+				float dist_sqr = chunk_dist_sq(chunks[id].pos, player.pos);
+
+				if (dist_sqr > unload_dist_sqr) {
+					// unload
+					free_chunk(id);
+				} else {
+					// check neighbour references in chunk for nulls
+					// if null check if chunks is supposed to be loaded, if yes then queue
+					// note that duplicates can be queued here since the neighbours can be reached via 6 directions
+					// instead of doing a potentially expensive hashmap lookup or linear search
+					// simply deal with the duplicates later, when we have decided which chunks we even consider to generate (these are more limited in number)
+					for (int i=0; i<6; ++i) {
+						if (chunks[id].neighbours[i] == U16_NULL) {
+							// neighbour chunk not yet loaded
+							int3 pos = chunks[id].pos + OFFSETS[i];
+							float ndist_sqr = chunk_dist_sq(pos, player.pos);
+
+							if (dist_sqr <= load_radius*load_radius) {
+								int bucketi = (int)(dist_sqr * BUCKET_FAC);
+								chunks_to_generate[bucketi].push_back(pos);
 							}
 						}
 					}
 				}
 			}
-		}
 
-		{
-			ZoneScopedN("std::sort(chunks_to_generate)");
-			ZoneValue(chunks_to_generate.size());
-			// load chunks nearest to player first
-			std::sort(chunks_to_generate.begin(), chunks_to_generate.end(),
-				[&] (int3 l, int3 r) { return chunk_dist_sq(l, player.pos) < chunk_dist_sq(r, player.pos); }
-			);
 		}
 
 		{
@@ -119,16 +122,28 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			static constexpr int QUEUE_LIMIT = 256;
 			std::unique_ptr<ThreadingJob> jobs[QUEUE_LIMIT];
 
-			int count = std::min((int)chunks_to_generate.size(), (int)ARRLEN(jobs) - background_queued_count);
-			for (int i=0; i<count; ++i) {
-				auto cp = chunks_to_generate[i];
+			// Process bucket-sorted chunks_to_generate in order, remove duplicates
+			//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
+			int bucket=0, j=0; // sort bucket indices
 
-				auto id = alloc_chunk(cp);
-				float dist = chunk_dist_sq(cp, player.pos);
+			int max_count = (int)ARRLEN(jobs) - background_queued_count;
+			int count = 0;
+			while (count < max_count) {
 
-				chunks[id].blocks = std::make_unique<ChunkData>();
+				while (bucket < chunks_to_generate.size() && j == chunks_to_generate[bucket].size()) {
+					bucket++;
+					j = 0;
+				}
+				if (bucket >= chunks_to_generate.size())
+					break; // all chunks_to_generate processed
 
-				jobs[i] = std::make_unique<WorldgenJob>(&chunks[id], this, &wg);
+				auto pos = chunks_to_generate[bucket][j++];
+				if (pos_to_id.find(pos) != pos_to_id.end())
+					continue; // duplicate (chunk with pos already alloc_chunk'd), ignore
+
+				auto id = alloc_chunk(pos);
+
+				jobs[count++] = std::make_unique<WorldgenJob>(&chunks[id], this, &wg);
 			}
 
 			background_threadpool.jobs.push_n(jobs, count);
@@ -143,9 +158,11 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 void WorldgenJob::finalize () {
 	ZoneScoped;
 
-	for (auto dir : { int3(-1,0,0),int3(+1,0,0), int3(0,-1,0),int3(0,+1,0),int3(0,0,-1),int3(0,0,+1) }) {
-		auto* c = chunks->query_chunk(chunk->pos + dir);
-		if (c) c->flags |= Chunk::REMESH;
+	for (int i=0; i<6; ++i) {
+		if (chunk->neighbours[i] != U16_NULL) {
+			auto& n = chunks->chunks[chunk->neighbours[i]];
+			if (n.flags & Chunk::LOADED) n.flags |= Chunk::REMESH;
+		}
 	}
 
 	chunk->flags |= Chunk::LOADED|Chunk::REMESH;

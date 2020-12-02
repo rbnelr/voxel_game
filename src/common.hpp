@@ -43,6 +43,14 @@
 
 #include "Tracy.hpp"
 
+#ifdef TRACY_ENABLE
+	// avoid large functions being inlined to make profiling results more clear
+	// but let compiler decide in non-profiled builds (also try to remove these after profiling section of code)
+	#define PROFILE_NOINLINE __declspec(noinline)
+#else
+	#define PROFILE_NOINLINE
+#endif
+
 #define SERIALIZE_LOG(type, ...) clog(type, __VA_ARGS__)
 #include "kisslib/serialization.hpp"
 
