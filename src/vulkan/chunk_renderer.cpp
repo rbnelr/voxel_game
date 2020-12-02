@@ -25,35 +25,43 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	remesh_chunks_count = remesh_jobs.size();
 }
 
-void ChunkRenderer::upload_slices (Chunks& chunks, std::vector<uint16_t>& chunk_slices, MeshData& mesh, Renderer& r) {
+void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshData& mesh, Renderer& r) {
 	ZoneScoped;
 
-	for (auto slice_id : chunk_slices)
-		chunks.slices_alloc.free(slice_id);
-	chunk_slices.clear();
+	slice_id* prev_next = chunk_slices;
+	slice_id slice_id = *chunk_slices;
 
+	// overwrite slices with new vertex counts (and allocate new slices when needed)
 	for (int slice = 0; slice < mesh.used_slices; ++slice) {
-		auto slice_id = chunks.slices_alloc.alloc();
-		chunk_slices.push_back(slice_id);
+		assert(*prev_next == slice_id);
+		
+		if (slice_id == U16_NULL) {
+			slice_id = chunks.alloc_slice();
+			*prev_next = slice_id;
+		}
 
 		auto count = mesh.get_vertex_count(slice);
 
 		uploads.push_back({ slice_id, mesh.slices[slice], count });
 		mesh.slices[slice] = nullptr;
 
-		if (slice_id >= (int)slices.size())
-			slices.resize(slice_id+1);
+		chunks.slices[slice_id].vertex_count = count;
 
-		slices[slice_id].vertex_count = count;
+		prev_next = &chunks.slices[slice_id].next;
+		slice_id = *prev_next;
 	}
+
+	// free potentially remaining slices no longer needed
+	*prev_next = U16_NULL;
+	chunks.free_slices(slice_id);
 }
 
 void RemeshChunkJob::finalize () {
 	mesh.opaque_vertices.free_preallocated();
 	mesh.tranparent_vertices.free_preallocated();
 
-	renderer.chunk_renderer.upload_slices(chunks, chunk->opaque_slices, mesh.opaque_vertices, renderer);
-	renderer.chunk_renderer.upload_slices(chunks, chunk->transparent_slices, mesh.tranparent_vertices, renderer);
+	renderer.chunk_renderer.upload_slices(chunks, &chunk->opaque_slices, mesh.opaque_vertices, renderer);
+	renderer.chunk_renderer.upload_slices(chunks, &chunk->transparent_slices, mesh.tranparent_vertices, renderer);
 
 	chunk->flags &= ~Chunk::REMESH;
 }
@@ -174,15 +182,16 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 		float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
 
-		for (auto& sid : chunks[cid].opaque_slices) {
-			assert(slices[sid].vertex_count > 0);
+		slice_id slice = chunks[cid].opaque_slices;
+		while (slice != U16_NULL) {
+			assert(chunks.slices[slice].vertex_count > 0);
 
-			uint32_t alloci =  sid / SLICES_PER_ALLOC;
-			uint32_t slicei = (sid % SLICES_PER_ALLOC);
+			uint32_t alloci =  slice / SLICES_PER_ALLOC;
+			uint32_t slicei = (slice % SLICES_PER_ALLOC);
 
 			VkDrawIndirectCommand draw_data;
 			draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-			draw_data.instanceCount = slices[sid].vertex_count; // for each instance in the mesh
+			draw_data.instanceCount = chunks.slices[slice].vertex_count; // for each instance in the mesh
 			draw_data.firstVertex = 0;
 			draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
 
@@ -192,6 +201,8 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			draw.per_draw_ubo_ptr[draw.opaque_draw_count] = { float4(chunk_pos, 1.0f) };
 
 			draw.opaque_draw_count++;
+
+			slice = chunks.slices[slice].next;
 		}
 	}
 
@@ -201,15 +212,16 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 	
 		float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
 	
-		for (auto& sid : chunks[cid].transparent_slices) {
-			assert(slices[sid].vertex_count > 0);
+		slice_id slice = chunks[cid].transparent_slices;
+		while (slice != U16_NULL) {
+			assert(chunks.slices[slice].vertex_count > 0);
 	
-			uint32_t alloci =  sid / SLICES_PER_ALLOC;
-			uint32_t slicei = (sid % SLICES_PER_ALLOC);
+			uint32_t alloci =  slice / SLICES_PER_ALLOC;
+			uint32_t slicei = (slice % SLICES_PER_ALLOC);
 	
 			VkDrawIndirectCommand draw_data;
 			draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-			draw_data.instanceCount = slices[sid].vertex_count; // for each instance in the mesh
+			draw_data.instanceCount = chunks.slices[slice].vertex_count; // for each instance in the mesh
 			draw_data.firstVertex = 0;
 			draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
 	
@@ -219,6 +231,8 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			draw.per_draw_ubo_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = { float4(chunk_pos, 1.0f) };
 	
 			draw.transparent_draw_count++;
+
+			slice = chunks.slices[slice].next;
 		}
 	}
 

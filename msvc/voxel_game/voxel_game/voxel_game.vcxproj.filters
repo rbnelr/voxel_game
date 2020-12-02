@@ -191,6 +191,9 @@
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
+    <ClInclude Include="myvector.hpp">
+      <Filter>engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">

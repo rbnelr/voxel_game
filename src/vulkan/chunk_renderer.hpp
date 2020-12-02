@@ -34,10 +34,6 @@ struct ChunkRenderer {
 		ChunkSliceData*	data;
 		size_t			vertex_count;
 	};
-	struct DrawSlice {
-		// data is implicitly placed in allocs based on the slice id
-		uint32_t		vertex_count;
-	};
 
 	struct StagingBuf {
 		Allocation	buf;
@@ -64,8 +60,6 @@ struct ChunkRenderer {
 	std::vector<AllocBlock>	allocs;
 	std::vector<FrameData>	frames;
 
-	std::vector<DrawSlice>	slices;
-
 	VkDescriptorPool		descriptor_pool;
 	VkDescriptorSetLayout	descriptor_layout;
 	VkPipelineLayout		pipeline_layout;
@@ -82,14 +76,14 @@ struct ChunkRenderer {
 	void imgui (Chunks& chunks) {
 
 		size_t vertices = 0;
-		for (size_t i=0; i<slices.size(); ++i) {
+		for (size_t i=0; i<chunks.slices.size(); ++i) {
 			if (is_slice_allocated(chunks, (slice_id)i)) {
-				vertices += slices[i].vertex_count;
+				vertices += chunks.slices[i].vertex_count;
 			}
 		}
 
 		ImGui::Text("Mesh allocs: %2d  slices: %5d  vertices: %12s",
-			allocs.size(), slices.size(), format_thousands(vertices).c_str());
+			allocs.size(), chunks.slices.size(), format_thousands(vertices).c_str());
 		ImGui::Text("Mesh VRAM: used: %7.3f MB  commited: %7.3f MB (%6.2f%% usage)",
 			(float)(vertices * sizeof(BlockMeshInstance)) / 1024 / 1024,
 			(float)(allocs.size() * ALLOC_SIZE) / 1024 / 1024,
@@ -102,12 +96,12 @@ struct ChunkRenderer {
 		}
 
 		if (ImGui::TreeNode("slices")) {
-			for (size_t i=0; i<slices.size(); ++i) {
+			for (size_t i=0; i<chunks.slices.size(); ++i) {
 				if (!is_slice_allocated(chunks, (slice_id)i)) {
-					ImGui::Text("<not allocated>");
+					ImGui::Text("[%5d] <not allocated>", i);
 				} else {
-					ImGui::Text("vertices: %7d  (%3.0f%%)", slices[i].vertex_count,
-						(float)(slices[i].vertex_count * sizeof(BlockMeshInstance)) / (float)CHUNK_SLICE_BYTESIZE * 100);
+					ImGui::Text("[%5d]vertices: %7d  (%3.0f%%)", i, chunks.slices[i].vertex_count,
+						(float)(chunks.slices[i].vertex_count * sizeof(BlockMeshInstance)) / (float)CHUNK_SLICE_BYTESIZE * 100);
 				}
 			}
 			ImGui::TreePop();
@@ -238,7 +232,7 @@ struct ChunkRenderer {
 	}
 
 	size_t remesh_chunks_count;
-	void upload_slices (Chunks& chunks, std::vector<uint16_t>& chunk_slices, MeshData& mesh, Renderer& r);
+	void upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshData& mesh, Renderer& r);
 
 	void queue_remeshing (Renderer& r, RenderData& data);
 

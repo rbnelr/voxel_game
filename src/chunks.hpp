@@ -73,6 +73,10 @@ struct ChunkData {
 inline constexpr uint16_t U16_NULL = (uint16_t)-1;
 typedef uint16_t slice_id;
 
+typedef uint16_t chunk_id;
+static constexpr uint16_t MAX_CHUNKS = (1<<16) - 1;
+static constexpr int MAX_SLICES = 32;
+
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED = 1, // identify non-allocated chunks in chunk array, default true so that this get's set 
@@ -84,10 +88,10 @@ struct Chunk {
 
 	Flags flags;
 
-	uint16_t neighbours[6];
+	chunk_id neighbours[6];
 
-	std::vector<uint16_t> opaque_slices;
-	std::vector<uint16_t> transparent_slices;
+	slice_id opaque_slices;
+	slice_id transparent_slices;
 
 	// block data
 	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
@@ -97,6 +101,9 @@ struct Chunk {
 	Chunk (int3 pos): pos{pos} {
 		flags = ALLOCATED;
 		memset(neighbours, -1, sizeof(neighbours));
+
+		opaque_slices = U16_NULL;
+		transparent_slices = U16_NULL;
 	}
 	~Chunk () {
 		flags = (Flags)0;
@@ -111,10 +118,6 @@ struct Chunk {
 	block_id get_block (int3 pos) const;
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
-
-typedef uint16_t chunk_id;
-static constexpr uint16_t MAX_CHUNKS = (1<<16) - 1;
-static constexpr int MAX_SLICES = 32;
 
 inline float chunk_dist_sq (int3 pos, float3 dist_to) {
 	int3 chunk_origin = pos * CHUNK_SIZE;
@@ -133,6 +136,11 @@ struct ChunkKey_Comparer {
 };
 typedef std::unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
+struct ChunkRendererSlice {
+	// data is implicitly placed in allocs based on the slice id
+	uint16_t		vertex_count;
+	slice_id		next;
+};
 struct Chunks {
 	Chunk* chunks;
 	uint32_t max_id = 0; // max chunk id needed to iterate chunks
@@ -140,7 +148,36 @@ struct Chunks {
 
 	char* commit_ptr; // end of committed chunk memory
 	BitsetAllocator id_alloc;
+
 	BitsetAllocator slices_alloc;
+
+	std::vector<ChunkRendererSlice>	slices;
+
+	slice_id alloc_slice () {
+		slice_id id = slices_alloc.alloc();
+
+		if (id >= slices.size())
+			slices.resize((size_t)id+1);
+
+		slices[id].next = U16_NULL;
+		return id;
+	}
+	void free_slices (slice_id id) {
+		while (id != U16_NULL) {
+			slices_alloc.free(id);
+			id = slices[id].next;
+		}
+
+		slices.resize(slices_alloc.alloc_end);
+	}
+	int _count_slices (slice_id id) {
+		int count = 0;
+		while (id != U16_NULL) {
+			count++;
+			id = slices[id].next;
+		}
+		return count;
+	}
 
 	chunk_pos_to_id_map pos_to_id;
 
@@ -220,10 +257,8 @@ struct Chunks {
 
 		id_alloc.free(id);
 
-		for (auto& s : chunks[id].opaque_slices)
-			slices_alloc.free(s);
-		for (auto& s : chunks[id].transparent_slices)
-			slices_alloc.free(s);
+		free_slices(chunks[id].opaque_slices);
+		free_slices(chunks[id].transparent_slices);
 
 		chunks[id].~Chunk();
 
@@ -238,7 +273,7 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float load_radius = 700.0f;
+	float load_radius = 20;//700.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
@@ -268,10 +303,10 @@ struct Chunks {
 		if (ImGui::TreeNode("chunks")) {
 			for (chunk_id id=0; id<max_id; ++id) {
 				if ((chunks[id].flags & Chunk::ALLOCATED) == 0)
-					ImGui::Text("<not allocated>");
+					ImGui::Text("[%5d] <not allocated>", id);
 				else
-					ImGui::Text("%+4d,%+4d,%+4d  %2d, %2d slices", chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
-						chunks[id].opaque_slices.size(), chunks[id].transparent_slices.size());
+					ImGui::Text("[%5d] %+4d,%+4d,%+4d - %2d, %2d slices", id, chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
+						_count_slices(chunks[id].opaque_slices), _count_slices(chunks[id].transparent_slices));
 			}
 			ImGui::TreePop();
 		}

@@ -239,6 +239,7 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
     <ClInclude Include="..\..\..\src\world.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />
+    <ClInclude Include="myvector.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
