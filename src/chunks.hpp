@@ -121,33 +121,17 @@ inline float chunk_dist_sq (int3 pos, float3 dist_to) {
 	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
 }
 
-struct alignas(16) ChunkKey {
-	alignas(16) __m128i sse;
-
-	ChunkKey (int3 const& pos) {
-		sse = _mm_set_epi32(0, pos.z, pos.y, pos.x);
-	}
-	operator int3 () { return int3(sse.m128i_i32[0], sse.m128i_i32[1], sse.m128i_i32[2]); }
-};
 struct ChunkKey_Hasher {
-	size_t operator() (ChunkKey const& key) const {
-		return std::hash<int3>()(*(int3*)key.sse.m128i_i32);
+	size_t operator() (int3 const& key) const {
+		return std::hash<int3>()(key);
 	}
 };
 struct ChunkKey_Comparer {
-	bool operator() (ChunkKey const& l, ChunkKey const& r) const {
-	#if 0
-		return l.pos == r.pos;
-	#elif 0
-		return memcmp(&l.pos, &r.pos, sizeof(int4)) == 0;
-	#else
-		auto x = _mm_xor_si128(l.sse, r.sse);
-		auto mask = _mm_set_epi32(0,-1,-1,-1);
-		return _mm_test_all_zeros(x, mask) != 0;
-	#endif
+	bool operator() (int3 const& l, int3 const& r) const {
+		return l == r;
 	}
 };
-typedef std::unordered_map<ChunkKey, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
+typedef std::unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
 struct Chunks {
 	Chunk* chunks;
@@ -220,6 +204,9 @@ struct Chunks {
 	}
 	PROFILE_NOINLINE void free_chunk (chunk_id id) {
 		ZoneScoped;
+
+		if (&chunks[id] == _query_cache)
+			_query_cache = nullptr; // invalidate cache
 
 		for (int i=0; i<6; ++i) {
 			auto* n = query_chunk(chunks[id].pos + OFFSETS[i]);
@@ -294,26 +281,58 @@ struct Chunks {
 			ImGui::TreePop();
 		}
 
+		if (ImGui::TreeNode("count_hash_collisions")) {
+			size_t collisions = 0, max_bucket_size = 0, empty_buckets = 0;
+			for (size_t i=0; i<pos_to_id.bucket_count(); ++i) {
+				size_t c = pos_to_id.bucket_size(i);
+				if (c > 1) collisions += c - 1;
+				if (c == 0) empty_buckets++;
+				max_bucket_size = std::max(max_bucket_size, c);
+			}
+
+			ImGui::Text("chunks: %5d  collisions: %d (buckets: %5d, max_bucket_size: %5d, empty_buckets: %5d)",
+				count, collisions, pos_to_id.bucket_count(), max_bucket_size, empty_buckets);
+
+			if (ImGui::TreeNode("bucket counts")) {
+				for (size_t i=0; i<pos_to_id.bucket_count(); ++i)
+					ImGui::Text("[%5d] %5d", i, pos_to_id.bucket_size(i));
+				ImGui::TreePop();
+			}
+
+			ImGui::TreePop();
+		}
+
 		chunk_renderer();
 
 		imgui_pop();
 	}
 
+	Chunk* _query_cache = nullptr;
+
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
-	PROFILE_NOINLINE chunk_id query_chunk_id (int3 coord) {
+	chunk_id query_chunk_id (int3 coord) {
+		if (_query_cache && _query_cache->pos == coord)
+			return (chunk_id)(_query_cache - chunks);
+
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return U16_NULL;
+
+		_query_cache = &chunks[it->second];
 		return it->second;
 	}
-	PROFILE_NOINLINE Chunk* query_chunk (int3 coord) {
-		ZoneScoped;
-
+	Chunk* query_chunk (int3 coord) {
+		//ZoneScoped;
+		if (_query_cache && _query_cache->pos == coord)
+			return _query_cache;
+		
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return nullptr;
 		Chunk* c = &this->operator[](it->second);
 		c->_validate_flags();
+
+		_query_cache = c;
 		return c;
 	}
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
