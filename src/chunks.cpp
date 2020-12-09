@@ -92,8 +92,8 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 							int3 pos = chunks[id].pos + OFFSETS[i];
 							float ndist_sqr = chunk_dist_sq(pos, player.pos);
 
-							if (dist_sqr <= load_radius*load_radius) {
-								int bucketi = (int)(dist_sqr * BUCKET_FAC);
+							if (ndist_sqr <= load_radius*load_radius) {
+								int bucketi = (int)(ndist_sqr * BUCKET_FAC);
 								chunks_to_generate[bucketi].push_back(pos);
 							}
 						}
