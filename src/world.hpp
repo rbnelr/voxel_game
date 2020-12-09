@@ -10,7 +10,7 @@ struct World {
 
 	Chunks chunks;
 
-	Player player = { float3(0,0,34) };
+	Player player = { float3(0.5f,0.5f,34) };
 
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
 

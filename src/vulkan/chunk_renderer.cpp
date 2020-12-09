@@ -28,16 +28,16 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshData& mesh, Renderer& r) {
 	ZoneScoped;
 
-	slice_id* prev_next = chunk_slices;
+	slice_id prev_id = U16_NULL; // use index with null for first case instead of ptr to slice_id since ptrs get invalidated by alloc_slice
 	slice_id slice_id = *chunk_slices;
 
 	// overwrite slices with new vertex counts (and allocate new slices when needed)
 	for (int slice = 0; slice < mesh.used_slices; ++slice) {
-		assert(*prev_next == slice_id);
+		assert(prev_id == U16_NULL || chunks.slices[prev_id].next == slice_id);
 		
 		if (slice_id == U16_NULL) {
 			slice_id = chunks.alloc_slice();
-			*prev_next = slice_id;
+			*(prev_id != U16_NULL ? &chunks.slices[prev_id].next : chunk_slices) = slice_id;
 		}
 
 		auto count = mesh.get_vertex_count(slice);
@@ -47,12 +47,12 @@ void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshD
 
 		chunks.slices[slice_id].vertex_count = count;
 
-		prev_next = &chunks.slices[slice_id].next;
-		slice_id = *prev_next;
+		prev_id = slice_id;
+		slice_id = chunks.slices[prev_id].next;
 	}
 
 	// free potentially remaining slices no longer needed
-	*prev_next = U16_NULL;
+	*(prev_id != U16_NULL ? &chunks.slices[prev_id].next : chunk_slices) = slice_id;
 	chunks.free_slices(slice_id);
 }
 
