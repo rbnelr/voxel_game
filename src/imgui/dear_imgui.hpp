@@ -127,7 +127,7 @@ struct FPS_Display {
 	}
 };
 
-inline void print_bitset_allocator (BitsetAllocator& bits, size_t sz=0, size_t pagesz=1) {
+inline void print_bitset_allocator (AllocatorBitset& bits, size_t sz=0, size_t pagesz=1) {
 	constexpr char chars[2] = {'#', '-'};
 	ImVec4 colors[2] = { ImVec4(1,1,1,1), ImVec4(0.7f, 0.7f, 0.7f, 1) };
 

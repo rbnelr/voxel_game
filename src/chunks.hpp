@@ -147,9 +147,9 @@ struct Chunks {
 	uint32_t count = 0; // number of ALLOCATED chunks
 
 	char* commit_ptr; // end of committed chunk memory
-	BitsetAllocator id_alloc;
+	AllocatorBitset id_alloc;
 
-	BitsetAllocator slices_alloc;
+	AllocatorBitset slices_alloc;
 
 	std::vector<ChunkRendererSlice>	slices;
 
@@ -273,7 +273,7 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float load_radius = 20;//700.0f;
+	float load_radius = 700.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
