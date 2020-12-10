@@ -93,10 +93,7 @@ struct Chunk {
 	slice_id opaque_slices;
 	slice_id transparent_slices;
 
-	// block data
-	//  with border that stores a copy of the blocks of our neighbour along the faces (edges and corners are invalid)
-	//  border gets automatically kept in sync if only set_block() is used to update blocks
-	std::unique_ptr<ChunkData> blocks = nullptr;
+	ChunkData* blocks;
 	
 	Chunk (int3 pos): pos{pos} {
 		flags = ALLOCATED;
@@ -209,7 +206,11 @@ struct Chunks {
 		if (count >= MAX_CHUNKS)
 			throw std::runtime_error("MAX_CHUNKS reached!");
 
-		auto id = (chunk_id)id_alloc.alloc();
+		chunk_id id;
+		{
+			ZoneScopedN("id_alloc.alloc()");
+			id = (chunk_id)id_alloc.alloc();
+		}
 
 		max_id = std::max(max_id, (uint32_t)id +1);
 		count++;
@@ -222,12 +223,20 @@ struct Chunks {
 		}
 
 		assert((chunks[id].flags & Chunk::ALLOCATED) == 0);
-		new (&chunks[id]) Chunk (pos);
+		{
+			ZoneScopedN("new (&chunks[id]) Chunk (pos)");
+			new (&chunks[id]) Chunk (pos);
+		}
 
 		assert(pos_to_id.find(pos) == pos_to_id.end());
-		pos_to_id.emplace(pos, id);
+		{
+			ZoneScopedN("pos_to_id.emplace");
+			pos_to_id.emplace(pos, id);
+		}
 
 		for (int i=0; i<6; ++i) {
+			ZoneScopedN("alloc_chunk::get neighbour");
+
 			chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]);
 			if (chunks[id].neighbours[i] != U16_NULL) {
 				assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
@@ -235,7 +244,10 @@ struct Chunks {
 			}
 		}
 
-		chunks[id].blocks = std::make_unique<ChunkData>();
+		{
+			ZoneScopedN("make_unique<ChunkData>");
+			chunks[id].blocks = (ChunkData*)malloc(sizeof(ChunkData));
+		}
 
 		return id;
 	}
@@ -260,6 +272,7 @@ struct Chunks {
 		free_slices(chunks[id].opaque_slices);
 		free_slices(chunks[id].transparent_slices);
 
+		free(chunks[id].blocks);
 		chunks[id].~Chunk();
 
 		while ((char*)&chunks[id_alloc.alloc_end] <= commit_ptr - os_page_size) { // free pages one by one when needed
@@ -357,7 +370,6 @@ struct Chunks {
 		return it->second;
 	}
 	Chunk* query_chunk (int3 coord) {
-		//ZoneScoped;
 		if (_query_cache && _query_cache->pos == coord)
 			return _query_cache;
 		

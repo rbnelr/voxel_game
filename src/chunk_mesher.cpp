@@ -66,13 +66,13 @@ void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks,
 	auto get_neighbour_blocks = [&] (int3 offs) -> block_id* {
 		auto* nc = chunks.query_chunk(chunk->pos + offs);
 		if (!nc) return nullptr;
-		return nc->blocks.get()->ids;
+		return nc->blocks->ids;
 	};
 	auto* nc_nx = get_neighbour_blocks(int3(-1,0,0));
 	auto* nc_ny = get_neighbour_blocks(int3(0,-1,0));
 	auto* nc_nz = get_neighbour_blocks(int3(0,0,-1));
 
-	auto* ptr = chunk->blocks.get()->ids;
+	auto* ptr = chunk->blocks->ids;
 
 	int idx = 0;
 
