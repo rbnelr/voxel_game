@@ -6,10 +6,10 @@
 
 namespace vk {
 
-std::vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
+std_vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
 	uint32_t count = 0;
 	auto names = glfwGetRequiredInstanceExtensions(&count);
-	return std::vector<char const*>(names, names + count);
+	return std_vector<char const*>(names, names + count);
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback (
@@ -166,7 +166,7 @@ void destroy_debug_utils_messenger_ext (VkInstance instance, VkDebugUtilsMesseng
 }
 
 VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallbackEXT callback,
-		std::vector<char const*>& extensions, std::vector<char const*>& layers) {
+		std_vector<char const*>& extensions, std_vector<char const*>& layers) {
 	ZoneScoped;
 
 	// Check extensions
@@ -270,7 +270,7 @@ QueueFamilies pick_queue_families (VkPhysicalDevice device, VkSurfaceKHR surface
 	return families;
 }
 
-bool contains_ext (std::vector<VkExtensionProperties> const& avail_extensions, char const* ext) {
+bool contains_ext (std_vector<VkExtensionProperties> const& avail_extensions, char const* ext) {
 	for (auto& avail : avail_extensions)
 		if (strcmp(ext, avail.extensionName) == 0)
 			return true;
@@ -341,7 +341,7 @@ VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, Queue
 	return selected;
 }
 
-VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker) {
+VkDevice create_logical_device (VkPhysicalDevice pdev, std_vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker) {
 	ZoneScoped;
 	
 	// make sure we only specifiy unique queues (We pretend that the present queue is a seperate queue, even though it is usually just the graphics queue)
@@ -370,7 +370,7 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> 
 
 	auto avail_extensions = get_vector<VkExtensionProperties>(vkEnumerateDeviceExtensionProperties, pdev, nullptr);
 
-	std::vector<const char*> enabled_extensions;
+	std_vector<const char*> enabled_extensions;
 	for (auto e : DEVICE_EXTENSIONS)
 		enabled_extensions.push_back(e);
 
@@ -421,7 +421,7 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std::vector<char const*> 
 }
 
 //// Swap chain creation
-VkSurfaceFormatKHR choose_swap_surface_format (std::vector<VkSurfaceFormatKHR> const& formats) {
+VkSurfaceFormatKHR choose_swap_surface_format (std_vector<VkSurfaceFormatKHR> const& formats) {
 	// My machine supports
 	// VK_FORMAT_R16G16B16A16_SFLOAT  VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT
 	// VK_FORMAT_A2B10G10R10_UNORM_PACK32  VK_COLOR_SPACE_HDR10_ST2084_EXT
@@ -443,7 +443,7 @@ VkSurfaceFormatKHR choose_swap_surface_format (std::vector<VkSurfaceFormatKHR> c
 	return formats[0];
 }
 
-VkPresentModeKHR choose_swap_present_mode (std::vector<VkPresentModeKHR> const& present_modes) {
+VkPresentModeKHR choose_swap_present_mode (std_vector<VkPresentModeKHR> const& present_modes) {
 	// TODO: Test these modes
 	return VK_PRESENT_MODE_FIFO_KHR;
 }

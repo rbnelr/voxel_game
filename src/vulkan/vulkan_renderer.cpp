@@ -73,7 +73,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 
 	{
 		GPU_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(ctx, cmds, data.chunks, cur_frame);
+		chunk_renderer.upload_remeshed(ctx, *this, cmds, data.chunks, cur_frame);
 	}
 
 	{ // set 0

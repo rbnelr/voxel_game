@@ -30,6 +30,3 @@ inline const int background_threads  = clamp(roundi((float)logical_cores * 0.79f
 // cores: 24 -> threads: 20
 // cores: 32 -> threads: 28
 inline const int parallelism_threads = clamp(roundi((float)logical_cores * 0.894f) - 1, 1, logical_cores);
-
-inline Threadpool background_threadpool		= Threadpool(background_threads	, ThreadPriority::LOW , ">> background threadpool"  );
-inline Threadpool parallelism_threadpool	= Threadpool(parallelism_threads, ThreadPriority::HIGH, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too

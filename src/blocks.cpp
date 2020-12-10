@@ -24,7 +24,7 @@ void BlockTypes::from_json (json const& blocks_json) {
 		auto val = kv.value();
 
 		// get block 'class' which eases the block config by setting block parameter defaults depending on class
-		std::string cls = "solid";
+		std_string cls = "solid";
 
 	#define GET(val, member) if ((val).contains(member)) (val).at(member)
 

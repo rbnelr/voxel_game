@@ -51,14 +51,14 @@ struct ChunkRenderer {
 	};
 
 	struct FrameData {
-		std::vector<StagingBuf> staging_bufs;
-		std::vector<IndirectDraw> indirect_draw;
+		std_vector<StagingBuf> staging_bufs;
+		std_vector<IndirectDraw> indirect_draw;
 
 		int slices_end; // one past max slice id allocated
 	};
 
-	std::vector<AllocBlock>	allocs;
-	std::vector<FrameData>	frames;
+	std_vector<AllocBlock>	allocs;
+	std_vector<FrameData>	frames;
 
 	VkDescriptorPool		descriptor_pool;
 	VkDescriptorSetLayout	descriptor_layout;
@@ -236,31 +236,25 @@ struct ChunkRenderer {
 
 	void queue_remeshing (Renderer& r, RenderData& data);
 
-	std::vector<UploadSlice> uploads;
-	void upload_remeshed (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
+	std_vector<UploadSlice> uploads;
+	void upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
 
 	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
 
 };
 
-struct RemeshChunkJob : ThreadingJob { // Chunk remesh
+struct RemeshChunkJob { // Chunk remesh
 	// input
 	Chunk*					chunk;
-	Chunks&					chunks;
-	Assets const&			assets;
-	WorldGenerator const&	wg;
-	Renderer&				renderer;
+	Chunks*					chunks;
+	Assets const*			assets;
+	WorldGenerator const*	wg;
 	// output
 	ChunkMesh				mesh;
 
-	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, Renderer& renderer) :
-		chunk{ chunk }, chunks{ chunks }, assets{ assets }, wg{ wg }, renderer{ renderer }, mesh{} {}
-	virtual ~RemeshChunkJob() = default;
-
-	virtual void execute () {
-		mesh_chunk(assets, wg, chunks, chunk, &mesh);
-	}
-	virtual void finalize ();
+	void execute ();
 };
+
+inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, ThreadPriority::HIGH, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
 
 } // namespace vk

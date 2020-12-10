@@ -134,7 +134,7 @@ struct ChunkKey_Comparer {
 		return l == r;
 	}
 };
-typedef std::unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
+typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
 struct ChunkRendererSlice {
 	// data is implicitly placed in allocs based on the slice id
@@ -151,7 +151,7 @@ struct Chunks {
 
 	AllocatorBitset slices_alloc;
 
-	std::vector<ChunkRendererSlice>	slices;
+	std_vector<ChunkRendererSlice>	slices;
 
 	slice_id alloc_slice () {
 		slice_id id = slices_alloc.alloc();

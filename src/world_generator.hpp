@@ -45,7 +45,7 @@ struct Chunk;
 struct Chunks;
 
 struct WorldGenerator {
-	std::string seed_str = "test2";
+	std_string seed_str = "test2";
 	uint64_t seed;
 
 	float elev_freq = 400, elev_amp = 25;
@@ -54,7 +54,7 @@ struct WorldGenerator {
 	struct Detail {
 		float freq, amp;
 	};
-	std::vector<Detail> detail = {
+	std_vector<Detail> detail = {
 		{ 70, 12 },
 		{ 20,  3 },
 		{  3, 0.14f },
@@ -106,14 +106,11 @@ struct WorldGenerator {
 	}
 };
 
-struct WorldgenJob : ThreadingJob {
+struct WorldgenJob {
 	Chunk* chunk;
-	Chunks* chunks;
 	WorldGenerator const* wg;
 
-	WorldgenJob (Chunk* chunk, Chunks* chunks, WorldGenerator const* wg): chunk{chunk}, chunks{chunks}, wg{wg} {}
-	virtual ~WorldgenJob() = default;
-
-	virtual void execute ();
-	virtual void finalize ();
+	void execute ();
 };
+
+inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, ThreadPriority::LOW, ">> background threadpool"  );

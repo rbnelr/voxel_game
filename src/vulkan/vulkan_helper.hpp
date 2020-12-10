@@ -21,11 +21,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback (
 
 // Return results of vulkan fuction that return arrays as std::vector by calling once for the length and then again to fill the array
 template <typename T, typename FUNC, typename... ARGS>
-inline std::vector<T> get_vector (FUNC func, ARGS... args) {
+inline std_vector<T> get_vector (FUNC func, ARGS... args) {
 	uint32_t count = 0;
 	func(args..., &count, nullptr);
 
-	std::vector<T> vec (count);
+	std_vector<T> vec (count);
 	if (count > 0)
 		func(args..., &count, vec.data());
 
@@ -160,7 +160,7 @@ template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 4> () { re
 
 struct VertexAttributes {
 	VkVertexInputBindingDescription descr;
-	std::vector<VkVertexInputAttributeDescription> attribs;
+	std_vector<VkVertexInputAttributeDescription> attribs;
 
 	void init (size_t vertex_size, bool instanced=false) {
 		descr = {};
@@ -270,7 +270,7 @@ struct UploadTexture {
 	Texture					vkimg;
 	size_t					vkoffset;
 	VkMemoryRequirements	mem_req;
-	std::vector<int2>		mip_sizes;
+	std_vector<int2>		mip_sizes;
 
 	void clac_mip_sizes () {
 		mip_sizes.reserve(16);
@@ -291,7 +291,7 @@ struct UploadTexture {
 struct StaticDataUploader {
 	VkCommandBuffer cmds;
 
-	std::vector<Allocation> staging_allocs;
+	std_vector<Allocation> staging_allocs;
 
 	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadBuffer* uploads, int uploads_count);
 	VkDeviceMemory upload (VkDevice dev, VkPhysicalDevice pdev, UploadTexture* uploads, int uploads_count);

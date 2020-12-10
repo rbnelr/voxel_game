@@ -152,7 +152,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 	OSN::Noise<2> noise(wg.seed);
 	Random rand = Random(chunk_seed);
 
-	std::vector<int3> tree_poss;
+	std_vector<int3> tree_poss;
 
 	auto find_min_tree_dist = [&] (int2 new_tree_pos) {
 		float min_dist = +INF;

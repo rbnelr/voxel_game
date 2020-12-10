@@ -8,14 +8,21 @@ namespace vk {
 void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	ZoneScoped;
 
-	std::vector<std::unique_ptr<ThreadingJob>> remesh_jobs;
+	std::vector<RemeshChunkJob> remesh_jobs;
+
 	{
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
 		auto should_remesh = Chunk::REMESH|Chunk::LOADED|Chunk::ALLOCATED;
 		for (chunk_id id = 0; id < data.chunks.max_id; ++id) {
 			data.chunks[id]._validate_flags();
 			if ((data.chunks[id].flags & should_remesh) != should_remesh) continue;
-			remesh_jobs.push_back(std::make_unique<RemeshChunkJob>(&data.chunks[id], data.chunks, r.assets, data.wg, r));
+			
+			RemeshChunkJob job;
+			job.chunk = &data.chunks[id];
+			job.chunks = &data.chunks;
+			job.assets = &r.assets;
+			job.wg = &data.wg;
+			remesh_jobs.emplace_back(std::move(job));
 		}
 	}
 
@@ -56,25 +63,24 @@ void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshD
 	chunks.free_slices(slice_id);
 }
 
-void RemeshChunkJob::finalize () {
-	mesh.opaque_vertices.free_preallocated();
-	mesh.tranparent_vertices.free_preallocated();
-
-	renderer.chunk_renderer.upload_slices(chunks, &chunk->opaque_slices, mesh.opaque_vertices, renderer);
-	renderer.chunk_renderer.upload_slices(chunks, &chunk->transparent_slices, mesh.tranparent_vertices, renderer);
-
-	chunk->flags &= ~Chunk::REMESH;
-}
-
-void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame) {
+void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCommandBuffer cmds, Chunks& chunks, int cur_frame) {
 	ZoneScoped;
 
 	for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
-		std::unique_ptr<ThreadingJob> results[64];
+		RemeshChunkJob results[64];
 		size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
 
-		for (size_t i = 0; i < count; ++i)
-			results[i]->finalize();
+		for (size_t i = 0; i < count; ++i) {
+			auto& res = results[i];
+
+			res.mesh.opaque_vertices.free_preallocated();
+			res.mesh.tranparent_vertices.free_preallocated();
+
+			upload_slices(chunks, &res.chunk->opaque_slices, res.mesh.opaque_vertices, r);
+			upload_slices(chunks, &res.chunk->transparent_slices, res.mesh.tranparent_vertices, r);
+
+			res.chunk->flags &= ~Chunk::REMESH;
+		}
 
 		result_count += count;
 	}
@@ -472,6 +478,10 @@ void ChunkRenderer::create (VulkanWindowContext& ctx, ShaderManager& shaders, Vk
 	transparent_pipeline = create_pipeline(ctx.dev, shaders.get(ctx.dev, "chunks", {{"ALPHA_TEST", "0"}}),
 		main_renderpass, pipeline_layout, 1, make_attribs<BlockMeshInstance>(), true);
 	GPU_DBG_NAME(ctx, transparent_pipeline, "ChunkRenderer.transparent_pipeline");
+}
+
+void RemeshChunkJob::execute () {
+	mesh_chunk(*assets, *wg, *chunks, chunk, &mesh);
 }
 
 } // namespace vk

@@ -188,7 +188,6 @@
     <ClInclude Include="..\..\..\src\dear_imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\..\src\dear_imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\..\src\dear_imgui\imstb_truetype.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="..\..\..\src\engine\camera.hpp" />
     <ClInclude Include="..\..\..\src\engine\input.hpp" />
     <ClInclude Include="..\..\..\src\engine\input_buttons.hpp" />
@@ -213,7 +212,6 @@
     <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\random.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\raw_array.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\running_average.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\serialization.hpp" />
@@ -239,7 +237,6 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
     <ClInclude Include="..\..\..\src\world.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />
-    <ClInclude Include="myvector.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
@@ -298,7 +295,6 @@
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\..\src\dear_imgui\imgui_widgets.cpp" />
-    <ClCompile Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
     <ClCompile Include="..\..\..\src\engine\camera.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>

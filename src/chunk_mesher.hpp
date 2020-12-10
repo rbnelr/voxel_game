@@ -16,7 +16,8 @@ struct ChunkSliceData {
 // To avoid allocation and memcpy when the meshing data grows larger than predicted,
 //  we output the mesh data into blocks, which can be allocated by BlockAllocator, which reuses freed blocks
 struct MeshData {
-	NO_MOVE_COPY_CLASS(MeshData) public:
+	MOVE_ONLY_CLASS(MeshData)
+public:
 
 	static constexpr int PREALLOC_SLICES = 1;
 
@@ -24,9 +25,18 @@ struct MeshData {
 	BlockMeshInstance* alloc_end = nullptr;
 
 	int used_slices = 0;
-	std::vector<ChunkSliceData*> slices;
+	std_vector<ChunkSliceData*> slices;
 
-	MeshData () {
+	friend void swap (MeshData& l, MeshData& r) {
+		std::swap(l.next_ptr, r.next_ptr);
+		std::swap(l.alloc_end, r.alloc_end);
+		std::swap(l.used_slices, r.used_slices);
+		std::swap(l.slices, r.slices);
+	}
+
+	MeshData () {}
+
+	void prealloc () {
 		// Preallocate before pushing job to threadpool so there is less calls of malloc in threads
 		// past experience has shown rapid calls to malloc can be bottleneck (presumably because of mutex contention in malloc)
 		for (int i=0; i<PREALLOC_SLICES; ++i)

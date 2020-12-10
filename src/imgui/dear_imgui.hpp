@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+#include "imgui.h"
+
 struct DearImgui {
 	bool enabled = true;
 
@@ -35,6 +37,45 @@ inline bool imgui_push (const char* class_name, const char* instance_name=nullpt
 inline void imgui_pop () {
 	ImGui::TreePop();
 	g_imgui.tree_depth--;
+}
+
+namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tracked std_string
+	struct _InputTextCallback_UserData {
+		std_string*             Str;
+		ImGuiInputTextCallback  ChainCallback;
+		void*                   ChainCallbackUserData;
+	};
+
+	inline int _InputTextCallback(ImGuiInputTextCallbackData* data) {
+		_InputTextCallback_UserData* user_data = (_InputTextCallback_UserData*)data->UserData;
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+		{
+			// Resize string callback
+			// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
+			std_string* str = user_data->Str;
+			IM_ASSERT(data->Buf == str->c_str());
+			str->resize(data->BufTextLen);
+			data->Buf = (char*)str->c_str();
+		}
+		else if (user_data->ChainCallback)
+		{
+			// Forward to user callback, if any
+			data->UserData = user_data->ChainCallbackUserData;
+			return user_data->ChainCallback(data);
+		}
+		return 0;
+	}
+
+	inline bool InputText(const char* label, std_string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
+		IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+		flags |= ImGuiInputTextFlags_CallbackResize;
+
+		_InputTextCallback_UserData cb_user_data;
+		cb_user_data.Str = str;
+		cb_user_data.ChainCallback = callback;
+		cb_user_data.ChainCallbackUserData = user_data;
+		return InputText(label, (char*)str->c_str(), str->capacity() + 1, flags, _InputTextCallback, &cb_user_data);
+	}
 }
 
 // Imgui is not srgb correct, ColorEdit3 assume srgb (since color pickers are usually in srgb and should display srgb values as ints because that is more convinient than floats)
@@ -71,7 +112,7 @@ public:
 		int frame;
 	};
 
-	std::vector<Line> lines;
+	std_vector<Line> lines;
 	bool shown = true;
 
 	bool show_levels[4] = { 0,1,1,1 };

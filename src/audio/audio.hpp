@@ -2,6 +2,7 @@
 #include "kisslib/string.hpp"
 using namespace kiss;
 
+#include "kisslib/stl_extensions.hpp"
 #include <string>
 #include <unordered_map>
 #include <memory>
@@ -77,7 +78,7 @@ namespace audio {
 
 class AudioManager {
 public:
-	const std::string sounds_directory = "sounds/";
+	const std_string sounds_directory = "sounds/";
 	
 	struct Sound {
 		audio::AudioData16 data;
@@ -85,9 +86,9 @@ public:
 		float speed;
 	};
 
-	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
+	std_unordered_map<std_string, std::unique_ptr<Sound>> loaded_sounds;
 
-	Sound* load_sound (std::string name, float volume, float speed) {
+	Sound* load_sound (std_string name, float volume, float speed) {
 		auto it = loaded_sounds.find(name);
 		if (it != loaded_sounds.end()) {
 			return it->second.get();
@@ -111,7 +112,7 @@ struct Sound {
 	AudioManager::Sound* sound = nullptr;
 
 	Sound () {}
-	Sound (std::string name, float volume=1, float speed=1) {
+	Sound (std_string name, float volume=1, float speed=1) {
 		sound = audio_manager.load_sound(std::move(name), volume, speed);
 	}
 

@@ -72,17 +72,17 @@ struct BlockMeshes {
 		BlockMeshVertex vertices[MERGE_INSTANCE_FACTOR];
 	};
 
-	std::vector<MeshSlice>	slices;
+	std_vector<MeshSlice>	slices;
 };
 
 struct Assets {
 	
-	std::vector<BlockMeshes::Mesh> block_mesh_info;
-	std::vector<int> block_meshes; // block mesh index (-1 => normal block, >=0 => index into block_mesh_info)
+	std_vector<BlockMeshes::Mesh> block_mesh_info;
+	std_vector<int> block_meshes; // block mesh index (-1 => normal block, >=0 => index into block_mesh_info)
 
 	BlockMeshes generate_block_meshes (json const& blocks_json);
 
-	std::vector<BlockTile> block_tiles;
+	std_vector<BlockTile> block_tiles;
 
 	void load_block_textures (json const& blocks_json);
 };

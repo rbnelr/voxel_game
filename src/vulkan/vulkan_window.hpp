@@ -58,8 +58,8 @@ struct Queues {
 
 struct SwapChainSupport {
 	VkSurfaceCapabilitiesKHR		caps;
-	std::vector<VkSurfaceFormatKHR>	formats;
-	std::vector<VkPresentModeKHR>	present_modes;
+	std_vector<VkSurfaceFormatKHR>	formats;
+	std_vector<VkPresentModeKHR>	present_modes;
 };
 struct SwapChain {
 	VkSwapchainKHR				swap_chain;
@@ -72,7 +72,7 @@ struct SwapChain {
 		VkImageView				image_view;
 		VkFramebuffer			framebuffer;
 	};
-	std::vector<SwapChainImage>	images;
+	std_vector<SwapChainImage>	images;
 };
 
 struct VulkanWindowContext {
@@ -92,8 +92,8 @@ struct VulkanWindowContext {
 	DebugMarker					dbgmarker;
 #endif
 
-	std::vector<char const*>	enabled_layers;
-	std::vector<char const*>	enabled_extensions;
+	std_vector<char const*>	enabled_layers;
+	std_vector<char const*>	enabled_extensions;
 
 	VkRenderPass				dummy_render_pass;
 
@@ -167,7 +167,7 @@ VkDebugUtilsMessengerEXT create_debug_utils_messenger_ext (VkInstance instance, 
 void destroy_debug_utils_messenger_ext (VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger);
 
 VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallbackEXT callback,
-	std::vector<char const*>& extensions, std::vector<char const*>& layers);
+	std_vector<char const*>& extensions, std_vector<char const*>& layers);
 
 //// Device creation
 QueueFamilies pick_queue_families (VkPhysicalDevice device, VkSurfaceKHR surface);
@@ -179,11 +179,11 @@ SwapChainSupport query_swap_chain_support (VkPhysicalDevice device, VkSurfaceKHR
 VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, QueueFamilies* out_queue_families);
 
 VkDevice create_logical_device (
-	VkPhysicalDevice physical_device, std::vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker);
+	VkPhysicalDevice physical_device, std_vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker);
 
 //// Swap chain creation
-VkSurfaceFormatKHR choose_swap_surface_format (std::vector<VkSurfaceFormatKHR> const& formats);
-VkPresentModeKHR choose_swap_present_mode (std::vector<VkPresentModeKHR> const& present_modes);
+VkSurfaceFormatKHR choose_swap_surface_format (std_vector<VkSurfaceFormatKHR> const& formats);
+VkPresentModeKHR choose_swap_present_mode (std_vector<VkPresentModeKHR> const& present_modes);
 VkExtent2D choose_swap_extent (VkSurfaceCapabilitiesKHR const& caps, int2 window_size);
 
 } // namespace vk

@@ -70,9 +70,6 @@
     <ClInclude Include="..\..\..\src\kisslib\random.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\raw_array.hpp">
-      <Filter>kisslib</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -163,9 +160,6 @@
     <ClInclude Include="..\..\..\src\graphics.hpp">
       <Filter>game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.h">
-      <Filter>dear_imgui</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
@@ -190,9 +184,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
-    </ClInclude>
-    <ClInclude Include="myvector.hpp">
-      <Filter>engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -297,9 +288,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\common.cpp">
       <Filter>engine</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\dear_imgui\misc\cpp\imgui_stdlib.cpp">
-      <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp">
       <Filter>kisslib\tracy</Filter>

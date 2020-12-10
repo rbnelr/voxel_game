@@ -21,7 +21,6 @@ struct World {
 	~World () {
 		// shutdown threads so we don't crash when destructing voxels.svo.allocator
 		background_threadpool.flush();
-		parallelism_threadpool.flush();
 	}
 
 	void raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_dist, bool hit_at_max_dist=false, float* hit_dist=nullptr);

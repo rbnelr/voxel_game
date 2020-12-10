@@ -28,7 +28,7 @@ bool select_monitor_from_window_pos (Rect window_positioning, Monitor* selected_
 	int count;
 	auto** glfw_monitors = glfwGetMonitors(&count);
 
-	std::vector<Monitor> monitors;
+	std_vector<Monitor> monitors;
 	monitors.resize(count);
 
 	auto window_monitor_overlap = [=] (Monitor const& mon) {
