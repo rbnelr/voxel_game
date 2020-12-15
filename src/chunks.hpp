@@ -63,7 +63,7 @@ static inline constexpr int _block_count (int lod_levels) {
 };
 
 struct ChunkData {
-	block_id	ids[CHUNK_BLOCK_COUNT];
+	block_id ids[CHUNK_BLOCK_COUNT];
 
 	static constexpr size_t pos_to_index (int3 pos) {
 		return (size_t)pos.z * CHUNK_SIZE * CHUNK_SIZE + (size_t)pos.y * CHUNK_SIZE + (size_t)pos.x;
@@ -245,7 +245,7 @@ struct Chunks {
 		}
 
 		{
-			ZoneScopedN("make_unique<ChunkData>");
+			ZoneScopedNC("malloc ChunkData", tracy::Color::Crimson);
 			chunks[id].blocks = (ChunkData*)malloc(sizeof(ChunkData));
 		}
 
@@ -272,7 +272,10 @@ struct Chunks {
 		free_slices(chunks[id].opaque_slices);
 		free_slices(chunks[id].transparent_slices);
 
-		free(chunks[id].blocks);
+		{
+			ZoneScopedNC("free ChunkData", tracy::Color::Crimson);
+			free(chunks[id].blocks);
+		}
 		chunks[id].~Chunk();
 
 		while ((char*)&chunks[id_alloc.alloc_end] <= commit_ptr - os_page_size) { // free pages one by one when needed

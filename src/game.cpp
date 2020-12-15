@@ -83,12 +83,12 @@ void Game::imgui (Window& window, Input& I, std::function<void()> renderscale_im
 					float3x3 cam_to_world_rot;
 					flycam.calc_world_to_cam_rot(&cam_to_world_rot);
 
-					flycam.pos = world->player.pos + world->player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
+					flycam.cam.pos = world->player.pos + world->player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
 				}
 			}
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
-				world->player.pos = flycam.pos;
+				world->player.pos = flycam.cam.pos;
 			}
 
 			if (open) ImGui::Separator();

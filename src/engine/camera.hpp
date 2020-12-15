@@ -31,8 +31,7 @@ struct Camera_View {
 	void calc_frustrum();
 };
 
-class Camera {
-public:
+struct Camera {
 	// camera position
 	float3				pos;
 
@@ -100,8 +99,9 @@ float3x3 calc_ae_rotation (float2 ae, float3x3* out_inverse=nullptr);
 float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse=nullptr);
 
 // Free flying camera
-class Flycam : public Camera {
-public:
+struct Flycam {
+	Camera cam;
+
 	float base_speed = 0.5f;
 	float max_speed = 1000000.0f;
 	float speedup_factor = 2;
@@ -111,12 +111,12 @@ public:
 
 	// TODO: configurable input bindings
 
-	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): Camera(pos, rot_aer), base_speed{base_speed} {}
+	Flycam (float3 pos=0, float3 rot_aer=0, float base_speed=0.5f): cam(pos, rot_aer), base_speed{base_speed} {}
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Flycam", name)) return;
 
-		Camera::imgui(name);
+		cam.imgui(name);
 
 		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
 		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);

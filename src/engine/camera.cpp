@@ -179,16 +179,16 @@ float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse) {
 
 
 float3x3 Flycam::calc_world_to_cam_rot (float3x3* cam_to_world_rot) {
-	return calc_aer_rotation(rot_aer, cam_to_world_rot);
+	return calc_aer_rotation(cam.rot_aer, cam_to_world_rot);
 }
 
 Camera_View Flycam::update (Input& I) {
 
 	//// look
-	rotate_with_mouselook(I, &rot_aer.x, &rot_aer.y, vfov);
+	rotate_with_mouselook(I, &cam.rot_aer.x, &cam.rot_aer.y, cam.vfov);
 
 	float3x3 cam_to_world_rot;
-	float3x3 world_to_cam_rot = calc_aer_rotation(rot_aer, &cam_to_world_rot);
+	float3x3 world_to_cam_rot = calc_aer_rotation(cam.rot_aer, &cam_to_world_rot);
 
 	{ //// movement
 		float3 move_dir = 0;
@@ -215,7 +215,7 @@ Camera_View Flycam::update (Input& I) {
 
 		float3 translation_cam_space = cur_speed * move_dir * I.unscaled_dt;
 
-		pos += cam_to_world_rot * translation_cam_space;
+		cam.pos += cam_to_world_rot * translation_cam_space;
 	}
 
 	{ //// fov change
@@ -224,17 +224,17 @@ Camera_View Flycam::update (Input& I) {
 			base_speed = powf(2, log2f(base_speed) +delta_log );
 		} else {
 			float delta_log = -0.1f * I.mouse_wheel_delta;
-			vfov = clamp(powf(2, log2f(vfov) +delta_log ), deg(1.0f/10), deg(170));
+			cam.vfov = clamp(powf(2, log2f(cam.vfov) +delta_log ), deg(1.0f/10), deg(170));
 		}
 	}
 
 	//// matrix calc
 	Camera_View v;
-	v.world_to_cam = world_to_cam_rot * translate(-pos);
-	v.cam_to_world = translate(pos) * cam_to_world_rot;
-	v.cam_to_clip = calc_cam_to_clip(I.window_size, &v.frustrum, &v.clip_to_cam);
-	v.clip_near = clip_near;
-	v.clip_far = clip_far;
+	v.world_to_cam = world_to_cam_rot * translate(-cam.pos);
+	v.cam_to_world = translate(cam.pos) * cam_to_world_rot;
+	v.cam_to_clip = cam.calc_cam_to_clip(I.window_size, &v.frustrum, &v.clip_to_cam);
+	v.clip_near = cam.clip_near;
+	v.clip_far = cam.clip_far;
 	v.calc_frustrum();
 	return v;
 }
