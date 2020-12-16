@@ -62,6 +62,8 @@ struct PipelineConfig {
 
 	macro_list			macros;
 
+	bool				allow_wireframe = true;
+
 	std::vector<ShaderStageConfig>	shader_stages;
 
 	//// All pipeline options (filled with defaults based on BasicOptions, but can be further modified if required before passing into compile_pipeline)
@@ -177,6 +179,28 @@ struct PipelineManager {
 
 	shaderc_compiler_t shaderc = nullptr;
 
+	bool wireframe = false;
+
+	void update (VulkanWindowContext& ctx, kiss::ChangedFiles& changed_files, bool wireframe) {
+		if (changed_files.any()) {
+			for (auto& p : pipelines) {
+				std::string const* changed_file;
+				if (changed_files.contains_any(p->shader_sources, FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME, &changed_file)) {
+					// any source file was changed
+					recompile_pipeline(ctx, *p, prints("shader source change (%s)", changed_file->c_str()).c_str());
+				}
+			}
+		}
+		
+		if (this->wireframe != wireframe) {
+			this->wireframe = wireframe;
+
+			for (auto& p : pipelines) {
+				recompile_pipeline(ctx, *p, "wireframe toggle");
+			}
+		}
+	}
+
 	void init (VkDevice dev) {
 		shaderc = shaderc_compiler_initialize();
 	}
@@ -189,17 +213,6 @@ struct PipelineManager {
 			shaderc_compiler_release(shaderc);
 	}
 
-	void reload_changed_shaders (VulkanWindowContext& ctx, kiss::ChangedFiles& changed_files) {
-		if (changed_files.any()) {
-			for (auto& p : pipelines) {
-				if (changed_files.contains_any(p->shader_sources, FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
-					// any source file was changed
-					recompile_pipeline(ctx, *p);
-				}
-			}
-		}
-	}
-
 	Pipeline* create_pipeline (VulkanWindowContext& ctx, std::string name, PipelineConfig const& cfg) {
 		auto p = std::make_unique<Pipeline>();
 		p->name = std::move(name);
@@ -210,7 +223,7 @@ struct PipelineManager {
 		pipelines.push_back(std::move(p));
 		return ptr;
 	}
-	bool recompile_pipeline (VulkanWindowContext& ctx, Pipeline& pipeline) {
+	bool recompile_pipeline (VulkanWindowContext& ctx, Pipeline& pipeline, char const* reason) {
 		Pipeline new_pipeline;
 		new_pipeline.name = pipeline.name;
 		new_pipeline.cfg = pipeline.cfg;
@@ -222,7 +235,7 @@ struct PipelineManager {
 			pipeline.destroy(ctx.dev);
 			pipeline = new_pipeline;
 			
-			clog(INFO, "[PipelineManager] Reloaded Pipeline due to shader source change (\"%s\")", pipeline.name.c_str());
+			clog(INFO, "[PipelineManager] Reloaded Pipeline %-35s due to %s", pipeline.name.c_str(), reason);
 			return true;
 		}
 		return false;
@@ -272,17 +285,19 @@ struct PipelineManager {
 			vertex_input.pVertexAttributeDescriptions = cfg.attribs.attribs.data();
 		}
 
-		VkPipelineDynamicStateCreateInfo dynamic_state = {};
-		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-		dynamic_state.dynamicStateCount = (uint32_t)cfg.dynamic_states.size();
-		dynamic_state.pDynamicStates = cfg.dynamic_states.data();
-
 		VkPipelineViewportStateCreateInfo		viewport_state = {};
 		viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
 		viewport_state.viewportCount = 1;
 		viewport_state.pViewports = &cfg.viewport;
 		viewport_state.scissorCount = 1;
 		viewport_state.pScissors = &cfg.scissor;
+
+		// wireframe by simply setting polygonMode to VK_POLYGON_MODE_LINE (also define a WIREFRAME macro to allow shader to improve wireframe)
+		VkPipelineRasterizationStateCreateInfo	rasterizer2 = cfg.rasterizer; // copy to be able to override polygonMode
+		if (cfg.allow_wireframe && wireframe && rasterizer2.polygonMode == VK_POLYGON_MODE_FILL) {
+			rasterizer2.polygonMode = VK_POLYGON_MODE_LINE;
+			rasterizer2.cullMode = VK_CULL_MODE_NONE; // no culling for wireframe
+		}
 
 		VkPipelineColorBlendStateCreateInfo		color_blending = {};
 		color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
@@ -295,6 +310,11 @@ struct PipelineManager {
 		//color_blending.blendConstants[2] = 0.0f;
 		//color_blending.blendConstants[3] = 0.0f;
 
+		VkPipelineDynamicStateCreateInfo dynamic_state = {};
+		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state.dynamicStateCount = (uint32_t)cfg.dynamic_states.size();
+		dynamic_state.pDynamicStates = cfg.dynamic_states.data();
+
 		VkGraphicsPipelineCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		info.stageCount				= (uint32_t)stages_info.size();
@@ -302,7 +322,7 @@ struct PipelineManager {
 		info.pVertexInputState		= &vertex_input;
 		info.pInputAssemblyState	= &cfg.input_assembly;
 		info.pViewportState			= &viewport_state;
-		info.pRasterizationState	= &cfg.rasterizer;
+		info.pRasterizationState	= &rasterizer2;
 		info.pMultisampleState		= &cfg.multisampling;
 		info.pDepthStencilState		= &cfg.depth_stencil;
 		info.pColorBlendState		= &color_blending;
@@ -339,7 +359,8 @@ struct PipelineManager {
 		auto path = kiss::get_path(requesting_source);
 		res->filepath = prints("%.*s%s", path.size(), path.data(), requested_source);
 
-		sources->emplace_back(res->filepath);
+		if (!contains(*sources, res->filepath))
+			sources->emplace_back(res->filepath);
 
 		bool file_found = kiss::load_text_file(res->filepath.c_str(), &res->source_code);
 
@@ -365,14 +386,20 @@ struct PipelineManager {
 		delete ((IncludeResult*)include_result);
 	}
 
+	void add_macro (shaderc_compile_options_t opt, std::string_view name, std::string_view value) {
+		shaderc_compile_options_add_macro_definition(opt, name.data(), name.size(), value.data(), value.size());
+	}
+
 	VkShaderModule compile_shader_stage (VulkanWindowContext& ctx, shaderc_shader_kind stage, std::string const& source_file, macro_list const& macros, std::vector<std::string>& sources) {
 		// compile from source
 		shaderc_compile_options_t opt = shaderc_compile_options_initialize();
 		shaderc_compile_options_set_optimization_level(opt, shaderc_optimization_level_performance);
 
-		shaderc_compile_options_add_macro_definition(opt, SHADERC_STAGE_MACRO[stage], strlen(SHADERC_STAGE_MACRO[stage]), "", 0);
+		add_macro(opt, SHADERC_STAGE_MACRO[stage], "");
+		if (wireframe)
+			add_macro(opt, "WIREFRAME", "1");
 		for (auto& m : macros)
-			shaderc_compile_options_add_macro_definition(opt, m.name.data(), m.name.size(), m.value.data(), m.value.size());
+			add_macro(opt, m.name, m.value);
 
 		shaderc_compile_options_set_include_callbacks(opt, shaderc_include_resolve, shaderc_include_result_release, &sources);
 
@@ -382,7 +409,8 @@ struct PipelineManager {
 			return VK_NULL_HANDLE;
 		}
 
-		sources.emplace_back(source_file);
+		if (!contains(sources, source_file))
+			sources.emplace_back(source_file);
 
 		auto res = shaderc_compile_into_spv(shaderc, source.data(), source.size(), stage, source_file.c_str(), "main", opt);
 

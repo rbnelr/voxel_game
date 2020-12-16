@@ -332,12 +332,12 @@ void ChunkRenderer::create (VulkanWindowContext& ctx, PipelineManager& pipelines
 	PipelineOptions opt;
 	opt.alpha_blend = false;
 	opt.depth_test = true;
-	opaque_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.opaque_pipeline",
-		PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "1"}}));
+	auto cfg = PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "1"}});
+	opaque_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.opaque_pipeline", cfg);
 
 	opt.alpha_blend = true;
-	transparent_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.transparent_pipeline",
-		PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "0"}}));
+	cfg = PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "0"}});
+	transparent_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.transparent_pipeline", cfg);
 }
 
 void RemeshChunkJob::execute () {

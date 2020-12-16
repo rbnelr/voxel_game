@@ -184,7 +184,7 @@ void Player::update_movement_controls (Input& I, World& world) {
 		static float poss[COUNT] = {};
 		static int cur = 0;
 
-		if (!input.pause_time) {
+		if (!I.pause_time) {
 			vels[cur] = length((float2)vel);
 			poss[cur++] = pos.x;
 			cur %= COUNT;

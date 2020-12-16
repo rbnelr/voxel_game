@@ -87,6 +87,17 @@ struct Assets {
 	void load_block_textures (json const& blocks_json);
 };
 
+struct DebugDraw {
+	struct Vertex {
+		float3 pos;
+		float4 col;
+	};
+
+	std::vector<Vertex> wire_cubes;
+
+
+};
+
 struct RenderData {
 	Camera_View		view;
 	int2			window_size;

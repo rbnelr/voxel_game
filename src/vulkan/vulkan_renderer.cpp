@@ -55,7 +55,7 @@ void set_viewport (VkCommandBuffer cmds, int2 size) {
 void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
 	
-	pipelines.reload_changed_shaders(ctx, changed_files);
+	pipelines.update(ctx, changed_files, wireframe);
 
 	////
 	chunk_renderer.queue_remeshing(*this, data);
@@ -261,8 +261,9 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 		opt.alpha_blend = false;
 		opt.depth_test = false;
 		opt.cull_mode = VK_CULL_MODE_NONE;
-		rescale_pipeline = pipelines.create_pipeline(ctx, "rescale_pipeline",
-			PipelineConfig("rescale", rescale_pipeline_layout, ui_renderpass, 0, opt, {}, {}));
+		auto cfg = PipelineConfig("rescale", rescale_pipeline_layout, ui_renderpass, 0, opt, {}, {});
+		cfg.allow_wireframe = false; // don't do wireframe for fullscreen quad draws or we won't see anything sensible
+		rescale_pipeline = pipelines.create_pipeline(ctx, "rescale_pipeline", cfg);
 	}
 }
 Renderer::~Renderer () {
@@ -700,7 +701,7 @@ void Renderer::destroy_main_framebuffer () {
 
 void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 	int2 cur_size = max(roundi((float2)wnd_size * renderscale), 1);
-	if (cur_size != renderscale_size || renderscale_changed) {
+	if (cur_size != renderscale_size || renderscale_nearest_changed) {
 		vkQueueWaitIdle(ctx.queues.graphics_queue);
 
 		if (renderscale_size.x > 0)
@@ -710,7 +711,7 @@ void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 		create_main_framebuffer(renderscale_size, fb_color_format, fb_depth_format, msaa);
 	}
 
-	renderscale_changed = false;
+	renderscale_nearest_changed = false;
 }
 
 //// Renderpass creation

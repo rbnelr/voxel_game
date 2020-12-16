@@ -9,13 +9,13 @@ layout(location = 0) vs2fs VS {
 
 #ifdef _VERTEX
 
-#define FIXEDPOINT_FAC (1.0 / 256.0)
+	#define FIXEDPOINT_FAC (1.0 / 256.0)
 
 	layout(location = 0) in vec3	v_pos; // pos of voxel instance in chunk
 	layout(location = 1) in uint	v_meshid;
 	layout(location = 2) in float	v_texid;
 
-#define MAX_UBO_SIZE (64*1024)
+	#define MAX_UBO_SIZE (64*1024)
 
 	//
 	layout(push_constant) uniform PC {
@@ -25,7 +25,7 @@ layout(location = 0) vs2fs VS {
 	struct PerDraw {
 		vec4 chunk_pos;
 	};
-#define MAX_PER_DRAW (MAX_UBO_SIZE / 16) // sizeof(PerDrawData)
+	#define MAX_PER_DRAW (MAX_UBO_SIZE / 16) // sizeof(PerDrawData)
 
 	layout(std140, set = 1, binding = 0) uniform PerDrawData {
 		PerDraw per_draw[MAX_PER_DRAW];
@@ -37,8 +37,8 @@ layout(location = 0) vs2fs VS {
 		vec4 normal;
 		vec4 uv;
 	};
-#define MERGE_INSTANCE_FACTOR 6
-#define MAX_BLOCK_MESHES (MAX_UBO_SIZE / (48 * MERGE_INSTANCE_FACTOR)) // sizeof(BlockMeshVertex)
+	#define MERGE_INSTANCE_FACTOR 6
+	#define MAX_BLOCK_MESHES (MAX_UBO_SIZE / (48 * MERGE_INSTANCE_FACTOR)) // sizeof(BlockMeshVertex)
 
 	layout(std140, set = 0, binding = 1) uniform BlockMeshes {
 		BlockMeshVertex vertices[MAX_BLOCK_MESHES][MERGE_INSTANCE_FACTOR];
@@ -64,13 +64,16 @@ layout(location = 0) vs2fs VS {
 	void main () {
 		vec4 col = texture(textures, vs.uvi);
 		
-		//col.rgb *= vec3(vs.brightness);
-		
-	#if ALPHA_TEST
+	#if ALPHA_TEST && !defined(WIREFRAME)
 		if (col.a <= ALPHA_TEST_THRES / 255.0)
 			discard;
 		col.a = 1.0;
 	#endif
+		
+	#if WIREFRAME
+		col = vec4(1.0);
+	#endif
+		
 		frag_col = col;
 	}
 #endif

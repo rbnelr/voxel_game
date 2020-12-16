@@ -189,7 +189,7 @@ void frameloop (Window& window) {
 		// Update
 
 		game->imgui(window, window.input,
-			[&] () { renderer->renderscale_imgui(); },
+			[&] () { renderer->graphics_imgui(); },
 			[&] () { renderer->chunk_renderer.imgui(game->world->chunks); }
 		);
 

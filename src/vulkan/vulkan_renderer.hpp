@@ -118,18 +118,22 @@ struct Renderer {
 	float						renderscale = 1.0f;
 	int2						renderscale_size = -1;
 	bool						renderscale_nearest = false;
-	bool						renderscale_changed = false;
+	bool						renderscale_nearest_changed = false;
 
-	void renderscale_imgui () {
-		if (!imgui_push("Renderscale")) return;
+	bool						wireframe = false;
 
-		renderscale_changed = ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
-		ImGui::SameLine();
-		ImGui::Text("= %4d x %4d px", renderscale_size.x, renderscale_size.y);
+	void graphics_imgui () {
+		if (imgui_push("Renderscale")) {
+			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
+			ImGui::SameLine();
+			ImGui::Text("= %4d x %4d px", renderscale_size.x, renderscale_size.y);
 
-		renderscale_changed = ImGui::Checkbox("renderscale nearest", &renderscale_nearest) || renderscale_changed;
+			renderscale_nearest_changed = ImGui::Checkbox("renderscale nearest", &renderscale_nearest);
 
-		imgui_pop();
+			imgui_pop();
+		}
+
+		ImGui::Checkbox("wireframe", &wireframe);
 	}
 
 	Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json);
