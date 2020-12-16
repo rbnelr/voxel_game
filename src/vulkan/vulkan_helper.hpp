@@ -159,11 +159,14 @@ template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 3> () { re
 template<> inline VkFormat get_formatv<AttribMode::SINT2FLT, int16_t, 4> () { return VK_FORMAT_R16G16B16A16_SSCALED; }
 
 struct VertexAttributes {
-	VkVertexInputBindingDescription descr;
-	std_vector<VkVertexInputAttributeDescription> attribs;
+	VkVertexInputBindingDescription descr = {};
+	std::vector<VkVertexInputAttributeDescription> attribs;
+
+	bool empty () {
+		return descr.stride == 0;
+	}
 
 	void init (size_t vertex_size, bool instanced=false) {
-		descr = {};
 		descr.binding = 0;
 		descr.stride = (uint32_t)vertex_size;
 		descr.inputRate = instanced ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;

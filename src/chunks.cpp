@@ -25,7 +25,7 @@ block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) 
 		*out_block_pos = block_pos_chunk;
 
 	Chunk* chunk = query_chunk(chunk_pos);
-	if (!chunk)
+	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
 		return B_NULL;
 
 	if (out_chunk)

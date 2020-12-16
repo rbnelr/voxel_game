@@ -63,7 +63,8 @@ struct ChunkRenderer {
 	VkDescriptorPool		descriptor_pool;
 	VkDescriptorSetLayout	descriptor_layout;
 	VkPipelineLayout		pipeline_layout;
-	VkPipeline				opaque_pipeline, transparent_pipeline;
+	Pipeline*				opaque_pipeline;
+	Pipeline*				transparent_pipeline;
 
 	bool is_slice_allocated (Chunks& chunks, slice_id id) {
 		auto i = id / 64;
@@ -211,7 +212,7 @@ struct ChunkRenderer {
 		vkFreeDescriptorSets(dev, descriptor_pool, 1, &buf.descriptor_set);
 	}
 
-	void create (VulkanWindowContext& ctx, ShaderManager& shaders, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight);
+	void create (VulkanWindowContext& ctx, PipelineManager& pipelines, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight);
 	void destroy (VkDevice dev) {
 		for (auto& f : frames) {
 			for (auto& buf : f.staging_bufs)
@@ -222,10 +223,6 @@ struct ChunkRenderer {
 		for (auto& a : allocs)
 			free_alloc(dev, a);
 
-		if (opaque_pipeline)
-			vkDestroyPipeline(dev, opaque_pipeline, nullptr);
-		if (transparent_pipeline)
-			vkDestroyPipeline(dev, transparent_pipeline, nullptr);
 		vkDestroyPipelineLayout(dev, pipeline_layout, nullptr);
 		vkDestroyDescriptorPool(dev, descriptor_pool, nullptr);
 		vkDestroyDescriptorSetLayout(dev, descriptor_layout, nullptr);

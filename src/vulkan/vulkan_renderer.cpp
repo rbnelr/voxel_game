@@ -157,7 +157,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
 						&rescale_descriptor_set, 0, nullptr);
 				}
 
-				vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline);
+				vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline->pipeline);
 
 				vkCmdDraw(cmds, 3, 1, 0, 0);
 			}
@@ -223,7 +223,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	ctx.init_vk_tracy(init_cmd_pool);
 #endif
 
-	shaders.init(ctx.dev);
+	pipelines.init(ctx.dev);
 
 	create_frame_data();
 
@@ -240,7 +240,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	for (int i=0; i<FRAMES_IN_FLIGHT; ++i)
 		GPU_DBG_NAMEf(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
 
-	chunk_renderer.create(ctx, shaders, main_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
+	chunk_renderer.create(ctx, pipelines, main_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
 
 	{
 		create_rescale_descriptors();
@@ -255,9 +255,12 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 			{ common_descriptor_layout, rescale_descriptor_layout }, {});
 		GPU_DBG_NAME(ctx, rescale_pipeline_layout, "rescale_pipeline_layout");
 
-		rescale_pipeline = create_rescale_pipeline(shaders.get(ctx.dev, "rescale"),
-			ui_renderpass, rescale_pipeline_layout);
-		GPU_DBG_NAME(ctx, rescale_pipeline, "rescale_pipeline");
+		PipelineOptions opt;
+		opt.alpha_blend = false;
+		opt.depth_test = false;
+		opt.cull_mode = VK_CULL_MODE_NONE;
+		rescale_pipeline = pipelines.create_pipeline(ctx, "rescale_pipeline",
+			PipelineConfig("rescale", rescale_pipeline_layout, ui_renderpass, 0, opt, {}, {}));
 	}
 }
 Renderer::~Renderer () {
@@ -270,8 +273,6 @@ Renderer::~Renderer () {
 
 	destroy_ubo_buffers();
 
-	if (rescale_pipeline)
-		vkDestroyPipeline(ctx.dev, rescale_pipeline, nullptr);
 	vkDestroyPipelineLayout(ctx.dev, rescale_pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(ctx.dev, rescale_descriptor_layout, nullptr);
 	vkDestroySampler(ctx.dev, rescale_sampler, nullptr);
@@ -285,7 +286,7 @@ Renderer::~Renderer () {
 
 	vkDestroyDescriptorPool(ctx.dev, descriptor_pool, nullptr);
 
-	shaders.destroy(ctx.dev);
+	pipelines.destroy(ctx.dev);
 	chunk_renderer.destroy(ctx.dev);
 
 	for (auto& frame : frame_data) {
@@ -572,18 +573,21 @@ void Renderer::create_rescale_descriptors () {
 		sampler_info.maxLod = 0;
 		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &rescale_sampler);
 
+		sampler_info.magFilter = VK_FILTER_NEAREST;
+		sampler_info.minFilter = VK_FILTER_LINEAR;
+		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &rescale_sampler_nearest);
+
 		VkDescriptorSetLayoutBinding binding = {};
 		binding.binding = 0;
 		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding.descriptorCount = 1;
 		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		binding.pImmutableSamplers = &rescale_sampler;
+		//binding.pImmutableSamplers = &rescale_sampler; // no pImmutableSamplers to be able to switch
 
 		VkDescriptorSetLayoutCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 		info.bindingCount = 1;
 		info.pBindings = &binding;
-
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &rescale_descriptor_layout));
 	}
 
@@ -593,7 +597,6 @@ void Renderer::create_rescale_descriptors () {
 		info.descriptorPool = descriptor_pool;
 		info.descriptorSetCount = 1;
 		info.pSetLayouts = &rescale_descriptor_layout;
-
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, &rescale_descriptor_set));
 	}
 }
@@ -601,7 +604,7 @@ void Renderer::update_rescale_img_descr () {
 	VkDescriptorImageInfo img = {};
 	img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	img.imageView = main_color.image_view;
-	//img.sampler = nullptr; // set in pImmutableSamplers
+	img.sampler = renderscale_nearest ? rescale_sampler_nearest : rescale_sampler; // if not set in pImmutableSamplers
 
 	VkWriteDescriptorSet write = {};
 	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -612,135 +615,6 @@ void Renderer::update_rescale_img_descr () {
 	write.descriptorCount = 1;
 	write.pImageInfo = &img;
 	vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
-}
-
-VkPipeline Renderer::create_rescale_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout) {
-	if (!shader->valid)
-		return VK_NULL_HANDLE;
-
-	VkPipelineShaderStageCreateInfo shader_stages[16] = {};
-
-	for (int i=0; i<(int)shader->stages.size(); ++i) {
-		shader_stages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		shader_stages[i].stage = SHADERC_STAGE_BITS_MAP[ shader->stages[i].stage ];
-		shader_stages[i].module = shader->stages[i].module;
-		shader_stages[i].pName = "main";
-	}
-
-	VkPipelineVertexInputStateCreateInfo vertex_input = {};
-	vertex_input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-	VkPipelineInputAssemblyStateCreateInfo input_assembly = {};
-	input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	input_assembly.primitiveRestartEnable = VK_FALSE;
-
-	// fake viewport and scissor, actually set dynamically
-	VkViewport viewport = {};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width  = (float)1920;//cur_size.x;
-	viewport.height = (float)1080;//cur_size.y;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	VkRect2D scissor = {};
-	scissor.offset = { 0, 0 };
-	scissor.extent = { 1920, 1080 };//swap_chain.extent;
-
-	VkPipelineViewportStateCreateInfo viewport_state = {};
-	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewport_state.viewportCount = 1;
-	viewport_state.pViewports = &viewport;
-	viewport_state.scissorCount = 1;
-	viewport_state.pScissors = &scissor;
-
-	VkPipelineRasterizationStateCreateInfo rasterizer = {};
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_NONE;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f;
-	rasterizer.depthBiasClamp = 0.0f;
-	rasterizer.depthBiasSlopeFactor = 0.0f;
-
-	VkPipelineMultisampleStateCreateInfo multisampling = {};
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = (VkSampleCountFlagBits)msaa;
-	multisampling.minSampleShading = 1.0f;
-	multisampling.pSampleMask = nullptr;
-	multisampling.alphaToCoverageEnable = VK_FALSE;
-	multisampling.alphaToOneEnable = VK_FALSE;
-
-	VkPipelineDepthStencilStateCreateInfo depth_stencil = {};
-	depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depth_stencil.depthTestEnable = VK_FALSE;
-	depth_stencil.depthWriteEnable = VK_FALSE;
-	depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	depth_stencil.depthBoundsTestEnable = VK_FALSE;
-	depth_stencil.minDepthBounds = 0.0f;
-	depth_stencil.maxDepthBounds = 1.0f;
-	depth_stencil.stencilTestEnable = VK_FALSE;
-	depth_stencil.front = {};
-	depth_stencil.back = {};
-
-	VkPipelineColorBlendAttachmentState color_blend_attachment = {};
-	color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	color_blend_attachment.blendEnable = VK_FALSE;
-	color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-	color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-	color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-	color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-	color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-	color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-	VkPipelineColorBlendStateCreateInfo color_blending = {};
-	color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	color_blending.logicOpEnable = VK_FALSE;
-	color_blending.logicOp = VK_LOGIC_OP_COPY;
-	color_blending.attachmentCount = 1;
-	color_blending.pAttachments = &color_blend_attachment;
-	color_blending.blendConstants[0] = 0.0f;
-	color_blending.blendConstants[1] = 0.0f;
-	color_blending.blendConstants[2] = 0.0f;
-	color_blending.blendConstants[3] = 0.0f;
-
-	VkDynamicState dynamic_states[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_SCISSOR,
-	};
-
-	VkPipelineDynamicStateCreateInfo dynamic_state = {};
-	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamic_state.dynamicStateCount = ARRLEN(dynamic_states);
-	dynamic_state.pDynamicStates = dynamic_states;
-
-	VkGraphicsPipelineCreateInfo info = {};
-	info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	info.stageCount				= (uint32_t)shader->stages.size();
-	info.pStages				= shader_stages;
-	info.pVertexInputState		= &vertex_input;
-	info.pInputAssemblyState	= &input_assembly;
-	info.pViewportState			= &viewport_state;
-	info.pRasterizationState	= &rasterizer;
-	info.pMultisampleState		= &multisampling;
-	info.pDepthStencilState		= &depth_stencil;
-	info.pColorBlendState		= &color_blending;
-	info.pDynamicState			= &dynamic_state;
-	info.layout					= layout;
-	info.renderPass				= renderpass;
-	info.subpass				= 0;
-	info.basePipelineHandle		= VK_NULL_HANDLE;
-	info.basePipelineIndex		= -1;
-
-	VkPipeline pipeline = VK_NULL_HANDLE;
-	VK_CHECK_RESULT(vkCreateGraphicsPipelines(ctx.dev, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline));
-	return pipeline;
 }
 
 //// Create per-frame data
@@ -824,15 +698,17 @@ void Renderer::destroy_main_framebuffer () {
 
 void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 	int2 cur_size = max(roundi((float2)wnd_size * renderscale), 1);
-	if (cur_size == renderscale_size) return;
+	if (cur_size != renderscale_size || renderscale_changed) {
+		vkQueueWaitIdle(ctx.queues.graphics_queue);
 
-	vkQueueWaitIdle(ctx.queues.graphics_queue);
+		if (renderscale_size.x > 0)
+			destroy_main_framebuffer();
 
-	if (renderscale_size.x > 0)
-		destroy_main_framebuffer();
+		renderscale_size = cur_size;
+		create_main_framebuffer(renderscale_size, fb_color_format, fb_depth_format, msaa);
+	}
 
-	renderscale_size = cur_size;
-	create_main_framebuffer(renderscale_size, fb_color_format, fb_depth_format, msaa);
+	renderscale_changed = false;
 }
 
 //// Renderpass creation

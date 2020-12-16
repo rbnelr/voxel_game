@@ -49,7 +49,7 @@ struct ViewUniforms {
 struct Renderer {
 	VulkanWindowContext			ctx;
 
-	ShaderManager				shaders;
+	PipelineManager				pipelines;
 
 	VkFormat					wnd_color_format;
 
@@ -106,10 +106,10 @@ struct Renderer {
 
 	VkDescriptorSetLayout		rescale_descriptor_layout; // set 1
 	VkPipelineLayout			rescale_pipeline_layout;
-	VkPipeline					rescale_pipeline;
+	Pipeline*					rescale_pipeline;
 
 	VkDescriptorSet				rescale_descriptor_set;
-	VkSampler					rescale_sampler;
+	VkSampler					rescale_sampler, rescale_sampler_nearest;
 
 	ChunkRenderer				chunk_renderer;
 
@@ -118,15 +118,16 @@ struct Renderer {
 	float						renderscale = 1.0f;
 	int2						renderscale_size = -1;
 	bool						renderscale_nearest = false;
+	bool						renderscale_changed = false;
 
 	void renderscale_imgui () {
 		if (!imgui_push("Renderscale")) return;
 
-		ImGui::SliderFloat("scale", &renderscale, 0.02f, 2.0f);
+		renderscale_changed = ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 		ImGui::SameLine();
 		ImGui::Text("= %4d x %4d px", renderscale_size.x, renderscale_size.y);
 
-		ImGui::Checkbox("renderscale nearest", &renderscale_nearest);
+		renderscale_changed = ImGui::Checkbox("renderscale nearest", &renderscale_nearest) || renderscale_changed;
 
 		imgui_pop();
 	}
@@ -153,9 +154,6 @@ struct Renderer {
 	void create_rescale_descriptors ();
 	void update_rescale_img_descr ();
 
-	VkPipeline create_main_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout, int msaa, VertexAttributes attribs);
-	VkPipeline create_rescale_pipeline (Shader* shader, VkRenderPass renderpass, VkPipelineLayout layout);
-	
 	//// Create per-frame data
 	void create_frame_data ();
 
