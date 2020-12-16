@@ -52,9 +52,11 @@ void set_viewport (VkCommandBuffer cmds, int2 size) {
 	vkCmdSetScissor(cmds, 0, 1, &scissor);
 }
 
-void Renderer::render_frame (GLFWwindow* window, RenderData& data) {
+void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
 	
+	pipelines.reload_changed_shaders(ctx, changed_files);
+
 	////
 	chunk_renderer.queue_remeshing(*this, data);
 

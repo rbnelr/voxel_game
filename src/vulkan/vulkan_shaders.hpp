@@ -71,7 +71,6 @@ struct PipelineConfig {
 	VkPipelineMultisampleStateCreateInfo	multisampling = {};
 	VkPipelineDepthStencilStateCreateInfo	depth_stencil = {};
 	VkPipelineColorBlendAttachmentState		color_blend_attachment = {};
-	VkPipelineColorBlendStateCreateInfo		color_blending = {};
 
 	std::vector<VkDynamicState>				dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkViewport								viewport = { 0, 0, 1920, 1080, 0, 1 }; // ignored with VK_DYNAMIC_STATE_VIEWPORT
@@ -146,16 +145,6 @@ struct PipelineConfig {
 			color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 			color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
 		}
-
-		color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		color_blending.logicOpEnable = VK_FALSE;
-		color_blending.logicOp = VK_LOGIC_OP_COPY;
-		color_blending.attachmentCount = 1;
-		color_blending.pAttachments = &color_blend_attachment;
-		//color_blending.blendConstants[0] = 0.0f;
-		//color_blending.blendConstants[1] = 0.0f;
-		//color_blending.blendConstants[2] = 0.0f;
-		//color_blending.blendConstants[3] = 0.0f;
 	}
 };
 
@@ -166,12 +155,7 @@ struct Pipeline {
 	VkPipeline					pipeline = VK_NULL_HANDLE;
 
 	std::vector<VkShaderModule>	shader_modules;
-
-	struct SrcFile {
-		std::string				filename;
-		// file hash? to detect if cached binary can be used
-	};
-	std::vector<SrcFile>		shader_sources;
+	std::vector<std::string>	shader_sources;
 
 	PipelineConfig				cfg;
 
@@ -205,10 +189,20 @@ struct PipelineManager {
 			shaderc_compiler_release(shaderc);
 	}
 
+	void reload_changed_shaders (VulkanWindowContext& ctx, kiss::ChangedFiles& changed_files) {
+		if (changed_files.any()) {
+			for (auto& p : pipelines) {
+				if (changed_files.contains_any(p->shader_sources, FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
+					// any source file was changed
+					recompile_pipeline(ctx, *p);
+				}
+			}
+		}
+	}
+
 	Pipeline* create_pipeline (VulkanWindowContext& ctx, std::string name, PipelineConfig const& cfg) {
 		auto p = std::make_unique<Pipeline>();
 		p->name = std::move(name);
-
 		p->cfg = cfg;
 		_compile_pipeline(ctx, *p);
 
@@ -218,13 +212,17 @@ struct PipelineManager {
 	}
 	bool recompile_pipeline (VulkanWindowContext& ctx, Pipeline& pipeline) {
 		Pipeline new_pipeline;
+		new_pipeline.name = pipeline.name;
 		new_pipeline.cfg = pipeline.cfg;
 
 		if (_compile_pipeline(ctx, new_pipeline)) { // only apply new pipeline if there is no compiler error to avoid vulkan freaking out while I fix errors in the edited shader
+			
+			vkQueueWaitIdle(ctx.queues.graphics_queue);
+
 			pipeline.destroy(ctx.dev);
 			pipeline = new_pipeline;
 			
-			clog(INFO, "reloaded ");
+			clog(INFO, "[PipelineManager] Reloaded Pipeline due to shader source change (\"%s\")", pipeline.name.c_str());
 			return true;
 		}
 		return false;
@@ -286,6 +284,17 @@ struct PipelineManager {
 		viewport_state.scissorCount = 1;
 		viewport_state.pScissors = &cfg.scissor;
 
+		VkPipelineColorBlendStateCreateInfo		color_blending = {};
+		color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		color_blending.logicOpEnable = VK_FALSE;
+		color_blending.logicOp = VK_LOGIC_OP_COPY;
+		color_blending.attachmentCount = 1;
+		color_blending.pAttachments = &cfg.color_blend_attachment;
+		//color_blending.blendConstants[0] = 0.0f;
+		//color_blending.blendConstants[1] = 0.0f;
+		//color_blending.blendConstants[2] = 0.0f;
+		//color_blending.blendConstants[3] = 0.0f;
+
 		VkGraphicsPipelineCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		info.stageCount				= (uint32_t)stages_info.size();
@@ -296,7 +305,7 @@ struct PipelineManager {
 		info.pRasterizationState	= &cfg.rasterizer;
 		info.pMultisampleState		= &cfg.multisampling;
 		info.pDepthStencilState		= &cfg.depth_stencil;
-		info.pColorBlendState		= &cfg.color_blending;
+		info.pColorBlendState		= &color_blending;
 		info.pDynamicState			= &dynamic_state;
 		info.layout					= cfg.layout;
 		info.renderPass				= cfg.render_pass;
@@ -322,7 +331,7 @@ struct PipelineManager {
 	static shaderc_include_result* shaderc_include_resolve (
 		void* user_data, const char* requested_source, int type,
 		const char* requesting_source, size_t include_depth) {
-		std::vector<Pipeline::SrcFile>* sources = (std::vector<Pipeline::SrcFile>*)user_data;
+		std::vector<std::string>* sources = (std::vector<std::string>*)user_data;
 
 		// New buffer so it stays valid until shaderc_include_result_release
 		auto* res = new IncludeResult();
@@ -330,7 +339,7 @@ struct PipelineManager {
 		auto path = kiss::get_path(requesting_source);
 		res->filepath = prints("%.*s%s", path.size(), path.data(), requested_source);
 
-		sources->push_back({ res->filepath });
+		sources->emplace_back(res->filepath);
 
 		bool file_found = kiss::load_text_file(res->filepath.c_str(), &res->source_code);
 
@@ -356,7 +365,7 @@ struct PipelineManager {
 		delete ((IncludeResult*)include_result);
 	}
 
-	VkShaderModule compile_shader_stage (VulkanWindowContext& ctx, shaderc_shader_kind stage, std::string const& source_file, macro_list const& macros, std::vector<Pipeline::SrcFile>& sources) {
+	VkShaderModule compile_shader_stage (VulkanWindowContext& ctx, shaderc_shader_kind stage, std::string const& source_file, macro_list const& macros, std::vector<std::string>& sources) {
 		// compile from source
 		shaderc_compile_options_t opt = shaderc_compile_options_initialize();
 		shaderc_compile_options_set_optimization_level(opt, shaderc_optimization_level_performance);
@@ -373,7 +382,7 @@ struct PipelineManager {
 			return VK_NULL_HANDLE;
 		}
 
-		sources.push_back({ source_file });
+		sources.emplace_back(source_file);
 
 		auto res = shaderc_compile_into_spv(shaderc, source.data(), source.size(), stage, source_file.c_str(), "main", opt);
 

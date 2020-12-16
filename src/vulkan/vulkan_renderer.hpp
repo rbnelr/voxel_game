@@ -136,7 +136,7 @@ struct Renderer {
 	~Renderer ();
 
 	void set_view_uniforms (Camera_View& view, int2 viewport_size);
-	void render_frame (GLFWwindow* window, RenderData& data);
+	void render_frame (GLFWwindow* window, RenderData& data, kiss::ChangedFiles& changed_files);
 
 	void frame_begin (GLFWwindow* window);
 	void submit (GLFWwindow* window, VkCommandBuffer buf);

@@ -71,7 +71,6 @@ layout(location = 0) vs2fs VS {
 			discard;
 		col.a = 1.0;
 	#endif
-
 		frag_col = col;
 	}
 #endif

@@ -166,6 +166,12 @@ void frameloop (Window& window) {
 		// Begin frame (aquire image in vk)
 		renderer->frame_begin(window.window);
 
+		kiss::ChangedFiles changed_files;
+		{
+			ZoneScopedN("file_changes.poll_changes()");
+			changed_files = window.file_changes.poll_changes();
+		}
+
 		{ // Input sampling
 			ZoneScopedN("sample_input");
 
@@ -177,7 +183,7 @@ void frameloop (Window& window) {
 
 			glfw_sample_non_callback_input(window);
 		}
-
+		
 		imgui_begin_frame(window);
 
 		// Update
@@ -194,7 +200,7 @@ void frameloop (Window& window) {
 			
 		// Render
 		imgui_end_frame();
-		renderer->render_frame(window.window, render_data);
+		renderer->render_frame(window.window, render_data, changed_files);
 
 		{ // Calc next frame dt based on this frame duration
 			auto& i = window.input;

@@ -25,6 +25,8 @@ struct Window {
 	
 	int		frame_counter = 0;
 
+	DirectoyChangeNotifier	file_changes = DirectoyChangeNotifier("./", true);
+
 	void set_vsync (bool on);
 
 	bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
