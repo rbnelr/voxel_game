@@ -88,12 +88,12 @@ struct Assets {
 };
 
 struct DebugDraw {
-	struct Vertex {
+	struct LineVertex {
 		float3 pos;
 		float4 col;
 	};
 
-	std::vector<Vertex> wire_cubes;
+	std::vector<LineVertex> lines;
 
 
 };

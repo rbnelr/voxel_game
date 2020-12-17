@@ -5,7 +5,7 @@
 
 Game::Game () {
 	//set_process_high_priority();
-	//set_thread_high_priority();
+	set_thread_priority(main_thread_prio);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
 }

@@ -14,7 +14,7 @@ struct ChunkRenderer {
 	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
 	static constexpr int SLICES_PER_ALLOC = (int)(ALLOC_SIZE / CHUNK_SLICE_BYTESIZE);
 
-	static constexpr uint64_t STAGING_SIZE = 16 * (1024ull * 1024);
+	static constexpr uint64_t STAGING_SIZE = 1 * (1024ull * 1024);
 
 	static constexpr uint64_t MAX_ALLOCS = 64;
 
@@ -252,6 +252,6 @@ struct RemeshChunkJob { // Chunk remesh
 	void execute ();
 };
 
-inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, ThreadPriority::HIGH, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
+inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, parallelism_threads_prio, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
 
 } // namespace vk
