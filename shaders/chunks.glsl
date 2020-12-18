@@ -19,16 +19,7 @@ layout(location = 0) vs2fs VS {
 
 	//
 	layout(push_constant) uniform PC {
-		int drawid_offs;
-	};
-
-	struct PerDraw {
-		vec4 chunk_pos;
-	};
-	#define MAX_PER_DRAW (MAX_UBO_SIZE / 16) // sizeof(PerDrawData)
-
-	layout(std140, set = 1, binding = 0) uniform PerDrawData {
-		PerDraw per_draw[MAX_PER_DRAW];
+		vec3 chunk_pos;
 	};
 
 	//
@@ -48,8 +39,6 @@ layout(location = 0) vs2fs VS {
 		BlockMeshVertex v = block_meshes.vertices[v_meshid][gl_VertexIndex];
 		vec3 mesh_pos_model	= v.pos.xyz;
 		vec2 uv				= v.uv.xy;
-
-		vec3 chunk_pos = per_draw[gl_DrawID + drawid_offs].chunk_pos.xyz;
 
 		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =		    vec3(uv, v_texid);

@@ -11,7 +11,7 @@ namespace vk {
 struct Renderer;
 
 struct ChunkRenderer {
-	static constexpr uint64_t ALLOC_SIZE = 2/*64*/ * (1024ull * 1024); // size of vram allocations
+	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
 	static constexpr int SLICES_PER_ALLOC = (int)(ALLOC_SIZE / CHUNK_SLICE_BYTESIZE);
 
 	static constexpr uint64_t STAGING_SIZE = 1 * (1024ull * 1024);
@@ -40,20 +40,9 @@ struct ChunkRenderer {
 		Allocation	buf;
 		void*		mapped_ptr;
 	};
-	struct IndirectDraw {
-		Allocation				draw_data;
-		Allocation				per_draw_ubo;
-		VkDrawIndirectCommand*	draw_data_ptr;
-		PerDrawData*			per_draw_ubo_ptr;
-
-		VkDescriptorSet			descriptor_set;
-		int						opaque_draw_count;
-		int						transparent_draw_count;
-	};
 
 	struct FrameData {
 		std_vector<StagingBuf> staging_bufs;
-		std_vector<IndirectDraw> indirect_draw;
 
 		int slices_end; // one past max slice id allocated
 	};
@@ -61,8 +50,6 @@ struct ChunkRenderer {
 	std_vector<AllocBlock>	allocs;
 	std_vector<FrameData>	frames;
 
-	VkDescriptorPool		descriptor_pool;
-	VkDescriptorSetLayout	descriptor_layout;
 	VkPipelineLayout		pipeline_layout;
 	Pipeline*				opaque_pipeline;
 	Pipeline*				transparent_pipeline;
@@ -154,80 +141,16 @@ struct ChunkRenderer {
 		buf.buf.free(dev);
 	}
 
-	IndirectDraw new_indirect_draw_buffer (VulkanWindowContext& ctx, int cur_frame, int alloc_i) {
-		ZoneScopedC(tracy::Color::Crimson);
-
-		IndirectDraw ret;
-
-		ret.draw_data = allocate_buffer(ctx.dev, ctx.pdev, SLICES_PER_ALLOC * sizeof(VkDrawIndirectCommand),
-			VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		GPU_DBG_NAMEf(ctx, ret.draw_data.buf, "slices.frames[%d].indirect_draw[%d].buf", cur_frame, alloc_i);
-		GPU_DBG_NAMEf(ctx, ret.draw_data.mem, "slices.frames[%d].indirect_draw[%d].mem", cur_frame, alloc_i);
-
-		ret.per_draw_ubo = allocate_buffer(ctx.dev, ctx.pdev, SLICES_PER_ALLOC * sizeof(PerDrawData),
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-		GPU_DBG_NAMEf(ctx, ret.per_draw_ubo.buf, "slices.frames[%d].per_draw_ubo[%d].buf", cur_frame, alloc_i);
-		GPU_DBG_NAMEf(ctx, ret.per_draw_ubo.mem, "slices.frames[%d].per_draw_ubo[%d].mem", cur_frame, alloc_i);
-
-		vkMapMemory(ctx.dev, ret.draw_data.mem, 0, SLICES_PER_ALLOC * sizeof(VkDrawIndirectCommand), 0, (void**)&ret.draw_data_ptr);
-		vkMapMemory(ctx.dev, ret.per_draw_ubo.mem, 0, SLICES_PER_ALLOC * sizeof(PerDrawData), 0, (void**)&ret.per_draw_ubo_ptr);
-
-		{ // create descriptor sets
-			VkDescriptorSetAllocateInfo info = {};
-			info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-			info.descriptorPool = descriptor_pool;
-			info.descriptorSetCount = 1;
-			info.pSetLayouts = &descriptor_layout;
-
-			VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, &ret.descriptor_set));
-			GPU_DBG_NAMEf(ctx, ret.descriptor_set, "slices.frames[%d].indirect_draw[%d].descriptor_set[%d]", cur_frame, alloc_i);
-
-			VkWriteDescriptorSet writes[1] = {};
-
-			VkDescriptorBufferInfo buf = {};
-			buf.buffer = ret.per_draw_ubo.buf;
-			buf.offset = 0;
-			buf.range = VK_WHOLE_SIZE;
-
-			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			writes[0].dstSet = ret.descriptor_set;
-			writes[0].dstBinding = 0;
-			writes[0].dstArrayElement = 0;
-			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-			writes[0].descriptorCount = 1;
-			writes[0].pBufferInfo = &buf;
-
-			vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
-		}
-
-		return ret;
-	}
-	void free_indirect_draw_buffer (VkDevice dev, IndirectDraw& buf) {
-		ZoneScopedC(tracy::Color::Crimson);
-		vkUnmapMemory(dev, buf.draw_data.mem);
-		vkUnmapMemory(dev, buf.per_draw_ubo.mem);
-		buf.draw_data.free(dev);
-		buf.per_draw_ubo.free(dev);
-
-		vkFreeDescriptorSets(dev, descriptor_pool, 1, &buf.descriptor_set);
-	}
-
 	void create (VulkanWindowContext& ctx, PipelineManager& pipelines, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight);
 	void destroy (VkDevice dev) {
 		for (auto& f : frames) {
 			for (auto& buf : f.staging_bufs)
 				free_staging_buffer(dev, buf);
-			for (auto& buf : f.indirect_draw)
-				free_indirect_draw_buffer(dev, buf);
 		}
 		for (auto& a : allocs)
 			free_alloc(dev, a);
 
 		vkDestroyPipelineLayout(dev, pipeline_layout, nullptr);
-		vkDestroyDescriptorPool(dev, descriptor_pool, nullptr);
-		vkDestroyDescriptorSetLayout(dev, descriptor_layout, nullptr);
 	}
 
 	size_t remesh_chunks_count;

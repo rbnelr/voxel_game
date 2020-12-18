@@ -152,13 +152,6 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCo
 			}
 		}
 
-		while (frame.indirect_draw.size() > allocs.size()) {
-			free_indirect_draw_buffer(ctx.dev, frame.indirect_draw.back());
-			frame.indirect_draw.pop_back();
-		}
-		while (frame.indirect_draw.size() < allocs.size())
-			frame.indirect_draw.push_back( new_indirect_draw_buffer(ctx, cur_frame, (int)frame.indirect_draw.size()) );
-		
 		if (uploads.size() > 0) {
 			VkMemoryBarrier mem = {};
 			mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -180,35 +173,40 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 	auto& frame = frames[cur_frame];
 	auto& chunks = data.world.chunks;
 
-	for (auto& draw : frame.indirect_draw) {
-		draw.opaque_draw_count = 0;
-		draw.transparent_draw_count = 0;
-	}
-	
-	auto col = srgba(0, 0, 255, 255);
-	auto col2 = srgba(255, 0, 0, 180);
 	auto& cull_view = debug_frustrum_culling ? data.player_view : data.view;
-	if (debug_frustrum_culling)
-		g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
-
+	
 	{
 		ZoneScopedN("chunk culling pass");
+
+		int nonculled = 0;
 
 		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
 
-			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
+			bool any_mesh = chunk.opaque_slices == U16_NULL && chunk.opaque_slices == U16_NULL;
 
-			bool culled = frustrum_cull_aabb(cull_view.frustrum, { chunk_pos, chunk_pos + (float3)CHUNK_SIZE });
+			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
+			bool culled = any_mesh || frustrum_cull_aabb(cull_view.frustrum, { chunk_pos, chunk_pos + (float3)CHUNK_SIZE });
 
 			chunk.flags &= ~Chunk::CULLED;
 			if (culled)
 				chunk.flags |= Chunk::CULLED;
+			else
+				nonculled++;
+		}
+	}
 
-			if (debug_frustrum_culling)
-				g_debugdraw.wire_cube(chunk_pos + (float3)CHUNK_SIZE/2, (float3)CHUNK_SIZE * 0.997f, culled ? col2 : col);
-
+	if (debug_frustrum_culling) {
+		auto col = srgba(0, 0, 255, 255);
+		auto col2 = srgba(255, 0, 0, 180);
+		
+		g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
+		
+		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+			if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
+			bool culled = chunks[cid].flags & Chunk::CULLED;
+			g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, culled ? col2 : col);
 		}
 	}
 
@@ -220,8 +218,9 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 		slice_id sid = 0;
 		for (int alloci=0; alloci<(int)allocs.size(); ++alloci) {
-			auto& draw = frame.indirect_draw[alloci];
-			draw.opaque_draw_count = 0;
+			VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
 
 			for (int slicei=0; slicei<SLICES_PER_ALLOC && sid < (slice_id)chunks.slices.size(); ++slicei, ++sid) {
 				auto slice = chunks.slices[sid];
@@ -229,35 +228,12 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 				if (slice.type == 0 && slice.vertex_count > 0) {
 					auto& chunk = chunks.chunks[slice.chunkid];
 					//if ((chunk.flags & Chunk::CULLED) == 0) {
-					
-						VkDrawIndirectCommand draw_data;
-						draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-						draw_data.instanceCount = slice.vertex_count; // for each instance in the mesh
-						draw_data.firstVertex = 0;
-						draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
+						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
+						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 
-						draw.draw_data_ptr[draw.opaque_draw_count] = draw_data;
-						draw.per_draw_ubo_ptr[draw.opaque_draw_count] = { float4((float3)(chunk.pos * CHUNK_SIZE), 1.0f) };
-
-						draw.opaque_draw_count++;
+						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
 					//}
 				}
-			}
-
-			if (draw.opaque_draw_count > 0) {
-				GPU_TRACE(ctx, cmds, "draw alloc block");
-
-				VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
-
-				// set 1
-				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
-
-				uint32_t offs = 0;
-				vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
-
-				vkCmdDrawIndirect(cmds, draw.draw_data.buf, offs * sizeof(VkDrawIndirectCommand), draw.opaque_draw_count, sizeof(VkDrawIndirectCommand));
 			}
 		}
 	}
@@ -270,8 +246,9 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 		slice_id sid = 0;
 		for (int alloci=0; alloci<(int)allocs.size(); ++alloci) {
-			auto& draw = frame.indirect_draw[alloci];
-			draw.transparent_draw_count = 0;
+			VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
 
 			for (int slicei=0; slicei<SLICES_PER_ALLOC && sid < (slice_id)chunks.slices.size(); ++slicei, ++sid) {
 				auto slice = chunks.slices[sid];
@@ -279,35 +256,12 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 				if (slice.type == 1 && slice.vertex_count > 0) {
 					auto& chunk = chunks.chunks[slice.chunkid];
 					//if ((chunk.flags & Chunk::CULLED) == 0) {
-
-						VkDrawIndirectCommand draw_data;
-						draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-						draw_data.instanceCount = slice.vertex_count; // for each instance in the mesh
-						draw_data.firstVertex = 0;
-						draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
-
-						draw.draw_data_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = draw_data;
-						draw.per_draw_ubo_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = { float4((float3)(chunks.chunks[slice.chunkid].pos * CHUNK_SIZE), 1.0f) };
-
-						draw.transparent_draw_count++;
+						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
+						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
+						
+						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
 					//}
 				}
-			}
-
-			if (draw.transparent_draw_count > 0) {
-				GPU_TRACE(ctx, cmds, "draw alloc block");
-
-				VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
-
-				// set 1
-				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
-
-				uint32_t offs = draw.opaque_draw_count;
-				vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
-
-				vkCmdDrawIndirect(cmds, draw.draw_data.buf, offs * sizeof(VkDrawIndirectCommand), draw.transparent_draw_count, sizeof(VkDrawIndirectCommand));
 			}
 		}
 	}
@@ -316,40 +270,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 void ChunkRenderer::create (VulkanWindowContext& ctx, PipelineManager& pipelines, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight) {
 	frames.resize(frames_in_flight);
 
-	{ // descriptor_pool
-		VkDescriptorPoolSize pool_sizes[1] = {};
-		pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		pool_sizes[0].descriptorCount = MAX_ALLOCS * frames_in_flight; // for per draw data ubo
-
-		VkDescriptorPoolCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-		info.poolSizeCount = ARRLEN(pool_sizes);
-		info.pPoolSizes = pool_sizes;
-		info.maxSets = (uint32_t)(MAX_ALLOCS * frames_in_flight); // for per draw data ubo
-
-		VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
-		GPU_DBG_NAME(ctx, descriptor_pool, "ChunkRenderer.descriptor_pool");
-	}
-
-	{ // descriptor_layout
-		VkDescriptorSetLayoutBinding bindings[1] = {};
-		bindings[0].binding = 0;
-		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		bindings[0].descriptorCount = 1;
-		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-		VkDescriptorSetLayoutCreateInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		info.bindingCount = ARRLEN(bindings);
-		info.pBindings = bindings;
-
-		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &descriptor_layout));
-		GPU_DBG_NAME(ctx, descriptor_layout, "ChunkRenderer.descriptor_layout");
-	}
-
-	pipeline_layout = create_pipeline_layout(ctx.dev,
-		{ common, descriptor_layout }, {{ VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int) }});
+	pipeline_layout = create_pipeline_layout(ctx.dev, { common }, {{ VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3) }});
 	GPU_DBG_NAME(ctx, pipeline_layout, "ChunkRenderer.pipeline_layout");
 
 	auto attribs = make_attribs<BlockMeshInstance>();
