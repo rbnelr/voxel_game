@@ -89,9 +89,9 @@ void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks,
 	
 				auto& tile = assets.block_tiles[id];
 				auto mesh_idx = assets.block_meshes[id];
-	
+
 				auto transparency = g_blocks.blocks[id].transparency;
-	
+			
 				{ // +X
 					block_id nid = ptr[idx - 1];
 					if (nid != id) {

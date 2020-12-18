@@ -77,6 +77,20 @@ BlockMeshes Assets::generate_block_meshes (json const& blocks_json) {
 		block_meshes.push_back( load_mesh(mesh_name.c_str()) );
 	}
 
+	//{
+	//	printf("const BlockMeshVertex vertices[%d][%d] = {\n", (int)bm.slices.size(), bm.MERGE_INSTANCE_FACTOR);
+	//	for (int i=0; i<(int)bm.slices.size(); ++i) {
+	//		printf("\t{\n");
+	//		for (int j=0; j<bm.MERGE_INSTANCE_FACTOR; ++j) {
+	//			auto& v = bm.slices[i].vertices[j];
+	//			printf("\t\tBlockMeshVertex( vec3(%f,%f,%f), vec2(%f,%f) ),\n",
+	//				v.pos.x, v.pos.y, v.pos.z,  v.uv.x, v.uv.y);
+	//		}
+	//		printf("\t},\n");
+	//	}
+	//	printf("};\n");
+	//}
+
 	aiReleaseImport(scene);
 	return bm;
 }
