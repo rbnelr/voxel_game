@@ -178,8 +178,6 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 	{
 		ZoneScopedN("chunk culling pass");
 
-		int nonculled = 0;
-
 		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
@@ -192,8 +190,6 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			chunk.flags &= ~Chunk::CULLED;
 			if (culled)
 				chunk.flags |= Chunk::CULLED;
-			else
-				nonculled++;
 		}
 	}
 
@@ -209,6 +205,8 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, culled ? col2 : col);
 		}
 	}
+
+	drawcount_opaque = 0;
 
 	{
 		ZoneScopedN("chunk draw opaque");
@@ -227,16 +225,20 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 				if (slice.type == 0 && slice.vertex_count > 0) {
 					auto& chunk = chunks.chunks[slice.chunkid];
-					//if ((chunk.flags & Chunk::CULLED) == 0) {
+					if ((chunk.flags & Chunk::CULLED) == 0) {
 						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 
 						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
-					//}
+
+						drawcount_opaque++;
+					}
 				}
 			}
 		}
 	}
+
+	drawcount_transparent = 0;
 
 	{
 		ZoneScopedN("chunk draw transparent");
@@ -255,12 +257,14 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 				if (slice.type == 1 && slice.vertex_count > 0) {
 					auto& chunk = chunks.chunks[slice.chunkid];
-					//if ((chunk.flags & Chunk::CULLED) == 0) {
+					if ((chunk.flags & Chunk::CULLED) == 0) {
 						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 						
 						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
-					//}
+
+						drawcount_transparent++;
+					}
 				}
 			}
 		}

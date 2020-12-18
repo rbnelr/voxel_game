@@ -35,18 +35,9 @@ layout(location = 0) vs2fs VS {
 	} block_meshes;
 	
 	void main () {
-		BlockMeshVertex v = block_meshes.vertices[v_meshid][gl_VertexIndex];
+		BlockMeshVertex v = block_meshes.vertices[meshid][gl_VertexIndex];
 		vec3 mesh_pos_model	= v.pos.xyz;
 		vec2 uv				= v.uv.xy;
-	
-		gl_Position =		world_to_clip * vec4(mesh_pos_model + v_pos * FIXEDPOINT_FAC + chunk_pos, 1);
-		vs.uvi =		    vec3(uv, v_texid);
-	}
-
-	void main () {
-		BlockMeshVertex v = vertices[meshid][gl_VertexIndex];
-		vec3 mesh_pos_model	= v.pos;
-		vec2 uv				= v.uv;
 	
 		gl_Position =		world_to_clip * vec4(mesh_pos_model + voxel_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =		    vec3(uv, texid);

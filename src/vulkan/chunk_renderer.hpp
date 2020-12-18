@@ -62,15 +62,26 @@ struct ChunkRenderer {
 		return ((chunks.slices_alloc.bits[i] >> j) & 1) == 0;
 	}
 
+	int drawcount_opaque = 0;
+	int drawcount_transparent = 0;
+
 	void imgui (Chunks& chunks) {
 
 		size_t vertices = 0;
+		size_t slices_total = 0;
 		for (size_t i=0; i<chunks.slices.size(); ++i) {
 			if (is_slice_allocated(chunks, (slice_id)i)) {
 				vertices += chunks.slices[i].vertex_count;
+				slices_total++;
 			}
 		}
 
+		ImGui::Separator();
+
+		ImGui::Text("Drawcalls: opaque: %3d  transparent: %3d (%3d / %3d slices - %3.0f%%)",
+			drawcount_opaque, drawcount_transparent, drawcount_opaque + drawcount_transparent,
+			slices_total, (float)(drawcount_opaque + drawcount_transparent) / slices_total * 100);
+		
 		ImGui::Text("Mesh allocs: %2d  slices: %5d  vertices: %12s",
 			allocs.size(), chunks.slices.size(), format_thousands(vertices).c_str());
 		ImGui::Text("Mesh VRAM: used: %7.3f MB  commited: %7.3f MB (%6.2f%% usage)",
