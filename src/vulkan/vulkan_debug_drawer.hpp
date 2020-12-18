@@ -5,7 +5,7 @@
 
 namespace vk {
 
-inline constexpr size_t BUFFER_SIZE = 8 * 1024ull * 1024ull;
+inline constexpr size_t BUFFER_SIZE = 1 * 1024ull * 1024ull;
 
 struct DebugDrawer {
 
@@ -21,6 +21,7 @@ struct DebugDrawer {
 
 	VkPipelineLayout pipeline_layout;
 	Pipeline* lines_pipeline;
+	Pipeline* tris_pipeline;
 
 	Buffer new_buffer (VulkanWindowContext& ctx, int cur_frame) {
 		ZoneScopedC(tracy::Color::Crimson);
@@ -49,14 +50,18 @@ struct DebugDrawer {
 		pipeline_layout = create_pipeline_layout(ctx.dev, { common }, {});
 		GPU_DBG_NAME(ctx, pipeline_layout, "DebugDrawer.pipeline_layout");
 
-		auto attribs = make_attribs<DebugDraw::LineVertex>();
-
 		PipelineOptions opt;
 		opt.alpha_blend = true;
 		opt.depth_test = true;
 		opt.primitive_mode = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		auto cfg = PipelineConfig("debug_lines", pipeline_layout, main_renderpass, 0, opt, attribs);
+		auto cfg = PipelineConfig("debug_lines", pipeline_layout, main_renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
 		lines_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.lines_pipeline", cfg);
+
+		PipelineOptions opt2;
+		opt2.alpha_blend = true;
+		opt2.depth_test = true;
+		cfg = PipelineConfig("debug_tris", pipeline_layout, main_renderpass, 0, opt2, make_attribs<DebugDraw::TriVertex>());
+		tris_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.tris_pipeline", cfg);
 	}
 	void destroy (VkDevice dev) {
 		for (auto& f : frames) {
@@ -68,30 +73,65 @@ struct DebugDrawer {
 	}
 
 	void draw (VulkanWindowContext& ctx, VkCommandBuffer cmds, int cur_frame) {
-		int min_bufs = 1;
+		int min_bufs = 2; // one for each lines and tris
 		
 		auto& frame = frames[cur_frame];
+
+		int bufi = 0;
+
+		{ //// Debug Lines
+			GPU_TRACE(ctx, cmds, "draw debug lines");
+			
+			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, lines_pipeline->pipeline);
 		
-		static constexpr int LINES_PER_BUF = BUFFER_SIZE / (sizeof(DebugDraw::LineVertex) * 2);
-		int lines_bufs = (int)( (g_debugdraw.lines.size()/2 + LINES_PER_BUF-1) / LINES_PER_BUF );
+			static constexpr int VERTS_PER_BUF = BUFFER_SIZE / sizeof(DebugDraw::LineVertex) /2 *2; // /2 *2 to round down to multiple of 2 as to not straddle across buffers
+			int buf_count = (int)( (g_debugdraw.lines.size() + VERTS_PER_BUF-1) / VERTS_PER_BUF );
 
-		vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, lines_pipeline->pipeline);
+			for (int i=0; i<buf_count; ++i) {
+				if (bufi >= (int)frame.bufs.size())
+					frame.bufs.push_back( new_buffer(ctx, cur_frame) );
 
-		for (int i=0; i<lines_bufs; ++i) {
-			if (i >= (int)frame.bufs.size())
-				frame.bufs.push_back( new_buffer(ctx, cur_frame) );
+				size_t first_vertex = i * VERTS_PER_BUF;
+				size_t vertex_count = std::min(g_debugdraw.lines.size() - first_vertex, (size_t)VERTS_PER_BUF);
 
-			size_t first_vertex = i * LINES_PER_BUF*2;
-			size_t vertex_count = std::min(g_debugdraw.lines.size() - first_vertex, (size_t)LINES_PER_BUF);
+				memcpy(frame.bufs[bufi].mapped_ptr, &g_debugdraw.lines[first_vertex], vertex_count * sizeof(DebugDraw::LineVertex));
 
-			memcpy(frame.bufs[i].mapped_ptr, &g_debugdraw.lines[first_vertex], vertex_count * sizeof(DebugDraw::LineVertex));
+				VkDeviceSize offs = 0;
+				vkCmdBindVertexBuffers(cmds, 0, 1, &frame.bufs[bufi].buf.buf, &offs);
 
-			VkDeviceSize offs = 0;
-			vkCmdBindVertexBuffers(cmds, 0, 1, &frame.bufs[i].buf.buf, &offs);
+				vkCmdDraw(cmds, (uint32_t)vertex_count, 1, 0, 0);
 
-			vkCmdDraw(cmds, (uint32_t)vertex_count, 1, (uint32_t)first_vertex, 0);
+				bufi++;
+			}
 		}
-		while ((int)frame.bufs.size() > std::max(lines_bufs, min_bufs)) {
+
+		{ //// Debug tris
+			GPU_TRACE(ctx, cmds, "draw debug tris");
+
+			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, tris_pipeline->pipeline);
+		
+			static constexpr int VERTS_PER_BUF = BUFFER_SIZE / sizeof(DebugDraw::TriVertex) /3 *3; // /3 *3 to round down to multiple of 3 as to not straddle across buffers
+			int buf_count = (int)( (g_debugdraw.tris.size() + VERTS_PER_BUF-1) / VERTS_PER_BUF );
+
+			for (int i=0; i<buf_count; ++i) {
+				if (bufi >= (int)frame.bufs.size())
+					frame.bufs.push_back( new_buffer(ctx, cur_frame) );
+		
+				size_t first_vertex = i * VERTS_PER_BUF;
+				size_t vertex_count = std::min(g_debugdraw.tris.size() - first_vertex, (size_t)VERTS_PER_BUF);
+		
+				memcpy(frame.bufs[bufi].mapped_ptr, &g_debugdraw.tris[first_vertex], vertex_count * sizeof(DebugDraw::TriVertex));
+		
+				VkDeviceSize offs = 0;
+				vkCmdBindVertexBuffers(cmds, 0, 1, &frame.bufs[bufi].buf.buf, &offs);
+		
+				vkCmdDraw(cmds, (uint32_t)vertex_count, 1, 0, 0);
+		
+				bufi++;
+			}
+		}
+
+		while ((int)frame.bufs.size() > std::max(bufi, min_bufs)) {
 			free_buffer(ctx.dev, frame.bufs.back());
 			frame.bufs.pop_back();
 		}

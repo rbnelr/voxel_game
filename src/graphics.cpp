@@ -155,3 +155,45 @@ void DebugDraw::wire_cube (float3 pos, float3 size, lrgba col) {
 		out++;
 	}
 }
+
+void DebugDraw::cylinder (float3 base, float radius, float height, lrgba col, int sides) {
+	size_t idx = tris.size();
+	tris.resize(idx + sides * 4 * 3); // tri for bottom + top cap + 2 tris for side
+	auto* out = &tris[idx];
+
+	float ang_step = 2*PI / (float)sides;
+
+	float sin0=0, cos0=1; // optimize not calling sin 2x per loop
+
+	auto push_tri = [&] (float3 pos, float3 normal) {
+		out->pos = pos * float3(radius, radius, height) + base;
+		out->normal = normal;
+		out->col = col;
+		out++;
+	};
+
+	for (int i=0; i<sides; ++i) {
+		float ang1 = (float)(i+1) * ang_step;
+
+		float sin1 = sin(ang1);
+		float cos1 = cos(ang1);
+
+		push_tri(float3(   0,    0, 0), float3(0, 0, -1));
+		push_tri(float3(cos1, sin1, 0), float3(0, 0, -1));
+		push_tri(float3(cos0, sin0, 0), float3(0, 0, -1));
+
+		push_tri(float3(cos1, sin1, 0), float3(cos1, sin1, 0));
+		push_tri(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
+		push_tri(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
+		push_tri(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
+		push_tri(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
+		push_tri(float3(cos0, sin0, 1), float3(cos0, sin0, 0));
+		
+		push_tri(float3(   0,    0, 1), float3(0, 0, +1));
+		push_tri(float3(cos0, sin0, 1), float3(0, 0, +1));
+		push_tri(float3(cos1, sin1, 1), float3(0, 0, +1));
+
+		sin0 = sin1;
+		cos0 = cos1;
+	}
+}

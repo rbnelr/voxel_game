@@ -454,6 +454,7 @@
     <None Include="..\..\..\shaders\chunks.glsl" />
     <None Include="..\..\..\shaders\block_highlight.glsl" />
     <None Include="..\..\..\shaders\common.glsl" />
+    <None Include="..\..\..\shaders\debug_tris.glsl" />
     <None Include="..\..\..\shaders\fog.glsl" />
     <None Include="..\..\..\shaders\generic.glsl" />
     <None Include="..\..\..\shaders\gui.glsl" />

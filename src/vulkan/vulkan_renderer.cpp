@@ -75,7 +75,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 
 	{
 		GPU_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(ctx, *this, cmds, data.chunks, cur_frame);
+		chunk_renderer.upload_remeshed(ctx, *this, cmds, data.world.chunks, cur_frame);
 	}
 
 	{ // set 0
@@ -107,7 +107,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 
 		{
 			GPU_TRACE(ctx, cmds, "draw chunks");
-			chunk_renderer.draw_chunks(ctx, cmds, data.chunks, cur_frame);
+			chunk_renderer.draw_chunks(ctx, cmds, data.world.chunks, cur_frame);
 		}
 
 		// -> debug_drawer.pipeline_layout is not compatible with chunk_renderer.pipeline_layout because of differing push constants

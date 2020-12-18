@@ -130,8 +130,10 @@ RenderData Game::update (Window& window, Input& I) {
 
 	world->chunks.update_chunk_loading(*world, world_gen, world->player);
 
+	if (activate_flycam)
+		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));
+	
 	return {
-		view, I.window_size,
-		world->chunks, world->world_gen
+		view, I.window_size, *world
 	};
 }

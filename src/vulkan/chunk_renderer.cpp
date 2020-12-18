@@ -13,15 +13,15 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	{
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
 		auto should_remesh = Chunk::REMESH|Chunk::LOADED|Chunk::ALLOCATED;
-		for (chunk_id id = 0; id < data.chunks.max_id; ++id) {
-			data.chunks[id]._validate_flags();
-			if ((data.chunks[id].flags & should_remesh) != should_remesh) continue;
+		for (chunk_id id = 0; id < data.world.chunks.max_id; ++id) {
+			data.world.chunks[id]._validate_flags();
+			if ((data.world.chunks[id].flags & should_remesh) != should_remesh) continue;
 			
 			RemeshChunkJob job;
-			job.chunk = &data.chunks[id];
-			job.chunks = &data.chunks;
+			job.chunk = &data.world.chunks[id];
+			job.chunks = &data.world.chunks;
 			job.assets = &r.assets;
-			job.wg = &data.wg;
+			job.wg = &data.world.world_gen;
 			remesh_jobs.emplace_back(std::move(job));
 		}
 	}
