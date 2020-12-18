@@ -92,7 +92,6 @@ BlockMeshes Assets::generate_block_meshes (json const& blocks_json) {
 	//}
 
 	aiReleaseImport(scene);
-	_bm = bm;
 	return bm;
 }
 

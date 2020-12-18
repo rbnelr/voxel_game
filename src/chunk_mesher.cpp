@@ -10,17 +10,17 @@ void face (ChunkMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockT
 
 	auto& out = b.transparency == TM_TRANSPARENT ? mesh->tranparent_vertices : mesh->opaque_vertices;
 
-	auto texid = tile.calc_tex_index(facei, 0);
+	auto* v = out.push();
 
-	for (int i=0; i<BlockMeshes::MERGE_INSTANCE_FACTOR; ++i) {
-		auto* v = out.push();
+	int16_t fixd_posx = (int16_t)(block_pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posy = (int16_t)(block_pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posz = (int16_t)(block_pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
 
-		auto v2 = _bm.slices[facei].vertices[i];
-
-		v->pos = (float3)v2.pos + (float3)block_pos;
-		v->uv = (float2)v2.uv;
-		v->texid = texid;
-	}
+	v->posx = fixd_posx;
+	v->posy = fixd_posy;
+	v->posz = fixd_posz;
+	v->texid = tile.calc_tex_index(facei, 0);
+	v->meshid = facei;
 }
 
 void block_mesh (ChunkMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile, int3 block_pos, uint64_t chunk_seed) {
@@ -48,16 +48,12 @@ void block_mesh (ChunkMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile
 	int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance::FIXEDPOINT_FAC);
 
 	for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
-		
-		for (int i=0; i<BlockMeshes::MERGE_INSTANCE_FACTOR; ++i) {
-			auto* v = mesh->opaque_vertices.push();
-
-			auto v2 = _bm.slices[meshid].vertices[i];
-
-			v->pos = (float3)v2.pos + (float3)block_pos;
-			v->uv = (float2)v2.uv;
-			v->texid = texid;
-		}
+		auto* v = mesh->opaque_vertices.push();
+		v->posx = fixd_posx;
+		v->posy = fixd_posy;
+		v->posz = fixd_posz;
+		v->texid = texid;
+		v->meshid = meshid;
 	}
 }
 

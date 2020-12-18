@@ -31,20 +31,19 @@ struct BlockTile {
 struct BlockMeshInstance {
 	static constexpr int FIXEDPOINT_FAC = 256;
 
-	float3		pos; // pos in chunk
-	float2		uv;
+	int16_t		posx, posy, posz; // pos in chunk
+	uint8_t		meshid; // index for merge instancing, this is used to index block meshes
 	uint16_t	texid; // texture array id based on block id
 
 	template <typename ATTRIBS>
 	static void attributes (ATTRIBS& a) {
 		int loc = 0;
-		a.init(sizeof(BlockMeshInstance));
-		a.template add<AttribMode::FLOAT   , decltype(pos  )>(loc++, "pos"  , offsetof(BlockMeshInstance, pos));
-		a.template add<AttribMode::FLOAT   , decltype(uv   )>(loc++, "uv"   , offsetof(BlockMeshInstance, uv));
-		a.template add<AttribMode::UINT2FLT, decltype(texid)>(loc++, "texid", offsetof(BlockMeshInstance, texid));
+		a.init(sizeof(BlockMeshInstance), true);
+		a.template addv<AttribMode::SINT2FLT, decltype(posx), 3>(loc++, "pos"   , offsetof(BlockMeshInstance, posx)); // fixed point
+		a.template add <AttribMode::UINT,     decltype(meshid) >(loc++, "meshid", offsetof(BlockMeshInstance, meshid));
+		a.template add <AttribMode::UINT2FLT, decltype(texid ) >(loc++, "texid" , offsetof(BlockMeshInstance, texid ));
 	}
 };
-
 // Vertex for block meshes which are used when rendering chunks via merge instancing
 struct BlockMeshVertex {
 	// all as float4 to avoid std140 layout problems
@@ -75,8 +74,6 @@ struct BlockMeshes {
 
 	std_vector<MeshSlice>	slices;
 };
-
-inline BlockMeshes _bm;
 
 struct Assets {
 	

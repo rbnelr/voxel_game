@@ -231,7 +231,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 
-						vkCmdDraw(cmds, slice.vertex_count, 1, slicei * CHUNK_SLICE_LENGTH, 0);
+						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
 					//}
 				}
 			}
@@ -259,7 +259,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 						float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 						vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(float3), &chunk_pos);
 						
-						vkCmdDraw(cmds, slice.vertex_count, 1, slicei * CHUNK_SLICE_LENGTH, 0);
+						vkCmdDraw(cmds, BlockMeshes::MERGE_INSTANCE_FACTOR, slice.vertex_count, 0, slicei * CHUNK_SLICE_LENGTH);
 					//}
 				}
 			}
