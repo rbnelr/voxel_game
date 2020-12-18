@@ -5,7 +5,7 @@
 
 namespace vk {
 
-inline constexpr size_t BUFFER_SIZE = 1 * 1024ull * 1024ull;
+inline constexpr size_t BUFFER_SIZE = 4 * 1024ull * 1024ull;
 
 struct DebugDrawer {
 

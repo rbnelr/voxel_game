@@ -11,7 +11,7 @@ namespace vk {
 struct Renderer;
 
 struct ChunkRenderer {
-	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
+	static constexpr uint64_t ALLOC_SIZE = 2/*64*/ * (1024ull * 1024); // size of vram allocations
 	static constexpr int SLICES_PER_ALLOC = (int)(ALLOC_SIZE / CHUNK_SLICE_BYTESIZE);
 
 	static constexpr uint64_t STAGING_SIZE = 1 * (1024ull * 1024);
@@ -28,6 +28,7 @@ struct ChunkRenderer {
 
 	struct AllocBlock {
 		Allocation		mesh_data;
+
 	};
 	struct UploadSlice {
 		uint32_t		slice_id;
@@ -112,6 +113,7 @@ struct ChunkRenderer {
 			print_bitset_allocator(chunks.slices_alloc, CHUNK_SLICE_BYTESIZE, ALLOC_SIZE);
 			ImGui::TreePop();
 		}
+
 	}
 
 	void new_alloc (VulkanWindowContext& ctx) {
@@ -229,14 +231,14 @@ struct ChunkRenderer {
 	}
 
 	size_t remesh_chunks_count;
-	void upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshData& mesh, Renderer& r);
+	void upload_slices (Chunks& chunks, chunk_id chunkid, slice_id* chunk_slices, uint16_t type, MeshData& mesh, Renderer& r);
 
 	void queue_remeshing (Renderer& r, RenderData& data);
 
 	std_vector<UploadSlice> uploads;
 	void upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
 
-	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame);
+	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, RenderData& data, bool debug_frustrum_culling, int cur_frame);
 
 };
 

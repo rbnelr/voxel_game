@@ -134,6 +134,6 @@ RenderData Game::update (Window& window, Input& I) {
 		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));
 	
 	return {
-		view, I.window_size, *world
+		I.window_size, view, player_view, *world
 	};
 }

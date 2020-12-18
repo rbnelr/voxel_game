@@ -124,6 +124,8 @@ struct Renderer {
 
 	bool						wireframe = false;
 
+	bool						debug_frustrum_culling = false;
+
 	void graphics_imgui () {
 		if (imgui_push("Renderscale")) {
 			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
@@ -136,6 +138,8 @@ struct Renderer {
 		}
 
 		ImGui::Checkbox("wireframe", &wireframe);
+
+		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 	}
 
 	Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json);

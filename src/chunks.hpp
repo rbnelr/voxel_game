@@ -79,9 +79,11 @@ static constexpr int MAX_SLICES = 32;
 
 struct Chunk {
 	enum Flags : uint32_t {
-		ALLOCATED = 1, // identify non-allocated chunks in chunk array, default true so that this get's set 
-		LOADED = 2, // block data valid and safe to use in main thread
-		REMESH = 4, // blocks were changed, need remesh
+		ALLOCATED	= 1<<0, // identify non-allocated chunks in chunk array, default true so that this get's set 
+		LOADED		= 1<<1, // block data valid and safe to use in main thread
+		REMESH		= 1<<2, // blocks were changed, need remesh
+
+		CULLED		= 1<<3,
 	};
 
 	const int3 pos;
@@ -136,6 +138,8 @@ typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> ch
 struct ChunkRendererSlice {
 	// data is implicitly placed in allocs based on the slice id
 	uint16_t		vertex_count;
+	chunk_id		chunkid;
+	uint16_t		type; // 0: opaque, 1: transparent
 	slice_id		next;
 };
 struct Chunks {
@@ -150,18 +154,22 @@ struct Chunks {
 
 	std_vector<ChunkRendererSlice>	slices;
 
-	slice_id alloc_slice () {
+	slice_id alloc_slice (chunk_id chunkid, uint16_t type) {
 		slice_id id = slices_alloc.alloc();
 
 		if (id >= slices.size())
 			slices.resize((size_t)id+1);
 
+		slices[id].chunkid = chunkid;
+		slices[id].type = type;
 		slices[id].next = U16_NULL;
 		return id;
 	}
 	void free_slices (slice_id id) {
 		while (id != U16_NULL) {
 			slices_alloc.free(id);
+			slices[id].vertex_count = 0;
+			slices[id].chunkid = U16_NULL;
 			id = slices[id].next;
 		}
 

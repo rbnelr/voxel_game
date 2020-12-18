@@ -32,7 +32,7 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	remesh_chunks_count = remesh_jobs.size();
 }
 
-void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshData& mesh, Renderer& r) {
+void ChunkRenderer::upload_slices (Chunks& chunks, chunk_id chunkid, slice_id* chunk_slices, uint16_t type, MeshData& mesh, Renderer& r) {
 	ZoneScoped;
 
 	slice_id prev_id = U16_NULL; // use index with null for first case instead of ptr to slice_id since ptrs get invalidated by alloc_slice
@@ -43,7 +43,7 @@ void ChunkRenderer::upload_slices (Chunks& chunks, slice_id* chunk_slices, MeshD
 		assert(prev_id == U16_NULL || chunks.slices[prev_id].next == slice_id);
 		
 		if (slice_id == U16_NULL) {
-			slice_id = chunks.alloc_slice();
+			slice_id = chunks.alloc_slice(chunkid, type);
 			*(prev_id != U16_NULL ? &chunks.slices[prev_id].next : chunk_slices) = slice_id;
 		}
 
@@ -76,8 +76,10 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCo
 			res.mesh.opaque_vertices.free_preallocated();
 			res.mesh.tranparent_vertices.free_preallocated();
 
-			upload_slices(chunks, &res.chunk->opaque_slices, res.mesh.opaque_vertices, r);
-			upload_slices(chunks, &res.chunk->transparent_slices, res.mesh.tranparent_vertices, r);
+			chunk_id cid = (chunk_id)(res.chunk - chunks.chunks);
+
+			upload_slices(chunks, cid, &res.chunk->opaque_slices, 0, res.mesh.opaque_vertices, r);
+			upload_slices(chunks, cid, &res.chunk->transparent_slices, 1, res.mesh.tranparent_vertices, r);
 
 			res.chunk->flags &= ~Chunk::REMESH;
 		}
@@ -172,118 +174,141 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCo
 	}
 }
 
-void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Chunks& chunks, int cur_frame) {
+void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, RenderData& data, bool debug_frustrum_culling, int cur_frame) {
 	ZoneScoped;
 
-	auto frame = frames[cur_frame];
+	auto& frame = frames[cur_frame];
+	auto& chunks = data.world.chunks;
 
 	for (auto& draw : frame.indirect_draw) {
 		draw.opaque_draw_count = 0;
 		draw.transparent_draw_count = 0;
 	}
+	
+	auto col = srgba(0, 0, 255, 255);
+	auto col2 = srgba(255, 0, 0, 180);
+	auto& cull_view = debug_frustrum_culling ? data.player_view : data.view;
+	if (debug_frustrum_culling)
+		g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
 
-	// Opaque draws
-	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
-		if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
+	{
+		ZoneScopedN("chunk culling pass");
 
-		float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
+		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+			auto& chunk = chunks[cid];
+			if ((chunk.flags & Chunk::LOADED) == 0) continue;
 
-		slice_id slice = chunks[cid].opaque_slices;
-		while (slice != U16_NULL) {
-			assert(chunks.slices[slice].vertex_count > 0);
+			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
 
-			uint32_t alloci =  slice / SLICES_PER_ALLOC;
-			uint32_t slicei = (slice % SLICES_PER_ALLOC);
+			bool culled = frustrum_cull_aabb(cull_view.frustrum, { chunk_pos, chunk_pos + (float3)CHUNK_SIZE });
 
-			VkDrawIndirectCommand draw_data;
-			draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-			draw_data.instanceCount = chunks.slices[slice].vertex_count; // for each instance in the mesh
-			draw_data.firstVertex = 0;
-			draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
+			chunk.flags &= ~Chunk::CULLED;
+			if (culled)
+				chunk.flags |= Chunk::CULLED;
 
+			if (debug_frustrum_culling)
+				g_debugdraw.wire_cube(chunk_pos + (float3)CHUNK_SIZE/2, (float3)CHUNK_SIZE * 0.997f, culled ? col2 : col);
+
+		}
+	}
+
+	{
+		ZoneScopedN("chunk draw opaque");
+		GPU_TRACE(ctx, cmds, "chunk draw opaque");
+
+		vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, opaque_pipeline->pipeline);
+
+		slice_id sid = 0;
+		for (int alloci=0; alloci<(int)allocs.size(); ++alloci) {
 			auto& draw = frame.indirect_draw[alloci];
+			draw.opaque_draw_count = 0;
 
-			draw.draw_data_ptr[draw.opaque_draw_count] = draw_data;
-			draw.per_draw_ubo_ptr[draw.opaque_draw_count] = { float4(chunk_pos, 1.0f) };
+			for (int slicei=0; slicei<SLICES_PER_ALLOC && sid < (slice_id)chunks.slices.size(); ++slicei, ++sid) {
+				auto slice = chunks.slices[sid];
 
-			draw.opaque_draw_count++;
+				if (slice.type == 0 && slice.vertex_count > 0) {
+					auto& chunk = chunks.chunks[slice.chunkid];
+					//if ((chunk.flags & Chunk::CULLED) == 0) {
+					
+						VkDrawIndirectCommand draw_data;
+						draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
+						draw_data.instanceCount = slice.vertex_count; // for each instance in the mesh
+						draw_data.firstVertex = 0;
+						draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
 
-			slice = chunks.slices[slice].next;
+						draw.draw_data_ptr[draw.opaque_draw_count] = draw_data;
+						draw.per_draw_ubo_ptr[draw.opaque_draw_count] = { float4((float3)(chunk.pos * CHUNK_SIZE), 1.0f) };
+
+						draw.opaque_draw_count++;
+					//}
+				}
+			}
+
+			if (draw.opaque_draw_count > 0) {
+				GPU_TRACE(ctx, cmds, "draw alloc block");
+
+				VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+
+				// set 1
+				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
+
+				uint32_t offs = 0;
+				vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
+
+				vkCmdDrawIndirect(cmds, draw.draw_data.buf, offs * sizeof(VkDrawIndirectCommand), draw.opaque_draw_count, sizeof(VkDrawIndirectCommand));
+			}
 		}
 	}
 
-	// Transparent draws
-	for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
-		if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
-	
-		float3 chunk_pos = (float3)(chunks[cid].pos * CHUNK_SIZE);
-	
-		slice_id slice = chunks[cid].transparent_slices;
-		while (slice != U16_NULL) {
-			assert(chunks.slices[slice].vertex_count > 0);
-	
-			uint32_t alloci =  slice / SLICES_PER_ALLOC;
-			uint32_t slicei = (slice % SLICES_PER_ALLOC);
-	
-			VkDrawIndirectCommand draw_data;
-			draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
-			draw_data.instanceCount = chunks.slices[slice].vertex_count; // for each instance in the mesh
-			draw_data.firstVertex = 0;
-			draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
-	
+	{
+		ZoneScopedN("chunk draw transparent");
+		GPU_TRACE(ctx, cmds, "chunk draw transparent");
+
+		vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, transparent_pipeline->pipeline);
+
+		slice_id sid = 0;
+		for (int alloci=0; alloci<(int)allocs.size(); ++alloci) {
 			auto& draw = frame.indirect_draw[alloci];
-	
-			draw.draw_data_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = draw_data;
-			draw.per_draw_ubo_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = { float4(chunk_pos, 1.0f) };
-	
-			draw.transparent_draw_count++;
+			draw.transparent_draw_count = 0;
 
-			slice = chunks.slices[slice].next;
-		}
-	}
+			for (int slicei=0; slicei<SLICES_PER_ALLOC && sid < (slice_id)chunks.slices.size(); ++slicei, ++sid) {
+				auto slice = chunks.slices[sid];
 
-	// Opaque draws
-	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, opaque_pipeline->pipeline);
+				if (slice.type == 1 && slice.vertex_count > 0) {
+					auto& chunk = chunks.chunks[slice.chunkid];
+					//if ((chunk.flags & Chunk::CULLED) == 0) {
 
-	for (int i=0; i<(int)frame.indirect_draw.size(); ++i) {
-		auto& draw = frame.indirect_draw[i];
-		if (draw.opaque_draw_count > 0) {
-			GPU_TRACE(ctx, cmds, "draw alloc");
+						VkDrawIndirectCommand draw_data;
+						draw_data.vertexCount = BlockMeshes::MERGE_INSTANCE_FACTOR; // repeat MERGE_INSTANCE_FACTOR vertices
+						draw_data.instanceCount = slice.vertex_count; // for each instance in the mesh
+						draw_data.firstVertex = 0;
+						draw_data.firstInstance = slicei * CHUNK_SLICE_LENGTH;
 
-			VkBuffer vertex_bufs[] = { allocs[i].mesh_data.buf };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
+						draw.draw_data_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = draw_data;
+						draw.per_draw_ubo_ptr[draw.opaque_draw_count + draw.transparent_draw_count] = { float4((float3)(chunks.chunks[slice.chunkid].pos * CHUNK_SIZE), 1.0f) };
 
-			// set 1
-			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
+						draw.transparent_draw_count++;
+					//}
+				}
+			}
 
-			int offs = 0;
-			vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
+			if (draw.transparent_draw_count > 0) {
+				GPU_TRACE(ctx, cmds, "draw alloc block");
 
-			vkCmdDrawIndirect(cmds, draw.draw_data.buf, 0, draw.opaque_draw_count, sizeof(VkDrawIndirectCommand));
-		}
-	}
+				VkBuffer vertex_bufs[] = { allocs[alloci].mesh_data.buf };
+				VkDeviceSize offsets[] = { 0 };
+				vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
 
-	// Transparent draws
-	vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, transparent_pipeline->pipeline);
+				// set 1
+				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
 
-	for (int i=0; i<(int)frame.indirect_draw.size(); ++i) {
-		auto& draw = frame.indirect_draw[i];
-		if (draw.transparent_draw_count > 0) {
-			GPU_TRACE(ctx, cmds, "draw alloc");
-	
-			VkBuffer vertex_bufs[] = { allocs[i].mesh_data.buf };
-			VkDeviceSize offsets[] = { 0 };
-			vkCmdBindVertexBuffers(cmds, 0, 1, vertex_bufs, offsets);
-	
-			// set 1
-			vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 1, 1, &draw.descriptor_set, 0, nullptr);
-			
-			int offs = draw.opaque_draw_count;
-			vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
+				uint32_t offs = draw.opaque_draw_count;
+				vkCmdPushConstants(cmds, pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int), &offs);
 
-			vkCmdDrawIndirect(cmds, draw.draw_data.buf, draw.opaque_draw_count * sizeof(VkDrawIndirectCommand),
-				draw.transparent_draw_count, sizeof(VkDrawIndirectCommand));
+				vkCmdDrawIndirect(cmds, draw.draw_data.buf, offs * sizeof(VkDrawIndirectCommand), draw.transparent_draw_count, sizeof(VkDrawIndirectCommand));
+			}
 		}
 	}
 }

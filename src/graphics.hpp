@@ -127,6 +127,7 @@ struct DebugDraw {
 	}
 
 	void wire_cube (float3 pos, float3 size, lrgba col);
+	void wire_frustrum (Camera_View const& view, lrgba col);
 
 	void cylinder (float3 base, float radius, float height, lrgba col, int sides=32);
 };
@@ -134,8 +135,10 @@ struct DebugDraw {
 inline DebugDraw g_debugdraw;
 
 struct RenderData {
-	Camera_View		view;
 	int2			window_size;
+
+	Camera_View		view;
+	Camera_View		player_view;
 
 	World&			world;
 };
