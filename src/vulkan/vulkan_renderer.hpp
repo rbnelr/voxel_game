@@ -3,6 +3,7 @@
 #include "vulkan_helper.hpp"
 #include "vulkan_shaders.hpp"
 #include "vulkan_window.hpp"
+#include "vulkan_debug_drawer.hpp"
 #include "chunk_renderer.hpp"
 #include "graphics.hpp"
 #include "engine/camera.hpp"
@@ -112,6 +113,7 @@ struct Renderer {
 	VkSampler					rescale_sampler, rescale_sampler_nearest;
 
 	ChunkRenderer				chunk_renderer;
+	DebugDrawer					debug_drawer;
 
 	Assets						assets;
 

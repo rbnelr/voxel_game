@@ -125,3 +125,33 @@ void Assets::load_block_textures (json const& blocks_json) {
 		block_tiles.push_back(bt);
 	}
 }
+
+constexpr float3 _wire_cube[12 * 2] {
+	// bottom lines
+	float3(-.5f,-.5f,-.5f), float3(+.5f,-.5f,-.5f),
+	float3(+.5f,-.5f,-.5f), float3(+.5f,+.5f,-.5f),
+	float3(+.5f,+.5f,-.5f), float3(-.5f,+.5f,-.5f),
+	float3(-.5f,+.5f,-.5f), float3(-.5f,-.5f,-.5f),
+	// vertical lines
+	float3(-.5f,-.5f,-.5f), float3(-.5f,-.5f,+.5f),
+	float3(+.5f,-.5f,-.5f), float3(+.5f,-.5f,+.5f),
+	float3(+.5f,+.5f,-.5f), float3(+.5f,+.5f,+.5f),
+	float3(-.5f,+.5f,-.5f), float3(-.5f,+.5f,+.5f),
+	// top lines
+	float3(-.5f,-.5f,+.5f), float3(+.5f,-.5f,+.5f),
+	float3(+.5f,-.5f,+.5f), float3(+.5f,+.5f,+.5f),
+	float3(+.5f,+.5f,+.5f), float3(-.5f,+.5f,+.5f),
+	float3(-.5f,+.5f,+.5f), float3(-.5f,-.5f,+.5f),
+};
+
+void DebugDraw::wire_cube (float3 pos, float3 size, lrgba col) {
+	size_t idx = lines.size();
+	lines.resize(idx + ARRLEN(_wire_cube));
+	auto* out = &lines[idx];
+
+	for (auto& p : _wire_cube) {
+		out->pos = p * size + pos;
+		out->col = col;
+		out++;
+	}
+}

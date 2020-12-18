@@ -109,6 +109,13 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 			GPU_TRACE(ctx, cmds, "draw chunks");
 			chunk_renderer.draw_chunks(ctx, cmds, data.chunks, cur_frame);
 		}
+
+		// -> debug_drawer.pipeline_layout is not compatible with chunk_renderer.pipeline_layout because of differing push constants
+		// It's wierd that I need to rebind set 0, but I prefer this to giving 
+		vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, debug_drawer.pipeline_layout, 0, 1,
+			&frame_data[cur_frame].ubo_descriptor_set, 0, nullptr);
+
+		debug_drawer.draw(ctx, cmds, cur_frame);
 	}
 	vkCmdEndRenderPass(cmds);
 
@@ -243,6 +250,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 		GPU_DBG_NAMEf(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
 
 	chunk_renderer.create(ctx, pipelines, main_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
+	debug_drawer.create(ctx, pipelines, main_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
 
 	{
 		create_rescale_descriptors();
@@ -291,6 +299,7 @@ Renderer::~Renderer () {
 
 	pipelines.destroy(ctx.dev);
 	chunk_renderer.destroy(ctx.dev);
+	debug_drawer.destroy(ctx.dev);
 
 	for (auto& frame : frame_data) {
 		vkDestroyCommandPool(ctx.dev, frame.command_pool, nullptr);

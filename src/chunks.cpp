@@ -71,9 +71,14 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			float unload_dist = load_radius + unload_hyster;
 			float unload_dist_sqr = unload_dist * unload_dist;
 
+			auto col = srgba(0, 0, 255, 255);
+
 			for (chunk_id id=0; id<max_id; ++id) {
 				chunks[id]._validate_flags();
 				if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+
+				float3 size = (float3)CHUNK_SIZE;
+				g_debugdraw.wire_cube(((float3)chunks[id].pos + 0.5f) * size, size * 0.997f, col);
 
 				float dist_sqr = chunk_dist_sq(chunks[id].pos, player.pos);
 

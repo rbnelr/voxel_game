@@ -91,12 +91,28 @@ struct DebugDraw {
 	struct LineVertex {
 		float3 pos;
 		float4 col;
+
+		template <typename ATTRIBS>
+		static void attributes (ATTRIBS& a) {
+			int loc = 0;
+			a.init(sizeof(LineVertex));
+			a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos", offsetof(LineVertex, pos));
+			a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col", offsetof(LineVertex, col));
+		}
 	};
 
 	std::vector<LineVertex> lines;
 
+	void clear () {
+		lines.clear();
+		lines.shrink_to_fit();
 
+	}
+
+	void wire_cube (float3 pos, float3 size, lrgba col);
 };
+
+inline DebugDraw g_debugdraw;
 
 struct RenderData {
 	Camera_View		view;

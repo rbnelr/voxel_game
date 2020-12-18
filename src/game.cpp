@@ -103,6 +103,7 @@ void Game::imgui (Window& window, Input& I, std::function<void()> graphics_imgui
 }
 
 RenderData Game::update (Window& window, Input& I) {
+	g_debugdraw.clear();
 
 	if (!activate_flycam) {
 		world->player.update_movement_controls(I, *world);

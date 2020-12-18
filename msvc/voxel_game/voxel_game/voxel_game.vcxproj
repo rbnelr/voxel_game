@@ -231,6 +231,7 @@
     <ClInclude Include="..\..\..\src\player.hpp" />
     <ClInclude Include="..\..\..\src\voxel_light.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
@@ -459,7 +460,7 @@
     <None Include="..\..\..\shaders\gui_item.glsl" />
     <None Include="..\..\..\shaders\gui_item_block.glsl" />
     <None Include="..\..\..\shaders\held_item.glsl" />
-    <None Include="..\..\..\shaders\overlay.glsl" />
+    <None Include="..\..\..\shaders\debug_lines.glsl" />
     <None Include="..\..\..\shaders\rescale.glsl" />
     <None Include="..\..\..\shaders\skybox.glsl" />
   </ItemGroup>

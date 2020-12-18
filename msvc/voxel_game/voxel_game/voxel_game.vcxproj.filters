@@ -178,12 +178,17 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
       <Filter>kisslib\tracy</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp">
+      <Filter>vulkan</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -298,7 +303,6 @@
     <ClCompile Include="..\..\..\src\vulkan\vulkan_helper.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp" />
     <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
@@ -307,6 +311,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\graphics.cpp">
       <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp">
+      <Filter>vulkan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -367,9 +374,6 @@
     <None Include="..\..\..\shaders\held_item.glsl">
       <Filter>shaders</Filter>
     </None>
-    <None Include="..\..\..\shaders\overlay.glsl">
-      <Filter>shaders</Filter>
-    </None>
     <None Include="..\..\..\shaders\skybox.glsl">
       <Filter>shaders</Filter>
     </None>
@@ -380,5 +384,8 @@
       <Filter>shaders</Filter>
     </None>
     <None Include="..\..\..\blocks.json" />
+    <None Include="..\..\..\shaders\debug_lines.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

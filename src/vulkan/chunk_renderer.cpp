@@ -131,7 +131,7 @@ void ChunkRenderer::upload_remeshed (VulkanWindowContext& ctx, Renderer& r, VkCo
 		}
 
 		{ // free staging buffers when no longer needed
-			int min_staging_bufs = 0;
+			int min_staging_bufs = 1;
 			while ((int)frame.staging_bufs.size() > max(used_sbufs, min_staging_bufs)) {
 				free_staging_buffer(ctx.dev, frame.staging_bufs.back());
 				frame.staging_bufs.pop_back();
