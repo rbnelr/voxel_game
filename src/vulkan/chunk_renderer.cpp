@@ -185,8 +185,10 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			bool any_mesh = chunk.opaque_slices == U16_NULL && chunk.opaque_slices == U16_NULL;
 
 			float3 chunk_pos = (float3)(chunk.pos * CHUNK_SIZE);
-			bool culled = any_mesh || frustrum_cull_aabb(cull_view.frustrum, { chunk_pos, chunk_pos + (float3)CHUNK_SIZE });
-
+			bool culled = any_mesh || frustrum_cull_aabb(cull_view.frustrum,
+				chunk_pos.x, chunk_pos.y, chunk_pos.z,
+				chunk_pos.x + (float)CHUNK_SIZE, chunk_pos.y + (float)CHUNK_SIZE, chunk_pos.z + (float)CHUNK_SIZE);
+			
 			chunk.flags &= ~Chunk::CULLED;
 			if (culled)
 				chunk.flags |= Chunk::CULLED;
