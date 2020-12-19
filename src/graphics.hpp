@@ -1,7 +1,6 @@
 #pragma once
 #include "common.hpp"
 #include "engine/camera.hpp"
-#include "world.hpp"
 
 enum class AttribMode {
 	FLOAT,		// simply pass float to shader
@@ -32,7 +31,7 @@ struct BlockMeshInstance {
 	static constexpr int FIXEDPOINT_FAC = 256;
 
 	int16_t		posx, posy, posz; // pos in chunk
-	uint8_t		meshid; // index for merge instancing, this is used to index block meshes
+	uint16_t	meshid; // index for merge instancing, this is used to index block meshes
 	uint16_t	texid; // texture array id based on block id
 
 	template <typename ATTRIBS>
@@ -133,6 +132,8 @@ struct DebugDraw {
 };
 
 inline DebugDraw g_debugdraw;
+
+struct World;
 
 struct RenderData {
 	int2			window_size;

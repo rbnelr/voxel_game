@@ -4,7 +4,7 @@
 #include "graphics.hpp"
 #include "player.hpp"
 
-void face (ChunkMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockTile const& tile) {
+void face (RemeshingMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockTile const& tile) {
 	auto& b = g_blocks.blocks[id];
 	if (id == B_NULL || b.collision == CM_GAS) return;
 
@@ -23,7 +23,7 @@ void face (ChunkMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockT
 	v->meshid = facei;
 }
 
-void block_mesh (ChunkMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile, int3 block_pos, uint64_t chunk_seed) {
+void block_mesh (RemeshingMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile, int3 block_pos, uint64_t chunk_seed) {
 	// get a 'random' but deterministic value based on block position
 	uint64_t h = hash(block_pos) ^ chunk_seed;
 		
@@ -57,33 +57,28 @@ void block_mesh (ChunkMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile
 	}
 }
 
-void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks, Chunk* chunk, ChunkMesh* mesh) {
+void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks, Chunk const* chunk, RemeshingMesh* mesh) {
 	ZoneScoped;
 	
 	uint64_t chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
 
 	// neighbour chunks (can be null)
-	auto get_neighbour_blocks = [&] (int3 offs) -> block_id* {
+	auto get_neighbour_blocks = [&] (int3 offs) -> block_id const* {
 		auto* nc = chunks.query_chunk(chunk->pos + offs);
-		if (!nc) return nullptr;
-		return nc->blocks->ids;
+		if (!nc || (nc->flags & Chunk::LOADED) == 0) return nullptr;
+		return nc->voxels->ids;
 	};
-	auto* nc_nx = get_neighbour_blocks(int3(-1,0,0));
-	auto* nc_ny = get_neighbour_blocks(int3(0,-1,0));
-	auto* nc_nz = get_neighbour_blocks(int3(0,0,-1));
+	auto const* nc_nx = get_neighbour_blocks(int3(-1,0,0));
+	auto const* nc_ny = get_neighbour_blocks(int3(0,-1,0));
+	auto const* nc_nz = get_neighbour_blocks(int3(0,0,-1));
 
-	auto* ptr = chunk->blocks->ids;
+	auto const* ptr = chunk->voxels->ids;
 
 	int idx = 0;
 
-	idx += CHUNK_LAYER_OFFS;
-	for (int z=1; z<CHUNK_SIZE; ++z) {
-
-		idx += CHUNK_ROW_OFFS;
-		for (int y=1; y<CHUNK_SIZE; ++y) {
-
-			idx += 1;
-			for (int x=1; x<CHUNK_SIZE; ++x) {
+	for (int z=0; z<CHUNK_SIZE; ++z) {
+		for (int y=0; y<CHUNK_SIZE; ++y) {
+			for (int x=0; x<CHUNK_SIZE; ++x) {
 	
 				block_id id = ptr[idx];
 	
@@ -92,8 +87,20 @@ void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks,
 
 				auto transparency = g_blocks.blocks[id].transparency;
 			
-				{ // +X
+				if (x > 0)
+				{ // X
 					block_id nid = ptr[idx - 1];
+
+					//block_id nid;
+					//if (x != 0)      nid = ptr[idx - 1];
+					//else {
+					//	int i = idx + (CHUNK_SIZE-1);
+					//	assert(i >= 0 && i < CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE);
+					//	nid = nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)] : B_NULL;
+					//	//nid = B_NULL;
+					//}
+					//assert(nid >= B_NULL && nid < g_blocks.blocks.size());
+
 					if (nid != id) {
 						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)
 							face(mesh, nid, int3(x-1,y,z), BF_POS_X, assets.block_tiles[nid]);
@@ -101,7 +108,7 @@ void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks,
 							face(mesh, id, int3(x,y,z), BF_NEG_X, tile);
 					}
 				}
-				{ // +Y
+				if (y > 0) { // Y
 					block_id nid = ptr[idx - CHUNK_ROW_OFFS];
 					if (nid != id) {
 						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)
@@ -110,7 +117,7 @@ void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks,
 							face(mesh, id, int3(x,y,z), BF_NEG_Y, tile);
 					}
 				}
-				{ // +Z
+				if (z > 0) { // Z
 					block_id nid = ptr[idx - CHUNK_LAYER_OFFS];
 					if (nid != id) {
 						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)

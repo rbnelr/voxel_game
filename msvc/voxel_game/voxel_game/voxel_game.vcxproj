@@ -235,6 +235,7 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_staging.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
     <ClInclude Include="..\..\..\src\world.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />

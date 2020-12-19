@@ -1,6 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
+#include "graphics.hpp"
 
 #define CHUNK_SIZE			64
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
@@ -9,6 +10,20 @@
 #define CHUNK_LAYER_OFFS	(CHUNK_SIZE * CHUNK_SIZE)
 
 #define CHUNK_BLOCK_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+
+
+#define U16_NULL			((uint16_t)-1)
+
+typedef uint16_t			slice_id;
+typedef uint16_t			chunk_id;
+
+#define MAX_CHUNKS			((1<<16)-1)
+#define MAX_SLICES			((1<<16)-1)
+#define MAX_CHUNK_SLICES	32
+
+#define CHUNK_SLICE_BYTESIZE	(64 * 1024)
+static_assert(CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance) < ((1<<16)-1), "");
+static constexpr uint16_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
 
 static constexpr int3 OFFSETS[6] = {
 	int3(-1,0,0), int3(+1,0,0),
@@ -54,15 +69,7 @@ struct Player;
 struct Assets;
 struct Chunks;
 
-static inline constexpr int _block_count (int lod_levels) {
-	int count = 0;
-	for (int lod=0; lod<lod_levels; ++lod) {
-		count += (CHUNK_SIZE >> lod) * (CHUNK_SIZE >> lod) * (CHUNK_SIZE >> lod);
-	}
-	return count;
-};
-
-struct ChunkData {
+struct ChunkVoxelData {
 	block_id ids[CHUNK_BLOCK_COUNT];
 
 	static constexpr size_t pos_to_index (int3 pos) {
@@ -70,51 +77,44 @@ struct ChunkData {
 	}
 };
 
-inline constexpr uint16_t U16_NULL = (uint16_t)-1;
-typedef uint16_t slice_id;
+struct ChunkMesh {
+	uint32_t vertex_count;
+	slice_id slices[MAX_CHUNK_SLICES];
 
-typedef uint16_t chunk_id;
-static constexpr uint16_t MAX_CHUNKS = (1<<16) - 1;
-static constexpr int MAX_SLICES = 32;
+	int slices_count () {
+		return (vertex_count + CHUNK_SLICE_LENGTH-1) / CHUNK_SLICE_LENGTH;
+	}
+};
 
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED	= 1<<0, // identify non-allocated chunks in chunk array, default true so that this get's set 
 		LOADED		= 1<<1, // block data valid and safe to use in main thread
 		REMESH		= 1<<2, // blocks were changed, need remesh
-
-		CULLED		= 1<<3,
 	};
 
-	const int3 pos;
+	int3 pos;
 
 	Flags flags;
 
 	chunk_id neighbours[6];
 
-	slice_id opaque_slices;
-	slice_id transparent_slices;
+	ChunkMesh opaque_mesh;
+	ChunkMesh transparent_mesh;
 
-	ChunkData* blocks;
-	
-	Chunk (int3 pos): pos{pos} {
-		flags = ALLOCATED;
-		memset(neighbours, -1, sizeof(neighbours));
-
-		opaque_slices = U16_NULL;
-		transparent_slices = U16_NULL;
-	}
-	~Chunk () {
-		flags = (Flags)0;
-	}
+	ChunkVoxelData* voxels;
 
 	void _validate_flags () {
 		if (flags & LOADED) assert(flags & ALLOCATED);
 		if (flags & REMESH) assert(flags & LOADED);
 	}
 
-	void set_block (int3 pos, block_id b);
-	block_id get_block (int3 pos) const;
+	block_id get_block (int3 pos) const {
+		return voxels->ids[ChunkVoxelData::pos_to_index(pos)];
+	}
+	void set_block (int3 pos, block_id b) {
+		voxels->ids[ChunkVoxelData::pos_to_index(pos)] = b;
+	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
@@ -135,13 +135,6 @@ struct ChunkKey_Comparer {
 };
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
-struct ChunkRendererSlice {
-	// data is implicitly placed in allocs based on the slice id
-	uint16_t		vertex_count;
-	chunk_id		chunkid;
-	uint16_t		type; // 0: opaque, 1: transparent
-	slice_id		next;
-};
 struct Chunks {
 	Chunk* chunks;
 	uint32_t max_id = 0; // max chunk id needed to iterate chunks
@@ -149,39 +142,18 @@ struct Chunks {
 
 	char* commit_ptr; // end of committed chunk memory
 	AllocatorBitset id_alloc;
-
 	AllocatorBitset slices_alloc;
 
-	std_vector<ChunkRendererSlice>	slices;
-
-	slice_id alloc_slice (chunk_id chunkid, uint16_t type) {
-		slice_id id = slices_alloc.alloc();
-
-		if (id >= slices.size())
-			slices.resize((size_t)id+1);
-
-		slices[id].chunkid = chunkid;
-		slices[id].type = type;
-		slices[id].next = U16_NULL;
-		return id;
+	void init_mesh (ChunkMesh& m) {
+		m.vertex_count = 0;
+		memset(m.slices, -1, sizeof(m.slices));
 	}
-	void free_slices (slice_id id) {
-		while (id != U16_NULL) {
-			slices_alloc.free(id);
-			slices[id].vertex_count = 0;
-			slices[id].chunkid = U16_NULL;
-			id = slices[id].next;
+	void free_mesh (ChunkMesh& m) {
+		for (auto s : m.slices) {
+			if (s != U16_NULL)
+				slices_alloc.free(s);
+			s = U16_NULL;
 		}
-
-		slices.resize(slices_alloc.alloc_end);
-	}
-	int _count_slices (slice_id id) {
-		int count = 0;
-		while (id != U16_NULL) {
-			count++;
-			id = slices[id].next;
-		}
-		return count;
 	}
 
 	chunk_pos_to_id_map pos_to_id;
@@ -208,7 +180,7 @@ struct Chunks {
 		release_address_space(chunks, sizeof(Chunk) * MAX_CHUNKS);
 	}
 
-	PROFILE_NOINLINE chunk_id alloc_chunk (int3 pos) {
+	chunk_id alloc_chunk (int3 pos) {
 		ZoneScoped;
 
 		if (count >= MAX_CHUNKS)
@@ -230,10 +202,16 @@ struct Chunks {
 			commit_ptr += os_page_size;
 		}
 
+		auto& chunk = chunks[id];
+
 		assert((chunks[id].flags & Chunk::ALLOCATED) == 0);
-		{
-			ZoneScopedN("new (&chunks[id]) Chunk (pos)");
-			new (&chunks[id]) Chunk (pos);
+		
+		{ // init
+			chunk.flags = Chunk::ALLOCATED;
+			chunk.pos = pos;
+			memset(chunk.neighbours, -1, sizeof(chunk.neighbours));
+			init_mesh(chunk.opaque_mesh);
+			init_mesh(chunk.transparent_mesh);
 		}
 
 		assert(pos_to_id.find(pos) == pos_to_id.end());
@@ -245,46 +223,45 @@ struct Chunks {
 		for (int i=0; i<6; ++i) {
 			ZoneScopedN("alloc_chunk::get neighbour");
 
-			chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]);
+			chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]); // add neighbour to our list
 			if (chunks[id].neighbours[i] != U16_NULL) {
 				assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
-				chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id;
+				chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id; // add ourself from neighbours neighbour list
 			}
 		}
 
 		{
-			ZoneScopedNC("malloc ChunkData", tracy::Color::Crimson);
-			chunks[id].blocks = (ChunkData*)malloc(sizeof(ChunkData));
+			ZoneScopedNC("malloc voxels", tracy::Color::Crimson);
+			chunk.voxels = (ChunkVoxelData*)malloc(sizeof(ChunkVoxelData));
 		}
 
 		return id;
 	}
-	PROFILE_NOINLINE void free_chunk (chunk_id id) {
+	void free_chunk (chunk_id id) {
 		ZoneScoped;
 
-		if (&chunks[id] == _query_cache)
-			_query_cache = nullptr; // invalidate cache
+		auto& chunk = chunks[id];
+
+		chunk.flags = (Chunk::Flags)0;
 
 		for (int i=0; i<6; ++i) {
-			auto* n = query_chunk(chunks[id].pos + OFFSETS[i]);
-			if (n) {
-				assert(n->neighbours[i^1] == id); // i^1 flips direction
-				n->neighbours[i^1] = U16_NULL;
+			auto n = chunk.neighbours[i];
+			if (n != U16_NULL) {
+				assert(chunks[n].neighbours[i^1] == id); // i^1 flips direction
+				chunks[n].neighbours[i^1] = U16_NULL; // delete ourself from neighbours neighbour list
 			}
 		}
 
-		pos_to_id.erase(chunks[id].pos);
-
-		id_alloc.free(id);
-
-		free_slices(chunks[id].opaque_slices);
-		free_slices(chunks[id].transparent_slices);
+		free_mesh(chunk.opaque_mesh);
+		free_mesh(chunk.transparent_mesh);
 
 		{
-			ZoneScopedNC("free ChunkData", tracy::Color::Crimson);
-			free(chunks[id].blocks);
+			ZoneScopedNC("free voxels", tracy::Color::Crimson);
+			free(chunk.voxels);
 		}
-		chunks[id].~Chunk();
+
+		pos_to_id.erase(chunks[id].pos);
+		id_alloc.free(id);
 
 		while ((char*)&chunks[id_alloc.alloc_end] <= commit_ptr - os_page_size) { // free pages one by one when needed
 			ZoneScopedNC("decommit_pages", tracy::Color::Crimson);
@@ -319,7 +296,7 @@ struct Chunks {
 		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
 		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-		uint64_t block_mem = count * sizeof(ChunkData);
+		uint64_t block_mem = count * sizeof(ChunkVoxelData);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB RAM",
 			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024);
@@ -330,7 +307,7 @@ struct Chunks {
 					ImGui::Text("[%5d] <not allocated>", id);
 				else
 					ImGui::Text("[%5d] %+4d,%+4d,%+4d - %2d, %2d slices", id, chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
-						_count_slices(chunks[id].opaque_slices), _count_slices(chunks[id].transparent_slices));
+						chunks[id].opaque_mesh.slices_count(), chunks[id].transparent_mesh.slices_count());
 			}
 			ImGui::TreePop();
 		}
@@ -370,9 +347,6 @@ struct Chunks {
 
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
 	chunk_id query_chunk_id (int3 coord) {
-		if (_query_cache && _query_cache->pos == coord)
-			return (chunk_id)(_query_cache - chunks);
-
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return U16_NULL;
@@ -381,9 +355,6 @@ struct Chunks {
 		return it->second;
 	}
 	Chunk* query_chunk (int3 coord) {
-		if (_query_cache && _query_cache->pos == coord)
-			return _query_cache;
-		
 		auto it = pos_to_id.find(coord);
 		if (it == pos_to_id.end())
 			return nullptr;

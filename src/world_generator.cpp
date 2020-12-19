@@ -188,7 +188,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				//float effective_tree_prob = tree_density;
 
 				for (i.z=0; i.z <= min(highest_block, CHUNK_SIZE-1); ++i.z) {
-					auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(i)];
+					auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(i)];
 
 					if (i.z <= highest_block - earth_layer) {
 						*bid = STONE;
@@ -201,7 +201,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					}
 				}
 
-				auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(i)];
+				auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(i)];
 
 				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
 
@@ -226,7 +226,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		ZoneScopedN("Place structures");
 
 		auto place_tree = [&] (int3 pos_chunk) {
-			auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(pos_chunk - int3(0,0,1))];
+			auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(pos_chunk - int3(0,0,1))];
 
 			if (*bid == GRASS) {
 				*bid = EARTH;
@@ -234,7 +234,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 			auto place_block = [&] (int3 pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_SIZE)) return;
-				auto* bid = &chunk->blocks->ids[ChunkData::pos_to_index(pos_chunk)];
+				auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(pos_chunk)];
 
 				if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
 					*bid = bt;

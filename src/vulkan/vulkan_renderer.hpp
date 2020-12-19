@@ -5,6 +5,7 @@
 #include "vulkan_window.hpp"
 #include "vulkan_debug_drawer.hpp"
 #include "chunk_renderer.hpp"
+#include "vulkan_staging.hpp"
 #include "graphics.hpp"
 #include "engine/camera.hpp"
 
@@ -80,6 +81,8 @@ struct Renderer {
 	};
 	FrameData					frame_data[FRAMES_IN_FLIGHT];
 
+	StagingBuffers				staging;
+
 	VkDeviceMemory				ubo_memory;
 	void*						ubo_mem_ptr;
 
@@ -140,6 +143,8 @@ struct Renderer {
 		ImGui::Checkbox("wireframe", &wireframe);
 
 		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+
+		staging.imgui();
 	}
 
 	Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json);

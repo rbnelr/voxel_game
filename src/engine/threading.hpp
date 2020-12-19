@@ -32,5 +32,9 @@ inline const ThreadPriority background_threads_prio = ThreadPriority::LOW;
 // cores: 16 -> threads: 13
 // cores: 24 -> threads: 20
 // cores: 32 -> threads: 28
+#if defined(NDEBUG) || 1
 inline const int parallelism_threads = clamp(roundi((float)logical_cores * 0.894f) - 1, 1, logical_cores);
+#else
+inline const int parallelism_threads = 1;
+#endif
 inline const ThreadPriority parallelism_threads_prio = ThreadPriority::ABOVE_NORMAL;

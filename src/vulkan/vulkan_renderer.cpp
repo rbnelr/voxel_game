@@ -2,6 +2,7 @@
 #include "vulkan_renderer.hpp"
 #include "engine/camera.hpp"
 #include "GLFW/glfw3.h"
+#include "world.hpp"
 
 namespace vk {
 
@@ -75,7 +76,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 
 	{
 		GPU_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(ctx, *this, cmds, data.world.chunks, cur_frame);
+		chunk_renderer.upload_remeshed(*this, data.world.chunks, cmds, cur_frame);
 	}
 
 	{ // set 0
@@ -176,6 +177,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 	}
 	vkCmdEndRenderPass(cmds);
 
+	staging.update_buffer_alloc(ctx, cur_frame);
+
 	TracyVkCollect(ctx.tracy_ctx, cmds);
 
 	VK_CHECK_RESULT(vkEndCommandBuffer(cmds));
@@ -233,6 +236,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 #endif
 
 	pipelines.init(ctx.dev);
+	staging.create(ctx, FRAMES_IN_FLIGHT);
 
 	create_frame_data();
 
@@ -297,7 +301,9 @@ Renderer::~Renderer () {
 
 	vkDestroyDescriptorPool(ctx.dev, descriptor_pool, nullptr);
 
+	staging.destroy(ctx.dev);
 	pipelines.destroy(ctx.dev);
+
 	chunk_renderer.destroy(ctx.dev);
 	debug_drawer.destroy(ctx.dev);
 

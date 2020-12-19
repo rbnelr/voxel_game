@@ -6,15 +6,6 @@
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
 
-//// Chunk
-block_id Chunk::get_block (int3 pos) const {
-	return blocks->ids[ChunkData::pos_to_index(pos)];
-}
-void Chunk::set_block (int3 pos, block_id b) {
-	blocks->ids[ChunkData::pos_to_index(pos)] = b;
-}
-
-//// Chunks
 block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {
 	if (out_chunk)
 		*out_chunk = nullptr;
@@ -44,7 +35,6 @@ void Chunks::set_block (int3 pos, block_id b) {
 
 	chunk->set_block(block_pos_chunk, b);
 }
-
 
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player) {
 	ZoneScoped;
@@ -107,11 +97,12 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			ZoneScopedN("chunks_to_generate finalize jobs");
 
 			static constexpr int LOAD_LIMIT = 32;
-			WorldgenJob jobs[LOAD_LIMIT];
+			std::unique_ptr<WorldgenJob> jobs[LOAD_LIMIT];
 
 			int count = (int)background_threadpool.results.pop_n(jobs, ARRLEN(jobs));
 			for (int i=0; i<count; ++i) {
-				auto& chunk = *jobs[i].chunk;
+				auto job = std::move(jobs[i]);
+				auto& chunk = *job->chunk;
 
 				for (int i=0; i<6; ++i) {
 					if (chunk.neighbours[i] != U16_NULL) {
@@ -130,7 +121,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 			ZoneScopedN("chunks_to_generate push jobs");
 
 			static constexpr int QUEUE_LIMIT = 256;
-			WorldgenJob jobs[QUEUE_LIMIT];
+			std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
 
 			// Process bucket-sorted chunks_to_generate in order, remove duplicates
 			//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
@@ -153,7 +144,10 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 
 				auto id = alloc_chunk(pos);
 
-				jobs[count++] = { &chunks[id], &wg };
+				auto job = std::make_unique<WorldgenJob>();
+				job->chunk = &chunks[id];
+				job->wg = &wg;
+				jobs[count++] = std::move(job);
 			}
 
 			background_threadpool.jobs.push_n(jobs, count);

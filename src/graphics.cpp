@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "graphics.hpp"
+#include "blocks.hpp"
 // 
 #include "assimp/cimport.h"        // Plain-C interface
 #include "assimp/scene.h"          // Output data structure

@@ -146,6 +146,8 @@ template<> inline VkFormat get_format<AttribMode::UNORM, uint8v2> () { return VK
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v3> () { return VK_FORMAT_R8G8B8_UNORM; }
 template<> inline VkFormat get_format<AttribMode::UNORM, uint8v4> () { return VK_FORMAT_R8G8B8A8_UNORM; }
 
+template<> inline VkFormat get_format<AttribMode::UINT, uint16_t> () { return VK_FORMAT_R16_UINT; }
+
 template<> inline VkFormat get_format<AttribMode::UINT2FLT, uint16_t> () { return VK_FORMAT_R16_USCALED; }
 template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 1> () { return VK_FORMAT_R16_USCALED; }
 template<> inline VkFormat get_formatv<AttribMode::UINT2FLT, uint16_t, 2> () { return VK_FORMAT_R16G16_USCALED; }
