@@ -27,6 +27,9 @@ struct ChunkMeshData {
 		if (used_slices >= MAX_CHUNK_SLICES)
 			throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
 		slices[used_slices++] = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
+
+		next_ptr  = slices[used_slices-1]->verts;
+		alloc_end = slices[used_slices-1]->verts + CHUNK_SLICE_LENGTH;
 	}
 	static void free_slice (ChunkSliceData* s) {
 		if (s) {
@@ -35,12 +38,13 @@ struct ChunkMeshData {
 		}
 	}
 
-	BlockMeshInstance* push () {
-		if (next_ptr == alloc_end) {
+	// forceinline because this is doing nothing but an if and a increment 99% of the time, compiler should keep alloc_slice not inlined instead
+	__forceinline BlockMeshInstance* push () {
+		if (next_ptr != alloc_end) {
+			// likely case
+		} else {
+			// unlikely case
 			alloc_slice();
-
-			next_ptr  = slices[used_slices-1]->verts;
-			alloc_end = slices[used_slices-1]->verts + CHUNK_SLICE_LENGTH;
 		}
 		return next_ptr++;
 	}
@@ -51,4 +55,21 @@ struct RemeshingMesh {
 	ChunkMeshData tranparent_vertices;
 };
 
-void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks, Chunk const* chunk, RemeshingMesh* mesh);
+struct RemeshChunkJob { // Chunk remesh
+	// input
+	Chunk*					chunk;
+	Chunks&					chunks;
+	// store these three LUTs here instead of Assets* to turn double indirection into single indir
+	BlockMeshes::Mesh const*	block_mesh_info;
+	int const*					block_meshes;
+	BlockTile const*			block_tiles;
+
+	uint64_t				chunk_seed;
+
+	// output
+	RemeshingMesh			mesh;
+
+	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg);
+
+	void execute ();
+};

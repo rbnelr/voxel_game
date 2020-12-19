@@ -144,18 +144,6 @@ struct ChunkRenderer {
 
 };
 
-struct RemeshChunkJob { // Chunk remesh
-	// input
-	Chunk*					chunk;
-	Chunks*					chunks;
-	Assets const*			assets;
-	WorldGenerator const*	wg;
-	// output
-	RemeshingMesh			mesh;
-
-	void execute ();
-};
-
 inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, parallelism_threads_prio, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
 
 } // namespace vk

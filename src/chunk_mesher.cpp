@@ -4,29 +4,13 @@
 #include "graphics.hpp"
 #include "player.hpp"
 
-void face (RemeshingMesh* mesh, block_id id, int3 block_pos, BlockFace facei, BlockTile const& tile) {
-	auto& b = g_blocks.blocks[id];
-	if (id == B_NULL || b.collision == CM_GAS) return;
+#define NOINLINE __declspec(noinline)
+//#define NOINLINE
 
-	auto& out = b.transparency == TM_TRANSPARENT ? mesh->tranparent_vertices : mesh->opaque_vertices;
-
-	auto* v = out.push();
-
-	int16_t fixd_posx = (int16_t)(block_pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
-	int16_t fixd_posy = (int16_t)(block_pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
-	int16_t fixd_posz = (int16_t)(block_pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
-
-	v->posx = fixd_posx;
-	v->posy = fixd_posy;
-	v->posz = fixd_posz;
-	v->texid = tile.calc_tex_index(facei, 0);
-	v->meshid = facei;
-}
-
-void block_mesh (RemeshingMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& tile, int3 block_pos, uint64_t chunk_seed) {
+void block_mesh (RemeshChunkJob& j, int3 block_pos, block_id id, int meshid) {
 	// get a 'random' but deterministic value based on block position
-	uint64_t h = hash(block_pos) ^ chunk_seed;
-		
+	uint64_t h = hash(block_pos) ^ j.chunk_seed;
+	
 	// get a random determinisitc 2d offset
 	float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
 	float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
@@ -34,6 +18,8 @@ void block_mesh (RemeshingMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& 
 	float rand_offsx = rand1;
 	float rand_offsy = rand2;
 		
+	auto& tile = j.block_tiles[id];
+
 	// get a random deterministic variant
 	int variant = (int)(rand1 * (float)tile.variants); // [0, tile.variants)
 		
@@ -47,8 +33,10 @@ void block_mesh (RemeshingMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& 
 	int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance::FIXEDPOINT_FAC);
 
+	auto& info = j.block_mesh_info[meshid];
+
 	for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
-		auto* v = mesh->opaque_vertices.push();
+		auto* v = j.mesh.opaque_vertices.push();
 		v->posx = fixd_posx;
 		v->posy = fixd_posy;
 		v->posz = fixd_posz;
@@ -57,83 +45,120 @@ void block_mesh (RemeshingMesh* mesh, BlockMeshes::Mesh& info, BlockTile const& 
 	}
 }
 
-void mesh_chunk (Assets const& assets, WorldGenerator const& wg, Chunks& chunks, Chunk const* chunk, RemeshingMesh* mesh) {
-	ZoneScoped;
+block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs) {
+	auto* nc = j.chunks.query_chunk(j.chunk->pos + offs);
+	if (!nc || (nc->flags & Chunk::LOADED) == 0)
+		return g_null_chunk.ids; // return dummy chunk data with B_NULL to avoid nullptr check in performance-critical code for non-loaded neighbours
+	return nc->voxels->ids;
+}
+
+void face (RemeshChunkJob& j, int3 block_pos, block_id id, ChunkMeshData& mesh, BlockFace facei) {
+	auto* v = mesh.push();
+
+	int16_t fixd_posx = (int16_t)(block_pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posy = (int16_t)(block_pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posz = (int16_t)(block_pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
+
+	v->posx = fixd_posx;
+	v->posy = fixd_posy;
+	v->posz = fixd_posz;
+	v->texid = j.block_tiles[id].calc_tex_index(facei, 0);
+	v->meshid = facei;
+}
+
+NOINLINE void face_x (RemeshChunkJob& j, int3 pos, block_id id, block_id nid) {
+	auto& b = g_blocks.blocks[id];
+	auto& nb = g_blocks.blocks[nid];
+
+	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
+		face(j, int3(pos.x-1, pos.y, pos.z), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_X);
 	
-	uint64_t chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
+	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
+		face(j, pos, id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_X);
+}
+NOINLINE void face_y (RemeshChunkJob& j, int3 pos, block_id id, block_id nid) {
+	auto& b = g_blocks.blocks[id];
+	auto& nb = g_blocks.blocks[nid];
+
+	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
+		face(j, int3(pos.x, pos.y-1, pos.z), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_Y);
+
+	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
+		face(j, pos, id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_Y);
+}
+NOINLINE void face_z (RemeshChunkJob& j, int3 pos, block_id id, block_id nid) {
+	auto& b = g_blocks.blocks[id];
+	auto& nb = g_blocks.blocks[nid];
+
+	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
+		face(j, int3(pos.x, pos.y, pos.z-1), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_Z);
+
+	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
+		face(j, pos, id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_Z);
+}
+
+void mesh_chunk (RemeshChunkJob& j) {
+	ZoneScoped;
 
 	// neighbour chunks (can be null)
-	auto get_neighbour_blocks = [&] (int3 offs) -> block_id const* {
-		auto* nc = chunks.query_chunk(chunk->pos + offs);
-		if (!nc || (nc->flags & Chunk::LOADED) == 0) return nullptr;
-		return nc->voxels->ids;
-	};
-	auto const* nc_nx = get_neighbour_blocks(int3(-1,0,0));
-	auto const* nc_ny = get_neighbour_blocks(int3(0,-1,0));
-	auto const* nc_nz = get_neighbour_blocks(int3(0,0,-1));
+	auto const* nc_nx = get_neighbour_blocks(j, int3(-1,0,0));
+	auto const* nc_ny = get_neighbour_blocks(j, int3(0,-1,0));
+	auto const* nc_nz = get_neighbour_blocks(j, int3(0,0,-1));
 
-	auto const* ptr = chunk->voxels->ids;
+	auto const* ptr = j.chunk->voxels->ids;
 
 	int idx = 0;
 
 	for (int z=0; z<CHUNK_SIZE; ++z) {
+		block_id const* prevz = (z != 0 ? ptr : nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS) - CHUNK_LAYER_OFFS;
+
 		for (int y=0; y<CHUNK_SIZE; ++y) {
+			block_id const* prevy = (y != 0 ? ptr : nc_ny + CHUNK_SIZE*CHUNK_ROW_OFFS) - CHUNK_ROW_OFFS;
+
+			block_id prevx = nc_nx[idx + CHUNK_SIZE-1];
+
 			for (int x=0; x<CHUNK_SIZE; ++x) {
-	
+
 				block_id id = ptr[idx];
 	
-				auto& tile = assets.block_tiles[id];
-				auto mesh_idx = assets.block_meshes[id];
-
-				auto transparency = g_blocks.blocks[id].transparency;
-			
-				if (x > 0)
 				{ // X
-					block_id nid = ptr[idx - 1];
+					block_id nid = prevx;
+					prevx = id;
 
-					//block_id nid;
-					//if (x != 0)      nid = ptr[idx - 1];
-					//else {
-					//	int i = idx + (CHUNK_SIZE-1);
-					//	assert(i >= 0 && i < CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE);
-					//	nid = nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)] : B_NULL;
-					//	//nid = B_NULL;
-					//}
-					//assert(nid >= B_NULL && nid < g_blocks.blocks.size());
+					if (nid != id)
+						face_x(j, int3(x,y,z), id, nid);
+				}
+				{ // Y
+					block_id nid = prevy[idx];
 
-					if (nid != id) {
-						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)
-							face(mesh, nid, int3(x-1,y,z), BF_POS_X, assets.block_tiles[nid]);
-						if (g_blocks.blocks[nid].transparency != TM_OPAQUE && mesh_idx < 0)
-							face(mesh, id, int3(x,y,z), BF_NEG_X, tile);
-					}
+					if (nid != id)
+						face_y(j, int3(x,y,z), id, nid);
 				}
-				if (y > 0) { // Y
-					block_id nid = ptr[idx - CHUNK_ROW_OFFS];
-					if (nid != id) {
-						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)
-							face(mesh, nid, int3(x,y-1,z), BF_POS_Y, assets.block_tiles[nid]);
-						if (g_blocks.blocks[nid].transparency != TM_OPAQUE && mesh_idx < 0)
-							face(mesh, id, int3(x,y,z), BF_NEG_Y, tile);
-					}
-				}
-				if (z > 0) { // Z
-					block_id nid = ptr[idx - CHUNK_LAYER_OFFS];
-					if (nid != id) {
-						if (transparency != TM_OPAQUE && assets.block_meshes[nid] < 0)
-							face(mesh, nid, int3(x,y,z-1), BF_POS_Z, assets.block_tiles[nid]);
-						if (g_blocks.blocks[nid].transparency != TM_OPAQUE && mesh_idx < 0)
-							face(mesh, id, int3(x,y,z), BF_NEG_Z, tile);
-					}
+				{ // Z
+					block_id nid = prevz[idx];
+
+					if (nid != id)
+						face_z(j, int3(x,y,z), id, nid);
 				}
 	
-				if (mesh_idx >= 0) {
-					auto mesh_info = assets.block_mesh_info[mesh_idx];
-					block_mesh(mesh, mesh_info, tile, int3(x,y,z), chunk_seed);
-				}
+				if (j.block_meshes[id] >= 0)
+					block_mesh(j, int3(x,y,z), id, j.block_meshes[id]);
 	
 				idx++;
 			}
 		}
 	}
+}
+
+RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg):
+		chunk{chunk}, chunks{chunks},
+		block_mesh_info{assets.block_mesh_info.data()},
+		block_meshes{assets.block_meshes.data()},
+		block_tiles{assets.block_tiles.data()} {
+
+	chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
+}
+
+void RemeshChunkJob::execute () {
+	mesh_chunk(*this);
 }

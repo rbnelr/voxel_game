@@ -18,11 +18,11 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 			data.world.chunks[id]._validate_flags();
 			if ((data.world.chunks[id].flags & should_remesh) != should_remesh) continue;
 			
-			auto job = std::make_unique<RemeshChunkJob>();
-			job->chunk = &data.world.chunks[id];
-			job->chunks = &data.world.chunks;
-			job->assets = &r.assets;
-			job->wg = &data.world.world_gen;
+			auto job = std::make_unique<RemeshChunkJob>(
+				&data.world.chunks[id],
+				data.world.chunks,
+				r.assets,
+				data.world.world_gen);
 			remesh_jobs.emplace_back(std::move(job));
 		}
 	}
@@ -41,7 +41,7 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 
 	// upload remeshed slices and register them in chunk mesh
 	auto upload_slices = [&] (ChunkMeshData& remeshed, ChunkMesh& mesh) {
-		ZoneScopedN("upload_slices");
+		ZoneScopedN("upload chunk slices");
 
 		mesh.vertex_count = remeshed.vertex_count();
 		uint32_t remain_vertices = mesh.vertex_count;
@@ -74,20 +74,23 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 		}
 	};
 
-	for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
-		std::unique_ptr<RemeshChunkJob> results[64];
-		size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+	{
+		ZoneScopedN("upload_slices");
+		for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
+			std::unique_ptr<RemeshChunkJob> results[64];
+			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
 
-		for (size_t i = 0; i < count; ++i) {
-			auto res = std::move(results[i]);
+			for (size_t i = 0; i < count; ++i) {
+				auto res = std::move(results[i]);
 
-			upload_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
-			upload_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
+				upload_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
+				upload_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
 
-			res->chunk->flags &= ~Chunk::REMESH;
+				res->chunk->flags &= ~Chunk::REMESH;
+			}
+
+			result_count += count;
 		}
-
-		result_count += count;
 	}
 
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight
@@ -177,10 +180,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 		}
 	}
 
-	auto draw_slices = [&] (char const* zone, VkPipeline pipeline, DrawType type, int& drawcount) {
-		ZoneScopedN(zone);
-		GPU_TRACE(ctx, cmds, zone);
-
+	auto draw_slices = [&] (VkPipeline pipeline, DrawType type, int& drawcount) {
 		vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
 		drawcount = 0;
@@ -205,15 +205,20 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 				drawcount += draw_list.count;
 			}
 		}
+
+		ZoneValue(drawcount);
 	};
 
-	draw_slices("chunk draw opaque", opaque_pipeline->pipeline, DT_OPAQUE, drawcount_opaque);
-	draw_slices("chunk draw transparent", transparent_pipeline->pipeline, DT_TRANSPARENT, drawcount_transparent);
-
-}
-
-void RemeshChunkJob::execute () {
-	mesh_chunk(*assets, *wg, *chunks, chunk, &mesh);
+	{
+		ZoneScopedN("chunk draw opaque");
+		GPU_TRACE(ctx, cmds, "chunk draw opaque");
+		draw_slices(opaque_pipeline->pipeline, DT_OPAQUE, drawcount_opaque);
+	}
+	{
+		ZoneScopedN("chunk draw transparent");
+		GPU_TRACE(ctx, cmds, "chunk draw transparent");
+		draw_slices(transparent_pipeline->pipeline, DT_TRANSPARENT, drawcount_transparent);
+	}
 }
 
 } // namespace vk

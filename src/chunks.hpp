@@ -77,6 +77,8 @@ struct ChunkVoxelData {
 	}
 };
 
+inline constexpr ChunkVoxelData g_null_chunk = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
+
 struct ChunkMesh {
 	uint32_t vertex_count;
 	slice_id slices[MAX_CHUNK_SLICES];
