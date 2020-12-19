@@ -4,10 +4,10 @@
 #include "graphics.hpp"
 #include "player.hpp"
 
-#define NOINLINE __declspec(noinline)
-//#define NOINLINE
+//#define NOINLINE __declspec(noinline)
+#define NOINLINE
 
-void block_mesh (RemeshChunkJob& j, int idx, block_id id, int meshid) {
+NOINLINE void block_mesh (RemeshChunkJob& j, int idx, block_id id, int meshid) {
 	int block_pos_z = idx / CHUNK_LAYER_OFFS;
 	int block_pos_y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
 	int block_pos_x = idx % CHUNK_ROW_OFFS;
@@ -70,7 +70,8 @@ void face (RemeshChunkJob& j, int3 block_pos, block_id id, ChunkMeshData& mesh, 
 	v->meshid = facei;
 }
 
-NOINLINE void face_x (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
+template <int AXIS>
+NOINLINE void face (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
 	int z = idx / CHUNK_LAYER_OFFS;
 	int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
 	int x = idx % CHUNK_ROW_OFFS;
@@ -78,39 +79,17 @@ NOINLINE void face_x (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
 	auto& b = g_blocks.blocks[id];
 	auto& nb = g_blocks.blocks[nid];
 
-	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
-		face(j, int3(x-1,y,z), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_X);
-	
-	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
-		face(j, int3(x,y,z), id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_X);
-}
-NOINLINE void face_y (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
-	int z = idx / CHUNK_LAYER_OFFS;
-	int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
-	int x = idx % CHUNK_ROW_OFFS;
-	
-	auto& b = g_blocks.blocks[id];
-	auto& nb = g_blocks.blocks[nid];
+	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
+		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
+		int3 pos = int3(x,y,z);
+		pos[AXIS] -= 1;
+		face(j, pos, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2));
+	}
 
-	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
-		face(j, int3(x,y-1,z), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_Y);
-
-	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
-		face(j, int3(x,y,z), id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_Y);
-}
-NOINLINE void face_z (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
-	int z = idx / CHUNK_LAYER_OFFS;
-	int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
-	int x = idx % CHUNK_ROW_OFFS;
-	
-	auto& b = g_blocks.blocks[id];
-	auto& nb = g_blocks.blocks[nid];
-
-	if (b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL && nb.collision != CM_GAS)
-		face(j, int3(x,y,z-1), nid, nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_POS_Z);
-
-	if (nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL && b.collision != CM_GAS)
-		face(j, int3(x,y,z), id, b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices, BF_NEG_Z);
+	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL) {
+		auto& mesh = b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
+		face(j, int3(x,y,z), id, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
+	}
 }
 
 void mesh_chunk (RemeshChunkJob& j) {
@@ -175,7 +154,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // X
 			block_id nid = prevx[idx - 1];
 			if (nid != id)
-				face_x(j, idx, id, nid);
+				face<0>(j, idx, id, nid);
 		}
 
 		int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
@@ -183,7 +162,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Y
 			block_id nid = prevy[idx - CHUNK_ROW_OFFS];
 			if (nid != id)
-				face_y(j, idx, id, nid);
+				face<1>(j, idx, id, nid);
 		}
 
 		int z = idx / CHUNK_LAYER_OFFS;
@@ -191,7 +170,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Z
 			block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
 			if (nid != id)
-				face_z(j, idx, id, nid);
+				face<2>(j, idx, id, nid);
 		}
 
 		if (j.block_meshes[id] >= 0)
