@@ -8,3 +8,5 @@ screenshots/
 *.ilk
 *.iobj
 *.ipdb
+*.pgc
+*.pgd
