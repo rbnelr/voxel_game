@@ -66,6 +66,27 @@ struct RemeshChunkJob { // Chunk remesh
 
 	uint64_t				chunk_seed;
 
+
+	int xfaces_count = 0;
+	int yfaces_count = 0;
+	int zfaces_count = 0;
+	int mesh_voxels_count = 0;
+
+	struct Face {
+		int idx;
+		block_id id, nid;
+	};
+	Face xfaces[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+	Face yfaces[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+	Face zfaces[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+
+	struct MeshVox {
+		int idx;
+		block_id id;
+	};
+	MeshVox mesh_voxels[CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE];
+
+
 	// output
 	RemeshingMesh			mesh;
 

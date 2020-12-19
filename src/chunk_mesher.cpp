@@ -154,7 +154,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // X
 			block_id nid = prevx[idx - 1];
 			if (nid != id)
-				face<0>(j, idx, id, nid);
+				j.xfaces[j.xfaces_count++] = { idx, id, nid };
 		}
 
 		int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
@@ -162,7 +162,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Y
 			block_id nid = prevy[idx - CHUNK_ROW_OFFS];
 			if (nid != id)
-				face<1>(j, idx, id, nid);
+				j.yfaces[j.yfaces_count++] = { idx, id, nid };
 		}
 
 		int z = idx / CHUNK_LAYER_OFFS;
@@ -170,12 +170,24 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Z
 			block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
 			if (nid != id)
-				face<2>(j, idx, id, nid);
+				j.zfaces[j.zfaces_count++] = { idx, id, nid };
 		}
 
 		if (j.block_meshes[id] >= 0)
-			block_mesh(j, idx, id, j.block_meshes[id]);
+			j.mesh_voxels[j.mesh_voxels_count++] = { idx, id };
 	}
+
+	for (int i=0; i<j.xfaces_count; ++i)
+		face<0>(j, j.xfaces[i].idx, j.xfaces[i].id, j.xfaces[i].nid);
+
+	for (int i=0; i<j.yfaces_count; ++i)
+		face<1>(j, j.yfaces[i].idx, j.yfaces[i].id, j.yfaces[i].nid);
+
+	for (int i=0; i<j.zfaces_count; ++i)
+		face<2>(j, j.zfaces[i].idx, j.zfaces[i].id, j.zfaces[i].nid);
+
+	for (int i=0; i<j.mesh_voxels_count; ++i)
+		block_mesh(j, j.mesh_voxels[i].idx, j.mesh_voxels[i].id, j.block_meshes[j.mesh_voxels[i].id]);
 #endif
 }
 
