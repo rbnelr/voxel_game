@@ -8,7 +8,6 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-		PGOCreate|x64 = PGOCreate|x64
 		Release|x64 = Release|x64
 		Tracy|x64 = Tracy|x64
 		Validate|x64 = Validate|x64
@@ -16,8 +15,6 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{47DC811C-2740-4248-AD93-C0199F8679EC}.Debug|x64.ActiveCfg = Debug|x64
 		{47DC811C-2740-4248-AD93-C0199F8679EC}.Debug|x64.Build.0 = Debug|x64
-		{47DC811C-2740-4248-AD93-C0199F8679EC}.PGOCreate|x64.ActiveCfg = PGOCreate|x64
-		{47DC811C-2740-4248-AD93-C0199F8679EC}.PGOCreate|x64.Build.0 = PGOCreate|x64
 		{47DC811C-2740-4248-AD93-C0199F8679EC}.Release|x64.ActiveCfg = Release|x64
 		{47DC811C-2740-4248-AD93-C0199F8679EC}.Release|x64.Build.0 = Release|x64
 		{47DC811C-2740-4248-AD93-C0199F8679EC}.Tracy|x64.ActiveCfg = Tracy|x64

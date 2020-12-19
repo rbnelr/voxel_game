@@ -4,16 +4,21 @@
 #include "graphics.hpp"
 #include "player.hpp"
 
-//#define NOINLINE __declspec(noinline)
-#define NOINLINE
+#define NOINLINE __declspec(noinline)
 
-NOINLINE void block_mesh (RemeshChunkJob& j, int idx, block_id id, int meshid) {
-	int block_pos_z = idx / CHUNK_LAYER_OFFS;
-	int block_pos_y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
-	int block_pos_x = idx % CHUNK_ROW_OFFS;
+int3 pos_from_idx (int idx) {
+	int3 pos;
+	pos.x =  idx & CHUNK_SIZE_MASK;
+	pos.y = (idx >> CHUNK_SIZE_SHIFT  ) & CHUNK_SIZE_MASK;
+	pos.z = (idx >> CHUNK_SIZE_SHIFT*2) & CHUNK_SIZE_MASK;
+	return pos;
+}
+
+NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
+	int3 pos = pos_from_idx(idx);
 
 	// get a 'random' but deterministic value based on block position
-	uint64_t h = hash(int3(block_pos_x, block_pos_y, block_pos_z)) ^ j.chunk_seed;
+	uint64_t h = hash(pos) ^ j.chunk_seed;
 	
 	// get a random determinisitc 2d offset
 	float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
@@ -29,9 +34,9 @@ NOINLINE void block_mesh (RemeshChunkJob& j, int idx, block_id id, int meshid) {
 		
 	int texid = tile.calc_tex_index((BlockFace)0, variant);
 
-	float posx = (float)block_pos_x + (rand_offsx * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
-	float posy = (float)block_pos_y + (rand_offsy * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
-	float posz = (float)block_pos_z;
+	float posx = (float)pos.x + (rand_offsx * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
+	float posy = (float)pos.y + (rand_offsy * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
+	float posz = (float)pos.z;
 
 	int16_t fixd_posx = (int16_t)roundi(posx * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance::FIXEDPOINT_FAC);
@@ -56,12 +61,12 @@ block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs) {
 	return nc->voxels->ids;
 }
 
-void face (RemeshChunkJob& j, int3 block_pos, block_id id, ChunkMeshData& mesh, BlockFace facei) {
+void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
 	auto* v = mesh.push();
 
-	int16_t fixd_posx = (int16_t)(block_pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
-	int16_t fixd_posy = (int16_t)(block_pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
-	int16_t fixd_posz = (int16_t)(block_pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posx = (int16_t)(pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posy = (int16_t)(pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
+	int16_t fixd_posz = (int16_t)(pos.z * BlockMeshInstance::FIXEDPOINT_FAC);
 
 	v->posx = fixd_posx;
 	v->posy = fixd_posy;
@@ -71,24 +76,21 @@ void face (RemeshChunkJob& j, int3 block_pos, block_id id, ChunkMeshData& mesh, 
 }
 
 template <int AXIS>
-NOINLINE void face (RemeshChunkJob& j, int idx, block_id id, block_id nid) {
-	int z = idx / CHUNK_LAYER_OFFS;
-	int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
-	int x = idx % CHUNK_ROW_OFFS;
+NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
+	int3 pos = pos_from_idx(idx);
 	
 	auto& b = g_blocks.blocks[id];
 	auto& nb = g_blocks.blocks[nid];
 
-	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
-		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
-		int3 pos = int3(x,y,z);
-		pos[AXIS] -= 1;
-		face(j, pos, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2));
-	}
-
 	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL) {
 		auto& mesh = b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
-		face(j, int3(x,y,z), id, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
+		face(j, id, mesh, (BlockFace)(BF_NEG_X + AXIS*2), pos);
+	}
+
+	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
+		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
+		pos[AXIS] -= 1;
+		face(j, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2), pos);
 	}
 }
 
@@ -102,7 +104,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 	auto const* ptr = j.chunk->voxels->ids;
 
-#if 0
+#if 1
 	int idx = 0;
 
 	block_id const* prevz = nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS;
@@ -118,27 +120,24 @@ void mesh_chunk (RemeshChunkJob& j) {
 	
 				{ // X
 					block_id nid = prevx;
-					prevx = id;
-
 					if (nid != id)
-						face_x(j, idx, id, nid);
+						face<0>(j, id, nid, idx);
 				}
 				{ // Y
 					block_id nid = prevy[idx - CHUNK_ROW_OFFS];
-
 					if (nid != id)
-						face_y(j, idx, id, nid);
+						face<1>(j, id, nid, idx);
 				}
 				{ // Z
 					block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
-
 					if (nid != id)
-						face_z(j, idx, id, nid);
+						face<2>(j, id, nid, idx);
 				}
 	
 				if (j.block_meshes[id] >= 0)
-					block_mesh(j, idx, id, j.block_meshes[id]);
-	
+					block_mesh(j, id, j.block_meshes[id], idx);
+
+				prevx = id;
 				idx++;
 			}
 			prevy = ptr;
@@ -154,7 +153,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // X
 			block_id nid = prevx[idx - 1];
 			if (nid != id)
-				j.xfaces[j.xfaces_count++] = { idx, id, nid };
+				face<0>(j, idx, id, nid);
 		}
 
 		int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
@@ -162,7 +161,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Y
 			block_id nid = prevy[idx - CHUNK_ROW_OFFS];
 			if (nid != id)
-				j.yfaces[j.yfaces_count++] = { idx, id, nid };
+				face<1>(j, idx, id, nid);
 		}
 
 		int z = idx / CHUNK_LAYER_OFFS;
@@ -170,24 +169,12 @@ void mesh_chunk (RemeshChunkJob& j) {
 		{ // Z
 			block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
 			if (nid != id)
-				j.zfaces[j.zfaces_count++] = { idx, id, nid };
+				face<2>(j, idx, id, nid);
 		}
 
 		if (j.block_meshes[id] >= 0)
-			j.mesh_voxels[j.mesh_voxels_count++] = { idx, id };
+			block_mesh(j, idx, id, j.block_meshes[id]);
 	}
-
-	for (int i=0; i<j.xfaces_count; ++i)
-		face<0>(j, j.xfaces[i].idx, j.xfaces[i].id, j.xfaces[i].nid);
-
-	for (int i=0; i<j.yfaces_count; ++i)
-		face<1>(j, j.yfaces[i].idx, j.yfaces[i].id, j.yfaces[i].nid);
-
-	for (int i=0; i<j.zfaces_count; ++i)
-		face<2>(j, j.zfaces[i].idx, j.zfaces[i].id, j.zfaces[i].nid);
-
-	for (int i=0; i<j.mesh_voxels_count; ++i)
-		block_mesh(j, j.mesh_voxels[i].idx, j.mesh_voxels[i].id, j.block_meshes[j.mesh_voxels[i].id]);
 #endif
 }
 

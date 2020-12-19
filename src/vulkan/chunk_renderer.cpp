@@ -60,6 +60,8 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 				remeshed.slices[slice]->verts, count * sizeof(BlockMeshInstance),
 				allocs[alloci].mesh_data.buf, slicei * CHUNK_SLICE_LENGTH * sizeof(BlockMeshInstance));
 			
+			ChunkMeshData::free_slice(remeshed.slices[slice]);
+
 			remain_vertices -= count;
 
 			upload_count++;
