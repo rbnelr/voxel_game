@@ -22,7 +22,8 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 				&data.world.chunks[id],
 				data.world.chunks,
 				r.assets,
-				data.world.world_gen);
+				data.world.world_gen,
+				r.draw_world_border);
 			remesh_jobs.emplace_back(std::move(job));
 		}
 	}

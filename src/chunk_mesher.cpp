@@ -79,14 +79,19 @@ template <int AXIS>
 NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
 	int3 pos = pos_from_idx(idx);
 	
+	if (!j.draw_world_border && (id == B_NULL || nid == B_NULL))
+		return;
+
 	auto& b = g_blocks.blocks[id];
 	auto& nb = g_blocks.blocks[nid];
 
-	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0 && id != B_NULL) {
+	// generate face of our voxel that faces negative direction neighbour
+	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0) {
 		auto& mesh = b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
 		face(j, id, mesh, (BlockFace)(BF_NEG_X + AXIS*2), pos);
 	}
 
+	// generate face of negative direction neighbour that faces this voxel
 	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
 		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
 		pos[AXIS] -= 1;
@@ -104,7 +109,6 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 	auto const* ptr = j.chunk->voxels->ids;
 
-#if 1
 	int idx = 0;
 
 	block_id const* prevz = nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS;
@@ -144,45 +148,14 @@ void mesh_chunk (RemeshChunkJob& j) {
 		}
 		prevz = ptr;
 	}
-#else
-	for (int idx=0; idx < CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE; ++idx) {
-		block_id id = ptr[idx];
-
-		int x = idx % CHUNK_SIZE;
-		block_id const* prevx = x != 0 ? ptr : (nc_nx + CHUNK_SIZE);
-		{ // X
-			block_id nid = prevx[idx - 1];
-			if (nid != id)
-				face<0>(j, idx, id, nid);
-		}
-
-		int y = idx % CHUNK_LAYER_OFFS / CHUNK_ROW_OFFS;
-		block_id const* prevy = y != 0 ? ptr : (nc_ny + CHUNK_SIZE*CHUNK_ROW_OFFS);
-		{ // Y
-			block_id nid = prevy[idx - CHUNK_ROW_OFFS];
-			if (nid != id)
-				face<1>(j, idx, id, nid);
-		}
-
-		int z = idx / CHUNK_LAYER_OFFS;
-		block_id const* prevz = z != 0 ? ptr : (nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS);
-		{ // Z
-			block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
-			if (nid != id)
-				face<2>(j, idx, id, nid);
-		}
-
-		if (j.block_meshes[id] >= 0)
-			block_mesh(j, idx, id, j.block_meshes[id]);
-	}
-#endif
 }
 
-RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg):
+RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, bool draw_world_border):
 		chunk{chunk}, chunks{chunks},
 		block_mesh_info{assets.block_mesh_info.data()},
 		block_meshes{assets.block_meshes.data()},
-		block_tiles{assets.block_tiles.data()} {
+		block_tiles{assets.block_tiles.data()},
+		draw_world_border{draw_world_border} {
 
 	chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
 }

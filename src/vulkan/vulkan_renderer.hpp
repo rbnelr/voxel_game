@@ -126,8 +126,8 @@ struct Renderer {
 	bool						renderscale_nearest_changed = false;
 
 	bool						wireframe = false;
-
 	bool						debug_frustrum_culling = false;
+	bool						draw_world_border = false;
 
 	void graphics_imgui () {
 		if (imgui_push("Renderscale")) {
@@ -141,8 +141,8 @@ struct Renderer {
 		}
 
 		ImGui::Checkbox("wireframe", &wireframe);
-
 		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+		ImGui::Checkbox("draw_world_border", &draw_world_border);
 
 		staging.imgui();
 	}

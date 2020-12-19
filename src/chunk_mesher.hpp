@@ -65,11 +65,13 @@ struct RemeshChunkJob { // Chunk remesh
 	BlockTile const*			block_tiles;
 
 	uint64_t				chunk_seed;
+	bool					draw_world_border;
 
 	// output
 	RemeshingMesh			mesh;
 
-	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg);
+	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg,
+		bool draw_world_border);
 
 	void execute ();
 };
