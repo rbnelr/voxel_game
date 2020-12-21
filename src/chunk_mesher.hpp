@@ -69,6 +69,8 @@ struct RemeshChunkJob { // Chunk remesh
 
 	// output
 	RemeshingMesh			mesh;
+	block_id				sparse_id;
+	bool					is_sparse;
 
 	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg,
 		bool draw_world_border);

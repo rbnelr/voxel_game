@@ -9,8 +9,12 @@
 #define CHUNK_ROW_OFFS		CHUNK_SIZE
 #define CHUNK_LAYER_OFFS	(CHUNK_SIZE * CHUNK_SIZE)
 
-#define CHUNK_BLOCK_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+#define CHUNK_VOXEL_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
 
+#define POS2IDX(x,y,z) ((size_t)(z) * CHUNK_LAYER_OFFS + (size_t)(y) * CHUNK_ROW_OFFS + (size_t)(x))
+#define OFFS2IDX(x,y,z) ((int64_t)(z) * CHUNK_LAYER_OFFS + (int64_t)(y) * CHUNK_ROW_OFFS + (int64_t)(x))
+
+#define VEC2IDX(xyz) ((size_t)(xyz).z * CHUNK_LAYER_OFFS + (size_t)(xyz).y * CHUNK_ROW_OFFS + (size_t)(xyz).x)
 
 #define U16_NULL			((uint16_t)-1)
 
@@ -69,15 +73,89 @@ struct Player;
 struct Assets;
 struct Chunks;
 
-struct ChunkVoxelData {
-	block_id ids[CHUNK_BLOCK_COUNT];
+struct ChunkVoxels {
+	block_id* ids;
+	block_id sparse_id;
 
-	static constexpr size_t pos_to_index (int3 pos) {
-		return (size_t)pos.z * CHUNK_SIZE * CHUNK_SIZE + (size_t)pos.y * CHUNK_SIZE + (size_t)pos.x;
+	void init () {
+		ids = nullptr;
+		alloc_ids(); // alloc non-sparse initnally bcause worldgen will need it this way
+		sparse_id = B_NULL;
+	}
+
+	bool is_sparse () {
+		return ids == nullptr;
+	}
+
+	block_id get_block (int x, int y, int z) const {
+		assert(x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE);
+		if (ids)
+			return ids[POS2IDX(x,y,z)];
+		else
+			return sparse_id;
+	}
+	void set_block (int x, int y, int z, block_id id) {
+		assert(x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE);
+		if (!ids) {
+			if (sparse_id == id)
+				return;
+
+			densify();
+		}
+		ids[POS2IDX(x,y,z)] = id;
+	}
+
+	void densify () {
+		clog(INFO, ">> densify");
+		ZoneScopedC(tracy::Color::Chocolate);
+
+		alloc_ids();
+
+		for (int i=0; i<CHUNK_VOXEL_COUNT; ++i)
+			ids[i] = sparse_id;
+
+		sparse_id = B_NULL;
+	}
+	void sparsify (block_id id) {
+		clog(INFO, ">> densify");
+		ZoneScopedC(tracy::Color::Chocolate);
+
+		free_ids();
+		sparse_id = id;
+	}
+
+	void alloc_ids () {
+		assert(ids == nullptr);
+		ZoneScopedC(tracy::Color::Crimson);
+		ids = (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
+	}
+	void free_ids () {
+		assert(ids != nullptr);
+		ZoneScopedC(tracy::Color::Crimson);
+		::free(ids);
+	}
+
+	void free () {
+		if (ids)
+			free_ids();
+	}
+
+	size_t _alloc_size () {
+		return ids ? sizeof(block_id) * CHUNK_VOXEL_COUNT : 0;
+	}
+
+	void _validate_ids () {
+		if (ids) {
+			for (int i=0; i<CHUNK_VOXEL_COUNT; ++i) {
+				assert(ids[i] >= 0 && ids[i] < g_blocks.blocks.size());
+			}
+		} else {
+			assert(sparse_id >= 0 && sparse_id < g_blocks.blocks.size());
+		}
 	}
 };
 
-inline constexpr ChunkVoxelData g_null_chunk = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
+inline constexpr block_id g_null_chunk[CHUNK_VOXEL_COUNT] = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
 
 struct ChunkMesh {
 	uint32_t vertex_count;
@@ -92,7 +170,7 @@ struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED	= 1<<0, // identify non-allocated chunks in chunk array, default true so that this get's set 
 		LOADED		= 1<<1, // block data valid and safe to use in main thread
-		REMESH		= 1<<2, // blocks were changed, need remesh
+		DIRTY		= 1<<2, // blocks were changed, need remesh
 	};
 
 	int3 pos;
@@ -104,18 +182,11 @@ struct Chunk {
 	ChunkMesh opaque_mesh;
 	ChunkMesh transparent_mesh;
 
-	ChunkVoxelData* voxels;
+	ChunkVoxels voxels;
 
 	void _validate_flags () {
 		if (flags & LOADED) assert(flags & ALLOCATED);
-		if (flags & REMESH) assert(flags & LOADED);
-	}
-
-	block_id get_block (int3 pos) const {
-		return voxels->ids[ChunkVoxelData::pos_to_index(pos)];
-	}
-	void set_block (int3 pos, block_id b) {
-		voxels->ids[ChunkVoxelData::pos_to_index(pos)] = b;
+		if (flags & DIRTY) assert(flags & LOADED);
 	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
@@ -214,6 +285,7 @@ struct Chunks {
 			memset(chunk.neighbours, -1, sizeof(chunk.neighbours));
 			init_mesh(chunk.opaque_mesh);
 			init_mesh(chunk.transparent_mesh);
+			chunk.voxels.init();
 		}
 
 		assert(pos_to_id.find(pos) == pos_to_id.end());
@@ -230,11 +302,6 @@ struct Chunks {
 				assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
 				chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id; // add ourself from neighbours neighbour list
 			}
-		}
-
-		{
-			ZoneScopedNC("malloc voxels", tracy::Color::Crimson);
-			chunk.voxels = (ChunkVoxelData*)malloc(sizeof(ChunkVoxelData));
 		}
 
 		return id;
@@ -256,11 +323,7 @@ struct Chunks {
 
 		free_mesh(chunk.opaque_mesh);
 		free_mesh(chunk.transparent_mesh);
-
-		{
-			ZoneScopedNC("free voxels", tracy::Color::Crimson);
-			free(chunk.voxels);
-		}
+		chunk.voxels.free();
 
 		pos_to_id.erase(chunks[id].pos);
 		id_alloc.free(id);
@@ -298,7 +361,7 @@ struct Chunks {
 		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
 		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-		uint64_t block_mem = count * sizeof(ChunkVoxelData);
+		uint64_t block_mem = count * sizeof(ChunkVoxels);
 
 		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB RAM",
 			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024);

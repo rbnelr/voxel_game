@@ -56,9 +56,9 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 
 block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs) {
 	auto* nc = j.chunks.query_chunk(j.chunk->pos + offs);
-	if (!nc || (nc->flags & Chunk::LOADED) == 0)
-		return g_null_chunk.ids; // return dummy chunk data with B_NULL to avoid nullptr check in performance-critical code for non-loaded neighbours
-	return nc->voxels->ids;
+	if (nc == nullptr || (nc->flags & Chunk::LOADED) == 0 || nc->voxels.ids == nullptr) // TODO: somehow handle sparse chunkvoxels here
+		return g_null_chunk; // return dummy chunk data with B_NULL to avoid nullptr check in performance-critical code for non-loaded neighbours
+	return nc->voxels.ids;
 }
 
 void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
@@ -106,10 +106,16 @@ void mesh_chunk (RemeshChunkJob& j) {
 	auto const* nc_nx = get_neighbour_blocks(j, int3(-1,0,0));
 	auto const* nc_ny = get_neighbour_blocks(j, int3(0,-1,0));
 	auto const* nc_nz = get_neighbour_blocks(j, int3(0,0,-1));
+	assert(nc_nx && nc_ny && nc_nz);
 
-	auto const* ptr = j.chunk->voxels->ids;
+	j.chunk->voxels._validate_ids();
+
+	auto const* ptr = j.chunk->voxels.ids;
 
 	int idx = 0;
+
+	j.sparse_id = ptr[0];
+	j.is_sparse = true;
 
 	block_id const* prevz = nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS;
 	for (int z=0; z<CHUNK_SIZE; ++z) {
@@ -121,7 +127,9 @@ void mesh_chunk (RemeshChunkJob& j) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
 				block_id id = ptr[idx];
-	
+				if (id != j.sparse_id)
+					j.is_sparse = false;
+
 				{ // X
 					block_id nid = prevx;
 					if (nid != id)

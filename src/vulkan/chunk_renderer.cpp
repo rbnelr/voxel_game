@@ -13,18 +13,32 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 
 	{
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
-		auto should_remesh = Chunk::REMESH|Chunk::LOADED|Chunk::ALLOCATED;
+		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
 		for (chunk_id id = 0; id < data.world.chunks.max_id; ++id) {
-			data.world.chunks[id]._validate_flags();
-			if ((data.world.chunks[id].flags & should_remesh) != should_remesh) continue;
-			
-			auto job = std::make_unique<RemeshChunkJob>(
-				&data.world.chunks[id],
-				data.world.chunks,
-				r.assets,
-				data.world.world_gen,
-				r.draw_world_border);
-			remesh_jobs.emplace_back(std::move(job));
+			auto& chunk = data.world.chunks[id];
+			chunk._validate_flags();
+			if ((chunk.flags & should_remesh) != should_remesh) continue;
+
+			//
+			//chunk.voxels.force_densify();
+			//
+			//for (int i=0; i<6; ++i) {
+			//	if (chunk.neighbours[i] != U16_NULL)
+			//		data.world.chunks[chunk.neighbours[i]].voxels.force_densify();
+			//}
+
+			if (chunk.voxels.is_sparse()) {
+				chunk.flags &= ~Chunk::DIRTY;
+			} else {
+
+				auto job = std::make_unique<RemeshChunkJob>(
+					&chunk,
+					data.world.chunks,
+					r.assets,
+					data.world.world_gen,
+					r.draw_world_border);
+				remesh_jobs.emplace_back(std::move(job));
+			}
 		}
 	}
 
@@ -79,9 +93,14 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 
 	{
 		ZoneScopedN("upload_slices");
-		for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
-			std::unique_ptr<RemeshChunkJob> results[64];
-			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+		//for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
+			//std::unique_ptr<RemeshChunkJob> results[64];
+			//size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+
+			// need to wait for all to be done to safely do sparsify
+			// TODO: figure something better out for sparse system
+			std::vector<std::unique_ptr<RemeshChunkJob>> results (remesh_chunks_count);
+			size_t count = parallelism_threadpool.results.pop_n_wait(results.data(), remesh_chunks_count, remesh_chunks_count);
 
 			for (size_t i = 0; i < count; ++i) {
 				auto res = std::move(results[i]);
@@ -89,11 +108,14 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 				upload_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
 				upload_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
 
-				res->chunk->flags &= ~Chunk::REMESH;
+				//if (res->is_sparse)
+				//	res->chunk->voxels.sparsify(res->sparse_id);
+
+				res->chunk->flags &= ~Chunk::DIRTY;
 			}
 
-			result_count += count;
-		}
+		//	result_count += count;
+		//}
 	}
 
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight

@@ -21,7 +21,7 @@ block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) 
 
 	if (out_chunk)
 		*out_chunk = chunk;
-	return chunk->get_block(block_pos_chunk);
+	return chunk->voxels.get_block(block_pos_chunk.x, block_pos_chunk.y, block_pos_chunk.z);
 }
 
 void Chunks::set_block (int3 pos, block_id b) {
@@ -33,7 +33,7 @@ void Chunks::set_block (int3 pos, block_id b) {
 	if (!chunk)
 		return;
 
-	chunk->set_block(block_pos_chunk, b);
+	chunk->voxels.set_block(block_pos_chunk.x, block_pos_chunk.y, block_pos_chunk.z, b);
 }
 
 void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player) {
@@ -107,11 +107,11 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 				for (int i=0; i<6; ++i) {
 					if (chunk.neighbours[i] != U16_NULL) {
 						auto& n = chunks[chunk.neighbours[i]];
-						if (n.flags & Chunk::LOADED) n.flags |= Chunk::REMESH;
+						if (n.flags & Chunk::LOADED) n.flags |= Chunk::DIRTY;
 					}
 				}
 
-				chunk.flags |= Chunk::LOADED|Chunk::REMESH;
+				chunk.flags |= Chunk::LOADED|Chunk::DIRTY;
 			}
 
 			background_queued_count -= (int)count;

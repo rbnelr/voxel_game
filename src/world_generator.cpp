@@ -121,29 +121,27 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 	const auto LEAVES		= g_blocks.map_id("leaves");
 	const auto TALLGRASS	= g_blocks.map_id("tallgrass");
 	const auto TORCH		= g_blocks.map_id("torch");
+	
+	assert(chunk->voxels.ids);
+	auto* ids = chunk->voxels.ids;
 
 	int3 chunk_origin = chunk->pos * CHUNK_SIZE;
 
 	int water_level = 21 - chunk_origin.z;
 
-	int3 i; // position in chunk
 	{
 		ZoneScopedN("Init blocks");
 
-		for (i.z=0; i.z<CHUNK_SIZE; ++i.z) {
-			for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
-				for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
-					block_id b;
-
-					if (i.z <= water_level) {
-						b = WATER;
-					} else {
-						b = AIR;
-					}
-
-					chunk->set_block(i, b);
-				}
+		for (int z=0; z<CHUNK_SIZE; ++z) {
+			block_id b;
+			if (z <= water_level) {
+				b = WATER;
+			} else {
+				b = AIR;
 			}
+
+			for (int i=0; i < CHUNK_SIZE * CHUNK_SIZE; ++i)
+				ids[CHUNK_LAYER_OFFS * z + i] = b;
 		}
 	}
 
@@ -164,10 +162,10 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 	{
 		ZoneScopedN("Generate blocks");
 
-		for (i.y=0; i.y<CHUNK_SIZE; ++i.y) {
-			for (i.x=0; i.x<CHUNK_SIZE; ++i.x) {
+		for (int y=0; y<CHUNK_SIZE; ++y) {
+			for (int x=0; x<CHUNK_SIZE; ++x) {
 
-				int3 pos_world = int3(i,0) + chunk_origin;
+				int3 pos_world = int3(x,y,0) + chunk_origin;
 
 				float earth_layer;
 				float height = heightmap(wg, noise, (float2)(int2)pos_world, &earth_layer);
@@ -177,7 +175,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 				float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world);
 
-				float tree_prox_prob = gradient<float>( find_min_tree_dist((int2)i), {
+				float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
 					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
 					{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
 					{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
@@ -187,13 +185,14 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				float effective_tree_prob = tree_density * tree_prox_prob;
 				//float effective_tree_prob = tree_density;
 
-				for (i.z=0; i.z <= min(highest_block, CHUNK_SIZE-1); ++i.z) {
-					auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(i)];
+				int z = 0;
+				for (; z <= min(highest_block, CHUNK_SIZE-1); ++z) {
+					auto* bid = &ids[POS2IDX(x,y,z)];
 
-					if (i.z <= highest_block - earth_layer) {
+					if (z <= highest_block - earth_layer) {
 						*bid = STONE;
 					} else {
-						if (i.z == highest_block && i.z >= water_level) {
+						if (z == highest_block && z >= water_level) {
 							*bid = GRASS;
 						} else {
 							*bid = EARTH;
@@ -201,7 +200,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					}
 				}
 
-				auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(i)];
+				auto* bid = &ids[POS2IDX(x,y,z)];
 
 				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
 
@@ -210,7 +209,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					float grass_chance = rand.uniform();
 
 					if (rand.uniform() < effective_tree_prob) {
-						tree_poss.push_back( int3((int2)i, highest_block +1) );
+						tree_poss.push_back( int3(x,y, highest_block +1) );
 					} else if (rand.uniform() < grass_density) {
 						*bid = TALLGRASS;
 					} else if (rand.uniform() < 0.0005f) {
@@ -226,7 +225,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		ZoneScopedN("Place structures");
 
 		auto place_tree = [&] (int3 pos_chunk) {
-			auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(pos_chunk - int3(0,0,1))];
+			auto* bid = &ids[VEC2IDX(pos_chunk + int3(0,0,-1))];
 
 			if (*bid == GRASS) {
 				*bid = EARTH;
@@ -234,7 +233,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 			auto place_block = [&] (int3 pos_chunk, block_id bt) {
 				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_SIZE)) return;
-				auto* bid = &chunk->voxels->ids[ChunkVoxelData::pos_to_index(pos_chunk)];
+				auto* bid = &ids[VEC2IDX(pos_chunk)];
 
 				if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
 					*bid = bt;
@@ -271,4 +270,6 @@ void WorldgenJob::execute () {
 	ZoneScoped;
 
 	gen(chunk, *wg);
+
+	chunk->voxels._validate_ids();
 }
