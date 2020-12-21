@@ -54,10 +54,16 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	}
 }
 
-block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs) {
+block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs, block_id* sparse_id) {
 	auto* nc = j.chunks.query_chunk(j.chunk->pos + offs);
-	if (nc == nullptr || (nc->flags & Chunk::LOADED) == 0 || nc->voxels.ids == nullptr) // TODO: somehow handle sparse chunkvoxels here
-		return g_null_chunk; // return dummy chunk data with B_NULL to avoid nullptr check in performance-critical code for non-loaded neighbours
+	if (nc == nullptr || (nc->flags & Chunk::LOADED) == 0) {
+		*sparse_id = B_NULL;
+		return nullptr;
+	}
+	if (nc->voxels.is_sparse()) {
+		*sparse_id = nc->voxels.sparse_id;
+		return nullptr;
+	}
 	return nc->voxels.ids;
 }
 
@@ -103,163 +109,147 @@ void mesh_chunk (RemeshChunkJob& j) {
 	ZoneScoped;
 
 	// neighbour chunks (can be null)
-	auto const* nc_nx = get_neighbour_blocks(j, int3(-1,0,0));
-	auto const* nc_ny = get_neighbour_blocks(j, int3(0,-1,0));
-	auto const* nc_nz = get_neighbour_blocks(j, int3(0,0,-1));
-	assert(nc_nx && nc_ny && nc_nz);
-
+	block_id sid_nx, sid_ny, sid_nz; 
+	auto const* nc_nx = get_neighbour_blocks(j, int3(-1,0,0), &sid_nx);
+	auto const* nc_ny = get_neighbour_blocks(j, int3(0,-1,0), &sid_ny);
+	auto const* nc_nz = get_neighbour_blocks(j, int3(0,0,-1), &sid_nz);
+	
 	j.chunk->voxels._validate_ids();
 
 	auto const* ptr = j.chunk->voxels.ids;
 
-#if 1
+#define XOFFS 1
+#define YOFFS CHUNK_ROW_OFFS
+#define ZOFFS CHUNK_LAYER_OFFS
+
+#if 0 //// Slow, general solution
 	int idx = 0;
 
+	// fast meshing without neighbour chunk access
 	for (int z=0; z<CHUNK_SIZE; ++z) {
 		for (int y=0; y<CHUNK_SIZE; ++y) {
-			for (int x=0; x<CHUNK_SIZE; ++x) {
-
-				block_id id = ptr[idx];
-
-				if (x > 0) { // X
-					block_id nid = ptr[idx - 1];
-					if (nid != id)
-						face<0>(j, id, nid, idx);
-				}
-				if (y > 0) { // Y
-					block_id nid = ptr[idx - CHUNK_ROW_OFFS];
-					if (nid != id)
-						face<1>(j, id, nid, idx);
-				}
-				if (z > 0) { // Z
-					block_id nid = ptr[idx - CHUNK_LAYER_OFFS];
-					if (nid != id)
-						face<2>(j, id, nid, idx);
-				}
-
-				if (j.block_meshes[id] >= 0)
-					block_mesh(j, id, j.block_meshes[id], idx);
-
-				idx++;
-			}
-		}
-	}
-#elif 0
-	int idx = 0;
-
-	block_id const* prevz = nc_nz + CHUNK_SIZE*CHUNK_LAYER_OFFS;
-	for (int z=0; z<CHUNK_SIZE; ++z) {
-		
-		block_id const* prevy = nc_ny + CHUNK_SIZE*CHUNK_ROW_OFFS;
-		for (int y=0; y<CHUNK_SIZE; ++y) {
-			
-			block_id prevx = nc_nx[idx + CHUNK_SIZE-1];
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
 				block_id id = ptr[idx];
 
 				{ // X
-					block_id nid = prevx;
+					block_id nid = x > 0 ? ptr[idx - XOFFS] :
+						(nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx);
 					if (nid != id)
 						face<0>(j, id, nid, idx);
 				}
 				{ // Y
-					block_id nid = prevy[idx - CHUNK_ROW_OFFS];
+					block_id nid = y > 0 ? ptr[idx - YOFFS] :
+						(nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny);
 					if (nid != id)
 						face<1>(j, id, nid, idx);
 				}
 				{ // Z
-					block_id nid = prevz[idx - CHUNK_LAYER_OFFS];
+					block_id nid = z > 0 ? ptr[idx - ZOFFS] :
+						(nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz);
 					if (nid != id)
 						face<2>(j, id, nid, idx);
 				}
-	
+
 				if (j.block_meshes[id] >= 0)
 					block_mesh(j, id, j.block_meshes[id], idx);
 
-				prevx = id;
 				idx++;
 			}
-			prevy = ptr;
 		}
-		prevz = ptr;
 	}
-#else
-	{
-		int idx = 0;
-		for (int z=0; z<CHUNK_SIZE; ++z) {
-			for (int y=0; y<CHUNK_SIZE; ++y) {
-			
-				block_id prevx = nc_nx[idx + CHUNK_SIZE-1];
-				for (int x=0; x<CHUNK_SIZE; ++x) {
-
-					block_id id = ptr[idx];
-				
-					{ // X
-						block_id nid = prevx;
-						if (nid != id)
-							face<0>(j, id, nid, idx);
-					}
+#else //// Manually unwrapped version where all x==0 y==0 z==0 are own code path, to avoid expensive if in core loop
 	
-					if (j.block_meshes[id] >= 0)
-						block_mesh(j, id, j.block_meshes[id], idx);
+	#define BODY(X,Y,Z) {								\
+		block_id id = ptr[idx];							\
+		{												\
+			block_id nid = X;							\
+			if (nid != id) face<0>(j, id, nid, idx);	\
+		}												\
+		{												\
+			block_id nid = Y;							\
+			if (nid != id) face<1>(j, id, nid, idx);	\
+		}												\
+		{												\
+			block_id nid = Z;							\
+			if (nid != id) face<2>(j, id, nid, idx);	\
+		}												\
+		if (j.block_meshes[id] >= 0)					\
+			block_mesh(j, id, j.block_meshes[id], idx);	\
+														\
+		idx++;											\
+	}
+	
+	int idx = 0;
 
-					prevx = id;
-					idx++;
-				}
+	{ // z == 0
+		{ // y == 0
+			{ // x == 0
+				BODY(
+					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
+					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
+					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
+				)
+			}
+			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
+				BODY(
+					ptr[idx - XOFFS],
+					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
+					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
+				)
+			}
+		}
+
+		for (int y=1; y<CHUNK_SIZE; ++y) {
+			{ // x == 0
+				BODY(
+					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nz,
+					ptr[idx - YOFFS],
+					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
+				)
+			}
+			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
+				BODY(
+					ptr[idx - XOFFS],
+					ptr[idx - YOFFS],
+					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
+				)
 			}
 		}
 	}
 
-	{
-		for (int z=0; z<CHUNK_SIZE; ++z) {
-			for (int x=0; x<CHUNK_SIZE; ++x) {
-				int idx = z * CHUNK_LAYER_OFFS + x;
-
-				block_id prevy = nc_ny[idx + (CHUNK_SIZE-1)*CHUNK_ROW_OFFS];
-				for (int y=0; y<CHUNK_SIZE; ++y) {
-	
-					block_id id = ptr[idx];
-				
-					{ // Y
-						block_id nid = prevy;
-						if (nid != id)
-							face<1>(j, id, nid, idx);
-					}
-	
-					if (j.block_meshes[id] >= 0)
-						block_mesh(j, id, j.block_meshes[id], idx);
-	
-					prevy = id;
-
-					idx += CHUNK_ROW_OFFS;
-				}
+	for (int z=1; z<CHUNK_SIZE; ++z) {
+		{ // y == 0
+			{ // x == 0
+				BODY(
+					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
+					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
+					ptr[idx - ZOFFS]
+				)
+			}
+			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
+				BODY(
+					ptr[idx - XOFFS],
+					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
+					ptr[idx - ZOFFS]
+				)
 			}
 		}
-	}
 
-	{
-		for (int y=0; y<CHUNK_SIZE; ++y) {
-			for (int x=0; x<CHUNK_SIZE; ++x) {
-				int idx = y * CHUNK_ROW_OFFS + x;
-	
-				block_id prevz = nc_nz[idx + (CHUNK_SIZE-1)*CHUNK_LAYER_OFFS];
-				for (int z=0; z<CHUNK_SIZE; ++z) {
-	
-					block_id id = ptr[idx];
-				
-					{ // Z
-						block_id nid = prevz;
-						if (nid != id)
-							face<2>(j, id, nid, idx);
-					}
-	
-					if (j.block_meshes[id] >= 0)
-						block_mesh(j, id, j.block_meshes[id], idx);
-	
-					prevz = id;
-					idx += CHUNK_LAYER_OFFS;
-				}
+		for (int y=1; y<CHUNK_SIZE; ++y) {
+			{ // x == 0
+				BODY(
+					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
+					ptr[idx - YOFFS],
+					ptr[idx - ZOFFS]
+				)
+			}
+			for (int x=1; x<CHUNK_SIZE; ++x) { // core loop; xyz != 0
+				BODY(
+					ptr[idx - XOFFS],
+					ptr[idx - YOFFS],
+					ptr[idx - ZOFFS]
+				)
 			}
 		}
 	}

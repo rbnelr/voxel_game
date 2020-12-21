@@ -106,7 +106,7 @@ struct ChunkVoxels {
 	}
 
 	void densify () {
-		clog(INFO, ">> densify");
+		//clog(INFO, ">> densify");
 		ZoneScopedC(tracy::Color::Chocolate);
 
 		alloc_ids();
@@ -117,7 +117,7 @@ struct ChunkVoxels {
 		sparse_id = B_NULL;
 	}
 	void sparsify (block_id id) {
-		clog(INFO, ">> sparsify");
+		//clog(INFO, ">> sparsify");
 		ZoneScopedC(tracy::Color::Chocolate);
 
 		free_ids();
