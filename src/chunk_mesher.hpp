@@ -26,10 +26,12 @@ struct ChunkMeshData {
 		ZoneScopedC(tracy::Color::Crimson);
 		if (used_slices >= MAX_CHUNK_SLICES)
 			throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
-		slices[used_slices++] = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
+		slices[used_slices] = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
 
-		next_ptr  = slices[used_slices-1]->verts;
-		alloc_end = slices[used_slices-1]->verts + CHUNK_SLICE_LENGTH;
+		next_ptr  = slices[used_slices]->verts;
+		alloc_end = slices[used_slices]->verts + CHUNK_SLICE_LENGTH;
+
+		used_slices++;
 	}
 	static void free_slice (ChunkSliceData* s) {
 		if (s) {
@@ -69,8 +71,6 @@ struct RemeshChunkJob { // Chunk remesh
 
 	// output
 	RemeshingMesh			mesh;
-	block_id				sparse_id;
-	bool					is_sparse;
 
 	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg,
 		bool draw_world_border);

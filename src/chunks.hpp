@@ -117,11 +117,54 @@ struct ChunkVoxels {
 		sparse_id = B_NULL;
 	}
 	void sparsify (block_id id) {
-		clog(INFO, ">> densify");
+		clog(INFO, ">> sparsify");
 		ZoneScopedC(tracy::Color::Chocolate);
 
 		free_ids();
 		sparse_id = id;
+	}
+
+	void check_sparsify () {
+		if (!ids) return;
+		ZoneScopedC(tracy::Color::Chocolate);
+
+		bool sparse = true;
+	#if 0
+		for (size_t i=0; i<CHUNK_VOXEL_COUNT; ++i) {
+			if (ids[i] != ids[0]) {
+				sparse = false;
+				break;
+			}
+		}
+	#elif 1
+		uint64_t val = (uint64_t)ids[0] | ((uint64_t)ids[0] << 16) | ((uint64_t)ids[0] << 32) | ((uint64_t)ids[0] << 48);
+
+		uint64_t const* ptr = (uint64_t const*)ids;
+		for (size_t i=0; i<CHUNK_VOXEL_COUNT/4; ++i) {
+			if (ptr[i] != val) {
+				sparse = false;
+				break;
+			}
+		}
+	#elif 1
+		__m128i ref = _mm_set1_epi16(ids[0]);
+		__m128i const* ptr = (__m128i const*)ids;
+		__m128i const* end = (__m128i const*)&ids[CHUNK_VOXEL_COUNT];
+		do {
+			__m128i vals = _mm_load_si128(ptr);
+			__m128i cmp = _mm_xor_si128(vals, ref);
+			ptr++;
+
+			if (_mm_test_all_zeros(cmp, cmp) == 0) {
+				sparse = false;
+				break;
+			}
+		} while (ptr < end);
+	#else
+	#endif
+
+		if (sparse)
+			sparsify(ids[0]);
 	}
 
 	void alloc_ids () {
@@ -133,6 +176,7 @@ struct ChunkVoxels {
 		assert(ids != nullptr);
 		ZoneScopedC(tracy::Color::Crimson);
 		::free(ids);
+		ids = nullptr;
 	}
 
 	void free () {
@@ -360,11 +404,26 @@ struct Chunks {
 		ImGui::DragFloat("load_radius", &load_radius, 1);
 		ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
-		uint64_t block_count = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-		uint64_t block_mem = count * sizeof(ChunkVoxels);
+		uint64_t block_volume = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+		uint64_t block_mem = 0;
+		int sparse_chunks = 0;
+		int loaded_chunks = 0;
 
-		ImGui::Text("Voxel data: %4d chunks %11s blocks %5.0f MB RAM",
-			count, format_thousands(block_count).c_str(), (float)block_mem/1024/1024);
+		for (chunk_id id = 0; id < max_id; ++id) {
+			if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+
+			if (chunks[id].voxels.is_sparse()) {
+				sparse_chunks++;
+			} else {
+				block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
+			}
+			loaded_chunks++;
+		}
+
+		ImGui::Text("Voxels: %4d chunks  %11s volume %6d KB chunk storage",
+			count, format_thousands(block_volume).c_str(), (int)((commit_ptr - (char*)chunks) / 1000));
+		ImGui::Text("Voxel data: %5.0f MB RAM  %3.0f %% sparse chunks",
+			(float)block_mem/1024/1024, (float)sparse_chunks / (float)loaded_chunks * 100);
 
 		if (ImGui::TreeNode("chunks")) {
 			for (chunk_id id=0; id<max_id; ++id) {

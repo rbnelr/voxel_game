@@ -19,13 +19,7 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 			chunk._validate_flags();
 			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
-			//
-			//chunk.voxels.force_densify();
-			//
-			//for (int i=0; i<6; ++i) {
-			//	if (chunk.neighbours[i] != U16_NULL)
-			//		data.world.chunks[chunk.neighbours[i]].voxels.force_densify();
-			//}
+			chunk.voxels.check_sparsify();
 
 			if (chunk.voxels.is_sparse()) {
 				chunk.flags &= ~Chunk::DIRTY;
