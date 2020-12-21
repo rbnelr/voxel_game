@@ -75,7 +75,10 @@ audio::AudioSample mix_sounds () {
 	return total;
 }
 
-int portaudio_callback (
+struct PortAudio {
+	PaStream *stream;
+
+	static int portaudio_callback (
 		const void *input,
 		void *output,
 		unsigned long frameCount,
@@ -83,79 +86,75 @@ int portaudio_callback (
 		PaStreamCallbackFlags statusFlags,
 		void *userData
 	) {
-	locked = true;
+		locked = true;
 
-	float *out = (float*)output;
+		float *out = (float*)output;
 
-	for(unsigned i=0; i<frameCount; i++) {
-		auto smpl = mix_sounds();
+		for(unsigned i=0; i<frameCount; i++) {
+			auto smpl = mix_sounds();
 
-		float left  = smpl.left  * volume;
-		float right = smpl.right * volume;
+			float left  = smpl.left  * volume;
+			float right = smpl.right * volume;
 
-		*out++ = left; // left
-		*out++ = right; // right
+			*out++ = left; // left
+			*out++ = right; // right
+		}
+
+		locked = false;
+		return 0;
 	}
+	
+	PortAudio () {
 
-	locked = false;
-	return 0;
-}
+		PaError err = Pa_Initialize();
+		if(err != paNoError) {
+			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+			return;
+		}
 
-bool test = [] () {
-	return false;
+		////
 
-	PaError err;
+		/* Open an audio I/O stream. */
+		err = Pa_OpenDefaultStream(&stream,
+			0,          /* no input channels */
+			2,          /* stereo output */
+			paFloat32,  /* 32 bit floating point output */
+			SAMPLE_RATE,
+			64,        /* frames per buffer, i.e. the number
+					   of sample frames that PortAudio will
+					   request from the callback. Many apps
+					   may want to use
+					   paFramesPerBufferUnspecified, which
+					   tells PortAudio to pick the best,
+					   possibly changing, buffer size.*/
+			portaudio_callback, /* this is your callback function */
+			NULL ); /*This is a pointer that will be passed to
+					your callback*/
+		if(err != paNoError) {
+			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+			return;
+		}
 
-	err = Pa_Initialize();
-	if(err != paNoError) {
-		fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-		return false;
+		err = Pa_StartStream(stream);
+		if(err != paNoError) {
+			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+			return;
+		}
 	}
-
-	////
-
-	PaStream *stream;
-	/* Open an audio I/O stream. */
-	err = Pa_OpenDefaultStream(&stream,
-		0,          /* no input channels */
-		2,          /* stereo output */
-		paFloat32,  /* 32 bit floating point output */
-		SAMPLE_RATE,
-		64,        /* frames per buffer, i.e. the number
-					of sample frames that PortAudio will
-					request from the callback. Many apps
-					may want to use
-					paFramesPerBufferUnspecified, which
-					tells PortAudio to pick the best,
-					possibly changing, buffer size.*/
-		portaudio_callback, /* this is your callback function */
-		NULL ); /*This is a pointer that will be passed to
-				 your callback*/
-	if(err != paNoError) {
-		fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-		return false;
+	~PortAudio () {
+		PaError err = Pa_StopStream( stream );
+		if(err != paNoError) {
+			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+			return;
+		}
+		
+		
+		err = Pa_Terminate();
+		if(err != paNoError) {
+			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+			return;
+		}
 	}
+};
 
-	err = Pa_StartStream(stream);
-	if(err != paNoError) {
-		fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-		return false;
-	}
-
-	//err = Pa_StopStream( stream );
-	//if(err != paNoError) {
-	//	fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-	//	return false;
-	//}
-	//
-	//
-	//////
-	//
-	//err = Pa_Terminate();
-	//if(err != paNoError) {
-	//	fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-	//	return false;
-	//}
-
-	return true;
-} ();
+PortAudio g_portaudio;

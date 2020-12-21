@@ -144,6 +144,6 @@ struct ChunkRenderer {
 
 };
 
-inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, parallelism_threads_prio, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
+inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, TPRIO_PARALLELISM, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
 
 } // namespace vk

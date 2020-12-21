@@ -113,4 +113,4 @@ struct WorldgenJob {
 	void execute ();
 };
 
-inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, background_threads_prio, ">> background threadpool"  );
+inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, TPRIO_BACKGROUND, ">> background threadpool"  );
