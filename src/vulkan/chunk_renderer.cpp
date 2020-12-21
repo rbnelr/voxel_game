@@ -93,29 +93,21 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 
 	{
 		ZoneScopedN("upload_slices");
-		//for (size_t result_count = 0; result_count < remesh_chunks_count; ) {
-			//std::unique_ptr<RemeshChunkJob> results[64];
-			//size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+		for (size_t resi=0; resi < remesh_chunks_count;) {
+			std::unique_ptr<RemeshChunkJob> results[64];
+			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
 
-			// need to wait for all to be done to safely do sparsify
-			// TODO: figure something better out for sparse system
-			std::vector<std::unique_ptr<RemeshChunkJob>> results (remesh_chunks_count);
-			size_t count = parallelism_threadpool.results.pop_n_wait(results.data(), remesh_chunks_count, remesh_chunks_count);
-
-			for (size_t i = 0; i < count; ++i) {
+			for (size_t i=0; i<count; ++i) {
 				auto res = std::move(results[i]);
 
 				upload_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
 				upload_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
 
-				//if (res->is_sparse)
-				//	res->chunk->voxels.sparsify(res->sparse_id);
-
 				res->chunk->flags &= ~Chunk::DIRTY;
 			}
 
-		//	result_count += count;
-		//}
+			resi += count;
+		}
 	}
 
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight

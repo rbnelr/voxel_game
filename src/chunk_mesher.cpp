@@ -156,6 +156,84 @@ void mesh_chunk (RemeshChunkJob& j) {
 		}
 		prevz = ptr;
 	}
+
+	/*
+		
+	for (int z=0; z<CHUNK_SIZE; ++z) {
+		for (int y=0; y<CHUNK_SIZE; ++y) {
+			
+			block_id prevx = nc_nx[idx + CHUNK_SIZE-1];
+			for (int x=0; x<CHUNK_SIZE; ++x) {
+
+				block_id id = ptr[idx];
+				if (id != j.sparse_id)
+					j.is_sparse = false;
+
+				{ // X
+					block_id nid = prevx;
+					if (nid != id)
+						face<0>(j, id, nid, idx);
+				}
+	
+				if (j.block_meshes[id] >= 0)
+					block_mesh(j, id, j.block_meshes[id], idx);
+
+				prevx = id;
+				idx++;
+			}
+		}
+	}
+
+	for (int z=0; z<CHUNK_SIZE; ++z) {
+		for (int x=0; x<CHUNK_SIZE; ++x) {
+
+			block_id prevy = nc_ny[idx + (CHUNK_SIZE-1)*CHUNK_ROW_OFFS];
+			for (int y=0; y<CHUNK_SIZE; ++y) {
+
+				block_id id = ptr[idx];
+				if (id != j.sparse_id)
+					j.is_sparse = false;
+
+				{ // Y
+					block_id nid = prevy;
+					if (nid != id)
+						face<1>(j, id, nid, idx);
+				}
+
+				if (j.block_meshes[id] >= 0)
+					block_mesh(j, id, j.block_meshes[id], idx);
+
+				prevy = id;
+				idx++;
+			}
+		}
+	}
+
+	for (int y=0; y<CHUNK_SIZE; ++y) {
+		for (int x=0; x<CHUNK_SIZE; ++x) {
+
+			block_id prevz = nc_nz[idx + (CHUNK_SIZE-1)*CHUNK_LAYER_OFFS];
+			for (int z=0; z<CHUNK_SIZE; ++z) {
+
+				block_id id = ptr[idx];
+				if (id != j.sparse_id)
+					j.is_sparse = false;
+
+				{ // Z
+					block_id nid = prevz;
+					if (nid != id)
+						face<2>(j, id, nid, idx);
+				}
+
+				if (j.block_meshes[id] >= 0)
+					block_mesh(j, id, j.block_meshes[id], idx);
+
+				prevz = id;
+				idx++;
+			}
+		}
+	}
+	*/
 }
 
 RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, bool draw_world_border):

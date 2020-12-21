@@ -16,8 +16,8 @@ inline const int logical_cores = std::thread::hardware_concurrency();
 
 // setting my threads to some value about NORMAL seems to be required to even get my main thread & parallelism_threads to run at all
 // when the scheduler is loaded with other apps and my background threads
-// -> THREAD_PRIORITY_ABOVE_NORMAL is needed to get stable framerates during load
-const int main_thread_prio = THREAD_PRIORITY_ABOVE_NORMAL;
+// -> THREAD_PRIORITY_HIGHEST + THREAD_PRIORITY_ABOVE_NORMAL is needed to get stable framerates during load
+const int main_thread_prio = THREAD_PRIORITY_HIGHEST;
 const int background_threads_prio = THREAD_PRIORITY_LOWEST;
 const int parallelism_threads_prio = THREAD_PRIORITY_ABOVE_NORMAL;
 
@@ -26,28 +26,11 @@ const int parallelism_threads_prio = THREAD_PRIORITY_ABOVE_NORMAL;
 // keep a reasonable amount of cores free from background work because lower thread priority is not enough to ensure that these threads get preempted when high prio threads need to run
 // this is because of limited frequency of the scheduling interrupt 'timer resolution' on windows at least
 // the main thread should be able to run after waiting and there need to be enough additional cores free for the os tasks, else mainthread often gets preemted for ver long (1ms - 10+ ms) causing serious lag
-// cores:  1 -> threads: 1
-// cores:  2 -> threads: 1
-// cores:  4 -> threads: 2
-// cores:  6 -> threads: 4
-// cores:  8 -> threads: 5
-// cores: 12 -> threads: 8
-// cores: 16 -> threads: 12
-// cores: 24 -> threads: 18
-// cores: 32 -> threads: 24
-inline const int background_threads  = clamp(roundi((float)logical_cores * 0.79f) - 1, 1, logical_cores);
 
-// cores:  1 -> threads: 1
-// cores:  2 -> threads: 1
-// cores:  4 -> threads: 3
-// cores:  6 -> threads: 4
-// cores:  8 -> threads: 6
-// cores: 12 -> threads: 10
-// cores: 16 -> threads: 13
-// cores: 24 -> threads: 20
-// cores: 32 -> threads: 28
+inline const int background_threads  = clamp(roundi((float)logical_cores * 0.6f) - 1, 1, logical_cores);
+
 #if defined(NDEBUG) || 1
-inline const int parallelism_threads = clamp(roundi((float)logical_cores * 0.894f) - 1, 1, logical_cores);
+inline const int parallelism_threads = clamp(roundi((float)logical_cores * 0.84f) - 1, 1, logical_cores);
 #else
 inline const int parallelism_threads = 1;
 #endif
