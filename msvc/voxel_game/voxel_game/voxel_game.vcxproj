@@ -544,6 +544,7 @@
     <None Include="..\..\..\shaders\debug_lines.glsl" />
     <None Include="..\..\..\shaders\rescale.glsl" />
     <None Include="..\..\..\shaders\skybox.glsl" />
+    <None Include="..\..\..\shaders\ssao.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

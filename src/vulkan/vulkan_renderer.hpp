@@ -104,13 +104,25 @@ struct Renderer {
 	VkSampler					main_sampler;
 	Texture						tilemap_img;
 
+	// SSAO Renderpass
+	VkRenderPass				ssao_renderpass;
+	RenderBuffer				ssao_color;
+	VkFramebuffer				ssao_framebuffer;
+
 	// UI renderpass (game ui + imgui)
 	// initial image is main_color rescaled, rendered at window_res
 	VkRenderPass				ui_renderpass;
 
+	VkDescriptorSetLayout		ssao_descriptor_layout; // set 1
+	VkPipelineLayout			ssao_pipeline_layout;
+	Pipeline*					ssao_pipeline;
+
 	VkDescriptorSetLayout		rescale_descriptor_layout; // set 1
 	VkPipelineLayout			rescale_pipeline_layout;
 	Pipeline*					rescale_pipeline;
+
+	VkDescriptorSet				ssao_descriptor_set;
+	VkSampler					ssao_sampler;
 
 	VkDescriptorSet				rescale_descriptor_set;
 	VkSampler					rescale_sampler, rescale_sampler_nearest;
@@ -166,6 +178,10 @@ struct Renderer {
 	void destroy_ubo_buffers ();
 
 	void create_common_descriptors ();
+
+	void create_ssao_descriptors ();
+	void update_ssao_img_descr ();
+
 	void create_rescale_descriptors ();
 	void update_rescale_img_descr ();
 
@@ -191,11 +207,15 @@ struct Renderer {
 	RenderBuffer create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa);
 
 	VkRenderPass create_main_renderpass (VkFormat color_format, VkFormat depth_format, int msaa);
+	VkRenderPass create_ssao_renderpass (VkFormat color_format);
 	VkRenderPass create_ui_renderpass (VkFormat color_format);
 
 	void create_main_framebuffer (int2 size, VkFormat color_format, VkFormat depth_format, int msaa);
 	void destroy_main_framebuffer ();
 	void recreate_main_framebuffer (int2 wnd_size);
+	
+	void create_ssao_framebuffer (int2 size, VkFormat color_format);
+	void destroy_ssao_framebuffer ();
 
 	//// One time commands
 	VkCommandBuffer begin_init_cmds ();

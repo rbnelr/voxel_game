@@ -4,6 +4,8 @@
 #include "imgui/imgui_impl_glfw.h"
 #include "imgui/imgui_impl_vulkan.h"
 
+#include <regex>
+
 namespace vk {
 
 std_vector<char const*> glfwGetRequiredInstanceExtensions_vec () {
@@ -21,8 +23,16 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback (
 		//| VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
 		)) return VK_FALSE;
 
-	fprintf(stderr, "[Vulkan] %s\n", pCallbackData->pMessage);
-	//clog(ERROR, "[Vulkan] %s\n", pCallbackData->pMessage);
+	// Try to get message to be more readable instead of a 500 char line
+	std::string msg = pCallbackData->pMessage;
+	msg = std::regex_replace(msg, std::regex("Object \\d*"), "\n$&");
+	msg = std::regex_replace(msg, std::regex("\\| MessageID .*\\| "), "\n$&\n\n");
+	msg = std::regex_replace(msg, std::regex(" - "), "\n$&");
+	msg = std::regex_replace(msg, std::regex("The Vulkan spec states: "), "\n\n$&\n");
+	msg = std::regex_replace(msg, std::regex("\\(https:.*\\)"), "\n$&");
+
+	fprintf(stderr, "[Vulkan] %s\n", msg.c_str());
+	//clog(ERROR, "[Vulkan] %s\n", msg.c_str());
 
 #if DEBUGLEVEL >= 2
 	if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
@@ -45,14 +55,17 @@ VulkanWindowContext::VulkanWindowContext (GLFWwindow* window, char const* app_na
 
 	instance = create_instance(app_name, debug_callback, enabled_extensions, enabled_layers);
 
-#ifdef VK_VALIDATION_LAYERS
-	debug_messenger = create_debug_utils_messenger_ext(instance, debug_callback);
+#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+	dbg_utils.load(instance);
+#endif
+#if VK_VALIDATION_LAYERS
+	debug_messenger = create_debug_utils_messenger_ext(dbg_utils, instance, debug_callback);
 #endif
 
 	VK_CHECK_RESULT(glfwCreateWindowSurface(instance, window, nullptr, &surface));
 
 	pdev = select_device(instance, surface, &queues.families);
-	dev = create_logical_device(pdev, enabled_layers, &queues, &dbgmarker);
+	dev = create_logical_device(pdev, enabled_layers, &queues);
 
 	create_swap_chain(SWAP_CHAIN_SIZE);
 }
@@ -62,8 +75,8 @@ VulkanWindowContext::~VulkanWindowContext () {
 	destroy_swap_chain();
 	vkDestroyDevice(dev, nullptr);
 	vkDestroySurfaceKHR(instance, surface, nullptr);
-#ifdef VK_VALIDATION_LAYERS
-	destroy_debug_utils_messenger_ext(instance, debug_messenger);
+#if VK_VALIDATION_LAYERS
+	destroy_debug_utils_messenger_ext(dbg_utils, instance, debug_messenger);
 #endif
 	vkDestroyInstance(instance, nullptr);
 }
@@ -147,22 +160,17 @@ void set_debug_utils_messenger_create_info_ext (VkDebugUtilsMessengerCreateInfoE
 	info->pUserData = nullptr;
 }
 
-VkDebugUtilsMessengerEXT create_debug_utils_messenger_ext (VkInstance instance, PFN_vkDebugUtilsMessengerCallbackEXT callback) {
+VkDebugUtilsMessengerEXT create_debug_utils_messenger_ext (DebugUtils& dbg_utils, VkInstance instance, PFN_vkDebugUtilsMessengerCallbackEXT callback) {
 	VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 
 	VkDebugUtilsMessengerCreateInfoEXT info = {};
 	set_debug_utils_messenger_create_info_ext(&info, callback);
 
-	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-	if (func)
-		func(instance, &info, nullptr, &debug_messenger);
-
+	dbg_utils.vkCreateDebugUtilsMessengerEXT(instance, &info, nullptr, &debug_messenger);
 	return debug_messenger;
 }
-void destroy_debug_utils_messenger_ext (VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger) {
-	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-	if (func)
-		func(instance, debug_messenger, nullptr);
+void destroy_debug_utils_messenger_ext (DebugUtils& dbg_utils, VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger) {
+	dbg_utils.vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
 }
 
 VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallbackEXT callback,
@@ -172,11 +180,13 @@ VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallb
 	// Check extensions
 	auto avail_extensions = get_vector<VkExtensionProperties>(vkEnumerateInstanceExtensionProperties, nullptr);
 
-	// Check validation layers
-#ifdef VK_VALIDATION_LAYERS
-	{
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
 
+	// Check validation layers
+#if VK_VALIDATION_LAYERS
+	{
 		auto avail_layers = get_vector<VkLayerProperties>(vkEnumerateInstanceLayerProperties);
 
 		for (auto avail : avail_layers) {
@@ -209,8 +219,8 @@ VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallb
 	info.enabledLayerCount	= (uint32_t)layers.size();
 	info.ppEnabledLayerNames = layers.data();
 
+#if VK_VALIDATION_LAYERS
 	VkDebugUtilsMessengerCreateInfoEXT dbg_create_info = {};
-#ifdef VK_VALIDATION_LAYERS
 	{
 		set_debug_utils_messenger_create_info_ext(&dbg_create_info, callback);
 		info.pNext = &dbg_create_info;
@@ -341,7 +351,7 @@ VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, Queue
 	return selected;
 }
 
-VkDevice create_logical_device (VkPhysicalDevice pdev, std_vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker) {
+VkDevice create_logical_device (VkPhysicalDevice pdev, std_vector<char const*> const& enabled_layers, Queues* queues) {
 	ZoneScoped;
 	
 	// make sure we only specifiy unique queues (We pretend that the present queue is a seperate queue, even though it is usually just the graphics queue)
@@ -373,12 +383,6 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std_vector<char const*> c
 	std_vector<const char*> enabled_extensions;
 	for (auto e : DEVICE_EXTENSIONS)
 		enabled_extensions.push_back(e);
-
-#if GPU_DEBUG_MARKERS
-	bool enable_dbg_marker = contains_ext(avail_extensions, VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-	if (enable_dbg_marker)
-		enabled_extensions.push_back(VK_EXT_DEBUG_MARKER_EXTENSION_NAME);
-#endif
 
 	VkPhysicalDeviceFeatures features = {};
 	// Just fail if these are not supported

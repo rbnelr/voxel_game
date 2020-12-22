@@ -5,15 +5,14 @@
 
 struct GLFWwindow;
 
-#if DEBUGLEVEL >= 2
-	#define VK_VALIDATION_LAYERS
-#endif
+#define VK_VALIDATION_LAYERS (DEBUGLEVEL >= 2)
+#define VK_DEBUG_LABELS 1
 
 namespace vk {
 
 static constexpr int SWAP_CHAIN_SIZE = 3;
 
-#ifdef VK_VALIDATION_LAYERS
+#if VK_VALIDATION_LAYERS
 inline constexpr const char* VALIDATION_LAYERS[] = {
 	"VK_LAYER_KHRONOS_validation",
 };
@@ -28,8 +27,6 @@ inline constexpr const char* DEVICE_EXTENSIONS[] = {
 
 	"VK_KHR_shader_draw_parameters", // needed for multidraw to be useful
 };
-
-#define GPU_DEBUG_MARKERS 1
 
 //// Vulkan Window Context to encapsulate most of the initialization
 struct QueueFamilies {
@@ -85,11 +82,11 @@ struct VulkanWindowContext {
 	VkSurfaceKHR				surface;
 	Queues						queues;
 
-#ifdef VK_VALIDATION_LAYERS
-	VkDebugUtilsMessengerEXT	debug_messenger;
+#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+	DebugUtils					dbg_utils;
 #endif
-#if GPU_DEBUG_MARKERS
-	DebugMarker					dbgmarker;
+#if VK_VALIDATION_LAYERS
+	VkDebugUtilsMessengerEXT	debug_messenger;
 #endif
 
 	std_vector<char const*>	enabled_layers;
@@ -136,15 +133,15 @@ struct VulkanWindowContext {
 	void recreate_swap_chain (int swap_chain_size);
 };
 
-#if GPU_DEBUG_MARKERS
+#if VK_DEBUG_LABELS
 	struct _ScopedGpuTrace {
-		VulkanWindowContext& ctx;
+		VulkanWindowContext& wndctx;
 		VkCommandBuffer cmds;
-		_ScopedGpuTrace (VulkanWindowContext& ctx, VkCommandBuffer cmds, char const* name): ctx{ctx}, cmds{cmds} {
-			ctx.dbgmarker.begin_marker(ctx.dev, cmds, name);
+		_ScopedGpuTrace (VulkanWindowContext& wndctx, VkCommandBuffer cmds, char const* name): wndctx{wndctx}, cmds{cmds} {
+			wndctx.dbg_utils.begin_cmdbuf_label(cmds, name);
 		}
 		~_ScopedGpuTrace () {
-			ctx.dbgmarker.end_marker(ctx.dev, cmds);
+			wndctx.dbg_utils.end_cmdbuf_label(cmds);
 		}
 	};
 
@@ -152,10 +149,10 @@ struct VulkanWindowContext {
 		_ScopedGpuTrace __scoped_##__COUNTER__ ((wndctx), (cmds), (name)); \
 		TracyVkZone((wndctx).tracy_ctx, (cmds), (name))
 
-	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), (name))
-	#define GPU_DBG_NAMEf(wndctx, obj, name, ...) (wndctx).dbgmarker.set_name((wndctx).dev, (obj), prints((name), __VA_ARGS__).c_str())
+	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbg_utils.set_obj_label((wndctx).dev, (obj), (name))
+	#define GPU_DBG_NAMEf(wndctx, obj, name, ...) (wndctx).dbg_utils.set_obj_label((wndctx).dev, (obj), prints((name), __VA_ARGS__).c_str())
 #else
-	#define GPU_TRACE(wndctx, cmds, name) TracyVkZone(wndctx.tracy_ctx, cmds, name)
+	#define GPU_TRACE(wndctx, cmds, name) TracyVkZone((wndctx).tracy_ctx, cmds, name)
 	#define GPU_DBG_NAME(wndctx, obj, name)
 	#define GPU_DBG_NAMEf(wndctx, obj, name, ...)
 #endif
@@ -163,8 +160,8 @@ struct VulkanWindowContext {
 //// Instance creation
 void set_debug_utils_messenger_create_info_ext (VkDebugUtilsMessengerCreateInfoEXT* info, PFN_vkDebugUtilsMessengerCallbackEXT callback);
 
-VkDebugUtilsMessengerEXT create_debug_utils_messenger_ext (VkInstance instance, PFN_vkDebugUtilsMessengerCallbackEXT callback);
-void destroy_debug_utils_messenger_ext (VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger);
+VkDebugUtilsMessengerEXT create_debug_utils_messenger_ext (DebugUtils& dbg_utils, VkInstance instance, PFN_vkDebugUtilsMessengerCallbackEXT callback);
+void destroy_debug_utils_messenger_ext (DebugUtils& dbg_utils, VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger);
 
 VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallbackEXT callback,
 	std_vector<char const*>& extensions, std_vector<char const*>& layers);
@@ -179,7 +176,7 @@ SwapChainSupport query_swap_chain_support (VkPhysicalDevice device, VkSurfaceKHR
 VkPhysicalDevice select_device (VkInstance instance, VkSurfaceKHR surface, QueueFamilies* out_queue_families);
 
 VkDevice create_logical_device (
-	VkPhysicalDevice physical_device, std_vector<char const*> const& enabled_layers, Queues* queues, DebugMarker* dbg_marker);
+	VkPhysicalDevice physical_device, std_vector<char const*> const& enabled_layers, Queues* queues);
 
 //// Swap chain creation
 VkSurfaceFormatKHR choose_swap_surface_format (std_vector<VkSurfaceFormatKHR> const& formats);
