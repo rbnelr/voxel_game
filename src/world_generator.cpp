@@ -205,14 +205,14 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
 
 				if (block_free) {
-					float tree_chance = rand.uniform();
-					float grass_chance = rand.uniform();
+					float tree_chance = rand.uniformf();
+					float grass_chance = rand.uniformf();
 
-					if (rand.uniform() < effective_tree_prob) {
+					if (rand.uniformf() < effective_tree_prob) {
 						tree_poss.push_back( int3(x,y, highest_block +1) );
-					} else if (rand.uniform() < grass_density) {
+					} else if (rand.uniformf() < grass_density) {
 						*bid = TALLGRASS;
-					} else if (rand.uniform() < 0.0005f) {
+					} else if (rand.uniformf() < 0.0005f) {
 						*bid = TORCH;
 						//*block_light = g_blocks.blocks[TORCH].glow;
 					}

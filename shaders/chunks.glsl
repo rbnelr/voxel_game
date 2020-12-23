@@ -49,6 +49,8 @@ layout(location = 0) vs2fs VS {
 
 	layout(set = 0, binding = 2) uniform sampler2DArray textures;
 
+	layout(location = 0) out vec4 frag_col;
+	layout(location = 1) out vec2 frag_normal;
 	void main () {
 		vec4 col = texture(textures, vs.uvi);
 		

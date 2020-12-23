@@ -396,5 +396,14 @@
     <None Include="..\..\..\shaders\ssao.glsl">
       <Filter>shaders</Filter>
     </None>
+    <None Include="..\..\..\shaders\util.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders\debug.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\..\shaders\noise.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

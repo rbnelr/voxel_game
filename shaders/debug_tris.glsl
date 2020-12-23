@@ -26,6 +26,7 @@ layout(location = 0) vs2fs VS {
 	const float light_col = 0.6;
 	const float ambient_col = 0.4;
 
+	layout(location = 0) out vec4 frag_col;
 	void main () {
 		vec3 light_dir_cam = normalize(light_pos_cam - vs.pos_cam);
 

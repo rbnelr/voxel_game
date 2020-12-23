@@ -70,6 +70,10 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 
 	float a, b;
 	// use_reverse_depth with use infinite far plane
+	// visible range on z axis in opengl and vulkan goes from -near to -inf
+	// depth formula is: (with input w=1) z' = near, w' = -z  ->  depth = near/-z
+	// depth values go from 1 at the near plane to 0 at infinity
+	// inverse formula ist -z = near / depth
 	clip_far = 1000000.0f; // can't actually set far to be infinite if I want frustrum culling to work without modification
 	a = 0.0f;
 	b = clip_near;
@@ -110,7 +114,7 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 	float y = 2.0f / vsize;
 
 	float a, b;
-	// use_reverse_depth
+	// TODO: why use clip_far here? because I can't divide z while not dividing x and y?
 	a = 1.0f / (clip_far - clip_near);
 	b = clip_near * a + 1.0f;
 
@@ -176,7 +180,6 @@ float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse) {
 		*out_inverse = rotate3_Z(+aer.x) * rotate3_X(+aer.y + deg(90)) * rotate3_Z(-aer.z);
 	return             rotate3_Z(+aer.z) * rotate3_X(-aer.y - deg(90)) * rotate3_Z(-aer.x);
 }
-
 
 float3x3 Flycam::calc_world_to_cam_rot (float3x3* cam_to_world_rot) {
 	return calc_aer_rotation(cam.rot_aer, cam_to_world_rot);

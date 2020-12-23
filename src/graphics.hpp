@@ -125,6 +125,8 @@ struct DebugDraw {
 		tris.shrink_to_fit();
 	}
 
+	void vector (float3 pos, float3 dir, lrgba col);
+
 	void wire_cube (float3 pos, float3 size, lrgba col);
 	void wire_frustrum (Camera_View const& view, lrgba col);
 

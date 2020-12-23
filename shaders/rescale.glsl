@@ -1,6 +1,5 @@
 #version 450
-#define NO_VIEW
-#include "common.glsl"
+#include "util.glsl"
 
 layout(location = 0) vs2fs VS {
 	vec2 uv;
@@ -14,8 +13,17 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-	layout(set = 1, binding = 0) uniform sampler2D src_image;
+	layout(set = 1, binding = 0) uniform sampler2D main_albedo;
+	layout(set = 1, binding = 1) uniform sampler2D ssao;
+
+	layout(location = 0) out vec4 frag_col;
 	void main () {
-		frag_col = texture(src_image, vs.uv);
+	#if 0
+		vec4 col = texture(main_albedo, vs.uv);
+		col.rgb *= texture(ssao, vs.uv).rrr;
+		frag_col = col;
+	#else
+		frag_col = vec4(texture(ssao, vs.uv).rrr, 1.0);
+	#endif
 	}
 #endif

@@ -13,7 +13,7 @@
 void Window::set_vsync (bool on) {
 	//ZoneScopedN("glfwSwapInterval");
 
-	glfwSwapInterval(on ? _vsync_on_interval : 0);
+	//glfwSwapInterval(on ? _vsync_on_interval : 0);
 	vsync = on;
 }
 

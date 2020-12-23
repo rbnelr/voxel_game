@@ -48,6 +48,23 @@ struct ViewUniforms {
 	}
 };
 
+#if 0
+inline bool gen_ssao_samples = [] () {
+	int count = 64;
+
+	printf("vec3 rand_samples[%d] = {\n", count);
+	for (int i=0; i<count; ++i) {
+		float3 v = random.uniform_direction();
+		float len = lerp(0.1f, 1.0f, random.uniformf());
+		v *= len * len; // bias toward center
+		printf("	vec3(%+f, %+f, %+f),\n", v.x, v.y, v.z);
+	}
+	printf("};\n");
+
+	return true;
+} ();
+#endif
+
 struct Renderer {
 	VulkanWindowContext			ctx;
 
@@ -56,8 +73,10 @@ struct Renderer {
 	VkFormat					wnd_color_format;
 
 	// Intermediary frame buffer formats
-	VkFormat					fb_color_format;
+	VkFormat					fb_color_format; // hopefully f16
 	VkFormat					fb_depth_format;
+	VkFormat					fb_float_format;
+	VkFormat					fb_vec2_format;
 
 	int							max_msaa_samples;
 	int							msaa = 1;
@@ -106,7 +125,7 @@ struct Renderer {
 
 	// SSAO Renderpass
 	VkRenderPass				ssao_renderpass;
-	RenderBuffer				ssao_color;
+	RenderBuffer				ssao_fac;
 	VkFramebuffer				ssao_framebuffer;
 
 	// UI renderpass (game ui + imgui)
@@ -122,10 +141,9 @@ struct Renderer {
 	Pipeline*					rescale_pipeline;
 
 	VkDescriptorSet				ssao_descriptor_set;
-	VkSampler					ssao_sampler;
-
 	VkDescriptorSet				rescale_descriptor_set;
-	VkSampler					rescale_sampler, rescale_sampler_nearest;
+
+	VkSampler					framebuf_sampler, framebuf_sampler_nearest;
 
 	ChunkRenderer				chunk_renderer;
 	DebugDrawer					debug_drawer;
@@ -201,6 +219,21 @@ struct Renderer {
 			{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+		);
+	}
+
+	VkFormat find_float_format () {
+		return find_supported_format(ctx.pdev,
+			{ VK_FORMAT_R16_SFLOAT, VK_FORMAT_R8_SNORM },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+		);
+	}
+	VkFormat find_vec2_format () {
+		return find_supported_format(ctx.pdev,
+			{ VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R8G8_SNORM },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
 		);
 	}
 

@@ -141,6 +141,15 @@ void Assets::load_block_textures (json const& blocks_json) {
 	}
 }
 
+void DebugDraw::vector (float3 pos, float3 dir, lrgba col) {
+	size_t idx = lines.size();
+	lines.resize(idx + 2);
+	auto* out = &lines[idx];
+	
+	*out++ = { pos, col };
+	*out++ = { pos + dir, col };
+}
+
 void DebugDraw::wire_cube (float3 pos, float3 size, lrgba col) {
 	static constexpr float3 _wire_cube[12 * 2] {
 		// bottom lines

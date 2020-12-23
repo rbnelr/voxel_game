@@ -120,29 +120,33 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 	}
 	vkCmdEndRenderPass(cmds);
 
+	auto image_barrier = [&] (RenderBuffer& renderbuf, bool depth=false) {
+		VkImageMemoryBarrier img = {};
+		img.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		img.srcAccessMask = depth ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		img.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		img.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		img.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		img.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		img.image = renderbuf.image;
+		img.subresourceRange.aspectMask = depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+		img.subresourceRange.baseMipLevel = 0;
+		img.subresourceRange.levelCount = 1;
+		img.subresourceRange.baseArrayLayer = 0;
+		img.subresourceRange.layerCount = 1;
+
+		vkCmdPipelineBarrier(cmds,
+			depth ?
+				VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : // TODO: correct stage for depth writes?
+				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0, 0, nullptr, 0, nullptr, 1, &img);
+	};
+
 	{ // ssao render pass
 
-		{ // sync up/downscaling to wait for main color rendering
-			VkImageMemoryBarrier img = {};
-			img.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			img.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			img.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			img.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			img.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			img.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			img.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			img.image = main_color.image;
-			img.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			img.subresourceRange.baseMipLevel = 0;
-			img.subresourceRange.levelCount = 1;
-			img.subresourceRange.baseArrayLayer = 0;
-			img.subresourceRange.layerCount = 1;
-
-			vkCmdPipelineBarrier(cmds,
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				0, 0, nullptr, 0, nullptr, 1, &img);
-		}
+		image_barrier(main_depth, true);
 
 		{
 			VkRenderPassBeginInfo render_pass_info = {};
@@ -176,27 +180,8 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 
 	{ // ui render pass
 		
-		{ // sync up/downscaling to wait for main color rendering
-			VkImageMemoryBarrier img = {};
-			img.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			img.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			img.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			img.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			img.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			img.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			img.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			img.image = ssao_color.image;
-			img.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			img.subresourceRange.baseMipLevel = 0;
-			img.subresourceRange.levelCount = 1;
-			img.subresourceRange.baseArrayLayer = 0;
-			img.subresourceRange.layerCount = 1;
-
-			vkCmdPipelineBarrier(cmds,
-				VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-				VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-				0, 0, nullptr, 0, nullptr, 1, &img);
-		}
+		image_barrier(main_color);
+		image_barrier(ssao_fac);
 
 		{
 			VkRenderPassBeginInfo render_pass_info = {};
@@ -277,6 +262,8 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 
 	fb_color_format = find_color_format();
 	fb_depth_format = find_depth_format();
+	fb_float_format = find_float_format();
+	fb_vec2_format = find_vec2_format();
 
 	max_msaa_samples = get_max_usable_multisample_count(ctx.pdev);
 	msaa = 1;
@@ -301,7 +288,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	main_renderpass = create_main_renderpass(fb_color_format, fb_depth_format, msaa);
 	GPU_DBG_NAME(ctx, main_renderpass, "main_renderpass");
 
-	ssao_renderpass = create_ssao_renderpass(fb_color_format);
+	ssao_renderpass = create_ssao_renderpass(fb_float_format);
 	GPU_DBG_NAME(ctx, ssao_renderpass, "ssao_renderpass");
 
 	ui_renderpass = create_ui_renderpass(wnd_color_format);
@@ -313,8 +300,28 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 		GPU_DBG_NAMEf(ctx, frame_data[i].ubo_descriptor_set, "ubo_descriptor_set[%d]", i);
 
 	{
+		VkSamplerCreateInfo sampler_info = {};
+		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		sampler_info.magFilter = VK_FILTER_LINEAR;
+		sampler_info.minFilter = VK_FILTER_LINEAR;
+		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampler_info.anisotropyEnable = VK_FALSE;
+		sampler_info.minLod = 0;
+		sampler_info.maxLod = 0;
+		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &framebuf_sampler);
+		GPU_DBG_NAME(ctx, framebuf_sampler, "framebuf_sampler");
+
+		sampler_info.magFilter = VK_FILTER_NEAREST;
+		sampler_info.minFilter = VK_FILTER_LINEAR;
+		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &framebuf_sampler_nearest);
+		GPU_DBG_NAME(ctx, framebuf_sampler_nearest, "framebuf_sampler_nearest");
+	}
+
+	{
 		create_ssao_descriptors();
-		GPU_DBG_NAME(ctx, ssao_sampler, "ssao_sampler");
 		GPU_DBG_NAME(ctx, ssao_descriptor_layout, "ssao_descriptor_layout");
 		GPU_DBG_NAME(ctx, ssao_descriptor_set, "ssao_descriptor_set");
 
@@ -332,7 +339,6 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	}
 	{
 		create_rescale_descriptors();
-		GPU_DBG_NAME(ctx, rescale_sampler, "rescale_sampler");
 		GPU_DBG_NAME(ctx, rescale_descriptor_layout, "rescale_descriptor_layout");
 		GPU_DBG_NAME(ctx, rescale_descriptor_set, "rescale_descriptor_set");
 
@@ -367,7 +373,8 @@ Renderer::~Renderer () {
 
 	vkDestroyPipelineLayout(ctx.dev, rescale_pipeline_layout, nullptr);
 	vkDestroyDescriptorSetLayout(ctx.dev, rescale_descriptor_layout, nullptr);
-	vkDestroySampler(ctx.dev, rescale_sampler, nullptr);
+	vkDestroySampler(ctx.dev, framebuf_sampler, nullptr);
+	vkDestroySampler(ctx.dev, framebuf_sampler_nearest, nullptr);
 
 	vkDestroySampler(ctx.dev, main_sampler, nullptr);
 
@@ -521,16 +528,16 @@ void Renderer::destroy_ubo_buffers () {
 void Renderer::create_descriptor_pool () {
 	VkDescriptorPoolSize pool_sizes[2] = {};
 	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	pool_sizes[0].descriptorCount = (uint32_t)(2 + FRAMES_IN_FLIGHT); // for main image + ssao + rescale
+	pool_sizes[0].descriptorCount = (uint32_t)(FRAMES_IN_FLIGHT + 3); // common tex(per frame) ssao + rescale(2)
 
 	pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	pool_sizes[1].descriptorCount = (uint32_t)FRAMES_IN_FLIGHT * 2; // for view ubo + block meshes ubo
+	pool_sizes[1].descriptorCount = (uint32_t)(FRAMES_IN_FLIGHT*2 + 1); // common ubos(per frame) + ssao
 
 	VkDescriptorPoolCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	info.poolSizeCount = ARRLEN(pool_sizes);
 	info.pPoolSizes = pool_sizes;
-	info.maxSets = (uint32_t)(2 + FRAMES_IN_FLIGHT); // for main + ssao + rescale
+	info.maxSets = (uint32_t)(FRAMES_IN_FLIGHT + 2); // for common(per frame) + ssao + rescale
 
 	VK_CHECK_RESULT(vkCreateDescriptorPool(ctx.dev, &info, nullptr, &descriptor_pool));
 	GPU_DBG_NAME(ctx, descriptor_pool, "descriptor_pool");
@@ -556,7 +563,7 @@ void Renderer::create_common_descriptors () {
 		bindings[idx].binding = idx;
 		bindings[idx].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		bindings[idx].descriptorCount = 1;
-		bindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		bindings[idx].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 		idx++;
 
 		bindings[idx].binding = idx;
@@ -648,30 +655,22 @@ void Renderer::create_common_descriptors () {
 
 void Renderer::create_ssao_descriptors () {
 	{ // create descriptor layout
-		VkSamplerCreateInfo sampler_info = {};
-		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		sampler_info.magFilter = VK_FILTER_LINEAR;
-		sampler_info.minFilter = VK_FILTER_LINEAR;
-		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.anisotropyEnable = VK_FALSE;
-		sampler_info.minLod = 0;
-		sampler_info.maxLod = 0;
-		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &ssao_sampler);
+		VkDescriptorSetLayoutBinding bindings[2] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		bindings[0].pImmutableSamplers = &framebuf_sampler;
 
-		VkDescriptorSetLayoutBinding binding = {};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding.descriptorCount = 1;
-		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		binding.pImmutableSamplers = &ssao_sampler;
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		VkDescriptorSetLayoutCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		info.bindingCount = 1;
-		info.pBindings = &binding;
+		info.bindingCount = ARRLEN(bindings);
+		info.pBindings = bindings;
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &ssao_descriptor_layout));
 	}
 
@@ -685,51 +684,49 @@ void Renderer::create_ssao_descriptors () {
 	}
 }
 void Renderer::update_ssao_img_descr () {
-	VkDescriptorImageInfo img = {};
-	img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	img.imageView = main_color.image_view;
+	VkDescriptorImageInfo depth = {};
+	depth.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	depth.imageView = main_depth.image_view;
 
-	VkWriteDescriptorSet write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = ssao_descriptor_set;
-	write.dstBinding = 0;
-	write.dstArrayElement = 0;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.descriptorCount = 1;
-	write.pImageInfo = &img;
-	vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
+	VkWriteDescriptorSet writes[1] = {};
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = ssao_descriptor_set;
+	writes[0].dstBinding = 0;
+	writes[0].dstArrayElement = 0;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[0].descriptorCount = 1;
+	writes[0].pImageInfo = &depth;
+
+	//writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	//writes[2].dstSet = ssao_descriptor_set;
+	//writes[2].dstBinding = 2;
+	//writes[2].dstArrayElement = 0;
+	//writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	//writes[2].descriptorCount = 1;
+	//writes[2].pBufferInfo = ;
+
+	vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
 }
 
 void Renderer::create_rescale_descriptors () {
 	{ // create descriptor layout
-		VkSamplerCreateInfo sampler_info = {};
-		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		sampler_info.magFilter = VK_FILTER_LINEAR;
-		sampler_info.minFilter = VK_FILTER_LINEAR;
-		sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sampler_info.anisotropyEnable = VK_FALSE;
-		sampler_info.minLod = 0;
-		sampler_info.maxLod = 0;
-		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &rescale_sampler);
+		VkDescriptorSetLayoutBinding bindings[2] = {};
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		//bindings[0].pImmutableSamplers = &rescale_sampler; // no pImmutableSamplers to be able to switch
 
-		sampler_info.magFilter = VK_FILTER_NEAREST;
-		sampler_info.minFilter = VK_FILTER_LINEAR;
-		vkCreateSampler(ctx.dev, &sampler_info, nullptr, &rescale_sampler_nearest);
-
-		VkDescriptorSetLayoutBinding binding = {};
-		binding.binding = 0;
-		binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding.descriptorCount = 1;
-		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		//binding.pImmutableSamplers = &rescale_sampler; // no pImmutableSamplers to be able to switch
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		//bindings[1].pImmutableSamplers = &framebuf_sampler; // no pImmutableSamplers to be able to switch
 
 		VkDescriptorSetLayoutCreateInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		info.bindingCount = 1;
-		info.pBindings = &binding;
+		info.bindingCount = ARRLEN(bindings);
+		info.pBindings = bindings;
 		VK_CHECK_RESULT(vkCreateDescriptorSetLayout(ctx.dev, &info, nullptr, &rescale_descriptor_layout));
 	}
 
@@ -743,20 +740,34 @@ void Renderer::create_rescale_descriptors () {
 	}
 }
 void Renderer::update_rescale_img_descr () {
-	VkDescriptorImageInfo img = {};
-	img.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	img.imageView = ssao_color.image_view;
-	img.sampler = renderscale_nearest ? rescale_sampler_nearest : rescale_sampler; // if not set in pImmutableSamplers
+	VkDescriptorImageInfo color = {};
+	color.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	color.imageView = main_color.image_view;
+	color.sampler = renderscale_nearest ? framebuf_sampler_nearest : framebuf_sampler; // if not set in pImmutableSamplers
 
-	VkWriteDescriptorSet write = {};
-	write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	write.dstSet = rescale_descriptor_set;
-	write.dstBinding = 0;
-	write.dstArrayElement = 0;
-	write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	write.descriptorCount = 1;
-	write.pImageInfo = &img;
-	vkUpdateDescriptorSets(ctx.dev, 1, &write, 0, nullptr);
+	VkDescriptorImageInfo ssao = {};
+	ssao.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	ssao.imageView = ssao_fac.image_view;
+	ssao.sampler = renderscale_nearest ? framebuf_sampler_nearest : framebuf_sampler; // if not set in pImmutableSamplers
+
+	VkWriteDescriptorSet writes[2] = {};
+	writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[0].dstSet = rescale_descriptor_set;
+	writes[0].dstBinding = 0;
+	writes[0].dstArrayElement = 0;
+	writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[0].descriptorCount = 1;
+	writes[0].pImageInfo = &color;
+
+	writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[1].dstSet = rescale_descriptor_set;
+	writes[1].dstBinding = 1;
+	writes[1].dstArrayElement = 0;
+	writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	writes[1].descriptorCount = 1;
+	writes[1].pImageInfo = &ssao;
+
+	vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
 }
 
 //// Create per-frame data
@@ -803,7 +814,7 @@ void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkForm
 	GPU_DBG_NAME(ctx, main_color.memory, "main_color.mem");
 
 	main_depth = create_render_buffer(size, depth_format,
-		VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		/*VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |*/ VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_IMAGE_ASPECT_DEPTH_BIT, msaa);
 	GPU_DBG_NAME(ctx, main_depth.image, "main_depth");
@@ -837,15 +848,15 @@ void Renderer::destroy_main_framebuffer () {
 }
 
 void Renderer::create_ssao_framebuffer (int2 size, VkFormat color_format) {
-	ssao_color = create_render_buffer(size, color_format,
+	ssao_fac = create_render_buffer(size, color_format,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		VK_IMAGE_ASPECT_COLOR_BIT, 1);
-	GPU_DBG_NAME(ctx, main_color.image, "ssao_color");
-	GPU_DBG_NAME(ctx, main_color.image_view, "ssao_color.img_view");
-	GPU_DBG_NAME(ctx, main_color.memory, "ssao_color.mem");
+	GPU_DBG_NAME(ctx, ssao_fac.image, "ssao_fac");
+	GPU_DBG_NAME(ctx, ssao_fac.image_view, "ssao_fac.img_view");
+	GPU_DBG_NAME(ctx, ssao_fac.memory, "ssao_fac.mem");
 
-	VkImageView attachments[] = { ssao_color.image_view };
+	VkImageView attachments[] = { ssao_fac.image_view };
 
 	VkFramebufferCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -862,9 +873,9 @@ void Renderer::create_ssao_framebuffer (int2 size, VkFormat color_format) {
 void Renderer::destroy_ssao_framebuffer () {
 	vkDestroyFramebuffer(ctx.dev, ssao_framebuffer, nullptr);
 
-	vkDestroyImageView(ctx.dev, ssao_color.image_view, nullptr);
-	vkDestroyImage(ctx.dev, ssao_color.image, nullptr);
-	vkFreeMemory(ctx.dev, ssao_color.memory, nullptr);
+	vkDestroyImageView(ctx.dev, ssao_fac.image_view, nullptr);
+	vkDestroyImage(ctx.dev, ssao_fac.image, nullptr);
+	vkFreeMemory(ctx.dev, ssao_fac.memory, nullptr);
 }
 
 void Renderer::recreate_main_framebuffer (int2 wnd_size) {
@@ -879,7 +890,7 @@ void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 
 		renderscale_size = cur_size;
 		create_main_framebuffer(renderscale_size, fb_color_format, fb_depth_format, msaa);
-		create_ssao_framebuffer(renderscale_size, fb_color_format);
+		create_ssao_framebuffer(renderscale_size, fb_float_format);
 
 		update_ssao_img_descr();
 		update_rescale_img_descr();
@@ -906,16 +917,16 @@ VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat d
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	// depth_attachment
 	attachments[1].format = depth_format;
 	attachments[1].samples = (VkSampleCountFlagBits)msaa;
 	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // VK_ATTACHMENT_STORE_OP_DONT_CARE if not read later
 	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	//VkAttachmentDescription color_attachment_resolve = {};
 	//color_attachment_resolve.format = color_format;
@@ -963,7 +974,7 @@ VkRenderPass Renderer::create_ssao_renderpass (VkFormat color_format) {
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	VkAttachmentReference color_attachment_ref = {};
 	color_attachment_ref.attachment = 0;
