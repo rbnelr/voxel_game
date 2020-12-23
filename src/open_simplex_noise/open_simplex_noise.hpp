@@ -1006,7 +1006,7 @@ public:
 
       // Determine the two lattice points not part of the tetrahedron that may contribute.
       // This depends on the closest two tetrahedral vertices, including (1,1,1).
-      T wins = 3.0 - inSum;
+      T wins = (T)3.0 - inSum;
       if (wins < aScore || wins < bScore) {
         // (1,1,1) is one of the closest two tetrahedral vertices.
 

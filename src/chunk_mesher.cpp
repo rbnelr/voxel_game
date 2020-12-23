@@ -203,7 +203,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		for (int y=1; y<CHUNK_SIZE; ++y) {
 			{ // x == 0
 				BODY(
-					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nz,
+					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
 					ptr[idx - YOFFS],
 					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
 				)

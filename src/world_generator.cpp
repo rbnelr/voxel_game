@@ -57,6 +57,36 @@ float heightmap (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float
 	return (elevation +32) +(roughness * detail);
 }
 
+float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 pos_world) {
+	auto noise = [&] (float3 pos, float period, float3 offs) {
+		pos /= period; // period is inverse frequency
+		pos += offs;
+
+		return osn_noise.eval<float>(pos.x, pos.y, pos.z / 0.7f);
+	};
+
+	//float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
+	//float dx = (noise(pos_world + float3(1,0,0), 180.0f, 0) * 180.0f - 50.0f) - val;
+	//float dy = (noise(pos_world + float3(0,1,0), 180.0f, 0) * 180.0f - 50.0f) - val;
+	//float dz = (noise(pos_world + float3(0,0,1), 180.0f, 0) * 180.0f - 50.0f) - val;
+	//
+	//float3 normal = normalize(float3(dx,dy,dz));
+	//
+	//float stalag_freq = 5.0f;
+	//float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * (abs(normal.z) - 0.2f);
+	//if (dz < 0) {
+	//	stalag = max(stalag, 0.0f);
+	//	stalag *= -40;
+	//	val += stalag;
+	//}
+
+	float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
+	val += noise(pos_world, 70.0f, float3(700,800,900)) * 70.0f;
+	val += noise(pos_world, 4.0f, float3(700,800,900)) * 2.0f;
+
+	return val;
+}
+
 float noise_tree_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
 	auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
 		pos = rotate2(ang_offs) * pos;
@@ -129,26 +159,12 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 	int water_level = 21 - chunk_origin.z;
 
-	{
-		ZoneScopedN("Init blocks");
-
-		for (int z=0; z<CHUNK_SIZE; ++z) {
-			block_id b;
-			if (z <= water_level) {
-				b = WATER;
-			} else {
-				b = AIR;
-			}
-
-			for (int i=0; i < CHUNK_SIZE * CHUNK_SIZE; ++i)
-				ids[CHUNK_LAYER_OFFS * z + i] = b;
-		}
-	}
-
 	uint64_t chunk_seed = wg.seed ^ hash(chunk->pos);
 
 	OSN::Noise<2> noise(wg.seed);
 	Random rand = Random(chunk_seed);
+
+	OSN::Noise<3> noise3 (wg.seed);
 
 	std_vector<int3> tree_poss;
 
@@ -159,21 +175,19 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		return min_dist;
 	};
 
+	memset(ids, 0, sizeof(block_id) * CHUNK_VOXEL_COUNT); // for debugging
+
 	{
 		ZoneScopedN("Generate blocks");
 
 		for (int y=0; y<CHUNK_SIZE; ++y) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
-				int3 pos_world = int3(x,y,0) + chunk_origin;
+				int3 pos_world2 = int3(x,y,0) + chunk_origin;
 
-				float earth_layer;
-				float height = heightmap(wg, noise, (float2)(int2)pos_world, &earth_layer);
-				int highest_block = (int)floor(height -1 +0.5f) - pos_world.z; // -1 because height 1 means the highest block is z=0
+				float tree_density = noise_tree_density(wg, noise, (float2)(int2)pos_world2);
 
-				float tree_density = noise_tree_density(wg, noise, (float2)(int2)pos_world);
-
-				float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world);
+				float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world2);
 
 				float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
 					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
@@ -185,36 +199,42 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 				float effective_tree_prob = tree_density * tree_prox_prob;
 				//float effective_tree_prob = tree_density;
 
-				int z = 0;
-				for (; z <= min(highest_block, CHUNK_SIZE-1); ++z) {
+				for (int z=0; z<CHUNK_SIZE; ++z) {
+					auto* below = &ids[POS2IDX(x,y,z-1)];
 					auto* bid = &ids[POS2IDX(x,y,z)];
 
-					if (z <= highest_block - earth_layer) {
+					int3 pos_world = int3(x,y,z) + chunk_origin;
+
+					float val = cave_noise(noise3, noise, (float3)pos_world);
+
+					if (val < -5.0f) {
 						*bid = STONE;
+					} else if (val <= 0.0f) {
+						*bid = EARTH;
 					} else {
-						if (z == highest_block && z >= water_level) {
-							*bid = GRASS;
+						if (z >= water_level) {
+							*bid = AIR;
 						} else {
-							*bid = EARTH;
+							*bid = WATER;
 						}
 					}
-				}
 
-				auto* bid = &ids[POS2IDX(x,y,z)];
+					bool block_free = *bid == AIR && z > 0 && *below == EARTH;
 
-				bool block_free = highest_block >= 0 && highest_block < CHUNK_SIZE && *bid != WATER;
+					if (block_free) {
+						*below = GRASS;
 
-				if (block_free) {
-					float tree_chance = rand.uniformf();
-					float grass_chance = rand.uniformf();
+						float tree_chance = rand.uniformf();
+						float grass_chance = rand.uniformf();
 
-					if (rand.uniformf() < effective_tree_prob) {
-						tree_poss.push_back( int3(x,y, highest_block +1) );
-					} else if (rand.uniformf() < grass_density) {
-						*bid = TALLGRASS;
-					} else if (rand.uniformf() < 0.0005f) {
-						*bid = TORCH;
-						//*block_light = g_blocks.blocks[TORCH].glow;
+						if (rand.uniformf() < effective_tree_prob) {
+							tree_poss.push_back( int3(x,y,z) );
+						} else if (rand.uniformf() < grass_density) {
+							*bid = TALLGRASS;
+						} else if (rand.uniformf() < 0.0005f) {
+							*bid = TORCH;
+							//*block_light = g_blocks.blocks[TORCH].glow;
+						}
 					}
 				}
 			}
@@ -227,7 +247,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		auto place_tree = [&] (int3 pos_chunk) {
 			auto* bid = &ids[VEC2IDX(pos_chunk + int3(0,0,-1))];
 
-			if (*bid == GRASS) {
+			if (pos_chunk.z > 0 && *bid == GRASS) {
 				*bid = EARTH;
 			}
 
