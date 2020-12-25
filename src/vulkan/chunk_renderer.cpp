@@ -163,8 +163,11 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			}
 		};
 
-		auto col = srgba(0, 0, 255, 255);
-		auto col2 = srgba(255, 0, 0, 180);
+		lrgba cols[] = {
+			srgba(0, 0, 255, 255),
+			srgba(0, 0, 200, 20),
+			srgba(255, 0, 0, 180),
+		};
 
 		if (debug_frustrum_culling)
 			g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
@@ -173,16 +176,21 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
 
-			if (chunk.opaque_mesh.vertex_count == 0 && chunk.transparent_mesh.vertex_count == 0)
-				continue;
+			bool empty = chunk.opaque_mesh.vertex_count == 0 && chunk.transparent_mesh.vertex_count == 0;
 
 			float3 lo = (float3)(chunk.pos * CHUNK_SIZE);
 			float3 hi = (float3)((chunk.pos + 1) * CHUNK_SIZE);
 
-			bool culled = frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
+			bool culled = false;
+			if (!empty)
+				culled = frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 			
-			if (debug_frustrum_culling)
-				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, culled ? col2 : col);
+			if (debug_frustrum_culling) {
+				if (!empty)
+					g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[culled ? 2 : 0]);
+			} else if (visualize_chunks) {
+				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[chunk.voxels.is_sparse() ? 1 : 0]);
+			}
 
 			if (culled) continue;
 

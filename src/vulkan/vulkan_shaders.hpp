@@ -39,6 +39,7 @@ struct PipelineOptions {
 
 	bool				alpha_blend = false;
 	bool				depth_test = true;
+	bool				no_depth_write = false;
 	bool				depth_clamp = false;
 	VkCullModeFlagBits	cull_mode = VK_CULL_MODE_BACK_BIT;
 	VkPrimitiveTopology	primitive_mode = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -120,7 +121,7 @@ struct PipelineConfig {
 
 		depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 		depth_stencil.depthTestEnable = opt.depth_test;
-		depth_stencil.depthWriteEnable = opt.depth_test;
+		depth_stencil.depthWriteEnable = opt.depth_test && !opt.no_depth_write;
 		depth_stencil.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL; // use reverse depth
 		depth_stencil.depthBoundsTestEnable = VK_FALSE;
 		depth_stencil.minDepthBounds = 0.0f;

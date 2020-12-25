@@ -46,6 +46,8 @@ struct ChunkRenderer {
 	int drawcount_opaque = 0;
 	int drawcount_transparent = 0;
 
+	bool					visualize_chunks = false;
+
 	void imgui (Chunks& chunks) {
 		
 		size_t vertices = 0;
@@ -64,6 +66,8 @@ struct ChunkRenderer {
 		
 		ImGui::Separator();
 		
+		ImGui::Checkbox("show_chunks", &visualize_chunks);
+
 		ImGui::Text("Drawcalls: opaque: %3d  transparent: %3d (%3d / %3d slices - %3.0f%%)",
 			drawcount_opaque, drawcount_transparent, drawcount_opaque + drawcount_transparent,
 			slices_total, (float)(drawcount_opaque + drawcount_transparent) / slices_total * 100);

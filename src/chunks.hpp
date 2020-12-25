@@ -125,8 +125,6 @@ struct ChunkVoxels {
 	}
 
 	void check_sparsify () {
-		return;
-
 		if (!ids) return;
 		ZoneScopedC(tracy::Color::Chocolate);
 

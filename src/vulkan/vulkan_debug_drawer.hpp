@@ -53,6 +53,7 @@ struct DebugDrawer {
 		PipelineOptions opt;
 		opt.alpha_blend = true;
 		opt.depth_test = true;
+		opt.no_depth_write = true;
 		opt.primitive_mode = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
 		auto cfg = PipelineConfig("debug_lines", pipeline_layout, main_renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
 		lines_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.lines_pipeline", cfg);
