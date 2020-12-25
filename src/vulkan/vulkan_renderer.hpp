@@ -18,7 +18,7 @@ static constexpr int FRAMES_IN_FLIGHT = 2;
 
 inline float4x4 clip_ogl2vk (float4x4 const& m) {
 	float4x4 ret = m;
-	ret.arr[1][1] = -ret.arr[1][1];
+	ret.arr[1][1] = -ret.arr[1][1]; // y-down in clip space for vulkan vs y-up in opengl
 	return ret;
 }
 
@@ -48,23 +48,6 @@ struct ViewUniforms {
 		this->viewport_size = (float2)viewport_size;
 	}
 };
-
-#if 0
-inline bool gen_ssao_samples = [] () {
-	int count = 64;
-
-	printf("vec3 rand_samples[%d] = {\n", count);
-	for (int i=0; i<count; ++i) {
-		float3 v = random.uniform_direction();
-		float len = lerp(0.1f, 1.0f, random.uniformf());
-		v *= len * len; // bias toward center
-		printf("	vec3(%+f, %+f, %+f),\n", v.x, v.y, v.z);
-	}
-	printf("};\n");
-
-	return true;
-} ();
-#endif
 
 struct Renderer {
 	VulkanWindowContext			ctx;
@@ -117,8 +100,7 @@ struct Renderer {
 	// Main renderpass (skybox, 3d world and 3d first person)
 	// cleared with skybox, rendered at window_res * renderscale
 	VkRenderPass				main_renderpass;
-	RenderBuffer				main_color;
-	RenderBuffer				main_depth;
+	RenderBuffer				main_color, main_normal, main_depth;
 	VkFramebuffer				main_framebuffer;
 
 	VkSampler					main_sampler;
@@ -244,11 +226,11 @@ struct Renderer {
 
 	RenderBuffer create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa);
 
-	VkRenderPass create_main_renderpass (VkFormat color_format, VkFormat depth_format, int msaa);
+	VkRenderPass create_main_renderpass (VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa);
 	VkRenderPass create_ssao_renderpass (VkFormat color_format);
 	VkRenderPass create_ui_renderpass (VkFormat color_format);
 
-	void create_main_framebuffer (int2 size, VkFormat color_format, VkFormat depth_format, int msaa);
+	void create_main_framebuffer (int2 size, VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa);
 	void destroy_main_framebuffer ();
 	void recreate_main_framebuffer (int2 wnd_size);
 	

@@ -54,17 +54,22 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	}
 }
 
-block_id const* get_neighbour_blocks (RemeshChunkJob& j, int3 offs, block_id* sparse_id) {
-	auto* nc = j.chunks.query_chunk(j.chunk->pos + offs);
-	if (nc == nullptr || (nc->flags & Chunk::LOADED) == 0) {
-		*sparse_id = B_NULL;
-		return nullptr;
+block_id const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour, block_id* sparse_id) {
+	*sparse_id = B_NULL;
+
+	auto nid = j.chunk->neighbours[neighbour];
+	if (nid != U16_NULL) {
+
+		auto& nc = j.chunks[nid];
+		if (nc.flags & Chunk::LOADED) {
+
+			if (!nc.voxels.is_sparse()) {
+				return nc.voxels.ids;
+			}
+			*sparse_id = nc.voxels.sparse_id;
+		}
 	}
-	if (nc->voxels.is_sparse()) {
-		*sparse_id = nc->voxels.sparse_id;
-		return nullptr;
-	}
-	return nc->voxels.ids;
+	return nullptr;
 }
 
 void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
@@ -110,9 +115,9 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 	// neighbour chunks (can be null)
 	block_id sid_nx, sid_ny, sid_nz; 
-	auto const* nc_nx = get_neighbour_blocks(j, int3(-1,0,0), &sid_nx);
-	auto const* nc_ny = get_neighbour_blocks(j, int3(0,-1,0), &sid_ny);
-	auto const* nc_nz = get_neighbour_blocks(j, int3(0,0,-1), &sid_nz);
+	auto const* nc_nx = get_neighbour_blocks(j, 0, &sid_nx);
+	auto const* nc_ny = get_neighbour_blocks(j, 2, &sid_ny);
+	auto const* nc_nz = get_neighbour_blocks(j, 4, &sid_nz);
 	
 	j.chunk->voxels._validate_ids();
 
@@ -158,7 +163,10 @@ void mesh_chunk (RemeshChunkJob& j) {
 			}
 		}
 	}
-#else //// Manually unwrapped version where all x==0 y==0 z==0 are own code path, to avoid expensive if in core loop
+#else
+	//// Manually unwrapped version where all x==0 y==0 z==0 are own code path, to avoid expensive if in core loop
+	// while still keeping flexible code in border voxels to allows fast code
+	// Code is super bloated and macro'd, but generates code that runs almost as fast as code without any neighbour handling
 	
 	#define BODY(X,Y,Z) {								\
 		block_id id = ptr[idx];							\
@@ -179,41 +187,33 @@ void mesh_chunk (RemeshChunkJob& j) {
 														\
 		idx++;											\
 	}
+
+#define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
+#define NEIGHBOURY (nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny)
+#define NEIGHBOURZ (nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz)
+
+#define OFFSX ptr[idx - XOFFS]
+#define OFFSY ptr[idx - YOFFS]
+#define OFFSZ ptr[idx - ZOFFS]
 	
 	int idx = 0;
 
 	{ // z == 0
 		{ // y == 0
 			{ // x == 0
-				BODY(
-					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
-					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
-					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
-				)
+				BODY(NEIGHBOURX, NEIGHBOURY, NEIGHBOURZ)
 			}
 			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(
-					ptr[idx - XOFFS],
-					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
-					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
-				)
+				BODY(OFFSX, NEIGHBOURY, NEIGHBOURZ )
 			}
 		}
 
 		for (int y=1; y<CHUNK_SIZE; ++y) {
 			{ // x == 0
-				BODY(
-					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
-					ptr[idx - YOFFS],
-					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
-				)
+				BODY(NEIGHBOURX, OFFSY, NEIGHBOURZ)
 			}
 			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(
-					ptr[idx - XOFFS],
-					ptr[idx - YOFFS],
-					nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz
-				)
+				BODY(OFFSX, OFFSY, NEIGHBOURZ)
 			}
 		}
 	}
@@ -221,35 +221,19 @@ void mesh_chunk (RemeshChunkJob& j) {
 	for (int z=1; z<CHUNK_SIZE; ++z) {
 		{ // y == 0
 			{ // x == 0
-				BODY(
-					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
-					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
-					ptr[idx - ZOFFS]
-				)
+				BODY(NEIGHBOURX, NEIGHBOURY, OFFSZ)
 			}
 			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(
-					ptr[idx - XOFFS],
-					nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny,
-					ptr[idx - ZOFFS]
-				)
+				BODY(OFFSX, NEIGHBOURY, OFFSZ)
 			}
 		}
 
 		for (int y=1; y<CHUNK_SIZE; ++y) {
 			{ // x == 0
-				BODY(
-					nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx,
-					ptr[idx - YOFFS],
-					ptr[idx - ZOFFS]
-				)
+				BODY(NEIGHBOURX, OFFSY, OFFSZ)
 			}
 			for (int x=1; x<CHUNK_SIZE; ++x) { // core loop; xyz != 0
-				BODY(
-					ptr[idx - XOFFS],
-					ptr[idx - YOFFS],
-					ptr[idx - ZOFFS]
-				)
+				BODY(OFFSX, OFFSY, OFFSZ)
 			}
 		}
 	}

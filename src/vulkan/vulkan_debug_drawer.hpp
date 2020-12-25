@@ -43,7 +43,7 @@ struct DebugDrawer {
 		buf.buf.free(dev);
 	}
 
-	void create (VulkanWindowContext& ctx, PipelineManager& pipelines, VkRenderPass main_renderpass, VkDescriptorSetLayout common, int frames_in_flight) {
+	void create (VulkanWindowContext& ctx, PipelineManager& pipelines, VkRenderPass renderpass, VkDescriptorSetLayout common, int frames_in_flight) {
 		frames.resize(frames_in_flight);
 
 		// NOTE:  // setting PC to { VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(int) } (same as chunk_renderer.pipeline_layout) would allows us to not re-bind set 0 for these calls
@@ -55,13 +55,12 @@ struct DebugDrawer {
 		opt.depth_test = true;
 		opt.no_depth_write = true;
 		opt.primitive_mode = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		auto cfg = PipelineConfig("debug_lines", pipeline_layout, main_renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
+		auto cfg = PipelineConfig("debug_lines", pipeline_layout, renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
 		lines_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.lines_pipeline", cfg);
 
 		PipelineOptions opt2;
 		opt2.alpha_blend = true;
-		opt2.depth_test = true;
-		cfg = PipelineConfig("debug_tris", pipeline_layout, main_renderpass, 0, opt2, make_attribs<DebugDraw::TriVertex>());
+		cfg = PipelineConfig("debug_tris", pipeline_layout, renderpass, 0, opt2, make_attribs<DebugDraw::TriVertex>());
 		tris_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.tris_pipeline", cfg);
 	}
 	void destroy (VkDevice dev) {

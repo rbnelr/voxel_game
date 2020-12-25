@@ -44,6 +44,8 @@ struct PipelineOptions {
 	VkCullModeFlagBits	cull_mode = VK_CULL_MODE_BACK_BIT;
 	VkPrimitiveTopology	primitive_mode = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	VkPolygonMode		polygon_mode = VK_POLYGON_MODE_FILL;
+
+	int					color_attachments = 1;
 };
 
 // All pipeline create settings in one struct exposed to caller to allow custom overrides not contained in ShaderConfig
@@ -73,7 +75,7 @@ struct PipelineConfig {
 	VkPipelineRasterizationStateCreateInfo	rasterizer = {};
 	VkPipelineMultisampleStateCreateInfo	multisampling = {};
 	VkPipelineDepthStencilStateCreateInfo	depth_stencil = {};
-	VkPipelineColorBlendAttachmentState		color_blend_attachment = {};
+	std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
 
 	std::vector<VkDynamicState>				dynamic_states = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
 	VkViewport								viewport = { 0, 0, 1920, 1080, 0, 1 }; // ignored with VK_DYNAMIC_STATE_VIEWPORT
@@ -130,23 +132,29 @@ struct PipelineConfig {
 		//depth_stencil.front = {};
 		//depth_stencil.back = {};
 
-		color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-		color_blend_attachment.blendEnable = opt.alpha_blend;
+		color_blend_attachments.resize(opt.color_attachments);
 
-		if (opt.alpha_blend) {
-			color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-			color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-			color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-			color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
-		} else {
-			color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-			color_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-			color_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
-			color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-			color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-			color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+		for (int i=0; i<opt.color_attachments; ++i) {
+			auto& attach = color_blend_attachments[i];
+
+			attach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+			attach.blendEnable = opt.alpha_blend;
+
+			if (/*i == 0 && */opt.alpha_blend) { // assume only color attachment 0 has alpha blending
+				attach.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+				attach.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+				attach.colorBlendOp = VK_BLEND_OP_ADD;
+				attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+				attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+				attach.alphaBlendOp = VK_BLEND_OP_ADD;
+			} else {
+				attach.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+				attach.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+				attach.colorBlendOp = VK_BLEND_OP_ADD;
+				attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+				attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+				attach.alphaBlendOp = VK_BLEND_OP_ADD;
+			}
 		}
 	}
 };
@@ -304,8 +312,8 @@ struct PipelineManager {
 		color_blending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 		color_blending.logicOpEnable = VK_FALSE;
 		color_blending.logicOp = VK_LOGIC_OP_COPY;
-		color_blending.attachmentCount = 1;
-		color_blending.pAttachments = &cfg.color_blend_attachment;
+		color_blending.attachmentCount = (uint32_t)cfg.color_blend_attachments.size();
+		color_blending.pAttachments = cfg.color_blend_attachments.data();
 		//color_blending.blendConstants[0] = 0.0f;
 		//color_blending.blendConstants[1] = 0.0f;
 		//color_blending.blendConstants[2] = 0.0f;
