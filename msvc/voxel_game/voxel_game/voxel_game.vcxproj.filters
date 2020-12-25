@@ -193,6 +193,9 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_staging.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vulkan_screenshot.hpp">
+      <Filter>vulkan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">

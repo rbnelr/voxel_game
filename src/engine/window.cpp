@@ -200,7 +200,7 @@ void frameloop (Window& window) {
 			
 		// Render
 		imgui_end_frame();
-		renderer->render_frame(window.window, render_data, changed_files);
+		renderer->render_frame(window.window, window.input, render_data, changed_files);
 
 		{ // Calc next frame dt based on this frame duration
 			auto& i = window.input;

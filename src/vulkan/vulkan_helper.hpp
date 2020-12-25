@@ -1,6 +1,7 @@
 #pragma once
 #include "vulkan/vulkan.h"
 #include "shaderc/shaderc.h"
+#include "kisslib/stb_image_write.hpp"
 #include "kisslib/macros.hpp"
 #include "kisslib/kissmath.hpp"
 #include "graphics.hpp" // for AttribMode

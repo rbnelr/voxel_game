@@ -53,8 +53,10 @@ void set_viewport (VkCommandBuffer cmds, int2 size) {
 	vkCmdSetScissor(cmds, 0, 1, &scissor);
 }
 
-void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::ChangedFiles& changed_files) {
+void Renderer::render_frame (GLFWwindow* window, Input& I, RenderData& data, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
+
+	screenshot.begin(I);
 	
 	pipelines.update(ctx, changed_files, wireframe);
 
@@ -62,7 +64,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 	chunk_renderer.queue_remeshing(*this, data);
 
 	auto cmds = frame_data[cur_frame].command_buffer;
-	auto wnd_framebuffer = ctx.swap_chain.images[ctx.image_index].framebuffer;
+	auto wnd_framebuffer = ctx.swap_chain.images[ctx.image_index];
 
 	set_view_uniforms(data.view, data.window_size);
 
@@ -187,7 +189,7 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 			VkRenderPassBeginInfo render_pass_info = {};
 			render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			render_pass_info.renderPass = ui_renderpass;
-			render_pass_info.framebuffer = wnd_framebuffer;
+			render_pass_info.framebuffer = wnd_framebuffer.framebuffer;
 			render_pass_info.renderArea.offset = { 0, 0 };
 			render_pass_info.renderArea.extent = { (uint32_t)ctx.wnd_size.x, (uint32_t)ctx.wnd_size.y };
 			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
@@ -210,10 +212,13 @@ void Renderer::render_frame (GLFWwindow* window, RenderData& data, kiss::Changed
 				vkCmdDraw(cmds, 3, 1, 0, 0);
 			}
 
-			ctx.imgui_draw(cmds);
+			ctx.imgui_draw(cmds, screenshot.take_screenshot && !screenshot.include_ui);
 		}
 	}
 	vkCmdEndRenderPass(cmds);
+
+	if (screenshot.take_screenshot)
+		screenshot.screenshot_swapchain_img(ctx, cmds);
 
 	staging.update_buffer_alloc(ctx, cur_frame);
 
@@ -251,6 +256,8 @@ void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 	}
 
 	ctx.present_image(frame.render_finished_semaphore);
+
+	screenshot.end(ctx);
 	
 	cur_frame = (cur_frame + 1) % FRAMES_IN_FLIGHT;
 }

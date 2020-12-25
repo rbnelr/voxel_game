@@ -534,7 +534,8 @@ void VulkanWindowContext::create_swap_chain (int swap_chain_size) {
 	info.imageColorSpace = swap_chain.format.colorSpace;
 	info.imageExtent = swap_chain.extent;
 	info.imageArrayLayers = 1;
-	info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+		| VK_IMAGE_USAGE_TRANSFER_SRC_BIT; // allow blit for screenshots
 
 	uint32_t q_family_indices[] = { queues.families.graphics_family, queues.families.present_family };
 	if (queues.families.graphics_family != queues.families.present_family) {
@@ -664,14 +665,13 @@ void VulkanWindowContext::imgui_destroy () {
 	ImGui::DestroyContext();
 }
 
-void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds) {
-	if (g_imgui.enabled) {
-		ZoneScoped;
-		GPU_TRACE(*this, cmds, "imgui_draw");
+void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds, bool hide_gui) {
+	ZoneScoped;
+	GPU_TRACE(*this, cmds, "imgui_draw");
 
-		ImGui::Render();
+	ImGui::Render();
+	if (g_imgui.enabled && !hide_gui)
 		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmds);
-	}
 }
 
 } // namespace vk

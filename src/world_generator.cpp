@@ -84,6 +84,8 @@ float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 p
 	val += noise(pos_world, 70.0f, float3(700,800,900)) * 70.0f;
 	val += noise(pos_world, 4.0f, float3(700,800,900)) * 2.0f;
 
+	val += pos_world.z;
+
 	return val;
 }
 

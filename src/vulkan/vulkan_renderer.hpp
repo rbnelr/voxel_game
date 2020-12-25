@@ -4,6 +4,7 @@
 #include "vulkan_shaders.hpp"
 #include "vulkan_window.hpp"
 #include "vulkan_debug_drawer.hpp"
+#include "vulkan_screenshot.hpp"
 #include "chunk_renderer.hpp"
 #include "vulkan_staging.hpp"
 #include "graphics.hpp"
@@ -150,6 +151,8 @@ struct Renderer {
 
 	Assets						assets;
 
+	Screenshots					screenshot;
+
 	float						renderscale = 1.0f;
 	int2						renderscale_size = -1;
 	bool						renderscale_nearest = false;
@@ -160,6 +163,8 @@ struct Renderer {
 	bool						draw_world_border = false;
 
 	void graphics_imgui () {
+		screenshot.imgui();
+
 		if (imgui_push("Renderscale")) {
 			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 			ImGui::SameLine();
@@ -181,7 +186,7 @@ struct Renderer {
 	~Renderer ();
 
 	void set_view_uniforms (Camera_View& view, int2 viewport_size);
-	void render_frame (GLFWwindow* window, RenderData& data, kiss::ChangedFiles& changed_files);
+	void render_frame (GLFWwindow* window, Input& I, RenderData& data, kiss::ChangedFiles& changed_files);
 
 	void frame_begin (GLFWwindow* window);
 	void submit (GLFWwindow* window, VkCommandBuffer buf);
