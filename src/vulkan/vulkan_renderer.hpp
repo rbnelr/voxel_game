@@ -61,6 +61,7 @@ struct Renderer {
 	VkFormat					fb_depth_format;
 	VkFormat					fb_float_format;
 	VkFormat					fb_vec2_format;
+	VkFormat					fb_vec3_format;
 
 	int							max_msaa_samples;
 	int							msaa = 1;
@@ -148,10 +149,9 @@ struct Renderer {
 		screenshot.imgui();
 
 		if (imgui_push("Renderscale")) {
+			ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", renderscale_size.x, renderscale_size.y, (float)(renderscale_size.x * renderscale_size.y) / 1000 / 1000);
 			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
-			ImGui::SameLine();
-			ImGui::Text("= %4d x %4d px", renderscale_size.x, renderscale_size.y);
-
+			
 			renderscale_nearest_changed = ImGui::Checkbox("renderscale nearest", &renderscale_nearest);
 
 			imgui_pop();
@@ -219,6 +219,13 @@ struct Renderer {
 	VkFormat find_vec2_format () {
 		return find_supported_format(ctx.pdev,
 			{ VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R8G8_SNORM },
+			VK_IMAGE_TILING_OPTIMAL,
+			VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+		);
+	}
+	VkFormat find_vec3_format () {
+		return find_supported_format(ctx.pdev,
+			{ VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8B8A8_SNORM }, // no rgb16 format?
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
 		);

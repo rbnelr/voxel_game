@@ -18,7 +18,7 @@ layout(location = 0) vs2fs VS {
 
 	layout(location = 0) out vec4 frag_col;
 	void main () {
-	#if 1
+	#if 0
 		vec4 col = texture(main_albedo, vs.uv);
 		col.rgb *= col.a * texture(ssao, vs.uv).rrr;
 		frag_col = col;

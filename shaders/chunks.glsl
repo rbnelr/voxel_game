@@ -67,7 +67,9 @@ layout(location = 0) vs2fs VS {
 		col = vec4(1.0);
 	#endif
 		
+		vec3 norm = normalize(vs.normal_cam); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
+		
 		frag_col = col;
-		frag_normal = vec4(vs.normal_cam.xy, 0.0, 1.0); // alpha 1 incase blending happens to never blend normals
+		frag_normal = vec4(norm.xyz, 1.0); // alpha 1 incase blending happens to never blend normals
 	}
 #endif

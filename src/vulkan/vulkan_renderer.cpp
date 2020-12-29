@@ -273,6 +273,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	fb_depth_format = find_depth_format();
 	fb_float_format = find_float_format();
 	fb_vec2_format = find_vec2_format();
+	fb_vec3_format = find_vec3_format();
 
 	max_msaa_samples = get_max_usable_multisample_count(ctx.pdev);
 	msaa = 1;
@@ -294,7 +295,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	create_descriptor_pool();
 	create_ubo_buffers();
 	
-	main_renderpass = create_main_renderpass(fb_color_format, fb_vec2_format, fb_depth_format, msaa);
+	main_renderpass = create_main_renderpass(fb_color_format, fb_vec3_format, fb_depth_format, msaa);
 	GPU_DBG_NAME(ctx, main_renderpass, "main_renderpass");
 
 	ssao_renderpass = create_ssao_renderpass(fb_float_format);
@@ -927,7 +928,7 @@ void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 		}
 
 		renderscale_size = cur_size;
-		create_main_framebuffer(renderscale_size, fb_color_format, fb_vec2_format, fb_depth_format, msaa);
+		create_main_framebuffer(renderscale_size, fb_color_format, fb_vec3_format, fb_depth_format, msaa);
 		create_ssao_framebuffer(renderscale_size, fb_float_format);
 
 		update_ssao_img_descr();

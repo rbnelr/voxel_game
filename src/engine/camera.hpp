@@ -118,8 +118,8 @@ struct Flycam {
 
 		cam.imgui(name);
 
-		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
-		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", 1.05f);
+		ImGui::DragFloat("base_speed", &base_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", ImGuiSliderFlags_Logarithmic);
+		ImGui::DragFloat("max_speed", &max_speed, 0.05f, 0, FLT_MAX / INT_MAX, "%.3f", ImGuiSliderFlags_Logarithmic);
 		ImGui::DragFloat("speedup_factor", &speedup_factor, 0.001f);
 		ImGui::DragFloat("fast_multiplier", &fast_multiplier, 0.05f);
 		ImGui::Text("cur_speed: %.3f", cur_speed);

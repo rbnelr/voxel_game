@@ -37,9 +37,12 @@ layout(location = 0) vs2fs VS {
 	//	vec3 hemisphere_samples[64];
 	//}
 
-	const int sample_count = 64;
+	const int sample_count = 32;
 	const float min_radius = 0.05;
 	const float max_radius = 0.5;
+	const float base_radius = 0.5;
+	const float range_cutoff = 2.0;
+	const float bias = 0.01;
 
 	vec3 hemisphere_samples[64] = {
 		vec3(-0.430422, +0.368863, 0.607364),
@@ -111,35 +114,45 @@ layout(location = 0) vs2fs VS {
 	layout(location = 0) out float frag_col;
 	void main () {
 		vec3 normal = vec3(0,0,+1);
-		normal.xy = texture(main_norm, vs.uv).rg;
-		normal.z = sqrt(1.0 - normal.x*normal.x - normal.y*normal.y);
-		
+		normal.xyz = texture(main_norm, vs.uv).xyz;
 		normal.y = -normal.y; // y-down in vulkan clip space, so we pretend cam space is y-down yoo to sample correctly
 		
+		// depth of geometry at pixel
+		float geom_depth = get_depth(vs.uv);
+
+		// radius of sample hemisphere based on world-size converted to and clamped in screen space
+		float sampl_radius = base_radius / geom_depth;
+		sampl_radius = clamp(sampl_radius, min_radius, max_radius);
 		
-		float depth = get_depth(vs.uv);
-		float radius = 1.0 / depth;
-		radius = clamp(radius, min_radius, max_radius);
-		
+		float cutoff = range_cutoff * sampl_radius / base_radius * geom_depth;
+
 		//vec3 randomVec = texture(random_vecs, vs.uv * random_vecs_uv_mult).rgb;
 		vec3 randomVec = normalize(rand3() * 2.0 - 1.0);
 		
+		// tangent space to camera space matrix to get hemisphere samples pointing away from geometry surface
 		float d = dot(randomVec, normal);
 		vec3 tangent   = d > 0.0001 ? normalize(randomVec - normal * d) : vec3(1,0,0);
 		vec3 bitangent = cross(normal, tangent);
 		mat3 TBN       = mat3(tangent, bitangent, normal);  
-
-		float non_occluded = 0;
-		for (int i=0; i<sample_count; ++i) {
-			vec3 sampl = (TBN * hemisphere_samples[i]) * radius;
-			//vec3 s = hemisphere_samples[i] * radius;
-			float sampl_depth = get_depth(vs.uv + sampl.xy);
-			
-			if (depth - sampl.z <= sampl_depth) // -sampl.z because normal.z points toward camera but depth goes away from camera
-				non_occluded++;
-		}
-		float fac = non_occluded / float(sample_count);
 		
+		float occluded = 0;
+		for (int i=0; i<sample_count; ++i) {
+			// sample vector in screen space
+			vec3 sampl_offs = (TBN * hemisphere_samples[i]) * sampl_radius;
+			//vec3 s = hemisphere_samples[i] * radius;
+
+			// geometry depth at sample xy screen coord
+			float sampl_depth = get_depth(vs.uv + sampl_offs.xy);
+			
+			float cutoff_fac = cutoff / abs(geom_depth - sampl_depth); // assume sampled difference depth closer than sampl_radius never actually occludes (stops shadow halos around forground objects)
+			cutoff_fac = smoothstep(0.0, 1.0, cutoff_fac);
+			float occl = sampl_depth + bias < geom_depth - sampl_offs.z ? 1.0 : 0.0; // see if sample point is occluded by geometry (-sampl_offs.z because normal.z points toward camera but depth goes away from camera)
+			
+			occluded += occl * cutoff_fac;
+		}
+		float fac = 1.0 - occluded / float(sample_count);
+		
+		//frag_col = normal.z;
 		frag_col = pow(fac, 1.0);
 	}
 #endif
