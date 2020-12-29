@@ -147,7 +147,7 @@ public:
 	bool						debug_frustrum_culling = false;
 	bool						draw_world_border = false;
 
-	void graphics_imgui () {
+	virtual void graphics_imgui () {
 		screenshot.imgui();
 
 		if (imgui_push("Renderscale")) {
@@ -164,6 +164,10 @@ public:
 		ImGui::Checkbox("draw_world_border", &draw_world_border);
 
 		staging.imgui();
+	}
+
+	virtual void chunk_renderer_imgui (Chunks& chunks) {
+		chunk_renderer.imgui(chunks);
 	}
 
 	VulkanRenderer (GLFWwindow* window, char const* app_name);

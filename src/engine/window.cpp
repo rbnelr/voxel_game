@@ -237,10 +237,7 @@ void Window::run () {
 
 		// Update
 
-		g_window.game->imgui(g_window, g_window.input,
-			[&] () { },//renderer->graphics_imgui(); },
-			[&] () { }//renderer->chunk_renderer.imgui(game->world->chunks); }
-		);
+		g_window.game->imgui(g_window, g_window.input, *g_window.renderer);
 
 		if (g_imgui.show_demo_window)
 			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
@@ -280,6 +277,8 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 	g_window.run();
 
+	g_window.renderer = nullptr;
+	g_window.game = nullptr;
 	g_window.close_window();
 
 	app_shutdown();

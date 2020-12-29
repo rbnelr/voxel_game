@@ -20,6 +20,9 @@ public:
 
 	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) = 0;
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game) = 0;
+
+	virtual void graphics_imgui () = 0;
+	virtual void chunk_renderer_imgui (Chunks& chunks) = 0;
 };
 
 struct DebugDraw {

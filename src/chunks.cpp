@@ -5,6 +5,7 @@
 #include "world.hpp"
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
+#include "renderer.hpp"
 
 block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {
 	if (out_chunk)
@@ -158,5 +159,73 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 			TracyPlot("background_queued_count", (int64_t)background_queued_count);
 		}
 	}
+}
 
+void Chunks::imgui (Renderer& renderer) {
+	if (!imgui_push("Chunks")) return;
+
+	ImGui::DragFloat("load_radius", &load_radius, 1);
+	ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
+
+	uint64_t block_volume = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+	uint64_t block_mem = 0;
+	int sparse_chunks = 0;
+	int loaded_chunks = 0;
+
+	for (chunk_id id = 0; id < max_id; ++id) {
+		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+
+		if (chunks[id].voxels.is_sparse()) {
+			sparse_chunks++;
+		} else {
+			block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
+		}
+		loaded_chunks++;
+	}
+
+	ImGui::Text("Voxels: %4d chunks  %11s volume %6d KB chunk storage",
+		count, format_thousands(block_volume).c_str(), (int)((commit_ptr - (char*)chunks) / 1000));
+	ImGui::Text("Voxel data: %5.0f MB RAM  %3.0f %% sparse chunks",
+		(float)block_mem/1024/1024, (float)sparse_chunks / (float)loaded_chunks * 100);
+
+	if (ImGui::TreeNode("chunks")) {
+		for (chunk_id id=0; id<max_id; ++id) {
+			if ((chunks[id].flags & Chunk::ALLOCATED) == 0)
+				ImGui::Text("[%5d] <not allocated>", id);
+			else
+				ImGui::Text("[%5d] %+4d,%+4d,%+4d - %2d, %2d slices", id, chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
+					chunks[id].opaque_mesh.slices_count(), chunks[id].transparent_mesh.slices_count());
+		}
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNode("chunks alloc")) {
+		print_bitset_allocator(id_alloc, sizeof(Chunk), os_page_size);
+		ImGui::TreePop();
+	}
+
+	if (ImGui::TreeNode("count_hash_collisions")) {
+		size_t collisions = 0, max_bucket_size = 0, empty_buckets = 0;
+		for (size_t i=0; i<pos_to_id.bucket_count(); ++i) {
+			size_t c = pos_to_id.bucket_size(i);
+			if (c > 1) collisions += c - 1;
+			if (c == 0) empty_buckets++;
+			max_bucket_size = std::max(max_bucket_size, c);
+		}
+
+		ImGui::Text("chunks: %5d  collisions: %d (buckets: %5d, max_bucket_size: %5d, empty_buckets: %5d)",
+			count, collisions, pos_to_id.bucket_count(), max_bucket_size, empty_buckets);
+
+		if (ImGui::TreeNode("bucket counts")) {
+			for (size_t i=0; i<pos_to_id.bucket_count(); ++i)
+				ImGui::Text("[%5d] %5d", i, pos_to_id.bucket_size(i));
+			ImGui::TreePop();
+		}
+
+		ImGui::TreePop();
+	}
+
+	renderer.chunk_renderer_imgui(*this);
+
+	imgui_pop();
 }

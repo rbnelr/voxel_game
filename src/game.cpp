@@ -14,7 +14,7 @@ Game::Game () {
 
 // try to do all debug guis in here,
 // but don't call ImGui::End() yet so we can quickly display values from inside algorithms if we want
-void Game::imgui (Window& window, Input& I, std::function<void()> graphics_imgui, std::function<void()> chunk_renderer) {
+void Game::imgui (Window& window, Input& I, Renderer& renderer) {
 	ZoneScoped;
 
 	ImGui::Begin("Debug");
@@ -59,7 +59,7 @@ void Game::imgui (Window& window, Input& I, std::function<void()> graphics_imgui
 		window.input.imgui();
 		
 		if (ImGui::CollapsingHeader("Graphics")) {
-			graphics_imgui();
+			renderer.graphics_imgui();
 		}
 		//graphics.imgui(world->chunks);
 
@@ -70,7 +70,7 @@ void Game::imgui (Window& window, Input& I, std::function<void()> graphics_imgui
 			}
 
 			world_gen.imgui();
-			world->chunks.imgui(chunk_renderer);
+			world->chunks.imgui(renderer);
 			block_update.imgui();
 		}
 
