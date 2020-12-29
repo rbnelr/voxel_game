@@ -102,7 +102,7 @@ void Game::imgui (Window& window, Input& I, std::function<void()> graphics_imgui
 	}
 }
 
-RenderData Game::update (Window& window, Input& I) {
+void Game::update (Window& window, Input& I) {
 	g_debugdraw.clear();
 
 	if (!activate_flycam) {
@@ -111,15 +111,13 @@ RenderData Game::update (Window& window, Input& I) {
 
 	physics.update_player(I.dt, *world, world->player);
 
-	SelectedBlock selected_block;
-	Camera_View player_view = world->player.update_post_physics(I, *world);
+	player_view = world->player.update_post_physics(I, *world);
 
 	if (selected_block)
 		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, g_blocks.blocks[selected_block.block].name);
 	else
 		ImGui::Text("Selected Block: None");
 
-	Camera_View view;
 	if (activate_flycam) {
 		view = flycam.update(I);
 	} else {
@@ -133,7 +131,4 @@ RenderData Game::update (Window& window, Input& I) {
 	if (activate_flycam)
 		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));
 
-	return {
-		I.window_size, view, player_view, *world
-	};
 }

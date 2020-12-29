@@ -5,6 +5,7 @@
 #include "vulkan_shaders.hpp"
 #include "chunk_mesher.hpp"
 #include "graphics.hpp"
+#include "game.hpp"
 
 namespace vk {
 
@@ -144,11 +145,11 @@ struct ChunkRenderer {
 	}
 
 	int remesh_chunks_count;
-	void queue_remeshing (Renderer& r, RenderData& data);
+	void queue_remeshing (Renderer& r, Game& game);
 
 	void upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame);
 
-	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, RenderData& data, bool debug_frustrum_culling, int cur_frame);
+	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, bool debug_frustrum_culling, int cur_frame);
 
 };
 

@@ -135,13 +135,3 @@ struct DebugDraw {
 
 inline DebugDraw g_debugdraw;
 
-struct World;
-
-struct RenderData {
-	int2			window_size;
-
-	Camera_View		view;
-	Camera_View		player_view;
-
-	World&			world;
-};

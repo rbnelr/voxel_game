@@ -2,7 +2,7 @@
 #include "vulkan_renderer.hpp"
 #include "engine/camera.hpp"
 #include "GLFW/glfw3.h"
-#include "world.hpp"
+#include "game.hpp"
 
 namespace vk {
 
@@ -53,7 +53,7 @@ void set_viewport (VkCommandBuffer cmds, int2 size) {
 	vkCmdSetScissor(cmds, 0, 1, &scissor);
 }
 
-void Renderer::render_frame (GLFWwindow* window, Input& I, RenderData& data, kiss::ChangedFiles& changed_files) {
+void Renderer::render_frame (GLFWwindow* window, Input& I, Game& game, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
 
 	screenshot.begin(I);
@@ -61,12 +61,12 @@ void Renderer::render_frame (GLFWwindow* window, Input& I, RenderData& data, kis
 	pipelines.update(ctx, changed_files, wireframe);
 
 	////
-	chunk_renderer.queue_remeshing(*this, data);
+	chunk_renderer.queue_remeshing(*this, game);
 
 	auto cmds = frame_data[cur_frame].command_buffer;
 	auto wnd_framebuffer = ctx.swap_chain.images[ctx.image_index];
 
-	set_view_uniforms(data.view, data.window_size);
+	set_view_uniforms(game.view, I.window_size);
 
 	{
 		VkCommandBufferBeginInfo begin_info = {};
@@ -78,7 +78,7 @@ void Renderer::render_frame (GLFWwindow* window, Input& I, RenderData& data, kis
 
 	{
 		GPU_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(*this, data.world.chunks, cmds, cur_frame);
+		chunk_renderer.upload_remeshed(*this, game.world->chunks, cmds, cur_frame);
 	}
 
 	{ // set 0
@@ -111,7 +111,7 @@ void Renderer::render_frame (GLFWwindow* window, Input& I, RenderData& data, kis
 
 		{
 			GPU_TRACE(ctx, cmds, "draw chunks");
-			chunk_renderer.draw_chunks(ctx, cmds, data, debug_frustrum_culling, cur_frame);
+			chunk_renderer.draw_chunks(ctx, cmds, game, debug_frustrum_culling, cur_frame);
 		}
 
 		// -> debug_drawer.pipeline_layout is not compatible with chunk_renderer.pipeline_layout because of differing push constants

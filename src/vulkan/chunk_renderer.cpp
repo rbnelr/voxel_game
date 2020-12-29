@@ -6,7 +6,7 @@
 
 namespace vk {
 
-void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
+void ChunkRenderer::queue_remeshing (Renderer& r, Game& game) {
 	ZoneScoped;
 
 	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
@@ -14,8 +14,8 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 	{
 		ZoneScopedN("chunks_to_remesh iterate all chunks");
 		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
-		for (chunk_id id = 0; id < data.world.chunks.max_id; ++id) {
-			auto& chunk = data.world.chunks[id];
+		for (chunk_id id = 0; id < game.world->chunks.max_id; ++id) {
+			auto& chunk = game.world->chunks[id];
 			chunk._validate_flags();
 			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
@@ -27,9 +27,9 @@ void ChunkRenderer::queue_remeshing (Renderer& r, RenderData& data) {
 
 				auto job = std::make_unique<RemeshChunkJob>(
 					&chunk,
-					data.world.chunks,
+					game.world->chunks,
 					r.assets,
-					data.world.world_gen,
+					game.world->world_gen,
 					r.draw_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
@@ -129,13 +129,13 @@ void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffe
 	}
 }
 
-void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, RenderData& data, bool debug_frustrum_culling, int cur_frame) {
+void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, bool debug_frustrum_culling, int cur_frame) {
 	ZoneScoped;
 
 	auto& frame = frames[cur_frame];
-	auto& chunks = data.world.chunks;
+	auto& chunks = game.world->chunks;
 
-	auto& cull_view = debug_frustrum_culling ? data.player_view : data.view;
+	auto& cull_view = debug_frustrum_culling ? game.player_view : game.view;
 	
 	{
 		ZoneScopedN("chunk culling pass");

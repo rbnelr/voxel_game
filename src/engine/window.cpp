@@ -196,11 +196,11 @@ void frameloop (Window& window) {
 		if (g_imgui.show_demo_window)
 			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
 
-		auto render_data = game->update(window, window.input);
+		game->update(window, window.input);
 			
 		// Render
 		imgui_end_frame();
-		renderer->render_frame(window.window, window.input, render_data, changed_files);
+		renderer->render_frame(window.window, window.input, *game, changed_files);
 
 		{ // Calc next frame dt based on this frame duration
 			auto& i = window.input;

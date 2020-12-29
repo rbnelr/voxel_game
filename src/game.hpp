@@ -24,8 +24,14 @@ struct Game {
 	bool activate_flycam = false;
 	bool trigger_place_block = false;
 
+	// Render data
+	SelectedBlock selected_block;
+
+	Camera_View player_view;
+	Camera_View view;
+
 	Game ();
 
 	void imgui (Window& window, Input& I, std::function<void()> graphics_imgui, std::function<void()> chunk_renderer);
-	RenderData update (Window& window, Input& I);
+	void update (Window& window, Input& I);
 };
