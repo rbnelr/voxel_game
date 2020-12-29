@@ -90,13 +90,13 @@ struct Inventory {
 			slots[0] = { 1, { I_WOOD_SWORD } };
 			slots[1] = { 1, { I_WOOD_PICKAXE } };
 			slots[2] = { 1, { I_WOOD_SHOVEL } };
-			slots[3] = { 1, { (item_id)g_blocks.map_id("earth") } };
-			slots[4] = { 1, { (item_id)g_blocks.map_id("grass") } };
-			slots[5] = { 1, { (item_id)g_blocks.map_id("stone") } };
-			slots[6] = { 1, { (item_id)g_blocks.map_id("tree_log") } };
-			slots[7] = { 1, { (item_id)g_blocks.map_id("leaves") } };
-			slots[8] = { 1, { (item_id)g_blocks.map_id("water") } };
-			slots[9] = { 1, { (item_id)g_blocks.map_id("torch") } };
+			slots[3] = { 1, { (item_id)g_assets.block_types.map_id("earth") } };
+			slots[4] = { 1, { (item_id)g_assets.block_types.map_id("grass") } };
+			slots[5] = { 1, { (item_id)g_assets.block_types.map_id("stone") } };
+			slots[6] = { 1, { (item_id)g_assets.block_types.map_id("tree_log") } };
+			slots[7] = { 1, { (item_id)g_assets.block_types.map_id("leaves") } };
+			slots[8] = { 1, { (item_id)g_assets.block_types.map_id("water") } };
+			slots[9] = { 1, { (item_id)g_assets.block_types.map_id("torch") } };
 		}
 	};
 

@@ -1,8 +1,8 @@
 #pragma once
 #include "common.hpp"
 #include "input.hpp"
-
-static constexpr const char* APPNAME = "Voxel Game";
+#include "game.hpp"
+#include "renderer.hpp"
 
 struct Rect {
 	int2	 pos;
@@ -25,14 +25,27 @@ struct Window {
 	
 	int		frame_counter = 0;
 
-	DirectoyChangeNotifier	file_changes = DirectoyChangeNotifier("./", true);
+	std::unique_ptr<Game>			game;
+
+	RenderBackend					render_backend = RenderBackend::VULKAN;
+	std::unique_ptr<Renderer>		renderer;
+
+	DirectoyChangeNotifier			file_changes = DirectoyChangeNotifier("./", true);
 
 	void set_vsync (bool on);
 
 	bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
 	bool toggle_fullscreen ();
 
+	// close down game after current frame
 	void close ();
+
+	void open_window ();
+	void close_window ();
+
+	void switch_renderer ();
+
+	void run ();
 };
 
-inline Window* g_window; // global window, needed to allow Logger to be global, which needs frame_counter, prefer to pass window along if possible
+inline Window g_window; // global window, needed to allow Logger to be global, which needs frame_counter, prefer to pass window along if possible

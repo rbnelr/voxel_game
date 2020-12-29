@@ -7,7 +7,7 @@ void World::raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_d
 	float _dist;
 	auto hit_block = [&] (int3 bp, int face, float dist, bool force_hit) {
 		block_id bid = chunks.query_block(bp);
-		if ((block_breakable(bid) || force_hit)) {
+		if ((g_assets.block_types.block_breakable(bid) || force_hit)) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			block.is_selected = true;
 			block.block = bid;
@@ -30,9 +30,9 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	assert(block);
 	auto tool_props = item.get_props();
 
-	auto hardness = g_blocks.blocks[block.block].hardness;
+	auto hardness = g_assets.block_types[block.block].hardness;
 
-	if (!block_breakable(block.block))
+	if (!g_assets.block_types.block_breakable(block.block))
 		return;
 
 	float dmg = 0;
@@ -42,7 +42,7 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 		dmg = 0.0f;
 	} else {
 		float damage_multiplier = (float)tool_props.hardness / (float)hardness;
-		if (tool_props.tool == g_blocks.blocks[block.block].tool)
+		if (tool_props.tool == g_assets.block_types[block.block].tool)
 			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
 
 		dmg = tool_props.damage * damage_multiplier;
@@ -55,14 +55,14 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	if (block.damage >= 1) {
 		break_sound.play();
 
-		chunks.set_block(block.pos, g_blocks.air_id);
+		chunks.set_block(block.pos, g_assets.block_types.air_id);
 	}
 }
 
 bool World::try_place_block (int3 pos, block_id id) {
 	auto oldb = chunks.query_block(pos);
 
-	if (!block_breakable(oldb)) { // non-breakable blocks are solids and gasses
+	if (!g_assets.block_types.block_breakable(oldb)) { // non-breakable blocks are solids and gasses
 		chunks.set_block(pos, id);
 		return true;
 	}

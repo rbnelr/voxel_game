@@ -22,7 +22,7 @@ static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 };
 
 struct ItemProperties {
-	ToolType	tool : 4;
+	ToolType	tool;
 	uint8_t		damage;
 	uint8_t		hardness;
 };
@@ -35,8 +35,8 @@ static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
 	/* I_WOOD_SHOVEL	*/	{ ToolType::SHOVEL	, 32, 4 },
 };
 
-static inline constexpr const char* get_item_name (item_id id) {
-	if (id < MAX_BLOCK_ID)	return g_blocks.blocks[(block_id)id].name.c_str();
+static inline constexpr const char* get_item_name (Assets& assets, item_id id) {
+	if (id < MAX_BLOCK_ID)	return assets.block_types[(block_id)id].name.c_str();
 	else					return ITEM_NAMES[id - MAX_BLOCK_ID];
 }
 static inline constexpr ItemProperties get_item_props (item_id id) {

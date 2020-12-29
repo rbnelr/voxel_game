@@ -1,8 +1,5 @@
 #include "common.hpp"
 #include "window.hpp"
-#include "game.hpp"
-#include "vulkan/vulkan_renderer.hpp"
-#include "vulkan/chunk_renderer.hpp"
 
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
@@ -137,73 +134,125 @@ void imgui_end_frame () {
 	ImGui::End();
 }
 
-void frameloop (Window& window) {
-	std::unique_ptr<Renderer> renderer;
-	std::unique_ptr<Game> game;
+void glfw_error (int err, const char* msg) {
+	fprintf(stderr, "GLFW Error! [0x%x] '%s'\n", err, msg);
+}
+
+bool app_init () {
+#if DEBUGLEVEL >= 2
+	glfwSetErrorCallback(glfw_error);
+#endif
 
 	{
-		json blocks_json = load_json("blocks.json");
-		g_blocks.from_json(blocks_json);
-
-		{
-			ZoneScopedN("Game::Game()");
-			game = std::make_unique<Game>();
-		}
-		{
-			ZoneScopedN("Renderer::Renderer()");
-			renderer = std::make_unique<Renderer>(window.window, APPNAME, blocks_json);
+		ZoneScopedN("glfwInit");
+		if (!glfwInit()) {
+			fprintf(stderr, "glfwInit failed!\n");
+			return false;
 		}
 	}
 
-	glfw_input_pre_gameloop(window);
+	return true;
+}
 
-	window.input.dt = 0; // dt zero on first frame
+void app_shutdown () {
+
+	{
+		ZoneScopedN("glfwTerminate");
+		glfwTerminate();
+	}
+}
+
+void Window::open_window () {
+	{
+		ZoneScopedN("glfwCreateWindow");
+
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
+
+		window = glfwCreateWindow(1920, 1080, APPNAME, NULL, NULL);
+	}
+
+	if (!window) {
+		fprintf(stderr, "glfwCreateWindow failed!\n");
+		return;
+	}
+
+	if (glfwRawMouseMotionSupported())
+		glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
+	glfw_register_input_callbacks(*this);
+}
+void Window::close_window () {
+	{
+		ZoneScopedN("glfwDestroyWindow");
+		glfwDestroyWindow(window);
+	}
+	window = nullptr;
+}
+
+void Window::switch_renderer () {
+	renderer = nullptr;
+	close_window();
+	open_window();
+	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
+}
+
+void Window::run () {
+	g_assets = Assets::load();
+
+	g_window.game = std::make_unique<Game>();
+	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
+
+	glfw_input_pre_gameloop(g_window);
+
+	g_window.input.dt = 0; // dt zero on first frame
 	uint64_t prev = get_timestamp();
 
+	//// Frameloop
 	for (;;) {
 		FrameMark;
-
-		// Begin frame (aquire image in vk)
-		renderer->frame_begin(window.window);
 
 		kiss::ChangedFiles changed_files;
 		{
 			ZoneScopedN("file_changes.poll_changes()");
-			changed_files = window.file_changes.poll_changes();
+			changed_files = g_window.file_changes.poll_changes();
 		}
+
+		// Begin frame (aquire image in vk)
+		g_window.renderer->frame_begin(g_window.window, changed_files);
 
 		{ // Input sampling
 			ZoneScopedN("sample_input");
 
-			window.input.clear_frame_input();
+			g_window.input.clear_frame_input();
 			glfwPollEvents();
 
-			if (glfwWindowShouldClose(window.window))
+			if (glfwWindowShouldClose(g_window.window))
 				break;
 
-			glfw_sample_non_callback_input(window);
+			glfw_sample_non_callback_input(g_window);
 		}
-		
-		imgui_begin_frame(window);
+
+		imgui_begin_frame(g_window);
 
 		// Update
 
-		game->imgui(window, window.input,
-			[&] () { renderer->graphics_imgui(); },
-			[&] () { renderer->chunk_renderer.imgui(game->world->chunks); }
+		g_window.game->imgui(g_window, g_window.input,
+			[&] () { },//renderer->graphics_imgui(); },
+			[&] () { }//renderer->chunk_renderer.imgui(game->world->chunks); }
 		);
 
 		if (g_imgui.show_demo_window)
 			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
 
-		game->update(window, window.input);
-			
+		g_window.game->update(g_window, g_window.input);
+
 		// Render
 		imgui_end_frame();
-		renderer->render_frame(window.window, window.input, *game, changed_files);
+		g_window.renderer->render_frame(g_window.window, g_window.input, *g_window.game);
 
 		{ // Calc next frame dt based on this frame duration
-			auto& i = window.input;
+			auto& i = g_window.input;
 
 			uint64_t now = get_timestamp();
 			i.real_dt = (float)(now - prev) / (float)timestamp_freq;
@@ -212,12 +261,8 @@ void frameloop (Window& window) {
 			prev = now;
 		}
 
-		window.frame_counter++;
+		g_window.frame_counter++;
 	}
-}
-
-void glfw_error (int err, const char* msg) {
-	fprintf(stderr, "GLFW Error! [0x%x] '%s'\n", err, msg);
 }
 
 #ifdef WIN32
@@ -228,51 +273,15 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	#endif
 #endif
 {
-#if DEBUGLEVEL >= 2
-	glfwSetErrorCallback(glfw_error);
-#endif
+	if (!app_init())
+		return 1;
 
-	auto window = std::make_unique<Window>();
-	g_window = window.get();
+	g_window.open_window();
 
-	{
-		ZoneScopedN("glfwInit");
-		if (!glfwInit()) {
-			fprintf(stderr, "glfwInit failed!\n");
-			return 1;
-		}
-	}
+	g_window.run();
 
-	{
-		ZoneScopedN("glfwCreateWindow");
+	g_window.close_window();
 
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
-
-		window->window = glfwCreateWindow(1920, 1080, APPNAME, NULL, NULL);
-	}
-
-	if (window->window) {
-
-		if (glfwRawMouseMotionSupported())
-			glfwSetInputMode(window->window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-
-		glfw_register_input_callbacks(*window);
-
-		frameloop(*window);
-
-		{
-			ZoneScopedN("glfwDestroyWindow");
-			glfwDestroyWindow(window->window);
-		}
-
-	} else {
-		fprintf(stderr, "glfwCreateWindow failed!\n");
-	}
-
-	{
-		ZoneScopedN("glfwTerminate");
-		glfwTerminate();
-	}
+	app_shutdown();
 	return 0;
 }

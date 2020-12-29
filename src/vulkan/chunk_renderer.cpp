@@ -6,7 +6,7 @@
 
 namespace vk {
 
-void ChunkRenderer::queue_remeshing (Renderer& r, Game& game) {
+void ChunkRenderer::queue_remeshing (VulkanRenderer& r, Game& game) {
 	ZoneScoped;
 
 	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
@@ -28,7 +28,6 @@ void ChunkRenderer::queue_remeshing (Renderer& r, Game& game) {
 				auto job = std::make_unique<RemeshChunkJob>(
 					&chunk,
 					game.world->chunks,
-					r.assets,
 					game.world->world_gen,
 					r.draw_world_border);
 				remesh_jobs.emplace_back(std::move(job));
@@ -42,7 +41,7 @@ void ChunkRenderer::queue_remeshing (Renderer& r, Game& game) {
 	remesh_chunks_count = (int)remesh_jobs.size();
 }
 
-void ChunkRenderer::upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame) {
+void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame) {
 	ZoneScoped;
 
 	auto& frame = frames[cur_frame];

@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "renderer.hpp"
 #include "vulkan_helper.hpp"
 #include "vulkan_shaders.hpp"
 #include "vulkan_window.hpp"
@@ -7,10 +8,11 @@
 #include "vulkan_screenshot.hpp"
 #include "chunk_renderer.hpp"
 #include "vulkan_staging.hpp"
-#include "graphics.hpp"
 #include "engine/camera.hpp"
 
 #include "TracyVulkan.hpp"
+
+struct GLFWwindow;
 
 namespace vk {
 
@@ -49,7 +51,9 @@ struct ViewUniforms {
 	}
 };
 
-struct Renderer {
+class VulkanRenderer : public Renderer {
+public:
+
 	VulkanWindowContext			ctx;
 
 	PipelineManager				pipelines;
@@ -132,8 +136,6 @@ struct Renderer {
 	ChunkRenderer				chunk_renderer;
 	DebugDrawer					debug_drawer;
 
-	Assets						assets;
-
 	Screenshots					screenshot;
 
 	float						renderscale = 1.0f;
@@ -164,16 +166,16 @@ struct Renderer {
 		staging.imgui();
 	}
 
-	Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json);
-	~Renderer ();
+	VulkanRenderer (GLFWwindow* window, char const* app_name);
+	virtual ~VulkanRenderer ();
 
+	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files);
+	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
+	
 	void set_view_uniforms (Camera_View& view, int2 viewport_size);
-	void render_frame (GLFWwindow* window, Input& I, Game& game, kiss::ChangedFiles& changed_files);
-
-	void frame_begin (GLFWwindow* window);
 	void submit (GLFWwindow* window, VkCommandBuffer buf);
 
-	void upload_static_data (json const& blocks_json);
+	void upload_static_data ();
 	void destroy_static_data ();
 
 	////
@@ -250,5 +252,3 @@ struct Renderer {
 };
 
 } // namespace vk
-
-using vk::Renderer;

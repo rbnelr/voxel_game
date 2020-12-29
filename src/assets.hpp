@@ -1,6 +1,6 @@
 #pragma once
 #include "common.hpp"
-#include "engine/camera.hpp"
+#include "blocks.hpp"
 
 enum class AttribMode {
 	FLOAT,		// simply pass float to shader
@@ -26,7 +26,7 @@ struct BlockTile {
 };
 
 // Vertex for rendering chunks via merge instancing
-// one vertex is expanded to a set (6 tris) of block mesh data
+// one vertex is expanded to a quad (6 vert) of block mesh data
 struct BlockMeshInstance {
 	static constexpr int FIXEDPOINT_FAC = 256;
 
@@ -63,75 +63,49 @@ struct BlockMeshVertex {
 struct BlockMeshes {
 	static constexpr int MERGE_INSTANCE_FACTOR = 6; // how many vertices are emitted per input vertex (how big is one slice of block mesh)
 
-	struct Mesh {
-		int offset;
-		int length; // number of mesh slices
-	};
+	// A mesh slice which is a fixed number of vertices
 	struct MeshSlice {
 		BlockMeshVertex vertices[MERGE_INSTANCE_FACTOR];
 	};
 
-	std_vector<MeshSlice>	slices;
+	// A mesh made up of a variable number of slices
+	struct Mesh {
+		int offset;
+		int length; // number of mesh slices
+	};
+
+	// mesh (slice) data
+	std::vector<MeshSlice>			slices;
+	// meshes
+	std::vector<Mesh>				meshes;
+	// block_id -> mesh lookup
+	std::vector<int>				block_meshes; // block mesh index (-1 => normal block, >=0 => index into block_mesh_info)
+
+	void load (json const& blocks_json);
 };
 
 struct Assets {
 	
-	std_vector<BlockMeshes::Mesh> block_mesh_info;
-	std_vector<int> block_meshes; // block mesh index (-1 => normal block, >=0 => index into block_mesh_info)
+	BlockMeshes				block_meshes;
+	std::vector<BlockTile>	block_tiles;
 
-	BlockMeshes generate_block_meshes (json const& blocks_json);
+	BlockTypes				block_types;
 
-	std_vector<BlockTile> block_tiles;
+	void load_block_types (json const& blocks_json);
+	void load_block_tiles (json const& blocks_json);
 
-	void load_block_textures (json const& blocks_json);
-};
+	static Assets load () {
+		ZoneScoped;
+		Assets a;
 
-struct DebugDraw {
-	struct LineVertex {
-		float3 pos;
-		float4 col;
+		json blocks_json = load_json("blocks.json");
 
-		template <typename ATTRIBS>
-		static void attributes (ATTRIBS& a) {
-			int loc = 0;
-			a.init(sizeof(LineVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos", offsetof(LineVertex, pos));
-			a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col", offsetof(LineVertex, col));
-		}
-	};
-	struct TriVertex {
-		float3 pos;
-		float3 normal;
-		float4 col;
+		a.load_block_types(blocks_json);
+		a.block_meshes.load(blocks_json);
+		a.load_block_tiles(blocks_json);
 
-		template <typename ATTRIBS>
-		static void attributes (ATTRIBS& a) {
-			int loc = 0;
-			a.init(sizeof(TriVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(TriVertex, pos));
-			a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(TriVertex, normal));
-			a.template add<AttribMode::FLOAT, decltype(col   )>(loc++, "col"   , offsetof(TriVertex, col));
-		}
-	};
-
-	std::vector<LineVertex> lines;
-	std::vector<TriVertex> tris;
-
-	void clear () {
-		lines.clear();
-		lines.shrink_to_fit();
-
-		tris.clear();
-		tris.shrink_to_fit();
+		return a;
 	}
-
-	void vector (float3 pos, float3 dir, lrgba col);
-
-	void wire_cube (float3 pos, float3 size, lrgba col);
-	void wire_frustrum (Camera_View const& view, lrgba col);
-
-	void cylinder (float3 base, float radius, float height, lrgba col, int sides=32);
 };
 
-inline DebugDraw g_debugdraw;
-
+inline Assets g_assets;

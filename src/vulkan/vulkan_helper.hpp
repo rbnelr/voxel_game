@@ -4,7 +4,7 @@
 #include "kisslib/stb_image_write.hpp"
 #include "kisslib/macros.hpp"
 #include "kisslib/kissmath.hpp"
-#include "graphics.hpp" // for AttribMode
+#include "assets.hpp"
 #include <vector>
 #include <stdexcept>
 

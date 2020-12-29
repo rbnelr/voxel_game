@@ -148,17 +148,11 @@
     <ClInclude Include="..\..\..\src\physics.hpp">
       <Filter>game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\voxel_light.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\world_generator.hpp">
       <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp">
       <Filter>open_simplex_noise</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\graphics.hpp">
-      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp">
       <Filter>vulkan</Filter>
@@ -195,6 +189,12 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\vulkan\vulkan_screenshot.hpp">
       <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\renderer.hpp">
+      <Filter>game</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\assets.hpp">
+      <Filter>game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -288,9 +288,6 @@
     <ClCompile Include="..\..\..\src\physics.cpp">
       <Filter>game</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\voxel_light.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\world_generator.cpp">
       <Filter>game</Filter>
     </ClCompile>
@@ -312,14 +309,14 @@
     <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\blocks.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\graphics.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp">
       <Filter>vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\renderer.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\assets.cpp">
+      <Filter>game</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

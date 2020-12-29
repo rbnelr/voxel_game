@@ -1,7 +1,7 @@
 #include "common.hpp"
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
-#include "graphics.hpp"
+#include "assets.hpp"
 #include "player.hpp"
 
 #define NOINLINE __declspec(noinline)
@@ -27,7 +27,7 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	float rand_offsx = rand1;
 	float rand_offsy = rand2;
 		
-	auto& tile = j.block_tiles[id];
+	auto& tile = g_assets.block_tiles[id];
 
 	// get a random deterministic variant
 	int variant = (int)(rand1 * (float)tile.variants); // [0, tile.variants)
@@ -42,7 +42,7 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance::FIXEDPOINT_FAC);
 
-	auto& info = j.block_mesh_info[meshid];
+	auto& info = g_assets.block_meshes.meshes[meshid];
 
 	for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
 		auto* v = j.mesh.opaque_vertices.push();
@@ -82,7 +82,7 @@ void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei,
 	v->posx = fixd_posx;
 	v->posy = fixd_posy;
 	v->posz = fixd_posz;
-	v->texid = j.block_tiles[id].calc_tex_index(facei, 0);
+	v->texid = g_assets.block_tiles[id].calc_tex_index(facei, 0);
 	v->meshid = facei;
 }
 
@@ -93,17 +93,17 @@ NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
 	if (!j.draw_world_border && (id == B_NULL || nid == B_NULL))
 		return;
 
-	auto& b = g_blocks.blocks[id];
-	auto& nb = g_blocks.blocks[nid];
+	auto& b = g_assets.block_types[id];
+	auto& nb = g_assets.block_types[nid];
 
 	// generate face of our voxel that faces negative direction neighbour
-	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[id] < 0) {
+	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && g_assets.block_meshes.block_meshes[id] < 0) {
 		auto& mesh = b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
 		face(j, id, mesh, (BlockFace)(BF_NEG_X + AXIS*2), pos);
 	}
 
 	// generate face of negative direction neighbour that faces this voxel
-	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
+	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && g_assets.block_meshes.block_meshes[nid] < 0 && nid != B_NULL) {
 		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
 		pos[AXIS] -= 1;
 		face(j, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2), pos);
@@ -118,8 +118,6 @@ void mesh_chunk (RemeshChunkJob& j) {
 	auto const* nc_nx = get_neighbour_blocks(j, 0, &sid_nx);
 	auto const* nc_ny = get_neighbour_blocks(j, 2, &sid_ny);
 	auto const* nc_nz = get_neighbour_blocks(j, 4, &sid_nz);
-	
-	j.chunk->voxels._validate_ids();
 
 	auto const* ptr = j.chunk->voxels.ids;
 
@@ -168,24 +166,24 @@ void mesh_chunk (RemeshChunkJob& j) {
 	// while still keeping flexible code in border voxels to allows fast code
 	// Code is super bloated and macro'd, but generates code that runs almost as fast as code without any neighbour handling
 	
-	#define BODY(X,Y,Z) {								\
-		block_id id = ptr[idx];							\
-		{												\
-			block_id nid = X;							\
-			if (nid != id) face<0>(j, id, nid, idx);	\
-		}												\
-		{												\
-			block_id nid = Y;							\
-			if (nid != id) face<1>(j, id, nid, idx);	\
-		}												\
-		{												\
-			block_id nid = Z;							\
-			if (nid != id) face<2>(j, id, nid, idx);	\
-		}												\
-		if (j.block_meshes[id] >= 0)					\
-			block_mesh(j, id, j.block_meshes[id], idx);	\
-														\
-		idx++;											\
+	#define BODY(X,Y,Z) {													\
+		block_id id = ptr[idx];												\
+		{																	\
+			block_id nid = X;												\
+			if (nid != id) face<0>(j, id, nid, idx);						\
+		}																	\
+		{																	\
+			block_id nid = Y;												\
+			if (nid != id) face<1>(j, id, nid, idx);						\
+		}																	\
+		{																	\
+			block_id nid = Z;												\
+			if (nid != id) face<2>(j, id, nid, idx);						\
+		}																	\
+		if (g_assets.block_meshes.block_meshes[id] >= 0)					\
+			block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);	\
+																			\
+		idx++;																\
 	}
 
 #define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
@@ -240,11 +238,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 #endif
 }
 
-RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg, bool draw_world_border):
+RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg, bool draw_world_border):
 		chunk{chunk}, chunks{chunks},
-		block_mesh_info{assets.block_mesh_info.data()},
-		block_meshes{assets.block_meshes.data()},
-		block_tiles{assets.block_tiles.data()},
 		draw_world_border{draw_world_border} {
 
 	chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);

@@ -74,7 +74,7 @@ void Logger::add_line (Line const& line) {
 
 void vlogf (LogLevel level, char const* format, va_list vl) {
 	char new_format[1024];
-	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", g_window->frame_counter, format);
+	snprintf(new_format, sizeof(new_format), "[%5d] %s\n", g_window.frame_counter, format);
 
 	char str[4096];
 	vsnprintf(str, sizeof(str), new_format, vl);
@@ -86,7 +86,7 @@ void vlogf (LogLevel level, char const* format, va_list vl) {
 
 	Logger::Line l;
 	l.level = level;
-	l.frame = g_window->frame_counter;
+	l.frame = g_window.frame_counter;
 
 	char* cur = str;
 	while (*cur != '\0') {

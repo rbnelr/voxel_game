@@ -4,12 +4,12 @@
 #include "vulkan_window.hpp"
 #include "vulkan_shaders.hpp"
 #include "chunk_mesher.hpp"
-#include "graphics.hpp"
+#include "assets.hpp"
 #include "game.hpp"
 
 namespace vk {
 
-struct Renderer;
+class VulkanRenderer;
 
 struct ChunkRenderer {
 	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
@@ -145,9 +145,9 @@ struct ChunkRenderer {
 	}
 
 	int remesh_chunks_count;
-	void queue_remeshing (Renderer& r, Game& game);
+	void queue_remeshing (VulkanRenderer& r, Game& game);
 
-	void upload_remeshed (Renderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame);
+	void upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame);
 
 	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, bool debug_frustrum_culling, int cur_frame);
 

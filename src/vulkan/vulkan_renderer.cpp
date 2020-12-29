@@ -6,16 +6,18 @@
 
 namespace vk {
 
-void Renderer::set_view_uniforms (Camera_View& view, int2 viewport_size) {
+void VulkanRenderer::set_view_uniforms (Camera_View& view, int2 viewport_size) {
 	ViewUniforms ubo;
 	ubo.set(view, viewport_size);
 
 	memcpy((char*)ubo_mem_ptr + frame_data[cur_frame].ubo_mem_offs, &ubo, sizeof(ViewUniforms));
 }
 
-void Renderer::frame_begin (GLFWwindow* window) {
+void VulkanRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
-	
+
+	pipelines.update(ctx, changed_files, wireframe);
+
 	auto frame = frame_data[cur_frame];
 
 	vkWaitForFences(ctx.dev, 1, &frame.fence, VK_TRUE, UINT64_MAX);
@@ -53,12 +55,10 @@ void set_viewport (VkCommandBuffer cmds, int2 size) {
 	vkCmdSetScissor(cmds, 0, 1, &scissor);
 }
 
-void Renderer::render_frame (GLFWwindow* window, Input& I, Game& game, kiss::ChangedFiles& changed_files) {
+void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	ZoneScoped;
 
 	screenshot.begin(I);
-	
-	pipelines.update(ctx, changed_files, wireframe);
 
 	////
 	chunk_renderer.queue_remeshing(*this, game);
@@ -231,7 +231,7 @@ void Renderer::render_frame (GLFWwindow* window, Input& I, Game& game, kiss::Cha
 	submit(window, cmds);
 }
 
-void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
+void VulkanRenderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 	ZoneScoped;
 	
 	auto frame = frame_data[cur_frame];
@@ -264,7 +264,7 @@ void Renderer::submit (GLFWwindow* window, VkCommandBuffer cmds) {
 	cur_frame = (cur_frame + 1) % FRAMES_IN_FLIGHT;
 }
 
-Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks_json): ctx{window, app_name} {
+VulkanRenderer::VulkanRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
 	ZoneScoped;
 
 	wnd_color_format = ctx.swap_chain.format.format;
@@ -290,7 +290,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 
 	create_frame_data();
 
-	upload_static_data(blocks_json);
+	upload_static_data();
 
 	create_descriptor_pool();
 	create_ubo_buffers();
@@ -368,7 +368,7 @@ Renderer::Renderer (GLFWwindow* window, char const* app_name, json const& blocks
 	chunk_renderer.create(ctx, pipelines, main_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
 	debug_drawer.create(ctx, pipelines, ui_renderpass, common_descriptor_layout, FRAMES_IN_FLIGHT);
 }
-Renderer::~Renderer () {
+VulkanRenderer::~VulkanRenderer () {
 	ZoneScoped;
 
 	//vkQueueWaitIdle(ctx.queues.graphics_queue);
@@ -411,11 +411,8 @@ Renderer::~Renderer () {
 	TracyVkDestroy(ctx.tracy_ctx);
 }
 
-void Renderer::upload_static_data (json const& blocks_json) {
+void VulkanRenderer::upload_static_data () {
 	ZoneScoped;
-	
-	assets.load_block_textures(blocks_json);
-	auto block_meshes = assets.generate_block_meshes(blocks_json);
 
 	StaticDataUploader uploader;
 	auto cmds = begin_init_cmds();
@@ -423,8 +420,8 @@ void Renderer::upload_static_data (json const& blocks_json) {
 
 	{
 		UploadBuffer bufs[1];
-		bufs[0].data = block_meshes.slices.data();
-		bufs[0].size = block_meshes.slices.size() * sizeof(block_meshes.slices[0]);
+		bufs[0].data = g_assets.block_meshes.slices.data();
+		bufs[0].size = g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]);
 		bufs[0].usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		mesh_mem = uploader.upload(ctx.dev, ctx.pdev, bufs, ARRLEN(bufs));
 
@@ -469,7 +466,7 @@ void Renderer::upload_static_data (json const& blocks_json) {
 	end_init_cmds(cmds);
 	uploader.end(ctx.dev);
 }
-void Renderer::destroy_static_data () {
+void VulkanRenderer::destroy_static_data () {
 	vkDestroyBuffer(ctx.dev, block_meshes_buf, nullptr);
 
 	vkFreeMemory(ctx.dev, mesh_mem, nullptr);
@@ -483,7 +480,7 @@ void Renderer::destroy_static_data () {
 }
 
 ////
-void Renderer::create_ubo_buffers () {
+void VulkanRenderer::create_ubo_buffers () {
 	ZoneScoped;
 
 	// Create buffers and calculate offets into memory block
@@ -527,7 +524,7 @@ void Renderer::create_ubo_buffers () {
 			vkBindBufferMemory(ctx.dev, f.ubo_buf, ubo_memory, f.ubo_mem_offs);
 	}
 }
-void Renderer::destroy_ubo_buffers () {
+void VulkanRenderer::destroy_ubo_buffers () {
 	vkUnmapMemory(ctx.dev, ubo_memory);
 
 	for (auto& f : frame_data)
@@ -535,7 +532,7 @@ void Renderer::destroy_ubo_buffers () {
 	vkFreeMemory(ctx.dev, ubo_memory, nullptr);
 }
 
-void Renderer::create_descriptor_pool () {
+void VulkanRenderer::create_descriptor_pool () {
 	VkDescriptorPoolSize pool_sizes[2] = {};
 	pool_sizes[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	pool_sizes[0].descriptorCount = (uint32_t)(FRAMES_IN_FLIGHT + 4); // common tex(per frame) ssao(20 + rescale(2)
@@ -553,7 +550,7 @@ void Renderer::create_descriptor_pool () {
 	GPU_DBG_NAME(ctx, descriptor_pool, "descriptor_pool");
 }
 
-void Renderer::create_common_descriptors () {
+void VulkanRenderer::create_common_descriptors () {
 	{ // create descriptor layout
 		VkSamplerCreateInfo sampler_info = {};
 		sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -663,7 +660,7 @@ void Renderer::create_common_descriptors () {
 	}
 }
 
-void Renderer::create_ssao_descriptors () {
+void VulkanRenderer::create_ssao_descriptors () {
 	{ // create descriptor layout
 		uint32_t idx = 0;
 		VkDescriptorSetLayoutBinding bindings[3] = {};
@@ -703,7 +700,7 @@ void Renderer::create_ssao_descriptors () {
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, &ssao_descriptor_set));
 	}
 }
-void Renderer::update_ssao_img_descr () {
+void VulkanRenderer::update_ssao_img_descr () {
 	VkDescriptorImageInfo depth = {};
 	depth.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	depth.imageView = main_depth.image_view;
@@ -739,7 +736,7 @@ void Renderer::update_ssao_img_descr () {
 	vkUpdateDescriptorSets(ctx.dev, ARRLEN(writes), writes, 0, nullptr);
 }
 
-void Renderer::create_rescale_descriptors () {
+void VulkanRenderer::create_rescale_descriptors () {
 	{ // create descriptor layout
 		VkDescriptorSetLayoutBinding bindings[2] = {};
 		bindings[0].binding = 0;
@@ -770,7 +767,7 @@ void Renderer::create_rescale_descriptors () {
 		VK_CHECK_RESULT(vkAllocateDescriptorSets(ctx.dev, &info, &rescale_descriptor_set));
 	}
 }
-void Renderer::update_rescale_img_descr () {
+void VulkanRenderer::update_rescale_img_descr () {
 	VkDescriptorImageInfo color = {};
 	color.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 	color.imageView = main_color.image_view;
@@ -802,7 +799,7 @@ void Renderer::update_rescale_img_descr () {
 }
 
 //// Create per-frame data
-void Renderer::create_frame_data () {
+void VulkanRenderer::create_frame_data () {
 	for (int i=0; i<FRAMES_IN_FLIGHT; ++i) {
 		auto& frame = frame_data[i];
 
@@ -835,7 +832,7 @@ void Renderer::create_frame_data () {
 }
 
 //// Framebuffer creation
-void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa) {
+void VulkanRenderer::create_main_framebuffer (int2 size, VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa) {
 	main_color = create_render_buffer(size, color_format,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -874,7 +871,7 @@ void Renderer::create_main_framebuffer (int2 size, VkFormat color_format, VkForm
 
 	GPU_DBG_NAME(ctx, main_framebuffer, "main_framebuffer");
 }
-void Renderer::destroy_main_framebuffer () {
+void VulkanRenderer::destroy_main_framebuffer () {
 	vkDestroyFramebuffer(ctx.dev, main_framebuffer, nullptr);
 
 	vkDestroyImageView(ctx.dev, main_color.image_view, nullptr);
@@ -886,7 +883,7 @@ void Renderer::destroy_main_framebuffer () {
 	vkFreeMemory(ctx.dev, main_depth.memory, nullptr);
 }
 
-void Renderer::create_ssao_framebuffer (int2 size, VkFormat color_format) {
+void VulkanRenderer::create_ssao_framebuffer (int2 size, VkFormat color_format) {
 	ssao_fac = create_render_buffer(size, color_format,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -909,7 +906,7 @@ void Renderer::create_ssao_framebuffer (int2 size, VkFormat color_format) {
 
 	GPU_DBG_NAME(ctx, ssao_framebuffer, "ssao_framebuffer");
 }
-void Renderer::destroy_ssao_framebuffer () {
+void VulkanRenderer::destroy_ssao_framebuffer () {
 	vkDestroyFramebuffer(ctx.dev, ssao_framebuffer, nullptr);
 
 	vkDestroyImageView(ctx.dev, ssao_fac.image_view, nullptr);
@@ -917,7 +914,7 @@ void Renderer::destroy_ssao_framebuffer () {
 	vkFreeMemory(ctx.dev, ssao_fac.memory, nullptr);
 }
 
-void Renderer::recreate_main_framebuffer (int2 wnd_size) {
+void VulkanRenderer::recreate_main_framebuffer (int2 wnd_size) {
 	int2 cur_size = max(roundi((float2)wnd_size * renderscale), 1);
 	if (cur_size != renderscale_size || renderscale_nearest_changed) {
 		vkQueueWaitIdle(ctx.queues.graphics_queue);
@@ -939,14 +936,14 @@ void Renderer::recreate_main_framebuffer (int2 wnd_size) {
 }
 
 //// Renderpass creation
-RenderBuffer Renderer::create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa) {
+RenderBuffer VulkanRenderer::create_render_buffer (int2 size, VkFormat format, VkImageUsageFlags usage, VkImageLayout initial_layout, VkMemoryPropertyFlags props, VkImageAspectFlags aspect, int msaa) {
 	RenderBuffer buf;
 	buf.image = create_image(ctx.dev, ctx.pdev, size, format, VK_IMAGE_TILING_OPTIMAL, usage, initial_layout, props, &buf.memory, 1, (VkSampleCountFlagBits)msaa);
 	buf.image_view = create_image_view(ctx.dev, buf.image, format, 1, aspect);
 	return buf;
 }
 
-VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa) {
+VkRenderPass VulkanRenderer::create_main_renderpass (VkFormat color_format, VkFormat normal_format, VkFormat depth_format, int msaa) {
 	VkAttachmentDescription attachments[3] = {};
 	// color_attachment
 	attachments[0].format = color_format;
@@ -1015,7 +1012,7 @@ VkRenderPass Renderer::create_main_renderpass (VkFormat color_format, VkFormat n
 	VK_CHECK_RESULT(vkCreateRenderPass(ctx.dev, &info, nullptr, &renderpass));
 	return renderpass;
 }
-VkRenderPass Renderer::create_ssao_renderpass (VkFormat color_format) {
+VkRenderPass VulkanRenderer::create_ssao_renderpass (VkFormat color_format) {
 	VkAttachmentDescription attachments[1] = {};
 	// color_attachment
 	attachments[0].format = color_format;
@@ -1058,7 +1055,7 @@ VkRenderPass Renderer::create_ssao_renderpass (VkFormat color_format) {
 	VK_CHECK_RESULT(vkCreateRenderPass(ctx.dev, &info, nullptr, &renderpass));
 	return renderpass;
 }
-VkRenderPass Renderer::create_ui_renderpass (VkFormat color_format) {
+VkRenderPass VulkanRenderer::create_ui_renderpass (VkFormat color_format) {
 	VkAttachmentDescription attachments[1] = {};
 	// color_attachment
 	attachments[0].format = color_format;
@@ -1103,7 +1100,7 @@ VkRenderPass Renderer::create_ui_renderpass (VkFormat color_format) {
 }
 
 //// One time init commands buffers
-VkCommandBuffer Renderer::begin_init_cmds () {
+VkCommandBuffer VulkanRenderer::begin_init_cmds () {
 	ZoneScoped;
 	
 	VkCommandBuffer buf;
@@ -1124,7 +1121,7 @@ VkCommandBuffer Renderer::begin_init_cmds () {
 
 	return buf;
 }
-void Renderer::end_init_cmds (VkCommandBuffer buf) {
+void VulkanRenderer::end_init_cmds (VkCommandBuffer buf) {
 	ZoneScoped;
 
 	vkEndCommandBuffer(buf);

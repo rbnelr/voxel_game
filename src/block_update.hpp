@@ -57,7 +57,7 @@ public:
 		imgui_pop();
 	}
 
-	bool update_block (Chunks& chunks, Chunk& chunk, Block& b, int3 pos_world);
+	bool update_block (Chunks& chunks, Chunk& chunk, block_id bid, int3 pos_world);
 	void update_blocks (Input& I, Chunks& chunks);
 };
 

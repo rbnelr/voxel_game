@@ -4,6 +4,8 @@
 #include "kisslib/threadpool.hpp"
 
 Game::Game () {
+	ZoneScoped;
+
 	//set_process_high_priority();
 	set_thread_priority(TPRIO_MAIN);
 	set_thread_preferred_core(0);
@@ -114,7 +116,7 @@ void Game::update (Window& window, Input& I) {
 	player_view = world->player.update_post_physics(I, *world);
 
 	if (selected_block)
-		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, g_blocks.blocks[selected_block.block].name);
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, g_assets.block_types[selected_block.block].name);
 	else
 		ImGui::Text("Selected Block: None");
 
@@ -126,7 +128,7 @@ void Game::update (Window& window, Input& I) {
 
 	block_update.update_blocks(I, world->chunks);
 
-	world->chunks.update_chunk_loading(*world, world_gen, world->player);
+	world->chunks.update_chunk_loading(*world, world->player);
 
 	if (activate_flycam)
 		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));

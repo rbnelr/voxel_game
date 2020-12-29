@@ -1,5 +1,7 @@
 #pragma once
 
+static constexpr const char* APPNAME = "Voxel Game";
+
 #include "kisslib/clean_windows_h.hpp"
 
 //

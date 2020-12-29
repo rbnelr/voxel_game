@@ -52,11 +52,16 @@ struct BlockTypes {
 
 	std_vector<Block> blocks;
 
+	int count () {
+		return (int)blocks.size();
+	}
+	Block const& operator[] (block_id id) const {
+		return blocks[id];
+	}
+
 	//std_unordered_map<std_string, block_id> name_map;
 
 	block_id air_id;
-
-	void from_json (json const& blocks_json);
 
 	block_id map_id (std::string_view name) {
 	#if 1
@@ -72,33 +77,15 @@ struct BlockTypes {
 		return it->second;
 	#endif
 	}
-};
 
-inline BlockTypes g_blocks;
+	inline bool grass_can_live_below (block_id id) {
+		auto& b = blocks[id];
+		return b.transparency != TM_OPAQUE && b.collision <= CM_LIQUID;
+	}
 
-inline bool grass_can_live_below (block_id id) {
-	auto& b = g_blocks.blocks[id];
-	return b.transparency != TM_OPAQUE && b.collision <= CM_LIQUID;
-}
-
-inline bool block_breakable (block_id id) {
-	auto& b = g_blocks.blocks[id];
-	return b.collision == CM_SOLID || b.collision == CM_BREAKABLE;
-}
-
-// Block instance
-struct Block {
-	block_id	id;
-	uint8_t		block_light;
-	uint8_t		sky_light;
-	uint8_t		hp;
-
-	Block () = default;
-
-	Block (block_id id): id{id} {
-		block_light = g_blocks.blocks[id].glow;
-		sky_light = 0;
-		hp = 255;
+	inline bool block_breakable (block_id id) {
+		auto& b = blocks[id];
+		return b.collision == CM_SOLID || b.collision == CM_BREAKABLE;
 	}
 };
 

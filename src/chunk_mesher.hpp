@@ -1,7 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "chunks.hpp"
-#include "graphics.hpp"
+#include "assets.hpp"
 
 struct WorldGenerator;
 struct Assets;
@@ -61,10 +61,6 @@ struct RemeshChunkJob { // Chunk remesh
 	// input
 	Chunk*					chunk;
 	Chunks&					chunks;
-	// store these three LUTs here instead of Assets* to turn double indirection into single indir
-	BlockMeshes::Mesh const*	block_mesh_info;
-	int const*					block_meshes;
-	BlockTile const*			block_tiles;
 
 	uint64_t				chunk_seed;
 	bool					draw_world_border;
@@ -72,7 +68,7 @@ struct RemeshChunkJob { // Chunk remesh
 	// output
 	RemeshingMesh			mesh;
 
-	RemeshChunkJob (Chunk* chunk, Chunks& chunks, Assets const& assets, WorldGenerator const& wg,
+	RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg,
 		bool draw_world_border);
 
 	void execute ();

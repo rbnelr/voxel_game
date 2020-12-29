@@ -1,7 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
-#include "graphics.hpp"
+#include "assets.hpp"
 
 #define CHUNK_SIZE			64
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
@@ -188,13 +188,13 @@ struct ChunkVoxels {
 		return ids ? sizeof(block_id) * CHUNK_VOXEL_COUNT : 0;
 	}
 
-	void _validate_ids () {
+	void _validate_ids (BlockTypes& blocks) {
 		if (ids) {
 			for (int i=0; i<CHUNK_VOXEL_COUNT; ++i) {
-				assert(ids[i] >= 0 && ids[i] < g_blocks.blocks.size());
+				assert(ids[i] >= 0 && ids[i] < blocks.count());
 			}
 		} else {
-			assert(sparse_id >= 0 && sparse_id < g_blocks.blocks.size());
+			assert(sparse_id >= 0 && sparse_id < blocks.count());
 		}
 	}
 };
@@ -494,5 +494,5 @@ struct Chunks {
 	void set_block (int3 pos, block_id b);
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player);
+	void update_chunk_loading (World const& world, Player const& player);
 };

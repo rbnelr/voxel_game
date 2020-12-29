@@ -4,7 +4,7 @@
 #include "world.hpp"
 #include "block_update.hpp"
 #include "engine/camera.hpp"
-#include "graphics.hpp"
+#include "assets.hpp"
 
 struct Game {
 	bool dbg_pause = false;

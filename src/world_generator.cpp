@@ -2,7 +2,6 @@
 #include "world_generator.hpp"
 #include "blocks.hpp"
 #include "chunks.hpp"
-#include "voxel_light.hpp"
 
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
@@ -144,15 +143,15 @@ float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_no
 	}
 
 void gen (Chunk* chunk, WorldGenerator const& wg) {
-	const auto AIR			= g_blocks.map_id("air");
-	const auto WATER		= g_blocks.map_id("water");
-	const auto STONE		= g_blocks.map_id("stone");
-	const auto EARTH		= g_blocks.map_id("earth");
-	const auto GRASS		= g_blocks.map_id("grass");
-	const auto TREE_LOG		= g_blocks.map_id("tree_log");
-	const auto LEAVES		= g_blocks.map_id("leaves");
-	const auto TALLGRASS	= g_blocks.map_id("tallgrass");
-	const auto TORCH		= g_blocks.map_id("torch");
+	const auto AIR			= g_assets.block_types.map_id("air");
+	const auto WATER		= g_assets.block_types.map_id("water");
+	const auto STONE		= g_assets.block_types.map_id("stone");
+	const auto EARTH		= g_assets.block_types.map_id("earth");
+	const auto GRASS		= g_assets.block_types.map_id("grass");
+	const auto TREE_LOG		= g_assets.block_types.map_id("tree_log");
+	const auto LEAVES		= g_assets.block_types.map_id("leaves");
+	const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
+	const auto TORCH		= g_assets.block_types.map_id("torch");
 	
 	assert(chunk->voxels.ids);
 	auto* ids = chunk->voxels.ids;
@@ -292,6 +291,4 @@ void WorldgenJob::execute () {
 	ZoneScoped;
 
 	gen(chunk, *wg);
-
-	chunk->voxels._validate_ids();
 }

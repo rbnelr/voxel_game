@@ -36,7 +36,7 @@ void Chunks::set_block (int3 pos, block_id b) {
 	chunk->voxels.set_block(block_pos_chunk.x, block_pos_chunk.y, block_pos_chunk.z, b);
 }
 
-void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg, Player const& player) {
+void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	ZoneScoped;
 
 	{ // chunk loading/unloading
@@ -148,7 +148,7 @@ void Chunks::update_chunk_loading (World const& world, WorldGenerator const& wg,
 
 				auto job = std::make_unique<WorldgenJob>();
 				job->chunk = &chunks[id];
-				job->wg = &wg;
+				job->wg = &world.world_gen;
 				jobs[count++] = std::move(job);
 			}
 

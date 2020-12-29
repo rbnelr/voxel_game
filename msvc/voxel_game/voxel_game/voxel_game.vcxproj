@@ -236,7 +236,7 @@
     <ClInclude Include="..\..\..\src\engine\threading.hpp" />
     <ClInclude Include="..\..\..\src\engine\window.hpp" />
     <ClInclude Include="..\..\..\src\game.hpp" />
-    <ClInclude Include="..\..\..\src\graphics.hpp" />
+    <ClInclude Include="..\..\..\src\assets.hpp" />
     <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_vulkan.h" />
@@ -271,7 +271,7 @@
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
-    <ClInclude Include="..\..\..\src\voxel_light.hpp" />
+    <ClInclude Include="..\..\..\src\renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
@@ -286,18 +286,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
     <ClCompile Include="..\..\..\src\audio\read_wav.cpp" />
-    <ClCompile Include="..\..\..\src\blocks.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PGOCreate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='PGOCreate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\block_update.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -398,7 +386,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\graphics.cpp">
+    <ClCompile Include="..\..\..\src\assets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
@@ -450,18 +438,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\voxel_light.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='PGOCreate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='PGOCreate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
+    <ClCompile Include="..\..\..\src\renderer.cpp" />
     <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
