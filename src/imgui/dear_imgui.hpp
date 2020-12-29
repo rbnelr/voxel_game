@@ -18,6 +18,20 @@ struct DearImgui {
 	bool show_demo_window = false;
 
 	int tree_depth = 0;
+
+	DearImgui () {
+		// Setup Dear ImGui context
+		IMGUI_CHECKVERSION();
+
+		ImGui::CreateContext();
+
+		ImGuiIO& io = ImGui::GetIO();
+		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	}
+	~DearImgui () {
+		ImGui::DestroyContext();
+	}
 };
 
 inline DearImgui g_imgui;

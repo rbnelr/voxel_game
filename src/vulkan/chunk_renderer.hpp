@@ -118,12 +118,12 @@ struct ChunkRenderer {
 		opt.depth_test = true;
 		opt.color_attachments = 2;
 		{
-			auto cfg = PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "1"}});
+			auto cfg = PipelineConfig("vk/chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "1"}});
 			opaque_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.opaque_pipeline", cfg);
 		}
 		{
 			opt.alpha_blend = true;
-			auto cfg = PipelineConfig("chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "0"}});
+			auto cfg = PipelineConfig("vk/chunks", pipeline_layout, main_renderpass, 0, opt, attribs, {{"ALPHA_TEST", "0"}});
 			transparent_pipeline = pipelines.create_pipeline(ctx, "ChunkRenderer.transparent_pipeline", cfg);
 		}
 	}

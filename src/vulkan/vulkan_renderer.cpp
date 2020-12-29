@@ -343,7 +343,7 @@ VulkanRenderer::VulkanRenderer (GLFWwindow* window, char const* app_name): ctx{w
 		opt.alpha_blend = false;
 		opt.depth_test = false;
 		opt.cull_mode = VK_CULL_MODE_NONE;
-		auto cfg = PipelineConfig("ssao", ssao_pipeline_layout, ssao_renderpass, 0, opt, {}, {});
+		auto cfg = PipelineConfig("vk/ssao", ssao_pipeline_layout, ssao_renderpass, 0, opt, {}, {});
 		cfg.allow_wireframe = false; // don't do wireframe for fullscreen quad draws or we won't see anything sensible
 		ssao_pipeline = pipelines.create_pipeline(ctx, "ssao_pipeline", cfg);
 	}
@@ -360,7 +360,7 @@ VulkanRenderer::VulkanRenderer (GLFWwindow* window, char const* app_name): ctx{w
 		opt.alpha_blend = false;
 		opt.depth_test = false;
 		opt.cull_mode = VK_CULL_MODE_NONE;
-		auto cfg = PipelineConfig("rescale", rescale_pipeline_layout, ui_renderpass, 0, opt, {}, {});
+		auto cfg = PipelineConfig("vk/rescale", rescale_pipeline_layout, ui_renderpass, 0, opt, {}, {});
 		cfg.allow_wireframe = false; // don't do wireframe for fullscreen quad draws or we won't see anything sensible
 		rescale_pipeline = pipelines.create_pipeline(ctx, "rescale_pipeline", cfg);
 	}

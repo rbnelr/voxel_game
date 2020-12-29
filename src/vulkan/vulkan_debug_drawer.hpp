@@ -55,12 +55,12 @@ struct DebugDrawer {
 		opt.depth_test = true;
 		opt.no_depth_write = true;
 		opt.primitive_mode = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-		auto cfg = PipelineConfig("debug_lines", pipeline_layout, renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
+		auto cfg = PipelineConfig("vk/debug_lines", pipeline_layout, renderpass, 0, opt, make_attribs<DebugDraw::LineVertex>());
 		lines_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.lines_pipeline", cfg);
 
 		PipelineOptions opt2;
 		opt2.alpha_blend = true;
-		cfg = PipelineConfig("debug_tris", pipeline_layout, renderpass, 0, opt2, make_attribs<DebugDraw::TriVertex>());
+		cfg = PipelineConfig("vk/debug_tris", pipeline_layout, renderpass, 0, opt2, make_attribs<DebugDraw::TriVertex>());
 		tris_pipeline = pipelines.create_pipeline(ctx, "DebugDrawer.tris_pipeline", cfg);
 	}
 	void destroy (VkDevice dev) {

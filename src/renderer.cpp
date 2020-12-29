@@ -7,11 +7,11 @@
 std::unique_ptr<Renderer> Renderer::start_renderer (RenderBackend backend, GLFWwindow* window) {
 	try {
 		switch (backend) {
-
+		
 			case RenderBackend::OPENGL: {
 			
 			} break;
-
+		
 			case RenderBackend::VULKAN: {
 				return std::make_unique<vk::VulkanRenderer>(window, APPNAME);
 			} break;

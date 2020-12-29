@@ -509,23 +509,6 @@
   <ItemGroup>
     <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
-    <None Include="..\..\..\shaders\chunks.glsl" />
-    <None Include="..\..\..\shaders\block_highlight.glsl" />
-    <None Include="..\..\..\shaders\common.glsl" />
-    <None Include="..\..\..\shaders\debug.glsl" />
-    <None Include="..\..\..\shaders\debug_tris.glsl" />
-    <None Include="..\..\..\shaders\fog.glsl" />
-    <None Include="..\..\..\shaders\generic.glsl" />
-    <None Include="..\..\..\shaders\gui.glsl" />
-    <None Include="..\..\..\shaders\gui_item.glsl" />
-    <None Include="..\..\..\shaders\gui_item_block.glsl" />
-    <None Include="..\..\..\shaders\held_item.glsl" />
-    <None Include="..\..\..\shaders\debug_lines.glsl" />
-    <None Include="..\..\..\shaders\noise.glsl" />
-    <None Include="..\..\..\shaders\rescale.glsl" />
-    <None Include="..\..\..\shaders\skybox.glsl" />
-    <None Include="..\..\..\shaders\ssao.glsl" />
-    <None Include="..\..\..\shaders\util.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

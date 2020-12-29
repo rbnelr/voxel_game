@@ -399,7 +399,7 @@ struct Chunks {
 		return clamp(floori(log2f(dist / load_radius * 16)), 0,3);
 	}
 
-	void imgui (Renderer& renderer);
+	void imgui (Renderer* renderer);
 
 	Chunk* _query_cache = nullptr;
 

@@ -627,14 +627,6 @@ void VulkanWindowContext::imgui_create (VkCommandBuffer one_time_cmds, int frame
 		VK_CHECK_RESULT(vkCreateDescriptorPool(dev, &info, nullptr, &imgui_descriptor_pool));
 	}
 
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-
-	ImGuiIO& io = ImGui::GetIO();
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
 	// Setup Platform/Renderer bindings
 	ImGui_ImplGlfw_InitForVulkan(glfw_window, true);
 
@@ -658,11 +650,10 @@ void VulkanWindowContext::imgui_create (VkCommandBuffer one_time_cmds, int frame
 void VulkanWindowContext::imgui_destroy () {
 	ZoneScoped;
 
-	vkDestroyDescriptorPool(dev, imgui_descriptor_pool, nullptr);
-
 	ImGui_ImplVulkan_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
+
+	vkDestroyDescriptorPool(dev, imgui_descriptor_pool, nullptr);
 }
 
 void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds, bool hide_gui) {

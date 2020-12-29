@@ -32,6 +32,6 @@ struct Game {
 
 	Game ();
 
-	void imgui (Window& window, Input& I, Renderer& renderer);
+	void imgui (Window& window, Input& I, Renderer* renderer);
 	void update (Window& window, Input& I);
 };

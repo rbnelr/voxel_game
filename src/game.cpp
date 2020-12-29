@@ -14,7 +14,7 @@ Game::Game () {
 
 // try to do all debug guis in here,
 // but don't call ImGui::End() yet so we can quickly display values from inside algorithms if we want
-void Game::imgui (Window& window, Input& I, Renderer& renderer) {
+void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 	ZoneScoped;
 
 	ImGui::Begin("Debug");
@@ -58,8 +58,8 @@ void Game::imgui (Window& window, Input& I, Renderer& renderer) {
 
 		window.input.imgui();
 		
-		if (ImGui::CollapsingHeader("Graphics")) {
-			renderer.graphics_imgui();
+		if (ImGui::CollapsingHeader("Graphics") && renderer) {
+			renderer->graphics_imgui();
 		}
 		//graphics.imgui(world->chunks);
 

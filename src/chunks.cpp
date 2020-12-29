@@ -161,7 +161,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	}
 }
 
-void Chunks::imgui (Renderer& renderer) {
+void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
 
 	ImGui::DragFloat("load_radius", &load_radius, 1);
@@ -225,7 +225,8 @@ void Chunks::imgui (Renderer& renderer) {
 		ImGui::TreePop();
 	}
 
-	renderer.chunk_renderer_imgui(*this);
+	if (renderer)
+		renderer->chunk_renderer_imgui(*this);
 
 	imgui_pop();
 }

@@ -163,6 +163,8 @@ void app_shutdown () {
 }
 
 void Window::open_window () {
+	ZoneScoped;
+
 	{
 		ZoneScopedN("glfwCreateWindow");
 
@@ -183,21 +185,29 @@ void Window::open_window () {
 	glfw_register_input_callbacks(*this);
 }
 void Window::close_window () {
-	{
-		ZoneScopedN("glfwDestroyWindow");
-		glfwDestroyWindow(window);
-	}
+	ZoneScoped;
+	glfwDestroyWindow(window);
 	window = nullptr;
 }
 
-void Window::switch_renderer () {
-	renderer = nullptr;
-	close_window();
+void Window::start_renderer () {
 	open_window();
 	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
 }
 
+void Window::stop_renderer () {
+	renderer = nullptr;
+	close_window();
+}
+
+void Window::switch_renderer () {
+	stop_renderer();
+	start_renderer();
+}
+
 void Window::run () {
+	open_window();
+
 	g_assets = Assets::load();
 
 	g_window.game = std::make_unique<Game>();
@@ -219,7 +229,8 @@ void Window::run () {
 		}
 
 		// Begin frame (aquire image in vk)
-		g_window.renderer->frame_begin(g_window.window, changed_files);
+		if (g_window.renderer)
+			g_window.renderer->frame_begin(g_window.window, changed_files);
 
 		{ // Input sampling
 			ZoneScopedN("sample_input");
@@ -237,7 +248,7 @@ void Window::run () {
 
 		// Update
 
-		g_window.game->imgui(g_window, g_window.input, *g_window.renderer);
+		g_window.game->imgui(g_window, g_window.input, g_window.renderer.get());
 
 		if (g_imgui.show_demo_window)
 			ImGui::ShowDemoWindow(&g_imgui.show_demo_window);
@@ -246,7 +257,8 @@ void Window::run () {
 
 		// Render
 		imgui_end_frame();
-		g_window.renderer->render_frame(g_window.window, g_window.input, *g_window.game);
+		if (g_window.renderer)
+			g_window.renderer->render_frame(g_window.window, g_window.input, *g_window.game);
 
 		{ // Calc next frame dt based on this frame duration
 			auto& i = g_window.input;
@@ -260,6 +272,9 @@ void Window::run () {
 
 		g_window.frame_counter++;
 	}
+
+	stop_renderer();
+	g_window.game = nullptr;
 }
 
 #ifdef WIN32
@@ -273,13 +288,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 	if (!app_init())
 		return 1;
 
-	g_window.open_window();
-
 	g_window.run();
-
-	g_window.renderer = nullptr;
-	g_window.game = nullptr;
-	g_window.close_window();
 
 	app_shutdown();
 	return 0;

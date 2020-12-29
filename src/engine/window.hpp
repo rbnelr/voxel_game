@@ -43,6 +43,9 @@ struct Window {
 	void open_window ();
 	void close_window ();
 
+	void start_renderer ();
+	void stop_renderer ();
+
 	void switch_renderer ();
 
 	void run ();
