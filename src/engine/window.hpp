@@ -21,13 +21,14 @@ struct Window {
 
 	bool	fullscreen = false; // readonly
 	bool	borderless_fullscreen = true; // readonly, use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
-	Rect	window_positioning;
+	Rect	window_pos;
 	
 	int		frame_counter = 0;
 
 	std::unique_ptr<Game>			game;
 
-	RenderBackend					render_backend = RenderBackend::OPENGL;
+	RenderBackend					render_backend = RenderBackend::VULKAN;
+	bool							switch_render_backend = false;
 	std::unique_ptr<Renderer>		renderer;
 
 	DirectoyChangeNotifier			file_changes = DirectoyChangeNotifier("./", true);
@@ -45,9 +46,6 @@ struct Window {
 
 	void open_window ();
 	void close_window ();
-
-	void start_renderer ();
-	void stop_renderer ();
 
 	void switch_renderer ();
 

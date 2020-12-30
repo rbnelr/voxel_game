@@ -267,11 +267,12 @@ struct Chunks {
 		memset(m.slices, -1, sizeof(m.slices));
 	}
 	void free_mesh (ChunkMesh& m) {
-		for (auto s : m.slices) {
+		for (auto& s : m.slices) {
 			if (s != U16_NULL)
 				slices_alloc.free(s);
 			s = U16_NULL;
 		}
+		m.vertex_count = 0;
 	}
 
 	chunk_pos_to_id_map pos_to_id;
@@ -381,6 +382,19 @@ struct Chunks {
 
 		max_id = (chunk_id)id_alloc.alloc_end;
 		count--;
+	}
+
+	// for renderer switch
+	void free_all_slices () {
+		for (chunk_id cid=0; cid<max_id; ++cid) {
+			auto& chunk = chunks[cid];
+			if ((chunk.flags & Chunk::LOADED) == 0) continue;
+
+			free_mesh(chunk.opaque_mesh);
+			free_mesh(chunk.transparent_mesh);
+
+			chunk.flags |= Chunk::DIRTY;
+		}
 	}
 
 	// load chunks in this radius in order of distance to the player 

@@ -4,8 +4,8 @@
 
 // Base class for multiple render backends
 
-enum class RenderBackend {
-	OPENGL,
+enum class RenderBackend : int {
+	OPENGL=0,
 	VULKAN,
 };
 

@@ -16,8 +16,12 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& change
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	
+	glViewport(0,0, I.window_size.x, I.window_size.y);
+	glScissor(0,0, I.window_size.x, I.window_size.y);
+
 	glClearColor(1,0,0,1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 
 
 	imgui_draw();
@@ -77,6 +81,9 @@ OpenglRenderer::OpenglRenderer (GLFWwindow* window, char const* app_name) {
 	//	!glfwExtensionSupported("GL_NV_shader_buffer_load")) {
 	//	clog(ERROR, "[OpenGL] GL_NV_gpu_shader5 or GL_NV_shader_buffer_load not supported!\n");
 	//}
+
+	// TODO: extension needed?
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init();

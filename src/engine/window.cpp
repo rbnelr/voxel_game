@@ -61,13 +61,13 @@ bool Window::switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 
 	if (!this->fullscreen) {
 		// store windowed window placement
-		glfwGetWindowPos(window, &window_positioning.pos.x, &window_positioning.pos.y);
-		glfwGetWindowSize(window, &window_positioning.dim.x, &window_positioning.dim.y);
+		glfwGetWindowPos(window, &window_pos.pos.x, &window_pos.pos.y);
+		glfwGetWindowSize(window, &window_pos.dim.x, &window_pos.dim.y);
 	}
 
 	if (fullscreen) {
 		Monitor monitor;
-		if (!select_monitor_from_window_pos(window_positioning, &monitor))
+		if (!select_monitor_from_window_pos(window_pos, &monitor))
 			return false; // fail
 
 		if (borderless_fullscreen) {
@@ -80,8 +80,8 @@ bool Window::switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 	} else {
 		// restore windowed window placement
 		glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
-		glfwSetWindowMonitor(window, NULL, window_positioning.pos.x, window_positioning.pos.y,
-			window_positioning.dim.x, window_positioning.dim.y, GLFW_DONT_CARE);
+		glfwSetWindowMonitor(window, NULL, window_pos.pos.x, window_pos.pos.y,
+			window_pos.dim.x, window_pos.dim.y, GLFW_DONT_CARE);
 	}
 
 	// reset vsync to make sure 
@@ -162,6 +162,7 @@ void Window::open_window () {
 		switch (render_backend) {
 			case RenderBackend::OPENGL: {
 
+				glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 			#ifdef OPENGL_DEBUG
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 			#endif
@@ -172,7 +173,9 @@ void Window::open_window () {
 
 			} break;
 			case RenderBackend::VULKAN: {
+
 				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
 			} break;
 		}
 
@@ -193,23 +196,25 @@ void Window::open_window () {
 }
 void Window::close_window () {
 	ZoneScoped;
+
+	glfwGetWindowPos(window, &window_pos.pos.x, &window_pos.pos.y);
+	glfwGetWindowSize(window, &window_pos.dim.x, &window_pos.dim.y);
+
 	glfwDestroyWindow(window);
 	window = nullptr;
 }
 
-void Window::start_renderer () {
-	open_window();
-	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
-}
-
-void Window::stop_renderer () {
+void Window::switch_renderer () {
 	renderer = nullptr;
 	close_window();
-}
+	game->world->chunks.free_all_slices();
+	
+	open_window();
 
-void Window::switch_renderer () {
-	stop_renderer();
-	start_renderer();
+	glfwSetWindowMonitor(window, NULL, window_pos.pos.x, window_pos.pos.y,
+		window_pos.dim.x, window_pos.dim.y, GLFW_DONT_CARE);
+
+	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
 }
 
 void Window::run () {
@@ -233,6 +238,11 @@ void Window::run () {
 		{
 			ZoneScopedN("file_changes.poll_changes()");
 			changed_files = g_window.file_changes.poll_changes();
+		}
+
+		if (switch_render_backend) {
+			switch_renderer();
+			switch_render_backend = false;
 		}
 
 		// Begin frame (aquire image in vk)
@@ -280,7 +290,8 @@ void Window::run () {
 		g_window.frame_counter++;
 	}
 
-	stop_renderer();
+	renderer = nullptr;
+	close_window();
 	g_window.game = nullptr;
 }
 

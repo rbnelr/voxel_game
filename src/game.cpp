@@ -58,8 +58,12 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 		window.input.imgui();
 		
-		if (ImGui::CollapsingHeader("Graphics") && renderer) {
-			renderer->graphics_imgui();
+		if (ImGui::CollapsingHeader("Graphics")) {
+			if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL\0VULKAN"))
+				g_window.switch_render_backend = true;
+
+			if (renderer)
+				renderer->graphics_imgui();
 		}
 		//graphics.imgui(world->chunks);
 
