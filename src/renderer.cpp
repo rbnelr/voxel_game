@@ -1,6 +1,7 @@
 #include "renderer.hpp"
 
 #include "vulkan/vulkan_renderer.hpp"
+#include "opengl/opengl_renderer.hpp"
 
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
@@ -9,7 +10,7 @@ std::unique_ptr<Renderer> Renderer::start_renderer (RenderBackend backend, GLFWw
 		switch (backend) {
 		
 			case RenderBackend::OPENGL: {
-			
+				return std::make_unique<gl::OpenglRenderer>(window, APPNAME);
 			} break;
 		
 			case RenderBackend::VULKAN: {

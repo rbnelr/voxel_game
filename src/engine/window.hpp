@@ -27,12 +27,15 @@ struct Window {
 
 	std::unique_ptr<Game>			game;
 
-	RenderBackend					render_backend = RenderBackend::VULKAN;
+	RenderBackend					render_backend = RenderBackend::OPENGL;
 	std::unique_ptr<Renderer>		renderer;
 
 	DirectoyChangeNotifier			file_changes = DirectoyChangeNotifier("./", true);
 
-	void set_vsync (bool on);
+	void set_vsync (bool on) {
+		renderer->set_vsync(on);
+		vsync = on;
+	}
 
 	bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
 	bool toggle_fullscreen ();

@@ -196,6 +196,24 @@
     <ClInclude Include="..\..\..\src\assets.hpp">
       <Filter>game</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\glad\glad.h">
+      <Filter>opengl\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h">
+      <Filter>opengl\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h">
+      <Filter>opengl\glad</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp">
+      <Filter>kisslib\tracy</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\imgui\imgui_impl_opengl3.h">
+      <Filter>dear_imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -318,6 +336,18 @@
     <ClCompile Include="..\..\..\src\assets.cpp">
       <Filter>game</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\glad\glad.c">
+      <Filter>opengl\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c">
+      <Filter>opengl\glad</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\imgui\imgui_impl_opengl3.cpp">
+      <Filter>dear_imgui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -352,6 +382,15 @@
     </Filter>
     <Filter Include="shaders\vk">
       <UniqueIdentifier>{f07e8f49-eac4-40db-8a91-be3bbfa63736}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shaders\gl">
+      <UniqueIdentifier>{aa3b83e7-5d21-4f93-999e-2b38f6c3972a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="opengl">
+      <UniqueIdentifier>{516eadd6-cb16-45fd-b546-0ab0b0fd4670}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="opengl\glad">
+      <UniqueIdentifier>{549d7535-531e-40de-9ffe-4bf1f67dcc2a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

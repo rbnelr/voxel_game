@@ -119,6 +119,7 @@ struct VulkanWindowContext {
 	//// Called by user
 	void imgui_create (VkCommandBuffer one_time_cmds, int frames_count);
 	void imgui_destroy ();
+	void imgui_begin ();
 	void imgui_draw (VkCommandBuffer cmds, bool hide_gui); // hide_gui for screenshots
 
 	//// Internal

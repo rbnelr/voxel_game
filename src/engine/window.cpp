@@ -4,16 +4,8 @@
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
 #include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_vulkan.h"
 
-//// vsync and fullscreen mode
-void Window::set_vsync (bool on) {
-	//ZoneScopedN("glfwSwapInterval");
-
-	//glfwSwapInterval(on ? _vsync_on_interval : 0);
-	vsync = on;
-}
-
+//// fullscreen mode
 struct Monitor {
 	GLFWmonitor* monitor;
 	GLFWvidmode const* vidmode;
@@ -113,7 +105,6 @@ void Window::close () {
 void imgui_begin_frame (Window& window) {
 	ZoneScoped;
 
-	ImGui_ImplVulkan_NewFrame();
 	ImGui_ImplGlfw_NewFrame(g_imgui.enabled && window.input.cursor_enabled);
 
 	{
@@ -168,7 +159,23 @@ void Window::open_window () {
 	{
 		ZoneScopedN("glfwCreateWindow");
 
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		switch (render_backend) {
+			case RenderBackend::OPENGL: {
+
+			#ifdef OPENGL_DEBUG
+				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+			#endif
+				glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+				glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
+
+			} break;
+			case RenderBackend::VULKAN: {
+				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+			} break;
+		}
+
 		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen
 
 		window = glfwCreateWindow(1920, 1080, APPNAME, NULL, NULL);
@@ -209,9 +216,9 @@ void Window::run () {
 	open_window();
 
 	g_assets = Assets::load();
+	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
 
 	g_window.game = std::make_unique<Game>();
-	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
 
 	glfw_input_pre_gameloop(g_window);
 

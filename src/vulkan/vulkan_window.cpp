@@ -129,6 +129,8 @@ void VulkanWindowContext::aquire_image (VkSemaphore image_available_semaphore) {
 		VK_CHECK_RESULT(res);
 		return;
 	}
+
+	imgui_begin();
 }
 void VulkanWindowContext::present_image (VkSemaphore render_finished_semaphore) {
 	ZoneScoped;
@@ -656,6 +658,9 @@ void VulkanWindowContext::imgui_destroy () {
 	vkDestroyDescriptorPool(dev, imgui_descriptor_pool, nullptr);
 }
 
+void VulkanWindowContext::imgui_begin () {
+	ImGui_ImplVulkan_NewFrame();
+}
 void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds, bool hide_gui) {
 	ZoneScoped;
 	GPU_TRACE(*this, cmds, "imgui_draw");

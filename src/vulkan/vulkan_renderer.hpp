@@ -170,6 +170,10 @@ public:
 		chunk_renderer.imgui(chunks);
 	}
 
+	virtual void set_vsync (bool state) {
+		// not implemented
+	}
+
 	VulkanRenderer (GLFWwindow* window, char const* app_name);
 	virtual ~VulkanRenderer ();
 
