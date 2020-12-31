@@ -61,8 +61,6 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	screenshot.begin(I);
 
 	////
-	chunk_renderer.queue_remeshing(*this, game);
-
 	auto cmds = frame_data[cur_frame].command_buffer;
 	auto wnd_framebuffer = ctx.swap_chain.images[ctx.image_index];
 

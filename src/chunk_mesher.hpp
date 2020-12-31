@@ -26,12 +26,12 @@ struct ChunkMeshData {
 		ZoneScopedC(tracy::Color::Crimson);
 		if (used_slices >= MAX_CHUNK_SLICES)
 			throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
-		slices[used_slices] = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
+		auto* s = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
 
-		next_ptr  = slices[used_slices]->verts;
-		alloc_end = slices[used_slices]->verts + CHUNK_SLICE_LENGTH;
+		next_ptr  = s->verts;
+		alloc_end = s->verts + CHUNK_SLICE_LENGTH;
 
-		used_slices++;
+		slices[used_slices++] = s;
 	}
 	static void free_slice (ChunkSliceData* s) {
 		if (s) {
@@ -63,7 +63,7 @@ struct RemeshChunkJob { // Chunk remesh
 	Chunks&					chunks;
 
 	uint64_t				chunk_seed;
-	bool					draw_world_border;
+	bool					mesh_world_border;
 
 	// output
 	RemeshingMesh			mesh;
@@ -73,3 +73,5 @@ struct RemeshChunkJob { // Chunk remesh
 
 	void execute ();
 };
+
+inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, TPRIO_PARALLELISM, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too

@@ -3,7 +3,6 @@
 #include "vulkan_helper.hpp"
 #include "vulkan_window.hpp"
 #include "vulkan_shaders.hpp"
-#include "chunk_mesher.hpp"
 #include "assets.hpp"
 #include "game.hpp"
 
@@ -44,8 +43,8 @@ struct ChunkRenderer {
 	Pipeline*				opaque_pipeline;
 	Pipeline*				transparent_pipeline;
 
-	int drawcount_opaque = 0;
-	int drawcount_transparent = 0;
+	int						drawcount_opaque = 0;
+	int						drawcount_transparent = 0;
 
 	bool					visualize_chunks = false;
 
@@ -135,24 +134,10 @@ struct ChunkRenderer {
 		vkDestroyPipelineLayout(dev, pipeline_layout, nullptr);
 	}
 
-	slice_id alloc_slice (VulkanWindowContext& ctx, Chunks& chunks) {
-		slice_id id = chunks.slices_alloc.alloc();
-		
-		if (id >= (uint32_t)allocs.size() * SLICES_PER_ALLOC)
-			new_alloc(ctx);
-
-		return id;
-	}
-
-	int remesh_chunks_count;
-	void queue_remeshing (VulkanRenderer& r, Game& game);
-
 	void upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame);
 
 	void draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, bool debug_frustrum_culling, int cur_frame);
 
 };
-
-inline auto parallelism_threadpool = Threadpool<RemeshChunkJob>(parallelism_threads, TPRIO_PARALLELISM, ">> parallelism threadpool" ); // parallelism_threads - 1 to let main thread contribute work too
 
 } // namespace vk

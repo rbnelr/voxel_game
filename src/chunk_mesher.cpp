@@ -90,7 +90,7 @@ template <int AXIS>
 NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
 	int3 pos = pos_from_idx(idx);
 	
-	if (!j.draw_world_border && (id == B_NULL || nid == B_NULL))
+	if (!j.mesh_world_border && (id == B_NULL || nid == B_NULL))
 		return;
 
 	auto& b = g_assets.block_types[id];
@@ -238,9 +238,9 @@ void mesh_chunk (RemeshChunkJob& j) {
 #endif
 }
 
-RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg, bool draw_world_border):
+RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg, bool mesh_world_border):
 		chunk{chunk}, chunks{chunks},
-		draw_world_border{draw_world_border} {
+		mesh_world_border{mesh_world_border} {
 
 	chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
 }

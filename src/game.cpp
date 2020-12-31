@@ -133,6 +133,7 @@ void Game::update (Window& window, Input& I) {
 	block_update.update_blocks(I, world->chunks);
 
 	world->chunks.update_chunk_loading(*world, world->player);
+	world->chunks.update_chunk_meshing(*world);
 
 	if (activate_flycam)
 		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));

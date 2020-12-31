@@ -145,7 +145,6 @@ public:
 
 	bool						wireframe = false;
 	bool						debug_frustrum_culling = false;
-	bool						draw_world_border = false;
 
 	virtual void graphics_imgui () {
 		screenshot.imgui();
@@ -161,7 +160,6 @@ public:
 
 		ImGui::Checkbox("wireframe", &wireframe);
 		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
-		ImGui::Checkbox("draw_world_border", &draw_world_border);
 
 		staging.imgui();
 	}

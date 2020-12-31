@@ -11,10 +11,10 @@
 
 #define CHUNK_VOXEL_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
 
-#define POS2IDX(x,y,z) ((size_t)(z) * CHUNK_LAYER_OFFS + (size_t)(y) * CHUNK_ROW_OFFS + (size_t)(x))
-#define OFFS2IDX(x,y,z) ((int64_t)(z) * CHUNK_LAYER_OFFS + (int64_t)(y) * CHUNK_ROW_OFFS + (int64_t)(x))
+#define POS2IDX(x,y,z)		((size_t)(z) * CHUNK_LAYER_OFFS + (size_t)(y) * CHUNK_ROW_OFFS + (size_t)(x))
+#define OFFS2IDX(x,y,z)		((int64_t)(z) * CHUNK_LAYER_OFFS + (int64_t)(y) * CHUNK_ROW_OFFS + (int64_t)(x))
 
-#define VEC2IDX(xyz) ((size_t)(xyz).z * CHUNK_LAYER_OFFS + (size_t)(xyz).y * CHUNK_ROW_OFFS + (size_t)(xyz).x)
+#define VEC2IDX(xyz)		((size_t)(xyz).z * CHUNK_LAYER_OFFS + (size_t)(xyz).y * CHUNK_ROW_OFFS + (size_t)(xyz).x)
 
 #define U16_NULL			((uint16_t)-1)
 
@@ -253,6 +253,8 @@ struct ChunkKey_Comparer {
 };
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
+struct ChunkSliceData;
+
 struct Chunks {
 	Chunk* chunks;
 	uint32_t max_id = 0; // max chunk id needed to iterate chunks
@@ -385,15 +387,13 @@ struct Chunks {
 	}
 
 	// for renderer switch
-	void free_all_slices () {
+	void renderer_switch () {
+		//assert(upload_slices.empty()); // Can have upload_slices here if a renderer did not consume them last frame, but these will simply be overwritten by newer duplicate versions, which is safe
+		
 		for (chunk_id cid=0; cid<max_id; ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
-
-			free_mesh(chunk.opaque_mesh);
-			free_mesh(chunk.transparent_mesh);
-
-			chunk.flags |= Chunk::DIRTY;
+			chunk.flags |= Chunk::DIRTY; // remesh chunk to make sure new renderer gets all meshes uploaded again
 		}
 	}
 
@@ -407,6 +407,8 @@ struct Chunks {
 	float unload_hyster = CHUNK_SIZE*1.5f;
 
 	int background_queued_count = 0;
+
+	bool mesh_world_border = false;
 
 	// distance of chunk to player
 	int chunk_lod (float dist) {
@@ -443,4 +445,13 @@ struct Chunks {
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, Player const& player);
+	
+	struct UploadSlice {
+		slice_id		sliceid;
+		ChunkSliceData*	data;
+	};
+	std_vector<UploadSlice> upload_slices;
+
+	// queue and finialize chunks that should be generated
+	void update_chunk_meshing (World const& world);
 };

@@ -6,6 +6,7 @@
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
 #include "renderer.hpp"
+#include "chunk_mesher.hpp"
 
 block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {
 	if (out_chunk)
@@ -161,8 +162,91 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	}
 }
 
+void Chunks::update_chunk_meshing (World const& world) {
+	ZoneScoped;
+
+	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
+
+	{
+		ZoneScopedN("remesh iterate chunks");
+
+		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
+		for (chunk_id id = 0; id < max_id; ++id) {
+			auto& chunk = chunks[id];
+			chunk._validate_flags();
+			if ((chunk.flags & should_remesh) != should_remesh) continue;
+
+			chunk.voxels.check_sparsify();
+
+			if (chunk.voxels.is_sparse()) {
+				chunk.flags &= ~Chunk::DIRTY;
+			} else {
+
+				auto job = std::make_unique<RemeshChunkJob>(
+					&chunk, *this, world.world_gen, mesh_world_border);
+				remesh_jobs.emplace_back(std::move(job));
+			}
+		}
+	}
+
+	// remesh all chunks in parallel
+	parallelism_threadpool.jobs.push_n(remesh_jobs.data(), remesh_jobs.size());
+
+	{
+		ZoneScopedN("remesh process slices");
+
+		// upload remeshed slices and register them in chunk mesh
+		auto process_slices = [&] (ChunkMeshData& remeshed, ChunkMesh& mesh) {
+			ZoneScopedN("process_slices");
+
+			mesh.vertex_count = remeshed.vertex_count();
+			uint32_t remain_vertices = mesh.vertex_count;
+
+			int slice = 0;
+			while (remain_vertices > 0) {
+				if (mesh.slices[slice] == U16_NULL)
+					mesh.slices[slice] = slices_alloc.alloc();
+
+				uint32_t count = std::min(remain_vertices, (uint32_t)CHUNK_SLICE_LENGTH);
+
+				// queue data to be uploaded for sliceid, data stays valid (malloc'd) until it is processed by the renderer
+				upload_slices.push_back({ mesh.slices[slice], remeshed.slices[slice] });
+
+				remain_vertices -= count;
+
+				slice++;
+			}
+
+			// free potentially remaining slices no longer needed
+			for (; slice<MAX_CHUNK_SLICES; ++slice) {
+				if (mesh.slices[slice] != U16_NULL)
+					slices_alloc.free(mesh.slices[slice]);
+				mesh.slices[slice] = U16_NULL;
+			}
+		};
+
+		for (size_t resi=0; resi < remesh_jobs.size();) {
+			std::unique_ptr<RemeshChunkJob> results[64];
+			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+
+			for (size_t i=0; i<count; ++i) {
+				auto res = std::move(results[i]);
+
+				process_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
+				process_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
+
+				res->chunk->flags &= ~Chunk::DIRTY;
+			}
+
+			resi += count;
+		}
+	}
+}
+
 void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
+
+	ImGui::Checkbox("mesh_world_border", &mesh_world_border);
 
 	ImGui::DragFloat("load_radius", &load_radius, 1);
 	ImGui::DragFloat("unload_hyster", &unload_hyster, 1);

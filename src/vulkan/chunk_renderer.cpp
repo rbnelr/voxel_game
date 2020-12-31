@@ -3,105 +3,34 @@
 #include "chunk_renderer.hpp"
 #include "vulkan_renderer.hpp"
 #include "world.hpp"
+#include "chunk_mesher.hpp"
 
 namespace vk {
-
-void ChunkRenderer::queue_remeshing (VulkanRenderer& r, Game& game) {
-	ZoneScoped;
-
-	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
-
-	{
-		ZoneScopedN("chunks_to_remesh iterate all chunks");
-		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
-		for (chunk_id id = 0; id < game.world->chunks.max_id; ++id) {
-			auto& chunk = game.world->chunks[id];
-			chunk._validate_flags();
-			if ((chunk.flags & should_remesh) != should_remesh) continue;
-
-			chunk.voxels.check_sparsify();
-
-			if (chunk.voxels.is_sparse()) {
-				chunk.flags &= ~Chunk::DIRTY;
-			} else {
-
-				auto job = std::make_unique<RemeshChunkJob>(
-					&chunk,
-					game.world->chunks,
-					game.world->world_gen,
-					r.draw_world_border);
-				remesh_jobs.emplace_back(std::move(job));
-			}
-		}
-	}
-
-	// remesh all chunks in parallel
-	parallelism_threadpool.jobs.push_n(remesh_jobs.data(), remesh_jobs.size());
-
-	remesh_chunks_count = (int)remesh_jobs.size();
-}
 
 void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkCommandBuffer cmds, int cur_frame) {
 	ZoneScoped;
 
 	auto& frame = frames[cur_frame];
-	int upload_count = 0;
 
-	// upload remeshed slices and register them in chunk mesh
-	auto upload_slices = [&] (ChunkMeshData& remeshed, ChunkMesh& mesh) {
-		ZoneScopedN("upload chunk slices");
+	for (auto& slice : chunks.upload_slices) {
+		uint32_t alloci = slice.sliceid / (uint32_t)SLICES_PER_ALLOC;
+		uint32_t slicei = slice.sliceid % (uint32_t)SLICES_PER_ALLOC;
 
-		mesh.vertex_count = remeshed.vertex_count();
-		uint32_t remain_vertices = mesh.vertex_count;
-
-		int slice = 0;
-		while (remain_vertices > 0) {
-			if (mesh.slices[slice] == U16_NULL)
-				mesh.slices[slice] = alloc_slice(r.ctx, chunks);
-
-			uint32_t count = std::min(remain_vertices, (uint32_t)CHUNK_SLICE_LENGTH);
-
-			uint32_t alloci = mesh.slices[slice] / (uint32_t)SLICES_PER_ALLOC;
-			uint32_t slicei = mesh.slices[slice] % (uint32_t)SLICES_PER_ALLOC;
-
-			r.staging.staged_copy(r.ctx, cmds, cur_frame,
-				remeshed.slices[slice]->verts, count * sizeof(BlockMeshInstance),
-				allocs[alloci].mesh_data.buf, slicei * CHUNK_SLICE_LENGTH * sizeof(BlockMeshInstance));
-			
-			ChunkMeshData::free_slice(remeshed.slices[slice]);
-
-			remain_vertices -= count;
-
-			upload_count++;
-			slice++;
+		while (alloci >= (uint32_t)allocs.size()) {
+			new_alloc(r.ctx);
 		}
 
-		// free potentially remaining slices no longer needed
-		for (; slice<MAX_CHUNK_SLICES; ++slice) {
-			if (mesh.slices[slice] != U16_NULL)
-				chunks.slices_alloc.free(mesh.slices[slice]);
-			mesh.slices[slice] = U16_NULL;
-		}
-	};
+		size_t unpadded_size = CHUNK_SLICE_LENGTH * sizeof(BlockMeshInstance); // size of slice data without padding
 
-	{
-		ZoneScopedN("upload_slices");
-		for (size_t resi=0; resi < remesh_chunks_count;) {
-			std::unique_ptr<RemeshChunkJob> results[64];
-			size_t count = parallelism_threadpool.results.pop_n_wait(results, 1, ARRLEN(results));
+		r.staging.staged_copy(r.ctx, cmds, cur_frame,
+			slice.data->verts, unpadded_size,
+			allocs[alloci].mesh_data.buf, slicei * unpadded_size); // important to use unpadded_size here, can't use vertex-sized offsets when rendering
 
-			for (size_t i=0; i<count; ++i) {
-				auto res = std::move(results[i]);
-
-				upload_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
-				upload_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
-
-				res->chunk->flags &= ~Chunk::DIRTY;
-			}
-
-			resi += count;
-		}
+		ChunkMeshData::free_slice(slice.data);
 	}
+
+	chunks.upload_slices.clear();
+	chunks.upload_slices.shrink_to_fit();
 
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight
 		frame.slices_end = chunks.slices_alloc.alloc_end;
@@ -116,7 +45,7 @@ void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkComman
 		}
 	}
 
-	if (upload_count > 0) {
+	if (chunks.upload_slices.size() > 0) {
 		VkMemoryBarrier mem = {};
 		mem.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
 		mem.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,

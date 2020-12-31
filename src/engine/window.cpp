@@ -207,7 +207,7 @@ void Window::close_window () {
 void Window::switch_renderer () {
 	renderer = nullptr;
 	close_window();
-	game->world->chunks.free_all_slices();
+	game->world->chunks.renderer_switch();
 	
 	open_window();
 
