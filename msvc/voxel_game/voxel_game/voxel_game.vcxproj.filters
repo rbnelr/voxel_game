@@ -226,6 +226,9 @@
     <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\chunk_renderer.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">

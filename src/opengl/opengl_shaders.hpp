@@ -126,9 +126,9 @@ struct Shader {
 				}
 			}
 
-			for (auto& kv : uniforms.elements) {
-				kv.value.location = glGetUniformLocation(prog, kv.key.c_str());
-				if (kv.value.location < 0) {
+			for (auto& kv : uniforms.ordered) {
+				kv->second.location = glGetUniformLocation(prog, kv->first.c_str());
+				if (kv->second.location < 0) {
 					// unused uniform? ignore
 				}
 			}

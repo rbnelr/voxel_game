@@ -233,6 +233,7 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />

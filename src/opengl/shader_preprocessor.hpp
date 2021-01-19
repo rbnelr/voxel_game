@@ -115,14 +115,17 @@ inline gl::uniform_set parse_shader_uniforms (std::string const& source) {
 			whitespace(c);
 			identifier(c, &typestr);
 			whitespace(c);
-			identifier(c, &name);
 
-			auto it = gl::glsl_type_map.find(typestr);
-			if (it == gl::glsl_type_map.end()) {
-				clog(WARNING, "[Shaders] parse_shader_uniforms: Unknown glsl type \"%s\"!", std::string(typestr).c_str());
-			} else {
-				gl::GlslType type = it->second;
-				uniforms.insert(std::string(name), gl::ShaderUniform{ type, 0 });
+			if (*c == '{') {
+				// UBO
+			} else if (identifier(c, &name)) {
+				auto it = gl::glsl_type_map.find(typestr);
+				if (it == gl::glsl_type_map.end()) {
+					clog(WARNING, "[Shaders] parse_shader_uniforms: Unknown glsl type \"%s\"!", std::string(typestr).c_str());
+				} else {
+					gl::GlslType type = it->second;
+					uniforms.insert(std::string(name), gl::ShaderUniform{ type, 0 });
+				}
 			}
 		}
 	}

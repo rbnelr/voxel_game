@@ -3,6 +3,7 @@
 #include "renderer.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
+#include "chunk_renderer.hpp"
 
 #include "glad/glad.h"
 
