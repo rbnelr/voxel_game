@@ -20,23 +20,20 @@ struct MacroDefinition {
 	std::string value;
 };
 
-struct ShaderUniform {
-	std::string name;
-	std::string value;
-};
-
 struct Shader {
 	std::string						name;
 
 	std::vector<ShaderStage>		stages;
 	std::vector<MacroDefinition>	macros;
 
+	uniform_set						uniforms;
 	std::vector<std::string>		src_files;
 
 	GLuint	prog = 0;
 
 	bool compile (bool wireframe = false) {
 		src_files.clear();
+		uniforms.clear();
 
 		std::string source;
 		source.reserve(4096);
@@ -48,6 +45,8 @@ struct Shader {
 			clog(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
 			return false;
 		}
+
+		uniforms = parse_shader_uniforms(source);
 
 		// Compile shader stages
 
@@ -126,6 +125,13 @@ struct Shader {
 					}
 				}
 			}
+
+			for (auto& kv : uniforms.elements) {
+				kv.value.location = glGetUniformLocation(prog, kv.key.c_str());
+				if (kv.value.location < 0) {
+					// unused uniform? ignore
+				}
+			}
 		}
 
 		for (auto stage : compiled_stages) {
@@ -157,6 +163,13 @@ struct Shader {
 
 		if (old_prog)
 			glDeleteProgram(old_prog);
+	}
+
+	template <typename T>
+	inline void set_uniform (std::string_view const& name, T const& val) {
+		auto* u = uniforms.bykey(name);
+		if (u)
+			_set_uniform(*u, val);
 	}
 };
 

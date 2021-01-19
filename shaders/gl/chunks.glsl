@@ -51,6 +51,7 @@ layout(location = 0) vs2fs VS {
 	#define ALPHA_TEST_THRES 127.0
 
 	uniform sampler2DArray textures;
+	uniform float test;
 
 	layout(location = 0) out vec4 frag_col;
 	layout(location = 1) out vec4 frag_normal;
