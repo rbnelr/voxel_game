@@ -214,6 +214,18 @@
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_opengl3.h">
       <Filter>dear_imgui</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\opengl_shaders.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\parse.hpp">
+      <Filter>kisslib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -348,6 +360,9 @@
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_opengl3.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -396,5 +411,41 @@
   <ItemGroup>
     <None Include="..\..\..\shaders.json" />
     <None Include="..\..\..\blocks.json" />
+    <None Include="..\..\..\shaders\vk\chunks.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\common.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\debug.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\debug_lines.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\debug_tris.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\noise.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\rescale.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\ssao.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\vk\util.glsl">
+      <Filter>shaders\vk</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\chunks.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\common.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\util.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>

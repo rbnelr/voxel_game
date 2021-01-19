@@ -27,7 +27,7 @@ struct Window {
 
 	std::unique_ptr<Game>			game;
 
-	RenderBackend					render_backend = RenderBackend::VULKAN;
+	RenderBackend					render_backend = RenderBackend::OPENGL;
 	bool							switch_render_backend = false;
 	std::unique_ptr<Renderer>		renderer;
 

@@ -79,7 +79,13 @@ float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 p
 	//	val += stalag;
 	//}
 
-	float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
+	float val = 0.0f;
+
+	// large scale
+	val += noise(pos_world, 300.0f, 0) * 300.0f;
+
+	// small scale
+	val += noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
 	val += noise(pos_world, 70.0f, float3(700,800,900)) * 70.0f;
 	val += noise(pos_world, 4.0f, float3(700,800,900)) * 2.0f;
 

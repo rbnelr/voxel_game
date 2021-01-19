@@ -12,6 +12,8 @@ namespace gl {
 
 void OpenglRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) {
 	ImGui_ImplOpenGL3_NewFrame();
+
+	shaders.update_recompilation(changed_files, wireframe);
 }
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
@@ -38,12 +40,12 @@ void OpenglRenderer::imgui_draw () {
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void OpenglRenderer::set_vsync (bool state) {
+void OpenglContext::set_vsync (bool state) {
 	ZoneScoped;
 	glfwSwapInterval(state ? _vsync_on_interval : 0);
 }
 
-OpenglRenderer::OpenglRenderer (GLFWwindow* window, char const* app_name) {
+OpenglContext::OpenglContext (GLFWwindow* window, char const* app_name) {
 	ZoneScoped;
 
 	glfwMakeContextCurrent(window);
@@ -91,12 +93,12 @@ OpenglRenderer::OpenglRenderer (GLFWwindow* window, char const* app_name) {
 	TracyGpuContext;
 }
 
-OpenglRenderer::~OpenglRenderer () {
+OpenglContext::~OpenglContext () {
 
 	ImGui_ImplOpenGL3_Shutdown();
 }
 
-void APIENTRY OpenglRenderer::debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
+void APIENTRY OpenglContext::debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
 	OpenglRenderer* r = (OpenglRenderer*)userParam;
 
 	//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;

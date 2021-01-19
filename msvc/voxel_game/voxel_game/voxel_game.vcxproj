@@ -216,6 +216,7 @@
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\parse.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\random.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\running_average.hpp" />
@@ -235,7 +236,10 @@
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_shaders.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp" />
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
@@ -367,6 +371,7 @@
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
     <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
     <ClCompile Include="..\..\..\src\physics.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
@@ -448,6 +453,18 @@
   <ItemGroup>
     <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
+    <None Include="..\..\..\shaders\gl\chunks.glsl" />
+    <None Include="..\..\..\shaders\gl\common.glsl" />
+    <None Include="..\..\..\shaders\gl\util.glsl" />
+    <None Include="..\..\..\shaders\vk\chunks.glsl" />
+    <None Include="..\..\..\shaders\vk\common.glsl" />
+    <None Include="..\..\..\shaders\vk\debug.glsl" />
+    <None Include="..\..\..\shaders\vk\debug_lines.glsl" />
+    <None Include="..\..\..\shaders\vk\debug_tris.glsl" />
+    <None Include="..\..\..\shaders\vk\noise.glsl" />
+    <None Include="..\..\..\shaders\vk\rescale.glsl" />
+    <None Include="..\..\..\shaders\vk\ssao.glsl" />
+    <None Include="..\..\..\shaders\vk\util.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
