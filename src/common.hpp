@@ -39,7 +39,6 @@ static constexpr const char* APPNAME = "Voxel Game";
 #include "kisslib/circular_buffer.hpp"
 #include "kisslib/collision.hpp"
 #include "kisslib/file_io.hpp"
-#include "kisslib/geometry.hpp"
 #include "kisslib/macros.hpp"
 #include "kisslib/random.hpp"
 #include "kisslib/raw_array.hpp"
@@ -63,3 +62,5 @@ using namespace kissmath;
 #include "engine/threading.hpp"
 #include "engine/input_buttons.hpp"
 #include "engine/input.hpp"
+#include "engine/renderer.hpp"
+#include "engine/debug_draw.hpp"

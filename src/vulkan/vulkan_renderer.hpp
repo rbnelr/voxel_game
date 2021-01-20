@@ -1,6 +1,5 @@
 #pragma once
 #include "common.hpp"
-#include "renderer.hpp"
 #include "vulkan_helper.hpp"
 #include "vulkan_shaders.hpp"
 #include "vulkan_window.hpp"

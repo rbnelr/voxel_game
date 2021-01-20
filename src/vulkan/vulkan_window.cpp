@@ -34,7 +34,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback (
 	fprintf(stderr, "[Vulkan] %s\n", msg.c_str());
 	//clog(ERROR, "[Vulkan] %s\n", msg.c_str());
 
-#if DEBUGLEVEL >= 2
+#if RENDERER_DEBUG_OUTPUT_BREAKPOINT
 	if (messageSeverity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
 		__debugbreak();
 #endif
@@ -55,7 +55,7 @@ VulkanWindowContext::VulkanWindowContext (GLFWwindow* window, char const* app_na
 
 	instance = create_instance(app_name, debug_callback, enabled_extensions, enabled_layers);
 
-#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+#if VK_VALIDATION_LAYERS || RENDERER_DEBUG_LABELS
 	dbg_utils.load(instance);
 #endif
 #if VK_VALIDATION_LAYERS
@@ -182,7 +182,7 @@ VkInstance create_instance (char const* app_name, PFN_vkDebugUtilsMessengerCallb
 	// Check extensions
 	auto avail_extensions = get_vector<VkExtensionProperties>(vkEnumerateInstanceExtensionProperties, nullptr);
 
-#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+#if VK_VALIDATION_LAYERS || RENDERER_DEBUG_LABELS
 	extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
@@ -417,13 +417,6 @@ VkDevice create_logical_device (VkPhysicalDevice pdev, std_vector<char const*> c
 		vkGetDeviceQueue(device, queues->families.async_transfer_family, 0, &queues->async_transfer_queue);
 		vkGetDeviceQueue(device, queues->families.present_family,        0, &queues->present_queue);
 	}
-
-#if GPU_DEBUG_MARKERS
-	if (enable_dbg_marker) {
-		clog(INFO, "[VulkanWindowContext] Loaded vk debug markers");
-		dbg_marker->load(device);
-	}
-#endif
 
 	return device;
 }
@@ -663,7 +656,7 @@ void VulkanWindowContext::imgui_begin () {
 }
 void VulkanWindowContext::imgui_draw (VkCommandBuffer cmds, bool hide_gui) {
 	ZoneScoped;
-	GPU_TRACE(*this, cmds, "imgui_draw");
+	VK_TRACE(*this, cmds, "imgui_draw");
 
 	ImGui::Render();
 	if (g_imgui.enabled && !hide_gui)

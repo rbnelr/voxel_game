@@ -193,8 +193,10 @@
     <ClInclude Include="..\..\..\src\dear_imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\..\src\dear_imgui\imstb_truetype.h" />
     <ClInclude Include="..\..\..\src\engine\camera.hpp" />
+    <ClInclude Include="..\..\..\src\engine\debug_draw.hpp" />
     <ClInclude Include="..\..\..\src\engine\input.hpp" />
     <ClInclude Include="..\..\..\src\engine\input_buttons.hpp" />
+    <ClInclude Include="..\..\..\src\engine\renderer.hpp" />
     <ClInclude Include="..\..\..\src\engine\threading.hpp" />
     <ClInclude Include="..\..\..\src\engine\window.hpp" />
     <ClInclude Include="..\..\..\src\game.hpp" />
@@ -211,7 +213,6 @@
     <ClInclude Include="..\..\..\src\kisslib\clean_windows_h.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\collision.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\file_io.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\geometry.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\image.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
@@ -237,6 +238,7 @@
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_shaders.hpp" />
@@ -244,7 +246,6 @@
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
-    <ClInclude Include="..\..\..\src\renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
@@ -323,6 +324,8 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\debug_draw.cpp" />
+    <ClCompile Include="..\..\..\src\engine\renderer.cpp" />
     <ClCompile Include="..\..\..\src\engine\window.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
@@ -371,6 +374,7 @@
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
+    <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp" />
     <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp" />
     <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
@@ -394,7 +398,6 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\renderer.cpp" />
     <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -456,6 +459,7 @@
     <None Include="..\..\..\shaders.json" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
+    <None Include="..\..\..\shaders\gl\test.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />
     <None Include="..\..\..\shaders\vk\chunks.glsl" />
     <None Include="..\..\..\shaders\vk\common.glsl" />

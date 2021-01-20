@@ -1,28 +1,6 @@
-#include "renderer.hpp"
-
-#include "vulkan/vulkan_renderer.hpp"
-#include "opengl/opengl_renderer.hpp"
-
-#include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
-
-std::unique_ptr<Renderer> Renderer::start_renderer (RenderBackend backend, GLFWwindow* window) {
-	try {
-		switch (backend) {
-		
-			case RenderBackend::OPENGL: {
-				return std::make_unique<gl::OpenglRenderer>(window, APPNAME);
-			} break;
-		
-			case RenderBackend::VULKAN: {
-				return std::make_unique<vk::VulkanRenderer>(window, APPNAME);
-			} break;
-		}
-	} catch (std::exception ex) {
-		fprintf(stderr, "Failed to initialize renderer! Exeption: %s\n", ex.what());
-	}
-	return nullptr;
-}
-
+#include "common.hpp"
+#include "debug_draw.hpp"
+#include "camera.hpp"
 
 void DebugDraw::vector (float3 pos, float3 dir, lrgba col) {
 	size_t idx = lines.size();

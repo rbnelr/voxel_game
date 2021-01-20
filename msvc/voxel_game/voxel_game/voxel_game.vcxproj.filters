@@ -55,9 +55,6 @@
     <ClInclude Include="..\..\..\src\kisslib\file_io.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\geometry.hpp">
-      <Filter>kisslib</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -190,9 +187,6 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_screenshot.hpp">
       <Filter>vulkan</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\renderer.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\assets.hpp">
       <Filter>game</Filter>
     </ClInclude>
@@ -227,6 +221,15 @@
       <Filter>opengl</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\chunk_renderer.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\debug_draw.hpp">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\renderer.hpp">
+      <Filter>engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
   </ItemGroup>
@@ -345,9 +348,6 @@
     <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\renderer.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\assets.cpp">
       <Filter>game</Filter>
     </ClCompile>
@@ -364,6 +364,15 @@
       <Filter>dear_imgui</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\debug_draw.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\renderer.cpp">
+      <Filter>engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
   </ItemGroup>
@@ -448,6 +457,9 @@
       <Filter>shaders\gl</Filter>
     </None>
     <None Include="..\..\..\shaders\gl\util.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\test.glsl">
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>

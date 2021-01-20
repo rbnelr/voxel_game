@@ -80,7 +80,7 @@ struct DebugDrawer {
 		int bufi = 0;
 
 		{ //// Debug Lines
-			GPU_TRACE(ctx, cmds, "draw debug lines");
+			VK_TRACE(ctx, cmds, "draw debug lines");
 			
 			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, lines_pipeline->pipeline);
 		
@@ -106,7 +106,7 @@ struct DebugDrawer {
 		}
 
 		{ //// Debug tris
-			GPU_TRACE(ctx, cmds, "draw debug tris");
+			VK_TRACE(ctx, cmds, "draw debug tris");
 
 			vkCmdBindPipeline(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, tris_pipeline->pipeline);
 		

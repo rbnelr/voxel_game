@@ -1,7 +1,6 @@
 #include "util.glsl"
 
-layout(std140, set = 0, binding = 0)
-uniform View {
+struct View {
 	// world space to cam space, ie. view transform
 	mat4 world_to_cam;
 	// cam space to world space, ie. inverse view transform
@@ -28,4 +27,8 @@ uniform View {
 	//	// bit 1 = shaded
 	//	// bit 2 = colored
 	*/
+};
+
+layout(std140, binding = 0) uniform Common {
+	View view;
 };

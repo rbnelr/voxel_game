@@ -1,16 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
-
-enum class AttribMode {
-	FLOAT,		// simply pass float to shader
-	SINT,		// simply pass sint to shader
-	UINT,		// simply pass uint to shader
-	SINT2FLT,	// convert sint to float 
-	UINT2FLT,	// convert uint to float
-	SNORM,		// sint turns into [-1, 1] float (ex. from [-127, +127], note that -127 instead of -128)
-	UNORM,		// uint turns into [0, 1] float (ex. from [0, 255])
-};
+#include "engine/renderer.hpp"
 
 inline constexpr int2 TILEMAP_SIZE = int2(16,16);
 

@@ -32,6 +32,7 @@ struct Shader {
 	GLuint	prog = 0;
 
 	bool compile (bool wireframe = false) {
+		
 		src_files.clear();
 		uniforms.clear();
 
@@ -51,6 +52,7 @@ struct Shader {
 		// Compile shader stages
 
 		prog = glCreateProgram();
+		OGL_DBG_LABEL(GL_PROGRAM, prog, name);
 
 		std::vector<GLuint> compiled_stages;
 
@@ -126,12 +128,7 @@ struct Shader {
 				}
 			}
 
-			for (auto& kv : uniforms.ordered) {
-				kv->second.location = glGetUniformLocation(prog, kv->first.c_str());
-				if (kv->second.location < 0) {
-					// unused uniform? ignore
-				}
-			}
+			get_uniform_locations();
 		}
 
 		for (auto stage : compiled_stages) {
@@ -163,6 +160,15 @@ struct Shader {
 
 		if (old_prog)
 			glDeleteProgram(old_prog);
+	}
+
+	void get_uniform_locations () {
+		for (auto& kv : uniforms.ordered) {
+			kv->second.location = glGetUniformLocation(prog, kv->first.c_str());
+			if (kv->second.location < 0) {
+				// unused uniform? ignore
+			}
+		}
 	}
 
 	template <typename T>
@@ -200,8 +206,8 @@ struct Shaders {
 
 	Shader* compile (
 			char const* name,
-			std::vector<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER },
-			std::vector<MacroDefinition> macros = {}
+			std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER },
+			std::initializer_list<MacroDefinition> macros = {}
 			) {
 		ZoneScoped;
 

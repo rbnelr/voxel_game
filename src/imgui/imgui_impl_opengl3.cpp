@@ -67,6 +67,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+// Give imgui debug labels too
+#include "opengl/opengl_helper.hpp" // for OGL_DBG_LABEL
+
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
@@ -211,6 +214,9 @@ bool    ImGui_ImplOpenGL3_Init(const char* glsl_version)
 
 #ifdef IMGUI_DONT_RECREATE_VAO
 	glGenVertexArrays(1, &g_vertex_array_object);
+
+	glBindVertexArray(g_vertex_array_object);
+	OGL_DBG_LABEL(GL_VERTEX_ARRAY, g_vertex_array_object, "imgui_vao");
 #endif
 
     // Make a dummy GL call (we don't actually need the result)
@@ -431,6 +437,16 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
 #endif
     glViewport(last_viewport[0], last_viewport[1], (GLsizei)last_viewport[2], (GLsizei)last_viewport[3]);
     glScissor(last_scissor_box[0], last_scissor_box[1], (GLsizei)last_scissor_box[2], (GLsizei)last_scissor_box[3]);
+#else
+	// Reset to stop imgui stuff being bound in my draw calls
+	glUseProgram(0);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindSampler(0, 0);
+
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 #endif
 }
 
@@ -456,6 +472,8 @@ bool ImGui_ImplOpenGL3_CreateFontsTexture()
 
     // Store our identifier
     io.Fonts->TexID = (ImTextureID)(intptr_t)g_FontTexture;
+
+	OGL_DBG_LABEL(GL_TEXTURE, g_FontTexture, "imgui_font_tex");
 
     // Restore state
     glBindTexture(GL_TEXTURE_2D, last_texture);
@@ -679,6 +697,13 @@ bool    ImGui_ImplOpenGL3_CreateDeviceObjects()
     glGenBuffers(1, &g_ElementsHandle);
 
     ImGui_ImplOpenGL3_CreateFontsTexture();
+
+	glBindBuffer(GL_ARRAY_BUFFER, g_VboHandle);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_ElementsHandle);
+
+	OGL_DBG_LABEL(GL_PROGRAM, g_ShaderHandle, "imgui_shader");
+	OGL_DBG_LABEL(GL_BUFFER, g_VboHandle, "imgui_vbo");
+	OGL_DBG_LABEL(GL_BUFFER, g_ElementsHandle, "imgui_ebo");
 
     // Restore modified GL state
     glBindTexture(GL_TEXTURE_2D, last_texture);

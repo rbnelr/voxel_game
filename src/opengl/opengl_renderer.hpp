@@ -1,29 +1,43 @@
 #pragma once
 #include "common.hpp"
-#include "renderer.hpp"
+#include "engine/renderer.hpp"
+#include "opengl_context.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 #include "chunk_renderer.hpp"
 
-#include "glad/glad.h"
-
-struct GLFWwindow;
-
 namespace gl {
 
-#define OGL_DEBUG_OUTPUT (DEBUGLEVEL >= 2)
-#define OGL_DEBUG_OUTPUT_BREAKPOINT (DEBUGLEVEL >= 4)
+struct ViewUniforms {
+	float4x4 world_to_cam;
+	float4x4 cam_to_world;
+	float4x4 cam_to_clip;
+	float4x4 clip_to_cam;
+	float4x4 world_to_clip;
+	float    clip_near;
+	float    clip_far;
+	float2   viewport_size;
 
-#define OGL_DEBUG_LABELS 1
+	void set (Camera_View const& view, int2 viewport_size) {
+		memset(this, 0, sizeof(*this)); // zero padding
 
-struct OpenglContext {
-	OpenglContext (GLFWwindow* window, char const* app_name);
-	~OpenglContext ();
+		world_to_cam = (float4x4)view.world_to_cam;
+		cam_to_world = (float4x4)view.cam_to_world;
+		cam_to_clip = view.cam_to_clip;
+		clip_to_cam = view.clip_to_cam;
+		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
+		clip_near = view.clip_near;
+		clip_far = view.clip_far;
+		this->viewport_size = (float2)viewport_size;
+	}
+};
 
-	int _vsync_on_interval = 1; // use 1 or -1 for vsync
+struct CommonUniforms {
+	ViewUniforms view;
 
-	void set_vsync (bool state);
-	static void APIENTRY debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam);
+	CommonUniforms (Input& I, Game& game, int2 viewport_size) {
+		view.set(game.view, viewport_size);
+	}
 };
 
 class OpenglRenderer : public Renderer {
@@ -32,13 +46,19 @@ public:
 
 	Shaders shaders;
 
-	Shader* test = shaders.compile("chunks");
+	UniformBuffer<CommonUniforms> common_uniforms = { "Common", 0 };
+	
+	Shader* test = shaders.compile("test");
+	Vao dummy_vao = {"dummy_vao"};
 
 	virtual void set_vsync (bool state) {
 		ctx.set_vsync(state);
 	}
 
 	bool wireframe = false;
+	bool wireframe_backfaces = true;
+	float line_width = 2.0f;
+
 	bool debug_frustrum_culling = false;
 
 	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {}
@@ -60,12 +80,14 @@ public:
 		//}
 
 		ImGui::Checkbox("wireframe", &wireframe);
+		ImGui::SameLine();
+		ImGui::Checkbox("backfaces", &wireframe_backfaces);
+		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
+
 		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {}
-
-	void imgui_draw ();
 };
 
 } // namespace gl

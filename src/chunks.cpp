@@ -5,7 +5,6 @@
 #include "world.hpp"
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
-#include "renderer.hpp"
 #include "chunk_mesher.hpp"
 
 block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {

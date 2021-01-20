@@ -1,31 +1,8 @@
 #pragma once
 #include "common.hpp"
-#include "game.hpp"
+#include "renderer.hpp"
 
-// Base class for multiple render backends
-
-enum class RenderBackend : int {
-	OPENGL=0,
-	VULKAN,
-};
-
-struct GLFWwindow;
-
-class Renderer {
-public:
-	
-	static std::unique_ptr<Renderer> start_renderer (RenderBackend backend, GLFWwindow* windo);
-
-	virtual ~Renderer () {}
-
-	virtual void set_vsync (bool state) = 0;
-
-	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) = 0;
-	virtual void render_frame (GLFWwindow* window, Input& I, Game& game) = 0;
-
-	virtual void graphics_imgui () = 0;
-	virtual void chunk_renderer_imgui (Chunks& chunks) = 0;
-};
+struct Camera_View;
 
 struct DebugDraw {
 	struct LineVertex {

@@ -1,9 +1,8 @@
 #include "common.hpp"
 #include "window.hpp"
 
-#include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
-
 #include "imgui/imgui_impl_glfw.h"
+#include "GLFW/glfw3.h"
 
 //// fullscreen mode
 struct Monitor {
@@ -159,16 +158,16 @@ void Window::open_window () {
 	{
 		ZoneScopedN("glfwCreateWindow");
 
-		switch (render_backend) {
+		switch (g_window.render_backend) {
 			case RenderBackend::OPENGL: {
 
 				glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-			#ifdef OPENGL_DEBUG
+			#if RENDERER_DEBUG_OUTPUT
 				glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 			#endif
 				glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+				glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 				glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 
 			} break;
@@ -214,14 +213,14 @@ void Window::switch_renderer () {
 	glfwSetWindowMonitor(window, NULL, window_pos.pos.x, window_pos.pos.y,
 		window_pos.dim.x, window_pos.dim.y, GLFW_DONT_CARE);
 
-	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
+	g_window.renderer = start_renderer(g_window.render_backend, g_window.window);
 }
 
 void Window::run () {
-	open_window();
+	open_window(); // open window first to get feedback when clicking exe
 
-	g_assets = Assets::load();
-	g_window.renderer = Renderer::start_renderer(g_window.render_backend, g_window.window);
+	g_assets = Assets::load(); // load assets before renderer so renderer can rely on assets in ctor
+	g_window.renderer = start_renderer(g_window.render_backend, g_window.window);
 
 	g_window.game = std::make_unique<Game>();
 

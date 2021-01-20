@@ -10,6 +10,9 @@
 
 namespace vk {
 
+#define VK_VALIDATION_LAYERS RENDERER_DEBUG_OUTPUT
+#define VK_VALIDATION_LAYERS RENDERER_DEBUG_OUTPUT
+
 ////
 #define VK_CHECK_RESULT(expr) if ((expr) != VK_SUCCESS) { \
 	throw std::runtime_error("[Vulkan] Fatal error: \"" TO_STRING(expr) "\""); \

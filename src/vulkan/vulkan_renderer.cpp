@@ -75,7 +75,7 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	}
 
 	{
-		GPU_TRACE(ctx, cmds, "upload_remeshed");
+		VK_TRACE(ctx, cmds, "upload_remeshed");
 		chunk_renderer.upload_remeshed(*this, game.world->chunks, cmds, cur_frame);
 	}
 
@@ -103,12 +103,12 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			vkCmdBeginRenderPass(cmds, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 		}
 
-		GPU_TRACE(ctx, cmds, "main_renderpass");
+		VK_TRACE(ctx, cmds, "main_renderpass");
 
 		set_viewport(cmds, renderscale_size);
 
 		{
-			GPU_TRACE(ctx, cmds, "draw chunks");
+			VK_TRACE(ctx, cmds, "draw chunks");
 			chunk_renderer.draw_chunks(ctx, cmds, game, debug_frustrum_culling, cur_frame);
 		}
 
@@ -159,12 +159,12 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		}
 
 		{
-			GPU_TRACE(ctx, cmds, "ssao_renderpass");
+			VK_TRACE(ctx, cmds, "ssao_renderpass");
 
 			//set_viewport(cmds, renderscale_size);
 
 			{
-				GPU_TRACE(ctx, cmds, "ssao draw");
+				VK_TRACE(ctx, cmds, "ssao draw");
 
 				// set 1
 				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, ssao_pipeline_layout, 1, 1,
@@ -194,12 +194,12 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		}
 
 		{
-			GPU_TRACE(ctx, cmds, "ui_renderpass");
+			VK_TRACE(ctx, cmds, "ui_renderpass");
 
 			set_viewport(cmds, ctx.wnd_size);
 
 			{
-				GPU_TRACE(ctx, cmds, "rescale draw");
+				VK_TRACE(ctx, cmds, "rescale draw");
 
 				// set 1
 				vkCmdBindDescriptorSets(cmds, VK_PIPELINE_BIND_POINT_GRAPHICS, rescale_pipeline_layout, 1, 1,

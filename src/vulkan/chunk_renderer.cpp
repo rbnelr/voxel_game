@@ -158,12 +158,12 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 	{
 		ZoneScopedN("chunk draw opaque");
-		GPU_TRACE(ctx, cmds, "chunk draw opaque");
+		VK_TRACE(ctx, cmds, "chunk draw opaque");
 		draw_slices(opaque_pipeline->pipeline, DT_OPAQUE, drawcount_opaque);
 	}
 	{
 		ZoneScopedN("chunk draw transparent");
-		GPU_TRACE(ctx, cmds, "chunk draw transparent");
+		VK_TRACE(ctx, cmds, "chunk draw transparent");
 		draw_slices(transparent_pipeline->pipeline, DT_TRANSPARENT, drawcount_transparent);
 	}
 }

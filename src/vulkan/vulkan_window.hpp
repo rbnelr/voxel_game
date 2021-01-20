@@ -5,9 +5,6 @@
 
 struct GLFWwindow;
 
-#define VK_VALIDATION_LAYERS (DEBUGLEVEL >= 2)
-#define VK_DEBUG_LABELS 1
-
 namespace vk {
 
 static constexpr int SWAP_CHAIN_SIZE = 3;
@@ -82,7 +79,7 @@ struct VulkanWindowContext {
 	VkSurfaceKHR				surface;
 	Queues						queues;
 
-#if VK_VALIDATION_LAYERS || VK_DEBUG_LABELS
+#if VK_VALIDATION_LAYERS || RENDERER_DEBUG_LABELS
 	DebugUtils					dbg_utils;
 #endif
 #if VK_VALIDATION_LAYERS
@@ -134,7 +131,7 @@ struct VulkanWindowContext {
 	void recreate_swap_chain (int swap_chain_size);
 };
 
-#if VK_DEBUG_LABELS
+#if RENDERER_DEBUG_LABELS
 	struct _ScopedGpuTrace {
 		VulkanWindowContext& wndctx;
 		VkCommandBuffer cmds;
@@ -146,14 +143,14 @@ struct VulkanWindowContext {
 		}
 	};
 
-	#define GPU_TRACE(wndctx, cmds, name) \
+	#define VK_TRACE(wndctx, cmds, name) \
 		_ScopedGpuTrace __scoped_##__COUNTER__ ((wndctx), (cmds), (name)); \
 		TracyVkZone((wndctx).tracy_ctx, (cmds), (name))
 
 	#define GPU_DBG_NAME(wndctx, obj, name) (wndctx).dbg_utils.set_obj_label((wndctx).dev, (obj), (name))
 	#define GPU_DBG_NAMEf(wndctx, obj, name, ...) (wndctx).dbg_utils.set_obj_label((wndctx).dev, (obj), prints((name), __VA_ARGS__).c_str())
 #else
-	#define GPU_TRACE(wndctx, cmds, name) TracyVkZone((wndctx).tracy_ctx, cmds, name)
+	#define VK_TRACE(wndctx, cmds, name) TracyVkZone((wndctx).tracy_ctx, cmds, name)
 	#define GPU_DBG_NAME(wndctx, obj, name)
 	#define GPU_DBG_NAMEf(wndctx, obj, name, ...)
 #endif
