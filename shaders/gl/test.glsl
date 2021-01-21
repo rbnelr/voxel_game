@@ -1,4 +1,4 @@
-#version 440
+#version 440 core
 #include "common.glsl"
 
 #ifdef _VERTEX

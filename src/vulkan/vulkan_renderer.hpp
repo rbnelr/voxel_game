@@ -167,6 +167,9 @@ public:
 		chunk_renderer.imgui(chunks);
 	}
 
+	virtual bool get_vsync () {
+		return false;
+	}
 	virtual void set_vsync (bool state) {
 		// not implemented
 	}

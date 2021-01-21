@@ -10,6 +10,7 @@ namespace gl {
 	void OpenglContext::set_vsync (bool state) {
 		ZoneScoped;
 		glfwSwapInterval(state ? _vsync_on_interval : 0);
+		vsync = state;
 	}
 
 	void OpenglContext::imgui_begin () {
@@ -44,7 +45,7 @@ namespace gl {
 		if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
 			_vsync_on_interval = -1;
 
-		set_vsync(true);
+		set_vsync(vsync);
 
 		// srgb enabled by default if supported
 		// TODO: should I use glfwExtensionSupported or GLAD_GL_ARB_framebuffer_sRGB? does it make a difference?

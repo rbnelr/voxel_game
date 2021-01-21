@@ -16,9 +16,6 @@ struct Window {
 
 	Input	input;
 
-	bool	vsync; // readonly
-	int		_vsync_on_interval = 1; // handle vsync interval allowing -1 or not depending on extension
-
 	bool	fullscreen = false; // readonly
 	bool	borderless_fullscreen = true; // readonly, use borderless fullscreen as long as the cpu usage (gpu driver?) bug happens on my dev desktop
 	Rect	window_pos;
@@ -32,11 +29,6 @@ struct Window {
 	std::unique_ptr<Renderer>		renderer;
 
 	DirectoyChangeNotifier			file_changes = DirectoyChangeNotifier("./", true);
-
-	void set_vsync (bool on) {
-		renderer->set_vsync(on);
-		vsync = on;
-	}
 
 	bool switch_fullscreen (bool fullscreen, bool borderless_fullscreen);
 	bool toggle_fullscreen ();

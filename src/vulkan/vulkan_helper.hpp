@@ -89,10 +89,8 @@ struct DebugUtils {
 };
 
 ////
-template <AttribMode M, typename T>
-inline constexpr VkFormat get_format ();
-template <AttribMode M, typename T, int VECN>
-inline constexpr VkFormat get_formatv ();
+template <AttribMode M, typename T>			inline constexpr VkFormat get_format ();
+template <AttribMode M, typename T, int N>	inline constexpr VkFormat get_formatv ();
 
 template<> inline VkFormat get_format<AttribMode::FLOAT, float > () { return VK_FORMAT_R32_SFLOAT; }
 template<> inline VkFormat get_format<AttribMode::FLOAT, float2> () { return VK_FORMAT_R32G32_SFLOAT; }

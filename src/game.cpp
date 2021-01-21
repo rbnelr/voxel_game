@@ -34,9 +34,9 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		}
 
 		ImGui::SameLine();
-		bool vsync = window.vsync;
+		bool vsync = window.renderer->get_vsync();
 		if (ImGui::Checkbox("Vsync", &vsync)) {
-			window.set_vsync(vsync);
+			window.renderer->set_vsync(vsync);
 		}
 
 		ImGui::SameLine();

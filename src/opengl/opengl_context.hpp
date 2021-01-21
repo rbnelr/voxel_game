@@ -9,7 +9,8 @@ namespace gl {
 		OpenglContext (GLFWwindow* window, char const* app_name);
 		~OpenglContext ();
 
-		int _vsync_on_interval = 1; // use 1 or -1 for vsync
+		bool vsync = true;
+		int _vsync_on_interval = 1; // handle vsync interval allowing -1 or not depending on extension
 
 		void set_vsync (bool state);
 

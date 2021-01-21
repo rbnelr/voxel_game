@@ -32,6 +32,7 @@ class Renderer {
 public:
 	virtual ~Renderer () {}
 
+	virtual bool get_vsync () = 0;
 	virtual void set_vsync (bool state) = 0;
 
 	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) = 0;

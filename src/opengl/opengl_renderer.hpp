@@ -51,6 +51,9 @@ public:
 	Shader* test = shaders.compile("test");
 	Vao dummy_vao = {"dummy_vao"};
 
+	virtual bool get_vsync () {
+		return ctx.vsync;
+	}
 	virtual void set_vsync (bool state) {
 		ctx.set_vsync(state);
 	}

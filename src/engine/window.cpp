@@ -84,7 +84,7 @@ bool Window::switch_fullscreen (bool fullscreen, bool borderless_fullscreen) {
 	}
 
 	// reset vsync to make sure 
-	set_vsync(vsync);
+	renderer->set_vsync(renderer->get_vsync());
 
 	this->fullscreen = fullscreen;
 	this->borderless_fullscreen = borderless_fullscreen;
