@@ -462,5 +462,11 @@
     <None Include="..\..\..\shaders\gl\test.glsl">
       <Filter>shaders\gl</Filter>
     </None>
+    <None Include="..\..\..\shaders\gl\debug_lines.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\debug_tris.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>

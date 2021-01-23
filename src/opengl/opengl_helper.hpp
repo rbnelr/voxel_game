@@ -50,98 +50,105 @@ struct glsl_bool {
 //// RAII Wrappers for managing lifetime
 
 class Vbo {
-	GLuint vbo;
+	GLuint vbo = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Vbo, vbo)
+	MOVE_ONLY_CLASS_MEMBER(Vbo, vbo);
 
-		Vbo (std::string_view label) {
+	Vbo () {} // not allocated
+	Vbo (std::string_view label) { // allocate
 		glGenBuffers(1, &vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo);
 		OGL_DBG_LABEL(GL_BUFFER, vbo, label);
 	}
 	~Vbo () {
-		glDeleteBuffers(1, &vbo);
+		if (vbo)
+			glDeleteBuffers(1, &vbo);
 	}
 
 	operator GLuint () const { return vbo; }
 };
 class Ebo {
-	GLuint ebo;
+	GLuint ebo = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Ebo, ebo)
+	MOVE_ONLY_CLASS_MEMBER(Ebo, ebo);
 
-		Ebo (std::string_view label) {
+	Ebo () {} // not allocated
+	Ebo (std::string_view label) { // allocate
 		glGenBuffers(1, &ebo);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 		OGL_DBG_LABEL(GL_BUFFER, ebo, label);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	}
 	~Ebo () {
-		glDeleteBuffers(1, &ebo);
+		if (ebo) glDeleteBuffers(1, &ebo);
 	}
 
 	operator GLuint () const { return ebo; }
 };
 class Ubo {
-	GLuint ubo;
+	GLuint ubo = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Ubo, ubo)
+	MOVE_ONLY_CLASS_MEMBER(Ubo, ubo);
 
-		Ubo (std::string_view label) {
+	Ubo () {} // not allocated
+	Ubo (std::string_view label) { // allocate
 		glGenBuffers(1, &ubo);
 		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
 		OGL_DBG_LABEL(GL_BUFFER, ubo, label);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 	~Ubo () {
-		glDeleteBuffers(1, &ubo);
+		if (ubo) glDeleteBuffers(1, &ubo);
 	}
 
 	operator GLuint () const { return ubo; }
 };
 class Vao {
-	GLuint vao;
+	GLuint vao = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Vao, vao)
+	MOVE_ONLY_CLASS_MEMBER(Vao, vao);
 
-		Vao (std::string_view label) {
+	Vao () {} // not allocated
+	Vao (std::string_view label) { // allocate
 		glGenVertexArrays(1, &vao);
 		glBindVertexArray(vao);
 		OGL_DBG_LABEL(GL_VERTEX_ARRAY, vao, label);
 		glBindVertexArray(0);
 	}
 	~Vao () {
-		glDeleteVertexArrays(1, &vao);
+		if (vao) glDeleteVertexArrays(1, &vao);
 	}
 
 	operator GLuint () const { return vao; }
 };
 class Texture {
-	GLuint tex;
+	GLuint tex = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Texture, tex)
+	MOVE_ONLY_CLASS_MEMBER(Texture, tex);
 
-		Texture (std::string_view label) {
+	Texture () {} // not allocated
+	Texture (std::string_view label) { // allocate
 		glGenTextures(1, &tex);
 		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
 	}
 	~Texture () {
-		glDeleteTextures(1, &tex);
+		if (tex) glDeleteTextures(1, &tex);
 	}
 
 	operator GLuint () const { return tex; }
 };
 class Sampler {
-	GLuint sampler;
+	GLuint sampler = 0;
 public:
-	MOVE_ONLY_CLASS_MEMBER(Sampler, sampler)
+	MOVE_ONLY_CLASS_MEMBER(Sampler, sampler);
 
-		Sampler (std::string_view label) {
+	Sampler () {} // not allocated
+	Sampler (std::string_view label) { // allocate
 		glGenSamplers(1, &sampler);
 		OGL_DBG_LABEL(GL_SAMPLER, sampler, label);
 	}
 	~Sampler () {
-		glDeleteSamplers(1, &sampler);
+		if (sampler) glDeleteSamplers(1, &sampler);
 	}
 
 	operator GLuint () const { return sampler; }
@@ -344,9 +351,8 @@ public:
 
 //// Vertex buffers
 
-template <typename T>
-inline constexpr GLenum _get_gltype () {
-	switch (get_type<T>().type) {
+inline constexpr GLenum _get_gltype (ScalarType type) {
+	switch (type) {
 		case ScalarType::FLOAT:		return GL_FLOAT;
 		case ScalarType::INT:		return GL_INT;
 		case ScalarType::UINT8:		return GL_UNSIGNED_BYTE;
@@ -379,7 +385,7 @@ struct VertexAttributes {
 		this->instanced = instanced;
 	}
 
-	template <AttribMode M, typename T, int N>
+	template <AttribMode M, ScalarType T, int N>
 	void addv (int location, char const* name, size_t offset) {
 		glEnableVertexAttribArray((GLuint)location);
 
@@ -404,17 +410,17 @@ struct VertexAttributes {
 				break;
 		}
 
-		GLenum type = _get_gltype<T>();
+		GLenum type = _get_gltype(T);
 
 		if (AttribI)
-			glVertexAttribIPointer((GLuint)location, N, type, normalized, stride, (void*)offset);
+			glVertexAttribIPointer((GLuint)location, N, type, stride, (void*)offset);
 		else
-			glVertexAttribPointer((GLuint)location, N, type, stride, (void*)offset);
+			glVertexAttribPointer((GLuint)location, N, type, normalized, stride, (void*)offset);
 	}
 
 	template <AttribMode M, typename T>
 	void add (int location, char const* name, size_t offset) {
-		addv<M, get_type<T>().type, get_type<T>().components>(location, name, offset);
+		addv<M, kissmath::get_type<T>().type, kissmath::get_type<T>().components>(location, name, offset);
 	}
 };
 
@@ -435,5 +441,93 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 	glBindVertexArray(0);
 	return vao;
 }
+
+//// Opengl global state management
+
+enum CullFace {
+	CULL_BACK,
+	CULL_FRONT,
+};
+enum PrimitiveMode {
+	PRIM_TRIANGELS=0,
+	PRIM_LINES,
+};
+
+struct BlendFunc {
+	GLenum equation = GL_FUNC_ADD;
+	GLenum sfactor = GL_SRC_ALPHA;
+	GLenum dfactor = GL_ONE_MINUS_SRC_ALPHA;
+};
+
+struct PipelineState {
+	bool depth_test = true;
+	bool depth_write = true;
+	GLenum depth_func = GL_GEQUAL;
+
+	bool scissor_test = false;
+
+	bool culling = true;
+	CullFace cull_face = CULL_BACK;
+
+	bool blend_enable = false;
+	BlendFunc blend_func = BlendFunc();
+};
+
+struct StateManager {
+	PipelineState state;
+
+	StateManager () {
+		set_default();
+	}
+
+	void set_default () {
+		state = PipelineState();
+
+		gl_enable(GL_DEPTH_TEST, state.depth_test);
+		// use_reverse_depth
+		glDepthFunc(GL_GEQUAL);
+		glClearDepth(0.0f);
+		glDepthRange(0.0f, 1.0f);
+		glDepthMask(state.depth_write ? GL_TRUE : GL_FALSE);
+
+		gl_enable(GL_SCISSOR_TEST, state.scissor_test);
+
+		// culling
+		gl_enable(GL_CULL_FACE, state.culling);
+		glCullFace(state.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
+		glFrontFace(GL_CCW);
+		// blending
+		gl_enable(GL_BLEND, state.blend_enable);
+		glBlendEquation(state.blend_func.equation);
+		glBlendFunc(state.blend_func.sfactor, state.blend_func.dfactor);
+	}
+
+	void set (PipelineState const& s) {
+		if (state.depth_test != s.depth_test)
+			gl_enable(GL_DEPTH_TEST, s.depth_test);
+		if (state.depth_func != s.depth_func)
+			glDepthFunc(s.depth_func);
+		if (state.depth_write != s.depth_write)
+			glDepthMask(s.depth_write ? GL_TRUE : GL_FALSE);
+
+		if (state.scissor_test != s.scissor_test)
+			gl_enable(GL_SCISSOR_TEST, s.scissor_test);
+
+		if (state.culling != s.culling)
+			gl_enable(GL_CULL_FACE, s.culling);
+		if (state.culling != s.culling)
+			glCullFace(s.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
+
+		// blending
+		if (state.blend_enable != s.blend_enable)
+			gl_enable(GL_BLEND, state.blend_enable);
+		if (state.blend_func.equation != s.blend_func.equation)
+			glBlendEquation(s.blend_func.equation);
+		if (state.blend_func.sfactor != s.blend_func.sfactor || state.blend_func.dfactor != s.blend_func.dfactor)
+			glBlendFunc(s.blend_func.sfactor, s.blend_func.dfactor);
+
+		state = s;
+	}
+};
 
 } // namespace gl

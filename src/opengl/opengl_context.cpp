@@ -52,7 +52,7 @@ namespace gl {
 		if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
 			glEnable(GL_FRAMEBUFFER_SRGB);
 		else
-			clog(ERROR, "[OpenGL] No sRGB supported! Output will be wrong!\n");
+			clog(ERROR, "[OpenGL] No sRGB framebuffers supported! Shading will be wrong!\n");
 
 		if (glfwExtensionSupported("GL_ARB_clip_control"))
 			glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
@@ -64,8 +64,7 @@ namespace gl {
 		//	clog(ERROR, "[OpenGL] GL_NV_gpu_shader5 or GL_NV_shader_buffer_load not supported!\n");
 		//}
 
-		// TODO: extension needed?
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // core since 3.2
 
 		ImGui_ImplGlfw_InitForOpenGL(window, true);
 		ImGui_ImplOpenGL3_Init();

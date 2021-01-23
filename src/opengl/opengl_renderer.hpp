@@ -40,10 +40,39 @@ struct CommonUniforms {
 	}
 };
 
+template <typename T>
+struct VertexBuffer {
+	Vao vao;
+	Vbo vbo;
+
+	VertexBuffer (std::string_view label) {
+		vbo = Vbo(label);
+		vao = setup_vao<T>(label, vbo);
+	}
+};
+
+class OpenglRenderer;
+
+struct glDebugDraw {
+	VertexBuffer<DebugDraw::LineVertex>	vbo_lines	= { "DebugDraw.vbo_lines" };
+	VertexBuffer<DebugDraw::TriVertex>	vbo_tris	= { "DebugDraw.vbo_tris" };
+
+	Shader* shad_lines;
+	Shader* shad_tris;
+
+	glDebugDraw (Shaders& shaders) {
+		shad_lines	= shaders.compile("debug_lines");
+		shad_tris	= shaders.compile("debug_tris");
+	}
+
+	void draw (OpenglRenderer& r);
+};
+
 class OpenglRenderer : public Renderer {
 public:
 	OpenglContext ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
+	StateManager state;
 	Shaders shaders;
 
 	UniformBuffer<CommonUniforms> common_uniforms = { "Common", 0 };
@@ -63,6 +92,8 @@ public:
 	float line_width = 2.0f;
 
 	bool debug_frustrum_culling = false;
+
+	glDebugDraw debug_draw = glDebugDraw(shaders);
 
 	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {}
 	virtual ~OpenglRenderer () {}
