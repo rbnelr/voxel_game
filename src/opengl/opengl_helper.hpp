@@ -477,7 +477,7 @@ struct StateManager {
 	PipelineState state;
 
 	StateManager () {
-		set_default();
+		//set_default();
 	}
 
 	void set_default () {

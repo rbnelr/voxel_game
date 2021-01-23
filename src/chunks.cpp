@@ -246,6 +246,8 @@ void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
 
 	ImGui::Checkbox("mesh_world_border", &mesh_world_border);
+	ImGui::Checkbox("show_chunks", &visualize_chunks);
+	ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 
 	ImGui::DragFloat("load_radius", &load_radius, 1);
 	ImGui::DragFloat("unload_hyster", &unload_hyster, 1);

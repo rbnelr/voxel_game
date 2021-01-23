@@ -143,7 +143,6 @@ public:
 	bool						renderscale_nearest_changed = false;
 
 	bool						wireframe = false;
-	bool						debug_frustrum_culling = false;
 
 	virtual void graphics_imgui () {
 		screenshot.imgui();
@@ -158,7 +157,6 @@ public:
 		}
 
 		ImGui::Checkbox("wireframe", &wireframe);
-		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 
 		staging.imgui();
 	}

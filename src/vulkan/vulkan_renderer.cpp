@@ -109,7 +109,7 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 		{
 			VK_TRACE(ctx, cmds, "draw chunks");
-			chunk_renderer.draw_chunks(ctx, cmds, game, debug_frustrum_culling, cur_frame);
+			chunk_renderer.draw_chunks(ctx, cmds, game, cur_frame);
 		}
 
 		// -> debug_drawer.pipeline_layout is not compatible with chunk_renderer.pipeline_layout because of differing push constants

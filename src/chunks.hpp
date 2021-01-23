@@ -410,6 +410,9 @@ struct Chunks {
 
 	bool mesh_world_border = false;
 
+	bool visualize_chunks = false;
+	bool debug_frustrum_culling = false;
+
 	// distance of chunk to player
 	int chunk_lod (float dist) {
 		return clamp(floori(log2f(dist / load_radius * 16)), 0,3);

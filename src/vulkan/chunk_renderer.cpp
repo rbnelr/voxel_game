@@ -57,13 +57,13 @@ void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkComman
 	}
 }
 
-void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, bool debug_frustrum_culling, int cur_frame) {
+void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds, Game& game, int cur_frame) {
 	ZoneScoped;
 
 	auto& frame = frames[cur_frame];
 	auto& chunks = game.world->chunks;
 
-	auto& cull_view = debug_frustrum_culling ? game.player_view : game.view;
+	auto& cull_view = chunks.debug_frustrum_culling ? game.player_view : game.view;
 	
 	{
 		ZoneScopedN("chunk culling pass");
@@ -97,7 +97,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			srgba(255, 0, 0, 180),
 		};
 
-		if (debug_frustrum_culling)
+		if (chunks.debug_frustrum_culling)
 			g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
 
 		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
@@ -113,10 +113,10 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			if (!empty)
 				culled = frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 			
-			if (debug_frustrum_culling) {
+			if (chunks.debug_frustrum_culling) {
 				if (!empty)
 					g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[culled ? 2 : 0]);
-			} else if (visualize_chunks) {
+			} else if (chunks.visualize_chunks) {
 				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[chunk.voxels.is_sparse() ? 1 : 0]);
 			}
 
