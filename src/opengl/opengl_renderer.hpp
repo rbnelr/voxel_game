@@ -58,11 +58,21 @@ struct glDebugDraw {
 	VertexBuffer<DebugDraw::TriVertex>	vbo_tris	= { "DebugDraw.vbo_tris" };
 
 	Shader* shad_lines;
+	Shader* shad_lines_occluded;
 	Shader* shad_tris;
 
+	bool draw_occluded = false;
+	float occluded_alpha = 0.3f;
+
+	void imgui () {
+		ImGui::Checkbox("draw_occluded", &draw_occluded);
+		ImGui::SliderFloat("occluded_alpha", &occluded_alpha, 0,1);
+	}
+
 	glDebugDraw (Shaders& shaders) {
-		shad_lines	= shaders.compile("debug_lines");
-		shad_tris	= shaders.compile("debug_tris");
+		shad_lines			= shaders.compile("debug_lines", {{"DRAW_OCCLUDED", "0"}});
+		shad_lines_occluded	= shaders.compile("debug_lines", {{"DRAW_OCCLUDED", "1"}});
+		shad_tris			= shaders.compile("debug_tris");
 	}
 
 	void draw (OpenglRenderer& r);
@@ -133,6 +143,8 @@ public:
 		ImGui::Checkbox("wireframe", &wireframe);
 		ImGui::SameLine();
 		ImGui::Checkbox("backfaces", &wireframe_backfaces);
+
+		debug_draw.imgui();
 		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
 	}
 

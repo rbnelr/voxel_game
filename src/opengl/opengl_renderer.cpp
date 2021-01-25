@@ -19,6 +19,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		chunk_renderer.upload_remeshed(game.world->chunks);
 	}
 
+	glLineWidth(line_width);
 	{
 		state.override_poly = wireframe;
 		state.override_cull = wireframe && wireframe_backfaces;
@@ -79,11 +80,14 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	s.depth_write = false;
 	s.blend_enable = true;
 
+	PipelineState s_occluded;
+	s_occluded.depth_test = true;
+	s_occluded.depth_func = DEPTH_BEHIND;
+	s_occluded.depth_write = false;
+	s_occluded.blend_enable = true;
+
 	{
 		OGL_TRACE("draw lines");
-
-		r.state.set(s);
-		glUseProgram(shad_lines->prog);
 
 		glBindVertexArray(vbo_lines.vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_lines.vbo);
@@ -93,7 +97,24 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		if (vertex_count > 0) {
 			glBufferData(GL_ARRAY_BUFFER, vertex_count, g_debugdraw.lines.data(), GL_STREAM_DRAW);
 
-			glDrawArrays(GL_LINES, 0, (GLsizei)vertex_count);
+			{ // lines in front of geometry
+				OGL_TRACE("normal");
+
+				r.state.set(s);
+				glUseProgram(shad_lines->prog);
+
+				glDrawArrays(GL_LINES, 0, (GLsizei)vertex_count);
+			}
+			if (draw_occluded) { // lines occluded by geometry
+				OGL_TRACE("occluded");
+
+				r.state.set(s_occluded);
+				glUseProgram(shad_lines_occluded->prog);
+
+				shad_lines_occluded->set_uniform("occluded_alpha", occluded_alpha);
+
+				glDrawArrays(GL_LINES, 0, (GLsizei)vertex_count);
+			}
 		}
 	}
 

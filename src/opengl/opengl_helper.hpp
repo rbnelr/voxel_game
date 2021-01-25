@@ -458,6 +458,18 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 
 //// Opengl global state management
 
+enum DepthFunc {
+	DEPTH_INFRONT, // normal: draw infront (or equal depth) of other things
+	DEPTH_BEHIND, // inverted: draw behind other things
+};
+inline GLenum map_depth_func (DepthFunc func) {
+	switch (func) { // all inverted because reverse depth
+		case DEPTH_INFRONT:	return GL_GEQUAL;
+		case DEPTH_BEHIND:	return GL_LESS;
+		default: return 0;
+	}
+}
+
 enum CullFace {
 	CULL_BACK,
 	CULL_FRONT,
@@ -480,7 +492,7 @@ struct BlendFunc {
 struct PipelineState {
 	bool depth_test = true;
 	bool depth_write = true;
-	GLenum depth_func = GL_GEQUAL;
+	DepthFunc depth_func = DEPTH_INFRONT;
 
 	bool scissor_test = false;
 
@@ -525,7 +537,7 @@ struct StateManager {
 
 		gl_enable(GL_DEPTH_TEST, o.depth_test);
 		// use_reverse_depth
-		glDepthFunc(GL_GEQUAL);
+		glDepthFunc(map_depth_func(o.depth_func));
 		glClearDepth(0.0f);
 		glDepthRange(0.0f, 1.0f);
 		glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
@@ -550,7 +562,7 @@ struct StateManager {
 		if (state.depth_test != o.depth_test)
 			gl_enable(GL_DEPTH_TEST, o.depth_test);
 		if (state.depth_func != o.depth_func)
-			glDepthFunc(o.depth_func);
+			glDepthFunc(map_depth_func(o.depth_func));
 		if (state.depth_write != o.depth_write)
 			glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
 
