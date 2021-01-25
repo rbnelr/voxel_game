@@ -17,10 +17,7 @@ layout(location = 0) vs2fs VS {
 	
 	#define MAX_UBO_SIZE (64*1024)
 	
-	//
-	layout(push_constant) uniform PC {
-		vec3 chunk_pos;
-	};
+	uniform vec3 chunk_pos;
 	
 	//
 	struct BlockMeshVertex {
@@ -31,7 +28,7 @@ layout(location = 0) vs2fs VS {
 	#define MERGE_INSTANCE_FACTOR 6
 	#define MAX_BLOCK_MESHES (MAX_UBO_SIZE / (48 * MERGE_INSTANCE_FACTOR)) // sizeof(BlockMeshVertex)
 	
-	layout(std140, set = 0, binding = 1) uniform BlockMeshes {
+	layout(std140, binding = 1) uniform BlockMeshes {
 		BlockMeshVertex vertices[MAX_BLOCK_MESHES][MERGE_INSTANCE_FACTOR];
 	} block_meshes;
 	
@@ -41,36 +38,35 @@ layout(location = 0) vs2fs VS {
 		vec3 mesh_norm_model	= v.normal.xyz;
 		vec2 uv					= v.uv.xy;
 	
-		gl_Position =		world_to_clip * vec4(mesh_pos_model + voxel_pos * FIXEDPOINT_FAC + chunk_pos, 1);
+		gl_Position =		view.world_to_clip * vec4(mesh_pos_model + voxel_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =			vec3(uv, texid);
-		vs.normal_cam =		mat3(world_to_cam) * mesh_norm_model;
+		vs.normal_cam =		mat3(view.world_to_cam) * mesh_norm_model;
 	}
 #endif
 
 #ifdef _FRAGMENT
 	#define ALPHA_TEST_THRES 127.0
 
-	uniform sampler2DArray textures;
-	uniform float test;
+	uniform sampler2DArray tile_textures;
 
 	layout(location = 0) out vec4 frag_col;
-	layout(location = 1) out vec4 frag_normal;
+	//layout(location = 1) out vec4 frag_normal;
 	void main () {
-		vec4 col = texture(textures, vs.uvi);
-		
-	#if ALPHA_TEST && !defined(WIREFRAME)
+		vec4 col = texture(tile_textures, vs.uvi);
+
+	#if ALPHA_TEST && !defined(_WIREFRAME)
 		if (col.a <= ALPHA_TEST_THRES / 255.0)
 			discard;
 		col.a = 1.0;
 	#endif
-		
-	#if WIREFRAME
+
+	#ifdef _WIREFRAME
 		col = vec4(1.0);
 	#endif
 		
 		vec3 norm = normalize(vs.normal_cam); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
 		
 		frag_col = col;
-		frag_normal = vec4(norm.xyz, 1.0); // alpha 1 incase blending happens to never blend normals
+		//frag_normal = vec4(norm.xyz, 1.0); // alpha 1 incase blending happens to never blend normals
 	}
 #endif

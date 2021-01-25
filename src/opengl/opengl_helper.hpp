@@ -49,6 +49,8 @@ struct glsl_bool {
 
 //// RAII Wrappers for managing lifetime
 
+// NOTE: objects need to be bound to something (eg. glBindBuffer) before I can call glObjectLabel on them or the call will fail
+
 class Vbo {
 	GLuint vbo = 0;
 public:
@@ -121,22 +123,6 @@ public:
 
 	operator GLuint () const { return vao; }
 };
-class Texture {
-	GLuint tex = 0;
-public:
-	MOVE_ONLY_CLASS_MEMBER(Texture, tex);
-
-	Texture () {} // not allocated
-	Texture (std::string_view label) { // allocate
-		glGenTextures(1, &tex);
-		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
-	}
-	~Texture () {
-		if (tex) glDeleteTextures(1, &tex);
-	}
-
-	operator GLuint () const { return tex; }
-};
 class Sampler {
 	GLuint sampler = 0;
 public:
@@ -145,6 +131,7 @@ public:
 	Sampler () {} // not allocated
 	Sampler (std::string_view label) { // allocate
 		glGenSamplers(1, &sampler);
+		glBindSampler(0, sampler);
 		OGL_DBG_LABEL(GL_SAMPLER, sampler, label);
 	}
 	~Sampler () {
@@ -152,6 +139,40 @@ public:
 	}
 
 	operator GLuint () const { return sampler; }
+};
+class Texture2D {
+	GLuint tex = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Texture2D, tex);
+
+	Texture2D () {} // not allocated
+	Texture2D (std::string_view label) { // allocate
+		glGenTextures(1, &tex);
+		glBindTexture(GL_TEXTURE_2D, tex);
+		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
+	}
+	~Texture2D () {
+		if (tex) glDeleteTextures(1, &tex);
+	}
+
+	operator GLuint () const { return tex; }
+};
+class Texture2DArray {
+	GLuint tex = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Texture2DArray, tex);
+
+	Texture2DArray () {} // not allocated
+	Texture2DArray (std::string_view label) { // allocate
+		glGenTextures(1, &tex);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
+	}
+	~Texture2DArray () {
+		if (tex) glDeleteTextures(1, &tex);
+	}
+
+	operator GLuint () const { return tex; }
 };
 
 //// Shader & Shader uniform stuff
@@ -204,6 +225,7 @@ const std::unordered_map<std::string_view, GlslType> glsl_type_map = {
 };
 
 struct ShaderUniform {
+	std::string	name;
 	GlslType	type;
 	GLint		location;
 };
@@ -221,7 +243,8 @@ inline void _set_uniform (ShaderUniform& u, float2x2 val) { assert(u.type == Gls
 inline void _set_uniform (ShaderUniform& u, float3x3 val) { assert(u.type == GlslType::MAT3  ); glUniformMatrix3fv(u.location, 1, GL_FALSE, &val.arr[0].x); }
 inline void _set_uniform (ShaderUniform& u, float4x4 val) { assert(u.type == GlslType::MAT4  ); glUniformMatrix4fv(u.location, 1, GL_FALSE, &val.arr[0].x); }
 
-typedef ordered_map<std::string, ShaderUniform> uniform_set;
+//typedef ordered_map<std::string, ShaderUniform> uniform_set;
+typedef std::vector<ShaderUniform> uniform_set;
 
 inline bool get_shader_compile_log (GLuint shad, std::string* log) {
 	GLsizei log_len;
@@ -311,43 +334,27 @@ return valid && sizeof(T) == offset;
 
 //// Uniform Buffer objects
 
-template <typename T>
-class UniformBuffer {
-	Ubo ubo;
+inline void upload_ubo (GLuint ubo, void* data, size_t size) {
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+	glBufferData(GL_UNIFORM_BUFFER, size, nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STREAM_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+inline void bind_ubo (GLuint ubo, int binding_point) {
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
+	glBindBufferBase(GL_UNIFORM_BUFFER, binding_point, ubo);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+inline void upload_bind_ubo (GLuint ubo, int binding_point, void* data, size_t size) {
+	glBindBuffer(GL_UNIFORM_BUFFER, ubo);
 
-	/*
-	static constexpr bool check_std140_layout () {
-	SharedUniformsLayoutChecker c;
-	T::check_layout(c);
-	return c.is_valid<T>();
-	}
+	glBufferData(GL_UNIFORM_BUFFER, size, nullptr, GL_STREAM_DRAW);
+	glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STREAM_DRAW);
 
-	// NOTE:
-	// error C2131: expression did not evaluate to a constant
-	// note: failure was caused by call of undefined function or one not declared 'constexpr'
-	// note: see usage of 'SharedUniformsLayoutChecker::get_align'
-	// when a type is not registered via a get_align template
-	static_assert(SharedUniforms<T>::check_std140_layout(), "SharedUniforms: layout of T is not how std140 expects it!");
-	*/
-public:
-	//operator GLuint () const { return ubo; }
+	glBindBufferBase(GL_UNIFORM_BUFFER, binding_point, ubo);
 
-	UniformBuffer (char const* name, int binding_point): ubo{prints("%s_ubo", name)} {
-		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(T), NULL, GL_STATIC_DRAW);
-
-		glBindBufferBase(GL_UNIFORM_BUFFER, binding_point, ubo);
-
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-
-	void set (T const& val) {
-		glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-		glBufferData(GL_UNIFORM_BUFFER, sizeof(T), &val, GL_STATIC_DRAW);
-		glBindBuffer(GL_UNIFORM_BUFFER, 0);
-	}
-};
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
 
 //// Vertex buffers
 
@@ -416,8 +423,15 @@ struct VertexAttributes {
 			glVertexAttribIPointer((GLuint)location, N, type, stride, (void*)offset);
 		else
 			glVertexAttribPointer((GLuint)location, N, type, normalized, stride, (void*)offset);
+
+		if (instanced)
+			glVertexAttribDivisor((GLuint)location, 1); // vertex attribute is per-instance
 	}
 
+	template <AttribMode M, typename T, int N>
+	void addv (int location, char const* name, size_t offset) {
+		addv<M, kissmath::get_type<T>().type, N>(location, name, offset);
+	}
 	template <AttribMode M, typename T>
 	void add (int location, char const* name, size_t offset) {
 		addv<M, kissmath::get_type<T>().type, kissmath::get_type<T>().components>(location, name, offset);
@@ -452,6 +466,10 @@ enum PrimitiveMode {
 	PRIM_TRIANGELS=0,
 	PRIM_LINES,
 };
+enum PolyMode {
+	POLY_FILL=0,
+	POLY_LINE,
+};
 
 struct BlendFunc {
 	GLenum equation = GL_FUNC_ADD;
@@ -471,62 +489,91 @@ struct PipelineState {
 
 	bool blend_enable = false;
 	BlendFunc blend_func = BlendFunc();
+
+	PolyMode poly_mode = POLY_FILL;
 };
 
 struct StateManager {
 	PipelineState state;
 
+	// overrides
+	bool override_poly = false;
+	bool override_cull = false;
+	PipelineState override_state;
+
 	StateManager () {
 		//set_default();
+	}
+
+	PipelineState _override (PipelineState const& s) {
+		PipelineState o = s;
+
+		if (override_poly)
+			o.poly_mode = override_state.poly_mode;
+		if (override_cull) {
+			o.culling = override_state.culling;
+			o.cull_face = override_state.cull_face;
+		}
+
+		return o;
 	}
 
 	void set_default () {
 		state = PipelineState();
 
-		gl_enable(GL_DEPTH_TEST, state.depth_test);
+		auto o = _override(state);
+
+		gl_enable(GL_DEPTH_TEST, o.depth_test);
 		// use_reverse_depth
 		glDepthFunc(GL_GEQUAL);
 		glClearDepth(0.0f);
 		glDepthRange(0.0f, 1.0f);
-		glDepthMask(state.depth_write ? GL_TRUE : GL_FALSE);
+		glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
 
-		gl_enable(GL_SCISSOR_TEST, state.scissor_test);
+		gl_enable(GL_SCISSOR_TEST, o.scissor_test);
 
 		// culling
-		gl_enable(GL_CULL_FACE, state.culling);
-		glCullFace(state.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
+		gl_enable(GL_CULL_FACE, o.culling);
+		glCullFace(o.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
 		glFrontFace(GL_CCW);
 		// blending
-		gl_enable(GL_BLEND, state.blend_enable);
-		glBlendEquation(state.blend_func.equation);
-		glBlendFunc(state.blend_func.sfactor, state.blend_func.dfactor);
+		gl_enable(GL_BLEND, o.blend_enable);
+		glBlendEquation(o.blend_func.equation);
+		glBlendFunc(o.blend_func.sfactor, state.blend_func.dfactor);
+
+		glPolygonMode(GL_FRONT_AND_BACK, o.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
 	}
 
 	void set (PipelineState const& s) {
-		if (state.depth_test != s.depth_test)
-			gl_enable(GL_DEPTH_TEST, s.depth_test);
-		if (state.depth_func != s.depth_func)
-			glDepthFunc(s.depth_func);
-		if (state.depth_write != s.depth_write)
-			glDepthMask(s.depth_write ? GL_TRUE : GL_FALSE);
+		auto o = _override(s);
 
-		if (state.scissor_test != s.scissor_test)
-			gl_enable(GL_SCISSOR_TEST, s.scissor_test);
+		if (state.depth_test != o.depth_test)
+			gl_enable(GL_DEPTH_TEST, o.depth_test);
+		if (state.depth_func != o.depth_func)
+			glDepthFunc(o.depth_func);
+		if (state.depth_write != o.depth_write)
+			glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
 
-		if (state.culling != s.culling)
-			gl_enable(GL_CULL_FACE, s.culling);
-		if (state.culling != s.culling)
-			glCullFace(s.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
+		if (state.scissor_test != o.scissor_test)
+			gl_enable(GL_SCISSOR_TEST, o.scissor_test);
+
+		if (state.culling != o.culling)
+			gl_enable(GL_CULL_FACE, o.culling);
+		if (state.culling != o.culling)
+			glCullFace(o.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
 
 		// blending
-		if (state.blend_enable != s.blend_enable)
-			gl_enable(GL_BLEND, state.blend_enable);
-		if (state.blend_func.equation != s.blend_func.equation)
-			glBlendEquation(s.blend_func.equation);
-		if (state.blend_func.sfactor != s.blend_func.sfactor || state.blend_func.dfactor != s.blend_func.dfactor)
-			glBlendFunc(s.blend_func.sfactor, s.blend_func.dfactor);
+		if (state.blend_enable != o.blend_enable)
+			gl_enable(GL_BLEND, o.blend_enable);
+		if (state.blend_func.equation != o.blend_func.equation)
+			glBlendEquation(o.blend_func.equation);
+		if (state.blend_func.sfactor != o.blend_func.sfactor || state.blend_func.dfactor != o.blend_func.dfactor)
+			glBlendFunc(o.blend_func.sfactor, o.blend_func.dfactor);
 
-		state = s;
+		if (state.poly_mode != o.poly_mode)
+			glPolygonMode(GL_FRONT_AND_BACK, o.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
+
+		state = o;
 	}
 };
 

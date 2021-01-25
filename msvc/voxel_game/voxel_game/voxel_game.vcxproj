@@ -234,7 +234,7 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\chunk_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />
@@ -246,7 +246,7 @@
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\vulkan\vk_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
@@ -372,6 +372,7 @@
     <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
     <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp" />
@@ -398,7 +399,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
+    <ClCompile Include="..\..\..\src\vulkan\vk_chunk_renderer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>

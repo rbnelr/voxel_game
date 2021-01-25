@@ -169,9 +169,6 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
       <Filter>kisslib\tracy</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\vulkan\chunk_renderer.hpp">
-      <Filter>vulkan</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -220,9 +217,6 @@
     <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\opengl\chunk_renderer.hpp">
-      <Filter>opengl</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\engine\debug_draw.hpp">
       <Filter>engine</Filter>
     </ClInclude>
@@ -230,6 +224,12 @@
       <Filter>engine</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\vulkan\vk_chunk_renderer.hpp">
+      <Filter>vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
   </ItemGroup>
@@ -342,9 +342,6 @@
     <ClCompile Include="..\..\..\src\vulkan\vulkan_helper.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\chunk_renderer.cpp">
-      <Filter>vulkan</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp">
       <Filter>vulkan</Filter>
     </ClCompile>
@@ -373,6 +370,12 @@
       <Filter>engine</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\vulkan\vk_chunk_renderer.cpp">
+      <Filter>vulkan</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
   </ItemGroup>

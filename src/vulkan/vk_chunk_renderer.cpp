@@ -1,6 +1,6 @@
 #pragma once
 #include "common.hpp"
-#include "chunk_renderer.hpp"
+#include "vk_chunk_renderer.hpp"
 #include "vulkan_renderer.hpp"
 #include "world.hpp"
 #include "chunk_mesher.hpp"
@@ -109,9 +109,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			float3 lo = (float3)(chunk.pos * CHUNK_SIZE);
 			float3 hi = (float3)((chunk.pos + 1) * CHUNK_SIZE);
 
-			bool culled = false;
-			if (!empty)
-				culled = frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
+			bool culled = empty || frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 			
 			if (chunks.debug_frustrum_culling) {
 				if (!empty)
@@ -120,10 +118,10 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[chunk.voxels.is_sparse() ? 1 : 0]);
 			}
 
-			if (culled) continue;
-
-			push_draw_slices(cid, chunk.opaque_mesh, DT_OPAQUE);
-			push_draw_slices(cid, chunk.transparent_mesh, DT_TRANSPARENT);
+			if (!culled) {
+				push_draw_slices(cid, chunk.opaque_mesh, DT_OPAQUE);
+				push_draw_slices(cid, chunk.transparent_mesh, DT_TRANSPARENT);
+			}
 		}
 	}
 

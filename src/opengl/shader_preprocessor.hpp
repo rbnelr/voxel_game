@@ -124,7 +124,7 @@ inline gl::uniform_set parse_shader_uniforms (std::string const& source) {
 					clog(WARNING, "[Shaders] parse_shader_uniforms: Unknown glsl type \"%s\"!", std::string(typestr).c_str());
 				} else {
 					gl::GlslType type = it->second;
-					uniforms.insert(std::string(name), gl::ShaderUniform{ type, 0 });
+					uniforms.push_back({ std::string(name), type, 0 });
 				}
 			}
 		}

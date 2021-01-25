@@ -5,7 +5,7 @@
 #include "vulkan_window.hpp"
 #include "vulkan_debug_drawer.hpp"
 #include "vulkan_screenshot.hpp"
-#include "chunk_renderer.hpp"
+#include "vk_chunk_renderer.hpp"
 #include "vulkan_staging.hpp"
 #include "engine/camera.hpp"
 

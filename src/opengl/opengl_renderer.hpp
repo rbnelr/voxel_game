@@ -4,7 +4,7 @@
 #include "opengl_context.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
-#include "chunk_renderer.hpp"
+#include "gl_chunk_renderer.hpp"
 
 namespace gl {
 
@@ -75,10 +75,16 @@ public:
 	StateManager state;
 	Shaders shaders;
 
-	UniformBuffer<CommonUniforms> common_uniforms = { "Common", 0 };
+	Ubo common_uniforms = {"common_ubo"};
 	
 	Shader* test = shaders.compile("test");
 	Vao dummy_vao = {"dummy_vao"};
+
+	Sampler tile_sampler = {"tile_sampler"};
+	Ubo block_meshes_ubo = {"block_meshes_ubo"};
+	Texture2DArray tile_textures = {"tile_textures"};
+
+	ChunkRenderer chunk_renderer = ChunkRenderer(shaders);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;
@@ -89,13 +95,24 @@ public:
 
 	bool wireframe = false;
 	bool wireframe_backfaces = true;
-	float line_width = 2.0f;
-
-	bool debug_frustrum_culling = false;
+	float line_width = 1.0f;
 
 	glDebugDraw debug_draw = glDebugDraw(shaders);
 
-	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {}
+	void upload_static_data ();
+
+	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
+		upload_static_data();
+
+		float max_aniso = 1.0f;
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
+
+		glSamplerParameteri(tile_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(tile_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameterf(tile_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+	}
 	virtual ~OpenglRenderer () {}
 
 	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files);
@@ -117,11 +134,11 @@ public:
 		ImGui::SameLine();
 		ImGui::Checkbox("backfaces", &wireframe_backfaces);
 		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
-
-		ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 	}
 
-	virtual void chunk_renderer_imgui (Chunks& chunks) {}
+	virtual void chunk_renderer_imgui (Chunks& chunks) {
+		chunk_renderer.imgui(chunks);
+	}
 };
 
 } // namespace gl

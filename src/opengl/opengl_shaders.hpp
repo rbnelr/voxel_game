@@ -152,7 +152,7 @@ struct Shader {
 
 		clog(INFO, "[Shaders] Recompile shader %-35s due to %s", name.c_str(), reason);
 
-		if (!compile()) {
+		if (!compile(wireframe)) {
 			// new compilation failed, revert old shader
 			prog = old_prog;
 			return;
@@ -163,19 +163,28 @@ struct Shader {
 	}
 
 	void get_uniform_locations () {
-		for (auto& kv : uniforms.ordered) {
-			kv->second.location = glGetUniformLocation(prog, kv->first.c_str());
-			if (kv->second.location < 0) {
+		for (auto& u : uniforms) {
+			u.location = glGetUniformLocation(prog, u.name.c_str());
+			if (u.location < 0) {
 				// unused uniform? ignore
 			}
 		}
 	}
 
+	inline static bool _findUniform (ShaderUniform const& l, std::string_view const& r) { return l.name == r; }
+
+	inline GLint get_uniform_location (std::string_view const& name) {
+		int i = indexof(uniforms, name, _findUniform);
+		if (i < 0)
+			return i;
+		return uniforms[i].location;
+	}
+
 	template <typename T>
 	inline void set_uniform (std::string_view const& name, T const& val) {
-		auto* u = uniforms.bykey(name);
-		if (u)
-			_set_uniform(*u, val);
+		int i = indexof(uniforms, name, _findUniform);
+		if (i >= 0)
+			_set_uniform(uniforms[i], val);
 	}
 };
 
@@ -206,9 +215,8 @@ struct Shaders {
 
 	Shader* compile (
 			char const* name,
-			std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER },
-			std::initializer_list<MacroDefinition> macros = {}
-			) {
+			std::initializer_list<MacroDefinition> macros = {},
+			std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
 		ZoneScoped;
 
 		auto s = std::make_unique<Shader>();
