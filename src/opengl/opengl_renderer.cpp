@@ -5,11 +5,30 @@
 
 namespace gl {
 
+// Repeat reloading of assets because reacting to filechanges often fails because of half-written files
+template <typename FUNC>
+bool try_reloading (FUNC loadfunc) {
+	int max_retries = 100;
+	int retry_delay = 10; // ms
+
+	for (int i=0; i<max_retries; ++i) {
+		Sleep(retry_delay); // start out with a delay in hopes of getting a working file the first time
+
+		if (loadfunc())
+			return true; // success
+	}
+	return false; // fail
+}
 
 void OpenglRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) {
 	ctx.imgui_begin();
 
 	shaders.update_recompilation(changed_files, wireframe);
+
+	if (changed_files.contains("textures/atlas.png", FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
+		clog(INFO, "[OpenglRenderer] Reload textures due to file change");
+		try_reloading([&] () { return load_textures(); });
+	}
 }
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
@@ -41,17 +60,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	PipelineState s;
-
-	{
-		OGL_TRACE("test");
-
-		state.set(s);
-		glUseProgram(test->prog);
-
-		glBindVertexArray(dummy_vao);
-
-		glDrawArrays(GL_TRIANGLES, 0, 6 * 1024);
-	}
 
 	//
 	bind_ubo(block_meshes_ubo, 1);
@@ -137,40 +145,44 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	}
 }
 
-void OpenglRenderer::upload_static_data () {
+bool OpenglRenderer::load_textures () {
+	Image<srgba8> img;
+	if (!img.load_from_file("textures/atlas.png", &img))
+		return false;
+
+	// place layers at y dir so ot make the memory contiguous
+	Image<srgba8> img_arr (int2(16, 16 * TILEMAP_SIZE.x * TILEMAP_SIZE.y));
+	{ // convert texture atlas/tilemap into texture array for proper sampling in shader
+		for (int y=0; y<TILEMAP_SIZE.y; ++y) {
+			for (int x=0; x<TILEMAP_SIZE.x; ++x) {
+				Image<srgba8>::blit_rect(
+					img, int2(x,y)*16,
+					img_arr, int2(0, (y * TILEMAP_SIZE.x + x) * 16),
+					16);
+			}
+		}
+	}
+
+
+	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
+
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_SRGB8_ALPHA8, 16, 16, TILEMAP_SIZE.x * TILEMAP_SIZE.y, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, img_arr.pixels);
+
+	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
+	return true;
+}
+
+void OpenglRenderer::load_static_data () {
 
 	upload_ubo(block_meshes_ubo,
 		g_assets.block_meshes.slices.data(),
 		g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]));
 
-	{
-		Image<srgba8> img;
-		img.load_from_file("textures/atlas.png", &img);
-		assert(img.size == int2(16*TILEMAP_SIZE));
-	
-		// place layers at y dir so ot make the memory contiguous
-		Image<srgba8> img_arr (int2(16, 16 * TILEMAP_SIZE.x * TILEMAP_SIZE.y));
-		{ // convert texture atlas/tilemap into texture array for proper sampling in shader
-			for (int y=0; y<TILEMAP_SIZE.y; ++y) {
-				for (int x=0; x<TILEMAP_SIZE.x; ++x) {
-					Image<srgba8>::blit_rect(
-						img, int2(x,y)*16,
-						img_arr, int2(0, (y * TILEMAP_SIZE.x + x) * 16),
-						16);
-				}
-			}
-		}
-		
-
-		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
-
-		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_SRGB8_ALPHA8, 16, 16, TILEMAP_SIZE.x * TILEMAP_SIZE.y, 0,
-			GL_RGBA, GL_UNSIGNED_BYTE, img_arr.pixels);
-
-		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-
-		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-	}
+	load_textures();
 }
 
 } // namespace gl

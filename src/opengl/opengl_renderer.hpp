@@ -86,9 +86,6 @@ public:
 	Shaders shaders;
 
 	Ubo common_uniforms = {"common_ubo"};
-	
-	Shader* test = shaders.compile("test");
-	Vao dummy_vao = {"dummy_vao"};
 
 	Sampler tile_sampler = {"tile_sampler"};
 	Ubo block_meshes_ubo = {"block_meshes_ubo"};
@@ -109,10 +106,11 @@ public:
 
 	glDebugDraw debug_draw = glDebugDraw(shaders);
 
-	void upload_static_data ();
+	bool load_textures (); // can be reloaded
+	void load_static_data ();
 
 	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
-		upload_static_data();
+		load_static_data();
 
 		float max_aniso = 1.0f;
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
