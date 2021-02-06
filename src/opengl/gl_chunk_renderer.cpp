@@ -90,12 +90,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 			bool culled = empty || frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 
-			if (chunks.debug_frustrum_culling) {
-				if (!empty)
-					g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[culled ? 2 : 0]);
-			} else if (chunks.visualize_chunks) {
-				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[chunk.voxels.is_sparse() ? 1 : 0]);
-			}
+			chunks.visualize_chunk(chunk, empty, culled);
 
 			if (!culled) {
 				push_draw_slices(cid, chunk.opaque_mesh, DT_OPAQUE);

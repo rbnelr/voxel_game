@@ -54,24 +54,6 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	}
 }
 
-block_id const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour, block_id* sparse_id) {
-	*sparse_id = B_NULL;
-
-	auto nid = j.chunk->neighbours[neighbour];
-	if (nid != U16_NULL) {
-
-		auto& nc = j.chunks[nid];
-		if (nc.flags & Chunk::LOADED) {
-
-			if (!nc.voxels.is_sparse()) {
-				return nc.voxels.ids;
-			}
-			*sparse_id = nc.voxels.sparse_id;
-		}
-	}
-	return nullptr;
-}
-
 void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
 	auto* v = mesh.push();
 
@@ -108,6 +90,25 @@ NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
 		pos[AXIS] -= 1;
 		face(j, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2), pos);
 	}
+}
+
+#if 0 // 2-Level sparse solution
+block_id const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour, block_id* sparse_id) {
+	*sparse_id = B_NULL;
+
+	auto nid = j.chunk->neighbours[neighbour];
+	if (nid != U16_NULL) {
+
+		auto& nc = j.chunks[nid];
+		if (nc.flags & Chunk::LOADED) {
+
+			if (!nc.voxels.is_sparse()) {
+				return nc.voxels.ids;
+			}
+			*sparse_id = nc.voxels.sparse_id;
+		}
+	}
+	return nullptr;
 }
 
 void mesh_chunk (RemeshChunkJob& j) {
@@ -154,8 +155,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 						face<2>(j, id, nid, idx);
 				}
 
-				if (j.block_meshes[id] >= 0)
-					block_mesh(j, id, j.block_meshes[id], idx);
+				if (g_assets.block_meshes.block_meshes[id] >= 0)
+					block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);
 
 				idx++;
 			}
@@ -236,6 +237,61 @@ void mesh_chunk (RemeshChunkJob& j) {
 		}
 	}
 #endif
+}
+#endif
+
+ChunkVoxels const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
+	auto nid = j.chunk->neighbours[neighbour];
+	if (nid != U16_NULL && (j.chunks[nid].flags & Chunk::LOADED)) {
+		return &j.chunks[nid].voxels;
+	}
+	return nullptr;
+}
+
+void mesh_chunk (RemeshChunkJob& j) {
+	ZoneScoped;
+
+	// neighbour chunks (can be null)
+	auto const* nc_nx = get_neighbour_blocks(j, 0);
+	auto const* nc_ny = get_neighbour_blocks(j, 2);
+	auto const* nc_nz = get_neighbour_blocks(j, 4);
+
+#define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
+
+	auto const* voxels = &j.chunk->voxels;
+
+	int idx = 0;
+
+	// fast meshing without neighbour chunk access
+	for (int z=0; z<CHUNK_SIZE; ++z) {
+		for (int y=0; y<CHUNK_SIZE; ++y) {
+			for (int x=0; x<CHUNK_SIZE; ++x) {
+
+				block_id id = voxels->read_block(x,y,z);
+
+				{ // X
+					block_id nid = x > 0 ? voxels->read_block(x-1, y, z) : (nc_nx ? nc_nx->read_block(CHUNK_SIZE-1, y, z) : B_NULL);
+					if (nid != id)
+						face<0>(j, id, nid, idx);
+				}
+				{ // Y
+					block_id nid = y > 0 ? voxels->read_block(x, y-1, z) : (nc_ny ? nc_ny->read_block(x, CHUNK_SIZE-1, z) : B_NULL);
+					if (nid != id)
+						face<1>(j, id, nid, idx);
+				}
+				{ // Z
+					block_id nid = z > 0 ? voxels->read_block(x, y, z-1) : (nc_nz ? nc_nz->read_block(x, y, CHUNK_SIZE-1) : B_NULL);
+					if (nid != id)
+						face<2>(j, id, nid, idx);
+				}
+
+				if (g_assets.block_meshes.block_meshes[id] >= 0)
+					block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);
+
+				idx++;
+			}
+		}
+	}
 }
 
 RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg, bool mesh_world_border):

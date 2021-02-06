@@ -3,18 +3,39 @@
 #include "blocks.hpp"
 #include "assets.hpp"
 
-#define CHUNK_SIZE			64
+#define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		63
-#define CHUNK_ROW_OFFS		CHUNK_SIZE
-#define CHUNK_LAYER_OFFS	(CHUNK_SIZE * CHUNK_SIZE)
 
-#define CHUNK_VOXEL_COUNT	(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE)
+#define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_SHIFT		2
+#define SUBCHUNK_MASK		3
 
-#define POS2IDX(x,y,z)		((size_t)(z) * CHUNK_LAYER_OFFS + (size_t)(y) * CHUNK_ROW_OFFS + (size_t)(x))
-#define OFFS2IDX(x,y,z)		((int64_t)(z) * CHUNK_LAYER_OFFS + (int64_t)(y) * CHUNK_ROW_OFFS + (int64_t)(x))
+#define IDX3D(x,y,z, sz) (size_t)(z) * (sz)*(sz) + (size_t)(y) * (sz) + (size_t)(x)
 
-#define VEC2IDX(xyz)		((size_t)(xyz).z * CHUNK_LAYER_OFFS + (size_t)(xyz).y * CHUNK_ROW_OFFS + (size_t)(xyz).x)
+// Get array index of subchunk in chunk data from chunk-relative xyz
+#define SUBCHUNK_IDX(x,y,z) ( (size_t)((z) >> SUBCHUNK_SHIFT) * SUBCHUNK_COUNT * SUBCHUNK_COUNT \
+                            + (size_t)((y) >> SUBCHUNK_SHIFT) * SUBCHUNK_COUNT \
+                            + (size_t)((x) >> SUBCHUNK_SHIFT) )
+// Get array index of block in subchunk from chunk-relative xyz
+#define BLOCK_IDX(x,y,z)  ( (size_t)((z) & SUBCHUNK_MASK) * SUBCHUNK_SIZE * SUBCHUNK_SIZE \
+                          + (size_t)((y) & SUBCHUNK_MASK) * SUBCHUNK_SIZE \
+                          + (size_t)((x) & SUBCHUNK_MASK) )
+
+// Seperate world-block pos into chunk pos and block pos in chunk
+#define CHUNK_BLOCK_POS(X,Y,Z, CHUNK_POS, BX, BY, BZ) do { \
+		(CHUNK_POS).x = (X) >> CHUNK_SIZE_SHIFT; \
+		(CHUNK_POS).y = (Y) >> CHUNK_SIZE_SHIFT; \
+		(CHUNK_POS).z = (Z) >> CHUNK_SIZE_SHIFT; \
+		BX = (X) & SUBCHUNK_MASK; \
+		BY = (Y) & SUBCHUNK_MASK; \
+		BZ = (Z) & SUBCHUNK_MASK; \
+	} while (0)
+
+#define CHUNK_VOXEL_COUNT		(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) // number of voxels per chunk
+#define CHUNK_SUBCHUNK_COUNT	(SUBCHUNK_COUNT * SUBCHUNK_COUNT * SUBCHUNK_COUNT) // number of subchunks per chunk
+#define SUBCHUNK_VOXEL_COUNT	(SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE) // number of voxels per subchunk
 
 #define U16_NULL			((uint16_t)-1)
 
@@ -34,38 +55,6 @@ static constexpr int3 OFFSETS[6] = {
 	int3(0,-1,0), int3(0,+1,0),
 	int3(0,0,-1), int3(0,0,+1),
 };
-static constexpr int BLOCK_OFFSETS[6] = {
-	-1,
-	+1,
-	-CHUNK_ROW_OFFS,
-	+CHUNK_ROW_OFFS,
-	-CHUNK_LAYER_OFFS,
-	+CHUNK_LAYER_OFFS,
-};
-
-// get world chunk position from world block position
-inline int3 to_chunk_pos (int3 pos) {
-
-	int3 chunk_pos;
-	chunk_pos.x = pos.x >> CHUNK_SIZE_SHIFT;
-	chunk_pos.y = pos.y >> CHUNK_SIZE_SHIFT;
-	chunk_pos.z = pos.z >> CHUNK_SIZE_SHIFT;
-
-	return chunk_pos;
-}
-inline int3 to_chunk_pos (int3 pos, int3* block_pos) {
-
-	int3 chunk_pos;
-	chunk_pos.x = pos.x >> CHUNK_SIZE_SHIFT;
-	chunk_pos.y = pos.y >> CHUNK_SIZE_SHIFT;
-	chunk_pos.z = pos.z >> CHUNK_SIZE_SHIFT;
-
-	block_pos->x = pos.x & CHUNK_SIZE_MASK;
-	block_pos->y = pos.y & CHUNK_SIZE_MASK;
-	block_pos->z = pos.z & CHUNK_SIZE_MASK;
-
-	return chunk_pos;
-}
 
 struct World;
 struct WorldGenerator;
@@ -74,128 +63,196 @@ struct Assets;
 struct Chunks;
 class Renderer;
 
+// 3-Level Sparse storage system for voxels
+// this system is similar to how a octree would work
+// but instead of every power of two being a size at which regions can be sparse
+// this system has 'chunks' and 2nd level 'subchunks' which can store their contents sparsely
+// 3-Level because 1st level is a sparse chunk, 2nd is a sparse subchunk, 3rd is a fully dense voxel
+//   Chunk-Subchunk-Block vs Chunk-Block vs 128-64-32-16-8-4-2-1 (Octree)
+// Chunks are currently 64^3 and are the blocks worldgen happens in,
+// which means they can not only be sparse (only 1 block id in entire region) but also additionally unloaded (queries currently return B_NULL)
+
 struct ChunkVoxels {
-	block_id* ids;
-	block_id sparse_id;
+	// sparse chunks only contain one voxel data (block id) and an empty pointer, while non-sparse chunks
 
-	void init () {
-		ids = nullptr;
-		alloc_ids(); // alloc non-sparse initnally bcause worldgen will need it this way
-		sparse_id = B_NULL;
-	}
+	struct DenseChunk {
+		// data for all subchunks
+		// sparse subchunk:  block_id of all subchunk voxels
+		// dense  subchunk:  index into dense_data where subchunk data is found
+		uint16_t sparse_data[CHUNK_SUBCHUNK_COUNT];
 
+		// packed bits for all subchunks, where  0: dense subchunk  1: sparse subchunk
+		uint64_t sparse_bits[CHUNK_SUBCHUNK_COUNT / 64];
+
+		struct SubchunkData {
+			block_id voxels[SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE];
+		};
+
+		SubchunkData* dense_data; // resizeable list of dense subchunks indexed by sparse_data indices
+
+		// Initial allocation is fully non-sparse with uninited data for worldgen to fill
+		void init_dense () {
+			for (uint16_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i)
+				sparse_data[i] = i;
+
+			memset(&sparse_bits, 0, sizeof(sparse_bits));
+
+			dense_data = (SubchunkData*)malloc(sizeof(SubchunkData) * CHUNK_SUBCHUNK_COUNT);
+		}
+		// Init chunk entirely to one data (so simply keep all subchunks sparse)
+		// this is for writes to completely sparse chunks that make them non-sparse (one subchunk then get's written afterwards)
+		void init_sparse (block_id data) {
+			for (uint16_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i)
+				sparse_data[i] = data;
+
+			memset(&sparse_bits, -1, sizeof(sparse_bits));
+
+			dense_data = nullptr;
+		}
+
+		// Use comma operator to assert and return value in expression
+		#define CHECK_BLOCK(b) (assert((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
+		//#define CHECK_BLOCK(b) ( ((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
+
+		bool is_subchunk_sparse (size_t subc_i) {
+			auto test = sparse_bits[subc_i >> 6] & (1ull << (subc_i & 63));
+			return test != 0;
+		}
+		void set_subchunk_sparse (size_t subc_i) {
+			sparse_bits[subc_i >> 6] |= 1ull << (subc_i & 63);
+		}
+		void set_subchunk_dense (size_t subc_i) {
+			sparse_bits[subc_i >> 6] &= ~(1ull << (subc_i & 63));
+		}
+
+		block_id read_block (int x, int y, int z) {
+			size_t subc_i = SUBCHUNK_IDX(x,y,z);
+			auto sparse_val = sparse_data[subc_i];
+
+			if (is_subchunk_sparse(subc_i)) {
+				return CHECK_BLOCK( (block_id)sparse_val );
+			}
+
+			auto& subchunk = dense_data[sparse_val];
+
+			auto blocki = BLOCK_IDX(x,y,z);
+			auto block = subchunk.voxels[blocki];
+
+			return CHECK_BLOCK(block);
+		}
+		void write_block (int x, int y, int z, block_id data) {
+			size_t subc_i = SUBCHUNK_IDX(x,y,z);
+			auto sparse_val = sparse_data[subc_i];
+
+			assert(false);
+
+			if (is_subchunk_sparse(subc_i)) {
+				// to implement
+				assert(false);
+			}
+
+			dense_data[sparse_val].voxels[BLOCK_IDX(x,y,z)] = data;
+		}
+
+		bool checked_sparsify () {
+			
+			//for (size_t subc_i=0; subc_i < CHUNK_SUBCHUNK_COUNT; ++subc_i) {
+			//	
+			//}
+
+			return false;
+		}
+	};
+	
+	block_id sparse_data; // if sparse: non-null block id   if non-sparse: B_NULL
+	DenseChunk* dense; // if non-sparse pointer to DenseChunk
+	
 	bool is_sparse () {
-		return ids == nullptr;
+		return sparse_data != B_NULL;
 	}
 
-	block_id get_block (int x, int y, int z) const {
-		assert(x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE);
-		if (ids)
-			return ids[POS2IDX(x,y,z)];
-		else
-			return sparse_id;
+	// Initial allocation is non-sparse with uninited data for worldgen to fill
+	void init () {
+		dense = nullptr;
+		sparse_data = B_NULL;
+		alloc_dense_chunk();
+		dense->init_dense();
 	}
-	void set_block (int x, int y, int z, block_id id) {
+	void free () {
+		if (dense)
+			free_dense_chunk();
+	}
+
+	void alloc_dense_chunk () {
+		assert(dense == nullptr);
+		ZoneScopedC(tracy::Color::Crimson);
+		dense = (DenseChunk*)malloc(sizeof(DenseChunk));
+	}
+	void free_dense_chunk () {
+		assert(dense != nullptr);
+		ZoneScopedC(tracy::Color::Crimson);
+		::free(dense);
+		dense = nullptr;
+	}
+	
+	// memory use for imgui display
+	size_t _alloc_size () {
+		size_t sz = dense ? sizeof(DenseChunk) : 0;
+
+	}
+
+	// read block with chunk-relative block pos
+	block_id read_block (int x, int y, int z) const {
 		assert(x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE);
-		if (!ids) {
-			if (sparse_id == id)
+		
+		if (sparse_data != B_NULL)
+			return sparse_data; // sparse chunk
+
+		assert(dense);
+		return dense->read_block(x,y,z);
+	}
+	
+	void write_block (int x, int y, int z, block_id data) {
+		assert(x >= 0 && x < CHUNK_SIZE && y >= 0 && y < CHUNK_SIZE && z >= 0 && z < CHUNK_SIZE);
+		if (sparse_data != B_NULL) {
+			if (sparse_data == data)
 				return;
 
 			densify();
 		}
-		ids[POS2IDX(x,y,z)] = id;
+
+		assert(dense);
+
+		dense->write_block(x,y,z, data);
 	}
 
+	// Realloc from sparse data to dense data (Keeping the data)
 	void densify () {
 		//clog(INFO, ">> densify");
 		ZoneScopedC(tracy::Color::Chocolate);
 
-		alloc_ids();
+		alloc_dense_chunk();
+		dense->init_sparse(sparse_data);
 
-		for (int i=0; i<CHUNK_VOXEL_COUNT; ++i)
-			ids[i] = sparse_id;
-
-		sparse_id = B_NULL;
+		sparse_data = B_NULL;
 	}
-	void sparsify (block_id id) {
+	// Realloc from dense data (after determining that it actually contains sparse data) and setting sparse data to id
+	void sparsify (block_id data) {
 		//clog(INFO, ">> sparsify");
 		ZoneScopedC(tracy::Color::Chocolate);
 
-		free_ids();
-		sparse_id = id;
+		free_dense_chunk();
+		sparse_data = data;
 	}
 
-	void check_sparsify () {
-		if (!ids) return;
+	// Scan data to see if dense data should be sparsify'ed (run once per frame)
+	void checked_sparsify () {
+		if (!is_sparse()) return;
 		ZoneScopedC(tracy::Color::Chocolate);
-
-		bool sparse = true;
-	#if 0
-		for (size_t i=0; i<CHUNK_VOXEL_COUNT; ++i) {
-			if (ids[i] != ids[0]) {
-				sparse = false;
-				break;
-			}
-		}
-	#elif 1
-		uint64_t val = (uint64_t)ids[0] | ((uint64_t)ids[0] << 16) | ((uint64_t)ids[0] << 32) | ((uint64_t)ids[0] << 48);
-
-		uint64_t const* ptr = (uint64_t const*)ids;
-		for (size_t i=0; i<CHUNK_VOXEL_COUNT/4; ++i) {
-			if (ptr[i] != val) {
-				sparse = false;
-				break;
-			}
-		}
-	#elif 1
-		__m128i ref = _mm_set1_epi16(ids[0]);
-		__m128i const* ptr = (__m128i const*)ids;
-		__m128i const* end = (__m128i const*)&ids[CHUNK_VOXEL_COUNT];
-		do {
-			__m128i vals = _mm_load_si128(ptr);
-			__m128i cmp = _mm_xor_si128(vals, ref);
-			ptr++;
-
-			if (_mm_test_all_zeros(cmp, cmp) == 0) {
-				sparse = false;
-				break;
-			}
-		} while (ptr < end);
-	#else
-	#endif
-
-		if (sparse)
-			sparsify(ids[0]);
-	}
-
-	void alloc_ids () {
-		assert(ids == nullptr);
-		ZoneScopedC(tracy::Color::Crimson);
-		ids = (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
-	}
-	void free_ids () {
-		assert(ids != nullptr);
-		ZoneScopedC(tracy::Color::Crimson);
-		::free(ids);
-		ids = nullptr;
-	}
-
-	void free () {
-		if (ids)
-			free_ids();
-	}
-
-	size_t _alloc_size () {
-		return ids ? sizeof(block_id) * CHUNK_VOXEL_COUNT : 0;
-	}
-
-	void _validate_ids (BlockTypes& blocks) {
-		if (ids) {
-			for (int i=0; i<CHUNK_VOXEL_COUNT; ++i) {
-				assert(ids[i] >= 0 && ids[i] < blocks.count());
-			}
-		} else {
-			assert(sparse_id >= 0 && sparse_id < blocks.count());
+		
+		if (dense->checked_sparsify()) {
+			// chunk was completely sparse
+			sparsify(dense->sparse_data[0]);
 		}
 	}
 };
@@ -254,6 +311,11 @@ struct ChunkKey_Comparer {
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
 struct ChunkSliceData;
+
+const lrgba DBG_CHUNK_COL			= srgba(0, 0, 255, 255);
+const lrgba DBG_SPARSE_CHUNK_COL	= srgba(0, 0, 200, 20);
+const lrgba DBG_CULLED_CHUNK_COL	= srgba(255, 0, 0, 180);
+const lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(234, 90, 0, 255);
 
 struct Chunks {
 	Chunk* chunks;
@@ -420,6 +482,39 @@ struct Chunks {
 
 	void imgui (Renderer* renderer);
 
+	void visualize_chunk (Chunk& chunk, bool empty, bool culled) {
+		lrgba const* col;
+		if (debug_frustrum_culling) {
+			if (empty) return;
+			col = culled ? &DBG_CULLED_CHUNK_COL : &DBG_CHUNK_COL;
+		} else if (visualize_chunks) {
+			col = chunk.voxels.is_sparse() ? &DBG_SPARSE_CHUNK_COL : &DBG_CHUNK_COL;
+
+			if (!chunk.voxels.is_sparse()) {
+				assert(chunk.voxels.dense);
+
+				size_t subc_i = 0;
+
+				for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+					for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+						for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+							auto sparse_bit = chunk.voxels.dense->is_subchunk_sparse(subc_i);
+
+							if (!sparse_bit) {
+								float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
+								g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
+							}
+
+							subc_i++;
+						}
+					}
+				}
+			}
+		}
+
+		g_debugdraw.wire_cube(((float3)chunk.pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, *col);
+	}
+
 	Chunk* _query_cache = nullptr;
 
 	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
@@ -442,9 +537,38 @@ struct Chunks {
 		return c;
 	}
 	// lookup a block with a world block pos, returns BT_NO_CHUNK for unloaded chunks or BT_OUT_OF_BOUNDS if out of bounds in z
-	block_id query_block (int3 pos, Chunk** out_chunk=nullptr, int3* out_block_pos=nullptr);
+	block_id query_block (int3 pos, Chunk** out_chunk=nullptr, int3* out_block_pos=nullptr) {
+		if (out_chunk)
+			*out_chunk = nullptr;
 
-	void set_block (int3 pos, block_id b);
+		int bx, by, bz;
+		int3 chunk_pos;
+		CHUNK_BLOCK_POS(pos.x, pos.y, pos.z, chunk_pos, bx,by,bz);
+
+		if (out_block_pos)
+			*out_block_pos = int3(bx, by, bz);
+
+		Chunk* chunk = query_chunk(chunk_pos);
+		if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
+			return B_NULL;
+
+		if (out_chunk)
+			*out_chunk = chunk;
+		return chunk->voxels.read_block(bx,by,bz);
+	}
+
+	void set_block (int3 pos, block_id b) {
+		int bx, by, bz;
+		int3 chunk_pos;
+		CHUNK_BLOCK_POS(pos.x, pos.y, pos.z, chunk_pos, bx,by,bz);
+
+		Chunk* chunk = query_chunk(chunk_pos);
+		assert(chunk);
+		if (!chunk)
+			return;
+
+		chunk->voxels.write_block(bx, by, bz, b);
+	}
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, Player const& player);

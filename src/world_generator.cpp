@@ -148,6 +148,10 @@ float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_no
 		return smoothstep( smoothstep(val + valb) );
 	}
 
+thread_local block_id thread_chunk_buffer[CHUNK_VOXEL_COUNT];
+
+#define POS2IDX(x,y,z) IDX3D(x,y,z, CHUNK_SIZE)
+
 void gen (Chunk* chunk, WorldGenerator const& wg) {
 	const auto AIR			= g_assets.block_types.map_id("air");
 	const auto WATER		= g_assets.block_types.map_id("water");
@@ -159,9 +163,6 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 	const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
 	const auto TORCH		= g_assets.block_types.map_id("torch");
 	
-	assert(chunk->voxels.ids);
-	auto* ids = chunk->voxels.ids;
-
 	int3 chunk_origin = chunk->pos * CHUNK_SIZE;
 
 	int water_level = 21 - chunk_origin.z;
@@ -173,19 +174,49 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 
 	OSN::Noise<3> noise3 (wg.seed);
 
+	block_id* blocks = thread_chunk_buffer;
+
+	{ // 3d noise generate
+		ZoneScopedN("3d noise generate");
+
+		block_id* cur = blocks;
+		for (int z=0; z<CHUNK_SIZE; ++z) {
+			for (int y=0; y<CHUNK_SIZE; ++y) {
+				for (int x=0; x<CHUNK_SIZE; ++x) {
+					int3 pos_world = int3(x,y,z) + chunk_origin;
+
+					float val = cave_noise(noise3, noise, (float3)pos_world);
+
+					block_id bid;
+					if (val < -5.0f) {
+						bid = STONE;
+					} else if (val <= 0.0f) {
+						bid = EARTH;
+					} else {
+						if (z >= water_level) {
+							bid = AIR;
+						} else {
+							bid = WATER;
+						}
+					}
+
+					*cur++ = bid;
+				}
+			}
+		}
+	}
+
 	std_vector<int3> tree_poss;
 
-	auto find_min_tree_dist = [&] (int2 new_tree_pos) {
-		float min_dist = +INF;
-		for (int3 p : tree_poss)
-			min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
-		return min_dist;
-	};
-
-	memset(ids, 0, sizeof(block_id) * CHUNK_VOXEL_COUNT); // for debugging
-
 	{
-		ZoneScopedN("Generate blocks");
+		ZoneScopedN("Tree pass");
+
+		auto find_min_tree_dist = [&] (int2 new_tree_pos) {
+			float min_dist = +INF;
+			for (int3 p : tree_poss)
+				min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
+			return min_dist;
+		};
 
 		for (int y=0; y<CHUNK_SIZE; ++y) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
@@ -202,29 +233,13 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 					{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
 					{ 4,		0.75f },
 					{ 6,		1 },
-					});
+				});
 				float effective_tree_prob = tree_density * tree_prox_prob;
 				//float effective_tree_prob = tree_density;
 
-				for (int z=0; z<CHUNK_SIZE; ++z) {
-					auto* below = &ids[POS2IDX(x,y,z-1)];
-					auto* bid = &ids[POS2IDX(x,y,z)];
-
-					int3 pos_world = int3(x,y,z) + chunk_origin;
-
-					float val = cave_noise(noise3, noise, (float3)pos_world);
-
-					if (val < -5.0f) {
-						*bid = STONE;
-					} else if (val <= 0.0f) {
-						*bid = EARTH;
-					} else {
-						if (z >= water_level) {
-							*bid = AIR;
-						} else {
-							*bid = WATER;
-						}
-					}
+				for (int z=1; z<CHUNK_SIZE; ++z) {
+					auto* below = &blocks[POS2IDX(x,y,z-1)];
+					auto* bid   = &blocks[POS2IDX(x,y,z)];
 
 					bool block_free = *bid == AIR && z > 0 && *below == EARTH;
 
@@ -251,16 +266,16 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 	{
 		ZoneScopedN("Place structures");
 
-		auto place_tree = [&] (int3 pos_chunk) {
-			auto* bid = &ids[VEC2IDX(pos_chunk + int3(0,0,-1))];
+		auto place_tree = [&] (int3 pos) {
+			auto* bid = &blocks[POS2IDX(pos.x, pos.y, pos.z) + POS2IDX(0,0,-1)];
 
-			if (pos_chunk.z > 0 && *bid == GRASS) {
+			if (pos.z > 0 && *bid == GRASS) {
 				*bid = EARTH;
 			}
 
-			auto place_block = [&] (int3 pos_chunk, block_id bt) {
-				if (any(pos_chunk < 0 || pos_chunk >= CHUNK_SIZE)) return;
-				auto* bid = &ids[VEC2IDX(pos_chunk)];
+			auto place_block = [&] (int3 pos, block_id bt) {
+				if (any(pos < 0 || pos >= CHUNK_SIZE)) return;
+				auto* bid = &blocks[POS2IDX(pos.x, pos.y, pos.z)];
 
 				if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
 					*bid = bt;
@@ -283,13 +298,43 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 			int tree_height = 6;
 
 			for (int i=0; i<tree_height; ++i)
-				place_block(pos_chunk +int3(0,0,i), TREE_LOG);
+				place_block(pos +int3(0,0,i), TREE_LOG);
 
-			place_block_sphere(pos_chunk +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), LEAVES);
+			place_block_sphere(pos +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), LEAVES);
 		};
 
 		for (int3 p : tree_poss)
 			place_tree(p);
+	}
+
+	{
+		ZoneScopedN("blocks buffer to voxel data");
+
+		// Chunk should have been inited to be fully dense
+		assert(chunk->voxels.dense);
+		assert(chunk->voxels.dense->dense_data);
+
+		auto* subchunk = chunk->voxels.dense->dense_data;
+
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+					block_id* dst = subchunk->voxels;
+					
+					for (int z=0; z<SUBCHUNK_SIZE; ++z) {
+						for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+							block_id* src = blocks + IDX3D(sx, sy+y, sz+z, CHUNK_SIZE);
+							
+							memcpy(dst, src, SUBCHUNK_SIZE * sizeof(block_id));
+							
+							dst += SUBCHUNK_SIZE;
+						}
+					}
+					
+					subchunk++;
+				}
+			}
+		}
 	}
 }
 

@@ -7,36 +7,6 @@
 #include "voxel_light.hpp"
 #include "chunk_mesher.hpp"
 
-block_id Chunks::query_block (int3 pos, Chunk** out_chunk, int3* out_block_pos) {
-	if (out_chunk)
-		*out_chunk = nullptr;
-
-	int3 block_pos_chunk;
-	int3 chunk_pos = to_chunk_pos(pos, &block_pos_chunk);
-	if (out_block_pos)
-		*out_block_pos = block_pos_chunk;
-
-	Chunk* chunk = query_chunk(chunk_pos);
-	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
-		return B_NULL;
-
-	if (out_chunk)
-		*out_chunk = chunk;
-	return chunk->voxels.get_block(block_pos_chunk.x, block_pos_chunk.y, block_pos_chunk.z);
-}
-
-void Chunks::set_block (int3 pos, block_id b) {
-	int3 block_pos_chunk;
-	int3 chunk_pos = to_chunk_pos(pos, &block_pos_chunk);
-	
-	Chunk* chunk = query_chunk(chunk_pos);
-	assert(chunk);
-	if (!chunk)
-		return;
-
-	chunk->voxels.set_block(block_pos_chunk.x, block_pos_chunk.y, block_pos_chunk.z, b);
-}
-
 void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	ZoneScoped;
 
@@ -175,7 +145,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 			chunk._validate_flags();
 			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
-			chunk.voxels.check_sparsify();
+			chunk.voxels.checked_sparsify();
 
 			if (chunk.voxels.is_sparse()) {
 				chunk.flags &= ~Chunk::DIRTY;
