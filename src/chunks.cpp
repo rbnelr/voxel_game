@@ -199,13 +199,14 @@ bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
 	block_id* in = ptr;
 	uint64_t* copy = (uint64_t*)subc.voxels;
 
-	bool is_sparse = true;
+	int is_sparse = 1;
+
 	for (int z=0; z<SUBCHUNK_SIZE; ++z) {
 		for (int y=0; y<SUBCHUNK_SIZE; ++y) {
 			for (int x=0; x<SUBCHUNK_SIZE/4; ++x) {
 				uint64_t read = *(uint64_t*)ptr;
 				
-				is_sparse = is_sparse && read == packed;
+				is_sparse &= (int)(read == packed);
 
 				ptr += 4;
 				*copy++ = read; // copy into subchunk
