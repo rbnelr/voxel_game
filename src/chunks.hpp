@@ -46,7 +46,7 @@ typedef uint16_t			chunk_id;
 #define MAX_SLICES			((1<<16)-1) // one less than POT to allow i<N loop condition and leave -1u as null value
 #define MAX_CHUNK_SLICES	32
 
-#define CHUNK_SLICE_BYTESIZE	(64 * 1024)
+#define CHUNK_SLICE_BYTESIZE	(64 *KB)
 static_assert(CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance) < ((1<<16)-1), "");
 static constexpr uint16_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
 
@@ -63,7 +63,7 @@ struct Assets;
 struct Chunks;
 class Renderer;
 
-#define MAX_SUBCHUNKS		(32ull * 1024*1024*1024) / sizeof(SubchunkVoxels)
+#define MAX_SUBCHUNKS		((32ull *GB) / sizeof(SubchunkVoxels))
 
 inline constexpr block_id g_null_chunk[CHUNK_VOXEL_COUNT] = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
 
@@ -112,6 +112,12 @@ struct ChunkVoxels {
 		sparse_bits[subc_i >> 6] &= ~(1ull << (subc_i & 63));
 	}
 	
+	int sparse_subchunk_count () {
+		int count = 0;
+		for (auto bits : sparse_bits)
+			count += (int)__popcnt64(bits);
+		return count;
+	}
 };
 
 struct Chunk {

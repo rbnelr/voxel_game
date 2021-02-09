@@ -396,33 +396,52 @@ void Chunks::imgui (Renderer* renderer) {
 
 	uint64_t block_volume = chunks.count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 	uint64_t block_mem = 0;
-	int dense = 0;
-	int loaded = 0;
+	int chunks_dense = 0;
+	int chunks_loaded = 0;
 
-	uint32_t subc_count = 0; // sparse chunks do not count, so essentially the number of either stored sparse subchunk block id or dense subchunk
-	uint32_t dense_subc = 0;
+	int subc_count = 0; // sparse chunks do not count, so essentially the number of either stored sparse subchunk block id or dense subchunk
+	int dense_subc = 0;
 
 	for (chunk_id id = 0; id < end(); ++id) {
 		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 
 		if ((chunks[id].flags & Chunk::SPARSE_VOXELS) == 0) {
-			dense++;
+			chunks_dense++;
+
 			subc_count += CHUNK_SUBCHUNK_COUNT;
+			dense_subc += CHUNK_SUBCHUNK_COUNT - dense_chunks[ chunks[id].voxel_data ].sparse_subchunk_count();
+
 			block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
 		}
-		loaded++;
+		chunks_loaded++;
 	}
 
-	dense_subc += dense_subchunks.count;
+	int sparse_chunks = chunks_loaded - chunks_dense;
+	int sparse_subc = subc_count - dense_subc;
 
+	// memory actually used for voxel data
+	uint64_t dense_vox_mem = dense_subc * sizeof(SubchunkVoxels);
+	dense_vox_mem += (sparse_subc + sparse_chunks) * sizeof(block_id); // include memory used to effectively store sparse voxel data
+																	   // memory actually commited in memory
+	uint64_t total_vox_mem = chunks.commit_size() + dense_chunks.commit_size() + dense_subchunks.commit_size();
+	uint64_t overhead = total_vox_mem - dense_vox_mem;
+
+	uint64_t sparse_voxels = (sparse_chunks * (uint64_t)CHUNK_VOXEL_COUNT) + (sparse_subc * (uint64_t)SUBCHUNK_VOXEL_COUNT);
+
+	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
+	
 	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM",
-		chunks.count, format_thousands(block_volume / (1024*1024)).c_str(), (int)(chunks.commit_size() / 1024));
+		chunks.count, format_thousands(block_volume / MB).c_str(), (int)(chunks.commit_size()/KB));
 	ImGui::Text("Sparse chunks: %5d / %5d dense (%6.2f %%)  %6d KB dense chunk RAM",
-		dense, loaded, (float)dense / loaded * 100, (int)(dense_chunks.commit_size() / 1024));
+		chunks_dense, chunks_loaded, (float)chunks_dense / chunks_loaded * 100, (int)(dense_chunks.commit_size()/KB));
 	ImGui::Text("Subchunks    : %4dk / %4dk dense (%6.2f %%)  %6d MB dense subchunk RAM",
-		dense_subc / 1024, subc_count / 1024, (float)dense_subc / subc_count * 100, (int)(dense_subchunks.commit_size() / (1024*1024)));
-	//ImGui::Text("Voxel data: %5.0f MB RAM",
-	//	(float)block_mem/1024/1024);//, (float)sparse_chunks / (float)loaded_chunks * 100);
+		dense_subc/KB, subc_count/KB, (float)dense_subc / subc_count * 100, (int)(dense_subchunks.commit_size()/MB));
+	
+	ImGui::Spacing();
+	ImGui::Text("Sparseness   : %6dM / %6dM vox sparse (%6.2f %%)  %4d MB total RAM  %4d KB overhead (%6.2f %%)",
+		sparse_voxels/MB, block_volume/MB, (float)sparse_voxels / block_volume * 100, total_vox_mem/MB, overhead/KB, (float)overhead / total_vox_mem * 100);
+
+	ImGui::Spacing();
 
 	if (ImGui::TreeNode("chunks")) {
 		for (chunk_id id=0; id<end(); ++id) {
@@ -435,10 +454,22 @@ void Chunks::imgui (Renderer* renderer) {
 		ImGui::TreePop();
 	}
 
+	ImGui::Spacing();
+
 	if (ImGui::TreeNode("chunks alloc")) {
 		print_bitset_allocator(chunks.slots, sizeof(Chunk), os_page_size);
 		ImGui::TreePop();
 	}
+	if (ImGui::TreeNode("dense chunks alloc")) {
+		print_bitset_allocator(dense_chunks.slots, sizeof(Chunk), os_page_size);
+		ImGui::TreePop();
+	}
+	if (ImGui::TreeNode("dense subchunks alloc")) {
+		print_bitset_allocator(dense_subchunks.slots, sizeof(Chunk), os_page_size);
+		ImGui::TreePop();
+	}
+
+	ImGui::Spacing();
 
 	if (ImGui::TreeNode("count_hash_collisions")) {
 		size_t collisions = 0, max_bucket_size = 0, empty_buckets = 0;
