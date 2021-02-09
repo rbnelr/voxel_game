@@ -7,6 +7,177 @@
 #include "voxel_light.hpp"
 #include "chunk_mesher.hpp"
 
+//// Voxel system
+
+void Chunks::init_voxels (Chunk& chunk) {
+	chunk.voxel_data = (uint16_t)dense_chunks.alloc();
+
+	auto& dc = dense_chunks[chunk.voxel_data];
+
+	memset(dc.sparse_bits, 0, sizeof(dc.sparse_bits)); // init to dense subchunks
+
+	for (uint16_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i)
+		dc.sparse_data[i] = dense_subchunks.alloc();
+}
+void Chunks::free_voxels (Chunk& c) {
+
+}
+
+block_id Chunks::read_block (int x, int y, int z) {
+	int bx, by, bz;
+	int3 chunk_pos;
+	CHUNK_BLOCK_POS(x,y,z, chunk_pos, bx,by,bz);
+
+	Chunk* chunk = query_chunk(chunk_pos);
+	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
+		return B_NULL;
+
+	return read_block(bx,by,bz, chunk);
+}
+
+block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
+
+	if (c->flags & Chunk::SPARSE_VOXELS)
+		return (block_id)c->voxel_data; // sparse chunk
+
+	auto& dc = dense_chunks[c->voxel_data];
+
+	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
+	auto subchunk_val = dc.sparse_data[subchunk_i];
+
+	if (dc.is_subchunk_sparse(subchunk_i))
+		return CHECK_BLOCK( (block_id)subchunk_val ); // sparse subchunk
+
+	auto& subchunk = dense_subchunks[subchunk_val];
+
+	auto blocki = BLOCK_IDX(x,y,z);
+	assert(blocki >= 0 && blocki < SUBCHUNK_VOXEL_COUNT);
+	auto block = subchunk.voxels[blocki];
+
+	return CHECK_BLOCK(block); // dense subchunk
+}
+
+void Chunks::write_block (int x, int y, int z, block_id data) {
+	int bx, by, bz;
+	int3 chunk_pos;
+	CHUNK_BLOCK_POS(x,y,z, chunk_pos, bx,by,bz);
+
+	Chunk* chunk = query_chunk(chunk_pos);
+	assert(chunk && (chunk->flags & Chunk::LOADED)); // invalid call
+	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
+		return;
+
+	write_block(bx,by,bz, chunk, data);
+}
+
+void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
+	assert(c->flags & Chunk::LOADED);
+
+	if (c->flags & Chunk::SPARSE_VOXELS) {
+		if (data == (block_id)c->voxel_data)
+			return; // chunk stays sparse
+		densify_chunk(*c); // sparse chunk, allocate dense chunk
+	}
+
+	auto& dc = dense_chunks[c->voxel_data];
+
+	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
+	uint32_t& subchunk_val = dc.sparse_data[subchunk_i];
+
+	if (dc.is_subchunk_sparse(subchunk_i)) {
+		if (data == (block_id)subchunk_val)
+			return; // chunk stays sparse
+		densify_subchunk(dc, subchunk_i, subchunk_val); // sparse subchunk, allocate dense subchunk
+	}
+
+	auto& subchunk = dense_subchunks[subchunk_val];
+	auto blocki = BLOCK_IDX(x,y,z);
+	subchunk.voxels[blocki] = data;
+}
+
+void Chunks::densify_chunk (Chunk& c) {
+	block_id bid = (block_id)c.voxel_data;
+
+	c.voxel_data = (uint16_t)dense_chunks.alloc();
+	c.flags &= ~Chunk::SPARSE_VOXELS;
+
+	auto& dc = dense_chunks[c.voxel_data];
+
+	memset(dc.sparse_bits, (uint32_t)-1, sizeof(dc.sparse_bits)); // init to sparse subchunks
+
+	for (uint16_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i)
+		dc.sparse_data[i] = (uint32_t)bid;
+}
+void Chunks::densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val) {
+	dc.set_subchunk_dense(subchunk_i);
+
+	block_id bid = (block_id)subchunk_val;
+
+	subchunk_val = dense_subchunks.alloc();
+	auto& subchunk = dense_subchunks[subchunk_val];
+
+	for (uint32_t i=0; i<SUBCHUNK_VOXEL_COUNT; ++i)
+		subchunk.voxels[i] = bid;
+}
+
+//// Chunk system
+
+chunk_id Chunks::alloc_chunk (int3 pos) {
+	ZoneScoped;
+
+	chunk_id id = chunks.alloc();
+	auto& chunk = chunks[id];
+
+	{ // init
+		chunk.flags = Chunk::ALLOCATED;
+		chunk.pos = pos;
+		init_voxels(chunk);
+		memset(chunk.neighbours, -1, sizeof(chunk.neighbours));
+		init_mesh(chunk.opaque_mesh);
+		init_mesh(chunk.transparent_mesh);
+	}
+
+	assert(pos_to_id.find(pos) == pos_to_id.end());
+	{
+		ZoneScopedN("pos_to_id.emplace");
+		pos_to_id.emplace(pos, id);
+	}
+
+	for (int i=0; i<6; ++i) {
+		ZoneScopedN("alloc_chunk::get neighbour");
+
+		chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]); // add neighbour to our list
+		if (chunks[id].neighbours[i] != U16_NULL) {
+			assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
+			chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id; // add ourself from neighbours neighbour list
+		}
+	}
+
+	return id;
+}
+void Chunks::free_chunk (chunk_id id) {
+	ZoneScoped;
+	auto& chunk = chunks[id];
+
+	free_voxels(chunk);
+
+	for (int i=0; i<6; ++i) {
+		auto n = chunk.neighbours[i];
+		if (n != U16_NULL) {
+			assert(chunks[n].neighbours[i^1] == id); // i^1 flips direction
+			chunks[n].neighbours[i^1] = U16_NULL; // delete ourself from neighbours neighbour list
+		}
+	}
+
+	free_mesh(chunk.opaque_mesh);
+	free_mesh(chunk.transparent_mesh);
+
+	pos_to_id.erase(chunks[id].pos);
+
+	chunks.free(id);
+	memset(&chunk, 0, sizeof(Chunk)); // zero chunk, flags will now indicate that chunk is unallocated
+}
+
 void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	ZoneScoped;
 
@@ -32,7 +203,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 			float unload_dist = load_radius + unload_hyster;
 			float unload_dist_sqr = unload_dist * unload_dist;
 
-			for (chunk_id id=0; id<max_id; ++id) {
+			for (chunk_id id=0; id<end(); ++id) {
 				chunks[id]._validate_flags();
 				if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 
@@ -119,6 +290,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 
 				auto job = std::make_unique<WorldgenJob>();
 				job->chunk = &chunks[id];
+				job->chunks = this;
 				job->wg = &world.world_gen;
 				jobs[count++] = std::move(job);
 			}
@@ -140,19 +312,19 @@ void Chunks::update_chunk_meshing (World const& world) {
 		ZoneScopedN("remesh iterate chunks");
 
 		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
-		for (chunk_id id = 0; id < max_id; ++id) {
+		for (chunk_id id = 0; id<end(); ++id) {
 			auto& chunk = chunks[id];
 			chunk._validate_flags();
 			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
-			chunk.voxels.checked_sparsify();
+			//checked_sparsify(chunk);
 
-			if (chunk.voxels.is_sparse()) {
+			if (chunk.flags & Chunk::SPARSE_VOXELS) {
 				chunk.flags &= ~Chunk::DIRTY;
 			} else {
 
 				auto job = std::make_unique<RemeshChunkJob>(
-					&chunk, *this, world.world_gen, mesh_world_border);
+					&chunk, this, world.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
 		}
@@ -222,29 +394,29 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::DragFloat("load_radius", &load_radius, 1);
 	ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
 
-	uint64_t block_volume = count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+	uint64_t block_volume = chunks.count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 	uint64_t block_mem = 0;
 	int sparse_chunks = 0;
 	int loaded_chunks = 0;
 
-	for (chunk_id id = 0; id < max_id; ++id) {
+	for (chunk_id id = 0; id < end(); ++id) {
 		if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
 
-		if (chunks[id].voxels.is_sparse()) {
-			sparse_chunks++;
-		} else {
+		//if (chunks[id].voxels.is_sparse()) {
+		//	sparse_chunks++;
+		//} else {
 			block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
-		}
+		//}
 		loaded_chunks++;
 	}
 
 	ImGui::Text("Voxels: %4d chunks  %11s volume %6d KB chunk storage",
-		count, format_thousands(block_volume).c_str(), (int)((commit_ptr - (char*)chunks) / 1000));
-	ImGui::Text("Voxel data: %5.0f MB RAM  %3.0f %% sparse chunks",
-		(float)block_mem/1024/1024, (float)sparse_chunks / (float)loaded_chunks * 100);
+		chunks.count, format_thousands(block_volume).c_str(), (int)((chunks.commit_end - (char*)chunks.arr) / 1000));
+	ImGui::Text("Voxel data: %5.0f MB RAM",
+		(float)block_mem/1024/1024);//, (float)sparse_chunks / (float)loaded_chunks * 100);
 
 	if (ImGui::TreeNode("chunks")) {
-		for (chunk_id id=0; id<max_id; ++id) {
+		for (chunk_id id=0; id<end(); ++id) {
 			if ((chunks[id].flags & Chunk::ALLOCATED) == 0)
 				ImGui::Text("[%5d] <not allocated>", id);
 			else
@@ -255,7 +427,7 @@ void Chunks::imgui (Renderer* renderer) {
 	}
 
 	if (ImGui::TreeNode("chunks alloc")) {
-		print_bitset_allocator(id_alloc, sizeof(Chunk), os_page_size);
+		print_bitset_allocator(chunks.slots, sizeof(Chunk), os_page_size);
 		ImGui::TreePop();
 	}
 
@@ -269,7 +441,7 @@ void Chunks::imgui (Renderer* renderer) {
 		}
 
 		ImGui::Text("chunks: %5d  collisions: %d (buckets: %5d, max_bucket_size: %5d, empty_buckets: %5d)",
-			count, collisions, pos_to_id.bucket_count(), max_bucket_size, empty_buckets);
+			chunks.count, collisions, pos_to_id.bucket_count(), max_bucket_size, empty_buckets);
 
 		if (ImGui::TreeNode("bucket counts")) {
 			for (size_t i=0; i<pos_to_id.bucket_count(); ++i)
@@ -284,4 +456,39 @@ void Chunks::imgui (Renderer* renderer) {
 		renderer->chunk_renderer_imgui(*this);
 
 	imgui_pop();
+}
+
+void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
+	lrgba const* col;
+	if (debug_frustrum_culling) {
+		if (empty) return;
+		col = culled ? &DBG_CULLED_CHUNK_COL : &DBG_CHUNK_COL;
+	} else if (visualize_chunks) {
+		col = chunk.flags & Chunk::SPARSE_VOXELS ? &DBG_SPARSE_CHUNK_COL : &DBG_CHUNK_COL;
+
+		//if (!chunk.voxels.is_sparse()) {
+		//	assert(chunk.voxels.dense);
+		//
+		//	size_t subc_i = 0;
+		//
+		//	for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+		//		for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+		//			for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+		//				auto sparse_bit = chunk.voxels.dense->is_subchunk_sparse(subc_i);
+		//
+		//				if (!sparse_bit) {
+		//					float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
+		//					g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
+		//				}
+		//
+		//				subc_i++;
+		//			}
+		//		}
+		//	}
+		//}
+	} else {
+		return;
+	}
+
+	g_debugdraw.wire_cube(((float3)chunk.pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, *col);
 }

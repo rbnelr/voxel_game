@@ -5,13 +5,13 @@ void World::raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_d
 	block.is_selected = false;
 
 	float _dist;
-	auto hit_block = [&] (int3 bp, int face, float dist, bool force_hit) {
-		block_id bid = chunks.query_block(bp);
+	auto hit_block = [&] (int3 pos, int face, float dist, bool force_hit) {
+		block_id bid = chunks.read_block(pos.x, pos.y, pos.z);
 		if ((g_assets.block_types.block_breakable(bid) || force_hit)) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			block.is_selected = true;
 			block.block = bid;
-			block.pos = bp;
+			block.pos = pos;
 			block.face = (BlockFace)face;
 			_dist = dist;
 			return true;
@@ -55,15 +55,15 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 	if (block.damage >= 1) {
 		break_sound.play();
 
-		chunks.set_block(block.pos, g_assets.block_types.air_id);
+		chunks.write_block(block.pos.x, block.pos.y, block.pos.z, g_assets.block_types.air_id);
 	}
 }
 
 bool World::try_place_block (int3 pos, block_id id) {
-	auto oldb = chunks.query_block(pos);
+	auto oldb = chunks.read_block(pos.x, pos.y, pos.z);
 
 	if (!g_assets.block_types.block_breakable(oldb)) { // non-breakable blocks are solids and gasses
-		chunks.set_block(pos, id);
+		chunks.write_block(pos.x, pos.y, pos.z, id);
 		return true;
 	}
 	return false;

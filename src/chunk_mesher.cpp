@@ -240,10 +240,10 @@ void mesh_chunk (RemeshChunkJob& j) {
 }
 #endif
 
-ChunkVoxels const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
+Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 	auto nid = j.chunk->neighbours[neighbour];
-	if (nid != U16_NULL && (j.chunks[nid].flags & Chunk::LOADED)) {
-		return &j.chunks[nid].voxels;
+	if (nid != U16_NULL && ((*j.chunks)[nid].flags & Chunk::LOADED)) {
+		return &(*j.chunks)[nid];
 	}
 	return nullptr;
 }
@@ -258,8 +258,6 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 #define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
 
-	auto const* voxels = &j.chunk->voxels;
-
 	int idx = 0;
 
 	// fast meshing without neighbour chunk access
@@ -267,20 +265,20 @@ void mesh_chunk (RemeshChunkJob& j) {
 		for (int y=0; y<CHUNK_SIZE; ++y) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
-				block_id id = voxels->read_block(x,y,z);
+				block_id id = j.chunks->read_block(x,y,z, j.chunk);
 
 				{ // X
-					block_id nid = x > 0 ? voxels->read_block(x-1, y, z) : (nc_nx ? nc_nx->read_block(CHUNK_SIZE-1, y, z) : B_NULL);
+					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);
 					if (nid != id)
 						face<0>(j, id, nid, idx);
 				}
 				{ // Y
-					block_id nid = y > 0 ? voxels->read_block(x, y-1, z) : (nc_ny ? nc_ny->read_block(x, CHUNK_SIZE-1, z) : B_NULL);
+					block_id nid = y > 0 ? j.chunks->read_block(x, y-1, z) : (nc_ny ? j.chunks->read_block(x, CHUNK_SIZE-1, z, nc_ny) : B_NULL);
 					if (nid != id)
 						face<1>(j, id, nid, idx);
 				}
 				{ // Z
-					block_id nid = z > 0 ? voxels->read_block(x, y, z-1) : (nc_nz ? nc_nz->read_block(x, y, CHUNK_SIZE-1) : B_NULL);
+					block_id nid = z > 0 ? j.chunks->read_block(x, y, z-1) : (nc_nz ? j.chunks->read_block(x, y, CHUNK_SIZE-1, nc_nz) : B_NULL);
 					if (nid != id)
 						face<2>(j, id, nid, idx);
 				}
@@ -294,7 +292,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 	}
 }
 
-RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg, bool mesh_world_border):
+RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks* chunks, WorldGenerator const& wg, bool mesh_world_border):
 		chunk{chunk}, chunks{chunks},
 		mesh_world_border{mesh_world_border} {
 

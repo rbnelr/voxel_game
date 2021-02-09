@@ -79,7 +79,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		if (chunks.debug_frustrum_culling)
 			g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
 
-		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+		for (chunk_id cid=0; cid < chunks.chunks.slots.alloc_end; ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
 

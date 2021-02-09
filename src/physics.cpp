@@ -15,15 +15,14 @@ CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
 		int3 start =	(int3)floor(obj.pos -float3(obj.r,obj.r,0)) -1;
 		int3 end =		(int3)ceil(obj.pos +float3(obj.r,obj.r,obj.h)) +1;
 
-		int3 bp;
-		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
-			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
-					auto b = world.chunks.query_block(bp);
+		for (int z=start.z; z<end.z; ++z) {
+			for (int y=start.y; y<end.y; ++y) {
+				for (int x=start.x; x<end.x; ++x) {
+					auto b = world.chunks.read_block(x,y,z);
 
 					if (g_assets.block_types[b].collision == CM_SOLID) {
 
-						float3 local_origin = (float3)bp;
+						float3 local_origin = (float3)int3(x,y,z);
 
 						float3 pos_local = obj.pos - local_origin;
 						float3 vel = obj.vel;

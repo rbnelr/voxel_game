@@ -50,7 +50,7 @@ struct ChunkRenderer {
 		
 		size_t vertices = 0;
 		size_t slices_total = 0;
-		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+		for (chunk_id cid=0; cid<chunks.end(); ++cid) {
 			if ((chunks[cid].flags & Chunk::LOADED) == 0) continue;
 			
 			vertices += chunks[cid].opaque_mesh.vertex_count;

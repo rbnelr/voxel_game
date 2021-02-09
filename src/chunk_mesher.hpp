@@ -60,7 +60,7 @@ struct RemeshingMesh {
 struct RemeshChunkJob { // Chunk remesh
 	// input
 	Chunk*					chunk;
-	Chunks&					chunks;
+	Chunks*					chunks;
 
 	uint64_t				chunk_seed;
 	bool					mesh_world_border;
@@ -68,7 +68,7 @@ struct RemeshChunkJob { // Chunk remesh
 	// output
 	RemeshingMesh			mesh;
 
-	RemeshChunkJob (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg,
+	RemeshChunkJob (Chunk* chunk, Chunks* chunks, WorldGenerator const& wg,
 		bool draw_world_border);
 
 	void execute ();

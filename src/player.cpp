@@ -78,15 +78,14 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 
 		bool any_intersecting = false;
 
-		int3 bp;
-		for (bp.z=start.z; bp.z<end.z; ++bp.z) {
-			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+		for (int z=start.z; z<end.z; ++z) {
+			for (int y=start.y; y<end.y; ++y) {
+				for (int x=start.x; x<end.x; ++x) {
 
-					auto b = world.chunks.query_block(bp);
+					auto b = world.chunks.read_block(x,y,z);
 					bool block_solid = g_assets.block_types[b].collision == CM_SOLID;
 
-					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)bp, radius, height);
+					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)int3(x,y,z), radius, height);
 
 					//if (0) {
 					//	lrgba col;
@@ -119,16 +118,15 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			int2 start =	(int2)floor((float2)pos - radius);
 			int2 end =		(int2)ceil ((float2)pos + radius);
 
-			int3 bp;
-			bp.z = pos_z -1;
+			int z = pos_z -1;
 
-			for (bp.y=start.y; bp.y<end.y; ++bp.y) {
-				for (bp.x=start.x; bp.x<end.x; ++bp.x) {
+			for (int y=start.y; y<end.y; ++y) {
+				for (int x=start.x; x<end.x; ++x) {
 
-					auto b = world.chunks.query_block(bp);
+					auto b = world.chunks.read_block(x,y,z);
 
 					bool block_solid = g_assets.block_types[b].collision == CM_SOLID;
-					if (block_solid && circle_square_intersect((float2)pos -(float2)(int2)bp, radius))
+					if (block_solid && circle_square_intersect((float2)pos -(float2)int2(x,y), radius))
 						grounded = true; // cylinder base touches at least one soild block
 				}
 			}

@@ -152,7 +152,7 @@ thread_local block_id thread_chunk_buffer[CHUNK_VOXEL_COUNT];
 
 #define POS2IDX(x,y,z) IDX3D(x,y,z, CHUNK_SIZE)
 
-void gen (Chunk* chunk, WorldGenerator const& wg) {
+void gen (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg) {
 	const auto AIR			= g_assets.block_types.map_id("air");
 	const auto WATER		= g_assets.block_types.map_id("water");
 	const auto STONE		= g_assets.block_types.map_id("stone");
@@ -311,15 +311,17 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 		ZoneScopedN("blocks buffer to voxel data");
 
 		// Chunk should have been inited to be fully dense
-		assert(chunk->voxels.dense);
-		assert(chunk->voxels.dense->dense_data);
+		assert((chunk->flags & Chunk::SPARSE_VOXELS) == 0);
 
-		auto* subchunk = chunk->voxels.dense->dense_data;
+		auto& dc = chunks.dense_chunks[chunk->voxel_data];
 
+		int subchunk_i = 0;
 		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
 			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
 				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-					block_id* dst = subchunk->voxels;
+					assert(!dc.is_subchunk_sparse(subchunk_i));
+					auto subchunk_data = dc.sparse_data[subchunk_i];
+					block_id* dst = chunks.dense_subchunks[subchunk_data].voxels;
 					
 					for (int z=0; z<SUBCHUNK_SIZE; ++z) {
 						for (int y=0; y<SUBCHUNK_SIZE; ++y) {
@@ -331,7 +333,7 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 						}
 					}
 					
-					subchunk++;
+					subchunk_i++;
 				}
 			}
 		}
@@ -341,5 +343,5 @@ void gen (Chunk* chunk, WorldGenerator const& wg) {
 void WorldgenJob::execute () {
 	ZoneScoped;
 
-	gen(chunk, *wg);
+	gen(chunk, *chunks, *wg);
 }

@@ -108,8 +108,9 @@ struct WorldGenerator {
 };
 
 struct WorldgenJob {
-	Chunk* chunk;
-	WorldGenerator const* wg;
+	Chunk*					chunk;
+	Chunks*					chunks;
+	WorldGenerator const*	wg;
 
 	void execute ();
 };

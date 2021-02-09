@@ -100,7 +100,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 		if (chunks.debug_frustrum_culling)
 			g_debugdraw.wire_frustrum(cull_view, srgba(141,41,234));
 
-		for (chunk_id cid=0; cid<chunks.max_id; ++cid) {
+		for (chunk_id cid=0; cid<chunks.end(); ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
 
@@ -111,12 +111,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 			bool culled = empty || frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 			
-			if (chunks.debug_frustrum_culling) {
-				if (!empty)
-					g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[culled ? 2 : 0]);
-			} else if (chunks.visualize_chunks) {
-				g_debugdraw.wire_cube(((float3)chunks[cid].pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, cols[chunk.voxels.is_sparse() ? 1 : 0]);
-			}
+			chunks.visualize_chunk(chunk, empty, culled);
 
 			if (!culled) {
 				push_draw_slices(cid, chunk.opaque_mesh, DT_OPAQUE);
