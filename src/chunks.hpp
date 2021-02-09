@@ -111,13 +111,6 @@ struct ChunkVoxels {
 	void set_subchunk_dense (uint32_t subc_i) {
 		sparse_bits[subc_i >> 6] &= ~(1ull << (subc_i & 63));
 	}
-	
-	int sparse_subchunk_count () {
-		int count = 0;
-		for (auto bits : sparse_bits)
-			count += (int)__popcnt64(bits);
-		return count;
-	}
 };
 
 struct Chunk {
