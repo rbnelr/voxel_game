@@ -117,8 +117,9 @@ struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED		= 1<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
 		LOADED			= 1<<1, // block data valid and safe to use in main thread
-		DIRTY			= 1<<2, // blocks were changed, need remesh
-		SPARSE_VOXELS	= 1<<4, // voxel_data is a single block id instead of a dense_chunk id
+		SPARSE_VOXELS	= 1<<2, // voxel_data is a single block id instead of a dense_chunk id
+		VOXELS_DIRTY	= 1<<3, // voxels were changed, run checked_sparsify
+		REMESH			= 1<<4, // need remesh due to voxel change, neighbour chunk change, etc.
 	};
 
 	Flags flags;
@@ -133,7 +134,9 @@ struct Chunk {
 	ChunkMesh transparent_mesh;
 
 	void _validate_flags () {
-		if (flags & DIRTY) assert(flags & LOADED);
+		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
+		if ((flags & LOADED) == 0) assert(flags == ALLOCATED);
+		if (flags & VOXELS_DIRTY) assert(flags & REMESH);
 	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
@@ -212,7 +215,7 @@ struct Chunks {
 		for (chunk_id cid=0; cid<end(); ++cid) {
 			auto& chunk = chunks[cid];
 			if ((chunk.flags & Chunk::LOADED) == 0) continue;
-			chunks[cid].flags |= Chunk::DIRTY; // remesh chunk to make sure new renderer gets all meshes uploaded again
+			chunks[cid].flags |= Chunk::REMESH; // remesh chunk to make sure new renderer gets all meshes uploaded again
 		}
 	}
 

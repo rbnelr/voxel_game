@@ -111,6 +111,8 @@ void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
 	auto& subchunk = dense_subchunks[subchunk_val];
 	auto blocki = BLOCK_IDX(x,y,z);
 	subchunk.voxels[blocki] = data;
+
+	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
 }
 
 void Chunks::densify_chunk (Chunk& c) {
@@ -326,11 +328,11 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 				for (int i=0; i<6; ++i) {
 					if (chunk.neighbours[i] != U16_NULL) {
 						auto& n = chunks[chunk.neighbours[i]];
-						if (n.flags & Chunk::LOADED) n.flags |= Chunk::DIRTY;
+						if (n.flags & Chunk::LOADED) n.flags |= Chunk::REMESH;
 					}
 				}
 
-				chunk.flags |= Chunk::LOADED|Chunk::DIRTY;
+				chunk.flags |= Chunk::LOADED|Chunk::REMESH;
 			}
 
 			background_queued_count -= (int)count;
@@ -386,18 +388,16 @@ void Chunks::update_chunk_meshing (World const& world) {
 	{
 		ZoneScopedN("remesh iterate chunks");
 
-		auto should_remesh = Chunk::DIRTY|Chunk::LOADED|Chunk::ALLOCATED;
 		for (chunk_id id = 0; id<end(); ++id) {
 			auto& chunk = chunks[id];
 			chunk._validate_flags();
-			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
-			checked_sparsify_chunk(chunk);
+			if (chunk.flags & Chunk::VOXELS_DIRTY) {
+				checked_sparsify_chunk(chunk);
+				chunk.flags &= ~Chunk::VOXELS_DIRTY;
+			}
 
-			if (chunk.flags & Chunk::SPARSE_VOXELS) {
-				chunk.flags &= ~Chunk::DIRTY;
-			} else {
-
+			if (chunk.flags & Chunk::REMESH) {
 				auto job = std::make_unique<RemeshChunkJob>(
 					&chunk, this, world.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
@@ -451,7 +451,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 				process_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
 				process_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
 
-				res->chunk->flags &= ~Chunk::DIRTY;
+				res->chunk->flags &= ~Chunk::REMESH;
 			}
 
 			resi += count;
