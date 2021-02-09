@@ -1,4 +1,4 @@
-#version 460 // for GL_ARB_shader_draw_parameters
+#version 460 core // for GL_ARB_shader_draw_parameters
 
 #include "common.glsl"
 

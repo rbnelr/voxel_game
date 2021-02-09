@@ -458,6 +458,7 @@
   <ItemGroup>
     <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
+    <None Include="..\..\..\shaders\gl\block_highlight.glsl" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />

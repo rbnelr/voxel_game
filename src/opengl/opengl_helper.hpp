@@ -180,6 +180,7 @@ public:
 enum class GlslType {
 	FLOAT,	FLOAT2,	FLOAT3,	FLOAT4,
 	INT,	INT2,	INT3,	INT4,
+	UINT,	UINT2,	UINT3,	UINT4,
 	BOOL,
 
 	MAT2, MAT3, MAT4,
@@ -205,6 +206,10 @@ const std::unordered_map<std::string_view, GlslType> glsl_type_map = {
 	{ "ivec2",				GlslType::INT2					},
 	{ "ivec3",				GlslType::INT3					},
 	{ "ivec4",				GlslType::INT4					},
+	{ "uint",				GlslType::UINT					},
+	{ "uvec2",				GlslType::UINT2					},
+	{ "uvec3",				GlslType::UINT3					},
+	{ "uvec4",				GlslType::UINT4					},
 	{ "bool",				GlslType::BOOL					},
 	{ "mat2",				GlslType::MAT2					},
 	{ "mat3",				GlslType::MAT3					},
@@ -454,6 +459,39 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 	return vao;
+}
+
+struct VertexBuffer {
+	Vao vao;
+	Vbo vbo;
+};
+
+template <typename T>
+inline VertexBuffer vertex_buffer (std::string_view label) {
+	VertexBuffer v;
+	v.vbo = Vbo(label);
+	v.vao = setup_vao<T>(label, v.vbo);
+	return v;
+}
+
+struct Mesh {
+	Vao vao;
+	Vbo vbo;
+	int vertex_count;
+};
+
+template <typename T>
+inline Mesh upload_mesh (std::string_view label, T* vertices, size_t vertex_count) {
+	Mesh m;
+	m.vbo = Vbo(label);
+	m.vao = setup_vao<T>(label, m.vbo);
+	m.vertex_count = (int)vertex_count;
+
+	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(T), vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	return m;
 }
 
 //// Opengl global state management

@@ -1,4 +1,4 @@
-#version 460
+#version 460 core
 
 #include "common.glsl"
 

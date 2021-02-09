@@ -40,22 +40,11 @@ struct CommonUniforms {
 	}
 };
 
-template <typename T>
-struct VertexBuffer {
-	Vao vao;
-	Vbo vbo;
-
-	VertexBuffer (std::string_view label) {
-		vbo = Vbo(label);
-		vao = setup_vao<T>(label, vbo);
-	}
-};
-
 class OpenglRenderer;
 
 struct glDebugDraw {
-	VertexBuffer<DebugDraw::LineVertex>	vbo_lines	= { "DebugDraw.vbo_lines" };
-	VertexBuffer<DebugDraw::TriVertex>	vbo_tris	= { "DebugDraw.vbo_tris" };
+	VertexBuffer vbo_lines	= vertex_buffer<DebugDraw::LineVertex>("DebugDraw.vbo_lines");
+	VertexBuffer vbo_tris	= vertex_buffer<DebugDraw::TriVertex> ("DebugDraw.vbo_tris");
 
 	Shader* shad_lines;
 	Shader* shad_lines_occluded;
@@ -78,6 +67,8 @@ struct glDebugDraw {
 	void draw (OpenglRenderer& r);
 };
 
+Mesh block_highlight ();
+
 class OpenglRenderer : public Renderer {
 public:
 	OpenglContext ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
@@ -92,6 +83,10 @@ public:
 	Texture2DArray tile_textures = {"tile_textures"};
 
 	ChunkRenderer chunk_renderer = ChunkRenderer(shaders);
+
+	Shader*			block_highl_shad = shaders.compile("block_highlight");
+	Mesh			block_highl_mesh = block_highlight();
+	void draw_block_highlight (OpenglRenderer& r);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;

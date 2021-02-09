@@ -468,5 +468,8 @@
     <None Include="..\..\..\shaders\gl\debug_tris.glsl">
       <Filter>shaders\gl</Filter>
     </None>
+    <None Include="..\..\..\shaders\gl\block_highlight.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>
