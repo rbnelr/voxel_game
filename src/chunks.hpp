@@ -7,10 +7,17 @@
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		63
 
+#if 1
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
 #define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
+#else
+#define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_SHIFT		3
+#define SUBCHUNK_MASK		7
+#endif
 
 #define IDX3D(x,y,z, sz) (size_t)(z) * (sz)*(sz) + (size_t)(y) * (sz) + (size_t)(x)
 
@@ -220,13 +227,13 @@ struct Chunks {
 	}
 
 	// load chunks in this radius in order of distance to the player 
-	float load_radius = 6;//700.0f;
+	float load_radius = 400;//700.0f;
 	
 	// prevent rapid loading and unloading chunks
 	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
-	float unload_hyster = CHUNK_SIZE*1.5f;
+	float unload_hyster = 0;//CHUNK_SIZE*1.5f;
 
 	int background_queued_count = 0;
 
