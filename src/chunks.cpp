@@ -132,7 +132,58 @@ void Chunks::densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& s
 	auto& subchunk = dense_subchunks[subchunk_val];
 
 	for (uint32_t i=0; i<SUBCHUNK_VOXEL_COUNT; ++i)
-		subchunk.voxels[i] = bid;
+		subchunk.voxels[i] = (uint32_t)bid;
+}
+
+bool Chunks::checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i) {
+	auto& subchunk = dense_subchunks[ dc.sparse_data[subchunk_i] ];
+	
+	block_id bid = subchunk.voxels[0];
+	for (int i=1; i<SUBCHUNK_VOXEL_COUNT; ++i) {
+		if (subchunk.voxels[i] != bid)
+			return false;
+	}
+	// Subchunk sparse
+
+	DBG_MEMSET(&subchunk, DBG_MEMSET_FREED, sizeof(subchunk));
+	dense_subchunks.free(dc.sparse_data[subchunk_i]);
+
+	dc.sparse_data[subchunk_i] = bid;
+	dc.set_subchunk_sparse(subchunk_i);
+
+	return true;
+}
+
+void Chunks::checked_sparsify_chunk (Chunk& c) {
+	if (c.flags & Chunk::SPARSE_VOXELS)
+		return; // chunk already sparse
+
+	auto& dc = dense_chunks[c.voxel_data];
+
+	bool sparse_chunk = true;
+	block_id bid;
+
+	{ // subc_i=0 spacial case to avoid extra branch in loop
+		if (!dc.is_subchunk_sparse(0))
+			sparse_chunk = checked_sparsify_subchunk(dc, 0);
+		if (sparse_chunk)
+			bid = (block_id)dc.sparse_data[0];
+	}
+	for (uint16_t subc_i=1; subc_i<CHUNK_SUBCHUNK_COUNT; ++subc_i) {
+		if (!dc.is_subchunk_sparse(subc_i))
+			sparse_chunk = checked_sparsify_subchunk(dc, subc_i) && sparse_chunk;
+		sparse_chunk = sparse_chunk && (bid == (block_id)dc.sparse_data[subc_i]);
+	}
+
+	if (!sparse_chunk)
+		return;
+	// Chunk completely sparse
+
+	DBG_MEMSET(&dc, DBG_MEMSET_FREED, sizeof(dc));
+	dense_chunks.free(c.voxel_data);
+
+	c.flags |= Chunk::SPARSE_VOXELS;
+	c.voxel_data = (uint16_t)bid;
 }
 
 //// Chunk system
@@ -332,7 +383,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 			chunk._validate_flags();
 			if ((chunk.flags & should_remesh) != should_remesh) continue;
 
-			//checked_sparsify(chunk);
+			checked_sparsify_chunk(chunk);
 
 			if (chunk.flags & Chunk::SPARSE_VOXELS) {
 				chunk.flags &= ~Chunk::DIRTY;

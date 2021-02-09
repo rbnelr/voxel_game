@@ -189,6 +189,9 @@ struct Chunks {
 	void densify_chunk (Chunk& c);
 	void densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val);
 
+	void checked_sparsify_chunk (Chunk& c);
+	bool checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i);
+
 	chunk_pos_to_id_map pos_to_id;
 
 	Chunk& operator[] (chunk_id id) {
