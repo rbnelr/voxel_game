@@ -10,6 +10,8 @@
 //// Voxel system
 
 void Chunks::init_voxels (Chunk& chunk) {
+	ZoneScoped;
+
 	chunk.voxel_data = (uint16_t)dense_chunks.alloc();
 
 	auto& dc = dense_chunks[chunk.voxel_data];
@@ -20,6 +22,7 @@ void Chunks::init_voxels (Chunk& chunk) {
 		dc.sparse_data[i] = dense_subchunks.alloc();
 }
 void Chunks::free_voxels (Chunk& c) {
+	ZoneScoped;
 
 	if (c.flags & Chunk::SPARSE_VOXELS)
 		return; // sparse chunk
@@ -111,6 +114,8 @@ void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
 }
 
 void Chunks::densify_chunk (Chunk& c) {
+	ZoneScoped;
+
 	block_id bid = (block_id)c.voxel_data;
 
 	c.voxel_data = (uint16_t)dense_chunks.alloc();
@@ -124,6 +129,8 @@ void Chunks::densify_chunk (Chunk& c) {
 		dc.sparse_data[i] = (uint32_t)bid;
 }
 void Chunks::densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val) {
+	ZoneScoped;
+
 	dc.set_subchunk_dense(subchunk_i);
 
 	block_id bid = (block_id)subchunk_val;
@@ -157,6 +164,8 @@ bool Chunks::checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i) {
 void Chunks::checked_sparsify_chunk (Chunk& c) {
 	if (c.flags & Chunk::SPARSE_VOXELS)
 		return; // chunk already sparse
+
+	ZoneScoped;
 
 	auto& dc = dense_chunks[c.voxel_data];
 
@@ -495,12 +504,15 @@ void Chunks::imgui (Renderer* renderer) {
 
 	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
 	
-	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM",
-		chunks.count, format_thousands(block_volume / MB).c_str(), (int)(chunks.commit_size()/KB));
-	ImGui::Text("Sparse chunks: %5d / %5d dense (%6.2f %%)  %6d KB dense chunk RAM",
-		chunks_dense, chunks_loaded, (float)chunks_dense / chunks_loaded * 100, (int)(dense_chunks.commit_size()/KB));
-	ImGui::Text("Subchunks    : %4dk / %4dk dense (%6.2f %%)  %6d MB dense subchunk RAM",
-		dense_subc/KB, subc_count/KB, (float)dense_subc / subc_count * 100, (int)(dense_subchunks.commit_size()/MB));
+	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM (%6.2f %% usage)",
+		chunks.count, format_thousands(block_volume / MB).c_str(),
+		(int)(chunks.commit_size()/KB), (float)chunks.count / chunks.slots.alloc_end * 100);
+	ImGui::Text("Sparse chunks: %5d / %5d dense (%6.2f %%)  %6d KB dense chunk RAM (%6.2f %% usage)",
+		chunks_dense, chunks_loaded, (float)chunks_dense / chunks_loaded * 100,
+		(int)(dense_chunks.commit_size()/KB), (float)dense_chunks.count / dense_chunks.slots.alloc_end * 100);
+	ImGui::Text("Subchunks    : %4dk / %4dk dense (%6.2f %%)  %6d MB dense subchunk RAM (%6.2f %% usage)",
+		dense_subc/KB, subc_count/KB, (float)dense_subc / subc_count * 100,
+		(int)(dense_subchunks.commit_size()/MB), (float)dense_subchunks.count / dense_subchunks.slots.alloc_end * 100);
 	
 	ImGui::Spacing();
 	ImGui::Text("Sparseness   : %6d M / %6d M vox sparse (%6.2f %%)  %3d MB total RAM  %4d KB overhead (%6.2f %%)",
