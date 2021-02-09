@@ -62,6 +62,8 @@ struct Player;
 struct Assets;
 struct Chunks;
 class Renderer;
+struct ChunkSliceData;
+struct WorldgenJob;
 
 #define MAX_SUBCHUNKS		((32ull *GB) / sizeof(SubchunkVoxels))
 
@@ -135,7 +137,6 @@ struct Chunk {
 
 	void _validate_flags () {
 		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
-		if ((flags & LOADED) == 0) assert(flags == ALLOCATED);
 		if (flags & VOXELS_DIRTY) assert(flags & REMESH);
 	}
 };
@@ -157,8 +158,6 @@ struct ChunkKey_Comparer {
 	}
 };
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
-
-struct ChunkSliceData;
 
 const lrgba DBG_CHUNK_COL			= srgba(0, 0, 255, 255);
 const lrgba DBG_SPARSE_CHUNK_COL	= srgba(0, 0, 200, 20);
@@ -185,7 +184,6 @@ struct Chunks {
 		m.vertex_count = 0;
 	}
 
-	// Initial chunk voxel allocation is non-sparse with uninited data for worldgen to fill in a threadsafe manner, sparse regions are detected later
 	void init_voxels (Chunk& c);
 	void free_voxels (Chunk& c);
 
@@ -194,6 +192,8 @@ struct Chunks {
 
 	void checked_sparsify_chunk (Chunk& c);
 	bool checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i);
+
+	void sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j);
 
 	chunk_pos_to_id_map pos_to_id;
 
@@ -233,6 +233,7 @@ struct Chunks {
 	bool mesh_world_border = false;
 
 	bool visualize_chunks = false;
+	bool visualize_subchunks = false;
 	bool debug_frustrum_culling = false;
 
 	// distance of chunk to player

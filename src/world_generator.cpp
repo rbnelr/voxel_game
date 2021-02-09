@@ -148,11 +148,11 @@ float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_no
 		return smoothstep( smoothstep(val + valb) );
 	}
 
-thread_local block_id thread_chunk_buffer[CHUNK_VOXEL_COUNT];
-
 #define POS2IDX(x,y,z) IDX3D(x,y,z, CHUNK_SIZE)
 
-void gen (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg) {
+void WorldgenJob::execute () {
+	ZoneScoped;
+
 	const auto AIR			= g_assets.block_types.map_id("air");
 	const auto WATER		= g_assets.block_types.map_id("water");
 	const auto STONE		= g_assets.block_types.map_id("stone");
@@ -167,14 +167,14 @@ void gen (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg) {
 
 	int water_level = 21 - chunk_origin.z;
 
-	uint64_t chunk_seed = wg.seed ^ hash(chunk->pos);
+	uint64_t chunk_seed = wg->seed ^ hash(chunk->pos);
 
-	OSN::Noise<2> noise(wg.seed);
+	OSN::Noise<2> noise(wg->seed);
 	Random rand = Random(chunk_seed);
 
-	OSN::Noise<3> noise3 (wg.seed);
+	OSN::Noise<3> noise3 (wg->seed);
 
-	block_id* blocks = thread_chunk_buffer;
+	block_id* blocks = voxel_buffer;
 
 	{ // 3d noise generate
 		ZoneScopedN("3d noise generate");
@@ -223,9 +223,9 @@ void gen (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg) {
 
 				int3 pos_world2 = int3(x,y,0) + chunk_origin;
 
-				float tree_density = noise_tree_density(wg, noise, (float2)(int2)pos_world2);
+				float tree_density = noise_tree_density(*wg, noise, (float2)(int2)pos_world2);
 
-				float grass_density = noise_grass_density(wg, noise, (float2)(int2)pos_world2);
+				float grass_density = noise_grass_density(*wg, noise, (float2)(int2)pos_world2);
 
 				float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
 					{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
@@ -306,42 +306,13 @@ void gen (Chunk* chunk, Chunks& chunks, WorldGenerator const& wg) {
 		for (int3 p : tree_poss)
 			place_tree(p);
 	}
-
-	{
-		ZoneScopedN("blocks buffer to voxel data");
-
-		// Chunk should have been inited to be fully dense
-		assert((chunk->flags & Chunk::SPARSE_VOXELS) == 0);
-
-		auto& dc = chunks.dense_chunks[chunk->voxel_data];
-
-		int subchunk_i = 0;
-		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
-			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
-				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-					assert(!dc.is_subchunk_sparse(subchunk_i));
-					auto subchunk_data = dc.sparse_data[subchunk_i];
-					block_id* dst = chunks.dense_subchunks[subchunk_data].voxels;
-					
-					for (int z=0; z<SUBCHUNK_SIZE; ++z) {
-						for (int y=0; y<SUBCHUNK_SIZE; ++y) {
-							block_id* src = blocks + IDX3D(sx, sy+y, sz+z, CHUNK_SIZE);
-							
-							memcpy(dst, src, SUBCHUNK_SIZE * sizeof(block_id));
-							
-							dst += SUBCHUNK_SIZE;
-						}
-					}
-					
-					subchunk_i++;
-				}
-			}
-		}
-	}
 }
 
-void WorldgenJob::execute () {
-	ZoneScoped;
-
-	gen(chunk, *chunks, *wg);
+WorldgenJob::WorldgenJob () {
+	ZoneScopedNC("malloc WorldgenJob::voxel_buffer", tracy::Color::Crimson);
+	voxel_buffer = (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
+}
+WorldgenJob::~WorldgenJob () {
+	ZoneScopedNC("free WorldgenJob::voxel_buffer", tracy::Color::Crimson);
+	free(voxel_buffer);
 }

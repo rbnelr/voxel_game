@@ -112,6 +112,14 @@ struct WorldgenJob {
 	Chunks*					chunks;
 	WorldGenerator const*	wg;
 
+	// temporary dense voxel buffer for chunk
+	// that are inserted into the sparse voxel storage on the main thread later
+	// This avoids heavy (80%) fragmentation when allocating dense data upfront and sparsifying later
+	block_id*				voxel_buffer;
+
+	WorldgenJob ();
+	~WorldgenJob ();
+
 	void execute ();
 };
 

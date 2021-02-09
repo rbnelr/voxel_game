@@ -182,41 +182,46 @@ struct FPS_Display {
 	}
 };
 
-inline void print_bitset_allocator (AllocatorBitset& bits, size_t sz=0, size_t pagesz=1) {
+inline void print_bitset_allocator (AllocatorBitset const& bits, size_t sz=0, size_t pagesz=1, size_t commit_size=-1) {
 	constexpr char chars[2] = {'#', '-'};
-	ImVec4 colors[2] = { ImVec4(1,1,1,1), ImVec4(0.7f, 0.7f, 0.7f, 1) };
+	ImVec4 colors[2] = { ImVec4(1,1,1,1), ImVec4(0.5f, 0.5f, 0.55f, 1) };
 
 	char str[64+1];
 
-	size_t cur = 0;
-	int cur_col = 0;
+	size_t offs = 0;
 
 	for (size_t b : bits.bits) {
 
-		int ci = 0;
-		int i = 0;
+		size_t cur_col = (offs / pagesz) % 2; // get color at start of line
+		char* out = str;
 
-		while (i < 64) {
-			int col = cur_col;
+		for (int i=0; i < 64 && offs < commit_size; ++i) {
+			size_t col = (offs / pagesz) % 2; // alternate col index based on which page we are in
 
-			for (; i<64; ++i) {
-				if (cur >= pagesz) {
-					cur -= pagesz;
-					cur_col++;
-					break;
-				}
+			if (col != cur_col) {
+				// color changed, print previous line
+				*out = '\0';
+				ImGui::TextColored(colors[cur_col], str);
+				ImGui::SameLine(0, 0);
+				out = str; // restart string
 
-				str[ci++] = chars[(b >> i) & 1];
-				cur += sz;
+				cur_col = col;
 			}
 
-			str[ci] = '\0';
-			ci = 0;
-
-			ImGui::TextColored(colors[col & 1], str);
-			if (i < 64)
-				ImGui::SameLine(0, 0);
+			*out++ = chars[(b >> i) & 1];
+			offs += sz;
 		}
+
+		*out = '\0';
+		ImGui::TextColored(colors[cur_col], str);
+	}
+}
+
+template <typename T>
+inline void print_block_allocator (BlockAllocator<T> const& alloc, char const* name) {
+	if (ImGui::TreeNode(name)) {
+		print_bitset_allocator(alloc.slots, sizeof(T), os_page_size, alloc.commit_size());
+		ImGui::TreePop();
 	}
 }
 
