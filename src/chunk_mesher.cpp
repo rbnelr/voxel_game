@@ -46,6 +46,7 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 
 	for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
 		auto* v = j.mesh.opaque_vertices.push();
+		if (!v) return;
 		v->posx = fixd_posx;
 		v->posy = fixd_posy;
 		v->posz = fixd_posz;
@@ -56,6 +57,7 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 
 void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
 	auto* v = mesh.push();
+	if (!v) return;
 
 	int16_t fixd_posx = (int16_t)(pos.x * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posy = (int16_t)(pos.y * BlockMeshInstance::FIXEDPOINT_FAC);
@@ -268,17 +270,17 @@ void mesh_chunk (RemeshChunkJob& j) {
 				block_id id = j.chunks->read_block(x,y,z, j.chunk);
 
 				{ // X
-					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);
+					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z, j.chunk) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);
 					if (nid != id)
 						face<0>(j, id, nid, idx);
 				}
 				{ // Y
-					block_id nid = y > 0 ? j.chunks->read_block(x, y-1, z) : (nc_ny ? j.chunks->read_block(x, CHUNK_SIZE-1, z, nc_ny) : B_NULL);
+					block_id nid = y > 0 ? j.chunks->read_block(x, y-1, z, j.chunk) : (nc_ny ? j.chunks->read_block(x, CHUNK_SIZE-1, z, nc_ny) : B_NULL);
 					if (nid != id)
 						face<1>(j, id, nid, idx);
 				}
 				{ // Z
-					block_id nid = z > 0 ? j.chunks->read_block(x, y, z-1) : (nc_nz ? j.chunks->read_block(x, y, CHUNK_SIZE-1, nc_nz) : B_NULL);
+					block_id nid = z > 0 ? j.chunks->read_block(x, y, z-1, j.chunk) : (nc_nz ? j.chunks->read_block(x, y, CHUNK_SIZE-1, nc_nz) : B_NULL);
 					if (nid != id)
 						face<2>(j, id, nid, idx);
 				}

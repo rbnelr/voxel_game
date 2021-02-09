@@ -25,7 +25,8 @@ struct ChunkMeshData {
 	void alloc_slice () {
 		ZoneScopedC(tracy::Color::Crimson);
 		if (used_slices >= MAX_CHUNK_SLICES)
-			throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
+			return;
+			//throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
 		auto* s = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
 
 		next_ptr  = s->verts;
@@ -42,6 +43,9 @@ struct ChunkMeshData {
 
 	// forceinline because this is doing nothing but an if and a increment 99% of the time, compiler should keep alloc_slice not inlined instead
 	__forceinline BlockMeshInstance* push () {
+		if (used_slices >= MAX_CHUNK_SLICES)
+			return nullptr;
+
 		if (next_ptr != alloc_end) {
 			// likely case
 		} else {
