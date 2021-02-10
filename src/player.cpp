@@ -8,10 +8,13 @@ void BreakBlock::update (Input& I, World& world, Player& player, bool creative_m
 
 	float anim_hit_t = 0;
 
+	//clog(INFO, "[BreakBlock] anim_t: %f", anim_t);
+
 	if (anim_t > 0 || inp) {
 		anim_t += anim_speed * I.dt;
 	}
-	if (!anim_triggered && anim_t >= anim_hit_t) {
+	if (!anim_triggered && anim_t > anim_hit_t && inp) {
+		//clog(INFO, "[BreakBlock] anim hit");
 		if (player.selected_block) {
 			world.apply_damage(player.selected_block, player.inventory.quickbar.get_selected().item, creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
@@ -19,6 +22,7 @@ void BreakBlock::update (Input& I, World& world, Player& player, bool creative_m
 		anim_triggered = true;
 	}
 	if (anim_t >= 1) {
+		//clog(INFO, "[BreakBlock] anim over");
 		anim_t = 0;
 		anim_triggered = false;
 	}

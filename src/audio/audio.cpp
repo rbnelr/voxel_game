@@ -36,8 +36,6 @@ PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
 int playing_sounds_count = 0;
 
 void AudioManager::play_sound (Sound* sound, float volume, float speed) {
-	return;
-
 	while (locked)
 		; // busy wait
 
