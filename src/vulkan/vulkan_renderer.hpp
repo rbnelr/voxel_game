@@ -144,9 +144,10 @@ public:
 
 	bool						wireframe = false;
 
-	virtual void graphics_imgui () {
+	virtual void screenshot_imgui (Input& I) {
 		screenshot.imgui();
-
+	}
+	virtual void graphics_imgui (Input& I) {
 		if (imgui_push("Renderscale")) {
 			ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", renderscale_size.x, renderscale_size.y, (float)(renderscale_size.x * renderscale_size.y) / 1000 / 1000);
 			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);

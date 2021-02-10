@@ -87,7 +87,12 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	glViewport(0,0, I.window_size.x, I.window_size.y);
 	glScissor(0,0, I.window_size.x, I.window_size.y);
 
+	if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
+
 	ctx.imgui_draw();
+
+	if (trigger_screenshot && screenshot_hud)	take_screenshot(I.window_size);
+	trigger_screenshot = false;
 
 	TracyGpuCollect;
 

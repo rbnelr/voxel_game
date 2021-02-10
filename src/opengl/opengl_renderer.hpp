@@ -5,6 +5,7 @@
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 #include "gl_chunk_renderer.hpp"
+#include "engine/input.hpp"
 
 namespace gl {
 
@@ -77,6 +78,8 @@ public:
 	Shaders			shaders;
 
 	Framebuffer		framebuffer;
+	bool			trigger_screenshot = false;
+	bool			screenshot_hud = false;
 
 	Ubo				common_uniforms = {"common_ubo"};
 
@@ -123,8 +126,12 @@ public:
 	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files);
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
 
-	virtual void graphics_imgui () {
-		//screenshot.imgui();
+	virtual void screenshot_imgui (Input& I) {
+		trigger_screenshot = ImGui::Button("Screenshot [F8]") || I.buttons[KEY_F8].went_down;
+		ImGui::SameLine();
+		ImGui::Checkbox("With HUD", &screenshot_hud);
+	}
+	virtual void graphics_imgui (Input& I) {
 		framebuffer.imgui();
 
 		ImGui::Checkbox("wireframe", &wireframe);

@@ -50,6 +50,11 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 	}
 
 	{
+		ImGui::Spacing();
+		if (renderer)
+			renderer->screenshot_imgui(I);
+		ImGui::Spacing();
+
 		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
 			fps_display.display_fps(window.input.real_dt, window.input.dt);
 
@@ -63,7 +68,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 				g_window.switch_render_backend = true;
 
 			if (renderer)
-				renderer->graphics_imgui();
+				renderer->graphics_imgui(I);
 		}
 		//graphics.imgui(world->chunks);
 

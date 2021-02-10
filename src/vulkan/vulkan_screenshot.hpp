@@ -12,14 +12,14 @@ struct Screenshots {
 	VkDeviceMemory readback_img_mem;
 
 	void imgui () {
-		take_screenshot = ImGui::Button("Screenshot [F3]") || take_screenshot;
+		take_screenshot = ImGui::Button("Screenshot [F8]") || take_screenshot;
 		ImGui::SameLine();
 		ImGui::Checkbox("With UI", &include_ui);
 	}
 
 	// call at frame start
 	void begin (Input& I) {
-		take_screenshot = I.buttons[KEY_F3].went_down || take_screenshot;
+		take_screenshot = I.buttons[KEY_F8].went_down || take_screenshot;
 	}
 
 	void screenshot_swapchain_img (VulkanWindowContext& ctx, VkCommandBuffer cmds) {
