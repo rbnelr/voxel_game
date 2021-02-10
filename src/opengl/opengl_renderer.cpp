@@ -20,7 +20,7 @@ bool try_reloading (FUNC loadfunc) {
 	return false; // fail
 }
 
-void OpenglRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) {
+void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files) {
 	ctx.imgui_begin();
 
 	shaders.update_recompilation(changed_files, wireframe);
@@ -29,6 +29,8 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& change
 		clog(INFO, "[OpenglRenderer] Reload textures due to file change");
 		try_reloading([&] () { return load_textures(); });
 	}
+
+	framebuffer.update(I.window_size);
 }
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
@@ -53,8 +55,9 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		upload_bind_ubo(common_uniforms, 0, &u, sizeof(u));
 	}
 
-	glViewport(0,0, I.window_size.x, I.window_size.y);
-	glScissor(0,0, I.window_size.x, I.window_size.y);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+	glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
+	glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
 
 	glClearColor(0,0,0,1);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -76,6 +79,13 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	//
 	debug_draw.draw(*this);
+
+	{
+		OGL_TRACE("framebuffer.blit");
+		framebuffer.blit(I.window_size);
+	}
+	glViewport(0,0, I.window_size.x, I.window_size.y);
+	glScissor(0,0, I.window_size.x, I.window_size.y);
 
 	ctx.imgui_draw();
 

@@ -13,7 +13,7 @@ void VulkanRenderer::set_view_uniforms (Camera_View& view, int2 viewport_size) {
 	memcpy((char*)ubo_mem_ptr + frame_data[cur_frame].ubo_mem_offs, &ubo, sizeof(ViewUniforms));
 }
 
-void VulkanRenderer::frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) {
+void VulkanRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files) {
 	ZoneScoped;
 
 	pipelines.update(ctx, changed_files, wireframe);

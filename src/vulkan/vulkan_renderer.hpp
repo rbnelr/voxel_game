@@ -175,7 +175,7 @@ public:
 	VulkanRenderer (GLFWwindow* window, char const* app_name);
 	virtual ~VulkanRenderer ();
 
-	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files);
+	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files);
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
 	
 	void set_view_uniforms (Camera_View& view, int2 viewport_size);

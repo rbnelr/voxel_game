@@ -71,18 +71,20 @@ Mesh block_highlight ();
 
 class OpenglRenderer : public Renderer {
 public:
-	OpenglContext ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
+	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
-	StateManager state;
-	Shaders shaders;
+	StateManager	state;
+	Shaders			shaders;
 
-	Ubo common_uniforms = {"common_ubo"};
+	Framebuffer		framebuffer;
 
-	Sampler tile_sampler = {"tile_sampler"};
-	Ubo block_meshes_ubo = {"block_meshes_ubo"};
-	Texture2DArray tile_textures = {"tile_textures"};
+	Ubo				common_uniforms = {"common_ubo"};
 
-	ChunkRenderer chunk_renderer = ChunkRenderer(shaders);
+	Sampler			tile_sampler = {"tile_sampler"};
+	Ubo				block_meshes_ubo = {"block_meshes_ubo"};
+	Texture2DArray	tile_textures = {"tile_textures"};
+
+	ChunkRenderer	chunk_renderer = ChunkRenderer(shaders);
 
 	Shader*			block_highl_shad = shaders.compile("block_highlight");
 	Mesh			block_highl_mesh = block_highlight();
@@ -118,20 +120,12 @@ public:
 	}
 	virtual ~OpenglRenderer () {}
 
-	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files);
+	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files);
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
 
 	virtual void graphics_imgui () {
 		//screenshot.imgui();
-
-		//if (imgui_push("Renderscale")) {
-		//	ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", renderscale_size.x, renderscale_size.y, (float)(renderscale_size.x * renderscale_size.y) / 1000 / 1000);
-		//	ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
-		//
-		//	renderscale_nearest_changed = ImGui::Checkbox("renderscale nearest", &renderscale_nearest);
-		//
-		//	imgui_pop();
-		//}
+		framebuffer.imgui();
 
 		ImGui::Checkbox("wireframe", &wireframe);
 		ImGui::SameLine();

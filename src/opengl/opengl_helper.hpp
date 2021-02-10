@@ -627,4 +627,81 @@ struct StateManager {
 	}
 };
 
+////
+
+// framebuffer for rendering at different resolution and to make sure we get float buffers
+struct Framebuffer {
+	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
+
+	GLuint color	= 0;
+	GLuint depth	= 0;
+	GLuint fbo		= 0;
+
+	int2 size = 0;
+	float renderscale = 1.0f;
+
+	bool nearest = false;
+
+	void imgui () {
+		if (imgui_push("Renderscale")) {
+			ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", size.x, size.y, (float)(size.x * size.y) / (1000*1000));
+			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
+
+			ImGui::Checkbox("nearest", &nearest);
+
+			imgui_pop();
+		}
+	}
+
+	static constexpr auto color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8
+	static constexpr auto depth_format = GL_DEPTH_COMPONENT32F;
+
+	void update (int2 window_size) {
+		auto old_size = size;
+		size = max(1, roundi((float2)window_size * renderscale));
+
+		if (old_size != size) {
+			// delete old
+			glDeleteTextures(1, &color);
+			glDeleteTextures(1, &depth);
+			glDeleteFramebuffers(1, &fbo);
+
+			// create new (textures created with glTexStorage2D cannot be resized)
+			glGenTextures(1, &color);
+			glBindTexture(GL_TEXTURE_2D, color);
+			glTexStorage2D(GL_TEXTURE_2D, 1, color_format, size.x, size.y);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenTextures(1, &depth);
+			glBindTexture(GL_TEXTURE_2D, depth);
+			glTexStorage2D(GL_TEXTURE_2D, 1, depth_format, size.x, size.y);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+
+			GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE) {
+				fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+			}
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+	}
+
+	void blit (int2 window_size) {
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // default FBO
+
+		// TODO: using blit here, but if a post processing pass is desired the rescaling (sampling) can also just be done in our post shader
+		glBlitFramebuffer(
+			0, 0, size.x, size.y,
+			0, 0, window_size.x, window_size.y,
+			GL_COLOR_BUFFER_BIT, nearest ? GL_NEAREST : GL_LINEAR);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+};
+
 } // namespace gl

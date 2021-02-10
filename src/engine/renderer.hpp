@@ -35,7 +35,7 @@ public:
 	virtual bool get_vsync () = 0;
 	virtual void set_vsync (bool state) = 0;
 
-	virtual void frame_begin (GLFWwindow* window, kiss::ChangedFiles& changed_files) = 0;
+	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files) = 0;
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game) = 0;
 
 	virtual void graphics_imgui () = 0;

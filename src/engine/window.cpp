@@ -246,7 +246,7 @@ void Window::run () {
 
 		// Begin frame (aquire image in vk)
 		if (g_window.renderer)
-			g_window.renderer->frame_begin(g_window.window, changed_files);
+			g_window.renderer->frame_begin(g_window.window, g_window.input, changed_files);
 
 		{ // Input sampling
 			ZoneScopedN("sample_input");
