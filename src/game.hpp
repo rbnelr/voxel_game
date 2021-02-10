@@ -22,6 +22,7 @@ struct Game {
 	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
 
 	bool activate_flycam = false;
+	bool creative_mode = false;
 	bool trigger_place_block = false;
 
 	// Render data

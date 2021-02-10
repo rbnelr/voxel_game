@@ -23,7 +23,7 @@ struct World {
 		background_threadpool.flush();
 	}
 
-	void raycast_breakable_blocks (SelectedBlock& block, Ray ray, float max_dist, bool hit_at_max_dist=false, float* hit_dist=nullptr);
+	void raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, float max_dist, bool hit_at_max_dist=false);
 
 	void apply_damage (SelectedBlock& block, Item& item, bool creative_mode);
 	bool try_place_block (int3 pos, block_id id);

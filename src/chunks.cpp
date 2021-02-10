@@ -498,7 +498,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 		for (chunk_id id = 0; id<end(); ++id) {
 			auto& chunk = chunks[id];
 			chunk._validate_flags();
-
+			
 			if (chunk.flags & Chunk::VOXELS_DIRTY) {
 				checked_sparsify_chunk(chunk);
 				chunk.flags &= ~Chunk::VOXELS_DIRTY;

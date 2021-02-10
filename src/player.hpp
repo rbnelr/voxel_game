@@ -204,4 +204,7 @@ struct Player {
 
 	void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view, float reach, bool creative_mode);
 	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
+
 };
+
+void update_block_edits (Input& I, World& world, Camera_View& view, bool creative_mode);

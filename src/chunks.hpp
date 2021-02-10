@@ -35,9 +35,9 @@
 		(CHUNK_POS).x = (X) >> CHUNK_SIZE_SHIFT; \
 		(CHUNK_POS).y = (Y) >> CHUNK_SIZE_SHIFT; \
 		(CHUNK_POS).z = (Z) >> CHUNK_SIZE_SHIFT; \
-		BX = (X) & SUBCHUNK_MASK; \
-		BY = (Y) & SUBCHUNK_MASK; \
-		BZ = (Z) & SUBCHUNK_MASK; \
+		BX = (X) & CHUNK_SIZE_MASK; \
+		BY = (Y) & CHUNK_SIZE_MASK; \
+		BZ = (Z) & CHUNK_SIZE_MASK; \
 	} while (0)
 
 #define CHUNK_VOXEL_COUNT		(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) // number of voxels per chunk
@@ -296,3 +296,75 @@ struct Chunks {
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (World const& world);
 };
+
+template <typename Func>
+void raycast_voxels (Chunks& chunks, Ray const& ray, float max_dist, Func hit_voxel) {
+	// get direction of each axis of ray_dir as integer (-1, 0, +1)
+	// normalize(float) is just float / abs(float)
+	int3 step_delta;
+	step_delta.x = (int)normalize(ray.dir.x);
+	step_delta.y = (int)normalize(ray.dir.y);
+	step_delta.z = (int)normalize(ray.dir.z);
+
+	// get how far you have to travel along the ray to move by 1 unit in each axis
+	// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
+	// a zero in ray_dir produces a NaN in step because 0 / 0
+	float3 step_dist;
+	step_dist.x = length(ray.dir / abs(ray.dir.x));
+	step_dist.y = length(ray.dir / abs(ray.dir.y));
+	step_dist.z = length(ray.dir / abs(ray.dir.z));
+
+	// get initial positon in block and intial voxel coord
+	float ray_pos_floorx = floor(ray.pos.x);
+	float ray_pos_floory = floor(ray.pos.y);
+	float ray_pos_floorz = floor(ray.pos.z);
+
+	float pos_in_blockx = ray.pos.x - ray_pos_floorx;
+	float pos_in_blocky = ray.pos.y - ray_pos_floory;
+	float pos_in_blockz = ray.pos.z - ray_pos_floorz;
+
+	int3 cur_voxel;
+	cur_voxel.x = (int)ray_pos_floorx;
+	cur_voxel.y = (int)ray_pos_floory;
+	cur_voxel.z = (int)ray_pos_floorz;
+
+	// how far to step along ray to step into the next voxel for each axis
+	float3 next;
+	next.x = step_dist.x * (ray.dir.x > 0 ? 1 -pos_in_blockx : pos_in_blockx);
+	next.y = step_dist.y * (ray.dir.y > 0 ? 1 -pos_in_blocky : pos_in_blocky);
+	next.z = step_dist.z * (ray.dir.z > 0 ? 1 -pos_in_blockz : pos_in_blockz);
+
+	// NaN -> Inf
+	next.x = ray.dir.x != 0 ? next.x : INF;
+	next.y = ray.dir.y != 0 ? next.y : INF;
+	next.z = ray.dir.z != 0 ? next.z : INF;
+
+	auto find_next_axis = [] (float3 const& next) { // index of smallest component
+		if (		next.x < next.y && next.x < next.z )	return 0;
+		else if (	next.y < next.z )						return 1;
+		else												return 2;
+	};
+
+	// find the axis of the next voxel step
+	int   cur_axis = find_next_axis(next);
+	float cur_dist = next[cur_axis];
+
+	auto get_step_face = [&] () {
+		return cur_axis*2 +(step_delta[cur_axis] < 0 ? 1 : 0);
+	};
+
+	while (!hit_voxel(cur_voxel, get_step_face(), cur_dist)) {
+
+		// find the axis of the cur step
+		cur_axis = find_next_axis(next);
+		cur_dist = next[cur_axis];
+
+		if (cur_dist > max_dist)
+			return; // stop stepping because max_dist is reached
+
+		// clac the distance at which the next voxel step for this axis happens
+		next[cur_axis] += step_dist[cur_axis];
+		// step into the next voxel
+		cur_voxel[cur_axis] += step_delta[cur_axis];
+	}
+}

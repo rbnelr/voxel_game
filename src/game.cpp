@@ -97,6 +97,10 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 				world->player.pos = flycam.cam.pos;
 			}
 
+			if (open) ImGui::Checkbox("Creative Mode [C]", &creative_mode);
+			if (window.input.buttons[KEY_C].went_down)
+				creative_mode = !creative_mode;
+
 			if (open) ImGui::Separator();
 
 			if (open) flycam.imgui("flycam");
@@ -129,6 +133,8 @@ void Game::update (Window& window, Input& I) {
 	} else {
 		view = player_view;
 	}
+
+	update_block_edits(I, *world, view, creative_mode);
 
 	block_update.update_blocks(I, world->chunks);
 
