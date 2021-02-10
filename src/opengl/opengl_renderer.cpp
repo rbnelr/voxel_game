@@ -71,7 +71,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	chunk_renderer.draw_chunks(*this, game);
 
 	//
-	draw_block_highlight(*this);
+	if (game.world->player.selected_block)
+		draw_block_highlight(*this, game.world->player.selected_block);
 
 	//
 	debug_draw.draw(*this);
@@ -182,7 +183,7 @@ Mesh block_highlight () {
 
 	return upload_mesh("block_highlight", vertices.data(), vertices.size());
 }
-void OpenglRenderer::draw_block_highlight (OpenglRenderer& r) {
+void OpenglRenderer::draw_block_highlight (OpenglRenderer& r, SelectedBlock& block) {
 	OGL_TRACE("block_highlight");
 
 	PipelineState s;
@@ -192,8 +193,8 @@ void OpenglRenderer::draw_block_highlight (OpenglRenderer& r) {
 
 	glUseProgram(r.block_highl_shad->prog);
 
-	r.block_highl_shad->set_uniform("block_pos", float3(0));
-	r.block_highl_shad->set_uniform("face_rotation", face_rotation[0]);
+	r.block_highl_shad->set_uniform("block_pos", (float3)block.pos);
+	r.block_highl_shad->set_uniform("face_rotation", face_rotation[ (BlockFace)(block.face >= 0 ? block.face : 0) ]);
 
 	glBindVertexArray(r.block_highl_mesh.vao);
 	glDrawArrays(GL_TRIANGLES, 0, (GLsizei)r.block_highl_mesh.vertex_count);

@@ -26,8 +26,6 @@ struct Game {
 	bool trigger_place_block = false;
 
 	// Render data
-	SelectedBlock selected_block;
-
 	Camera_View player_view;
 	Camera_View view;
 

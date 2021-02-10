@@ -237,12 +237,12 @@ struct ShaderUniform {
 
 inline void _set_uniform (ShaderUniform& u, float    val) { assert(u.type == GlslType::FLOAT ); glUniform1f( u.location, val); }
 inline void _set_uniform (ShaderUniform& u, float2   val) { assert(u.type == GlslType::FLOAT2); glUniform2fv(u.location, 1, &val.x); }
-inline void _set_uniform (ShaderUniform& u, float3   val) { assert(u.type == GlslType::FLOAT3); glUniform3fv(u.location, 1, &val.y); }
-inline void _set_uniform (ShaderUniform& u, float4   val) { assert(u.type == GlslType::FLOAT4); glUniform4fv(u.location, 1, &val.z); }
+inline void _set_uniform (ShaderUniform& u, float3   val) { assert(u.type == GlslType::FLOAT3); glUniform3fv(u.location, 1, &val.x); }
+inline void _set_uniform (ShaderUniform& u, float4   val) { assert(u.type == GlslType::FLOAT4); glUniform4fv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, int      val) { assert(u.type == GlslType::INT   ); glUniform1i( u.location, val); }
 inline void _set_uniform (ShaderUniform& u, int2     val) { assert(u.type == GlslType::INT2  ); glUniform2iv(u.location, 1, &val.x); }
-inline void _set_uniform (ShaderUniform& u, int3     val) { assert(u.type == GlslType::INT3  ); glUniform3iv(u.location, 1, &val.y); }
-inline void _set_uniform (ShaderUniform& u, int4     val) { assert(u.type == GlslType::INT4  ); glUniform4iv(u.location, 1, &val.z); }
+inline void _set_uniform (ShaderUniform& u, int3     val) { assert(u.type == GlslType::INT3  ); glUniform3iv(u.location, 1, &val.x); }
+inline void _set_uniform (ShaderUniform& u, int4     val) { assert(u.type == GlslType::INT4  ); glUniform4iv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, bool     val) { assert(u.type == GlslType::BOOL  ); glUniform1i( u.location, val ? GL_TRUE : GL_FALSE); }
 inline void _set_uniform (ShaderUniform& u, float2x2 val) { assert(u.type == GlslType::MAT2  ); glUniformMatrix2fv(u.location, 1, GL_FALSE, &val.arr[0].x); }
 inline void _set_uniform (ShaderUniform& u, float3x3 val) { assert(u.type == GlslType::MAT3  ); glUniformMatrix3fv(u.location, 1, GL_FALSE, &val.arr[0].x); }

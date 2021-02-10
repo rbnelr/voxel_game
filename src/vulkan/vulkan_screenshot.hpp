@@ -206,7 +206,7 @@ struct Screenshots {
 				pitch = 4ull * img_size.x;
 			}
 
-			if (stbi_write_png("screenshot.png", img_size.x, img_size.y, 4, data, (int)subresource_layout.rowPitch)) {
+			if (stbi_write_png("../screenshot.png", img_size.x, img_size.y, 4, data, (int)subresource_layout.rowPitch)) {
 				clog(INFO, "Screenshot taken!");
 			} else {
 				clog(WARNING, "Screenshot error!");

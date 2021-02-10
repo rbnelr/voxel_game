@@ -123,8 +123,9 @@ void Game::update (Window& window, Input& I) {
 
 	player_view = world->player.update_post_physics(I, *world);
 
-	if (selected_block)
-		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", selected_block.pos.x, selected_block.pos.y, selected_block.pos.z, g_assets.block_types[selected_block.block].name);
+	auto& sel = world->player.selected_block;
+	if (sel)
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.pos.x, sel.pos.y, sel.pos.z, g_assets.block_types[sel.block].name.c_str());
 	else
 		ImGui::Text("Selected Block: None");
 

@@ -73,11 +73,23 @@ void Chunks::write_block (int x, int y, int z, block_id data) {
 	CHUNK_BLOCK_POS(x,y,z, chunk_pos, bx,by,bz);
 
 	Chunk* chunk = query_chunk(chunk_pos);
-	assert(chunk && (chunk->flags & Chunk::LOADED)); // invalid call
+	//assert(chunk && (chunk->flags & Chunk::LOADED)); // out of bounds writes happen on digging in unloaded chunks
 	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
 		return;
 
 	write_block(bx,by,bz, chunk, data);
+}
+
+void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
+	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
+
+	// Set remesh flags for neighbours where needed
+	if (x == 0            && c->neighbours[0] != U16_NULL) chunks[c->neighbours[0]].flags |= Chunk::REMESH;
+	if (x == CHUNK_SIZE-1 && c->neighbours[1] != U16_NULL) chunks[c->neighbours[1]].flags |= Chunk::REMESH;
+	if (y == 0            && c->neighbours[2] != U16_NULL) chunks[c->neighbours[2]].flags |= Chunk::REMESH;
+	if (y == CHUNK_SIZE-1 && c->neighbours[3] != U16_NULL) chunks[c->neighbours[3]].flags |= Chunk::REMESH;
+	if (z == 0            && c->neighbours[4] != U16_NULL) chunks[c->neighbours[4]].flags |= Chunk::REMESH;
+	if (z == CHUNK_SIZE-1 && c->neighbours[5] != U16_NULL) chunks[c->neighbours[5]].flags |= Chunk::REMESH;
 }
 
 void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
@@ -104,7 +116,7 @@ void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
 	auto blocki = BLOCK_IDX(x,y,z);
 	subchunk.voxels[blocki] = data;
 
-	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
+	write_block_update_chunk_flags(x,y,z, c);
 }
 
 void Chunks::densify_chunk (Chunk& c) {

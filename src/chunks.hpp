@@ -284,6 +284,8 @@ struct Chunks {
 	//
 	void write_block (int x, int y, int z, Chunk* c, block_id bid);
 
+	void write_block_update_chunk_flags (int x, int y, int z, Chunk* c);
+
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, Player const& player);
 	

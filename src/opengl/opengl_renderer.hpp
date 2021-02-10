@@ -86,7 +86,7 @@ public:
 
 	Shader*			block_highl_shad = shaders.compile("block_highlight");
 	Mesh			block_highl_mesh = block_highlight();
-	void draw_block_highlight (OpenglRenderer& r);
+	void draw_block_highlight (OpenglRenderer& r, SelectedBlock& block);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;

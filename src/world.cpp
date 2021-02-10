@@ -9,10 +9,9 @@ void World::raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, floa
 
 	float _dist;
 	auto hit_block = [&] (int3 pos, int face, float dist) -> bool {
-		g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
+		//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
 
 		block_id bid = chunks.read_block(pos.x, pos.y, pos.z);
-		
 		if ((g_assets.block_types.block_breakable(bid))) {
 			//hit.pos_world = ray.pos + ray.dir * dist;
 			block.is_selected = true;
