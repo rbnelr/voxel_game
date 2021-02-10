@@ -13,12 +13,12 @@ void Assets::load_block_types (json const& blocks_json) {
 		BlockTypes::Block b;
 
 		b.name = "null";
-		b.hardness = 1;
+		b.hardness = 255;
 		b.collision = CM_SOLID;
 		//b.transparency = TM_OPAQUE; // don't render edges of world
 		b.transparency = TM_TRANSPARENT; // render edges of world
 
-										 //name_map.emplace(b.name, (block_id)blocks.size());
+		//name_map.emplace(b.name, (block_id)blocks.size());
 		block_types.blocks.push_back(std::move(b));
 	}
 

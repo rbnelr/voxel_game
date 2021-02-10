@@ -46,10 +46,10 @@ void World::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) 
 		if (tool_props.tool == g_assets.block_types[block.block].tool)
 			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
 
-		dmg = tool_props.damage * damage_multiplier;
+		dmg = ((float)tool_props.damage / 255.0f) * damage_multiplier;
 
 		if (creative_mode)
-			dmg = 1;
+			dmg = 1.0f;
 	}
 	block.damage += dmg;
 
