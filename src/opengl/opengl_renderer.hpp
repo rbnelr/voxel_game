@@ -9,6 +9,15 @@
 
 namespace gl {
 
+// mesh has to be bound
+inline void draw_submesh (IndexedMesh& mesh, GenericSubmesh submesh) {
+	glDrawElementsBaseVertex(GL_TRIANGLES,
+		submesh.index_count, // vertex draw count is how many indicies there are
+		GL_UNSIGNED_SHORT,
+		(void*)(submesh.index_offs * sizeof(uint16_t)), // index offset
+		(GLint)submesh.vertex_offs); // basevertex is the vertex offset
+}
+
 struct ViewUniforms {
 	float4x4 world_to_cam;
 	float4x4 cam_to_world;
@@ -68,7 +77,23 @@ struct glDebugDraw {
 	void draw (OpenglRenderer& r);
 };
 
-Mesh block_highlight ();
+struct BlockHighlight {
+	Shader*			shad;
+	IndexedMesh		mesh;
+	GenericSubmesh	block_highl, face_highl;
+
+	BlockHighlight (Shaders& shaders) {
+		shad = shaders.compile("block_highlight");
+
+		auto bh = load_block_highlight_mesh();
+		mesh = upload_mesh("block_highlight",
+			bh.data.vertices.data(), bh.data.vertices.size(), bh.data.indices.data(), bh.data.indices.size());
+
+		block_highl = bh.block_highlight;
+		face_highl = bh.face_highlight;
+	}
+	void draw (OpenglRenderer& r, SelectedBlock& block);
+};
 
 class OpenglRenderer : public Renderer {
 public:
@@ -87,11 +112,13 @@ public:
 	Ubo				block_meshes_ubo = {"block_meshes_ubo"};
 	Texture2DArray	tile_textures = {"tile_textures"};
 
-	ChunkRenderer	chunk_renderer = ChunkRenderer(shaders);
+	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
+	BlockHighlight	block_highl		= BlockHighlight(shaders);
 
-	Shader*			block_highl_shad = shaders.compile("block_highlight");
-	Mesh			block_highl_mesh = block_highlight();
-	void draw_block_highlight (OpenglRenderer& r, SelectedBlock& block);
+	bool			wireframe = false;
+	bool			wireframe_backfaces = true;
+	float			line_width = 1.0f;
+	glDebugDraw		debug_draw = glDebugDraw(shaders);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;
@@ -99,12 +126,6 @@ public:
 	virtual void set_vsync (bool state) {
 		ctx.set_vsync(state);
 	}
-
-	bool wireframe = false;
-	bool wireframe_backfaces = true;
-	float line_width = 1.0f;
-
-	glDebugDraw debug_draw = glDebugDraw(shaders);
 
 	bool load_textures (); // can be reloaded
 	void load_static_data ();

@@ -200,3 +200,95 @@ void Assets::load_block_tiles (json const& blocks_json) {
 		block_tiles.push_back(bt);
 	}
 }
+
+#if 0
+// Can use mTransformation in node tree to avoid having to apply transformations in blender,
+// but for some reason the object names do not appear in the fbx? only the mesh names do
+void print_fbx (aiNode const* node, int depth, float scale, float4x4 transform) {
+	auto& t = node->mTransformation;
+	float4x4 m = float4x4(t.a1,t.a2,t.a3,t.a4,  t.b1,t.b2,t.b3,t.b4, t.c1,t.c2,t.c3,t.c4,  t.d1,t.d2,t.d3,t.d4);
+	m = transform * m;
+
+	float3 pos = (float3)(m * float4(0,0,0,1)) * scale;
+
+	for (int i=0; i<depth; ++i)
+		printf("  ");
+	printf("%s %f,%f,%f\n", node->mName.C_Str(), pos.x, pos.y, pos.z);
+
+	for (unsigned int i=0; i<node->mNumChildren; ++i)
+		print_fbx(node->mChildren[i], depth+1, scale, m);
+}
+void print_fbx (aiScene const* scene) {
+	float scale = 1.0f / 100; // fbx seems to use centimeter units (with UnitScaleFactor 1) 
+
+	for (unsigned int i=0; i<scene->mMetaData->mNumProperties; ++i) {
+		if (strcmp(scene->mMetaData->mKeys[i].C_Str(), "UnitScaleFactor") == 0) {
+			if (scene->mMetaData->mValues[i].mType == AI_DOUBLE) scale *= (float)*(double*)scene->mMetaData->mValues[i].mData;
+			if (scene->mMetaData->mValues[i].mType == AI_FLOAT)  scale *=        *(float*) scene->mMetaData->mValues[i].mData;
+		}
+	}
+
+	print_fbx(scene->mRootNode, 0, scale, float4x4::identity());
+}
+#endif
+
+GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, std::string_view subobj) {
+	GenericSubmesh m = {};
+
+	if (scene) {
+		for (unsigned i=0; i<scene->mNumMeshes; ++i) {
+			auto* mesh = scene->mMeshes[i];
+
+			if (subobj.compare(mesh->mName.C_Str()) == 0) {
+
+				m.vertex_offs = data->vertices.size();
+				m.index_offs  = data->indices.size();
+
+				for (unsigned j=0; j<mesh->mNumVertices; ++j) {
+					data->vertices.emplace_back();
+					GenericVertex& v = data->vertices.back();
+
+					auto& pos = mesh->mVertices[j];
+					auto& norm = mesh->mNormals[j];
+					auto* uv = &mesh->mTextureCoords[0][j];
+					auto* col = &mesh->mColors[0][j];
+
+					v.pos = float3(pos.x, pos.y, pos.z);
+					v.norm = float3(norm.x, norm.y, norm.z);
+					v.uv = mesh->mTextureCoords[0] ? float2(uv->x, uv->y) : 0;
+					v.col = mesh->mColors[0] ? float4(col->r, col->g, col->b, col->a) : lrgba(1,1,1,1);
+				}
+
+				for (unsigned j=0; j<mesh->mNumFaces; ++j) {
+					auto& f = mesh->mFaces[j];
+					assert(f.mNumIndices == 3);
+
+					for (unsigned k=0; k<3; ++k) {
+						data->indices.push_back( (uint16_t)f.mIndices[k] );
+					}
+				}
+
+				m.vertex_count = mesh->mNumVertices;
+				m.index_count  = mesh->mNumFaces * 3;
+			
+				return m;
+			}
+		}
+	}
+
+	clog(ERROR, "[load_subobject] Suboject %s not found in fbx!", subobj);
+	return m;
+}
+
+BlockHighlight load_block_highlight_mesh () {
+	BlockHighlight bh;
+
+	auto* block_highlight_fbx = aiImportFile("meshes/block_highlight.fbx", aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
+	//print_fbx(block_highlight_fbx);
+	
+	bh.block_highlight = load_subobject(&bh.data, block_highlight_fbx, "block_highlight");
+	bh.face_highlight  = load_subobject(&bh.data, block_highlight_fbx, "face_highlight");
+
+	aiReleaseImport(block_highlight_fbx);
+	return bh;
+}

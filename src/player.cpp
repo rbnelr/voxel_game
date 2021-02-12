@@ -41,9 +41,10 @@ void BlockPlace::update (Input& I, World& world, Player const& player) {
 
 	if (trigger && player.selected_block && is_block) {
 		int3 offs = 0;
-		offs[player.selected_block.face / 2] = (player.selected_block.face % 2) ? +1 : -1;
+		if (player.selected_block.hit.face >= 0)
+			offs[player.selected_block.hit.face / 2] = (player.selected_block.hit.face % 2) ? +1 : -1;
 
-		int3 block_place_pos = player.selected_block.pos + offs;
+		int3 block_place_pos = player.selected_block.hit.pos + offs;
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
@@ -261,11 +262,11 @@ void update_block_edits (Input& I, World& world, Camera_View& view, bool creativ
 	auto& block = world.player.selected_block;
 
 	bool was_selected = block.is_selected;
-	int3 old_pos = block.pos;
+	int3 old_pos = block.hit.pos;
 
 	calc_selected_block(block, world, view, world.player.break_block.reach, creative_mode);
 
-	if (!was_selected || !block.is_selected || old_pos != block.pos) {
+	if (!was_selected || !block.is_selected || old_pos != block.hit.pos) {
 		block.damage = 0;
 	}
 

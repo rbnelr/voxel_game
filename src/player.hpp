@@ -9,10 +9,13 @@
 struct Block;
 struct World;
 
-struct SelectedBlock {
+struct VoxelHit {
 	int3		pos;
-	block_id	block;
-	BlockFace	face = (BlockFace)-1; // -1 == no face
+	block_id	bid;
+	BlockFace	face; // -1 == no face
+};
+struct SelectedBlock {
+	VoxelHit	hit;
 	bool		is_selected = false;
 
 	float		damage = 0; // damage is accumulated from prev frame if was_selected then and is_selected now and if pos is the same

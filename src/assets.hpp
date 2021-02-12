@@ -100,3 +100,37 @@ struct Assets {
 };
 
 inline Assets g_assets;
+
+
+struct GenericVertex {
+	float3	pos;
+	float3	norm;
+	float2	uv;
+	lrgba	col;
+
+	template <typename ATTRIBS>
+	static void attributes (ATTRIBS& a) {
+		int loc = 0;
+		a.init(sizeof(GenericVertex));
+		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos",  offsetof(GenericVertex, pos));
+		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "norm", offsetof(GenericVertex, norm));
+		a.template add<AttribMode::FLOAT, decltype(uv )>(loc++, "uv",   offsetof(GenericVertex, uv));
+		a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col",  offsetof(GenericVertex, col));
+	}
+};
+struct GenericVertexData {
+	std::vector<GenericVertex>	vertices;
+	std::vector<uint16_t>		indices;
+};
+struct GenericSubmesh {
+	size_t		vertex_offs;
+	size_t		index_offs;
+	uint32_t	vertex_count;
+	uint32_t	index_count;
+};
+
+struct BlockHighlight {
+	GenericVertexData data;
+	GenericSubmesh block_highlight, face_highlight;
+};
+BlockHighlight load_block_highlight_mesh ();

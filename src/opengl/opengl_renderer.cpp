@@ -34,6 +34,7 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFil
 }
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
+	ImGui::Begin("Debug");
 
 	{
 		OGL_TRACE("upload_remeshed");
@@ -71,11 +72,11 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
 	glBindSampler(0, tile_sampler);
 
-	chunk_renderer.draw_chunks(*this, game);
-
-	//
+	// draw before chunks so it shows through transparent blocks
 	if (game.world->player.selected_block)
-		draw_block_highlight(*this, game.world->player.selected_block);
+		block_highl.draw(*this, game.world->player.selected_block);
+
+	chunk_renderer.draw_chunks(*this, game);
 
 	//
 	debug_draw.draw(*this);
@@ -89,6 +90,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
 
+	ImGui::End();
 	ctx.imgui_draw();
 
 	if (trigger_screenshot && screenshot_hud)	take_screenshot(I.window_size);
@@ -100,119 +102,49 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 }
 
 
-// rotate from facing up to facing in a block face direction
-static inline constexpr float3x3 face_rotation[] = {
-	// BF_NEG_X  = rotate3_Z(-deg(90)) * rotate3_X(deg(90)),
-	float3x3( 0, 0,-1,
-	-1, 0, 0,
-	0, 1, 0),
-	// BF_POS_X  = rotate3_Z(+deg(90)) * rotate3_X(deg(90)),
-	float3x3( 0, 0, 1,
-	1, 0, 0,
-	0, 1, 0),
-	// BF_NEG_Y  = rotate3_Z(-deg(0)) * rotate3_X(deg(90)),
-	float3x3( 1, 0, 0,
-	0, 0,-1,
-	0, 1, 0),
-	// BF_POS_Y  = rotate3_Z(+deg(180)) * rotate3_X(deg(90)),
-	float3x3(-1, 0, 0,
-	0, 0, 1,
-	0, 1, 0),
-	// BF_NEG_Z  = rotate3_X(deg(180)),
-	float3x3( 1, 0, 0,
-	0,-1, 0,
-	0, 0,-1),
-	// BF_POS_Z  = float3x3::identity()
-	float3x3( 1, 0, 0,
-	0, 1, 0,
-	0, 0, 1),
+// rotate from -Y to facing in a block face direction
+static constexpr float3x3 face_rotation[] = {
+	// BF_NEG_X
+	//rotate3_Z(deg(-90)),
+	float3x3(0,1,0,  -1,0,0,  0,0,1),
+	// BF_POS_X
+	//rotate3_Z(deg(+90)),
+	float3x3(0,-1,0,  1,0,0,  0,0,1),
+	// BF_NEG_Y
+	//float3x3::identity(),
+	float3x3(1,0,0,  0,1,0,  0,0,1),
+	// BF_POS_Y
+	//rotate3_Z(deg(180)),
+	float3x3(-1,0,0,  0,-1,0,  0,0,1),
+	// BF_NEG_Z
+	//rotate3_X(deg(+90)),
+	float3x3(1,0,0,  0,0,-1,  0,1,0),
+	// BF_POS_Z
+	//rotate3_X(deg(-90)),
+	float3x3(1,0,0,  0,0,1,  0,-1,0),
 };
 
-struct Vertex_BlockHighlight {
-	float3	pos;
-	lrgba	col;
-
-	template <typename ATTRIBS>
-	static void attributes (ATTRIBS& a) {
-		int loc = 0;
-		a.init(sizeof(Vertex_BlockHighlight));
-		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos", offsetof(Vertex_BlockHighlight, pos));
-		a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col", offsetof(Vertex_BlockHighlight, col));
-	}
-};
-Mesh block_highlight () {
-
-	lrgba col = srgba(40,40,40,240);
-	lrgba dot_col = srgba(40,40,40,240);
-
-	float r = 0.504f;
-	float inset = 1.0f / 100;
-
-	float side_r = r * 0.04f;
-
-	std::vector<Vertex_BlockHighlight> vertices;
-
-	for (int face=0; face<6; ++face) {
-
-		auto vert = [&] (float3 v, lrgba col) {
-			vertices.push_back(Vertex_BlockHighlight{ face_rotation[face] * v, col });
-		};
-		auto quad = [&] (float3 a, float3 b, float3 c, float3 d, lrgba col) {
-			vert(b, col);	vert(c, col);	vert(a, col);
-			vert(a, col);	vert(c, col);	vert(d, col);
-		};
-
-		quad(	float3(-r,-r,+r),
-			float3(+r,-r,+r),
-			float3(+r,-r,+r) + float3(-inset,+inset,0),
-			float3(-r,-r,+r) + float3(+inset,+inset,0),
-			col);
-
-		quad(	float3(+r,-r,+r),
-			float3(+r,+r,+r),
-			float3(+r,+r,+r) + float3(-inset,-inset,0),
-			float3(+r,-r,+r) + float3(-inset,+inset,0),
-			col);
-
-		quad(	float3(+r,+r,+r),
-			float3(-r,+r,+r),
-			float3(-r,+r,+r) + float3(+inset,-inset,0),
-			float3(+r,+r,+r) + float3(-inset,-inset,0),
-			col);
-
-		quad(	float3(-r,+r,+r),
-			float3(-r,-r,+r),
-			float3(-r,-r,+r) + float3(+inset,+inset,0),
-			float3(-r,+r,+r) + float3(+inset,-inset,0),
-			col);
-
-		if (face == BF_POS_Z) {
-			// face highlight
-			quad(float3(-side_r,-side_r,+r),
-				float3(+side_r,-side_r,+r),
-				float3(+side_r,+side_r,+r),
-				float3(-side_r,+side_r,+r),
-				dot_col );
-		}
-	}
-
-	return upload_mesh("block_highlight", vertices.data(), vertices.size());
-}
-void OpenglRenderer::draw_block_highlight (OpenglRenderer& r, SelectedBlock& block) {
+void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	OGL_TRACE("block_highlight");
 
 	PipelineState s;
 	s.depth_test = true;
-	s.blend_enable = false;
+	s.blend_enable = true;
 	r.state.set(s);
 
-	glUseProgram(r.block_highl_shad->prog);
+	glUseProgram(shad->prog);
 
-	r.block_highl_shad->set_uniform("block_pos", (float3)block.pos);
-	r.block_highl_shad->set_uniform("face_rotation", face_rotation[ (BlockFace)(block.face >= 0 ? block.face : 0) ]);
+	shad->set_uniform("block_pos", (float3)block.hit.pos);
+	shad->set_uniform("face_rotation", face_rotation[0]);
+	shad->set_uniform("tint", srgba(40,40,40,240));
 
-	glBindVertexArray(r.block_highl_mesh.vao);
-	glDrawArrays(GL_TRIANGLES, 0, (GLsizei)r.block_highl_mesh.vertex_count);
+	glBindVertexArray(mesh.vao);
+	draw_submesh(mesh, block_highl);
+	
+	if (block.hit.face >= 0) {
+		shad->set_uniform("face_rotation", face_rotation[ (BlockFace)(block.hit.face >= 0 ? block.hit.face : 0) ]);
+		draw_submesh(mesh, face_highl);
+	}
 }
 
 void glDebugDraw::draw (OpenglRenderer& r) {

@@ -115,9 +115,14 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		}
 
 	}
+
+	ImGui::PopItemWidth();
+	ImGui::End();
 }
 
 void Game::update (Window& window, Input& I) {
+	ImGui::Begin("Debug");
+
 	g_debugdraw.clear();
 
 	if (!activate_flycam) {
@@ -130,7 +135,7 @@ void Game::update (Window& window, Input& I) {
 
 	auto& sel = world->player.selected_block;
 	if (sel)
-		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.pos.x, sel.pos.y, sel.pos.z, g_assets.block_types[sel.block].name.c_str());
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.hit.pos.x, sel.hit.pos.y, sel.hit.pos.z, g_assets.block_types[sel.hit.bid].name.c_str());
 	else
 		ImGui::Text("Selected Block: None");
 
@@ -150,4 +155,5 @@ void Game::update (Window& window, Input& I) {
 	if (activate_flycam)
 		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));
 
+	ImGui::End();
 }

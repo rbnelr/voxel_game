@@ -455,10 +455,11 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 	VertexAttributes a;
 	T::attributes(a);
 
+	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
+
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	if (indices_buf)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindVertexArray(0);
 	return vao;
 }
 
@@ -491,6 +492,36 @@ inline Mesh upload_mesh (std::string_view label, T* vertices, size_t vertex_coun
 	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
 	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(T), vertices, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	return m;
+}
+
+struct IndexedMesh {
+	Vao vao;
+	Vbo vbo;
+	Ebo ebo;
+	uint32_t vertex_count;
+	uint32_t index_count;
+};
+
+template <typename T>
+inline IndexedMesh upload_mesh (std::string_view label,
+		T* vertices, size_t vertex_count, uint16_t* indices, size_t index_count) {
+	IndexedMesh m;
+	m.vbo = Vbo(label);
+	m.ebo = Ebo(label);
+	m.vao = setup_vao<T>(label, m.vbo, m.ebo);
+	m.vertex_count = (uint32_t)vertex_count;
+	m.index_count = (uint32_t)index_count;
+
+	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(T), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(uint16_t), indices, GL_STATIC_DRAW);
+	
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 	return m;
 }

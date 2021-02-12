@@ -119,9 +119,6 @@ void imgui_begin_frame (Window& window) {
 }
 void imgui_end_frame () {
 	g_logger.imgui();
-
-	ImGui::PopItemWidth();
-	ImGui::End();
 }
 
 void glfw_error (int err, const char* msg) {

@@ -8,14 +8,17 @@ layout(location = 0) vs2fs VS {
 
 #ifdef _VERTEX
 	layout (location = 0) in vec3 pos;
-	layout (location = 1) in vec4 col;
+	//layout (location = 1) in vec3 norm;
+	//layout (location = 2) in vec2 uv;
+	//layout (location = 3) in vec4 col;
 
 	uniform	vec3	block_pos;
 	uniform	mat3	face_rotation;
+	uniform	vec4	tint;
 
 	void main () {
 		gl_Position =		view.world_to_clip * vec4(face_rotation * pos + block_pos + vec3(0.5), 1);
-		vs.col =			col;
+		vs.col =			tint;
 	}
 #endif
 
