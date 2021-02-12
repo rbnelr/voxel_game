@@ -40,6 +40,70 @@ void DebugDraw::wire_cube (float3 pos, float3 size, lrgba col) {
 		out++;
 	}
 }
+
+void DebugDraw::wire_sphere (float3 pos, float r, lrgba col, int angres, int wires) {
+	int wiresz = wires/2 -1; // one less wire, so we gett even vertical wires and odd number of horiz wires, so that there is a 'middle' horiz wire
+	int wiresxy = wires;
+
+	int count = (wiresz + wiresxy) * angres * 2; // every wire is <angres> lines, <wires> * 2 because horiz and vert wires
+
+	size_t idx = lines.size();
+	lines.resize(idx + count);
+	auto* out = &lines[idx];
+
+	float ang_step = deg(360) / (float)angres;
+
+	for (int i=0; i<count; ++i)
+		out[i].col = col;
+
+	auto set = [&] (float3 pos) {
+		out->pos = pos * r + pos;
+		out++;
+	};
+
+	for (int j=0; j<wiresz; ++j) {
+		float a = (((float)j + 1) / (float)(wires/2) - 0.5f) * deg(180); // j +1 / (wires/2) gives us better placement of wires
+
+		float sa = sin(a);
+		float ca = cos(a);
+
+		float sb0=0, cb0=1; // optimize not calling sin&cos 2x per loop
+		for (int i=0; i<angres; ++i) {
+			float b1 = (float)(i+1) * ang_step;
+
+			float sb1 = sin(b1);
+			float cb1 = cos(b1);
+
+			set(float3(cb0 * ca, sb0 * ca, sa));
+			set(float3(cb1 * ca, sb1 * ca, sa));
+
+			sb0 = sb1;
+			cb0 = cb1;
+		}
+	}
+
+	for (int j=0; j<wiresxy; ++j) {
+		float a = (float)j / (float)wiresxy * deg(360);
+	
+		float sa = sin(a);
+		float ca = cos(a);
+
+		float sb0=0, cb0=1; // optimize not calling sin&cos 2x per loop
+		for (int i=0; i<angres; ++i) {
+			float b1 = (float)(i+1) * ang_step;
+
+			float sb1 = sin(b1);
+			float cb1 = cos(b1);
+
+			set(float3(cb0 * ca, cb0 * sa, sb0));
+			set(float3(cb1 * ca, cb1 * sa, sb1));
+
+			sb0 = sb1;
+			cb0 = cb1;
+		}
+	}
+}
+
 void DebugDraw::wire_frustrum (Camera_View const& view, lrgba col) {
 	static constexpr int _frustrum_corners[12 * 2] {
 		0,1,  1,2,  2,3,  3,0, // bottom lines

@@ -46,6 +46,7 @@ struct DebugDraw {
 	void vector (float3 pos, float3 dir, lrgba col);
 
 	void wire_cube (float3 pos, float3 size, lrgba col);
+	void wire_sphere (float3 pos, float r, lrgba col, int angres=32, int wires=16);
 	void wire_frustrum (Camera_View const& view, lrgba col);
 
 	void cylinder (float3 base, float radius, float height, lrgba col, int sides=32);

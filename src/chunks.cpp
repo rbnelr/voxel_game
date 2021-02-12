@@ -397,6 +397,9 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 			float unload_dist = load_radius + unload_hyster;
 			float unload_dist_sqr = unload_dist * unload_dist;
 
+			if (visualize_chunks && visualize_radius)
+				g_debugdraw.wire_sphere(player.pos, load_radius, lrgba(0.8, 0.2, 0.2, 1));
+
 			for (chunk_id id=0; id<end(); ++id) {
 				chunks[id]._validate_flags();
 				if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
@@ -581,13 +584,22 @@ void Chunks::update_chunk_meshing (World const& world) {
 void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
 
-	ImGui::Checkbox("mesh_world_border", &mesh_world_border);
-
-	ImGui::Spacing();
 	ImGui::Checkbox("visualize_chunks", &visualize_chunks);
 	ImGui::SameLine();
 	ImGui::Checkbox("subchunks", &visualize_subchunks);
+
+	if (ImGui::BeginPopupContextWindow("Colors")) {
+		imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
+		imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
+		imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
+		imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
+		ImGui::EndPopup();
+	}
+
 	ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
+
+	ImGui::Spacing();
+	ImGui::Checkbox("mesh_world_border", &mesh_world_border);
 
 	ImGui::Spacing();
 	ImGui::DragFloat("load_radius", &load_radius, 1);

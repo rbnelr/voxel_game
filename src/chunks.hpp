@@ -166,10 +166,10 @@ struct ChunkKey_Comparer {
 };
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 
-const lrgba DBG_CHUNK_COL			= srgba(0, 0, 255, 255);
-const lrgba DBG_SPARSE_CHUNK_COL	= srgba(0, 0, 200, 20);
-const lrgba DBG_CULLED_CHUNK_COL	= srgba(255, 0, 0, 180);
-const lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(234, 90, 0, 255);
+inline lrgba DBG_CHUNK_COL			= srgba(0, 0, 255, 255);
+inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(60, 60, 60, 45);
+inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255, 0, 0, 180);
+inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(234, 90, 0, 255);
 
 struct Chunks {
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
@@ -241,6 +241,7 @@ struct Chunks {
 
 	bool visualize_chunks = false;
 	bool visualize_subchunks = false;
+	bool visualize_radius = true;
 	bool debug_frustrum_culling = false;
 
 	// distance of chunk to player

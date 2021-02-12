@@ -92,15 +92,29 @@ namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tr
 	}
 }
 
-// Imgui is not srgb correct, ColorEdit3 assume srgb (since color pickers are usually in srgb and should display srgb values as ints because that is more convinient than floats)
-//  but the values its displays are the same as are passed to the shader, which assumes linear values, so it's impossible to both have the color picker be in srgb and the color be correct on screen
-//  solution -> fix the shader to manually convert srgb to linear??
-inline bool imgui_ColorEdit3 (const char* label, float col[3], ImGuiColorEditFlags flags) {
-	float3 srgbf = float3( to_srgb(col[0]), to_srgb(col[1]), to_srgb(col[2]) );
+inline bool imgui_ColorEdit (const char* label, lrgb* col, ImGuiColorEditFlags flags=0) {
+	float3 srgbf = float3( to_srgb(col->x), to_srgb(col->y), to_srgb(col->z) );
 	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);
-	col[0] = to_linear(srgbf.x);
-	col[1] = to_linear(srgbf.y);
-	col[2] = to_linear(srgbf.z);
+	*col = float3( to_linear(srgbf.x), to_linear(srgbf.y), to_linear(srgbf.z) );
+	return ret;
+}
+inline bool imgui_ColorEdit (const char* label, lrgba* col, ImGuiColorEditFlags flags=0) {
+	float4 srgbaf = float4( to_srgb(col->x), to_srgb(col->y), to_srgb(col->z), col->w ); // alpha is linear
+	bool ret = ImGui::ColorEdit4(label, &srgbaf.x, flags);
+	*col = float4( to_linear(srgbaf.x), to_linear(srgbaf.y), to_linear(srgbaf.z), srgbaf.w );
+	return ret;
+}
+
+inline bool imgui_ColorEdit (const char* label, srgb8* col, ImGuiColorEditFlags flags=0) {
+	float3 srgbf = (float3)(*col) / 255.0f;
+	bool ret = ImGui::ColorEdit3(label, &srgbf.x, flags);
+	*col = (srgb8)roundi(srgbf * 255.0f);
+	return ret;
+}
+inline bool imgui_ColorEdit (const char* label, srgba8* col, ImGuiColorEditFlags flags=0) {
+	float4 srgbaf = (float4)(*col) / 255.0f;
+	bool ret = ImGui::ColorEdit4(label, &srgbaf.x, flags);
+	*col = (srgba8)roundi(srgbaf * 255.0f);
 	return ret;
 }
 
