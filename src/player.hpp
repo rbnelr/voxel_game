@@ -99,7 +99,8 @@ struct Inventory {
 			slots[6] = { 1, { (item_id)g_assets.block_types.map_id("tree_log") } };
 			slots[7] = { 1, { (item_id)g_assets.block_types.map_id("leaves") } };
 			slots[8] = { 1, { (item_id)g_assets.block_types.map_id("water") } };
-			slots[9] = { 1, { (item_id)g_assets.block_types.map_id("torch") } };
+			//slots[9] = { 1, { (item_id)g_assets.block_types.map_id("torch") } };
+			slots[9] = { 1, { (item_id)g_assets.block_types.map_id("glass") } };
 		}
 	};
 

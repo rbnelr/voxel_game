@@ -52,6 +52,12 @@
 			"mesh": "X-plant",
 			"tex": [2,2],
 			"variants": 4
+		},
+
+		"glass": {
+			"class": "solid",
+			"transparency": "transparent",
+			"tex": [2,4]
 		}
 	}
 }
