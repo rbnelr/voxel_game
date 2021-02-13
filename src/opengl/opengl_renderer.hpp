@@ -56,8 +56,12 @@ struct glDebugDraw {
 	VertexBuffer vbo_lines	= vertex_buffer<DebugDraw::LineVertex>("DebugDraw.vbo_lines");
 	VertexBuffer vbo_tris	= vertex_buffer<DebugDraw::TriVertex> ("DebugDraw.vbo_tris");
 
+	IndexedInstancedBuffer vbo_wire_cube = indexed_instanced_buffer<DebugDraw::PosVertex, DebugDraw::Instance>("DebugDraw.vbo_wire_cube");
+
 	Shader* shad_lines;
 	Shader* shad_lines_occluded;
+	Shader* shad_wire_cube;
+
 	Shader* shad_tris;
 
 	bool draw_occluded = false;
@@ -72,6 +76,15 @@ struct glDebugDraw {
 		shad_lines			= shaders.compile("debug_lines", {{"DRAW_OCCLUDED", "0"}});
 		shad_lines_occluded	= shaders.compile("debug_lines", {{"DRAW_OCCLUDED", "1"}});
 		shad_tris			= shaders.compile("debug_tris");
+
+		shad_wire_cube		= shaders.compile("debug_wire_cube", {{"DRAW_OCCLUDED", "0"}});
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_wire_cube.mesh_vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(DebugDraw::_wire_vertices), DebugDraw::_wire_vertices, GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo_wire_cube.mesh_ebo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(DebugDraw::_wire_indices), DebugDraw::_wire_indices, GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	}
 
 	void draw (OpenglRenderer& r);

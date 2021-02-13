@@ -2,7 +2,7 @@
 #include "debug_draw.hpp"
 #include "camera.hpp"
 
-void DebugDraw::vector (float3 pos, float3 dir, lrgba col) {
+void DebugDraw::vector (float3 const& pos, float3 const& dir, lrgba const& col) {
 	size_t idx = lines.size();
 	lines.resize(idx + 2);
 	auto* out = &lines[idx];
@@ -11,37 +11,32 @@ void DebugDraw::vector (float3 pos, float3 dir, lrgba col) {
 	*out++ = { pos + dir, col };
 }
 
-void DebugDraw::wire_cube (float3 pos, float3 size, lrgba col) {
-	static constexpr float3 _wire_cube[12 * 2] {
-		// bottom lines
-		float3(-.5f,-.5f,-.5f), float3(+.5f,-.5f,-.5f),
-		float3(+.5f,-.5f,-.5f), float3(+.5f,+.5f,-.5f),
-		float3(+.5f,+.5f,-.5f), float3(-.5f,+.5f,-.5f),
-		float3(-.5f,+.5f,-.5f), float3(-.5f,-.5f,-.5f),
-		// vertical lines
-		float3(-.5f,-.5f,-.5f), float3(-.5f,-.5f,+.5f),
-		float3(+.5f,-.5f,-.5f), float3(+.5f,-.5f,+.5f),
-		float3(+.5f,+.5f,-.5f), float3(+.5f,+.5f,+.5f),
-		float3(-.5f,+.5f,-.5f), float3(-.5f,+.5f,+.5f),
-		// top lines
-		float3(-.5f,-.5f,+.5f), float3(+.5f,-.5f,+.5f),
-		float3(+.5f,-.5f,+.5f), float3(+.5f,+.5f,+.5f),
-		float3(+.5f,+.5f,+.5f), float3(-.5f,+.5f,+.5f),
-		float3(-.5f,+.5f,+.5f), float3(-.5f,-.5f,+.5f),
-	};
-
+void DebugDraw::wire_cube (float3 const& pos, float3 const& size, lrgba const& col) {
+#if 0
 	size_t idx = lines.size();
 	lines.resize(idx + ARRLEN(_wire_cube));
 	auto* out = &lines[idx];
 
 	for (auto& p : _wire_cube) {
-		out->pos = p * size + pos;
+		out->pos.x = p.x * size.x + pos.x;
+		out->pos.y = p.y * size.y + pos.y;
+		out->pos.z = p.z * size.z + pos.z;
+
 		out->col = col;
+
 		out++;
 	}
+#else
+	wire_cubes.emplace_back();
+	auto& v = wire_cubes.back();
+
+	v.pos = pos;
+	v.size = size;
+	v.col = col;
+#endif
 }
 
-void DebugDraw::wire_sphere (float3 pos, float r, lrgba col, int angres, int wires) {
+void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int angres, int wires) {
 	int wiresz = wires/2 -1; // one less wire, so we gett even vertical wires and odd number of horiz wires, so that there is a 'middle' horiz wire
 	int wiresxy = wires;
 
@@ -104,7 +99,7 @@ void DebugDraw::wire_sphere (float3 pos, float r, lrgba col, int angres, int wir
 	}
 }
 
-void DebugDraw::wire_frustrum (Camera_View const& view, lrgba col) {
+void DebugDraw::wire_frustrum (Camera_View const& view, lrgba const& col) {
 	static constexpr int _frustrum_corners[12 * 2] {
 		0,1,  1,2,  2,3,  3,0, // bottom lines
 		0,4,  1,5,  2,6,  3,7, // vertical lines
@@ -122,7 +117,7 @@ void DebugDraw::wire_frustrum (Camera_View const& view, lrgba col) {
 	}
 }
 
-void DebugDraw::cylinder (float3 base, float radius, float height, lrgba col, int sides) {
+void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides) {
 	size_t idx = tris.size();
 	tris.resize(idx + sides * 4 * 3); // tri for bottom + top cap + 2 tris for side
 	auto* out = &tris[idx];

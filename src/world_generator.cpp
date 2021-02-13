@@ -64,32 +64,32 @@ float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 p
 		return osn_noise.eval<float>(pos.x, pos.y, pos.z / 0.7f);
 	};
 
-	//float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
-	//float dx = (noise(pos_world + float3(1,0,0), 180.0f, 0) * 180.0f - 50.0f) - val;
-	//float dy = (noise(pos_world + float3(0,1,0), 180.0f, 0) * 180.0f - 50.0f) - val;
-	//float dz = (noise(pos_world + float3(0,0,1), 180.0f, 0) * 180.0f - 50.0f) - val;
-	//
-	//float3 normal = normalize(float3(dx,dy,dz));
-	//
-	//float stalag_freq = 5.0f;
-	//float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * (abs(normal.z) - 0.2f);
-	//if (dz < 0) {
-	//	stalag = max(stalag, 0.0f);
-	//	stalag *= -40;
-	//	val += stalag;
-	//}
+	float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
+	float dx = (noise(pos_world + float3(1,0,0), 180.0f, 0) * 180.0f - 50.0f) - val;
+	float dy = (noise(pos_world + float3(0,1,0), 180.0f, 0) * 180.0f - 50.0f) - val;
+	float dz = (noise(pos_world + float3(0,0,1), 180.0f, 0) * 180.0f - 50.0f) - val;
 
-	float val = 0.0f;
+	float3 normal = normalize(float3(dx,dy,dz));
+
+	float stalag_freq = 5.0f;
+	float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * (abs(normal.z) - 0.2f);
+	if (dz < 0) {
+		stalag = max(stalag, 0.0f);
+		stalag *= -40;
+		val += stalag;
+	}
+
+	//float val = 0.0f;
 
 	// large scale
-	val += noise(pos_world, 300.0f, 0) * 300.0f;
+	//val += noise(pos_world, 300.0f, 0) * 300.0f;
 
 	// small scale
 	val += noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
 	val += noise(pos_world, 70.0f, float3(700,800,900)) * 70.0f;
 	val += noise(pos_world, 4.0f, float3(700,800,900)) * 2.0f;
 
-	val += pos_world.z * 0.5f;
+	//val += pos_world.z * 0.5f;
 
 	return val;
 }

@@ -210,6 +210,24 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_count);
 		}
 	}
+
+	{
+		OGL_TRACE("draw wire cubes");
+
+		glBindVertexArray(vbo_wire_cube.vao);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo_wire_cube.instance_vbo);
+
+		GLsizeiptr instance_count = g_debugdraw.wire_cubes.size() * sizeof(DebugDraw::Instance);
+		glBufferData(GL_ARRAY_BUFFER, instance_count, nullptr, GL_STREAM_DRAW);
+		if (instance_count > 0) {
+			glBufferData(GL_ARRAY_BUFFER, instance_count, g_debugdraw.wire_cubes.data(), GL_STREAM_DRAW);
+
+			r.state.set(s);
+			glUseProgram(shad_wire_cube->prog);
+
+			glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_indices), GL_UNSIGNED_SHORT, (void*)0, (GLsizei)instance_count);
+		}
+	}
 }
 
 bool OpenglRenderer::load_textures () {

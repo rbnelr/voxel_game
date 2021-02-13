@@ -467,12 +467,79 @@ struct VertexBuffer {
 	Vao vao;
 	Vbo vbo;
 };
-
 template <typename T>
 inline VertexBuffer vertex_buffer (std::string_view label) {
 	VertexBuffer v;
 	v.vbo = Vbo(label);
 	v.vao = setup_vao<T>(label, v.vbo);
+	return v;
+}
+
+struct InstancedBuffer {
+	Vao vao;
+	Vbo mesh_vbo;
+	Vbo instance_vbo;
+};
+template <typename MeshVertex, typename InstanceVertVertex>
+inline InstancedBuffer instanced_buffer (std::string_view label) {
+	InstancedBuffer v;
+	v.mesh_vbo = Vbo(label);
+	v.instance_vbo = Vbo(label);
+	
+	v.vao = { label };
+
+	glBindVertexArray(v.vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, v.mesh_vbo);
+	{
+		VertexAttributes a;
+		MeshVertex::attributes(a);
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, v.instance_vbo);
+	{
+		VertexAttributes a;
+		InstanceVertVertex::attributes(a);
+	}
+	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	return v;
+}
+
+struct IndexedInstancedBuffer {
+	Vao vao;
+	Vbo mesh_vbo;
+	Ebo mesh_ebo;
+	Vbo instance_vbo;
+};
+template <typename MeshVertex, typename InstanceVertVertex>
+inline IndexedInstancedBuffer indexed_instanced_buffer (std::string_view label) {
+	IndexedInstancedBuffer v;
+	v.mesh_vbo = Vbo(label);
+	v.mesh_ebo = Ebo(label);
+	v.instance_vbo = Vbo(label);
+
+	v.vao = { label };
+
+	glBindVertexArray(v.vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, v.mesh_vbo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v.mesh_ebo);
+	{
+		VertexAttributes a;
+		MeshVertex::attributes(a);
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, v.instance_vbo);
+	{
+		VertexAttributes a;
+		InstanceVertVertex::attributes(a);
+	}
+	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
 	return v;
 }
 
