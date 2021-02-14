@@ -243,8 +243,11 @@ void mesh_chunk (RemeshChunkJob& j) {
 #endif
 
 Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
-	auto nid = j.chunk->neighbours[neighbour];
-	if (nid != U16_NULL && ((*j.chunks)[nid].flags & Chunk::LOADED)) {
+	int3 pos = j.chunk->pos;
+	pos[neighbour] -= 1;
+
+	auto nid = j.chunks->chunks_arr.checked_get(pos.x, pos.y, pos.z);
+	if (nid != U16_NULL && (*j.chunks)[nid].flags != 0) {
 		return &(*j.chunks)[nid];
 	}
 	return nullptr;
@@ -255,10 +258,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 	// neighbour chunks (can be null)
 	auto const* nc_nx = get_neighbour_blocks(j, 0);
-	auto const* nc_ny = get_neighbour_blocks(j, 2);
-	auto const* nc_nz = get_neighbour_blocks(j, 4);
-
-#define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
+	auto const* nc_ny = get_neighbour_blocks(j, 1);
+	auto const* nc_nz = get_neighbour_blocks(j, 2);
 
 	int idx = 0;
 
@@ -268,6 +269,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
 				block_id id = j.chunks->read_block(x,y,z, j.chunk);
+
+				// TODO: 
 
 				{ // X
 					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z, j.chunk) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);

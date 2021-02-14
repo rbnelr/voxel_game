@@ -360,9 +360,6 @@
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_opengl3.cpp">
       <Filter>dear_imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp">
-      <Filter>opengl</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\engine\debug_draw.cpp">
       <Filter>engine</Filter>
     </ClCompile>

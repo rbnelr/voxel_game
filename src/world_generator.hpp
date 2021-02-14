@@ -1,6 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
+#include "chunks.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);
@@ -41,9 +42,6 @@ template<typename T>
 inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) {
 	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
-
-struct Chunk;
-struct Chunks;
 
 struct WorldGenerator {
 	std_string seed_str = "test2";
@@ -108,8 +106,7 @@ struct WorldGenerator {
 };
 
 struct WorldgenJob {
-	Chunk*					chunk;
-	Chunks*					chunks;
+	int3					chunk_pos;
 	WorldGenerator const*	wg;
 
 	// temporary dense voxel buffer for chunk
@@ -117,7 +114,7 @@ struct WorldgenJob {
 	// This avoids heavy (80%) fragmentation when allocating dense data upfront and sparsifying later
 	block_id*				voxel_buffer;
 
-	WorldgenJob ();
+	WorldgenJob (int3 const& chunk_pos, WorldGenerator const* wg);
 	~WorldgenJob ();
 
 	void execute ();

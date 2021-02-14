@@ -35,17 +35,18 @@ void Chunks::free_voxels (Chunk& c) {
 
 block_id Chunks::read_block (int x, int y, int z) {
 	int bx, by, bz;
-	int3 chunk_pos;
-	CHUNK_BLOCK_POS(x,y,z, chunk_pos, bx,by,bz);
+	int cx, cy, cz;
+	CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
 
-	Chunk* chunk = query_chunk(chunk_pos);
-	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
+	auto cid = chunks_arr.checked_get(cx,cy,cz);
+	if (cid == U16_NULL)
 		return B_NULL;
 
-	return read_block(bx,by,bz, chunk);
+	return read_block(bx,by,bz, &chunks[cid]);
 }
 
 block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
+	assert(c->flags != 0);
 
 	if (c->flags & Chunk::SPARSE_VOXELS)
 		return (block_id)c->voxel_data; // sparse chunk
@@ -69,31 +70,19 @@ block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
 
 void Chunks::write_block (int x, int y, int z, block_id data) {
 	int bx, by, bz;
-	int3 chunk_pos;
-	CHUNK_BLOCK_POS(x,y,z, chunk_pos, bx,by,bz);
+	int cx, cy, cz;
+	CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
 
-	Chunk* chunk = query_chunk(chunk_pos);
+	auto cid = chunks_arr.checked_get(cx,cy,cz);
 	//assert(chunk && (chunk->flags & Chunk::LOADED)); // out of bounds writes happen on digging in unloaded chunks
-	if (!chunk || (chunk->flags & Chunk::LOADED) == 0)
+	if (cid == U16_NULL)
 		return;
 
-	write_block(bx,by,bz, chunk, data);
-}
-
-void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
-	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
-
-	// Set remesh flags for neighbours where needed
-	if (x == 0            && c->neighbours[0] != U16_NULL) chunks[c->neighbours[0]].flags |= Chunk::REMESH;
-	if (x == CHUNK_SIZE-1 && c->neighbours[1] != U16_NULL) chunks[c->neighbours[1]].flags |= Chunk::REMESH;
-	if (y == 0            && c->neighbours[2] != U16_NULL) chunks[c->neighbours[2]].flags |= Chunk::REMESH;
-	if (y == CHUNK_SIZE-1 && c->neighbours[3] != U16_NULL) chunks[c->neighbours[3]].flags |= Chunk::REMESH;
-	if (z == 0            && c->neighbours[4] != U16_NULL) chunks[c->neighbours[4]].flags |= Chunk::REMESH;
-	if (z == CHUNK_SIZE-1 && c->neighbours[5] != U16_NULL) chunks[c->neighbours[5]].flags |= Chunk::REMESH;
+	write_block(bx,by,bz, &chunks[cid], data);
 }
 
 void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
-	assert(c->flags & Chunk::LOADED);
+	assert(c->flags != 0);
 
 	if (c->flags & Chunk::SPARSE_VOXELS) {
 		if (data == (block_id)c->voxel_data)
@@ -117,6 +106,26 @@ void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
 	subchunk.voxels[blocki] = data;
 
 	write_block_update_chunk_flags(x,y,z, c);
+}
+
+void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
+	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
+
+	auto flag_neighbour = [&] (int x, int y, int z) {
+		auto nid = chunks_arr.checked_get(x,y,z);
+		if (nid != U16_NULL) {
+			assert(chunks[nid].flags != 0);
+			chunks[nid].flags |= Chunk::REMESH;
+		}
+	};
+
+	// Set remesh flags for neighbours where needed
+	if (x == 0           ) flag_neighbour(x-1, y,   z  );
+	if (x == CHUNK_SIZE-1) flag_neighbour(x+1, y,   z  );
+	if (y == 0           ) flag_neighbour(x,   y-1, z  );
+	if (y == CHUNK_SIZE-1) flag_neighbour(x,   y+1, z  );
+	if (z == 0           ) flag_neighbour(x,   y,   z-1);
+	if (z == CHUNK_SIZE-1) flag_neighbour(x,   y,   z+1);
 }
 
 void Chunks::densify_chunk (Chunk& c) {
@@ -326,25 +335,8 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
 		init_voxels(chunk);
-		memset(chunk.neighbours, -1, sizeof(chunk.neighbours));
 		init_mesh(chunk.opaque_mesh);
 		init_mesh(chunk.transparent_mesh);
-	}
-
-	assert(pos_to_id.find(pos) == pos_to_id.end());
-	{
-		ZoneScopedN("pos_to_id.emplace");
-		pos_to_id.emplace(pos, id);
-	}
-
-	for (int i=0; i<6; ++i) {
-		ZoneScopedN("alloc_chunk::get neighbour");
-
-		chunks[id].neighbours[i] = query_chunk_id(pos + OFFSETS[i]); // add neighbour to our list
-		if (chunks[id].neighbours[i] != U16_NULL) {
-			assert(chunks[ chunks[id].neighbours[i] ].neighbours[i^1] == U16_NULL);
-			chunks[ chunks[id].neighbours[i] ].neighbours[i^1] = id; // add ourself from neighbours neighbour list
-		}
 	}
 
 	return id;
@@ -355,18 +347,8 @@ void Chunks::free_chunk (chunk_id id) {
 
 	free_voxels(chunk);
 
-	for (int i=0; i<6; ++i) {
-		auto n = chunk.neighbours[i];
-		if (n != U16_NULL) {
-			assert(chunks[n].neighbours[i^1] == id); // i^1 flips direction
-			chunks[n].neighbours[i^1] = U16_NULL; // delete ourself from neighbours neighbour list
-		}
-	}
-
 	free_mesh(chunk.opaque_mesh);
 	free_mesh(chunk.transparent_mesh);
-
-	pos_to_id.erase(chunks[id].pos);
 
 	memset(&chunk, 0, sizeof(Chunk)); // zero chunk, flags will now indicate that chunk is unallocated
 	chunks.free(id);
@@ -375,130 +357,122 @@ void Chunks::free_chunk (chunk_id id) {
 void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	ZoneScoped;
 
-	{ // chunk loading/unloading
-		constexpr float BUCKET_FAC = 1.0f / (CHUNK_SIZE*CHUNK_SIZE * 4);
+	float unload_dist = load_radius + unload_hyster;
 
-		// check all chunk positions within a square of chunk_generation_radius
-		std_vector< std_vector<int3> > chunks_to_generate;
-		chunks_to_generate.resize((int)(load_radius*load_radius * BUCKET_FAC) + 1);
-		
+	// size chunks_arr to unload radius
+	chunks_arr.update(unload_dist / CHUNK_SIZE, player.pos / CHUNK_SIZE);
+
+	{
+		ZoneScopedN("chunks_to_generate iterate all chunks");
+
+		float load_dist_sqr = load_radius * load_radius;
+		float unload_dist_sqr = unload_dist * unload_dist;
+
 		{
-			ZoneScopedN("chunks_to_generate iterate all chunks");
+			chunks_to_generate.clear(); // clear all inner vectors
+			chunks_to_generate.shrink_to_fit(); // delete all inner vectors to avoid constant memory alloc when loading idle
+			chunks_to_generate.resize((int)(load_dist_sqr * BUCKET_FAC) + 1);
+		}
 
-			{
-				// queue first chunk explicitly, so that we can queue the rest via the neighbour refs
-				int3 player_pos = floori(player.pos / CHUNK_SIZE);
-				if (pos_to_id.find(player_pos) == pos_to_id.end()) {
-					chunks_to_generate[0].push_back(player_pos);
-				}
+		if (visualize_chunks) {
+			if (visualize_radius) {
+				g_debugdraw.wire_sphere(player.pos, load_radius, DBG_RADIUS_COL);
+
+				auto sz = (float)(chunks_arr.size * CHUNK_SIZE);
+				g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
 			}
 
-			float load_dist_sqr = load_radius * load_radius;
-			float unload_dist = load_radius + unload_hyster;
-			float unload_dist_sqr = unload_dist * unload_dist;
+			for (auto chunk_pos : queued_chunks) {
+				g_debugdraw.wire_cube(((float3)chunk_pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.6f, DBG_QUEUED_CHUNK_COL);
+			}
+		}
 
-			if (visualize_chunks && visualize_radius)
-				g_debugdraw.wire_sphere(player.pos, load_radius, lrgba(0.8, 0.2, 0.2, 1));
+		for (int z=chunks_arr.pos.z; z < (int)(chunks_arr.pos.z + chunks_arr.size); ++z) {
+			for (int y=chunks_arr.pos.y; y < (int)(chunks_arr.pos.y + chunks_arr.size); ++y) {
+				for (int x=chunks_arr.pos.x; x < (int)(chunks_arr.pos.x + chunks_arr.size); ++x) {
+					chunk_id& cid = chunks_arr.get(x,y,z);
+						
+					int3 pos = int3(x,y,z);
+					float dist_sqr = chunk_dist_sq(pos, player.pos);
+						
+					if (cid == U16_NULL) {
+						// chunk not yet loaded
+						bool should_load = dist_sqr <= load_dist_sqr;
 
-			for (chunk_id id=0; id<end(); ++id) {
-				chunks[id]._validate_flags();
-				if ((chunks[id].flags & Chunk::LOADED) == 0) continue;
+						if (should_load && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) { // chunk not yet queued for worldgen
+							int bucketi = (int)(dist_sqr * BUCKET_FAC);
+							chunks_to_generate[bucketi].push_back(pos);
+						}
+					} else {
+						// chunk loaded
+						chunks[cid]._validate_flags();
 
-				float dist_sqr = chunk_dist_sq(chunks[id].pos, player.pos);
-
-				if (dist_sqr > unload_dist_sqr) {
-					// unload
-					free_chunk(id);
-				} else {
-					// check neighbour references in chunk for nulls
-					// if null check if chunks is supposed to be loaded, if yes then queue
-					// note that duplicates can be queued here since the neighbours can be reached via 6 directions
-					// instead of doing a potentially expensive hashmap lookup or linear search
-					// simply deal with the duplicates later, when we have decided which chunks we even consider to generate (these are more limited in number)
-					for (int i=0; i<6; ++i) {
-						if (chunks[id].neighbours[i] == U16_NULL) {
-							// neighbour chunk not yet loaded
-							int3 pos = chunks[id].pos + OFFSETS[i];
-							float ndist_sqr = chunk_dist_sq(pos, player.pos);
-
-							if (ndist_sqr <= load_radius*load_radius) {
-								int bucketi = (int)(ndist_sqr * BUCKET_FAC);
-								chunks_to_generate[bucketi].push_back(pos);
-							}
+						bool should_unload = dist_sqr > unload_dist_sqr;
+						if (should_unload) {
+							free_chunk(cid);
+							cid = U16_NULL;
 						}
 					}
 				}
 			}
-
 		}
+	}
 
-		{
-			ZoneScopedN("chunks_to_generate finalize jobs");
+	{
+		ZoneScopedN("chunks_to_generate finalize jobs");
 
-			static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
-			static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
+		static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
+		static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
 
-			std::unique_ptr<WorldgenJob> jobs[64];
+		std::unique_ptr<WorldgenJob> jobs[64];
 
-			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
-			for (int i=0; i<count; ++i) {
-				auto job = std::move(jobs[i]);
-				auto& chunk = *job->chunk;
+		int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
+		for (int i=0; i<count; ++i) {
+			auto job = std::move(jobs[i]);
+			queued_chunks.erase(job->chunk_pos);
 
-				sparse_chunk_from_worldgen(chunk, *job);
+			auto cid = alloc_chunk(job->chunk_pos);
+			auto& chunk = chunks[cid];
 
-				for (int i=0; i<6; ++i) {
-					if (chunk.neighbours[i] != U16_NULL) {
-						auto& n = chunks[chunk.neighbours[i]];
-						if (n.flags & Chunk::LOADED) n.flags |= Chunk::REMESH;
-					}
+			chunk.flags |= Chunk::REMESH;
+			chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
+
+			sparse_chunk_from_worldgen(chunk, *job);
+
+			for (int i=0; i<6; ++i) {
+				int3 npos = job->chunk_pos + NEIGHBOURS[i];
+				auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
+				if (nid != U16_NULL) {
+					assert(chunks[nid].flags != 0);
+					chunks[nid].flags |= Chunk::REMESH;
 				}
-
-				chunk.flags |= Chunk::LOADED|Chunk::REMESH;
 			}
+		}
+	}
 
-			background_queued_count -= (int)count;
+	{
+		ZoneScopedN("chunks_to_generate push jobs");
+
+		static constexpr int QUEUE_LIMIT = 64; // 256
+		std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
+
+		// Process bucket-sorted chunks_to_generate in order
+		//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
+		int bucket=0, j=0; // sort bucket indices
+
+		int max_count = (int)ARRLEN(jobs) - (int)queued_chunks.size();
+		int count = 0;
+		for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
+			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
+				int3 chunk_pos = chunks_to_generate[bucket][i];
+				jobs[count++] = std::make_unique<WorldgenJob>(chunk_pos, &world.world_gen);
+				queued_chunks.emplace(chunk_pos);
+			}
 		}
 
-		{
-			ZoneScopedN("chunks_to_generate push jobs");
+		background_threadpool.jobs.push_n(jobs, count);
 
-			static constexpr int QUEUE_LIMIT = 256;
-			std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
-
-			// Process bucket-sorted chunks_to_generate in order, remove duplicates
-			//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
-			int bucket=0, j=0; // sort bucket indices
-
-			int max_count = (int)ARRLEN(jobs) - background_queued_count;
-			int count = 0;
-			while (count < max_count) {
-
-				while (bucket < chunks_to_generate.size() && j == chunks_to_generate[bucket].size()) {
-					bucket++;
-					j = 0;
-				}
-				if (bucket >= chunks_to_generate.size())
-					break; // all chunks_to_generate processed
-
-				auto pos = chunks_to_generate[bucket][j++];
-				if (pos_to_id.find(pos) != pos_to_id.end())
-					continue; // duplicate (chunk with pos already alloc_chunk'd), ignore
-
-				auto id = alloc_chunk(pos);
-
-				auto job = std::make_unique<WorldgenJob>();
-				job->chunk = &chunks[id];
-				job->chunks = this;
-				job->wg = &world.world_gen;
-				jobs[count++] = std::move(job);
-			}
-
-			background_threadpool.jobs.push_n(jobs, count);
-			background_queued_count += (int)count;
-
-			TracyPlot("background_queued_count", (int64_t)background_queued_count);
-		}
+		TracyPlot("background_queued_count", (int64_t)background_queued_count);
 	}
 }
 
@@ -584,15 +558,42 @@ void Chunks::update_chunk_meshing (World const& world) {
 void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
 
+	{
+		uint32_t total_pending = 0;
+		for (auto& b : chunks_to_generate)
+			total_pending += (uint32_t)b.size();
+
+		uint32_t final_chunks = chunks.count + total_pending;
+		
+		ImGui::Text("chunk loading: %5d / %5d (%3.0f %%)", chunks.count, final_chunks, (float)chunks.count / final_chunks * 100);
+
+		if (total_pending > 0) {
+			std::string str = "(";
+			for (auto& b : chunks_to_generate) {
+				str = prints("%s%3d ", str.c_str(), b.size());
+			}
+
+			str += ")";
+
+			ImGui::SameLine();
+			ImGui::Text("  %s", str.c_str());
+		}
+	}
+
 	ImGui::Checkbox("visualize_chunks", &visualize_chunks);
 	ImGui::SameLine();
 	ImGui::Checkbox("subchunks", &visualize_subchunks);
+	ImGui::SameLine();
+	ImGui::Checkbox("radius", &visualize_radius);
 
 	if (ImGui::BeginPopupContextWindow("Colors")) {
 		imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
+		imgui_ColorEdit("DBG_QUEUED_CHUNK_COL",		&DBG_QUEUED_CHUNK_COL);
 		imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
 		imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
 		imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
+		imgui_ColorEdit("DBG_RADIUS_COL",			&DBG_RADIUS_COL);
+		imgui_ColorEdit("DBG_CHUNK_ARRAY_COL",		&DBG_CHUNK_ARRAY_COL);
 		ImGui::EndPopup();
 	}
 
@@ -622,7 +623,7 @@ void Chunks::imgui (Renderer* renderer) {
 			block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
 		}
 
-		if (chunks[id].flags & Chunk::LOADED)
+		if (chunks[id].flags != 0)
 			chunks_loaded++;
 	}
 
@@ -674,7 +675,8 @@ void Chunks::imgui (Renderer* renderer) {
 	print_block_allocator(dense_subchunks, "dense_subchunks alloc");
 
 	ImGui::Spacing();
-
+	
+#if 0
 	if (ImGui::TreeNode("count_hash_collisions")) {
 		size_t collisions = 0, max_bucket_size = 0, empty_buckets = 0;
 		for (size_t i=0; i<pos_to_id.bucket_count(); ++i) {
@@ -695,6 +697,7 @@ void Chunks::imgui (Renderer* renderer) {
 
 		ImGui::TreePop();
 	}
+#endif
 
 	if (renderer)
 		renderer->chunk_renderer_imgui(*this);

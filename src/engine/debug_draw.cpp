@@ -51,8 +51,8 @@ void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int a
 	for (int i=0; i<count; ++i)
 		out[i].col = col;
 
-	auto set = [&] (float3 pos) {
-		out->pos = pos * r + pos;
+	auto set = [&] (float3 p) {
+		out->pos = p * r + pos;
 		out++;
 	};
 

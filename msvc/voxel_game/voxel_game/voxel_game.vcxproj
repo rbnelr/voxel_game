@@ -377,7 +377,6 @@
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
     <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp" />
     <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp" />
-    <ClCompile Include="..\..\..\src\opengl\opengl_shaders.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
     <ClCompile Include="..\..\..\src\physics.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>

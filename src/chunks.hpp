@@ -31,10 +31,10 @@
                           + (uint32_t)((x) & SUBCHUNK_MASK) )
 
 // Seperate world-block pos into chunk pos and block pos in chunk
-#define CHUNK_BLOCK_POS(X,Y,Z, CHUNK_POS, BX, BY, BZ) do { \
-		(CHUNK_POS).x = (X) >> CHUNK_SIZE_SHIFT; \
-		(CHUNK_POS).y = (Y) >> CHUNK_SIZE_SHIFT; \
-		(CHUNK_POS).z = (Z) >> CHUNK_SIZE_SHIFT; \
+#define CHUNK_BLOCK_POS(X,Y,Z, CX, CY, CZ, BX, BY, BZ) do { \
+		CX = (X) >> CHUNK_SIZE_SHIFT; \
+		CY = (Y) >> CHUNK_SIZE_SHIFT; \
+		CZ = (Z) >> CHUNK_SIZE_SHIFT; \
 		BX = (X) & CHUNK_SIZE_MASK; \
 		BY = (Y) & CHUNK_SIZE_MASK; \
 		BZ = (Z) & CHUNK_SIZE_MASK; \
@@ -57,7 +57,7 @@ typedef uint16_t			chunk_id;
 static_assert(CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance) < ((1<<16)-1), "");
 static constexpr uint16_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
 
-static constexpr int3 OFFSETS[6] = {
+static constexpr int3 NEIGHBOURS[6] = {
 	int3(-1,0,0), int3(+1,0,0),
 	int3(0,-1,0), int3(0,+1,0),
 	int3(0,0,-1), int3(0,0,+1),
@@ -125,7 +125,7 @@ struct ChunkVoxels {
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED		= 1<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
-		LOADED			= 1<<1, // block data valid and safe to use in main thread
+		//LOADED			= 1<<1, // block data valid and safe to use in main thread
 		SPARSE_VOXELS	= 1<<2, // voxel_data is a single block id instead of a dense_chunk id
 		VOXELS_DIRTY	= 1<<3, // voxels were changed, run checked_sparsify
 		REMESH			= 1<<4, // need remesh due to voxel change, neighbour chunk change, etc.
@@ -137,8 +137,6 @@ struct Chunk {
 
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
-	chunk_id neighbours[6];
-
 	ChunkMesh opaque_mesh;
 	ChunkMesh transparent_mesh;
 
@@ -149,10 +147,98 @@ struct Chunk {
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
-inline float chunk_dist_sq (int3 pos, float3 dist_to) {
+inline float chunk_dist_sq (int3 const& pos, float3 const& dist_to) {
 	int3 chunk_origin = pos * CHUNK_SIZE;
 	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
 }
+
+inline lrgba DBG_CHUNK_COL			= srgba(  0,   0, 255, 255);
+inline lrgba DBG_QUEUED_CHUNK_COL	= srgba(  0, 255, 200, 255);
+inline lrgba DBG_SPARSE_CHUNK_COL	= srgba( 60,  60,  60,  45);
+inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
+inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
+inline lrgba DBG_RADIUS_COL			= srgba(200,   0,   0, 255);
+inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
+
+// 3d array to store chunks around the player that moves with the player by not actually moving entries
+// but instead simply moving a virtual origin point (offs) that is used when indexing
+template <typename T>
+struct ScrollingArray {
+	T*			arr = nullptr;
+	uint32_t	size; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
+	int3		pos; // pos of lower corner of 3d array in the world (in chunk coords)
+
+	~ScrollingArray () {
+		free(arr);
+	}
+
+	void update (float required_radius, float3 new_center) {
+		uint32_t new_size = (uint32_t)ceili(required_radius * 2 + 1);
+		new_size = round_up_pot(new_size);
+
+		int3 new_pos = floori(new_center) - new_size / 2;
+
+		if (!arr || new_size != size) {
+			// size changed or init, alloc new array
+			T* new_arr = (T*)malloc(sizeof(T) * new_size*new_size*new_size);
+
+			// clear array to U16_NULL
+			memset(new_arr, -1, sizeof(T) * new_size*new_size*new_size);
+
+			// copy chunks from old array into resized array
+			if (arr) {
+				//size_t i=0;
+				//for (int z=pos.z; z < (int)(pos.z + size); ++z) {
+				//	for (int y=pos.y; y < (int)(pos.y + size); ++y) {
+				//		for (int x=pos.x; x < (int)(pos.x + size); ++x) {
+				//			auto& c = arr[i++];
+				//
+				//			if (in_bounds(x,y,z, new_pos, new_size)) {
+				//				// old chunk in new window of chunks, transfer
+				//				
+				//			} else {
+				//
+				//			}
+				//		}
+				//	}
+				//}
+
+				free(arr);
+			}
+
+			arr = new_arr;
+			size = new_size;
+			pos = new_pos;
+		
+		} else if (new_pos != pos) {
+			// only position changed
+
+			pos = new_pos;
+		}
+	}
+
+	static bool in_bounds (int x, int y, int z, int3 const& pos, int size) {
+		return z >= pos.z && z < pos.z + size &&
+		       y >= pos.y && y < pos.y + size &&
+		       x >= pos.x && x < pos.x + size;
+	}
+	bool in_bounds (int x, int y, int z) {
+		return in_bounds(x,y,z, pos, size);
+	}
+
+	T& get (int x, int y, int z) {
+		assert(in_bounds(x,y,z));
+		uint32_t mask = size -1;
+		uint32_t mx = (uint32_t)x & mask;
+		uint32_t my = (uint32_t)y & mask;
+		uint32_t mz = (uint32_t)z & mask;
+		return arr[IDX3D(mx,my,mz, size)];
+	}
+
+	T checked_get (int x, int y, int z) {
+		return in_bounds(x,y,z) ? get(x,y,z) : U16_NULL;
+	}
+};
 
 struct ChunkKey_Hasher {
 	size_t operator() (int3 const& key) const {
@@ -165,18 +251,18 @@ struct ChunkKey_Comparer {
 	}
 };
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
-
-inline lrgba DBG_CHUNK_COL			= srgba(0, 0, 255, 255);
-inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(60, 60, 60, 45);
-inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255, 0, 0, 180);
-inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(234, 90, 0, 255);
+typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
 
 struct Chunks {
+	ScrollingArray<chunk_id>		chunks_arr;
+
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
 	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
 	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
 
-	AllocatorBitset slices_alloc;
+	AllocatorBitset					slices_alloc;
+
+	chunk_pos_set					queued_chunks; // queued for async worldgen
 
 	void init_mesh (ChunkMesh& m) {
 		m.vertex_count = 0;
@@ -202,8 +288,6 @@ struct Chunks {
 
 	void sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j);
 
-	chunk_pos_to_id_map pos_to_id;
-
 	Chunk& operator[] (chunk_id id) {
 		return chunks[id];
 	}
@@ -221,7 +305,7 @@ struct Chunks {
 		
 		for (chunk_id cid=0; cid<end(); ++cid) {
 			auto& chunk = chunks[cid];
-			if ((chunk.flags & Chunk::LOADED) == 0) continue;
+			if (chunk.flags == 0) continue;
 			chunks[cid].flags |= Chunk::REMESH; // remesh chunk to make sure new renderer gets all meshes uploaded again
 		}
 	}
@@ -234,8 +318,6 @@ struct Chunks {
 	//  and only the "oldest" chunks should be unloaded
 	// This way walking back and forth might not even need to load any chunks at all
 	float unload_hyster = 0;//CHUNK_SIZE*1.5f;
-
-	int background_queued_count = 0;
 
 	bool mesh_world_border = false;
 
@@ -253,28 +335,6 @@ struct Chunks {
 
 	void visualize_chunk (Chunk& chunk, bool empty, bool culled);
 
-	Chunk* _query_cache = nullptr;
-
-	// lookup a chunk with a chunk coord, returns nullptr chunk not loaded
-	chunk_id query_chunk_id (int3 coord) {
-		auto it = pos_to_id.find(coord);
-		if (it == pos_to_id.end())
-			return U16_NULL;
-
-		_query_cache = &chunks[it->second];
-		return it->second;
-	}
-	Chunk* query_chunk (int3 coord) {
-		auto it = pos_to_id.find(coord);
-		if (it == pos_to_id.end())
-			return nullptr;
-		Chunk* c = &this->operator[](it->second);
-		c->_validate_flags();
-
-		_query_cache = c;
-		return c;
-	}
-
 	// read a block with a world block pos, returns B_NULL for unloaded chunks
 	block_id read_block (int x, int y, int z);
 	// read a block with a chunk block pos
@@ -286,6 +346,16 @@ struct Chunks {
 	void write_block (int x, int y, int z, Chunk* c, block_id bid);
 
 	void write_block_update_chunk_flags (int x, int y, int z, Chunk* c);
+
+	// instead of sorting the chunks using a exact sorting of a vector ( O(N logN) )
+	// simply insert the chunks into a set of buckets ( O(N) )
+	// that each span a fixed interval in squared distance to player space
+	// using squared distances is easier and has the advantage of having more buckets close to the player
+	// this means we still load the chunks in a routhly sorted order but chunks with closeish distances might be out of order
+	// by changing the BUCKET_FAC you increase the amount of vectors needed but increase the accuracy of the sort
+	static constexpr float BUCKET_FAC = 1.0f / (CHUNK_SIZE*CHUNK_SIZE * 4);
+	// check all chunk positions within a square of chunk_generation_radius
+	std_vector< std_vector<int3> > chunks_to_generate;
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_loading (World const& world, Player const& player);

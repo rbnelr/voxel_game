@@ -102,7 +102,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 		for (chunk_id cid=0; cid<chunks.end(); ++cid) {
 			auto& chunk = chunks[cid];
-			if ((chunk.flags & Chunk::LOADED) == 0) continue;
+			if (chunk.flags == 0) continue;
 
 			bool empty = chunk.opaque_mesh.vertex_count == 0 && chunk.transparent_mesh.vertex_count == 0;
 

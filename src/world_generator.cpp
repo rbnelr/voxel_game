@@ -68,9 +68,9 @@ float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 p
 	float dx = (noise(pos_world + float3(1,0,0), 180.0f, 0) * 180.0f - 50.0f) - val;
 	float dy = (noise(pos_world + float3(0,1,0), 180.0f, 0) * 180.0f - 50.0f) - val;
 	float dz = (noise(pos_world + float3(0,0,1), 180.0f, 0) * 180.0f - 50.0f) - val;
-
+	
 	float3 normal = normalize(float3(dx,dy,dz));
-
+	
 	float stalag_freq = 5.0f;
 	float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * (abs(normal.z) - 0.2f);
 	if (dz < 0) {
@@ -163,11 +163,11 @@ void WorldgenJob::execute () {
 	const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
 	const auto TORCH		= g_assets.block_types.map_id("torch");
 	
-	int3 chunk_origin = chunk->pos * CHUNK_SIZE;
+	int3 chunk_origin = chunk_pos * CHUNK_SIZE;
 
 	int water_level = 21 - chunk_origin.z;
 
-	uint64_t chunk_seed = wg->seed ^ hash(chunk->pos);
+	uint64_t chunk_seed = wg->seed ^ hash(chunk_pos);
 
 	OSN::Noise<2> noise(wg->seed);
 	Random rand = Random(chunk_seed);
@@ -308,7 +308,7 @@ void WorldgenJob::execute () {
 	}
 }
 
-WorldgenJob::WorldgenJob () {
+WorldgenJob::WorldgenJob (int3 const& chunk_pos, WorldGenerator const* wg): chunk_pos{chunk_pos}, wg{wg} {
 	ZoneScopedNC("malloc WorldgenJob::voxel_buffer", tracy::Color::Crimson);
 	voxel_buffer = (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
 }
