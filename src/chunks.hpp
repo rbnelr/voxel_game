@@ -172,8 +172,9 @@ struct ScrollingArray {
 		free(arr);
 	}
 
-	void update (float required_radius, float3 new_center) {
-		uint32_t new_size = (uint32_t)ceili(required_radius * 2 + 1);
+	template <typename FREE>
+	void update (float required_radius, float3 new_center, FREE free_chunk) {
+		uint32_t new_size = (uint32_t)ceili(max(required_radius, 0.0f) * 2 + 1);
 		new_size = round_up_pot(new_size);
 
 		int3 new_pos = floori(new_center) - new_size / 2;
@@ -187,21 +188,26 @@ struct ScrollingArray {
 
 			// copy chunks from old array into resized array
 			if (arr) {
-				//size_t i=0;
-				//for (int z=pos.z; z < (int)(pos.z + size); ++z) {
-				//	for (int y=pos.y; y < (int)(pos.y + size); ++y) {
-				//		for (int x=pos.x; x < (int)(pos.x + size); ++x) {
-				//			auto& c = arr[i++];
-				//
-				//			if (in_bounds(x,y,z, new_pos, new_size)) {
-				//				// old chunk in new window of chunks, transfer
-				//				
-				//			} else {
-				//
-				//			}
-				//		}
-				//	}
-				//}
+				size_t i=0;
+				for (int z=pos.z; z < (int)(pos.z + size); ++z) {
+					for (int y=pos.y; y < (int)(pos.y + size); ++y) {
+						for (int x=pos.x; x < (int)(pos.x + size); ++x) {
+							chunk_id& c = get(x,y,z);
+				
+							if (in_bounds(x,y,z, new_pos, new_size)) {
+								// old chunk in new window of chunks, transfer
+								auto idx = index(x,y,z, new_pos, new_size);
+
+								assert(new_arr[idx] == U16_NULL);
+								new_arr[idx] = c;
+							} else {
+								// old chunk outside of window of chunks, delete
+								if (c != U16_NULL)
+									free_chunk(c);
+							}
+						}
+					}
+				}
 
 				free(arr);
 			}
@@ -213,6 +219,61 @@ struct ScrollingArray {
 		} else if (new_pos != pos) {
 			// only position changed
 
+			int x0 = pos.x;
+			int x1 = (int)(pos.x + size);
+			int y0 = pos.y;
+			int y1 = (int)(pos.y + size);
+			int z0 = pos.z;
+			int z1 = (int)(pos.z + size);
+
+			int dx0, dx1;
+			if (new_pos.x >= pos.x) { dx0 = pos.x;            dx1 = new_pos.x;    }
+			else                    { dx0 = new_pos.x + size; dx1 = pos.x + size; }
+
+			int dy0, dy1;
+			if (new_pos.y >= pos.y) { dy0 = pos.y;            dy1 = new_pos.y;    }
+			else                    { dy0 = new_pos.y + size; dy1 = pos.y + size; }
+
+			int dz0, dz1;
+			if (new_pos.z >= pos.z) { dz0 = pos.z;            dz1 = new_pos.z;    }
+			else                    { dz0 = new_pos.z + size; dz1 = pos.z + size; }
+
+			for (int x=dx0; x<dx1; ++x) {
+				for (int z=z0; z<z1; ++z) {
+					for (int y=y0; y<y1; ++y) {
+						chunk_id& c = get(x,y,z);
+						if (c != U16_NULL) {
+							free_chunk(c);
+							c = U16_NULL;
+						}
+					}
+				}
+			}
+
+			for (int y=dy0; y<dy1; ++y) {
+				for (int z=z0; z<z1; ++z) {
+					for (int x=x0; x<x1; ++x) {
+						chunk_id& c = get(x,y,z);
+						if (c != U16_NULL) {
+							free_chunk(c);
+							c = U16_NULL;
+						}
+					}
+				}
+			}
+
+			for (int z=dz0; z<dz1; ++z) {
+				for (int y=y0; y<y1; ++y) {
+					for (int x=x0; x<x1; ++x) {
+						chunk_id& c = get(x,y,z);
+						if (c != U16_NULL) {
+							free_chunk(c);
+							c = U16_NULL;
+						}
+					}
+				}
+			}
+
 			pos = new_pos;
 		}
 	}
@@ -222,17 +283,21 @@ struct ScrollingArray {
 		       y >= pos.y && y < pos.y + size &&
 		       x >= pos.x && x < pos.x + size;
 	}
+	static size_t index (int x, int y, int z, int3 const& pos, int size) {
+		assert(in_bounds(x,y,z, pos, size));
+		uint32_t mask = size -1;
+		uint32_t mx = (uint32_t)x & mask;
+		uint32_t my = (uint32_t)y & mask;
+		uint32_t mz = (uint32_t)z & mask;
+		return IDX3D(mx,my,mz, size);
+	}
+
 	bool in_bounds (int x, int y, int z) {
 		return in_bounds(x,y,z, pos, size);
 	}
 
 	T& get (int x, int y, int z) {
-		assert(in_bounds(x,y,z));
-		uint32_t mask = size -1;
-		uint32_t mx = (uint32_t)x & mask;
-		uint32_t my = (uint32_t)y & mask;
-		uint32_t mz = (uint32_t)z & mask;
-		return arr[IDX3D(mx,my,mz, size)];
+		return arr[index(x,y,z, pos, size)];
 	}
 
 	T checked_get (int x, int y, int z) {

@@ -356,11 +356,16 @@ void Chunks::free_chunk (chunk_id id) {
 
 void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	ZoneScoped;
+	
+	// clamp for sanity
+	load_radius = clamp(load_radius, 0.0f, 20000.0f);
+	unload_hyster = clamp(unload_hyster, 0.0f, 20000.0f);
 
 	float unload_dist = load_radius + unload_hyster;
 
 	// size chunks_arr to unload radius
-	chunks_arr.update(unload_dist / CHUNK_SIZE, player.pos / CHUNK_SIZE);
+	chunks_arr.update(unload_dist / CHUNK_SIZE, player.pos / CHUNK_SIZE,
+		[this] (chunk_id cid) { free_chunk(cid); });
 
 	{
 		ZoneScopedN("chunks_to_generate iterate all chunks");
@@ -386,7 +391,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 				g_debugdraw.wire_cube(((float3)chunk_pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.6f, DBG_QUEUED_CHUNK_COL);
 			}
 		}
-
+		
 		for (int z=chunks_arr.pos.z; z < (int)(chunks_arr.pos.z + chunks_arr.size); ++z) {
 			for (int y=chunks_arr.pos.y; y < (int)(chunks_arr.pos.y + chunks_arr.size); ++y) {
 				for (int x=chunks_arr.pos.x; x < (int)(chunks_arr.pos.x + chunks_arr.size); ++x) {
@@ -431,20 +436,26 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 			auto job = std::move(jobs[i]);
 			queued_chunks.erase(job->chunk_pos);
 
-			auto cid = alloc_chunk(job->chunk_pos);
-			auto& chunk = chunks[cid];
+			// Check that chunk is still in 3d array bounds, if not simply discard the job results
+			if (chunks_arr.in_bounds(job->chunk_pos.x, job->chunk_pos.y, job->chunk_pos.z)) {
 
-			chunk.flags |= Chunk::REMESH;
-			chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
+				auto cid = alloc_chunk(job->chunk_pos);
+				auto& chunk = chunks[cid];
 
-			sparse_chunk_from_worldgen(chunk, *job);
+				chunk.flags |= Chunk::REMESH;
+				
+				assert(chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) == U16_NULL);
+				chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
 
-			for (int i=0; i<6; ++i) {
-				int3 npos = job->chunk_pos + NEIGHBOURS[i];
-				auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
-				if (nid != U16_NULL) {
-					assert(chunks[nid].flags != 0);
-					chunks[nid].flags |= Chunk::REMESH;
+				sparse_chunk_from_worldgen(chunk, *job);
+
+				for (int i=0; i<6; ++i) {
+					int3 npos = job->chunk_pos + NEIGHBOURS[i];
+					auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
+					if (nid != U16_NULL) {
+						assert(chunks[nid].flags != 0);
+						chunks[nid].flags |= Chunk::REMESH;
+					}
 				}
 			}
 		}
@@ -558,27 +569,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 void Chunks::imgui (Renderer* renderer) {
 	if (!imgui_push("Chunks")) return;
 
-	{
-		uint32_t total_pending = 0;
-		for (auto& b : chunks_to_generate)
-			total_pending += (uint32_t)b.size();
-
-		uint32_t final_chunks = chunks.count + total_pending;
-		
-		ImGui::Text("chunk loading: %5d / %5d (%3.0f %%)", chunks.count, final_chunks, (float)chunks.count / final_chunks * 100);
-
-		if (total_pending > 0) {
-			std::string str = "(";
-			for (auto& b : chunks_to_generate) {
-				str = prints("%s%3d ", str.c_str(), b.size());
-			}
-
-			str += ")";
-
-			ImGui::SameLine();
-			ImGui::Text("  %s", str.c_str());
-		}
-	}
+	////
 
 	ImGui::Checkbox("visualize_chunks", &visualize_chunks);
 	ImGui::SameLine();
@@ -603,8 +594,36 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::Checkbox("mesh_world_border", &mesh_world_border);
 
 	ImGui::Spacing();
-	ImGui::DragFloat("load_radius", &load_radius, 1);
-	ImGui::DragFloat("unload_hyster", &unload_hyster, 1);
+	ImGui::DragFloat("load_radius", &load_radius, 1, 0);
+	ImGui::DragFloat("unload_hyster", &unload_hyster, 1, 0);
+
+	////
+	ImGui::Separator();
+
+	{
+		uint32_t total_pending = 0;
+		for (auto& b : chunks_to_generate)
+			total_pending += (uint32_t)b.size();
+
+		uint32_t final_chunks = chunks.count + total_pending;
+
+		ImGui::Text("chunk loading: %5d / %5d (%3.0f %%)", chunks.count, final_chunks, (float)chunks.count / final_chunks * 100);
+
+		if (total_pending > 0) {
+			std::string str = "(";
+			for (auto& b : chunks_to_generate) {
+				str = prints("%s%3d ", str.c_str(), b.size());
+			}
+
+			str += ")";
+
+			ImGui::SameLine();
+			ImGui::Text("  %s", str.c_str());
+		}
+	}
+	
+	////
+	ImGui::Separator();
 
 	uint64_t block_volume = chunks.count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 	uint64_t block_mem = 0;
@@ -640,7 +659,10 @@ void Chunks::imgui (Renderer* renderer) {
 	uint64_t sparse_voxels = (sparse_chunks * (uint64_t)CHUNK_VOXEL_COUNT) + (sparse_subc * (uint64_t)SUBCHUNK_VOXEL_COUNT);
 
 	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
-	
+
+	ImGui::Text("3D Array     : %4d^3 chunks %4d KB",
+		chunks_arr.size, sizeof(chunk_id) * chunks_arr.size*chunks_arr.size*chunks_arr.size / KB);
+
 	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM (%6.2f %% usage)",
 		chunks.count, format_thousands(block_volume / MB).c_str(),
 		(int)(chunks.commit_size()/KB), chunks.usage() * 100);

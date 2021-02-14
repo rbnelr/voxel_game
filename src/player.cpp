@@ -175,7 +175,7 @@ void Player::update_movement_controls (Input& I, World& world) {
 		float delta_speed = length(delta_vel);
 
 		float accel = delta_speed * walk_accel_proport + walk_accel_base;
-
+		
 		delta_vel = normalizesafe(delta_vel) * min(accel * I.dt, delta_speed);
 		vel += float3(delta_vel, 0);
 	}
