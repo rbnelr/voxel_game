@@ -120,12 +120,12 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	};
 
 	// Set remesh flags for neighbours where needed
-	if (x == 0           ) flag_neighbour(x-1, y,   z  );
-	if (x == CHUNK_SIZE-1) flag_neighbour(x+1, y,   z  );
-	if (y == 0           ) flag_neighbour(x,   y-1, z  );
-	if (y == CHUNK_SIZE-1) flag_neighbour(x,   y+1, z  );
-	if (z == 0           ) flag_neighbour(x,   y,   z-1);
-	if (z == CHUNK_SIZE-1) flag_neighbour(x,   y,   z+1);
+	if (x == 0           ) flag_neighbour(c->pos.x-1, c->pos.y,   c->pos.z  );
+	if (x == CHUNK_SIZE-1) flag_neighbour(c->pos.x+1, c->pos.y,   c->pos.z  );
+	if (y == 0           ) flag_neighbour(c->pos.x,   c->pos.y-1, c->pos.z  );
+	if (y == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y+1, c->pos.z  );
+	if (z == 0           ) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z-1);
+	if (z == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z+1);
 }
 
 void Chunks::densify_chunk (Chunk& c) {
