@@ -56,9 +56,9 @@ struct Physics {
 		return sqrt( 2.0f * jump_height * grav_mag );
 	}
 
-	void update_object (float dt, World& world, PhysicsObject& obj);
+	void update_object (float dt, Chunks& chunks, PhysicsObject& obj);
 
-	void update_player (float dt, World& world, Player& player);
+	void update_player (float dt, Chunks& chunks, Player& player);
 };
 
 // Global physics

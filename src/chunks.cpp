@@ -1,13 +1,27 @@
 #include "common.hpp"
 #include "chunks.hpp"
 #include "chunk_mesher.hpp"
-#include "player.hpp"
-#include "world.hpp"
+#include "game.hpp"
 #include "world_generator.hpp"
 #include "voxel_light.hpp"
 #include "chunk_mesher.hpp"
 
 //// Voxel system
+
+void Chunks::destroy () {
+	// wait for all jobs to be completed to be able to safely recreate a new chunks with the same positions again later
+	background_threadpool.flush();
+	queued_chunks.clear();
+
+	for (chunk_id cid=0; cid < chunks.slots.alloc_end; ++cid) {
+		if (chunks[cid].flags != 0)
+			free_chunk(cid);
+	}
+	assert(chunks.count == 0);
+	assert(dense_chunks.count == 0);
+	assert(dense_subchunks.count == 0);
+	chunks_arr = ScrollingArray<chunk_id>();
+}
 
 void Chunks::init_voxels (Chunk& chunk) {
 	chunk.flags |= Chunk::SPARSE_VOXELS;
@@ -358,7 +372,7 @@ void Chunks::free_chunk (chunk_id id) {
 	chunks.free(id);
 }
 
-void Chunks::update_chunk_loading (World const& world, Player const& player) {
+void Chunks::update_chunk_loading (Game& game) {
 	ZoneScoped;
 	
 	// clamp for sanity
@@ -368,7 +382,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 	float unload_dist = load_radius + unload_hyster;
 
 	// size chunks_arr to unload radius
-	chunks_arr.update(unload_dist / CHUNK_SIZE, player.pos / CHUNK_SIZE,
+	chunks_arr.update(unload_dist / CHUNK_SIZE, game.player.pos / CHUNK_SIZE,
 		[this] (chunk_id cid) { free_chunk(cid); });
 
 	{
@@ -377,6 +391,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 		float load_dist_sqr = load_radius * load_radius;
 		float unload_dist_sqr = unload_dist * unload_dist;
 
+		static constexpr float BUCKET_FAC = (0.5f) / (CHUNK_SIZE*CHUNK_SIZE);
 		{
 			chunks_to_generate.clear(); // clear all inner vectors
 			chunks_to_generate.shrink_to_fit(); // delete all inner vectors to avoid constant memory alloc when loading idle
@@ -385,7 +400,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 
 		if (visualize_chunks) {
 			if (visualize_radius) {
-				g_debugdraw.wire_sphere(player.pos, load_radius, DBG_RADIUS_COL);
+				g_debugdraw.wire_sphere(game.player.pos, load_radius, DBG_RADIUS_COL);
 
 				auto sz = (float)(chunks_arr.size * CHUNK_SIZE);
 				g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
@@ -402,7 +417,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 					chunk_id* cid = &chunks_arr.get(x,y,z);
 						
 					int3 pos = int3(x,y,z);
-					float dist_sqr = chunk_dist_sq(pos, player.pos);
+					float dist_sqr = chunk_dist_sq(pos, game.player.pos);
 						
 					if (*cid == U16_NULL) {
 						// chunk not yet loaded
@@ -480,18 +495,25 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 		for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
 			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
 				int3 chunk_pos = chunks_to_generate[bucket][i];
-				jobs[count++] = std::make_unique<WorldgenJob>(chunk_pos, &world.world_gen);
+				jobs[count++] = std::make_unique<WorldgenJob>(chunk_pos, &game._threads_world_gen);
 				queued_chunks.emplace(chunk_pos);
 			}
 		}
 
 		background_threadpool.jobs.push_n(jobs, count);
 
+		{ // for imgui
+			pending_chunks = 0; // chunks waiting to be queued
+			for (auto& b : chunks_to_generate)
+				pending_chunks += (uint32_t)b.size();
+			pending_chunks -= count; // exclude chunks we have already queued
+		}
+
 		//TracyPlot("background_queued_count", (int64_t)background_queued_count);
 	}
 }
 
-void Chunks::update_chunk_meshing (World const& world) {
+void Chunks::update_chunk_meshing (Game& game) {
 	ZoneScoped;
 
 	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
@@ -510,7 +532,7 @@ void Chunks::update_chunk_meshing (World const& world) {
 
 			if (chunk.flags & Chunk::REMESH) {
 				auto job = std::make_unique<RemeshChunkJob>(
-					&chunk, this, world.world_gen, mesh_world_border);
+					&chunk, this, game.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
 		}
@@ -571,8 +593,6 @@ void Chunks::update_chunk_meshing (World const& world) {
 }
 
 void Chunks::imgui (Renderer* renderer) {
-	if (!imgui_push("Chunks")) return;
-
 	////
 
 	ImGui::Checkbox("visualize_chunks", &visualize_chunks);
@@ -605,15 +625,11 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::Separator();
 
 	{
-		uint32_t total_pending = 0;
-		for (auto& b : chunks_to_generate)
-			total_pending += (uint32_t)b.size();
-
-		uint32_t final_chunks = chunks.count + total_pending;
-
+		uint32_t final_chunks = chunks.count + (uint32_t)queued_chunks.size() + pending_chunks;
+		
 		ImGui::Text("chunk loading: %5d / %5d (%3.0f %%)", chunks.count, final_chunks, (float)chunks.count / final_chunks * 100);
 
-		if (total_pending > 0) {
+		if (pending_chunks > 0) {
 			std::string str = "(";
 			for (auto& b : chunks_to_generate) {
 				str = prints("%s%3d ", str.c_str(), b.size());
@@ -727,8 +743,6 @@ void Chunks::imgui (Renderer* renderer) {
 
 	if (renderer)
 		renderer->chunk_renderer_imgui(*this);
-
-	imgui_pop();
 }
 
 void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {

@@ -5,11 +5,16 @@
 
 Game::Game () {
 	ZoneScoped;
-
+	load("debug.json", this); 
+	
 	//set_process_high_priority();
 	set_thread_priority(TPRIO_MAIN);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
+}
+Game::~Game () {
+	ZoneScoped;
+	//save("debug.json", *this); 
 }
 
 // try to do all debug guis in here,
@@ -43,10 +48,20 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		if (ImGui::Button("exit"))
 			window.close();
 
+		ImGui::SameLine();
 		ImGui::Checkbox("Logger", &g_logger.shown);
 
 		ImGui::SameLine();
 		ImGui::Checkbox("ImGui Demo", &g_imgui.show_demo_window);
+
+		//
+		ImGui::Text("debug.json:");
+		ImGui::SameLine();
+		if (ImGui::Button("Load [;]") || I.buttons[KEY_SEMICOLON].went_down)
+			load("debug.json", this); 
+		ImGui::SameLine();
+		if (ImGui::Button("Save [']") || I.buttons[KEY_APOSTROPHE].went_down)
+			save("debug.json", *this); 
 	}
 
 	{
@@ -70,16 +85,19 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (renderer)
 				renderer->graphics_imgui(I);
 		}
-		//graphics.imgui(world->chunks);
 
 		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
 
 			if (ImGui::Button("Recreate")) {
-				world = std::make_unique<World>(world_gen);
+				chunks.destroy();
+				_threads_world_gen = world_gen;
 			}
 
 			world_gen.imgui();
-			world->chunks.imgui(renderer);
+		}
+
+		if (ImGui::CollapsingHeader("Chunks", ImGuiTreeNodeFlags_DefaultOpen)) {
+			chunks.imgui(renderer);
 			block_update.imgui();
 		}
 
@@ -94,12 +112,12 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 					float3x3 cam_to_world_rot;
 					flycam.calc_world_to_cam_rot(&cam_to_world_rot);
 
-					flycam.cam.pos = world->player.pos + world->player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
+					flycam.cam.pos = player.pos + player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
 				}
 			}
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
-				world->player.pos = flycam.cam.pos;
+				player.pos = flycam.cam.pos;
 			}
 
 			if (open) ImGui::Checkbox("Creative Mode [C]", &creative_mode);
@@ -109,7 +127,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (open) ImGui::Separator();
 
 			if (open) flycam.imgui("flycam");
-			if (open) world->player.imgui("player");
+			if (open) player.imgui("player");
 
 			if (open) ImGui::Separator();
 		}
@@ -126,14 +144,14 @@ void Game::update (Window& window, Input& I) {
 	g_debugdraw.clear();
 
 	if (!activate_flycam) {
-		world->player.update_movement_controls(I, *world);
+		player.update_movement_controls(I, chunks);
 	}
 
-	physics.update_player(I.dt, *world, world->player);
+	physics.update_player(I.dt, chunks, player);
 
-	player_view = world->player.update_post_physics(I, *world);
+	player_view = player.update_post_physics(I, chunks);
 
-	auto& sel = world->player.selected_block;
+	auto& sel = player.selected_block;
 	if (sel)
 		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.hit.pos.x, sel.hit.pos.y, sel.hit.pos.z, g_assets.block_types[sel.hit.bid].name.c_str());
 	else
@@ -145,15 +163,93 @@ void Game::update (Window& window, Input& I) {
 		view = player_view;
 	}
 
-	update_block_edits(I, *world, view, creative_mode);
+	update_block_edits(I, *this, player, view);
 
-	block_update.update_blocks(I, world->chunks);
+	block_update.update_blocks(I, chunks);
 
-	world->chunks.update_chunk_loading(*world, world->player);
-	world->chunks.update_chunk_meshing(*world);
+	chunks.update_chunk_loading(*this);
+	chunks.update_chunk_meshing(*this);
 
 	if (activate_flycam)
-		g_debugdraw.cylinder(world->player.pos, world->player.radius, world->player.height, lrgba(1,0,1,0.5f));
+		g_debugdraw.cylinder(player.pos, player.radius, player.height, lrgba(1,0,1,0.5f));
 
 	ImGui::End();
+}
+
+//
+void Game::raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, float max_dist, bool hit_at_max_dist) {
+	ZoneScoped;
+
+	block.is_selected = false;
+
+	VoxelHit last_hit;
+
+	auto hit_block = [&] (int3 pos, int face, float dist) -> bool {
+		//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
+
+		block_id bid = chunks.read_block(pos.x, pos.y, pos.z);
+
+		last_hit.bid = bid;
+		last_hit.pos = pos;
+		last_hit.face = (BlockFace)face;
+
+		if ((g_assets.block_types.block_breakable(bid))) {
+			//hit.pos_world = ray.pos + ray.dir * dist;
+			block.is_selected = true;
+			block.hit = last_hit;
+			return true;
+		}
+		return false;
+	};
+
+	raycast_voxels(chunks, ray, max_dist, hit_block);
+
+	if (!block.is_selected && hit_at_max_dist) {
+		block.is_selected = true;
+		block.hit = last_hit;
+		block.hit.face = (BlockFace)-1; // select block itself instead of face
+	}
+}
+
+void Game::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) {
+	assert(block);
+	auto tool_props = item.get_props();
+
+	auto hardness = g_assets.block_types[block.hit.bid].hardness;
+
+	if (!g_assets.block_types.block_breakable(block.hit.bid))
+		return;
+
+	float dmg = 0;
+	if (hardness == 0) {
+		dmg = 1.0f;
+	} else if (hardness == 255) {
+		dmg = 0.0f;
+	} else {
+		float damage_multiplier = (float)tool_props.hardness / (float)hardness;
+		if (tool_props.tool == g_assets.block_types[block.hit.bid].tool)
+			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
+
+		dmg = ((float)tool_props.damage / 255.0f) * damage_multiplier;
+
+		if (creative_mode)
+			dmg = 1.0f;
+	}
+	block.damage += dmg;
+
+	if (block.damage >= 1) {
+		break_sound.play();
+
+		chunks.write_block(block.hit.pos.x, block.hit.pos.y, block.hit.pos.z, g_assets.block_types.air_id);
+	}
+}
+
+bool Game::try_place_block (int3 pos, block_id id) {
+	auto oldb = chunks.read_block(pos.x, pos.y, pos.z);
+
+	if (!g_assets.block_types.block_breakable(oldb)) { // non-breakable blocks are solids and gasses
+		chunks.write_block(pos.x, pos.y, pos.z, id);
+		return true;
+	}
+	return false;
 }

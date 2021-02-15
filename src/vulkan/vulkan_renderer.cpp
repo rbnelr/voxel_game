@@ -76,7 +76,7 @@ void VulkanRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	{
 		VK_TRACE(ctx, cmds, "upload_remeshed");
-		chunk_renderer.upload_remeshed(*this, game.world->chunks, cmds, cur_frame);
+		chunk_renderer.upload_remeshed(*this, game.chunks, cmds, cur_frame);
 	}
 
 	{ // set 0

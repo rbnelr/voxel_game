@@ -203,7 +203,7 @@ void Window::close_window () {
 void Window::switch_renderer () {
 	renderer = nullptr;
 	close_window();
-	game->world->chunks.renderer_switch();
+	game->chunks.renderer_switch();
 	
 	open_window();
 

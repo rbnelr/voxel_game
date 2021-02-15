@@ -330,6 +330,11 @@ struct Chunks {
 
 	chunk_pos_set					queued_chunks; // queued for async worldgen
 
+	void destroy ();
+	~Chunks () {
+		destroy();
+	}
+
 	void init_mesh (ChunkMesh& m) {
 		m.vertex_count = 0;
 		memset(m.slices, -1, sizeof(m.slices));
@@ -376,14 +381,14 @@ struct Chunks {
 		}
 	}
 
+	SERIALIZE(Chunks, load_radius, unload_hyster, mesh_world_border, visualize_chunks, visualize_subchunks, visualize_radius, debug_frustrum_culling)
+
 	// load chunks in this radius in order of distance to the player 
-	float load_radius = 400;//700.0f;
+	float load_radius = 700.0f;
 	
 	// prevent rapid loading and unloading chunks
-	// better would be a cache in chunks outside this radius get added (cache size based on desired memory use)
-	//  and only the "oldest" chunks should be unloaded
-	// This way walking back and forth might not even need to load any chunks at all
-	float unload_hyster = 0;//CHUNK_SIZE*1.5f;
+	// This way walking back and forth small distances does not cause load on the system
+	float unload_hyster = 40;
 
 	bool mesh_world_border = false;
 
@@ -419,12 +424,11 @@ struct Chunks {
 	// using squared distances is easier and has the advantage of having more buckets close to the player
 	// this means we still load the chunks in a routhly sorted order but chunks with closeish distances might be out of order
 	// by changing the BUCKET_FAC you increase the amount of vectors needed but increase the accuracy of the sort
-	static constexpr float BUCKET_FAC = 1.0f / (CHUNK_SIZE*CHUNK_SIZE * 4);
-	// check all chunk positions within a square of chunk_generation_radius
 	std_vector< std_vector<int3> > chunks_to_generate;
+	uint32_t pending_chunks = 0; // chunks waiting to be queued
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (World const& world, Player const& player);
+	void update_chunk_loading (Game& game);
 	
 	struct UploadSlice {
 		slice_id		sliceid;
@@ -433,7 +437,7 @@ struct Chunks {
 	std_vector<UploadSlice> upload_slices;
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_meshing (World const& world);
+	void update_chunk_meshing (Game& game);
 };
 
 template <typename Func>

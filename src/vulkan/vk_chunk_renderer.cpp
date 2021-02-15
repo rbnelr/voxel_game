@@ -2,7 +2,6 @@
 #include "common.hpp"
 #include "vk_chunk_renderer.hpp"
 #include "vulkan_renderer.hpp"
-#include "world.hpp"
 #include "chunk_mesher.hpp"
 
 namespace vk {
@@ -61,7 +60,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 	ZoneScoped;
 
 	auto& frame = frames[cur_frame];
-	auto& chunks = game.world->chunks;
+	auto& chunks = game.chunks;
 
 	auto& cull_view = chunks.debug_frustrum_culling ? game.player_view : game.view;
 	

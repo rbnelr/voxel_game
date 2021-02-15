@@ -254,7 +254,6 @@
     <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_staging.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
-    <ClInclude Include="..\..\..\src\world.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -433,16 +432,6 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp" />
-    <ClCompile Include="..\..\..\src\world.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\world_generator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>

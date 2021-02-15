@@ -38,7 +38,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	{
 		OGL_TRACE("upload_remeshed");
-		chunk_renderer.upload_remeshed(game.world->chunks);
+		chunk_renderer.upload_remeshed(game.chunks);
 	}
 
 	glLineWidth(line_width);
@@ -73,8 +73,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	glBindSampler(0, tile_sampler);
 
 	// draw before chunks so it shows through transparent blocks
-	if (game.world->player.selected_block)
-		block_highl.draw(*this, game.world->player.selected_block);
+	if (game.player.selected_block)
+		block_highl.draw(*this, game.player.selected_block);
 
 	chunk_renderer.draw_chunks(*this, game);
 

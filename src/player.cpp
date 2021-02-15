@@ -1,8 +1,8 @@
 #include "common.hpp"
 #include "player.hpp"
-#include "world.hpp"
+#include "game.hpp"
 
-void BreakBlock::update (Input& I, World& world, Player& player, bool creative_mode) {
+void BreakBlock::update (Input& I, Game& game, Player& player) {
 	auto& button = I.buttons[MOUSE_BUTTON_LEFT];
 	bool inp = player.selected_block ? button.is_down : button.went_down;
 
@@ -16,7 +16,7 @@ void BreakBlock::update (Input& I, World& world, Player& player, bool creative_m
 	if (!anim_triggered && anim_t > anim_hit_t && inp) {
 		//clog(INFO, "[BreakBlock] anim hit");
 		if (player.selected_block) {
-			world.apply_damage(player.selected_block, player.inventory.quickbar.get_selected().item, creative_mode);
+			game.apply_damage(player.selected_block, player.inventory.quickbar.get_selected().item, game.creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 		}
 		anim_triggered = true;
@@ -28,7 +28,7 @@ void BreakBlock::update (Input& I, World& world, Player& player, bool creative_m
 	}
 }
 
-void BlockPlace::update (Input& I, World& world, Player const& player) {
+void BlockPlace::update (Input& I, Game& game, Player const& player) {
 	auto& slot = player.inventory.quickbar.get_selected();
 	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
 	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;
@@ -49,7 +49,7 @@ void BlockPlace::update (Input& I, World& world, Player const& player) {
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
 		if (!block_place_is_inside_player || g_assets.block_types[(block_id)item].collision != CM_SOLID) {
-			world.try_place_block(block_place_pos, (block_id)item);
+			game.try_place_block(block_place_pos, (block_id)item);
 		} else {
 			trigger = false;
 		}
@@ -76,7 +76,7 @@ void Inventory::update (Input& I) {
 	}
 }
 
-bool Player::calc_ground_contact (World& world, bool* stuck) {
+bool Player::calc_ground_contact (Chunks& chunks, bool* stuck) {
 	{ // Check block intersection to see if we are somehow stuck inside a block
 		int3 start =	(int3)floor(pos -float3(radius, radius, 0));
 		int3 end =		(int3)ceil(pos +float3(radius, radius, height));
@@ -87,7 +87,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (int y=start.y; y<end.y; ++y) {
 				for (int x=start.x; x<end.x; ++x) {
 
-					auto b = world.chunks.read_block(x,y,z);
+					auto b = chunks.read_block(x,y,z);
 					bool block_solid = g_assets.block_types[b].collision == CM_SOLID;
 
 					bool intersecting = block_solid && cylinder_cube_intersect(pos -(float3)int3(x,y,z), radius, height);
@@ -128,7 +128,7 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 			for (int y=start.y; y<end.y; ++y) {
 				for (int x=start.x; x<end.x; ++x) {
 
-					auto b = world.chunks.read_block(x,y,z);
+					auto b = chunks.read_block(x,y,z);
 
 					bool block_solid = g_assets.block_types[b].collision == CM_SOLID;
 					if (block_solid && circle_square_intersect((float2)pos -(float2)int2(x,y), radius))
@@ -141,9 +141,9 @@ bool Player::calc_ground_contact (World& world, bool* stuck) {
 	return grounded;
 }
 
-void Player::update_movement_controls (Input& I, World& world) {
+void Player::update_movement_controls (Input& I, Chunks& chunks) {
 	bool stuck;
-	bool grounded = calc_ground_contact(world, &stuck);
+	bool grounded = calc_ground_contact(chunks, &stuck);
 
 	//// toggle camera view
 	if (I.buttons[KEY_F].went_down)
@@ -207,7 +207,7 @@ void Player::update_movement_controls (Input& I, World& world) {
 		vel += jump_impulse;
 }
 
-float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation) {
+float3 Player::calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation) {
 	Ray ray;
 	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
 	ray.dir = body_rotation * head_elevation * tps_camera_dir;
@@ -223,7 +223,7 @@ float3 Player::calc_third_person_cam_pos (World& world, float3x3 body_rotation, 
 	return tps_camera_base_pos + tps_camera_dir * dist;
 }
 
-Camera_View Player::update_post_physics (Input& I, World& world) {
+Camera_View Player::update_post_physics (Input& I, Chunks& chunks) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -232,7 +232,7 @@ Camera_View Player::update_post_physics (Input& I, World& world) {
 
 	float3 cam_pos = 0;
 	if (third_person)
-		cam_pos = calc_third_person_cam_pos(world, body_rotation, head_elevation);
+		cam_pos = calc_third_person_cam_pos(chunks, body_rotation, head_elevation);
 
 	Camera& cam = third_person ? tps_camera : fps_camera;
 
@@ -250,27 +250,27 @@ Camera_View Player::update_post_physics (Input& I, World& world) {
 	return view;
 }
 
-void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view, float reach, bool creative_mode) {
+void calc_selected_block (SelectedBlock& block, Game& game, Player& player, Camera_View& view, float reach) {
 	Ray ray;
 	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
 	ray.pos = view.cam_to_world * float3(0,0,0);
 
-	world.raycast_breakable_blocks(block, ray, reach, creative_mode);
+	game.raycast_breakable_blocks(block, ray, reach, game.creative_mode);
 }
 
-void update_block_edits (Input& I, World& world, Camera_View& view, bool creative_mode) {
-	auto& block = world.player.selected_block;
+void update_block_edits (Input& I, Game& game, Player& player, Camera_View& view) {
+	auto& block = player.selected_block;
 
 	bool was_selected = block.is_selected;
 	int3 old_pos = block.hit.pos;
 
-	calc_selected_block(block, world, view, world.player.break_block.reach, creative_mode);
+	calc_selected_block(block, game, player, view, player.break_block.reach);
 
 	if (!was_selected || !block.is_selected || old_pos != block.hit.pos) {
 		block.damage = 0;
 	}
 
-	world.player.break_block.update(I, world, world.player, creative_mode);
-	world.player.block_place.update(I, world, world.player);
-	world.player.inventory.update(I);
+	player.break_block.update(I, game, player);
+	player.block_place.update(I, game, player);
+	player.inventory.update(I);
 }

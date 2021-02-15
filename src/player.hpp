@@ -7,7 +7,7 @@
 #include "audio/audio.hpp"
 
 struct Block;
-struct World;
+struct Game;
 
 struct VoxelHit {
 	int3		pos;
@@ -45,7 +45,7 @@ struct BreakBlock {
 
 		imgui_pop();
 	}
-	void update (Input& I, World& world, Player& player, bool creative_mode);
+	void update (Input& I, Game& game, Player& player);
 };
 
 struct BlockPlace {
@@ -64,7 +64,7 @@ struct BlockPlace {
 
 		imgui_pop();
 	}
-	void update (Input& I, World& world, Player const& player);
+	void update (Input& I, Game& game, Player const& player);
 };
 
 struct InventorySlot {
@@ -198,17 +198,17 @@ struct Player {
 		imgui_pop();
 	}
 
-	bool calc_ground_contact (World& world, bool* stuck);
+	bool calc_ground_contact (Chunks& chunks, bool* stuck);
 
-	void update_movement_controls (Input& I, World& world);
+	void update_movement_controls (Input& I, Chunks& chunks);
 
 	float3x4 head_to_world;
 
-	Camera_View update_post_physics (Input& I, World& world);
+	Camera_View update_post_physics (Input& I, Chunks& chunks);
 
-	void calc_selected_block (SelectedBlock& block, World& world, Camera_View& view, float reach, bool creative_mode);
-	float3 calc_third_person_cam_pos (World& world, float3x3 body_rotation, float3x3 head_elevation);
+	void calc_selected_block (SelectedBlock& block, Chunks& chunks, Camera_View& view, float reach, bool creative_mode);
+	float3 calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation);
 
 };
 
-void update_block_edits (Input& I, World& world, Camera_View& view, bool creative_mode);
+void update_block_edits (Input& I, Game& game, Player& player, Camera_View& view);

@@ -1,10 +1,9 @@
 #include "common.hpp"
 #include "physics.hpp"
 #include "blocks.hpp"
-#include "world.hpp"
 #include "player.hpp"
 
-CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
+CollisionHit calc_earliest_collision (Chunks& chunks, PhysicsObject& obj) {
 	ZoneScoped;
 
 	CollisionHit closest_hit;
@@ -18,7 +17,7 @@ CollisionHit calc_earliest_collision (World& world, PhysicsObject& obj) {
 		for (int z=start.z; z<end.z; ++z) {
 			for (int y=start.y; y<end.y; ++y) {
 				for (int x=start.x; x<end.x; ++x) {
-					auto b = world.chunks.read_block(x,y,z);
+					auto b = chunks.read_block(x,y,z);
 
 					if (g_assets.block_types[b].collision == CM_SOLID) {
 
@@ -94,7 +93,7 @@ void handle_collison (PhysicsObject& obj, CollisionHit const& hit) {
 
 extern int frame_counter;
 
-void Physics::update_object (float dt, World& world, PhysicsObject& obj) {
+void Physics::update_object (float dt, Chunks& chunks, PhysicsObject& obj) {
 	ZoneScoped;
 
 	//// gravity
@@ -106,7 +105,7 @@ void Physics::update_object (float dt, World& world, PhysicsObject& obj) {
 
 	while (t_remain > 0) {
 
-		CollisionHit earliest_collision = calc_earliest_collision(world, obj);
+		CollisionHit earliest_collision = calc_earliest_collision(chunks, obj);
 
 		// if we are moving so fast that we would move by more than one block on any one axis we will do sub steps of exactly one block
 		float max_dt = min(t_remain, 1.0f / max_component(abs(obj.vel)));
@@ -134,7 +133,7 @@ void Physics::update_object (float dt, World& world, PhysicsObject& obj) {
 	//logf("%5d: pos.z: %7.4f vel.z: %7.4f", frame_counter, obj.pos.z, obj.vel.z);
 }
 
-void Physics::update_player (float dt, World& world, Player& player) {
+void Physics::update_player (float dt, Chunks& chunks, Player& player) {
 	ZoneScoped;
 
 	PhysicsObject obj;
@@ -147,7 +146,7 @@ void Physics::update_player (float dt, World& world, Player& player) {
 	
 	obj.coll = player.collison_response;
 	
-	update_object(dt, world, obj);
+	update_object(dt, chunks, obj);
 	
 	player.pos = obj.pos;
 	player.vel = obj.vel;

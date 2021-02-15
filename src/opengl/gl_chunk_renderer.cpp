@@ -40,7 +40,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("draw_chunks");
 
-	auto& chunks = game.world->chunks;
+	auto& chunks = game.chunks;
 
 	auto& cull_view = chunks.debug_frustrum_culling ? game.player_view : game.view;
 

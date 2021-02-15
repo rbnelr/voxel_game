@@ -118,9 +118,6 @@
     <ClInclude Include="..\..\..\src\player.hpp">
       <Filter>game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\world.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\audio\audio.hpp">
       <Filter>audio</Filter>
     </ClInclude>
@@ -301,9 +298,6 @@
       <Filter>game</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\player.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\world.cpp">
       <Filter>game</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\audio\audio.cpp">

@@ -7,6 +7,7 @@ enum perspective_mode {
 	PERSPECTIVE,
 	ORTHOGRAPHIC
 };
+NLOHMANN_JSON_SERIALIZE_ENUM(perspective_mode, {{PERSPECTIVE, "PERSPECTIVE"}, {ORTHOGRAPHIC, "ORTHOGRAPHIC"}})
 
 struct Camera_View {
 	// World space to camera space transform
@@ -32,6 +33,8 @@ struct Camera_View {
 };
 
 struct Camera {
+	SERIALIZE(Camera, pos, rot_aer, mode, clip_near, clip_far, vfov, ortho_vsize)
+
 	// camera position
 	float3				pos;
 
@@ -100,6 +103,8 @@ float3x3 calc_aer_rotation (float3 aer, float3x3* out_inverse=nullptr);
 
 // Free flying camera
 struct Flycam {
+	SERIALIZE(Flycam, cam, base_speed, max_speed, speedup_factor, fast_multiplier)
+
 	Camera cam;
 
 	float base_speed = 0.5f;

@@ -1,25 +1,28 @@
 #pragma once
 #include "common.hpp"
 #include "world_generator.hpp"
-#include "world.hpp"
 #include "block_update.hpp"
 #include "engine/camera.hpp"
+#include "player.hpp"
 #include "assets.hpp"
 
 struct Game {
 	bool dbg_pause = false;
-
 	FPS_Display fps_display;
 
-	// Global world gen I can tweak (changes are only visible on world recreate)
 	WorldGenerator world_gen;
+	WorldGenerator _threads_world_gen = world_gen; // used in threads, do not modify
 
-	// World gets world gen copy on create
-	std::unique_ptr<World> world = std::make_unique<World>(world_gen);
+	Chunks chunks;
+
+	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
+	Player player = { float3(0.5f,0.5f,34) };
 
 	BlockUpdate block_update;
 
-	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
+	Sound break_sound = { "dig1", 1.2f, 0.8f };
+
+	SERIALIZE(Game, flycam, activate_flycam, chunks)
 
 	bool activate_flycam = false;
 	bool creative_mode = false;
@@ -30,7 +33,15 @@ struct Game {
 	Camera_View view;
 
 	Game ();
+	~Game ();
 
 	void imgui (Window& window, Input& I, Renderer* renderer);
 	void update (Window& window, Input& I);
+
+	//
+	void raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, float max_dist, bool hit_at_max_dist=false);
+
+	void apply_damage (SelectedBlock& block, Item& item, bool creative_mode);
+	bool try_place_block (int3 pos, block_id id);
+
 };
