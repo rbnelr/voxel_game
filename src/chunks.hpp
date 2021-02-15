@@ -165,7 +165,7 @@ inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
 template <typename T>
 struct ScrollingArray {
 	T*			arr = nullptr;
-	uint32_t	size; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
+	int			size; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
 	int3		pos; // pos of lower corner of 3d array in the world (in chunk coords)
 
 	~ScrollingArray () {
@@ -174,10 +174,10 @@ struct ScrollingArray {
 
 	template <typename FREE>
 	void update (float required_radius, float3 new_center, FREE free_chunk) {
-		uint32_t new_size = (uint32_t)ceili(max(required_radius, 0.0f) * 2 + 1);
-		new_size = round_up_pot(new_size);
+		int new_size = ceili(max(required_radius, 0.0f) * 2 + 1);
+		new_size = (int)round_up_pot((uint32_t)new_size);
 
-		int3 new_pos = floori(new_center) - new_size / 2;
+		int3 new_pos = roundi(new_center) - new_size / 2;
 
 		if (!arr || new_size != size) {
 			// size changed or init, alloc new array
@@ -189,11 +189,11 @@ struct ScrollingArray {
 			// copy chunks from old array into resized array
 			if (arr) {
 				size_t i=0;
-				for (int z=pos.z; z < (int)(pos.z + size); ++z) {
-					for (int y=pos.y; y < (int)(pos.y + size); ++y) {
-						for (int x=pos.x; x < (int)(pos.x + size); ++x) {
+				for (int z=pos.z; z < pos.z + size; ++z) {
+					for (int y=pos.y; y < pos.y + size; ++y) {
+						for (int x=pos.x; x < pos.x + size; ++x) {
 							chunk_id& c = get(x,y,z);
-				
+
 							if (in_bounds(x,y,z, new_pos, new_size)) {
 								// old chunk in new window of chunks, transfer
 								auto idx = index(x,y,z, new_pos, new_size);
@@ -215,64 +215,37 @@ struct ScrollingArray {
 			arr = new_arr;
 			size = new_size;
 			pos = new_pos;
-		
+
 		} else if (new_pos != pos) {
 			// only position changed
 
-			int x0 = pos.x;
-			int x1 = (int)(pos.x + size);
-			int y0 = pos.y;
-			int y1 = (int)(pos.y + size);
-			int z0 = pos.z;
-			int z1 = (int)(pos.z + size);
+			// free all chunks that are outside of new 3d array now
+			// with double iteration for y and z
+			int3 dsize = min(abs(new_pos - pos), size);
+			int3 csize = size - dsize;
 
-			int dx0, dx1;
-			if (new_pos.x >= pos.x) { dx0 = pos.x;            dx1 = new_pos.x;    }
-			else                    { dx0 = new_pos.x + size; dx1 = pos.x + size; }
+			int3 dpos = select(new_pos >= pos, pos, pos + csize);
 
-			int dy0, dy1;
-			if (new_pos.y >= pos.y) { dy0 = pos.y;            dy1 = new_pos.y;    }
-			else                    { dy0 = new_pos.y + size; dy1 = pos.y + size; }
+			for (int z=pos.z; z < pos.z + size; ++z) {
+			for (int y=pos.y; y < pos.y + size; ++y) {
+			for (int x=dpos.x; x < dpos.x + dsize.x; ++x) {
+				chunk_id& c = get(x,y,z);
+				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
+			}}}
 
-			int dz0, dz1;
-			if (new_pos.z >= pos.z) { dz0 = pos.z;            dz1 = new_pos.z;    }
-			else                    { dz0 = new_pos.z + size; dz1 = pos.z + size; }
+			for (int z=pos.z; z < pos.z + size; ++z) {
+			for (int y=dpos.y; y < dpos.y + dsize.y; ++y) {
+			for (int x=pos.x; x < pos.x + size; ++x) {
+				chunk_id& c = get(x,y,z);
+				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
+			}}}
 
-			for (int x=dx0; x<dx1; ++x) {
-				for (int z=z0; z<z1; ++z) {
-					for (int y=y0; y<y1; ++y) {
-						chunk_id& c = get(x,y,z);
-						if (c != U16_NULL) {
-							free_chunk(c);
-							c = U16_NULL;
-						}
-					}
-				}
-			}
-
-			for (int y=dy0; y<dy1; ++y) {
-				for (int z=z0; z<z1; ++z) {
-					for (int x=x0; x<x1; ++x) {
-						chunk_id& c = get(x,y,z);
-						if (c != U16_NULL) {
-							free_chunk(c);
-							c = U16_NULL;
-						}
-					}
-				}
-			}
-
-			for (int z=dz0; z<dz1; ++z) {
-				for (int y=y0; y<y1; ++y) {
-					for (int x=x0; x<x1; ++x) {
-						chunk_id& c = get(x,y,z);
-						if (c != U16_NULL) {
-							free_chunk(c);
-							c = U16_NULL;
-						}
-					}
-				}
-			}
+			for (int z=dpos.z; z < dpos.z + dsize.z; ++z) {
+			for (int y=pos.y; y < pos.y + size; ++y) {
+			for (int x=pos.x; x < pos.x + size; ++x) {
+				chunk_id& c = get(x,y,z);
+				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
+			}}}
 
 			pos = new_pos;
 		}

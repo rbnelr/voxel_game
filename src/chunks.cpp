@@ -392,9 +392,9 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 			}
 		}
 		
-		for (int z=chunks_arr.pos.z; z < (int)(chunks_arr.pos.z + chunks_arr.size); ++z) {
-			for (int y=chunks_arr.pos.y; y < (int)(chunks_arr.pos.y + chunks_arr.size); ++y) {
-				for (int x=chunks_arr.pos.x; x < (int)(chunks_arr.pos.x + chunks_arr.size); ++x) {
+		for (int z=chunks_arr.pos.z; z < chunks_arr.pos.z + chunks_arr.size; ++z) {
+			for (int y=chunks_arr.pos.y; y < chunks_arr.pos.y + chunks_arr.size; ++y) {
+				for (int x=chunks_arr.pos.x; x < chunks_arr.pos.x + chunks_arr.size; ++x) {
 					chunk_id& cid = chunks_arr.get(x,y,z);
 						
 					int3 pos = int3(x,y,z);
