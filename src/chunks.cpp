@@ -34,11 +34,25 @@ void Chunks::free_voxels (Chunk& c) {
 }
 
 block_id Chunks::read_block (int x, int y, int z) {
-	int bx, by, bz;
-	int cx, cy, cz;
-	CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+	ZoneScoped;
 
-	auto cid = chunks_arr.checked_get(cx,cy,cz);
+	int bx, by, bz;
+	int3 cpos;
+	CHUNK_BLOCK_POS(x,y,z, cpos.x,cpos.y,cpos.z, bx,by,bz);
+
+	chunk_id cid;
+#if 1
+	{
+		ZoneScopedN("query_chunk");
+		auto it = all_chunks.find(cpos);
+		cid = it != all_chunks.end() ? it->second : U16_NULL;
+	}
+#else
+	{
+		ZoneScopedN("query_chunk");
+		cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
+	}
+#endif
 	if (cid == U16_NULL)
 		return B_NULL;
 
@@ -69,6 +83,8 @@ block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
 }
 
 void Chunks::write_block (int x, int y, int z, block_id data) {
+	ZoneScoped;
+
 	int bx, by, bz;
 	int cx, cy, cz;
 	CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
@@ -395,12 +411,12 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 		for (int z=chunks_arr.pos.z; z < chunks_arr.pos.z + chunks_arr.size; ++z) {
 			for (int y=chunks_arr.pos.y; y < chunks_arr.pos.y + chunks_arr.size; ++y) {
 				for (int x=chunks_arr.pos.x; x < chunks_arr.pos.x + chunks_arr.size; ++x) {
-					chunk_id& cid = chunks_arr.get(x,y,z);
+					chunk_id* cid = &chunks_arr.get(x,y,z);
 						
 					int3 pos = int3(x,y,z);
 					float dist_sqr = chunk_dist_sq(pos, player.pos);
 						
-					if (cid == U16_NULL) {
+					if (*cid == U16_NULL) {
 						// chunk not yet loaded
 						bool should_load = dist_sqr <= load_dist_sqr;
 
@@ -410,12 +426,13 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 						}
 					} else {
 						// chunk loaded
-						chunks[cid]._validate_flags();
+						chunks[*cid]._validate_flags();
 
 						bool should_unload = dist_sqr > unload_dist_sqr;
 						if (should_unload) {
-							free_chunk(cid);
-							cid = U16_NULL;
+							free_chunk(*cid);
+							*cid = U16_NULL;
+							all_chunks.erase(int3(x,y,z));
 						}
 					}
 				}
@@ -446,6 +463,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 				
 				assert(chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) == U16_NULL);
 				chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
+				all_chunks.emplace(chunk.pos, cid);
 
 				sparse_chunk_from_worldgen(chunk, *job);
 

@@ -165,11 +165,11 @@ inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
 template <typename T>
 struct ScrollingArray {
 	T*			arr = nullptr;
-	int			size; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
-	int3		pos; // pos of lower corner of 3d array in the world (in chunk coords)
+	int			size = 0; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
+	int3		pos = 0; // pos of lower corner of 3d array in the world (in chunk coords)
 
-	uint32_t	shift; // size = 1 << shift
-	uint32_t	mask; // mask = size -1
+	uint32_t	shift = 0; // size = 1 << shift
+	uint32_t	mask = 0; // mask = size -1
 
 	~ScrollingArray () {
 		if (arr)
@@ -327,6 +327,8 @@ struct Chunks {
 	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
 
 	AllocatorBitset					slices_alloc;
+
+	chunk_pos_to_id_map				all_chunks; // queued for async worldgen
 
 	chunk_pos_set					queued_chunks; // queued for async worldgen
 
