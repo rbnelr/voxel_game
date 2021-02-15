@@ -168,23 +168,64 @@ struct ScrollingArray {
 	int			size; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
 	int3		pos; // pos of lower corner of 3d array in the world (in chunk coords)
 
+	uint32_t	shift; // size = 1 << shift
+	uint32_t	mask; // mask = size -1
+
 	~ScrollingArray () {
-		free(arr);
+		if (arr)
+			free(arr);
+	}
+
+	bool in_bounds (int x, int y, int z) {
+	#if 0
+		return z >= pos.z && z < pos.z + size &&
+		       y >= pos.y && y < pos.y + size &&
+		       x >= pos.x && x < pos.x + size;
+	#else
+		// use single unsigned wrapped compare instead of two normal compares
+		return (uint32_t)(x - pos.x) < (uint32_t)size && 
+		       (uint32_t)(y - pos.y) < (uint32_t)size &&
+		       (uint32_t)(z - pos.z) < (uint32_t)size;
+	#endif
+	}
+
+	static size_t pos2idx (int x, int y, int z, uint32_t mask, uint32_t shift) {
+		assert(in_bounds(x,y,z));
+		size_t a = (size_t)((uint32_t)x & mask);
+		size_t b = (size_t)((uint32_t)y & mask) <<  shift;
+		size_t c = (size_t)((uint32_t)z & mask) << (shift*2);
+		return a + b + c;
+	}
+
+	T& get (int x, int y, int z) {
+		assert(in_bounds(x,y,z));
+		return arr[pos2idx(x,y,z, mask, shift)];
+	}
+
+	T checked_get (int x, int y, int z) {
+		return in_bounds(x,y,z) ? get(x,y,z) : U16_NULL;
 	}
 
 	template <typename FREE>
 	void update (float required_radius, float3 new_center, FREE free_chunk) {
-		int new_size = ceili(max(required_radius, 0.0f) * 2 + 1);
-		new_size = (int)round_up_pot((uint32_t)new_size);
+		ScrollingArray temp;
 
-		int3 new_pos = roundi(new_center) - new_size / 2;
+		temp.size = ceili(max(required_radius, 0.0f) * 2 + 1);
+		temp.size = (int)round_up_pot((uint32_t)temp.size, &temp.shift);
+		size_t alloc_size = sizeof(T) * ((size_t)temp.size * temp.size * temp.size);
 
-		if (!arr || new_size != size) {
+		temp.mask = (uint32_t)(temp.size-1);
+
+		temp.pos = roundi(new_center) - temp.size / 2;
+
+		if (!arr || temp.size != size) {
+			ZoneScopedN("ScrollingArray::resize");
+
 			// size changed or init, alloc new array
-			T* new_arr = (T*)malloc(sizeof(T) * new_size*new_size*new_size);
+			temp.arr = (T*)malloc(alloc_size);
 
 			// clear array to U16_NULL
-			memset(new_arr, -1, sizeof(T) * new_size*new_size*new_size);
+			memset(temp.arr, -1, alloc_size);
 
 			// copy chunks from old array into resized array
 			if (arr) {
@@ -192,14 +233,13 @@ struct ScrollingArray {
 				for (int z=pos.z; z < pos.z + size; ++z) {
 					for (int y=pos.y; y < pos.y + size; ++y) {
 						for (int x=pos.x; x < pos.x + size; ++x) {
-							chunk_id& c = get(x,y,z);
+							chunk_id c = get(x,y,z);
 
-							if (in_bounds(x,y,z, new_pos, new_size)) {
+							if (temp.in_bounds(x,y,z)) {
 								// old chunk in new window of chunks, transfer
-								auto idx = index(x,y,z, new_pos, new_size);
-
-								assert(new_arr[idx] == U16_NULL);
-								new_arr[idx] = c;
+								auto* ptr = &temp.get(x,y,z);
+								assert(*ptr == U16_NULL);
+								*ptr = c;
 							} else {
 								// old chunk outside of window of chunks, delete
 								if (c != U16_NULL)
@@ -210,71 +250,60 @@ struct ScrollingArray {
 				}
 
 				free(arr);
+				arr = nullptr; // avoid dtor
 			}
 
-			arr = new_arr;
-			size = new_size;
-			pos = new_pos;
+			*this = temp;
+			temp.arr = nullptr; // avoid dtor
 
-		} else if (new_pos != pos) {
+		} else if (temp.pos != pos) {
+			ZoneScopedN("ScrollingArray::move");
+
 			// only position changed
 
 			// free all chunks that are outside of new 3d array now
 			// with double iteration for y and z
-			int3 dsize = min(abs(new_pos - pos), size);
-			int3 csize = size - dsize;
+			int dsizex = min(abs(temp.pos.x - pos.x), size);
+			int dsizey = min(abs(temp.pos.y - pos.y), size);
+			int dsizez = min(abs(temp.pos.z - pos.z), size);
+			int csizex = size - dsizex;
+			int csizey = size - dsizey;
+			int csizez = size - dsizez;
 
-			int3 dpos = select(new_pos >= pos, pos, pos + csize);
+			int dposx = pos.x;
+			int dposy = pos.y;
+			int dposz = pos.z;
+			if (temp.pos.x < pos.x) dposx += csizex;
+			if (temp.pos.y < pos.y) dposy += csizey;
+			if (temp.pos.z < pos.z) dposz += csizez;
+			
+			// get struct vars because compiler does not understand that it does not need to reload them in every loop iteration
+			auto mask = this->mask;
+			auto shift = this->shift;
 
-			for (int z=pos.z; z < pos.z + size; ++z) {
-			for (int y=pos.y; y < pos.y + size; ++y) {
-			for (int x=dpos.x; x < dpos.x + dsize.x; ++x) {
-				chunk_id& c = get(x,y,z);
+			for (int z=pos.z; z < pos.z + size; ++z)
+			for (int y=pos.y; y < pos.y + size; ++y)
+			for (int x=dposx; x < dposx + dsizex; ++x) {
+				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
 				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}}}
+			}
 
-			for (int z=pos.z; z < pos.z + size; ++z) {
-			for (int y=dpos.y; y < dpos.y + dsize.y; ++y) {
+			for (int z=pos.z; z < pos.z + size; ++z)
+			for (int y=dposy; y < dposy + dsizey; ++y)
 			for (int x=pos.x; x < pos.x + size; ++x) {
-				chunk_id& c = get(x,y,z);
+				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
 				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}}}
+			}
 
-			for (int z=dpos.z; z < dpos.z + dsize.z; ++z) {
-			for (int y=pos.y; y < pos.y + size; ++y) {
+			for (int z=dposz; z < dposz + dsizez; ++z)
+			for (int y=pos.y; y < pos.y + size; ++y)
 			for (int x=pos.x; x < pos.x + size; ++x) {
-				chunk_id& c = get(x,y,z);
+				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
 				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}}}
+			}
 
-			pos = new_pos;
+			pos = temp.pos;
 		}
-	}
-
-	static bool in_bounds (int x, int y, int z, int3 const& pos, int size) {
-		return z >= pos.z && z < pos.z + size &&
-		       y >= pos.y && y < pos.y + size &&
-		       x >= pos.x && x < pos.x + size;
-	}
-	static size_t index (int x, int y, int z, int3 const& pos, int size) {
-		assert(in_bounds(x,y,z, pos, size));
-		uint32_t mask = size -1;
-		uint32_t mx = (uint32_t)x & mask;
-		uint32_t my = (uint32_t)y & mask;
-		uint32_t mz = (uint32_t)z & mask;
-		return IDX3D(mx,my,mz, size);
-	}
-
-	bool in_bounds (int x, int y, int z) {
-		return in_bounds(x,y,z, pos, size);
-	}
-
-	T& get (int x, int y, int z) {
-		return arr[index(x,y,z, pos, size)];
-	}
-
-	T checked_get (int x, int y, int z) {
-		return in_bounds(x,y,z) ? get(x,y,z) : U16_NULL;
 	}
 };
 

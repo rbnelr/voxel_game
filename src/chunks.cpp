@@ -483,7 +483,7 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 
 		background_threadpool.jobs.push_n(jobs, count);
 
-		TracyPlot("background_queued_count", (int64_t)background_queued_count);
+		//TracyPlot("background_queued_count", (int64_t)background_queued_count);
 	}
 }
 
