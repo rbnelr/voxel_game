@@ -40,19 +40,7 @@ block_id Chunks::read_block (int x, int y, int z) {
 	int3 cpos;
 	CHUNK_BLOCK_POS(x,y,z, cpos.x,cpos.y,cpos.z, bx,by,bz);
 
-	chunk_id cid;
-#if 1
-	{
-		ZoneScopedN("query_chunk");
-		auto it = all_chunks.find(cpos);
-		cid = it != all_chunks.end() ? it->second : U16_NULL;
-	}
-#else
-	{
-		ZoneScopedN("query_chunk");
-		cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
-	}
-#endif
+	chunk_id cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
 	if (cid == U16_NULL)
 		return B_NULL;
 
@@ -432,7 +420,6 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 						if (should_unload) {
 							free_chunk(*cid);
 							*cid = U16_NULL;
-							all_chunks.erase(int3(x,y,z));
 						}
 					}
 				}
@@ -463,7 +450,6 @@ void Chunks::update_chunk_loading (World const& world, Player const& player) {
 				
 				assert(chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) == U16_NULL);
 				chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
-				all_chunks.emplace(chunk.pos, cid);
 
 				sparse_chunk_from_worldgen(chunk, *job);
 

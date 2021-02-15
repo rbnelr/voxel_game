@@ -328,8 +328,6 @@ struct Chunks {
 
 	AllocatorBitset					slices_alloc;
 
-	chunk_pos_to_id_map				all_chunks; // queued for async worldgen
-
 	chunk_pos_set					queued_chunks; // queued for async worldgen
 
 	void init_mesh (ChunkMesh& m) {
