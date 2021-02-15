@@ -508,7 +508,7 @@ void Chunks::update_chunk_loading (Game& game) {
 				pending_chunks += (uint32_t)b.size();
 			pending_chunks -= count; // exclude chunks we have already queued
 		}
-
+		
 		//TracyPlot("background_queued_count", (int64_t)background_queued_count);
 	}
 }
