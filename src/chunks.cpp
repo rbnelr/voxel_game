@@ -352,6 +352,7 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 	{ // init
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
+		chunk.genstage = 0;
 		init_voxels(chunk);
 		init_mesh(chunk.opaque_mesh);
 		init_mesh(chunk.transparent_mesh);
@@ -406,9 +407,9 @@ void Chunks::update_chunk_loading (Game& game) {
 				g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
 			}
 
-			for (auto chunk_pos : queued_chunks) {
-				g_debugdraw.wire_cube(((float3)chunk_pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.6f, DBG_QUEUED_CHUNK_COL);
-			}
+			//for (auto chunk_pos : queued_chunks) {
+			//	g_debugdraw.wire_cube(((float3)chunk_pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.6f, DBG_STAGE0_COL);
+			//}
 		}
 		
 		for (int z=chunks_arr.pos.z; z < chunks_arr.pos.z + chunks_arr.size; ++z) {
@@ -429,12 +430,31 @@ void Chunks::update_chunk_loading (Game& game) {
 						}
 					} else {
 						// chunk loaded
-						chunks[*cid]._validate_flags();
+						auto& chunk = chunks[*cid];
+						chunk._validate_flags();
 
-						bool should_unload = dist_sqr > unload_dist_sqr;
-						if (should_unload) {
-							free_chunk(*cid);
-							*cid = U16_NULL;
+						if (chunk.genstage == 1) {
+
+							bool all_stage1 = true;
+							for (auto& offs : FULL_NEIGHBOURS) {
+								auto nid = chunks_arr.get(x + offs.x, y + offs.y, z + offs.z);
+								if (nid != U16_NULL && chunks[nid].genstage != 1) {
+									all_stage1 = false;
+									break;
+								}
+							}
+
+							if (all_stage1) {
+								int bucketi = (int)(dist_sqr * BUCKET_FAC);
+								chunks_to_generate[bucketi].push_back(pos);
+							}
+						} else if (chunk.genstage == 2) {
+
+							bool should_unload = dist_sqr > unload_dist_sqr;
+							if (should_unload) {
+								free_chunk(*cid);
+								*cid = U16_NULL;
+							}
 						}
 					}
 				}
@@ -453,27 +473,29 @@ void Chunks::update_chunk_loading (Game& game) {
 		int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
 		for (int i=0; i<count; ++i) {
 			auto job = std::move(jobs[i]);
-			queued_chunks.erase(job->chunk_pos);
+			queued_chunks.erase(job->chunk->pos);
 
 			// Check that chunk is still in 3d array bounds, if not simply discard the job results
-			if (chunks_arr.in_bounds(job->chunk_pos.x, job->chunk_pos.y, job->chunk_pos.z)) {
+			if (chunks_arr.in_bounds(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z)) {
+				chunk_id* cid = &chunks_arr.get(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z);
+				assert(*cid != U16_NULL);
+				auto& chunk = chunks[*cid];
 
-				auto cid = alloc_chunk(job->chunk_pos);
-				auto& chunk = chunks[cid];
+				assert(chunk.genstage == 0);
+				if (chunk.genstage == 0) {
+					chunk.genstage = 1;
 
-				chunk.flags |= Chunk::REMESH;
+					chunk.flags |= Chunk::REMESH;
 				
-				assert(chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) == U16_NULL);
-				chunks_arr.get(chunk.pos.x, chunk.pos.y, chunk.pos.z) = cid;
+					sparse_chunk_from_worldgen(chunk, *job);
 
-				sparse_chunk_from_worldgen(chunk, *job);
-
-				for (int i=0; i<6; ++i) {
-					int3 npos = job->chunk_pos + NEIGHBOURS[i];
-					auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
-					if (nid != U16_NULL) {
-						assert(chunks[nid].flags != 0);
-						chunks[nid].flags |= Chunk::REMESH;
+					for (int i=0; i<6; ++i) {
+						int3 npos = job->chunk->pos + NEIGHBOURS[i];
+						auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
+						if (nid != U16_NULL) {
+							assert(chunks[nid].flags != 0);
+							chunks[nid].flags |= Chunk::REMESH;
+						}
 					}
 				}
 			}
@@ -495,8 +517,22 @@ void Chunks::update_chunk_loading (Game& game) {
 		for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
 			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
 				int3 chunk_pos = chunks_to_generate[bucket][i];
-				jobs[count++] = std::make_unique<WorldgenJob>(chunk_pos, &game._threads_world_gen);
-				queued_chunks.emplace(chunk_pos);
+				
+				auto* cid = &chunks_arr.get(chunk_pos.x, chunk_pos.y, chunk_pos.z);
+				if (*cid == U16_NULL)
+					*cid = alloc_chunk(chunk_pos);
+				auto& chunk = chunks[*cid];
+
+				if (chunk.genstage == 0) {
+
+					jobs[count++] = std::make_unique<WorldgenJob>(&chunk, &game._threads_world_gen);
+					queued_chunks.emplace(chunk_pos);
+
+				} else if (chunk.genstage == 1) {
+					// TODO: queue for genstage 2 processing
+					chunk.genstage = 2;
+				}
+
 			}
 		}
 
@@ -603,7 +639,8 @@ void Chunks::imgui (Renderer* renderer) {
 
 	if (ImGui::BeginPopupContextWindow("Colors")) {
 		imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
-		imgui_ColorEdit("DBG_QUEUED_CHUNK_COL",		&DBG_QUEUED_CHUNK_COL);
+		imgui_ColorEdit("DBG_STAGE0_COL",			&DBG_STAGE0_COL);
+		imgui_ColorEdit("DBG_STAGE1_COL",			&DBG_STAGE1_COL);
 		imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
 		imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
 		imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
@@ -746,32 +783,47 @@ void Chunks::imgui (Renderer* renderer) {
 }
 
 void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
-	lrgba const* col;
+	lrgba const* col = &DBG_CHUNK_COL;
+	float size = 1.0f;
+
 	if (debug_frustrum_culling) {
 		if (empty) return;
-		col = culled ? &DBG_CULLED_CHUNK_COL : &DBG_CHUNK_COL;
+
+		if (culled)
+			col = &DBG_CULLED_CHUNK_COL;
+
 	} else if (visualize_chunks) {
-		col = chunk.flags & Chunk::SPARSE_VOXELS ? &DBG_SPARSE_CHUNK_COL : &DBG_CHUNK_COL;
-
-		if (visualize_subchunks && (chunk.flags & Chunk::SPARSE_VOXELS) == 0) {
-			auto& dc = dense_chunks[chunk.voxel_data];
-
-			uint32_t subc_i = 0;
-			for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
-				for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
-					for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-						if (!dc.is_subchunk_sparse(subc_i)) {
-							float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
-							g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
-						}
-						subc_i++;
-					}
-				}
-			}
+		
+		if (chunk.genstage == 0) {
+			col = &DBG_STAGE0_COL;
+			size = 0.6f;
+		} else if (chunk.genstage == 1) {
+			col = &DBG_STAGE1_COL;
+			size = 0.8f;
+		} else if (chunk.flags & Chunk::SPARSE_VOXELS) {
+			col = &DBG_SPARSE_CHUNK_COL;
 		}
+
 	} else {
 		return;
 	}
 
-	g_debugdraw.wire_cube(((float3)chunk.pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.997f, *col);
+	g_debugdraw.wire_cube(((float3)chunk.pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * size * 0.997f, *col);
+
+	if (visualize_chunks && visualize_subchunks && (chunk.flags & Chunk::SPARSE_VOXELS) == 0) {
+		auto& dc = dense_chunks[chunk.voxel_data];
+
+		uint32_t subc_i = 0;
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+					if (!dc.is_subchunk_sparse(subc_i)) {
+						float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
+						g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
+					}
+					subc_i++;
+				}
+			}
+		}
+	}
 }

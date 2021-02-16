@@ -63,6 +63,38 @@ static constexpr int3 NEIGHBOURS[6] = {
 	int3(0,0,-1), int3(0,0,+1),
 };
 
+static constexpr int3 FULL_NEIGHBOURS[26] = {
+	int3(-1,-1,-1),
+	int3( 0,-1,-1),
+	int3(+1,-1,-1),
+	int3(-1, 0,-1),
+	int3( 0, 0,-1),
+	int3(+1, 0,-1),
+	int3(-1,+1,-1),
+	int3( 0,+1,-1),
+	int3(+1,+1,-1),
+
+	int3(-1,-1, 0),
+	int3( 0,-1, 0),
+	int3(+1,-1, 0),
+	int3(-1, 0, 0),
+	//int3( 0, 0, 0),
+	int3(+1, 0, 0),
+	int3(-1,+1, 0),
+	int3( 0,+1, 0),
+	int3(+1,+1, 0),
+
+	int3(-1,-1,+1),
+	int3( 0,-1,+1),
+	int3(+1,-1,+1),
+	int3(-1, 0,+1),
+	int3( 0, 0,+1),
+	int3(+1, 0,+1),
+	int3(-1,+1,+1),
+	int3( 0,+1,+1),
+	int3(+1,+1,+1),
+};
+
 struct World;
 struct WorldGenerator;
 struct Player;
@@ -132,8 +164,9 @@ struct Chunk {
 	};
 
 	Flags flags;
-	
 	int3 pos;
+
+	int genstage;
 
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
@@ -153,7 +186,8 @@ inline float chunk_dist_sq (int3 const& pos, float3 const& dist_to) {
 }
 
 inline lrgba DBG_CHUNK_COL			= srgba(  0,   0, 255, 255);
-inline lrgba DBG_QUEUED_CHUNK_COL	= srgba(  0, 255, 200, 255);
+inline lrgba DBG_STAGE0_COL			= srgba(  0, 255, 200, 255);
+inline lrgba DBG_STAGE1_COL			= srgba(  0, 140, 255, 255);
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba( 60,  60,  60,  45);
 inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
 inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
