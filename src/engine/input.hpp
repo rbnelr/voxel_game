@@ -51,14 +51,14 @@ struct Input {
 	bool _prev_cursor_enabled;
 
 	void imgui () {
-		if (buttons[KEY_SEMICOLON].went_down)
+		if (buttons[KEY_COMMA].went_down)
 			pause_time = !pause_time;
 
 		if (!ImGui::CollapsingHeader("Input")) return;
 
 		ImGui::DragFloat("max_dt", &max_dt, 0.01f);
 		ImGui::DragFloat("time_scale", &time_scale, 0.01f);
-		ImGui::Checkbox("pause_time [;]", &pause_time);
+		ImGui::Checkbox("pause_time [,]", &pause_time);
 
 		ImGui::DragFloat("mouselook_sensitiviy_divider", &mouselook_sensitiviy_divider, 0.1f);
 

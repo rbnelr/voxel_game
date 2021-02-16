@@ -11,7 +11,6 @@
 void Chunks::destroy () {
 	// wait for all jobs to be completed to be able to safely recreate a new chunks with the same positions again later
 	background_threadpool.flush();
-	queued_chunks.clear();
 
 	for (chunk_id cid=0; cid < chunks.slots.alloc_end; ++cid) {
 		if (chunks[cid].flags != 0)
@@ -20,7 +19,10 @@ void Chunks::destroy () {
 	assert(chunks.count == 0);
 	assert(dense_chunks.count == 0);
 	assert(dense_subchunks.count == 0);
-	chunks_arr = ScrollingArray<chunk_id>();
+	//chunks_arr = ScrollingArray<chunk_id>();
+
+	chunks_map.clear();
+	queued_chunks.clear();
 }
 
 void Chunks::init_voxels (Chunk& chunk) {
@@ -54,7 +56,8 @@ block_id Chunks::read_block (int x, int y, int z) {
 	int3 cpos;
 	CHUNK_BLOCK_POS(x,y,z, cpos.x,cpos.y,cpos.z, bx,by,bz);
 
-	chunk_id cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
+	//chunk_id cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
+	chunk_id cid = query_chunk(cpos);
 	if (cid == U16_NULL)
 		return B_NULL;
 
@@ -88,10 +91,12 @@ void Chunks::write_block (int x, int y, int z, block_id data) {
 	ZoneScoped;
 
 	int bx, by, bz;
-	int cx, cy, cz;
-	CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+	int3 cpos;
+	CHUNK_BLOCK_POS(x,y,z, cpos.x,cpos.y,cpos.z, bx,by,bz);
 
-	auto cid = chunks_arr.checked_get(cx,cy,cz);
+	//chunk_id cid = chunks_arr.checked_get(cx,cy,cz);
+	chunk_id cid = query_chunk(cpos);
+	
 	//assert(chunk && (chunk->flags & Chunk::LOADED)); // out of bounds writes happen on digging in unloaded chunks
 	if (cid == U16_NULL)
 		return;
@@ -130,7 +135,8 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
 
 	auto flag_neighbour = [&] (int x, int y, int z) {
-		auto nid = chunks_arr.checked_get(x,y,z);
+		//auto nid = chunks_arr.checked_get(x,y,z);
+		auto nid = query_chunk(int3(x,y,z));
 		if (nid != U16_NULL) {
 			assert(chunks[nid].flags != 0);
 			chunks[nid].flags |= Chunk::REMESH;
@@ -352,7 +358,8 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 	{ // init
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
-		chunk.genstage = 0;
+		chunk.genphase = 0;
+		chunk.refcount = 0;
 		init_voxels(chunk);
 		init_mesh(chunk.opaque_mesh);
 		init_mesh(chunk.transparent_mesh);
@@ -381,16 +388,35 @@ void Chunks::update_chunk_loading (Game& game) {
 	unload_hyster = clamp(unload_hyster, 0.0f, 20000.0f);
 
 	float unload_dist = load_radius + unload_hyster;
+	float load_dist_sqr = load_radius * load_radius;
+	float unload_dist_sqr = unload_dist * unload_dist;
 
 	// size chunks_arr to unload radius
-	chunks_arr.update(unload_dist / CHUNK_SIZE, game.player.pos / CHUNK_SIZE,
-		[this] (chunk_id cid) { free_chunk(cid); });
+	//chunks_arr.update(unload_dist / CHUNK_SIZE, game.player.pos / CHUNK_SIZE,
+	//	[this] (chunk_id cid) { free_chunk(cid); });
 
 	{
-		ZoneScopedN("chunks_to_generate iterate all chunks");
+		ZoneScopedN("iterate chunks for unload");
 
-		float load_dist_sqr = load_radius * load_radius;
-		float unload_dist_sqr = unload_dist * unload_dist;
+		for (chunk_id cid=0; cid < end(); ++cid) {
+			auto& chunk = chunks[cid];
+			if (chunk.flags == 0) continue;
+
+			if (chunk.refcount == 0) {
+
+				float dist_sqr = chunk_dist_sq(chunk.pos, game.player.pos);
+
+				bool should_unload = dist_sqr > unload_dist_sqr;
+				if (should_unload) {
+					chunks_map.erase(chunk.pos);
+					free_chunk(cid);
+				}
+			}
+		}
+	}
+
+	{
+		ZoneScopedN("iterate chunk loading box");
 
 		static constexpr float BUCKET_FAC = (0.5f) / (CHUNK_SIZE*CHUNK_SIZE);
 		{
@@ -403,24 +429,28 @@ void Chunks::update_chunk_loading (Game& game) {
 			if (visualize_radius) {
 				g_debugdraw.wire_sphere(game.player.pos, load_radius, DBG_RADIUS_COL);
 
-				auto sz = (float)(chunks_arr.size * CHUNK_SIZE);
-				g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
+				//auto sz = (float)(chunks_arr.size * CHUNK_SIZE);
+				//g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
 			}
 
 			//for (auto chunk_pos : queued_chunks) {
 			//	g_debugdraw.wire_cube(((float3)chunk_pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.6f, DBG_STAGE0_COL);
 			//}
 		}
-		
-		for (int z=chunks_arr.pos.z; z < chunks_arr.pos.z + chunks_arr.size; ++z) {
-			for (int y=chunks_arr.pos.y; y < chunks_arr.pos.y + chunks_arr.size; ++y) {
-				for (int x=chunks_arr.pos.x; x < chunks_arr.pos.x + chunks_arr.size; ++x) {
-					chunk_id* cid = &chunks_arr.get(x,y,z);
-						
+
+		int size = ceili(max(unload_dist / CHUNK_SIZE, 0.0f) * 2 + 1);
+		int3 pos = roundi(game.player.pos / CHUNK_SIZE) - size / 2;
+
+		for (int z=pos.z; z < pos.z + size; ++z) {
+			for (int y=pos.y; y < pos.y + size; ++y) {
+				for (int x=pos.x; x < pos.x + size; ++x) {
+					//chunk_id* cid = &chunks_arr.get(x,y,z);
+					chunk_id cid = query_chunk(int3(x,y,z));
+
 					int3 pos = int3(x,y,z);
 					float dist_sqr = chunk_dist_sq(pos, game.player.pos);
-						
-					if (*cid == U16_NULL) {
+
+					if (cid == U16_NULL) {
 						// chunk not yet loaded
 						bool should_load = dist_sqr <= load_dist_sqr;
 
@@ -430,15 +460,15 @@ void Chunks::update_chunk_loading (Game& game) {
 						}
 					} else {
 						// chunk loaded
-						auto& chunk = chunks[*cid];
+						auto& chunk = chunks[cid];
 						chunk._validate_flags();
 
-						if (chunk.genstage == 1) {
+						if (chunk.genphase == 1) {
 
 							bool all_stage1 = true;
 							for (auto& offs : FULL_NEIGHBOURS) {
-								auto nid = chunks_arr.get(x + offs.x, y + offs.y, z + offs.z);
-								if (nid != U16_NULL && chunks[nid].genstage != 1) {
+								auto nid = query_chunk(int3(x,y,z) + offs);
+								if (nid == U16_NULL || chunks[nid].genphase < 1) {
 									all_stage1 = false;
 									break;
 								}
@@ -448,13 +478,6 @@ void Chunks::update_chunk_loading (Game& game) {
 								int bucketi = (int)(dist_sqr * BUCKET_FAC);
 								chunks_to_generate[bucketi].push_back(pos);
 							}
-						} else if (chunk.genstage == 2) {
-
-							bool should_unload = dist_sqr > unload_dist_sqr;
-							if (should_unload) {
-								free_chunk(*cid);
-								*cid = U16_NULL;
-							}
 						}
 					}
 				}
@@ -463,7 +486,7 @@ void Chunks::update_chunk_loading (Game& game) {
 	}
 
 	{
-		ZoneScopedN("chunks_to_generate finalize jobs");
+		ZoneScopedN("finalize jobs");
 
 		static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
 		static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
@@ -475,35 +498,36 @@ void Chunks::update_chunk_loading (Game& game) {
 			auto job = std::move(jobs[i]);
 			queued_chunks.erase(job->chunk->pos);
 
-			// Check that chunk is still in 3d array bounds, if not simply discard the job results
-			if (chunks_arr.in_bounds(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z)) {
-				chunk_id* cid = &chunks_arr.get(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z);
-				assert(*cid != U16_NULL);
-				auto& chunk = chunks[*cid];
+			//// Check that chunk is still in 3d array bounds, if not simply discard the job results
+			//if (chunks_arr.in_bounds(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z)) {
+				//chunk_id* cid = &chunks_arr.get(job->chunk->pos.x, job->chunk->pos.y, job->chunk->pos.z);
+				//assert(*cid != U16_NULL);
+				auto& chunk = *job->chunk;
 
-				assert(chunk.genstage == 0);
-				if (chunk.genstage == 0) {
-					chunk.genstage = 1;
+				assert(chunk.genphase == 0);
+				if (chunk.genphase == 0) {
+					chunk.genphase = 1;
 
+					chunk.refcount--;
 					chunk.flags |= Chunk::REMESH;
 				
 					sparse_chunk_from_worldgen(chunk, *job);
 
 					for (int i=0; i<6; ++i) {
 						int3 npos = job->chunk->pos + NEIGHBOURS[i];
-						auto nid = chunks_arr.checked_get(npos.x, npos.y, npos.z);
+						auto nid = query_chunk(npos);
 						if (nid != U16_NULL) {
 							assert(chunks[nid].flags != 0);
 							chunks[nid].flags |= Chunk::REMESH;
 						}
 					}
 				}
-			}
+			//}
 		}
 	}
 
 	{
-		ZoneScopedN("chunks_to_generate push jobs");
+		ZoneScopedN("push jobs");
 
 		static constexpr int QUEUE_LIMIT = 64; // 256
 		std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
@@ -518,19 +542,28 @@ void Chunks::update_chunk_loading (Game& game) {
 			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
 				int3 chunk_pos = chunks_to_generate[bucket][i];
 				
-				auto* cid = &chunks_arr.get(chunk_pos.x, chunk_pos.y, chunk_pos.z);
-				if (*cid == U16_NULL)
-					*cid = alloc_chunk(chunk_pos);
-				auto& chunk = chunks[*cid];
+				//auto* cid = &chunks_arr.get(chunk_pos.x, chunk_pos.y, chunk_pos.z);
+				//if (*cid == U16_NULL)
+				//	*cid = alloc_chunk(chunk_pos);
+				
+				auto cid = query_chunk(chunk_pos);
+				if (cid == U16_NULL) {
+					cid = alloc_chunk(chunk_pos);
+					chunks_map.emplace(chunk_pos, cid);
+				}
 
-				if (chunk.genstage == 0) {
+				auto& chunk = chunks[cid];
+
+				if (chunk.genphase == 0) {
+
+					chunk.refcount++;
 
 					jobs[count++] = std::make_unique<WorldgenJob>(&chunk, &game._threads_world_gen);
 					queued_chunks.emplace(chunk_pos);
 
-				} else if (chunk.genstage == 1) {
+				} else if (chunk.genphase == 1) {
 					// TODO: queue for genstage 2 processing
-					chunk.genstage = 2;
+					chunk.genphase = 2;
 				}
 
 			}
@@ -717,8 +750,8 @@ void Chunks::imgui (Renderer* renderer) {
 
 	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
 
-	ImGui::Text("3D Array     : %4d^3 chunks %4d KB",
-		chunks_arr.size, sizeof(chunk_id) * chunks_arr.size*chunks_arr.size*chunks_arr.size / KB);
+	//ImGui::Text("3D Array     : %4d^3 chunks %4d KB",
+	//	chunks_arr.size, sizeof(chunk_id) * chunks_arr.size*chunks_arr.size*chunks_arr.size / KB);
 
 	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM (%6.2f %% usage)",
 		chunks.count, format_thousands(block_volume / MB).c_str(),
@@ -794,12 +827,12 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 
 	} else if (visualize_chunks) {
 		
-		if (chunk.genstage == 0) {
+		if (chunk.genphase == 0) {
 			col = &DBG_STAGE0_COL;
-			size = 0.6f;
-		} else if (chunk.genstage == 1) {
+			size = 0.3f;
+		} else if (chunk.genphase == 1) {
 			col = &DBG_STAGE1_COL;
-			size = 0.8f;
+			size = 0.4f;
 		} else if (chunk.flags & Chunk::SPARSE_VOXELS) {
 			col = &DBG_SPARSE_CHUNK_COL;
 		}

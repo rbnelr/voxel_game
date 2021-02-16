@@ -166,7 +166,8 @@ struct Chunk {
 	Flags flags;
 	int3 pos;
 
-	int genstage;
+	int genphase;
+	int refcount; // how many async jobs are using this data, if > 0 chunk is not allowed to be freed etc.
 
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
@@ -185,15 +186,17 @@ inline float chunk_dist_sq (int3 const& pos, float3 const& dist_to) {
 	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
 }
 
-inline lrgba DBG_CHUNK_COL			= srgba(  0,   0, 255, 255);
-inline lrgba DBG_STAGE0_COL			= srgba(  0, 255, 200, 255);
-inline lrgba DBG_STAGE1_COL			= srgba(  0, 140, 255, 255);
-inline lrgba DBG_SPARSE_CHUNK_COL	= srgba( 60,  60,  60,  45);
+inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
+inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
+inline lrgba DBG_STAGE0_COL			= srgba(128,   0, 255, 255);
+inline lrgba DBG_STAGE1_COL			= srgba(  0,   8, 255, 255);
+
 inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
 inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
 inline lrgba DBG_RADIUS_COL			= srgba(200,   0,   0, 255);
 inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
 
+#if 0
 // 3d array to store chunks around the player that moves with the player by not actually moving entries
 // but instead simply moving a virtual origin point (offs) that is used when indexing
 template <typename T>
@@ -339,6 +342,7 @@ struct ScrollingArray {
 		}
 	}
 };
+#endif
 
 struct ChunkKey_Hasher {
 	size_t operator() (int3 const& key) const {
@@ -354,13 +358,19 @@ typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> ch
 typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
 
 struct Chunks {
-	ScrollingArray<chunk_id>		chunks_arr;
+	//ScrollingArray<chunk_id>		chunks_arr;
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
 	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
 	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
 
 	AllocatorBitset					slices_alloc;
+
+	chunk_pos_to_id_map				chunks_map; // queued for async worldgen
+	chunk_id query_chunk (int3 const& pos) {
+		auto it = chunks_map.find(pos);
+		return it != chunks_map.end() ? it->second : U16_NULL;
+	}
 
 	chunk_pos_set					queued_chunks; // queued for async worldgen
 
