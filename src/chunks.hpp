@@ -169,6 +169,17 @@ struct Chunk {
 	int genphase;
 	int refcount; // how many async jobs are using this data, if > 0 chunk is not allowed to be freed etc.
 
+	bool visible () {
+		return genphase == 2;
+	}
+
+	// temporary dense voxel buffer for chunk
+	// that are inserted into the sparse voxel storage on the main thread later
+	// This avoids heavy (80%) fragmentation when allocating dense data upfront and sparsifying later
+	block_id* phase1_voxels;
+
+	block_id* phase2_voxels;
+
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
 	ChunkMesh opaque_mesh;
@@ -177,6 +188,7 @@ struct Chunk {
 	void _validate_flags () {
 		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
 		if (flags & VOXELS_DIRTY) assert(flags & REMESH);
+		if (flags & REMESH) assert(visible());
 	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
@@ -368,6 +380,7 @@ struct Chunks {
 
 	chunk_pos_to_id_map				chunks_map; // queued for async worldgen
 	chunk_id query_chunk (int3 const& pos) {
+		ZoneScoped;
 		auto it = chunks_map.find(pos);
 		return it != chunks_map.end() ? it->second : U16_NULL;
 	}
@@ -401,7 +414,7 @@ struct Chunks {
 	void checked_sparsify_chunk (Chunk& c);
 	bool checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i);
 
-	void sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j);
+	void sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels);
 
 	Chunk& operator[] (chunk_id id) {
 		return chunks[id];

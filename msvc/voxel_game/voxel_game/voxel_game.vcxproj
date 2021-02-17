@@ -222,6 +222,9 @@
     <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\running_average.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\serialization.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash1.h" />
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash2.h" />
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h" />
     <ClInclude Include="..\..\..\src\kisslib\stb_image.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\stb_image_write.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\stb_rect_pack.hpp" />
@@ -364,6 +367,9 @@
     <ClCompile Include="..\..\..\src\kisslib\file_io.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\random.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\read_directory.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash1.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash2.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash3.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\stb_image.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\stb_image_write.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\stb_rect_pack.cpp" />

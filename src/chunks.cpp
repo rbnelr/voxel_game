@@ -58,7 +58,7 @@ block_id Chunks::read_block (int x, int y, int z) {
 
 	//chunk_id cid = chunks_arr.checked_get(cpos.x,cpos.y,cpos.z);
 	chunk_id cid = query_chunk(cpos);
-	if (cid == U16_NULL)
+	if (cid == U16_NULL || !chunks[cid].visible())
 		return B_NULL;
 
 	return read_block(bx,by,bz, &chunks[cid]);
@@ -98,7 +98,7 @@ void Chunks::write_block (int x, int y, int z, block_id data) {
 	chunk_id cid = query_chunk(cpos);
 	
 	//assert(chunk && (chunk->flags & Chunk::LOADED)); // out of bounds writes happen on digging in unloaded chunks
-	if (cid == U16_NULL)
+	if (cid == U16_NULL || !chunks[cid].visible())
 		return;
 
 	write_block(bx,by,bz, &chunks[cid], data);
@@ -137,7 +137,7 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	auto flag_neighbour = [&] (int x, int y, int z) {
 		//auto nid = chunks_arr.checked_get(x,y,z);
 		auto nid = query_chunk(int3(x,y,z));
-		if (nid != U16_NULL) {
+		if (nid != U16_NULL && chunks[nid].visible()) {
 			assert(chunks[nid].flags != 0);
 			chunks[nid].flags |= Chunk::REMESH;
 		}
@@ -277,7 +277,7 @@ bool check_chunk_sparse (ChunkVoxels& dc) {
 	return true; // chunk contains only <bid> voxels
 }
 
-void Chunks::sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j) {
+void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 	ZoneScoped;
 	assert(c.flags & Chunk::SPARSE_VOXELS);
 
@@ -294,7 +294,7 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j) {
 
 	bool chunk_sparse = true;
 
-	block_id* ptr = j.voxel_buffer;
+	block_id* ptr = raw_voxels;
 
 	int subc_i = 0;
 	for (int sz=0; sz<SUBCHUNK_COUNT; sz++) {
@@ -349,6 +349,15 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, WorldgenJob& j) {
 
 //// Chunk system
 
+block_id* alloc_voxel_buffer () {
+	ZoneScopedC(tracy::Color::Crimson);
+	return (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
+}
+void free_voxel_buffer (block_id* ptr) {
+	ZoneScopedC(tracy::Color::Crimson);
+	free(ptr);
+}
+
 chunk_id Chunks::alloc_chunk (int3 pos) {
 	ZoneScoped;
 
@@ -360,6 +369,7 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 		chunk.pos = pos;
 		chunk.genphase = 0;
 		chunk.refcount = 0;
+		chunk.phase1_voxels = nullptr;
 		init_voxels(chunk);
 		init_mesh(chunk.opaque_mesh);
 		init_mesh(chunk.transparent_mesh);
@@ -373,6 +383,8 @@ void Chunks::free_chunk (chunk_id id) {
 
 	free_voxels(chunk);
 
+	if (chunk.phase1_voxels) free_voxel_buffer(chunk.phase1_voxels);
+	if (chunk.phase2_voxels) free_voxel_buffer(chunk.phase2_voxels);
 	free_mesh(chunk.opaque_mesh);
 	free_mesh(chunk.transparent_mesh);
 
@@ -474,7 +486,7 @@ void Chunks::update_chunk_loading (Game& game) {
 								}
 							}
 
-							if (all_stage1) {
+							if (all_stage1 && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) {
 								int bucketi = (int)(dist_sqr * BUCKET_FAC);
 								chunks_to_generate[bucketi].push_back(pos);
 							}
@@ -504,24 +516,32 @@ void Chunks::update_chunk_loading (Game& game) {
 				//assert(*cid != U16_NULL);
 				auto& chunk = *job->chunk;
 
-				assert(chunk.genphase == 0);
-				if (chunk.genphase == 0) {
-					chunk.genphase = 1;
+				chunk.refcount--;
 
-					chunk.refcount--;
+				if (job->phase == 1) {
+
+				} else if (job->phase == 2) {
 					chunk.flags |= Chunk::REMESH;
-				
-					sparse_chunk_from_worldgen(chunk, *job);
+
+					sparse_chunk_from_worldgen(chunk, chunk.phase2_voxels);
+
+					free_voxel_buffer(chunk.phase2_voxels);
+					chunk.phase2_voxels = nullptr;
 
 					for (int i=0; i<6; ++i) {
 						int3 npos = job->chunk->pos + NEIGHBOURS[i];
 						auto nid = query_chunk(npos);
-						if (nid != U16_NULL) {
+						assert(nid != U16_NULL && chunks[nid].genphase >= 1);
+						if (chunks[nid].visible()) {
+							assert(chunks[nid].refcount > 0);
+							chunks[nid].refcount--;
 							assert(chunks[nid].flags != 0);
 							chunks[nid].flags |= Chunk::REMESH;
 						}
 					}
 				}
+
+				chunk.genphase = job->phase;
 			//}
 		}
 	}
@@ -553,19 +573,35 @@ void Chunks::update_chunk_loading (Game& game) {
 				}
 
 				auto& chunk = chunks[cid];
+				chunk.refcount++;
+				
+				auto job = std::make_unique<WorldgenJob>();
+				job->chunk = &chunk;
+				job->chunks = this;
+				job->wg = &game._threads_world_gen;
 
 				if (chunk.genphase == 0) {
 
-					chunk.refcount++;
-
-					jobs[count++] = std::make_unique<WorldgenJob>(&chunk, &game._threads_world_gen);
-					queued_chunks.emplace(chunk_pos);
+					chunk.phase1_voxels = alloc_voxel_buffer();
+					job->phase = 1;
 
 				} else if (chunk.genphase == 1) {
-					// TODO: queue for genstage 2 processing
-					chunk.genphase = 2;
+
+					for (int i=0; i<6; ++i) {
+						int3 npos = job->chunk->pos + NEIGHBOURS[i];
+						auto nid = query_chunk(npos);
+						assert(nid != U16_NULL && chunks[nid].genphase >= 1);
+						chunks[nid].refcount++;
+					}
+
+					chunk.phase2_voxels = alloc_voxel_buffer();
+					job->phase = 2;
+
 				}
 
+				jobs[count++] = std::move(job);
+
+				queued_chunks.emplace(chunk_pos);
 			}
 		}
 

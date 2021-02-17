@@ -20,10 +20,10 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	// get a 'random' but deterministic value based on block position
 	uint64_t h = hash(pos) ^ j.chunk_seed;
 	
-	// get a random determinisitc 2d offset
-	float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-	float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // [0, 1)
-		
+	float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
+	float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
+
+	// random 2d offset
 	float rand_offsx = rand1;
 	float rand_offsy = rand2;
 		
@@ -248,7 +248,7 @@ Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 
 	//auto nid = j.chunks->chunks_arr.checked_get(pos.x, pos.y, pos.z);
 	auto nid = j.chunks->query_chunk(pos);
-	if (nid != U16_NULL && (*j.chunks)[nid].flags != 0) {
+	if (nid != U16_NULL && (*j.chunks)[nid].flags != 0 && (*j.chunks)[nid].visible()) {
 		return &(*j.chunks)[nid];
 	}
 	return nullptr;

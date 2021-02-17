@@ -229,6 +229,15 @@
     <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash1.h">
+      <Filter>kisslib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash2.h">
+      <Filter>kisslib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h">
+      <Filter>kisslib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -368,6 +377,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
       <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash1.cpp">
+      <Filter>kisslib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash2.cpp">
+      <Filter>kisslib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash3.cpp">
+      <Filter>kisslib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

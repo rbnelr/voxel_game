@@ -110,6 +110,7 @@ struct Inventory {
 };
 
 struct Player {
+	SERIALIZE(Player, pos, vel, rot_ae, third_person)
 
 	Player (float3 pos): pos{pos} {}
 

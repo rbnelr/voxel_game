@@ -22,7 +22,7 @@ struct Game {
 
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
 
-	SERIALIZE(Game, flycam, activate_flycam, chunks)
+	SERIALIZE(Game, flycam, player, activate_flycam, chunks)
 
 	bool activate_flycam = false;
 	bool creative_mode = false;

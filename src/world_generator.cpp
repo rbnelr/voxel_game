@@ -58,6 +58,8 @@ namespace worldgen {
 	}
 
 	float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 pos_world) {
+		return dot(pos_world, normalize(float3(1,-2,40))) - 50;
+
 		auto noise = [&] (float3 pos, float period, float3 offs) {
 			pos /= period; // period is inverse frequency
 			pos += offs;
@@ -168,14 +170,10 @@ namespace worldgen {
 
 		int water_level = 21 - chunk_origin.z;
 
-		uint64_t chunk_seed = j.wg->seed ^ hash(j.chunk->pos);
+		OSN::Noise<2> noise2(j.wg->seed);
+		OSN::Noise<3> noise3(j.wg->seed);
 
-		OSN::Noise<2> noise(j.wg->seed);
-		Random rand = Random(chunk_seed);
-
-		OSN::Noise<3> noise3 (j.wg->seed);
-
-		block_id* blocks = j.voxel_buffer;
+		block_id* blocks = j.chunk->phase1_voxels;
 
 		{ // 3d noise generate
 			ZoneScopedN("3d noise generate");
@@ -186,7 +184,7 @@ namespace worldgen {
 					for (int x=0; x<CHUNK_SIZE; ++x) {
 						int3 pos_world = int3(x,y,z) + chunk_origin;
 
-						float val = cave_noise(noise3, noise, (float3)pos_world);
+						float val = cave_noise(noise3, noise2, (float3)pos_world);
 
 						block_id bid;
 						if (val < -5.0f) {
@@ -209,8 +207,67 @@ namespace worldgen {
 
 	}
 
-	void object_pass () {
-	#if 0
+	void object_pass (WorldgenJob& j) {
+		ZoneScoped;
+
+		const auto AIR			= g_assets.block_types.map_id("air");
+		const auto WATER		= g_assets.block_types.map_id("water");
+		const auto STONE		= g_assets.block_types.map_id("stone");
+		const auto EARTH		= g_assets.block_types.map_id("earth");
+		const auto GRASS		= g_assets.block_types.map_id("grass");
+		const auto TREE_LOG		= g_assets.block_types.map_id("tree_log");
+		const auto LEAVES		= g_assets.block_types.map_id("leaves");
+		const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
+		const auto TORCH		= g_assets.block_types.map_id("torch");
+
+		OSN::Noise<2> noise(j.wg->seed);
+
+		int3 chunkpos = j.chunk->pos * CHUNK_SIZE;
+
+		memcpy(j.chunk->phase2_voxels, j.chunk->phase1_voxels, sizeof(block_id) * CHUNK_VOXEL_COUNT);
+		block_id* blocks = j.chunk->phase2_voxels;
+
+		block_id const* neighbours[3][3][3] = {};
+		for (auto& offs : FULL_NEIGHBOURS) {
+			auto nid = j.chunks->query_chunk(j.chunk->pos + offs);
+			auto* n = &j.chunks->chunks[nid];
+			assert(nid != U16_NULL && n->flags != 0 && n->genphase >= 1);
+			neighbours[offs.z+1][offs.y+1][offs.x+1] = n->phase1_voxels;
+		}
+		neighbours[1][1][1] = j.chunk->phase1_voxels;
+
+		// read block with coord relative to this chunk, reads go through neighbours array, so neighbour chunks can also be read
+		auto read_block = [neighbours] (int x, int y, int z) -> chunk_id {
+			assert(x >= -CHUNK_SIZE && x < CHUNK_SIZE*2 &&
+			       y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
+			       z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
+			int bx, by, bz;
+			int cx, cy, cz;
+			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+
+			return neighbours[cz+1][cy+1][cx+1][IDX3D(bx,by,bz, CHUNK_SIZE)];
+		};
+		// write block with coord relative to this chunk, writes outside of this chunk are ignored
+		auto write_block = [blocks] (int x, int y, int z, block_id bid) -> void {
+			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
+			                y >= 0 && y < CHUNK_SIZE &&
+			                z >= 0 && z < CHUNK_SIZE;
+			if (in_chunk)
+				blocks[IDX3D(x,y,z, CHUNK_SIZE)] = bid;
+		};
+
+		auto replace_block = [&] (int x, int y, int z, block_id val) { // for tree placing
+			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
+			                y >= 0 && y < CHUNK_SIZE &&
+			                z >= 0 && z < CHUNK_SIZE;
+			if (!in_chunk) return;
+			
+			auto* bid = &blocks[IDX3D(x,y,z, CHUNK_SIZE)];
+			if (*bid == AIR || *bid == WATER || (val == TREE_LOG && *bid == LEAVES)) { // replace air and water with tree log, replace leaves with tree log
+				*bid = val;
+			}
+		};
+
 		std_vector<int3> tree_poss;
 
 		{
@@ -223,44 +280,71 @@ namespace worldgen {
 				return min_dist;
 			};
 
-			for (int y=0; y<CHUNK_SIZE; ++y) {
-				for (int x=0; x<CHUNK_SIZE; ++x) {
+			// how many blocks around the main chunk to process to fix cutoff trees
+			static constexpr int borderxy = 5;
+			static constexpr int borderz0 = 5 + 6; // need to add more depth to fix trees being cut off at the top (trees are higher than 5)
+			static constexpr int borderz1 = 5; 
 
-					int3 pos_world2 = int3(x,y,0) + chunk_origin;
+			// cx=-1 means that blocks [range[0], range[1]) are iterated, ie. [-border, -1]
+			// cx= 0 means that blocks [range[1], range[2]) are iterated, ie. [0, CHUNK_SIZE-1]
+			// cx=+1 means that blocks [range[2], range[3]) are iterated, ie. [CHUNK_SIZE, CHUNK_SIZE +border-1]
+			static constexpr int rangexy[4] = { -borderxy, 0, CHUNK_SIZE, CHUNK_SIZE +borderxy };
+			static constexpr int rangez[4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
 
-					float tree_density = noise_tree_density(*j.wg, noise, (float2)(int2)pos_world2);
+			// For neighbour chunks (and this chunk)
+			for (int cz=-1; cz<=+1; ++cz)
+			for (int cy=-1; cy<=+1; ++cy)
+			for (int cx=-1; cx<=+1; ++cx) {
 
-					float grass_density = noise_grass_density(*j.wg, noise, (float2)(int2)pos_world2);
+				// For blocks in chunk
+				for (int y=rangexy[cy+1]; y<rangexy[cy+2]; ++y)
+				for (int x=rangexy[cx+1]; x<rangexy[cx+2]; ++x) {
 
-					float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
-						{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
-						{ 2.236f,	0.02f },	// length(float2(1,2)) -> one block free
-						{ 2.828f,	0.15f },	// length(float2(2,2)) -> one block free diagonally
-						{ 4,		0.75f },
-						{ 6,		1 },
-						});
-					float effective_tree_prob = tree_density * tree_prox_prob;
-					//float effective_tree_prob = tree_density;
+					for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
+						auto bid   = read_block(x,y,z);
+						if (bid == EARTH && read_block(x,y,z+1) == AIR) {
+							write_block(x,y,z, GRASS);
+							
+							// get a 'random' but deterministic value based on block position
+							uint64_t h = hash(int3(x,y,z) + chunkpos, j.wg->seed);
 
-					for (int z=1; z<CHUNK_SIZE; ++z) {
-						auto* below = &blocks[POS2IDX(x,y,z-1)];
-						auto* bid   = &blocks[POS2IDX(x,y,z)];
+							double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
-						bool block_free = *bid == AIR && z > 0 && *below == EARTH;
+							auto chance = [&] (float prob) {
+								double probd = (double)prob;
 
-						if (block_free) {
-							*below = GRASS;
+								bool happened = rand <= probd;
+								// transform uniform random value such that [0,prob] becomes [0,1]
+								// so that successive checks are independent of the result of this one
+								// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
+								if (happened)	rand = rand / probd;
+								else			rand = (rand - probd) / (1.0 - probd);
+								return happened;
+							};
 
-							float tree_chance = rand.uniformf();
-							float grass_chance = rand.uniformf();
+							//
+							float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
+							float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
 
-							if (rand.uniformf() < effective_tree_prob) {
-								tree_poss.push_back( int3(x,y,z) );
-							} else if (rand.uniformf() < grass_density) {
-								*bid = TALLGRASS;
-							} else if (rand.uniformf() < 0.0005f) {
-								*bid = TORCH;
-								//*block_light = g_blocks.blocks[TORCH].glow;
+							tree_density = 0.5f;
+
+							float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
+								{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
+								{ 2.236f,	0.005f },	// length(float2(1,2)) -> one block free
+								{ 2.828f,	0.05f },	// length(float2(2,2)) -> one block free diagonally
+								{ 4,		0.5f },
+								{ 6,		1 },
+								});
+
+							float effective_tree_prob = tree_density * tree_prox_prob;
+							//float effective_tree_prob = tree_density;
+							
+							if (chance(effective_tree_prob)) {
+								tree_poss.push_back( int3(x,y,z+1) );
+							} else if (chance(grass_density)) {
+								write_block(x,y,z+1, TALLGRASS);
+							} else if (chance(0.0005f)) {
+								write_block(x,y,z+1, TORCH);
 							}
 						}
 					}
@@ -271,59 +355,41 @@ namespace worldgen {
 		{
 			ZoneScopedN("Place structures");
 
-			auto place_tree = [&] (int3 pos) {
-				auto* bid = &blocks[POS2IDX(pos.x, pos.y, pos.z) + POS2IDX(0,0,-1)];
+			auto place_block_ellipsoid = [&] (float3 const& center, float3 const& radius, block_id bid) {
+				// round makes the box include all blocks that have their center intersect with the ellipsoid
+				int3 start = roundi((float3)center -radius);
+				int3 end   = roundi((float3)center +radius);
 
-				if (pos.z > 0 && *bid == GRASS) {
-					*bid = EARTH;
-				}
-
-				auto place_block = [&] (int3 pos, block_id bt) {
-					if (any(pos < 0 || pos >= CHUNK_SIZE)) return;
-					auto* bid = &blocks[POS2IDX(pos.x, pos.y, pos.z)];
-
-					if (*bid == AIR || *bid == WATER || (bt == TREE_LOG && *bid == LEAVES)) {
-						*bid = bt;
-					}
-				};
-				auto place_block_sphere = [&] (int3 pos_chunk, float3 r, block_id bt) {
-					int3 start = (int3)floor((float3)pos_chunk +0.5f -r);
-					int3 end = (int3)ceil((float3)pos_chunk +0.5f +r);
-
-					int3 i; // position in chunk
-					for (i.z=start.z; i.z<end.z; ++i.z) {
-						for (i.y=start.y; i.y<end.y; ++i.y) {
-							for (i.x=start.x; i.x<end.x; ++i.x) {
-								if (length_sqr((float3)(i -pos_chunk) / r) <= 1) place_block(i, bt);
-							}
+				for (int z=start.z; z<end.z; ++z) {
+					for (int y=start.y; y<end.y; ++y) {
+						for (int x=start.x; x<end.x; ++x) {
+							// check dist^2 of block to ellipsoid center,  /radius turns radius 1 sphere into desired ellipsoid
+							if (length_sqr(((float3)int3(x,y,z) + 0.5f - center) / radius) <= 1)
+								replace_block(x,y,z, bid);
 						}
 					}
-				};
+				}
+			};
 
+			auto place_tree = [&] (int x, int y, int z) {
 				int tree_height = 6;
 
 				for (int i=0; i<tree_height; ++i)
-					place_block(pos +int3(0,0,i), TREE_LOG);
+					replace_block(x,y, z + i, TREE_LOG);
 
-				place_block_sphere(pos +int3(0,0,tree_height-1), float3(float2(3.2f),tree_height/2.5f), LEAVES);
+				place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
 			};
 
 			for (int3 p : tree_poss)
-				place_tree(p);
+				place_tree(p.x,p.y,p.z);
 		}
-	#endif
 	}
 }
 
 void WorldgenJob::execute () {
-	worldgen::noise_pass(*this);
+	if (phase == 1)
+		worldgen::noise_pass(*this);
+	else if (phase == 2)
+		worldgen::object_pass(*this);
 }
 
-WorldgenJob::WorldgenJob (Chunk* chunk, WorldGenerator const* wg): chunk{chunk}, wg{wg} {
-	ZoneScopedNC("malloc WorldgenJob::voxel_buffer", tracy::Color::Crimson);
-	voxel_buffer = (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
-}
-WorldgenJob::~WorldgenJob () {
-	ZoneScopedNC("free WorldgenJob::voxel_buffer", tracy::Color::Crimson);
-	free(voxel_buffer);
-}

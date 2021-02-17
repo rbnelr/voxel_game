@@ -35,8 +35,6 @@
 		"leaves": {
 			"hardness": 2,
 
-			"mesh": "X-leaves",
-
 			"tex": [2,1],
 			"transparency": "alpha_test"
 		},
