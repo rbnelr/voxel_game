@@ -77,6 +77,8 @@ void BlockMeshes::load (json const& blocks_json) {
 	ZoneScoped;
 
 	auto* scene = aiImportFile("meshes/block_meshes.fbx", aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+	if (!scene)
+		throw std::runtime_error("meshes/block_meshes.fbx not found!");
 
 	auto load_mesh = [&] (char const* name) {
 		int mesh_idx = -1;

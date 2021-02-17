@@ -369,6 +369,62 @@ struct ChunkKey_Comparer {
 typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
 typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
 
+struct BlueNoiseTexture {
+	float* data;
+
+	struct BlueNoiseRawFileHeader {
+		uint32_t Version;
+		uint32_t nChannel;
+		uint32_t nDimension;
+		uint32_t Shape[3]; // actually Shape[nDimension], but assume 3 for our case, not sure if zyx or xyz, but is irrelevant in my usecase
+		// uint32_t Pixels[Shape[0]][Shape[1]][Shape[2]][nChannel]
+	};
+	bool load_file (const char* filename) {
+		uint64_t size;
+		auto file = load_binary_file(filename, &size);
+		if (!file) return false;
+
+		if (size < sizeof(BlueNoiseRawFileHeader)) return false;
+		auto* header = (BlueNoiseRawFileHeader*)file.get();
+
+		if (header->Version != 1) return false;
+		if (header->nChannel != 1) return false;
+		if (header->nDimension != 3) return false;
+		if (header->Shape[0] != 16) return false;
+		if (header->Shape[1] != 16) return false;
+		if (header->Shape[2] != 16) return false;
+		if (header->Shape[0] != header->Shape[1]) return false;
+		if (header->Shape[0] != header->Shape[2]) return false;
+
+		if (size < sizeof(BlueNoiseRawFileHeader) + sizeof(int)*16*16*16) return false;
+		uint32_t* data_in = (uint32_t*)(file.get() + sizeof(BlueNoiseRawFileHeader));
+
+		data = (float*)malloc(sizeof(float)*16*16*16);
+
+		static constexpr float FAC = 1.0f / (float)(16ull*16*16);
+		for (size_t i=0; i<16ull*16*16; ++i) {
+			data[i] = (float)data_in[i] * FAC;
+		}
+
+		return true;
+	}
+
+	BlueNoiseTexture () {
+		if (!load_file("textures/bluenoisetest.raw"))
+			throw std::runtime_error("textures/bluenoisetest.raw could not be loaded!");
+	}
+	~BlueNoiseTexture () {
+		free(data);
+	}
+
+	float sample (int x, int y, int z) {
+		x &= 15;
+		y &= 15;
+		z &= 15;
+		return data[z * 16*16 + y * 16 + x];
+	}
+};
+
 struct Chunks {
 	//ScrollingArray<chunk_id>		chunks_arr;
 
@@ -386,6 +442,8 @@ struct Chunks {
 	}
 
 	chunk_pos_set					queued_chunks; // queued for async worldgen
+
+	BlueNoiseTexture				blue_noise_tex;
 
 	void destroy ();
 	~Chunks () {
@@ -495,6 +553,7 @@ struct Chunks {
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);
+
 };
 
 template <typename Func>

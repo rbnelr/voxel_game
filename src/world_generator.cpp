@@ -326,24 +326,28 @@ namespace worldgen {
 							float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
 							float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
 
-							tree_density = 0.5f;
+							tree_density = clamp(map((float)(x + chunkpos.x), -100.0f, +100.0f));
 
-							float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
-								{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
-								{ 2.236f,	0.005f },	// length(float2(1,2)) -> one block free
-								{ 2.828f,	0.05f },	// length(float2(2,2)) -> one block free diagonally
-								{ 4,		0.5f },
-								{ 6,		1 },
-								});
+							//float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
+							//	{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
+							//	{ 2.236f,	0.005f },	// length(float2(1,2)) -> one block free
+							//	{ 2.828f,	0.05f },	// length(float2(2,2)) -> one block free diagonally
+							//	{ 4,		0.5f },
+							//	{ 6,		1 },
+							//	});
 
-							float effective_tree_prob = tree_density * tree_prox_prob;
+							//float effective_tree_prob = tree_density * tree_prox_prob;
 							//float effective_tree_prob = tree_density;
 							
-							if (chance(effective_tree_prob)) {
+							// if (chance(effective_tree_prob)) {
+
+							if (j.chunks->blue_noise_tex.sample(x,y,z) < tree_density) {
 								tree_poss.push_back( int3(x,y,z+1) );
-							} else if (chance(grass_density)) {
+							}
+							else if (chance(grass_density)) {
 								write_block(x,y,z+1, TALLGRASS);
-							} else if (chance(0.0005f)) {
+							}
+							else if (chance(0.0005f)) {
 								write_block(x,y,z+1, TORCH);
 							}
 						}
@@ -377,7 +381,7 @@ namespace worldgen {
 				for (int i=0; i<tree_height; ++i)
 					replace_block(x,y, z + i, TREE_LOG);
 
-				place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
+				//place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
 			};
 
 			for (int3 p : tree_poss)
