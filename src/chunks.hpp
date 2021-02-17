@@ -372,6 +372,8 @@ typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_se
 struct BlueNoiseTexture {
 	float* data;
 
+	static constexpr size_t SIZE = 32;
+
 	struct BlueNoiseRawFileHeader {
 		uint32_t Version;
 		uint32_t nChannel;
@@ -390,19 +392,19 @@ struct BlueNoiseTexture {
 		if (header->Version != 1) return false;
 		if (header->nChannel != 1) return false;
 		if (header->nDimension != 3) return false;
-		if (header->Shape[0] != 16) return false;
-		if (header->Shape[1] != 16) return false;
-		if (header->Shape[2] != 16) return false;
+		if (header->Shape[0] != (uint32_t)SIZE) return false;
+		if (header->Shape[1] != (uint32_t)SIZE) return false;
+		if (header->Shape[2] != (uint32_t)SIZE) return false;
 		if (header->Shape[0] != header->Shape[1]) return false;
 		if (header->Shape[0] != header->Shape[2]) return false;
 
-		if (size < sizeof(BlueNoiseRawFileHeader) + sizeof(int)*16*16*16) return false;
+		if (size < sizeof(BlueNoiseRawFileHeader) + sizeof(int)*SIZE*SIZE*SIZE) return false;
 		uint32_t* data_in = (uint32_t*)(file.get() + sizeof(BlueNoiseRawFileHeader));
 
-		data = (float*)malloc(sizeof(float)*16*16*16);
+		data = (float*)malloc(sizeof(float)*SIZE*SIZE*SIZE);
 
-		static constexpr float FAC = 1.0f / (float)(16ull*16*16);
-		for (size_t i=0; i<16ull*16*16; ++i) {
+		static constexpr float FAC = 1.0f / (float)(SIZE*SIZE*SIZE);
+		for (size_t i=0; i<SIZE*SIZE*SIZE; ++i) {
 			data[i] = (float)data_in[i] * FAC;
 		}
 
@@ -410,18 +412,18 @@ struct BlueNoiseTexture {
 	}
 
 	BlueNoiseTexture () {
-		if (!load_file("textures/bluenoisetest.raw"))
-			throw std::runtime_error("textures/bluenoisetest.raw could not be loaded!");
+		if (!load_file("textures/bluenoise32.raw"))
+			throw std::runtime_error("textures/bluenoise32.raw could not be loaded!");
 	}
 	~BlueNoiseTexture () {
 		free(data);
 	}
 
 	float sample (int x, int y, int z) {
-		x &= 15;
-		y &= 15;
-		z &= 15;
-		return data[z * 16*16 + y * 16 + x];
+		x &= (int)SIZE-1;
+		y &= (int)SIZE-1;
+		z &= (int)SIZE-1;
+		return data[z * SIZE*SIZE + y * SIZE + x];
 	}
 };
 
