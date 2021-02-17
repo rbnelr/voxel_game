@@ -58,9 +58,6 @@ namespace worldgen {
 	}
 
 	float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 pos_world) {
-		return dot(pos_world, normalize(float3(1,-2,40))) - 50;
-		//return pos_world.z - 40;
-
 		auto noise = [&] (float3 pos, float period, float3 offs) {
 			pos /= period; // period is inverse frequency
 			pos += offs;
@@ -269,17 +266,34 @@ namespace worldgen {
 			}
 		};
 
-		std_vector<int3> tree_poss;
+		auto place_block_ellipsoid = [&] (float3 const& center, float3 const& radius, block_id bid) {
+			// round makes the box include all blocks that have their center intersect with the ellipsoid
+			int3 start = roundi((float3)center -radius);
+			int3 end   = roundi((float3)center +radius);
+
+			for (int z=start.z; z<end.z; ++z) {
+				for (int y=start.y; y<end.y; ++y) {
+					for (int x=start.x; x<end.x; ++x) {
+						// check dist^2 of block to ellipsoid center,  /radius turns radius 1 sphere into desired ellipsoid
+						if (length_sqr(((float3)int3(x,y,z) + 0.5f - center) / radius) <= 1)
+							replace_block(x,y,z, bid);
+					}
+				}
+			}
+		};
+
+		auto place_tree = [&] (int x, int y, int z) {
+			int tree_height = 6;
+
+			for (int i=0; i<tree_height; ++i)
+				replace_block(x,y, z + i, TREE_LOG);
+
+			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
+		};
+
 
 		{
 			ZoneScopedN("Tree pass");
-
-			auto find_min_tree_dist = [&] (int2 new_tree_pos) {
-				float min_dist = +INF;
-				for (int3 p : tree_poss)
-					min_dist = min(min_dist, length((float2)(int2)p -(float2)new_tree_pos));
-				return min_dist;
-			};
 
 			// how many blocks around the main chunk to process to fix cutoff trees
 			static constexpr int borderxy = 5;
@@ -331,13 +345,8 @@ namespace worldgen {
 							float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(wx, wy));
 							float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(wx, wy));
 
-							if (y + chunkpos.y > 0)
-								tree_density = clamp(map((float)(x + chunkpos.x), -100.0f, +100.0f));
-							else
-								tree_density *= 1;
-
 							if (j.chunks->blue_noise_tex.sample(wx,wy,wz) < tree_density) {
-								tree_poss.push_back( int3(x,y,z+1) );
+								place_tree(x,y,z+1);
 							}
 							else if (chance(grass_density)) {
 								write_block(x,y,z+1, TALLGRASS);
@@ -349,38 +358,6 @@ namespace worldgen {
 					}
 				}
 			}
-		}
-
-		{
-			ZoneScopedN("Place structures");
-
-			auto place_block_ellipsoid = [&] (float3 const& center, float3 const& radius, block_id bid) {
-				// round makes the box include all blocks that have their center intersect with the ellipsoid
-				int3 start = roundi((float3)center -radius);
-				int3 end   = roundi((float3)center +radius);
-
-				for (int z=start.z; z<end.z; ++z) {
-					for (int y=start.y; y<end.y; ++y) {
-						for (int x=start.x; x<end.x; ++x) {
-							// check dist^2 of block to ellipsoid center,  /radius turns radius 1 sphere into desired ellipsoid
-							if (length_sqr(((float3)int3(x,y,z) + 0.5f - center) / radius) <= 1)
-								replace_block(x,y,z, bid);
-						}
-					}
-				}
-			};
-
-			auto place_tree = [&] (int x, int y, int z) {
-				int tree_height = 6;
-
-				for (int i=0; i<tree_height; ++i)
-					replace_block(x,y, z + i, TREE_LOG);
-
-				//place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
-			};
-
-			for (int3 p : tree_poss)
-				place_tree(p.x,p.y,p.z);
 		}
 	}
 }
