@@ -372,7 +372,7 @@ typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_se
 struct BlueNoiseTexture {
 	float* data;
 
-	static constexpr size_t SIZE = 32;
+	static constexpr size_t SIZE = 64;
 
 	struct BlueNoiseRawFileHeader {
 		uint32_t Version;
@@ -412,8 +412,8 @@ struct BlueNoiseTexture {
 	}
 
 	BlueNoiseTexture () {
-		if (!load_file("textures/bluenoise32.raw"))
-			throw std::runtime_error("textures/bluenoise32.raw could not be loaded!");
+		if (!load_file("textures/bluenoise64.raw"))
+			throw std::runtime_error("textures/bluenoise64.raw could not be loaded!");
 	}
 	~BlueNoiseTexture () {
 		free(data);
