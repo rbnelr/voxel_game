@@ -326,7 +326,10 @@ namespace worldgen {
 							float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
 							float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(x + chunkpos.x, y + chunkpos.y));
 
-							tree_density = clamp(map((float)(x + chunkpos.x), -100.0f, +100.0f));
+							if (y + chunkpos.y > 0)
+								tree_density = clamp(map((float)(x + chunkpos.x), -100.0f, +100.0f));
+							else
+								tree_density *= 32;
 
 							//float tree_prox_prob = gradient<float>( find_min_tree_dist(int2(x,y)), {
 							//	{ SQRT_2,	0 },		// length(float2(1,1)) -> zero blocks free diagonally
@@ -340,6 +343,10 @@ namespace worldgen {
 							//float effective_tree_prob = tree_density;
 							
 							// if (chance(effective_tree_prob)) {
+
+							//if (j.chunks->blue_noise_tex.sample(x,y,z) < tree_density) {
+							//	write_block(x,y,z+1, TALLGRASS);
+							//}
 
 							if (j.chunks->blue_noise_tex.sample(x,y,z) < tree_density) {
 								tree_poss.push_back( int3(x,y,z+1) );
