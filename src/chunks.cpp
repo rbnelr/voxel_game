@@ -660,9 +660,14 @@ void Chunks::update_chunk_loading (Game& game) {
 					for (auto& offs : FULL_NEIGHBOURS) {
 						auto nid = query_chunk(job->chunk->pos + offs);
 						assert(nid != U16_NULL && chunks[nid].genphase >= 1);
+						assert(chunks[nid].refcount > 0);
+						chunks[nid].refcount--;
+					}
+
+					for (auto& offs : NEIGHBOURS) {
+						auto nid = query_chunk(job->chunk->pos + offs);
+						assert(nid != U16_NULL && chunks[nid].genphase >= 1);
 						if (chunks[nid].visible()) {
-							assert(chunks[nid].refcount > 0);
-							chunks[nid].refcount--;
 							assert(chunks[nid].flags != 0);
 							chunks[nid].flags |= Chunk::REMESH;
 						}
@@ -689,10 +694,6 @@ void Chunks::update_chunk_loading (Game& game) {
 		for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
 			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
 				int3 chunk_pos = chunks_to_generate[bucket][i];
-				
-				//auto* cid = &chunks_arr.get(chunk_pos.x, chunk_pos.y, chunk_pos.z);
-				//if (*cid == U16_NULL)
-				//	*cid = alloc_chunk(chunk_pos);
 				
 				auto cid = query_chunk(chunk_pos);
 				if (cid == U16_NULL) {
