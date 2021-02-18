@@ -597,12 +597,18 @@ void Chunks::update_chunk_loading (Game& game) {
 
 							bool all_stage1 = true;
 							for (auto& offs : FULL_NEIGHBOURS) {
+								int3 npos = int3(x + offs.x, y + offs.y, z + offs.z);
 							#if CHUNK_ARROPT
-								chunk_id nid = chunks_arr_get(x + offs.x, y + offs.y, z + offs.z);
+								chunk_id nid = chunks_arr_get(npos.x, npos.y, npos.z);
 							#else
-								chunk_id nid = query_chunk(int3(x,y,z) + offs);
+								chunk_id nid = query_chunk(npos);
 							#endif
 								if (nid == U16_NULL || chunks[nid].genphase < 1) {
+									float ndist_sqr = chunk_dist_sq(npos, game.player.pos);
+									if (nid == U16_NULL) {
+										queue_chunk(npos, ndist_sqr);
+									}
+
 									all_stage1 = false;
 									break;
 								}
