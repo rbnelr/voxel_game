@@ -154,6 +154,10 @@ struct ChunkVoxels {
 	}
 };
 
+#define CHUNK_NEIGHBOUR_PTRS 1
+#define CHUNK_HASHMAP 1
+#define CHUNK_ARROPT 1
+
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED		= 1<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
@@ -172,6 +176,10 @@ struct Chunk {
 	bool visible () {
 		return genphase == 2;
 	}
+
+#if CHUNK_NEIGHBOUR_PTRS
+	chunk_id neighbours[6];
+#endif
 
 	// temporary dense voxel buffer for chunk
 	// that are inserted into the sparse voxel storage on the main thread later
@@ -438,12 +446,14 @@ struct Chunks {
 
 	chunk_pos_to_id_map				chunks_map; // queued for async worldgen
 	chunk_id query_chunk (int3 const& pos) {
-		ZoneScoped;
+		//ZoneScoped;
 		auto it = chunks_map.find(pos);
 		return it != chunks_map.end() ? it->second : U16_NULL;
 	}
 
+#if CHUNK_HASHMAP
 	chunk_pos_set					queued_chunks; // queued for async worldgen
+#endif
 
 	BlueNoiseTexture				blue_noise_tex;
 

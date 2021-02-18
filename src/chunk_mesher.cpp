@@ -205,7 +205,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 				BODY(NEIGHBOURX, NEIGHBOURY, NEIGHBOURZ)
 			}
 			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(OFFSX, NEIGHBOURY, NEIGHBOURZ )
+				BODY(OFFSX, NEIGHBOURY, NEIGHBOURZ)
 			}
 		}
 
@@ -270,8 +270,6 @@ void mesh_chunk (RemeshChunkJob& j) {
 			for (int x=0; x<CHUNK_SIZE; ++x) {
 
 				block_id id = j.chunks->read_block(x,y,z, j.chunk);
-
-				// TODO: 
 
 				{ // X
 					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z, j.chunk) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);
