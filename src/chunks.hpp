@@ -154,7 +154,7 @@ struct ChunkVoxels {
 	}
 };
 
-#define CHUNK_NEIGHBOUR_PTRS 1
+#define CHUNK_NEIGHBOUR_PTRS 0
 #define CHUNK_HASHMAP 1
 #define CHUNK_ARROPT 1
 

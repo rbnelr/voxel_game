@@ -6,6 +6,8 @@
 #include "voxel_light.hpp"
 #include "chunk_mesher.hpp"
 
+//#pragma optimize("", off)
+
 //// Voxel system
 
 void Chunks::destroy () {
@@ -458,6 +460,12 @@ void Chunks::update_chunk_loading (Game& game) {
 			chunks_to_generate.shrink_to_fit(); // delete all inner vectors to avoid constant memory alloc when loading idle
 			chunks_to_generate.resize((int)(load_dist_sqr * BUCKET_FAC) + 1);
 		}
+		auto queue_chunk = [&] (int3 const& chunk_pos, float chunk_dist_sqr) {
+			int bucketi = (int)(chunk_dist_sqr * BUCKET_FAC);
+			//assert(bucketi >= 0 && bucketi < chunks_to_generate.size());
+			bucketi = clamp(bucketi, 0, (int)chunks_to_generate.size() -1);
+			chunks_to_generate[bucketi].push_back(chunk_pos);
+		};
 
 		if (visualize_chunks) {
 			if (visualize_radius) {
@@ -478,14 +486,14 @@ void Chunks::update_chunk_loading (Game& game) {
 		int3 pos = roundi(game.player.pos / CHUNK_SIZE) - size / 2;
 
 		ZoneValue(size*size*size)
-			ZoneValue(chunks_map.size())
+		ZoneValue(chunks_map.size())
 
-			chunk_id* chunks_arr;
+		chunk_id* chunks_arr;
 		int arrsize = size+2;
 		auto bounds = [&] (int x, int y, int z) {
 			return (uint32_t)(x - pos.x +1) < (uint32_t)arrsize && 
-				(uint32_t)(y - pos.y +1) < (uint32_t)arrsize &&
-				(uint32_t)(z - pos.z +1) < (uint32_t)arrsize;
+			       (uint32_t)(y - pos.y +1) < (uint32_t)arrsize &&
+			       (uint32_t)(z - pos.z +1) < (uint32_t)arrsize;
 		};
 
 		auto chunks_arr_get = [&] (int x, int y, int z) -> chunk_id& {
@@ -514,7 +522,7 @@ void Chunks::update_chunk_loading (Game& game) {
 			int3 pos = floori(game.player.pos / CHUNK_SIZE);
 			if (chunks_map.find(pos) == chunks_map.end()) { // chunk not yet loaded
 				if (queued_chunks.find(pos) == queued_chunks.end()) // chunk not yet queued for worldgen
-					chunks_to_generate[0].push_back(pos);
+					queue_chunk(pos, 0);
 			}
 		}
 
@@ -542,10 +550,8 @@ void Chunks::update_chunk_loading (Game& game) {
 					}
 				}
 
-				if (all_stage1 && queued_chunks.find(chunk.pos) == queued_chunks.end()) {
-					int bucketi = (int)(dist_sqr * BUCKET_FAC);
-					chunks_to_generate[bucketi].push_back(chunk.pos);
-				}
+				if (all_stage1 && queued_chunks.find(chunk.pos) == queued_chunks.end())
+					queue_chunk(chunk.pos, dist_sqr);
 			}
 
 			for (int i=0; i<6; ++i) {
@@ -556,10 +562,8 @@ void Chunks::update_chunk_loading (Game& game) {
 					float ndist_sqr = chunk_dist_sq(npos, game.player.pos);
 					bool should_load = ndist_sqr <= load_dist_sqr;
 
-					if (should_load && queued_chunks.find(npos) == queued_chunks.end()) { // chunk not yet queued for worldgen
-						int bucketi = (int)(ndist_sqr * BUCKET_FAC);
-						chunks_to_generate[bucketi].push_back(npos);
-					}
+					if (should_load && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
+						queue_chunk(npos, ndist_sqr);
 				}
 			}
 		}
@@ -581,10 +585,9 @@ void Chunks::update_chunk_loading (Game& game) {
 						// chunk not yet loaded
 						bool should_load = dist_sqr <= load_dist_sqr;
 
-						if (should_load && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) { // chunk not yet queued for worldgen
-							int bucketi = (int)(dist_sqr * BUCKET_FAC);
-							chunks_to_generate[bucketi].push_back(pos);
-						}
+						if (should_load && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) // chunk not yet queued for worldgen
+							queue_chunk(pos, dist_sqr);
+
 					} else {
 						// chunk loaded
 						auto& chunk = chunks[cid];
@@ -605,10 +608,8 @@ void Chunks::update_chunk_loading (Game& game) {
 								}
 							}
 
-							if (all_stage1 && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) {
-								int bucketi = (int)(dist_sqr * BUCKET_FAC);
-								chunks_to_generate[bucketi].push_back(pos);
-							}
+							if (all_stage1 && queued_chunks.find(int3(x,y,z)) == queued_chunks.end())
+								queue_chunk(pos, dist_sqr);
 						}
 					}
 				}

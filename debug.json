@@ -2,13 +2,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				112.06258392333984,
-				106.07833862304688,
-				156.09788513183594
+				126.10295867919922,
+				-601.2313842773438,
+				235.05523681640625
 			],
 			"rot_aer": [
-				-0.8090770244598389,
-				-0.6527512669563293,
+				0.00042557716369628906,
+				-0.13474038243293762,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -17,7 +17,7 @@
 			"vfov": 1.2217304706573486,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 59.0948371887207,
+		"base_speed": 72.75426483154297,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -41,7 +41,7 @@
 	},
 	"activate_flycam": true,
 	"chunks": {
-		"load_radius": 476.0,
+		"load_radius": 264.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": true,
