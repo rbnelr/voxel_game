@@ -248,7 +248,7 @@ Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 
 	//auto nid = j.chunks->chunks_arr.checked_get(pos.x, pos.y, pos.z);
 	auto nid = j.chunks->query_chunk(pos);
-	if (nid != U16_NULL && (*j.chunks)[nid].flags != 0 && (*j.chunks)[nid].visible()) {
+	if (nid != U16_NULL && (*j.chunks)[nid].flags != 0) {
 		return &(*j.chunks)[nid];
 	}
 	return nullptr;

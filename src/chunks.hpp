@@ -170,23 +170,11 @@ struct Chunk {
 	Flags flags;
 	int3 pos;
 
-	int genphase;
-	int refcount; // how many async jobs are using this data, if > 0 chunk is not allowed to be freed etc.
-
-	bool visible () {
-		return genphase == 2;
-	}
+	int refcount; // how many async jobs are using this chunk data, if > 0 chunk is not allowed to be freed etc.
 
 #if CHUNK_NEIGHBOUR_PTRS
 	chunk_id neighbours[6];
 #endif
-
-	// temporary dense voxel buffer for chunk
-	// that are inserted into the sparse voxel storage on the main thread later
-	// This avoids heavy (80%) fragmentation when allocating dense data upfront and sparsifying later
-	block_id* phase1_voxels;
-
-	block_id* phase2_voxels;
 
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
@@ -196,7 +184,6 @@ struct Chunk {
 	void _validate_flags () {
 		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
 		if (flags & VOXELS_DIRTY) assert(flags & REMESH);
-		if (flags & REMESH) assert(visible());
 	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
@@ -208,161 +195,13 @@ inline float chunk_dist_sq (int3 const& pos, float3 const& dist_to) {
 
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
 inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
-inline lrgba DBG_STAGE0_COL			= srgba(128,   0, 255, 255);
-inline lrgba DBG_STAGE1_COL			= srgba(  0,   8, 255, 255);
+inline lrgba DBG_STAGE1_COL			= srgba(128,   0, 255, 255);
+inline lrgba DBG_STAGE2_COL			= srgba(  0,   8, 255, 255);
 
 inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
 inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
 inline lrgba DBG_RADIUS_COL			= srgba(200,   0,   0, 255);
 inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
-
-#if 0
-// 3d array to store chunks around the player that moves with the player by not actually moving entries
-// but instead simply moving a virtual origin point (offs) that is used when indexing
-template <typename T>
-struct ScrollingArray {
-	T*			arr = nullptr;
-	int			size = 0; // allocated size of 3d array (same for each axis, always power of two for access speed; bit masking instead of mod)
-	int3		pos = 0; // pos of lower corner of 3d array in the world (in chunk coords)
-
-	uint32_t	shift = 0; // size = 1 << shift
-	uint32_t	mask = 0; // mask = size -1
-
-	~ScrollingArray () {
-		if (arr)
-			free(arr);
-	}
-
-	bool in_bounds (int x, int y, int z) {
-	#if 0
-		return z >= pos.z && z < pos.z + size &&
-		       y >= pos.y && y < pos.y + size &&
-		       x >= pos.x && x < pos.x + size;
-	#else
-		// use single unsigned wrapped compare instead of two normal compares
-		return (uint32_t)(x - pos.x) < (uint32_t)size && 
-		       (uint32_t)(y - pos.y) < (uint32_t)size &&
-		       (uint32_t)(z - pos.z) < (uint32_t)size;
-	#endif
-	}
-
-	static size_t pos2idx (int x, int y, int z, uint32_t mask, uint32_t shift) {
-		size_t a = (size_t)((uint32_t)x & mask);
-		size_t b = (size_t)((uint32_t)y & mask) <<  shift;
-		size_t c = (size_t)((uint32_t)z & mask) << (shift*2);
-		return a + b + c;
-	}
-
-	T& get (int x, int y, int z) {
-		assert(in_bounds(x,y,z));
-		return arr[pos2idx(x,y,z, mask, shift)];
-	}
-
-	T checked_get (int x, int y, int z) {
-		return in_bounds(x,y,z) ? get(x,y,z) : U16_NULL;
-	}
-
-	template <typename FREE>
-	void update (float required_radius, float3 new_center, FREE free_chunk) {
-		ScrollingArray temp;
-
-		temp.size = ceili(max(required_radius, 0.0f) * 2 + 1);
-		temp.size = (int)round_up_pot((uint32_t)temp.size, &temp.shift);
-		size_t alloc_size = sizeof(T) * ((size_t)temp.size * temp.size * temp.size);
-
-		temp.mask = (uint32_t)(temp.size-1);
-
-		temp.pos = roundi(new_center) - temp.size / 2;
-
-		if (!arr || temp.size != size) {
-			ZoneScopedN("ScrollingArray::resize");
-
-			// size changed or init, alloc new array
-			temp.arr = (T*)malloc(alloc_size);
-
-			// clear array to U16_NULL
-			memset(temp.arr, -1, alloc_size);
-
-			// copy chunks from old array into resized array
-			if (arr) {
-				size_t i=0;
-				for (int z=pos.z; z < pos.z + size; ++z) {
-					for (int y=pos.y; y < pos.y + size; ++y) {
-						for (int x=pos.x; x < pos.x + size; ++x) {
-							chunk_id c = get(x,y,z);
-
-							if (temp.in_bounds(x,y,z)) {
-								// old chunk in new window of chunks, transfer
-								auto* ptr = &temp.get(x,y,z);
-								assert(*ptr == U16_NULL);
-								*ptr = c;
-							} else {
-								// old chunk outside of window of chunks, delete
-								if (c != U16_NULL)
-									free_chunk(c);
-							}
-						}
-					}
-				}
-
-				free(arr);
-				arr = nullptr; // avoid dtor
-			}
-
-			*this = temp;
-			temp.arr = nullptr; // avoid dtor
-
-		} else if (temp.pos != pos) {
-			ZoneScopedN("ScrollingArray::move");
-
-			// only position changed
-
-			// free all chunks that are outside of new 3d array now
-			// with double iteration for y and z
-			int dsizex = min(abs(temp.pos.x - pos.x), size);
-			int dsizey = min(abs(temp.pos.y - pos.y), size);
-			int dsizez = min(abs(temp.pos.z - pos.z), size);
-			int csizex = size - dsizex;
-			int csizey = size - dsizey;
-			int csizez = size - dsizez;
-
-			int dposx = pos.x;
-			int dposy = pos.y;
-			int dposz = pos.z;
-			if (temp.pos.x < pos.x) dposx += csizex;
-			if (temp.pos.y < pos.y) dposy += csizey;
-			if (temp.pos.z < pos.z) dposz += csizez;
-			
-			// get struct vars because compiler does not understand that it does not need to reload them in every loop iteration
-			auto mask = this->mask;
-			auto shift = this->shift;
-
-			for (int z=pos.z; z < pos.z + size; ++z)
-			for (int y=pos.y; y < pos.y + size; ++y)
-			for (int x=dposx; x < dposx + dsizex; ++x) {
-				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
-				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}
-
-			for (int z=pos.z; z < pos.z + size; ++z)
-			for (int y=dposy; y < dposy + dsizey; ++y)
-			for (int x=pos.x; x < pos.x + size; ++x) {
-				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
-				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}
-
-			for (int z=dposz; z < dposz + dsizez; ++z)
-			for (int y=pos.y; y < pos.y + size; ++y)
-			for (int x=pos.x; x < pos.x + size; ++x) {
-				chunk_id& c = arr[pos2idx(x,y,z, mask, shift)];
-				if (c != U16_NULL) { free_chunk(c); c = U16_NULL; }
-			}
-
-			pos = temp.pos;
-		}
-	}
-};
-#endif
 
 struct ChunkKey_Hasher {
 	size_t operator() (int3 const& key) const {
@@ -374,9 +213,13 @@ struct ChunkKey_Comparer {
 		return l == r;
 	}
 };
-typedef std_unordered_map<int3, chunk_id, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_to_id_map;
+
+template <typename T>
+using chunk_pos_map = std_unordered_map<int3, T, ChunkKey_Hasher, ChunkKey_Comparer>;
+
 typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
 
+// TODO: Maybe a 128x128x16 Texture might have less artefacting than a 64^3 texture because trees are mainly horizontally placed
 struct BlueNoiseTexture {
 	float* data;
 
@@ -444,7 +287,7 @@ struct Chunks {
 
 	AllocatorBitset					slices_alloc;
 
-	chunk_pos_to_id_map				chunks_map; // queued for async worldgen
+	chunk_pos_map<chunk_id>			chunks_map;
 	chunk_id query_chunk (int3 const& pos) {
 		//ZoneScoped;
 		auto it = chunks_map.find(pos);
@@ -452,8 +295,20 @@ struct Chunks {
 	}
 
 #if CHUNK_HASHMAP
-	chunk_pos_set					queued_chunks; // queued for async worldgen
+	chunk_pos_map<int>				queued_chunks; // queued for async worldgen, val is phase
 #endif
+
+	struct Phase1Voxels {
+		//int refcount = 0;
+		block_id* voxels = nullptr;
+
+		Phase1Voxels () {}
+		~Phase1Voxels () {
+			if (voxels)
+				free(voxels);
+		}
+	};
+	chunk_pos_map<Phase1Voxels>		phase1_voxels;
 
 	BlueNoiseTexture				blue_noise_tex;
 
@@ -551,7 +406,11 @@ struct Chunks {
 	// using squared distances is easier and has the advantage of having more buckets close to the player
 	// this means we still load the chunks in a routhly sorted order but chunks with closeish distances might be out of order
 	// by changing the BUCKET_FAC you increase the amount of vectors needed but increase the accuracy of the sort
-	std_vector< std_vector<int3> > chunks_to_generate;
+	struct GenChunk {
+		int3 pos;
+		int phase;
+	};
+	std_vector< std_vector<GenChunk> > chunks_to_generate;
 	uint32_t pending_chunks = 0; // chunks waiting to be queued
 
 	// queue and finialize chunks that should be generated

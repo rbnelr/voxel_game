@@ -106,13 +106,22 @@ struct WorldGenerator {
 };
 
 struct WorldgenJob {
-	Chunk*					chunk;
+	int3					chunk_pos;
 	Chunks*					chunks;
 	WorldGenerator const*	wg;
 
 	int						phase;
+	block_id*				voxel_output;
+
+	// phase2
+	block_id* phase1_voxels[3][3][3];
 
 	void execute ();
+
+	~WorldgenJob () { // handle cases where we destroy the threadpool without its results being read first
+		if (voxel_output)
+			free(voxel_output);
+	}
 };
 
 inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, TPRIO_BACKGROUND, ">> background threadpool"  );

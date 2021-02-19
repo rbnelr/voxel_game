@@ -84,8 +84,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			if (chunk.flags == 0) continue;
 
 			bool empty = chunk.opaque_mesh.vertex_count == 0 && chunk.transparent_mesh.vertex_count == 0;
-			if (!empty) assert(chunk.visible());
-
+			
 			float3 lo = (float3)(chunk.pos * CHUNK_SIZE);
 			float3 hi = (float3)((chunk.pos + 1) * CHUNK_SIZE);
 

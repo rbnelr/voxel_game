@@ -164,14 +164,14 @@ namespace worldgen {
 		const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
 		const auto TORCH		= g_assets.block_types.map_id("torch");
 
-		int3 chunk_origin = j.chunk->pos * CHUNK_SIZE;
+		int3 chunk_origin = j.chunk_pos * CHUNK_SIZE;
 
 		int water_level = 21 - chunk_origin.z;
 
 		OSN::Noise<2> noise2(j.wg->seed);
 		OSN::Noise<3> noise3(j.wg->seed);
 
-		block_id* blocks = j.chunk->phase1_voxels;
+		block_id* blocks = j.voxel_output;
 
 		{ // 3d noise generate
 			ZoneScopedN("3d noise generate");
@@ -220,22 +220,13 @@ namespace worldgen {
 
 		OSN::Noise<2> noise(j.wg->seed);
 
-		int3 chunkpos = j.chunk->pos * CHUNK_SIZE;
+		int3 chunkpos = j.chunk_pos * CHUNK_SIZE;
 
-		memcpy(j.chunk->phase2_voxels, j.chunk->phase1_voxels, sizeof(block_id) * CHUNK_VOXEL_COUNT);
-		block_id* blocks = j.chunk->phase2_voxels;
-
-		block_id const* neighbours[3][3][3] = {};
-		for (auto& offs : FULL_NEIGHBOURS) {
-			auto nid = j.chunks->query_chunk(j.chunk->pos + offs);
-			auto* n = &j.chunks->chunks[nid];
-			assert(nid != U16_NULL && n->flags != 0 && n->genphase >= 1);
-			neighbours[offs.z+1][offs.y+1][offs.x+1] = n->phase1_voxels;
-		}
-		neighbours[1][1][1] = j.chunk->phase1_voxels;
+		memcpy(j.voxel_output, j.phase1_voxels[1][1][1], sizeof(block_id) * CHUNK_VOXEL_COUNT);
+		block_id* blocks = j.voxel_output;
 
 		// read block with coord relative to this chunk, reads go through neighbours array, so neighbour chunks can also be read
-		auto read_block = [neighbours] (int x, int y, int z) -> chunk_id {
+		auto read_block = [&] (int x, int y, int z) -> chunk_id {
 			assert(x >= -CHUNK_SIZE && x < CHUNK_SIZE*2 &&
 			       y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
 			       z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
@@ -243,7 +234,7 @@ namespace worldgen {
 			int cx, cy, cz;
 			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
 
-			return neighbours[cz+1][cy+1][cx+1][IDX3D(bx,by,bz, CHUNK_SIZE)];
+			return j.phase1_voxels[cz+1][cy+1][cx+1][IDX3D(bx,by,bz, CHUNK_SIZE)];
 		};
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
 		auto write_block = [blocks] (int x, int y, int z, block_id bid) -> void {
