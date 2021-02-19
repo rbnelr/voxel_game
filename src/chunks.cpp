@@ -617,16 +617,45 @@ void Chunks::update_chunk_loading (Game& game) {
 			}
 		}
 
-		for (auto& kv : phase1_voxels) {
-			if (kv.second.voxels == nullptr && queued_chunks.find(kv.first) == queued_chunks.end())
-			add_chunk_to_generate(kv.first, chunk_dist_sq(kv.first, game.player.pos), 1);
+		for (auto it = phase1_voxels.begin(); it != phase1_voxels.end();) {
+			auto& pos = it->first;
+			auto& p1 = it->second;
 
 			if (visualize_chunks) {
 				auto col = DBG_STAGE1_COL;
-				if (!kv.second.voxels)
+				if (!p1.voxels)
 					col.w *= 0.1f;
 				col.w *= 0.5f;
-				g_debugdraw.wire_cube(((float3)kv.first + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.99f, col);
+				g_debugdraw.wire_cube(((float3)pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.99f, col);
+			}
+			
+			bool still_needed = false;
+
+			for (int nz=-1; nz<=1; ++nz)
+			for (int ny=-1; ny<=1; ++ny)
+			for (int nx=-1; nx<=1; ++nx) {
+				int3 npos = int3(pos.x+nx, pos.y+ny, pos.z+nz);
+
+			#if CHUNK_ARROPT
+				chunk_id cid = bounds(npos.x, npos.y, npos.z) ? chunks_arr_get(npos.x, npos.y, npos.z) : U16_NULL;
+			#else
+				chunk_id cid = query_chunk(int3(x,y,z));
+			#endif
+				float ndist_sqr = chunk_dist_sq(npos, game.player.pos);
+				
+				if (ndist_sqr < load_dist_sqr && cid == U16_NULL)
+					still_needed = true;
+			}
+
+			if (still_needed) {
+				if (p1.voxels == nullptr && queued_chunks.find(pos) == queued_chunks.end())
+					add_chunk_to_generate(pos, chunk_dist_sq(pos, game.player.pos), 1);
+			}
+
+			if (!still_needed) {
+				it = phase1_voxels.erase(it);
+			} else {
+				++it;
 			}
 		}
 
