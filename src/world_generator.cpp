@@ -282,69 +282,64 @@ namespace worldgen {
 			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
 		};
 
+		// how many blocks around the main chunk to process to fix cutoff trees
+		static constexpr int borderxy = 5;
+		static constexpr int borderz0 = 5 + 6; // need to add more depth to fix trees being cut off at the top (trees are higher than 5)
+		static constexpr int borderz1 = 5; 
 
-		{
-			ZoneScopedN("Tree pass");
+		// cx=-1 means that blocks [range[0], range[1]) are iterated, ie. [-border, -1]
+		// cx= 0 means that blocks [range[1], range[2]) are iterated, ie. [0, CHUNK_SIZE-1]
+		// cx=+1 means that blocks [range[2], range[3]) are iterated, ie. [CHUNK_SIZE, CHUNK_SIZE +border-1]
+		static constexpr int rangexy[4] = { -borderxy, 0, CHUNK_SIZE, CHUNK_SIZE +borderxy };
+		static constexpr int rangez[4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
 
-			// how many blocks around the main chunk to process to fix cutoff trees
-			static constexpr int borderxy = 5;
-			static constexpr int borderz0 = 5 + 6; // need to add more depth to fix trees being cut off at the top (trees are higher than 5)
-			static constexpr int borderz1 = 5; 
+		// For neighbour chunks (and this chunk)
+		for (int cz=-1; cz<=+1; ++cz)
+		for (int cy=-1; cy<=+1; ++cy)
+		for (int cx=-1; cx<=+1; ++cx) {
 
-			// cx=-1 means that blocks [range[0], range[1]) are iterated, ie. [-border, -1]
-			// cx= 0 means that blocks [range[1], range[2]) are iterated, ie. [0, CHUNK_SIZE-1]
-			// cx=+1 means that blocks [range[2], range[3]) are iterated, ie. [CHUNK_SIZE, CHUNK_SIZE +border-1]
-			static constexpr int rangexy[4] = { -borderxy, 0, CHUNK_SIZE, CHUNK_SIZE +borderxy };
-			static constexpr int rangez[4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
+			// For blocks in chunk
+			for (int y=rangexy[cy+1]; y<rangexy[cy+2]; ++y)
+			for (int x=rangexy[cx+1]; x<rangexy[cx+2]; ++x) {
 
-			// For neighbour chunks (and this chunk)
-			for (int cz=-1; cz<=+1; ++cz)
-			for (int cy=-1; cy<=+1; ++cy)
-			for (int cx=-1; cx<=+1; ++cx) {
-
-				// For blocks in chunk
-				for (int y=rangexy[cy+1]; y<rangexy[cy+2]; ++y)
-				for (int x=rangexy[cx+1]; x<rangexy[cx+2]; ++x) {
-
-					for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
-						auto bid   = read_block(x,y,z);
-						if (bid == EARTH && read_block(x,y,z+1) == AIR) {
-							write_block(x,y,z, GRASS);
+				for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
+					auto bid   = read_block(x,y,z);
+					if (bid == EARTH && read_block(x,y,z+1) == AIR) {
+						write_block(x,y,z, GRASS);
 							
-							// get a 'random' but deterministic value based on block position
-							uint64_t h = hash(int3(x,y,z) + chunkpos, j.wg->seed);
+						// get a 'random' but deterministic value based on block position
+						uint64_t h = hash(int3(x,y,z) + chunkpos, j.wg->seed);
 
-							double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
+						double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
-							auto chance = [&] (float prob) {
-								double probd = (double)prob;
+						auto chance = [&] (float prob) {
+							double probd = (double)prob;
 
-								bool happened = rand <= probd;
-								// transform uniform random value such that [0,prob] becomes [0,1]
-								// so that successive checks are independent of the result of this one
-								// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
-								if (happened)	rand = rand / probd;
-								else			rand = (rand - probd) / (1.0 - probd);
-								return happened;
-							};
+							bool happened = rand <= probd;
+							// transform uniform random value such that [0,prob] becomes [0,1]
+							// so that successive checks are independent of the result of this one
+							// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
+							if (happened)	rand = rand / probd;
+							else			rand = (rand - probd) / (1.0 - probd);
+							return happened;
+						};
 
-							int wx = x + chunkpos.x;
-							int wy = y + chunkpos.y;
-							int wz = z + chunkpos.z;
+						int wx = x + chunkpos.x;
+						int wy = y + chunkpos.y;
+						int wz = z + chunkpos.z;
 
-							//
-							float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(wx, wy));
-							float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(wx, wy));
+						//
+						float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(wx, wy));
+						float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(wx, wy));
 
-							if (j.chunks->blue_noise_tex.sample(wx,wy,wz) < tree_density) {
-								place_tree(x,y,z+1);
-							}
-							else if (chance(grass_density)) {
-								write_block(x,y,z+1, TALLGRASS);
-							}
-							else if (chance(0.0005f)) {
-								write_block(x,y,z+1, TORCH);
-							}
+						if (j.chunks->blue_noise_tex.sample(wx,wy,wz) < tree_density) {
+							place_tree(x,y,z+1);
+						}
+						else if (chance(grass_density)) {
+							write_block(x,y,z+1, TALLGRASS);
+						}
+						else if (chance(0.0005f)) {
+							write_block(x,y,z+1, TORCH);
 						}
 					}
 				}
