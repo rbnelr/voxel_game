@@ -154,9 +154,9 @@ struct ChunkVoxels {
 	}
 };
 
-#define CHUNK_NEIGHBOUR_PTRS 0
+#define CHUNK_NEIGHBOUR_PTRS 1
 #define CHUNK_HASHMAP 1
-#define CHUNK_ARROPT 1
+#define CHUNK_ARROPT 0
 
 struct Chunk {
 	enum Flags : uint32_t {
@@ -170,7 +170,8 @@ struct Chunk {
 	Flags flags;
 	int3 pos;
 
-	int refcount; // how many async jobs are using this chunk data, if > 0 chunk is not allowed to be freed etc.
+	uint8_t loadphase;
+	//uint8_t refcount; // how many async jobs are using this chunk data, if > 0 chunk is not allowed to be freed etc.
 
 #if CHUNK_NEIGHBOUR_PTRS
 	chunk_id neighbours[6];
@@ -188,15 +189,25 @@ struct Chunk {
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
-inline float chunk_dist_sq (int3 const& pos, float3 const& dist_to) {
-	int3 chunk_origin = pos * CHUNK_SIZE;
-	return point_box_nearest_dist_sqr((float3)chunk_origin, CHUNK_SIZE, dist_to);
+inline float chunk_dist_sqr (int3 const& pos, float3 const& dist_to) {
+	float pos_relx = dist_to.x - pos.x * (float)CHUNK_SIZE;
+	float pos_rely = dist_to.y - pos.y * (float)CHUNK_SIZE;
+	float pos_relz = dist_to.z - pos.z * (float)CHUNK_SIZE;
+
+	float nearestx = clamp(pos_relx, 0.0f, (float)CHUNK_SIZE);
+	float nearesty = clamp(pos_rely, 0.0f, (float)CHUNK_SIZE);
+	float nearestz = clamp(pos_relz, 0.0f, (float)CHUNK_SIZE);
+
+	float offsx = nearestx - pos_relx;
+	float offsy = nearesty - pos_rely;
+	float offsz = nearestz - pos_relz;
+
+	return offsx*offsx + offsy*offsy + offsz*offsz;
 }
 
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
 inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
 inline lrgba DBG_STAGE1_COL			= srgba(128,   0, 255, 255);
-inline lrgba DBG_STAGE2_COL			= srgba(  0,   8, 255, 255);
 
 inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
 inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
@@ -287,30 +298,19 @@ struct Chunks {
 
 	AllocatorBitset					slices_alloc;
 
+#if CHUNK_HASHMAP
 	chunk_pos_map<chunk_id>			chunks_map;
+#endif
+
+	chunk_pos_map<int>				queued_chunks; // queued for async worldgen, val is phase
+
+	BlueNoiseTexture				blue_noise_tex;
+
 	chunk_id query_chunk (int3 const& pos) {
 		//ZoneScoped;
 		auto it = chunks_map.find(pos);
 		return it != chunks_map.end() ? it->second : U16_NULL;
 	}
-
-#if CHUNK_HASHMAP
-	chunk_pos_map<int>				queued_chunks; // queued for async worldgen, val is phase
-#endif
-
-	struct Phase1Voxels {
-		//int refcount = 0;
-		block_id* voxels = nullptr;
-
-		Phase1Voxels () {}
-		~Phase1Voxels () {
-			if (voxels)
-				free(voxels);
-		}
-	};
-	chunk_pos_map<Phase1Voxels>		phase1_voxels;
-
-	BlueNoiseTexture				blue_noise_tex;
 
 	void destroy ();
 	~Chunks () {

@@ -25,7 +25,6 @@ void Chunks::destroy () {
 
 	chunks_map.clear();
 	queued_chunks.clear();
-	phase1_voxels.clear();
 }
 
 void Chunks::init_voxels (Chunk& chunk) {
@@ -282,6 +281,11 @@ bool check_chunk_sparse (ChunkVoxels& dc) {
 
 void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 	ZoneScoped;
+
+	// handle overwriting old voxel data
+	free_voxels(c);
+	init_voxels(c);
+
 	assert(c.flags & Chunk::SPARSE_VOXELS);
 
 	// Allocate dense chunk data as a buffer (buffer will be freed again if chunks turns out to be sparse)
@@ -370,7 +374,7 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 	{ // init
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
-		chunk.refcount = 0;
+		//chunk.refcount = 0;
 		init_voxels(chunk);
 		init_mesh(chunk.opaque_mesh);
 		init_mesh(chunk.transparent_mesh);
@@ -423,38 +427,21 @@ void Chunks::update_chunk_loading (Game& game) {
 
 	static constexpr float BUCKET_FAC = (0.5f) / (CHUNK_SIZE*CHUNK_SIZE);
 	{
-		float radius = load_radius + CHUNK_SIZE * 2; // add more radius for phase1
+		float radius = load_radius;
 
 		chunks_to_generate.clear(); // clear all inner vectors
 		chunks_to_generate.shrink_to_fit(); // delete all inner vectors to avoid constant memory alloc when loading idle
 		chunks_to_generate.resize((int)(radius*radius * BUCKET_FAC) + 1);
 	}
+	auto add_chunk_to_generate = [&] (int3 chunk_pos, float dist_sqr, int phase) {
+		int bucketi = (int)(dist_sqr * BUCKET_FAC);
+		//assert(bucketi >= 0 && bucketi < chunks_to_generate.size());
+		bucketi = clamp(bucketi, 0, (int)chunks_to_generate.size() -1);
+		chunks_to_generate[bucketi].push_back({ chunk_pos, phase });
+	};
 
 	{
-		ZoneScopedN("iterate chunks for unload");
-		ZoneValue(end())
-
-		for (chunk_id cid=0; cid < end(); ++cid) {
-			auto& chunk = chunks[cid];
-			if (chunk.flags == 0) continue;
-
-			if (chunk.refcount == 0) {
-
-				float dist_sqr = chunk_dist_sq(chunk.pos, game.player.pos);
-
-				bool should_unload = dist_sqr > unload_dist_sqr;
-				if (should_unload) {
-				#if CHUNK_HASHMAP
-					chunks_map.erase(chunk.pos);
-				#endif
-					free_chunk(cid);
-				}
-			}
-		}
-	}
-
-	{
-		ZoneScopedN("iterate chunk loading box");
+		ZoneScopedN("iterate chunk loading");
 		
 		if (visualize_chunks) {
 			if (visualize_radius) {
@@ -468,13 +455,10 @@ void Chunks::update_chunk_loading (Game& game) {
 				auto& chunk_pos = kv.first;
 				int phase = kv.second;
 
-				lrgba const* col = nullptr;
+				lrgba const* col = &DBG_CHUNK_COL;
 				float size = 1.0f;
 				if (phase == 1) {
 					col = &DBG_STAGE1_COL;
-					size = 0.3f;
-				} else if (phase == 2) {
-					col = &DBG_STAGE2_COL;
 					size = 0.4f;
 				}
 
@@ -518,12 +502,11 @@ void Chunks::update_chunk_loading (Game& game) {
 		}
 	#endif
 
-	#if CHUNK_NEIGHBOUR_PTRS
 		{
 			int3 pos = floori(game.player.pos / CHUNK_SIZE);
 			if (chunks_map.find(pos) == chunks_map.end()) { // chunk not yet loaded
 				if (queued_chunks.find(pos) == queued_chunks.end()) // chunk not yet queued for worldgen
-					queue_chunk(pos, 0);
+					add_chunk_to_generate(pos, 0, 1);
 			}
 		}
 
@@ -532,134 +515,61 @@ void Chunks::update_chunk_loading (Game& game) {
 			if (chunk.flags == 0) continue;
 			chunk._validate_flags();
 
-			// chunk loaded
+			float dist_sqr = chunk_dist_sqr(chunk.pos, game.player.pos);
 
-			float dist_sqr = chunk_dist_sq(chunk.pos, game.player.pos);
+			if (dist_sqr <= unload_dist_sqr) {
+				// common case
 
-			if (chunk.genphase == 1) {
-
-				bool all_stage1 = true;
-				for (auto& offs : FULL_NEIGHBOURS) {
-				#if CHUNK_ARROPT
-					chunk_id nid = chunks_arr_get(chunk.pos.x + offs.x, chunk.pos.y + offs.y, chunk.pos.z + offs.z);
-				#else
-					chunk_id nid = query_chunk(chunk.pos + offs);
-				#endif
-					if (nid == U16_NULL || chunks[nid].genphase < 1) {
-						all_stage1 = false;
-						break;
-					}
-				}
-
-				if (all_stage1 && queued_chunks.find(chunk.pos) == queued_chunks.end())
-					queue_chunk(chunk.pos, dist_sqr);
-			}
-
-			for (int i=0; i<6; ++i) {
-				auto nid = chunk.neighbours[i];
-				if (nid == U16_NULL) {
-					// neighbour chunk not yet loaded
-					auto npos = chunk.pos + NEIGHBOURS[i];
-					float ndist_sqr = chunk_dist_sq(npos, game.player.pos);
-					bool should_load = ndist_sqr <= load_dist_sqr;
-
-					if (should_load && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
-						queue_chunk(npos, ndist_sqr);
-				}
-			}
-		}
-	#else
-
-		auto add_chunk_to_generate = [&] (int3 chunk_pos, float dist_sqr, int phase) {
-			int bucketi = (int)(dist_sqr * BUCKET_FAC);
-			//assert(bucketi >= 0 && bucketi < chunks_to_generate.size());
-			bucketi = clamp(bucketi, 0, (int)chunks_to_generate.size() -1);
-			chunks_to_generate[bucketi].push_back({ chunk_pos, phase });
-		};
-
-		for (int z=pos.z; z < pos.z + size; ++z)
-		for (int y=pos.y; y < pos.y + size; ++y)
-		for (int x=pos.x; x < pos.x + size; ++x) {
-		#if CHUNK_ARROPT
-			chunk_id cid = chunks_arr_get(x,y,z);
-		#else
-			chunk_id cid = query_chunk(int3(x,y,z));
-		#endif
-
-			int3 pos = int3(x,y,z);
-			float dist_sqr = chunk_dist_sq(pos, game.player.pos);
-
-			if (cid == U16_NULL) {
-				// chunk not yet loaded
-				bool should_load = dist_sqr <= load_dist_sqr;
-
-				if (should_load && queued_chunks.find(int3(x,y,z)) == queued_chunks.end()) { // chunk not yet queued for worldgen
+				if (chunk.loadphase == 1) {
 					
-					bool all_phase1_done = true;
+					worldgen::Neighbours n;
+					
+					bool neighbours_ready = true;
+					for (int z=-1; z<=1; ++z)
+					for (int y=-1; y<=1; ++y)
+					for (int x=-1; x<=1; ++x) {
 
-					// add phase1_voxels entry for all dependencies
-					for (int nz=-1; nz<=1; ++nz)
-					for (int ny=-1; ny<=1; ++ny)
-					for (int nx=-1; nx<=1; ++nx) {
-						int3 npos = int3(x+nx, y+ny, z+nz);
-						auto& p1 = phase1_voxels[npos];
+					#if CHUNK_ARROPT
+						chunk_id nid = chunks_arr_get(chunk.pos.x + offs.x, chunk.pos.y + offs.y, chunk.pos.z + offs.z);
+					#else
+						chunk_id nid = query_chunk(chunk.pos + int3(x,y,z));
+					#endif
+						if (nid == U16_NULL || chunks[nid].loadphase < 1) {
+							neighbours_ready = false;
+							break;
+						}
 
-						if (p1.voxels == nullptr)
-							all_phase1_done = false;
+						n.neighbours[z+1][y+1][x+1] = &chunks[nid];
 					}
+				
+					if (neighbours_ready) {
+						worldgen::object_pass(*this, chunk, n, &game._threads_world_gen);
 
-					if (all_phase1_done) {
-						// all dependencies done, we can queue our phase 2
-						add_chunk_to_generate(pos, dist_sqr, 2);
+						chunk.loadphase = 2;
+						chunk.flags |= Chunk::REMESH;
 					}
 				}
 
-			}
-		}
+				for (int i=0; i<6; ++i) {
+					auto nid = chunk.neighbours[i];
+					if (nid == U16_NULL) {
+						// neighbour chunk not yet loaded
+						auto npos = chunk.pos + NEIGHBOURS[i];
+						float ndist_sqr = chunk_dist_sqr(npos, game.player.pos);
+						bool should_load = ndist_sqr <= load_dist_sqr;
 
-		for (auto it = phase1_voxels.begin(); it != phase1_voxels.end();) {
-			auto& pos = it->first;
-			auto& p1 = it->second;
-
-			if (visualize_chunks) {
-				auto col = DBG_STAGE1_COL;
-				if (!p1.voxels)
-					col.w *= 0.1f;
-				col.w *= 0.5f;
-				g_debugdraw.wire_cube(((float3)pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * 0.99f, col);
-			}
-			
-			bool still_needed = false;
-
-			for (int nz=-1; nz<=1; ++nz)
-			for (int ny=-1; ny<=1; ++ny)
-			for (int nx=-1; nx<=1; ++nx) {
-				int3 npos = int3(pos.x+nx, pos.y+ny, pos.z+nz);
-
-			#if CHUNK_ARROPT
-				chunk_id cid = bounds(npos.x, npos.y, npos.z) ? chunks_arr_get(npos.x, npos.y, npos.z) : U16_NULL;
-			#else
-				chunk_id cid = query_chunk(int3(x,y,z));
-			#endif
-				float ndist_sqr = chunk_dist_sq(npos, game.player.pos);
-				
-				if (ndist_sqr < load_dist_sqr && cid == U16_NULL)
-					still_needed = true;
-			}
-
-			if (still_needed) {
-				if (p1.voxels == nullptr && queued_chunks.find(pos) == queued_chunks.end())
-					add_chunk_to_generate(pos, chunk_dist_sq(pos, game.player.pos), 1);
-			}
-
-			if (!still_needed) {
-				it = phase1_voxels.erase(it);
+						if (should_load && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
+							add_chunk_to_generate(npos, ndist_sqr, 1); // note: this creates duplicates because we arrive at the same chunk through two ways
+					}
+				}
 			} else {
-				++it;
+				// chunk outside unload radius
+			#if CHUNK_HASHMAP
+				chunks_map.erase(chunk.pos);
+			#endif
+				free_chunk(cid);
 			}
 		}
-
-	#endif
 
 	#if CHUNK_ARROPT
 		{
@@ -670,41 +580,37 @@ void Chunks::update_chunk_loading (Game& game) {
 	}
 
 	{
-		ZoneScopedN("finalize jobs");
+		ZoneScopedN("process jobs");
 
-		static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
-		static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
+		{
+			ZoneScopedN("pop jobs");
 
-		std::unique_ptr<WorldgenJob> jobs[64];
+			static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
+			static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
 
-		int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
-		for (int i=0; i<count; ++i) {
-			auto job = std::move(jobs[i]);
-			queued_chunks.erase(job->chunk_pos);
+			std::unique_ptr<WorldgenJob> jobs[64];
 
-			if (job->phase == 1) {
-				auto& p1 = phase1_voxels[job->chunk_pos];
-				
-				p1.voxels = job->voxel_output;
-				job->voxel_output = nullptr;
+			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
+			for (int i=0; i<count; ++i) {
+				auto job = std::move(jobs[i]);
+				queued_chunks.erase(job->chunk_pos);
 
-			} else if (job->phase == 2) {
 				auto cid = alloc_chunk(job->chunk_pos);
 				auto& chunk = chunks[cid];
-
 			#if CHUNK_HASHMAP
 				chunks_map.emplace(chunk.pos, cid);
 			#endif
-
-				chunk.flags |= Chunk::REMESH;
 
 				sparse_chunk_from_worldgen(chunk, job->voxel_output);
 
 				free_voxel_buffer(job->voxel_output);
 				job->voxel_output = nullptr;
 
+				chunk.loadphase = job->phase;
+				chunk.flags |= Chunk::REMESH;
+
 				for (auto& offs : NEIGHBOURS) {
-					auto nid = query_chunk(chunk.pos + offs);
+					auto nid = query_chunk(job->chunk_pos + offs);
 					if (nid != U16_NULL) {
 						assert(chunks[nid].flags != 0);
 						chunks[nid].flags |= Chunk::REMESH;
@@ -712,61 +618,56 @@ void Chunks::update_chunk_loading (Game& game) {
 				}
 			}
 		}
-	}
 
-	{
-		ZoneScopedN("push jobs");
+		{
+			ZoneScopedN("push jobs");
 
-		static constexpr int QUEUE_LIMIT = 64; // 256
-		std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
+			static constexpr int QUEUE_LIMIT = 64; // 256
+			std::unique_ptr<WorldgenJob> jobs[QUEUE_LIMIT];
 
-		// Process bucket-sorted chunks_to_generate in order
-		//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
-		int bucket=0, j=0; // sort bucket indices
+			// Process bucket-sorted chunks_to_generate in order
+			//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
+			int bucket=0, j=0; // sort bucket indices
 
-		int max_count = (int)ARRLEN(jobs) - (int)queued_chunks.size();
-		int count = 0;
-		for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
-			for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
-				auto genchunk = chunks_to_generate[bucket][i];
-				
-				auto job = std::make_unique<WorldgenJob>();
-				job->chunk_pos = genchunk.pos;
-				job->chunks = this;
-				job->wg = &game._threads_world_gen;
+			int max_count = (int)ARRLEN(jobs) - (int)queued_chunks.size();
+			int count = 0;
+			for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
+				for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
+					auto genchunk = chunks_to_generate[bucket][i];
 
-				job->phase = genchunk.phase;
-				job->voxel_output = alloc_voxel_buffer();
+					if (queued_chunks.find(genchunk.pos) != queued_chunks.end()) continue; // remove duplicates generated by code above
 
-				if (genchunk.phase == 2) {
-					for (int z=-1; z<=1; ++z)
-					for (int y=-1; y<=1; ++y)
-					for (int x=-1; x<=1; ++x) {
-						auto it = phase1_voxels.find(genchunk.pos + int3(x,y,z));
-						assert(it != phase1_voxels.end() && it->second.voxels != nullptr);
-						job->phase1_voxels[z+1][y+1][x+1] = it->second.voxels;
+					if (genchunk.phase == 1) {
+						ZoneScopedN("phase 1 job");
+
+						auto job = std::make_unique<WorldgenJob>();
+						memset(job.get(), 0, sizeof(WorldgenJob)); // zero neighbours etc.
+
+						job->chunk_pos = genchunk.pos;
+						job->wg = &game._threads_world_gen;
+
+						job->phase = genchunk.phase;
+						job->voxel_output = alloc_voxel_buffer();
+
+						jobs[count++] = std::move(job);
+
+						queued_chunks.emplace(genchunk.pos, genchunk.phase);
+
 					}
 				}
-
-				jobs[count++] = std::move(job);
-
-			#if CHUNK_HASHMAP
-				assert(queued_chunks.find(genchunk.pos) == queued_chunks.end()); // can't have same chunk pos have two jobs at once (phase2 after phase1)
-				queued_chunks.emplace(genchunk.pos, genchunk.phase);
-			#endif
 			}
-		}
 
-		background_threadpool.jobs.push_n(jobs, count);
+			background_threadpool.jobs.push_n(jobs, count);
 
-		{ // for imgui
-			pending_chunks = 0; // chunks waiting to be queued
-			for (auto& b : chunks_to_generate)
-				pending_chunks += (uint32_t)b.size();
-			pending_chunks -= count; // exclude chunks we have already queued
+			{ // for imgui
+				pending_chunks = 0; // chunks waiting to be queued
+				for (auto& b : chunks_to_generate)
+					pending_chunks += (uint32_t)b.size();
+				pending_chunks -= count; // exclude chunks we have already queued
+			}
+
+			//TracyPlot("background_queued_count", (int64_t)background_queued_count);
 		}
-		
-		//TracyPlot("background_queued_count", (int64_t)background_queued_count);
 	}
 }
 
@@ -861,7 +762,6 @@ void Chunks::imgui (Renderer* renderer) {
 	if (ImGui::BeginPopupContextWindow("Colors")) {
 		imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
 		imgui_ColorEdit("DBG_STAGE1_COL",			&DBG_STAGE1_COL);
-		imgui_ColorEdit("DBG_STAGE2_COL",			&DBG_STAGE2_COL);
 		imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
 		imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
 		imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
@@ -955,9 +855,6 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::Text("Sparseness   : %6d M / %6d M vox sparse (%6.2f %%)  %3d MB total RAM  %4d KB overhead (%6.2f %%)",
 		sparse_voxels/MB, block_volume/MB, (float)sparse_voxels / block_volume * 100, total_vox_mem/MB, overhead/KB, (float)overhead / total_vox_mem * 100);
 
-	ImGui::Text("Phases       : %3d phase1 voxels",
-		phase1_voxels.size());
-
 	ImGui::Spacing();
 
 	if (ImGui::TreeNode("chunks")) {
@@ -1017,8 +914,12 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 			col = &DBG_CULLED_CHUNK_COL;
 
 	} else if (visualize_chunks) {
-		
-		if (chunk.flags & Chunk::SPARSE_VOXELS) {
+
+		col = &DBG_CHUNK_COL;
+		if (chunk.loadphase == 1) {
+			col = &DBG_STAGE1_COL;
+			size = 0.4f;
+		} else if (chunk.flags & Chunk::SPARSE_VOXELS) {
 			col = &DBG_SPARSE_CHUNK_COL;
 		}
 

@@ -107,14 +107,10 @@ struct WorldGenerator {
 
 struct WorldgenJob {
 	int3					chunk_pos;
-	Chunks*					chunks;
 	WorldGenerator const*	wg;
 
 	int						phase;
 	block_id*				voxel_output;
-
-	// phase2
-	block_id* phase1_voxels[3][3][3];
 
 	void execute ();
 
@@ -125,3 +121,12 @@ struct WorldgenJob {
 };
 
 inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, TPRIO_BACKGROUND, ">> background threadpool"  );
+
+namespace worldgen {
+	struct Neighbours {
+		WorldGenerator const* wg;
+		Chunk* neighbours[3][3][3];
+	};
+
+	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg);
+}

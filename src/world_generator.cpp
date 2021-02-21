@@ -205,7 +205,7 @@ namespace worldgen {
 
 	}
 
-	void object_pass (WorldgenJob& j) {
+	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg) {
 		ZoneScoped;
 
 		const auto AIR			= g_assets.block_types.map_id("air");
@@ -218,12 +218,9 @@ namespace worldgen {
 		const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
 		const auto TORCH		= g_assets.block_types.map_id("torch");
 
-		OSN::Noise<2> noise(j.wg->seed);
+		OSN::Noise<2> noise(wg->seed);
 
-		int3 chunkpos = j.chunk_pos * CHUNK_SIZE;
-
-		memcpy(j.voxel_output, j.phase1_voxels[1][1][1], sizeof(block_id) * CHUNK_VOXEL_COUNT);
-		block_id* blocks = j.voxel_output;
+		int3 chunkpos = chunk.pos * CHUNK_SIZE;
 
 		// read block with coord relative to this chunk, reads go through neighbours array, so neighbour chunks can also be read
 		auto read_block = [&] (int x, int y, int z) -> chunk_id {
@@ -234,15 +231,16 @@ namespace worldgen {
 			int cx, cy, cz;
 			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
 
-			return j.phase1_voxels[cz+1][cy+1][cx+1][IDX3D(bx,by,bz, CHUNK_SIZE)];
+			Chunk const* chunk = n.neighbours[cz+1][cy+1][cx+1];
+			return chunks.read_block(bx,by,bz, chunk);
 		};
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
-		auto write_block = [blocks] (int x, int y, int z, block_id bid) -> void {
+		auto write_block = [&] (int x, int y, int z, block_id bid) -> void {
 			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
 			                y >= 0 && y < CHUNK_SIZE &&
 			                z >= 0 && z < CHUNK_SIZE;
 			if (in_chunk)
-				blocks[IDX3D(x,y,z, CHUNK_SIZE)] = bid;
+				chunks.write_block(x,y,z, &chunk, bid);
 		};
 
 		auto replace_block = [&] (int x, int y, int z, block_id val) { // for tree placing
@@ -250,10 +248,11 @@ namespace worldgen {
 			                y >= 0 && y < CHUNK_SIZE &&
 			                z >= 0 && z < CHUNK_SIZE;
 			if (!in_chunk) return;
-			
-			auto* bid = &blocks[IDX3D(x,y,z, CHUNK_SIZE)];
-			if (*bid == AIR || *bid == WATER || (val == TREE_LOG && *bid == LEAVES)) { // replace air and water with tree log, replace leaves with tree log
-				*bid = val;
+
+			auto bid = chunks.read_block(x,y,z, &chunk);
+
+			if (bid == AIR || bid == WATER || (val == TREE_LOG && bid == LEAVES)) { // replace air and water with tree log, replace leaves with tree log
+				chunks.write_block(x,y,z, &chunk, val);
 			}
 		};
 
@@ -304,11 +303,11 @@ namespace worldgen {
 
 				for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
 					auto bid   = read_block(x,y,z);
-					if (bid == EARTH && read_block(x,y,z+1) == AIR) {
+					if ((bid == EARTH || bid == GRASS) && read_block(x,y,z+1) == AIR) {
 						write_block(x,y,z, GRASS);
-							
+						
 						// get a 'random' but deterministic value based on block position
-						uint64_t h = hash(int3(x,y,z) + chunkpos, j.wg->seed);
+						uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
 
 						double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
@@ -329,10 +328,10 @@ namespace worldgen {
 						int wz = z + chunkpos.z;
 
 						//
-						float tree_density  = noise_tree_density (*j.wg, noise, (float2)int2(wx, wy));
-						float grass_density = noise_grass_density(*j.wg, noise, (float2)int2(wx, wy));
+						float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
+						float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
 
-						if (j.chunks->blue_noise_tex.sample(wx,wy,wz) < tree_density) {
+						if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
 							place_tree(x,y,z+1);
 						}
 						else if (chance(grass_density)) {
@@ -349,9 +348,8 @@ namespace worldgen {
 }
 
 void WorldgenJob::execute () {
-	if (phase == 1)
-		worldgen::noise_pass(*this);
-	else if (phase == 2)
-		worldgen::object_pass(*this);
+	assert(phase == 1);
+	
+	worldgen::noise_pass(*this);
 }
 
