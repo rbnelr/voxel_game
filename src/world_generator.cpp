@@ -154,16 +154,6 @@ namespace worldgen {
 	void noise_pass (WorldgenJob& j) {
 		ZoneScoped;
 
-		const auto AIR			= g_assets.block_types.map_id("air");
-		const auto WATER		= g_assets.block_types.map_id("water");
-		const auto STONE		= g_assets.block_types.map_id("stone");
-		const auto EARTH		= g_assets.block_types.map_id("earth");
-		const auto GRASS		= g_assets.block_types.map_id("grass");
-		const auto TREE_LOG		= g_assets.block_types.map_id("tree_log");
-		const auto LEAVES		= g_assets.block_types.map_id("leaves");
-		const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
-		const auto TORCH		= g_assets.block_types.map_id("torch");
-
 		int3 chunk_origin = j.chunk_pos * CHUNK_SIZE;
 
 		int water_level = 21 - chunk_origin.z;
@@ -184,20 +174,20 @@ namespace worldgen {
 
 						float val = cave_noise(noise3, noise2, (float3)pos_world);
 
-						block_id bid;
+						BlockID bid;
 						if (val < -5.0f) {
-							bid = STONE;
+							bid = B_STONE;
 						} else if (val <= 0.0f) {
-							bid = EARTH;
+							bid = B_EARTH;
 						} else {
 							if (z >= water_level) {
-								bid = AIR;
+								bid = B_AIR;
 							} else {
-								bid = WATER;
+								bid = B_WATER;
 							}
 						}
 
-						*cur++ = bid;
+						*cur++ = j.wg->bids[bid];
 					}
 				}
 			}
@@ -207,43 +197,21 @@ namespace worldgen {
 
 	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg) {
 		ZoneScoped;
-
-		const auto AIR			= g_assets.block_types.map_id("air");
-		const auto WATER		= g_assets.block_types.map_id("water");
-		const auto STONE		= g_assets.block_types.map_id("stone");
-		const auto EARTH		= g_assets.block_types.map_id("earth");
-		const auto GRASS		= g_assets.block_types.map_id("grass");
-		const auto TREE_LOG		= g_assets.block_types.map_id("tree_log");
-		const auto LEAVES		= g_assets.block_types.map_id("leaves");
-		const auto TALLGRASS	= g_assets.block_types.map_id("tallgrass");
-		const auto TORCH		= g_assets.block_types.map_id("torch");
-
+		
 		OSN::Noise<2> noise(wg->seed);
 
 		int3 chunkpos = chunk.pos * CHUNK_SIZE;
 
-		// read block with coord relative to this chunk, reads go through neighbours array, so neighbour chunks can also be read
-		auto read_block = [&] (int x, int y, int z) -> chunk_id {
-			assert(x >= -CHUNK_SIZE && x < CHUNK_SIZE*2 &&
-			       y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
-			       z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
-			int bx, by, bz;
-			int cx, cy, cz;
-			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
-
-			Chunk const* chunk = n.neighbours[cz+1][cy+1][cx+1];
-			return chunks.read_block(bx,by,bz, chunk);
-		};
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
-		auto write_block = [&] (int x, int y, int z, block_id bid) -> void {
+		auto write_block = [&] (int x, int y, int z, BlockID bid) -> void {
 			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
 			                y >= 0 && y < CHUNK_SIZE &&
 			                z >= 0 && z < CHUNK_SIZE;
 			if (in_chunk)
-				chunks.write_block(x,y,z, &chunk, bid);
+				chunks.write_block(x,y,z, &chunk, wg->bids[bid]);
 		};
 
-		auto replace_block = [&] (int x, int y, int z, block_id val) { // for tree placing
+		auto replace_block = [&] (int x, int y, int z, BlockID val) { // for tree placing
 			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
 			                y >= 0 && y < CHUNK_SIZE &&
 			                z >= 0 && z < CHUNK_SIZE;
@@ -251,12 +219,13 @@ namespace worldgen {
 
 			auto bid = chunks.read_block(x,y,z, &chunk);
 
-			if (bid == AIR || bid == WATER || (val == TREE_LOG && bid == LEAVES)) { // replace air and water with tree log, replace leaves with tree log
-				chunks.write_block(x,y,z, &chunk, val);
+			if (	bid == wg->bids[B_AIR] || bid == wg->bids[B_WATER] ||
+					(val == B_TREE_LOG && bid == wg->bids[B_LEAVES])) { // replace air and water with tree log, replace leaves with tree log
+				chunks.write_block(x,y,z, &chunk, wg->bids[val]);
 			}
 		};
 
-		auto place_block_ellipsoid = [&] (float3 const& center, float3 const& radius, block_id bid) {
+		auto place_block_ellipsoid = [&] (float3 const& center, float3 const& radius, BlockID bid) {
 			// round makes the box include all blocks that have their center intersect with the ellipsoid
 			int3 start = roundi((float3)center -radius);
 			int3 end   = roundi((float3)center +radius);
@@ -276,9 +245,9 @@ namespace worldgen {
 			int tree_height = 6;
 
 			for (int i=0; i<tree_height; ++i)
-				replace_block(x,y, z + i, TREE_LOG);
+				replace_block(x,y, z + i, B_TREE_LOG);
 
-			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), LEAVES);
+			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), B_LEAVES);
 		};
 
 		// how many blocks around the main chunk to process to fix cutoff trees
@@ -290,7 +259,7 @@ namespace worldgen {
 		// cx= 0 means that blocks [range[1], range[2]) are iterated, ie. [0, CHUNK_SIZE-1]
 		// cx=+1 means that blocks [range[2], range[3]) are iterated, ie. [CHUNK_SIZE, CHUNK_SIZE +border-1]
 		static constexpr int rangexy[4] = { -borderxy, 0, CHUNK_SIZE, CHUNK_SIZE +borderxy };
-		static constexpr int rangez[4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
+		static constexpr int rangez [4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
 
 		// For neighbour chunks (and this chunk)
 		for (int cz=-1; cz<=+1; ++cz)
@@ -302,43 +271,50 @@ namespace worldgen {
 			for (int x=rangexy[cx+1]; x<rangexy[cx+2]; ++x) {
 
 				for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
-					auto bid   = read_block(x,y,z);
-					if ((bid == EARTH || bid == GRASS) && read_block(x,y,z+1) == AIR) {
-						write_block(x,y,z, GRASS);
+					auto bid   = n.read_block(chunks, x,y,z);
+					bool ground = bid == wg->bids[B_EARTH] || bid == wg->bids[B_GRASS];
+					
+					if (ground) {
+						auto above = n.read_block(chunks, x,y,z+1);
+						bool was_air = above != wg->bids[B_EARTH] && above != wg->bids[B_GRASS] && above != wg->bids[B_STONE] && above != wg->bids[B_WATER]; // TODO: Ugh! not good
+
+						if (was_air) {
+							write_block(x,y,z, B_GRASS);
 						
-						// get a 'random' but deterministic value based on block position
-						uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
+							// get a 'random' but deterministic value based on block position
+							uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
 
-						double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
+							double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
-						auto chance = [&] (float prob) {
-							double probd = (double)prob;
+							auto chance = [&] (float prob) {
+								double probd = (double)prob;
 
-							bool happened = rand <= probd;
-							// transform uniform random value such that [0,prob] becomes [0,1]
-							// so that successive checks are independent of the result of this one
-							// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
-							if (happened)	rand = rand / probd;
-							else			rand = (rand - probd) / (1.0 - probd);
-							return happened;
-						};
+								bool happened = rand <= probd;
+								// transform uniform random value such that [0,prob] becomes [0,1]
+								// so that successive checks are independent of the result of this one
+								// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
+								if (happened)	rand = rand / probd;
+								else			rand = (rand - probd) / (1.0 - probd);
+								return happened;
+							};
 
-						int wx = x + chunkpos.x;
-						int wy = y + chunkpos.y;
-						int wz = z + chunkpos.z;
+							int wx = x + chunkpos.x;
+							int wy = y + chunkpos.y;
+							int wz = z + chunkpos.z;
 
-						//
-						float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
-						float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
+							//
+							float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
+							float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
 
-						if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
-							place_tree(x,y,z+1);
-						}
-						else if (chance(grass_density)) {
-							write_block(x,y,z+1, TALLGRASS);
-						}
-						else if (chance(0.0005f)) {
-							write_block(x,y,z+1, TORCH);
+							if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
+								place_tree(x,y,z+1);
+							}
+							else if (chance(grass_density)) {
+								write_block(x,y,z+1, B_TALLGRASS);
+							}
+							else if (chance(0.0005f)) {
+								write_block(x,y,z+1, B_TORCH);
+							}
 						}
 					}
 				}

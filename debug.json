@@ -41,7 +41,7 @@
 	},
 	"activate_flycam": true,
 	"chunks": {
-		"load_radius": 264.0,
+		"load_radius": 325.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": true,

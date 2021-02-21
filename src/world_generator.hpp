@@ -43,6 +43,50 @@ inline T gradient (float key, std::initializer_list<Gradient_KV<T>> const& kvs) 
 	return gradient<T>(key, &*kvs.begin(), kvs.size());
 }
 
+namespace worldgen {
+	// I don't have any way of supplying block names to the world generation
+	// so I hardcode block types for now and map them to the ids from blocks.json
+	// Really seems like this is pointless, though
+
+	enum BlockID : block_id {
+		B_AIR		=0,
+		B_WATER		,
+		B_STONE		,
+		B_EARTH		,
+		B_GRASS		,
+		B_TREE_LOG	,
+		B_LEAVES	,
+		B_TALLGRASS	,
+		B_TORCH		,
+		B_COUNT		,
+	};
+	struct BlockIDs {
+		block_id	bids[B_COUNT];
+
+		char const*	names[B_COUNT] = {
+			/*B_AIR			*/ "air",
+			/*B_WATER		*/ "water",
+			/*B_STONE		*/ "stone",
+			/*B_EARTH		*/ "earth",
+			/*B_GRASS		*/ "grass",
+			/*B_TREE_LOG	*/ "tree_log",
+			/*B_LEAVES		*/ "leaves",
+			/*B_TALLGRASS	*/ "tallgrass",
+			/*B_TORCH		*/ "torch",
+		};
+
+		void load () {
+			for (int i=0; i<B_COUNT; ++i) {
+				bids[i] = g_assets.block_types.map_id(names[i]);
+			}
+		}
+
+		block_id operator[] (BlockID bid) const {
+			return bids[bid];
+		}
+	};
+}
+
 struct WorldGenerator {
 	std_string seed_str = "test2";
 	uint64_t seed;
@@ -64,9 +108,11 @@ struct WorldGenerator {
 
 	float grass_desity_period = 40;
 	float grass_density_amp = .5f;
+
+	worldgen::BlockIDs	bids;
 	
 	WorldGenerator (): seed{get_seed(seed_str)} {
-		
+		bids.load();
 	}
 
 	void imgui () {
@@ -126,6 +172,19 @@ namespace worldgen {
 	struct Neighbours {
 		WorldGenerator const* wg;
 		Chunk* neighbours[3][3][3];
+
+		// read block with coord relative to center chunk
+		chunk_id read_block (Chunks& chunks, int x, int y, int z) {
+			assert(x >= -CHUNK_SIZE && x < CHUNK_SIZE*2 &&
+				y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
+				z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
+			int bx, by, bz;
+			int cx, cy, cz;
+			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+
+			Chunk const* chunk = neighbours[cz+1][cy+1][cx+1];
+			return chunks.read_block(bx,by,bz, chunk);
+		}
 	};
 
 	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg);
