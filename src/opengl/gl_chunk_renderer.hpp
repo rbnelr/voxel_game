@@ -109,29 +109,21 @@ struct ChunkRenderer {
 };
 
 struct Raytracer {
+	//SERIALIZE(Raytracer, enable)
+
 	Shader* shad_test;
 
 	Ssbo ssbo = {"Raytracer.ssbo"};
 
 	bool enable = false;
 
-	std::vector<float4> cols;
-	lrgba col = 1;
-
 	void imgui () {
 		ImGui::Separator();
-		if (!ImGui::TreeNode("Raytracer")) return;
+		//if (!ImGui::TreeNode("Raytracer")) return;
 
 		ImGui::Checkbox("enable", &enable);
-		
-		imgui_ColorEdit("col", &col);
 
-		if (cols.size() > 0) {
-			memmove(&cols[1], &cols[0], sizeof(float4) * (cols.size()-1));
-			cols[0] = col;
-		}
-
-		ImGui::TreePop();
+		//ImGui::TreePop();
 	}
 
 	Raytracer (Shaders& shaders) {

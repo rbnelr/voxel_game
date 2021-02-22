@@ -19,11 +19,15 @@ inline void draw_submesh (IndexedMesh& mesh, GenericSubmesh submesh) {
 }
 
 struct ViewUniforms {
-	float4x4 world_to_cam;
-	float4x4 cam_to_world;
-	float4x4 cam_to_clip;
-	float4x4 clip_to_cam;
+	// forward
 	float4x4 world_to_clip;
+	float4x4 world_to_cam;
+	float4x4 cam_to_clip;
+	// inverse
+	float4x4 clip_to_world;
+	float4x4 clip_to_cam;
+	float4x4 cam_to_world;
+
 	float    clip_near;
 	float    clip_far;
 	float2   viewport_size;
@@ -31,11 +35,14 @@ struct ViewUniforms {
 	void set (Camera_View const& view, int2 viewport_size) {
 		memset(this, 0, sizeof(*this)); // zero padding
 
-		world_to_cam = (float4x4)view.world_to_cam;
-		cam_to_world = (float4x4)view.cam_to_world;
-		cam_to_clip = view.cam_to_clip;
-		clip_to_cam = view.clip_to_cam;
 		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
+		world_to_cam = (float4x4)view.world_to_cam;
+		cam_to_clip = view.cam_to_clip;
+
+		clip_to_world = (float4x4)view.cam_to_world * view.clip_to_cam;
+		clip_to_cam = view.clip_to_cam;
+		cam_to_world = (float4x4)view.cam_to_world;
+
 		clip_near = view.clip_near;
 		clip_far = view.clip_far;
 		this->viewport_size = (float2)viewport_size;

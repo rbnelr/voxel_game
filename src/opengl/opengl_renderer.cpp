@@ -52,7 +52,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	}
 
 	{
-		CommonUniforms u = { I, game, I.window_size };
+		CommonUniforms u = { I, game, framebuffer.size };
 		upload_bind_ubo(common_uniforms, 0, &u, sizeof(u));
 	}
 
@@ -84,6 +84,10 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	//
 	debug_draw.draw(*this);
 
+	{
+		CommonUniforms u = { I, game, I.window_size };
+		upload_bind_ubo(common_uniforms, 0, &u, sizeof(u));
+	}
 	{
 		OGL_TRACE("framebuffer.blit");
 		framebuffer.blit(I.window_size);
