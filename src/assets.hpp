@@ -61,8 +61,10 @@ struct BlockMeshes {
 
 	// A mesh made up of a variable number of slices
 	struct Mesh {
-		int offset;
+		int index;
 		int length; // number of mesh slices
+
+		float offs_strength;
 	};
 
 	// mesh (slice) data

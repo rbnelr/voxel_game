@@ -34,17 +34,17 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 		
 	int texid = tile.calc_tex_index((BlockFace)0, variant);
 
-	float posx = (float)pos.x + (rand_offsx * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
-	float posy = (float)pos.y + (rand_offsy * 2 - 1) * 0.25f; // [0,1] -> [-1,+1]
+	auto& info = g_assets.block_meshes.meshes[meshid];
+
+	float posx = (float)pos.x + (rand_offsx * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
+	float posy = (float)pos.y + (rand_offsy * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
 	float posz = (float)pos.z;
 
 	int16_t fixd_posx = (int16_t)roundi(posx * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance::FIXEDPOINT_FAC);
 	int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance::FIXEDPOINT_FAC);
 
-	auto& info = g_assets.block_meshes.meshes[meshid];
-
-	for (int meshid=info.offset; meshid < info.offset + info.length; ++meshid) {
+	for (int meshid=info.index; meshid < info.index + info.length; ++meshid) {
 		auto* v = j.mesh.opaque_vertices.push();
 		if (!v) return;
 		v->posx = fixd_posx;

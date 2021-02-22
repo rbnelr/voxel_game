@@ -917,7 +917,7 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 		col = &DBG_CHUNK_COL;
 		if (chunk.loadphase == 1) {
 			col = &DBG_STAGE1_COL;
-			size = 0.4f;
+			size = 0.99f;
 		} else if (chunk.flags & Chunk::SPARSE_VOXELS) {
 			col = &DBG_SPARSE_CHUNK_COL;
 		}

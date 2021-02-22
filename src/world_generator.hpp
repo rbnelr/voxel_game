@@ -49,24 +49,28 @@ namespace worldgen {
 	// Really seems like this is pointless, though
 
 	enum BlockID : block_id {
-		B_AIR		=0,
-		B_WATER		,
-		B_STONE		,
-		B_EARTH		,
-		B_GRASS		,
-		B_TREE_LOG	,
-		B_LEAVES	,
-		B_TALLGRASS	,
-		B_TORCH		,
-		B_COUNT		,
+		B_AIR			=0,
+		B_UNBREAKIUM	,
+		B_WATER			,
+		B_STONE			,
+		B_HARDSTONE		,
+		B_EARTH			,
+		B_GRASS			,
+		B_TREE_LOG		,
+		B_LEAVES		,
+		B_TALLGRASS		,
+		B_TORCH			,
+		B_COUNT			,
 	};
 	struct BlockIDs {
 		block_id	bids[B_COUNT];
 
 		char const*	names[B_COUNT] = {
 			/*B_AIR			*/ "air",
+			/*B_UNBREAKIUM	*/ "unbreakium",
 			/*B_WATER		*/ "water",
 			/*B_STONE		*/ "stone",
+			/*B_HARDSTONE	*/ "hardstone",
 			/*B_EARTH		*/ "earth",
 			/*B_GRASS		*/ "grass",
 			/*B_TREE_LOG	*/ "tree_log",

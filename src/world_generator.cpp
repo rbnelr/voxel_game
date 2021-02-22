@@ -57,42 +57,85 @@ namespace worldgen {
 		return (elevation +32) +(roughness * detail);
 	}
 
-	float cave_noise (float3 const& pos_world, OSN::Noise<3> const& osn_noise, OSN::Noise<2> const& noise2) {
-		auto noise = [&] (float3 pos, float period, float3 offs) {
-			pos /= period; // period is inverse frequency
-			pos += offs;
+	BlockID cave_noise (float3 const& pos_world, OSN::Noise<3> const& osn_noise, OSN::Noise<2> const& noise2) {
+		int water_level = 21;
 
-			return osn_noise.eval<float>(pos.x, pos.y, pos.z / 0.7f);
+		auto noise = [&] (float3 pos, float period, float seed) {
+			//pos += (1103 * float3(53, 211, 157)) * seed; // random prime directional offset to replace lack of seed in OSN noise
+			pos /= period; // period is inverse frequency
+
+			return osn_noise.eval<float>(pos.x, pos.y, pos.z / 0.7f) * period; // 0.7 to flatten world
 		};
 
-		float val = noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
-		float dx = (noise(pos_world + float3(1,0,0), 180.0f, 0) * 180.0f - 50.0f) - val;
-		float dy = (noise(pos_world + float3(0,1,0), 180.0f, 0) * 180.0f - 50.0f) - val;
-		float dz = (noise(pos_world + float3(0,0,1), 180.0f, 0) * 180.0f - 50.0f) - val;
-	
-		float3 normal = normalize(float3(dx,dy,dz));
-	
-		float stalag_freq = 5.0f;
-		float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * (abs(normal.z) - 0.2f);
-		if (dz < 0) {
-			stalag = max(stalag, 0.0f);
-			stalag *= -40;
-			val += stalag;
-		}
-
-		//float val = 0.0f;
+		auto large_freq = [noise] (float3 pos) {
+			float val = 70;
+			val -= noise(pos, 300, 0);
+			val -= noise(pos, 180, 1);
+			val -= noise(pos,  70, 2);
+			return val;
+		};
 
 		// large scale
-		//val += noise(pos_world, 300.0f, 0) * 300.0f;
+		float base = large_freq(pos_world);
+
+		if (base > 200)
+			return B_UNBREAKIUM;
+
+		// large normal vector
+		float3 delta;
+		delta.x = base - large_freq(pos_world + float3(1,0,0));
+		delta.y = base - large_freq(pos_world + float3(0,1,0));
+		delta.z = base - large_freq(pos_world + float3(0,0,1));
+		float3 normal = normalize(delta);
+
+		// stalag
+		float stalag_freq = 6;
+		float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * clamp(map(normal.z, -0.8f, -0.9f));
+		base += stalag * 50;
 
 		// small scale
-		val += noise(pos_world, 180.0f, 0) * 180.0f - 50.0f;
-		val += noise(pos_world, 70.0f, float3(700,800,900)) * 70.0f;
-		val += noise(pos_world, 4.0f, float3(700,800,900)) * 2.0f;
+		base += -noise(pos_world, 4.0f, 3) * 0.5f;
 
-		//val += pos_world.z * 0.5f;
+		// erode rock
+		float eroded = base;
 
-		return val;
+		bool ground = normal.z > 0.55f;
+		if (!ground) {
+			eroded -= 1.2f;
+		
+			float3 roughpos = pos_world;
+			roughpos.z /= 4;
+		
+			float stren = noise(roughpos, 14, 5) + 0.5f;
+			eroded -= max(noise(roughpos, 8, 4) * 0.2f * stren, 0.0f);
+		}
+
+		{
+			BlockID bid;
+			if (pos_world.z >= water_level) {
+				bid = B_AIR;
+			} else {
+				bid = B_WATER;
+			}
+
+			if (base > 0) {
+				// positive -> in rock
+				if (ground && base < 5.0f) {
+					// ground soil
+					bid = B_EARTH;
+				} else {
+					// rock
+					if (eroded > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
+						if (base < 8.0f) {
+							bid = B_STONE; 
+						} else {
+							bid = B_HARDSTONE;
+						}
+					}
+				}
+			}
+			return bid;
+		}
 	}
 
 	float noise_tree_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
@@ -156,8 +199,6 @@ namespace worldgen {
 
 		int3 chunkpos = j.chunk_pos * CHUNK_SIZE;
 
-		int water_level = 21;
-
 		OSN::Noise<2> noise2(j.wg->seed);
 		OSN::Noise<3> noise3(j.wg->seed);
 
@@ -178,21 +219,7 @@ namespace worldgen {
 					for (int x = chunkpos.x; x < chunkpos.x + CHUNK_SIZE; ++x) {
 						pos_world.x = (float)x;
 
-						float val = cave_noise(pos_world, noise3, noise2);
-
-						BlockID bid;
-						if (val < -5.0f) {
-							bid = B_STONE;
-						} else if (val <= 0.0f) {
-							bid = B_EARTH;
-						} else {
-							if (z >= water_level) {
-								bid = B_AIR;
-							} else {
-								bid = B_WATER;
-							}
-						}
-
+						auto bid = cave_noise(pos_world, noise3, noise2);
 						*cur++ = j.wg->bids[bid];
 					}
 				}
@@ -202,6 +229,11 @@ namespace worldgen {
 	}
 
 #if 1
+
+}
+#include "immintrin.h"
+namespace worldgen {
+
 	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, Chunk const* c) {
 		assert(c->flags != 0);
 
@@ -400,7 +432,7 @@ namespace worldgen {
 			else if (chance(grass_density)) {
 				write_block(x,y,z, B_TALLGRASS);
 			}
-			else if (chance(0.0005f)) {
+			else if (chance(0.003f)) {
 				write_block(x,y,z, B_TORCH);
 			}
 		});

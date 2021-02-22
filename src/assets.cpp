@@ -13,7 +13,7 @@ void Assets::load_block_types (json const& blocks_json) {
 		BlockTypes::Block b;
 
 		b.name = "null";
-		b.hardness = 255;
+		b.hardness = MAX_HARDNESS;
 		b.collision = CM_SOLID;
 		//b.transparency = TM_OPAQUE; // don't render edges of world
 		b.transparency = TM_TRANSPARENT; // render edges of world
@@ -80,7 +80,9 @@ void BlockMeshes::load (json const& blocks_json) {
 	if (!scene)
 		throw std::runtime_error("meshes/block_meshes.fbx not found!");
 
-	auto load_mesh = [&] (char const* name) {
+	auto load_mesh = [&] (char const* name, float offs_strength=1.0f) {
+		static constexpr float scale = 1.0f / 16;
+
 		int mesh_idx = -1;
 
 		for (unsigned i=0; i<scene->mNumMeshes; ++i) {
@@ -89,9 +91,10 @@ void BlockMeshes::load (json const& blocks_json) {
 			if (strcmp(mesh->mName.C_Str(), name) == 0) {
 
 				BlockMeshes::Mesh m;
-				m.offset = (int)slices.size();
+				m.index = (int)slices.size();
 				m.length = mesh->mNumFaces / 2; // 2 tris -> one face
-				slices.resize(m.offset + m.length);
+				m.offs_strength = offs_strength;
+				slices.resize(m.index + m.length);
 
 				for (unsigned j=0; j<mesh->mNumFaces; ++j) {
 					auto& f = mesh->mFaces[j];
@@ -104,8 +107,8 @@ void BlockMeshes::load (json const& blocks_json) {
 						auto norm = mesh->mNormals[index];
 						auto uv = mesh->mTextureCoords[0][index];
 
-						slices[m.offset + j/2].vertices[j%2 * 3 + k] = {
-							roundv( float4(pos.x, pos.y, pos.z, 1.0f) ),
+						slices[m.index + j/2].vertices[j%2 * 3 + k] = {
+							roundv( float4(pos.x * scale, pos.y * scale, pos.z * scale, 1.0f) ),
 							roundv( float4(norm.x, norm.y, norm.z, 1.0f) ),
 							roundv( float4(uv.x, 1.0f - uv.y, 0.0f, 1.0f) ),
 						};
@@ -132,11 +135,18 @@ void BlockMeshes::load (json const& blocks_json) {
 		auto& name = kv.key();
 		auto& val = kv.value();
 
-		auto mesh_name = name;
+		int mesh = -1;
+		if (val.contains("mesh")) {
+			std::string mesh_name;
+			val.at("mesh").get_to(mesh_name);
+			
+			float offs_strength = 1.0f;
+			if (val.contains("offs-strength")) val.at("offs-strength").get_to(offs_strength);
 
-		if (val.contains("mesh")) mesh_name = val.at("mesh").get_to(mesh_name);
+			mesh = load_mesh(mesh_name.c_str(), offs_strength);
+		}
 
-		block_meshes.push_back( load_mesh(mesh_name.c_str()) );
+		block_meshes.push_back(mesh);
 	}
 
 	//{

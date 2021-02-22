@@ -36,6 +36,8 @@ inline constexpr float TOOL_MATCH_BONUS_DAMAGE = 2;
 inline constexpr float TOOL_MISMATCH_PENALTY_BREAK = 2;
 inline constexpr int MAX_LIGHT_LEVEL = 18;
 
+inline constexpr uint16_t MAX_HARDNESS = (uint16_t)-1;
+
 struct BlockTypes {
 	struct Block {
 		std_string			name = "null";
@@ -45,7 +47,8 @@ struct BlockTypes {
 		collision_mode		collision;                  // collision mode for physics
 		transparency_mode	transparency;               // transparency mode for meshing
 		ToolType			tool = ToolType::NONE;      // tool type to determine which tool should be used for mining
-		uint8_t				hardness = 0;               // hardness value to determine damage resistance
+		
+		uint16_t			hardness = 0;               // hardness value to determine damage resistance
 		uint8_t				glow = 0;                   // with what light level to glow with
 		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
 	};
