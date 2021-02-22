@@ -329,22 +329,13 @@ namespace worldgen {
 
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
 		auto write_block = [&] (int x, int y, int z, BlockID bid) -> void {
-			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
-			                y >= 0 && y < CHUNK_SIZE &&
-			                z >= 0 && z < CHUNK_SIZE;
-			if (in_chunk)
-				chunks.write_block(x,y,z, &chunk, wg->bids[bid]);
+			chunks.write_block(x,y,z, wg->bids[bid]);
 		};
 		auto replace_block = [&] (int x, int y, int z, BlockID val) { // for tree placing
-			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
-			                y >= 0 && y < CHUNK_SIZE &&
-			                z >= 0 && z < CHUNK_SIZE;
-			if (!in_chunk) return;
-
-			auto bid = chunks.read_block(x,y,z, &chunk);
+			auto bid = chunks.read_block(x,y,z);
 
 			if (bid == wg->bids[B_AIR] || (val == B_TREE_LOG && bid == wg->bids[B_LEAVES])) { // replace air and water with tree log, replace leaves with tree log
-				chunks.write_block(x,y,z, &chunk, wg->bids[val]);
+				chunks.write_block(x,y,z, wg->bids[val]);
 			}
 		};
 
@@ -374,10 +365,15 @@ namespace worldgen {
 		};
 
 		iter_growable_blocks(chunks, chunk, neighbours, wg, [&] (int x, int y, int z, block_id below) {
+			// convert to world coords
+			x += chunkpos.x;
+			y += chunkpos.y;
+			z += chunkpos.z;
+
 			write_block(x,y,z-1, B_GRASS);
 
 			// get a 'random' but deterministic value based on block position
-			uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
+			uint64_t h = hash(int3(x,y,z), wg->seed);
 
 			double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
@@ -393,15 +389,12 @@ namespace worldgen {
 				return happened;
 			};
 
-			int wx = x + chunkpos.x;
-			int wy = y + chunkpos.y;
-			int wz = z + chunkpos.z;
-
 			//
-			float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
-			float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
+			float2 pos2 = float2((float)x, (float)y);
+			float tree_density  = noise_tree_density (*wg, noise, pos2);
+			float grass_density = noise_grass_density(*wg, noise, pos2);
 
-			if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
+			if (chunks.blue_noise_tex.sample(x,y,z) < tree_density) {
 				place_tree(x,y,z);
 			}
 			else if (chance(grass_density)) {
