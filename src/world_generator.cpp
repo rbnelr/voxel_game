@@ -396,14 +396,14 @@ namespace worldgen {
 				}
 			}
 		};
-		auto place_tree = [&] (int x, int y, int z) {
-			int tree_height = 6;
-			float leaf_r = 3.2f;
+		auto place_tree = [&] (int x, int y, int z, float height, float r) {
+			float leaf_r = 4 * r;
 
-			for (int i=0; i<tree_height; ++i)
+			int h = roundi(height);
+			for (int i=0; i<h; ++i)
 				replace_block(x,y, z + i, B_TREE_LOG);
 
-			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(leaf_r, leaf_r, tree_height/2.5f), B_LEAVES);
+			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + height-0.5f), float3(leaf_r, leaf_r, height/2.5f), B_LEAVES);
 		};
 
 		iter_growable_blocks(chunks, chunk, neighbours, wg, [&] (int x, int y, int z, block_id below) {
@@ -418,6 +418,8 @@ namespace worldgen {
 			uint64_t h = hash(int3(x,y,z), wg->seed);
 
 			double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
+			float rand1 = (float)(h & 0xffffffff) * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
+			float rand2 = (float)(h >> 32)        * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
 
 			auto chance = [&] (float prob) {
 				double probd = (double)prob;
@@ -437,7 +439,7 @@ namespace worldgen {
 			float grass_density = noise_grass_density(*wg, noise, pos2);
 
 			if (chunks.blue_noise_tex.sample(x,y,z) < tree_density) {
-				place_tree(x,y,z);
+				place_tree(x,y,z, lerp(6, 10, rand1), lerp(0.8f, 1.2f, rand2));
 			}
 			else if (chance(grass_density)) {
 				write_block(x,y,z, B_TALLGRASS);
