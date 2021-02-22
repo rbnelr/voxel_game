@@ -264,7 +264,6 @@ bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
 	}
 	return is_sparse;
 }
-
 bool check_chunk_sparse (ChunkVoxels& dc) {
 	uint32_t bid = dc.sparse_data[0];
 	uint64_t packed = (uint64_t)bid | ((uint64_t)bid << 32);

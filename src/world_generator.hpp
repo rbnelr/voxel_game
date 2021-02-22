@@ -169,15 +169,19 @@ struct WorldgenJob {
 inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, TPRIO_BACKGROUND, ">> background threadpool"  );
 
 namespace worldgen {
+	// Faster voxel access in 3x3x3 chunk region than hashmap-based global chunk lookup
 	struct Neighbours {
-		WorldGenerator const* wg;
 		Chunk* neighbours[3][3][3];
 
+		Chunk* get (int x, int y, int z) {
+			return neighbours[z+1][y+1][x+1];
+		}
+
 		// read block with coord relative to center chunk
-		chunk_id read_block (Chunks& chunks, int x, int y, int z) {
+		chunk_id read_block (Chunks& chunks, int x, int y, int z) const {
 			assert(x >= -CHUNK_SIZE && x < CHUNK_SIZE*2 &&
-				y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
-				z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
+			       y >= -CHUNK_SIZE && y < CHUNK_SIZE*2 &&
+			       z >= -CHUNK_SIZE && z < CHUNK_SIZE*2);
 			int bx, by, bz;
 			int cx, cy, cz;
 			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
@@ -187,5 +191,6 @@ namespace worldgen {
 		}
 	};
 
-	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg);
+
+	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg);
 }

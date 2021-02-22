@@ -57,7 +57,7 @@ namespace worldgen {
 		return (elevation +32) +(roughness * detail);
 	}
 
-	float cave_noise (OSN::Noise<3> const& osn_noise, OSN::Noise<2> noise2, float3 pos_world) {
+	float cave_noise (float3 const& pos_world, OSN::Noise<3> const& osn_noise, OSN::Noise<2> const& noise2) {
 		auto noise = [&] (float3 pos, float period, float3 offs) {
 			pos /= period; // period is inverse frequency
 			pos += offs;
@@ -154,9 +154,9 @@ namespace worldgen {
 	void noise_pass (WorldgenJob& j) {
 		ZoneScoped;
 
-		int3 chunk_origin = j.chunk_pos * CHUNK_SIZE;
+		int3 chunkpos = j.chunk_pos * CHUNK_SIZE;
 
-		int water_level = 21 - chunk_origin.z;
+		int water_level = 21;
 
 		OSN::Noise<2> noise2(j.wg->seed);
 		OSN::Noise<3> noise3(j.wg->seed);
@@ -167,12 +167,18 @@ namespace worldgen {
 			ZoneScopedN("3d noise generate");
 
 			block_id* cur = blocks;
-			for (int z=0; z<CHUNK_SIZE; ++z) {
-				for (int y=0; y<CHUNK_SIZE; ++y) {
-					for (int x=0; x<CHUNK_SIZE; ++x) {
-						int3 pos_world = int3(x,y,z) + chunk_origin;
+			float3 pos_world;
 
-						float val = cave_noise(noise3, noise2, (float3)pos_world);
+			for (int z = chunkpos.z; z < chunkpos.z + CHUNK_SIZE; ++z) {
+				pos_world.z = (float)z;
+				
+				for (int y = chunkpos.y; y < chunkpos.y + CHUNK_SIZE; ++y) {
+					pos_world.y = (float)y;
+					
+					for (int x = chunkpos.x; x < chunkpos.x + CHUNK_SIZE; ++x) {
+						pos_world.x = (float)x;
+
+						float val = cave_noise(pos_world, noise3, noise2);
 
 						BlockID bid;
 						if (val < -5.0f) {
@@ -195,7 +201,126 @@ namespace worldgen {
 
 	}
 
-	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& n, WorldGenerator const* wg) {
+#if 1
+	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, Chunk const* c) {
+		assert(c->flags != 0);
+
+		block_id sparse;
+
+		if (c->flags & Chunk::SPARSE_VOXELS) {
+			// sparse chunk
+			sparse = (block_id)c->voxel_data;
+		} else {
+			auto& dc = chunks.dense_chunks[c->voxel_data];
+
+			uint32_t subchunk_i = IDX3D(sx,sy, z >> SUBCHUNK_SHIFT, SUBCHUNK_COUNT);
+			auto subchunk_val = dc.sparse_data[subchunk_i];
+
+			if (dc.is_subchunk_sparse(subchunk_i)) {
+				// sparse subchunk
+				sparse = (block_id)subchunk_val;
+			} else {
+				// dense subchunk
+				auto& subchunk = chunks.dense_subchunks[subchunk_val];
+
+				auto blocki = BLOCK_IDX(0,0,z);
+				return _mm256_load_si256((__m256i*)&subchunk.voxels[blocki]);
+			}
+		}
+
+		// sparse
+		return _mm256_set1_epi16((short)sparse);
+	}
+	void _read_subchunk (Chunks& chunks, int sx, int sy, int sz, Chunk const* c, __m256i* planes) {
+		assert(c->flags != 0);
+
+		block_id sparse;
+
+		if (c->flags & Chunk::SPARSE_VOXELS) {
+			// sparse chunk
+			sparse = (block_id)c->voxel_data;
+		} else {
+			auto& dc = chunks.dense_chunks[c->voxel_data];
+
+			uint32_t subchunk_i = IDX3D(sx,sy,sz, SUBCHUNK_COUNT);
+			auto subchunk_val = dc.sparse_data[subchunk_i];
+
+			if (dc.is_subchunk_sparse(subchunk_i)) {
+				// sparse subchunk
+				sparse = (block_id)subchunk_val;
+			} else {
+				// dense subchunk
+				auto& subchunk = chunks.dense_subchunks[subchunk_val];
+
+				for (int z=0; z<4; ++z)
+					planes[z] = _mm256_load_si256((__m256i*)&subchunk.voxels[z*16]);
+				return;
+			}
+		}
+
+		// sparse
+		auto plane = _mm256_set1_epi16((short)sparse);
+		for (int z=0; z<4; ++z)
+			planes[z] = plane;
+	}
+
+	template <typename FUNC>
+	void iter_growable_blocks (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
+		auto air   = _mm256_set1_epi16(wg->bids[B_AIR]);
+		auto earth = _mm256_set1_epi16(wg->bids[B_EARTH]);
+		
+		for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
+		for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
+			auto below = _read_subchunk_plane(chunks, sx,sy, CHUNK_SIZE-1, neighbours.get(0,0,-1));
+
+			for (int sz=0; sz<SUBCHUNK_COUNT; ++sz) {
+				__m256i subc[4];
+				_read_subchunk(chunks, sx,sy,sz, &chunk, subc);
+
+				for (int z=0; z<4; ++z) {
+					auto cur = subc[z];
+
+					auto a = _mm256_cmpeq_epi16(cur,   air);
+					auto b = _mm256_cmpeq_epi16(below, earth);
+					auto c = _mm256_testz_si256(a, b); // 1: all !=   0: any ==
+
+					if (c == 0) {
+						auto ab = _mm256_and_si256(a, b);
+
+						for (int y=0; y<4; ++y)
+						for (int x=0; x<4; ++x) {
+							int i = y*4 + x;
+							if (ab.m256i_u16[i])
+								block(sx*4 + x, sy*4 + y, sz*4 + z, cur.m256i_u16[i]);
+						}
+					}
+
+					below = cur;
+				}
+			}
+		}
+	}
+#else
+	template <typename FUNC>
+	void iter_growable_blocks (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
+		for (int y=0; y<CHUNK_SIZE; ++y)
+		for (int x=0; x<CHUNK_SIZE; ++x) {
+			auto below = chunks.read_block(x,y, CHUNK_SIZE-1, neighbours.get(0,0,-1));
+
+			for (int z=0; z<CHUNK_SIZE; ++z) {
+				auto bid = chunks.read_block(x,y,z, &chunk);
+
+				if (bid == wg->bids[B_AIR] && below == wg->bids[B_EARTH]) {
+					block(x, y, z, below);
+				}
+
+				below = bid;
+			}
+		}
+	}
+#endif
+
+	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg) {
 		ZoneScoped;
 		
 		OSN::Noise<2> noise(wg->seed);
@@ -210,7 +335,6 @@ namespace worldgen {
 			if (in_chunk)
 				chunks.write_block(x,y,z, &chunk, wg->bids[bid]);
 		};
-
 		auto replace_block = [&] (int x, int y, int z, BlockID val) { // for tree placing
 			bool in_chunk = x >= 0 && x < CHUNK_SIZE &&
 			                y >= 0 && y < CHUNK_SIZE &&
@@ -219,8 +343,7 @@ namespace worldgen {
 
 			auto bid = chunks.read_block(x,y,z, &chunk);
 
-			if (	bid == wg->bids[B_AIR] || bid == wg->bids[B_WATER] ||
-					(val == B_TREE_LOG && bid == wg->bids[B_LEAVES])) { // replace air and water with tree log, replace leaves with tree log
+			if (bid == wg->bids[B_AIR] || (val == B_TREE_LOG && bid == wg->bids[B_LEAVES])) { // replace air and water with tree log, replace leaves with tree log
 				chunks.write_block(x,y,z, &chunk, wg->bids[val]);
 			}
 		};
@@ -240,86 +363,54 @@ namespace worldgen {
 				}
 			}
 		};
-
 		auto place_tree = [&] (int x, int y, int z) {
 			int tree_height = 6;
+			float leaf_r = 3.2f;
 
 			for (int i=0; i<tree_height; ++i)
 				replace_block(x,y, z + i, B_TREE_LOG);
 
-			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(3.2f, 3.2f, tree_height/2.5f), B_LEAVES);
+			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + tree_height-0.5f), float3(leaf_r, leaf_r, tree_height/2.5f), B_LEAVES);
 		};
 
-		// how many blocks around the main chunk to process to fix cutoff trees
-		static constexpr int borderxy = 5;
-		static constexpr int borderz0 = 5 + 6; // need to add more depth to fix trees being cut off at the top (trees are higher than 5)
-		static constexpr int borderz1 = 5; 
+		iter_growable_blocks(chunks, chunk, neighbours, wg, [&] (int x, int y, int z, block_id below) {
+			write_block(x,y,z-1, B_GRASS);
 
-		// cx=-1 means that blocks [range[0], range[1]) are iterated, ie. [-border, -1]
-		// cx= 0 means that blocks [range[1], range[2]) are iterated, ie. [0, CHUNK_SIZE-1]
-		// cx=+1 means that blocks [range[2], range[3]) are iterated, ie. [CHUNK_SIZE, CHUNK_SIZE +border-1]
-		static constexpr int rangexy[4] = { -borderxy, 0, CHUNK_SIZE, CHUNK_SIZE +borderxy };
-		static constexpr int rangez [4] = { -borderz0, 0, CHUNK_SIZE, CHUNK_SIZE +borderz1 };
+			// get a 'random' but deterministic value based on block position
+			uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
 
-		// For neighbour chunks (and this chunk)
-		for (int cz=-1; cz<=+1; ++cz)
-		for (int cy=-1; cy<=+1; ++cy)
-		for (int cx=-1; cx<=+1; ++cx) {
+			double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 
-			// For blocks in chunk
-			for (int y=rangexy[cy+1]; y<rangexy[cy+2]; ++y)
-			for (int x=rangexy[cx+1]; x<rangexy[cx+2]; ++x) {
+			auto chance = [&] (float prob) {
+				double probd = (double)prob;
 
-				for (int z=rangez[cz+1]; z<rangez[cz+2]; ++z) {
-					auto bid   = n.read_block(chunks, x,y,z);
-					bool ground = bid == wg->bids[B_EARTH] || bid == wg->bids[B_GRASS];
-					
-					if (ground) {
-						auto above = n.read_block(chunks, x,y,z+1);
-						bool was_air = above != wg->bids[B_EARTH] && above != wg->bids[B_GRASS] && above != wg->bids[B_STONE] && above != wg->bids[B_WATER]; // TODO: Ugh! not good
+				bool happened = rand <= probd;
+				// transform uniform random value such that [0,prob] becomes [0,1]
+				// so that successive checks are independent of the result of this one
+				// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
+				if (happened)	rand = rand / probd;
+				else			rand = (rand - probd) / (1.0 - probd);
+				return happened;
+			};
 
-						if (was_air) {
-							write_block(x,y,z, B_GRASS);
-						
-							// get a 'random' but deterministic value based on block position
-							uint64_t h = hash(int3(x,y,z) + chunkpos, wg->seed);
+			int wx = x + chunkpos.x;
+			int wy = y + chunkpos.y;
+			int wz = z + chunkpos.z;
 
-							double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
+			//
+			float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
+			float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
 
-							auto chance = [&] (float prob) {
-								double probd = (double)prob;
-
-								bool happened = rand <= probd;
-								// transform uniform random value such that [0,prob] becomes [0,1]
-								// so that successive checks are independent of the result of this one
-								// Note: this effectively removes bits from the value (50% prob cuts 1 bit, 1% change cuts 99% of number space)
-								if (happened)	rand = rand / probd;
-								else			rand = (rand - probd) / (1.0 - probd);
-								return happened;
-							};
-
-							int wx = x + chunkpos.x;
-							int wy = y + chunkpos.y;
-							int wz = z + chunkpos.z;
-
-							//
-							float tree_density  = noise_tree_density (*wg, noise, (float2)int2(wx, wy));
-							float grass_density = noise_grass_density(*wg, noise, (float2)int2(wx, wy));
-
-							if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
-								place_tree(x,y,z+1);
-							}
-							else if (chance(grass_density)) {
-								write_block(x,y,z+1, B_TALLGRASS);
-							}
-							else if (chance(0.0005f)) {
-								write_block(x,y,z+1, B_TORCH);
-							}
-						}
-					}
-				}
+			if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
+				place_tree(x,y,z);
 			}
-		}
+			else if (chance(grass_density)) {
+				write_block(x,y,z, B_TALLGRASS);
+			}
+			else if (chance(0.0005f)) {
+				write_block(x,y,z, B_TORCH);
+			}
+		});
 	}
 }
 
