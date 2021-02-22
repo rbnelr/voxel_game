@@ -126,6 +126,8 @@ public:
 	Texture2DArray	tile_textures = {"tile_textures"};
 
 	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
+	Raytracer		raytracer		= Raytracer(shaders);
+
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
 
 	bool			wireframe = false;
@@ -174,6 +176,8 @@ public:
 
 		debug_draw.imgui();
 		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
+
+		raytracer.imgui();
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {

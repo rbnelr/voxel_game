@@ -108,4 +108,58 @@ struct ChunkRenderer {
 
 };
 
+struct Raytracer {
+	Shader* shad_test;
+
+	Ssbo ssbo = {"Raytracer.ssbo"};
+
+	bool enable = false;
+
+	std::vector<float4> cols;
+	lrgba col = 1;
+
+	void imgui () {
+		ImGui::Separator();
+		if (!ImGui::TreeNode("Raytracer")) return;
+
+		ImGui::Checkbox("enable", &enable);
+		
+		imgui_ColorEdit("col", &col);
+
+		if (cols.size() > 0) {
+			memmove(&cols[1], &cols[0], sizeof(float4) * (cols.size()-1));
+			cols[0] = col;
+		}
+
+		ImGui::TreePop();
+	}
+
+	Raytracer (Shaders& shaders) {
+		shad_test = shaders.compile("raytracer_test", {}, {{ COMPUTE_SHADER }});
+
+		{
+			int3 count, size;
+
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &count.x);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &count.y);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &count.z);
+
+			printf("max global (total) work group count (%d, %d, %d)\n", count.x, count.y, count.z);
+
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &size.x);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &size.y);
+			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &size.z);
+
+			printf("max local (in one shader) work group size (%d, %d, %d)\n", size.x, size.y, size.z);
+
+			int number;
+			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
+			printf("max local work group invocations %d\n", number);
+		}
+	}
+
+	void draw (OpenglRenderer& r, Game& game);
+};
+
+
 } // namespace gl

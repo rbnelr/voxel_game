@@ -78,6 +78,9 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	chunk_renderer.draw_chunks(*this, game);
 
+	if (raytracer.enable)
+		raytracer.draw(*this, game);
+
 	//
 	debug_draw.draw(*this);
 

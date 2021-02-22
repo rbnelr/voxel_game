@@ -458,6 +458,7 @@
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
     <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
     <None Include="..\..\..\shaders\gl\debug_wire_cube.glsl" />
+    <None Include="..\..\..\shaders\gl\raytracer_test.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />
     <None Include="..\..\..\shaders\vk\chunks.glsl" />
     <None Include="..\..\..\shaders\vk\common.glsl" />

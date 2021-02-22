@@ -124,6 +124,24 @@ public:
 
 	operator GLuint () const { return vao; }
 };
+class Ssbo {
+	GLuint ssbo = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Ssbo, ssbo);
+
+	Ssbo () {} // not allocated
+	Ssbo (std::string_view label) { // allocate
+		glGenBuffers(1, &ssbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+		OGL_DBG_LABEL(GL_BUFFER, ssbo, label);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	}
+	~Ssbo () {
+		if (ssbo) glDeleteBuffers(1, &ssbo);
+	}
+
+	operator GLuint () const { return ssbo; }
+};
 class Sampler {
 	GLuint sampler = 0;
 public:

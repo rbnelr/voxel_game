@@ -9,11 +9,12 @@ namespace gl {
 enum ShaderStage {
 	VERTEX_SHADER,
 	FRAGMENT_SHADER,
+	COMPUTE_SHADER,
 };
 
-static constexpr GLenum SHADER_STAGE_GLENUM[] = {		GL_VERTEX_SHADER,	GL_FRAGMENT_SHADER	};
-static constexpr const char* SHADER_STAGE_NAME[] = {	"vertex",			"fragment"	};
-static constexpr const char* SHADER_STAGE_MACRO[] = {	"_VERTEX",			"_FRAGMENT"	};
+static constexpr GLenum SHADER_STAGE_GLENUM[] = {		GL_VERTEX_SHADER,	GL_FRAGMENT_SHADER,		GL_COMPUTE_SHADER	};
+static constexpr const char* SHADER_STAGE_NAME[] = {	"vertex",			"fragment",				"compute" };
+static constexpr const char* SHADER_STAGE_MACRO[] = {	"_VERTEX",			"_FRAGMENT",			"_COMPUTE" };
 
 struct MacroDefinition {
 	std::string name;

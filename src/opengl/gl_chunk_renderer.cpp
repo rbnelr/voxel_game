@@ -145,4 +145,29 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 	}
 }
 
+//
+void Raytracer::draw (OpenglRenderer& r, Game& game) {
+	ZoneScoped;
+	OGL_TRACE("raytracer_test");
+
+	glUseProgram(shad_test->prog);
+
+	shad_test->set_uniform("img_size", (float2)r.framebuffer.size);
+	
+	cols.resize(r.framebuffer.size.x);
+
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float4) * cols.size(), cols.data(), GL_STREAM_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+
+	glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+
+	glDispatchCompute(r.framebuffer.size.x, r.framebuffer.size.y, 1);
+
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	// TODO: how to unbind framebuffer??
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
 } // namespace gl
