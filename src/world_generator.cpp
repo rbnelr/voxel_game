@@ -60,6 +60,11 @@ namespace worldgen {
 	BlockID cave_noise (float3 const& pos_world, OSN::Noise<3> const& osn_noise, OSN::Noise<2> const& noise2) {
 		int water_level = 21;
 
+		auto noise01 = [&] (float3 pos, float period, float seed) {
+			pos /= period; // period is inverse frequency
+
+			return osn_noise.eval<float>(pos.x, pos.y, pos.z) * 0.5f + 0.5f;
+		};
 		auto noise = [&] (float3 pos, float period, float seed) {
 			//pos += (1103 * float3(53, 211, 157)) * seed; // random prime directional offset to replace lack of seed in OSN noise
 			pos /= period; // period is inverse frequency
@@ -69,16 +74,16 @@ namespace worldgen {
 
 		auto large_freq = [noise] (float3 pos) {
 			float val = 70;
-			val -= noise(pos, 300, 0);
-			val -= noise(pos, 180, 1);
-			val -= noise(pos,  70, 2);
+			val += -noise(pos, 300, 0) + 30;
+			val += -noise(pos, 180, 1);
+			val += -noise(pos,  70, 2) * 1.5f;
 			return val;
 		};
 
 		// large scale
 		float base = large_freq(pos_world);
 
-		if (base > 200)
+		if (base > 40)
 			return B_UNBREAKIUM;
 
 		// large normal vector
@@ -90,24 +95,29 @@ namespace worldgen {
 
 		// stalag
 		float stalag_freq = 6;
-		float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * clamp(map(normal.z, -0.8f, -0.9f));
-		base += stalag * 50;
+		float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * clamp(map(normal.z, -0.2f, -0.9f));
+		base += stalag*stalag * 40;
 
 		// small scale
-		base += -noise(pos_world, 4.0f, 3) * 0.5f;
+		base += noise(pos_world, 4.0f, 4) * 0.3f;
+		//base -= max(noise(pos_world, 20.0f, 3) * 0.9f, 0.0f);
+
+		bool ground = normal.z > 0.55f;
 
 		// erode rock
 		float eroded = base;
 
-		bool ground = normal.z > 0.55f;
-		if (!ground) {
+		if (!ground && normal.z > -0.6f) {
 			eroded -= 1.2f;
-		
+
 			float3 roughpos = pos_world;
-			roughpos.z /= 4;
-		
-			float stren = noise(roughpos, 14, 5) + 0.5f;
-			eroded -= max(noise(roughpos, 8, 4) * 0.2f * stren, 0.0f);
+			roughpos.z /= 14;
+
+			float stren = noise01(roughpos, 14, 6);
+			stren = max(stren - 0.1f, 0.0f);
+			stren = stren * stren;
+
+			eroded -= max(noise(roughpos, 3, 6) * 18 * stren, 0.0f);
 		}
 
 		{
@@ -126,7 +136,7 @@ namespace worldgen {
 				} else {
 					// rock
 					if (eroded > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
-						if (base < 8.0f) {
+						if (base < 10.0f) {
 							bid = B_STONE; 
 						} else {
 							bid = B_HARDSTONE;
