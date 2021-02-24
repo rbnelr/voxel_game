@@ -359,31 +359,36 @@ void mesh_chunk (RemeshChunkJob& j) {
 		block_id scbx;
 		auto scx = read_subchunk(j, sx > 0 ? subchunk_i-SCX : subchunk_i + SCX*(SUBCHUNK_COUNT-1), sx > 0 ? j.chunk : cx, scbx);
 
-		uint32_t block_i = 0;
+		if (!sc && !scz && !scy && !scx && (scb == scbz) && (scb == scby) && (scb == scbx) && // subchunk cannot generate any faces
+			g_assets.block_meshes.block_meshes[scb] < 0) { // subchunk cannot generate block meshes
+			// skip processing entire subchunk
+		} else {
+			uint32_t block_i = 0;
 
-		for (int z = sz; z < sz + SUBCHUNK_SIZE; ++z)
-		for (int y = sy; y < sy + SUBCHUNK_SIZE; ++y)
-		for (int x = sx; x < sx + SUBCHUNK_SIZE; ++x) {
+			for (int z = sz; z < sz + SUBCHUNK_SIZE; ++z)
+			for (int y = sy; y < sy + SUBCHUNK_SIZE; ++y)
+			for (int x = sx; x < sx + SUBCHUNK_SIZE; ++x) {
 
-			block_id b  = sc ? sc[block_i] : scb;
+				block_id b  = sc ? sc[block_i] : scb;
 
-			block_id bz = (z & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BZ] : scb) : (scz ? scz[block_i + BZ*(SUBCHUNK_SIZE-1)] : scbz);
-			block_id by = (y & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BY] : scb) : (scy ? scy[block_i + BY*(SUBCHUNK_SIZE-1)] : scby);
-			block_id bx = (x & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BX] : scb) : (scx ? scx[block_i + BX*(SUBCHUNK_SIZE-1)] : scbx);
-			
-			int3 pos;
-			pos.z = z;
-			pos.y = y;
-			pos.x = x;
+				block_id bz = (z & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BZ] : scb) : (scz ? scz[block_i + BZ*(SUBCHUNK_SIZE-1)] : scbz);
+				block_id by = (y & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BY] : scb) : (scy ? scy[block_i + BY*(SUBCHUNK_SIZE-1)] : scby);
+				block_id bx = (x & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BX] : scb) : (scx ? scx[block_i + BX*(SUBCHUNK_SIZE-1)] : scbx);
+				
+				int3 pos;
+				pos.z = z;
+				pos.y = y;
+				pos.x = x;
 
-			if (b != bx)	face<0>(j, pos, b, bx);
-			if (b != by)	face<1>(j, pos, b, by);
-			if (b != bz)	face<2>(j, pos, b, bz);
+				if (b != bx)	face<0>(j, pos, b, bx);
+				if (b != by)	face<1>(j, pos, b, by);
+				if (b != bz)	face<2>(j, pos, b, bz);
 
-			auto& bm = g_assets.block_meshes.block_meshes[b];
-			if (bm >= 0)	block_mesh(j, pos, b, bm);
+				auto& bm = g_assets.block_meshes.block_meshes[b];
+				if (bm >= 0)	block_mesh(j, pos, b, bm);
 
-			block_i++;
+				block_i++;
+			}
 		}
 
 		//subchunk_i++;
