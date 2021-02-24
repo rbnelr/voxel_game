@@ -14,9 +14,7 @@ int3 pos_from_idx (int idx) {
 	return pos;
 }
 
-NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
-	int3 pos = pos_from_idx(idx);
-
+NOINLINE void block_mesh (RemeshChunkJob& j, int3 const& pos, block_id id, int meshid) {
 	// get a 'random' but deterministic value based on block position
 	uint64_t h = hash(pos) ^ j.chunk_seed;
 	
@@ -55,7 +53,7 @@ NOINLINE void block_mesh (RemeshChunkJob& j, block_id id, int meshid, int idx) {
 	}
 }
 
-void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei, int3 pos) {
+void face (RemeshChunkJob& j, int3 const& pos, block_id id, ChunkMeshData& mesh, BlockFace facei) {
 	auto* v = mesh.push();
 	if (!v) return;
 
@@ -71,9 +69,7 @@ void face (RemeshChunkJob& j, block_id id, ChunkMeshData& mesh, BlockFace facei,
 }
 
 template <int AXIS>
-NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
-	int3 pos = pos_from_idx(idx);
-	
+NOINLINE void face (RemeshChunkJob& j, int3 const& pos, block_id id, block_id nid) {
 	if (!j.mesh_world_border && (id == B_NULL || nid == B_NULL))
 		return;
 
@@ -83,164 +79,17 @@ NOINLINE void face (RemeshChunkJob& j, block_id id, block_id nid, int idx) {
 	// generate face of our voxel that faces negative direction neighbour
 	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && g_assets.block_meshes.block_meshes[id] < 0) {
 		auto& mesh = b.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
-		face(j, id, mesh, (BlockFace)(BF_NEG_X + AXIS*2), pos);
+		face(j, pos, id, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
 	}
 
 	// generate face of negative direction neighbour that faces this voxel
 	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && g_assets.block_meshes.block_meshes[nid] < 0 && nid != B_NULL) {
 		auto& mesh = nb.transparency == TM_TRANSPARENT ? j.mesh.tranparent_vertices : j.mesh.opaque_vertices;
-		pos[AXIS] -= 1;
-		face(j, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2), pos);
+		int3 npos = pos;
+		npos[AXIS] -= 1;
+		face(j, npos, nid, mesh, (BlockFace)(BF_POS_X + AXIS*2));
 	}
 }
-
-#if 0 // 2-Level sparse solution
-block_id const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour, block_id* sparse_id) {
-	*sparse_id = B_NULL;
-
-	auto nid = j.chunk->neighbours[neighbour];
-	if (nid != U16_NULL) {
-
-		auto& nc = j.chunks[nid];
-		if (nc.flags & Chunk::LOADED) {
-
-			if (!nc.voxels.is_sparse()) {
-				return nc.voxels.ids;
-			}
-			*sparse_id = nc.voxels.sparse_id;
-		}
-	}
-	return nullptr;
-}
-
-void mesh_chunk (RemeshChunkJob& j) {
-	ZoneScoped;
-
-	// neighbour chunks (can be null)
-	block_id sid_nx, sid_ny, sid_nz; 
-	auto const* nc_nx = get_neighbour_blocks(j, 0, &sid_nx);
-	auto const* nc_ny = get_neighbour_blocks(j, 2, &sid_ny);
-	auto const* nc_nz = get_neighbour_blocks(j, 4, &sid_nz);
-
-	auto const* ptr = j.chunk->voxels.ids;
-
-#define XOFFS 1
-#define YOFFS CHUNK_ROW_OFFS
-#define ZOFFS CHUNK_LAYER_OFFS
-
-#if 0 //// Slow, general solution
-	int idx = 0;
-
-	// fast meshing without neighbour chunk access
-	for (int z=0; z<CHUNK_SIZE; ++z) {
-		for (int y=0; y<CHUNK_SIZE; ++y) {
-			for (int x=0; x<CHUNK_SIZE; ++x) {
-
-				block_id id = ptr[idx];
-
-				{ // X
-					block_id nid = x > 0 ? ptr[idx - XOFFS] :
-						(nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx);
-					if (nid != id)
-						face<0>(j, id, nid, idx);
-				}
-				{ // Y
-					block_id nid = y > 0 ? ptr[idx - YOFFS] :
-						(nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny);
-					if (nid != id)
-						face<1>(j, id, nid, idx);
-				}
-				{ // Z
-					block_id nid = z > 0 ? ptr[idx - ZOFFS] :
-						(nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz);
-					if (nid != id)
-						face<2>(j, id, nid, idx);
-				}
-
-				if (g_assets.block_meshes.block_meshes[id] >= 0)
-					block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);
-
-				idx++;
-			}
-		}
-	}
-#else
-	//// Manually unwrapped version where all x==0 y==0 z==0 are own code path, to avoid expensive if in core loop
-	// while still keeping flexible code in border voxels to allows fast code
-	// Code is super bloated and macro'd, but generates code that runs almost as fast as code without any neighbour handling
-	
-	#define BODY(X,Y,Z) {													\
-		block_id id = ptr[idx];												\
-		{																	\
-			block_id nid = X;												\
-			if (nid != id) face<0>(j, id, nid, idx);						\
-		}																	\
-		{																	\
-			block_id nid = Y;												\
-			if (nid != id) face<1>(j, id, nid, idx);						\
-		}																	\
-		{																	\
-			block_id nid = Z;												\
-			if (nid != id) face<2>(j, id, nid, idx);						\
-		}																	\
-		if (g_assets.block_meshes.block_meshes[id] >= 0)					\
-			block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);	\
-																			\
-		idx++;																\
-	}
-
-#define NEIGHBOURX (nc_nx ? nc_nx[idx + (CHUNK_SIZE-1)*XOFFS] : sid_nx)
-#define NEIGHBOURY (nc_ny ? nc_ny[idx + (CHUNK_SIZE-1)*YOFFS] : sid_ny)
-#define NEIGHBOURZ (nc_nz ? nc_nz[idx + (CHUNK_SIZE-1)*ZOFFS] : sid_nz)
-
-#define OFFSX ptr[idx - XOFFS]
-#define OFFSY ptr[idx - YOFFS]
-#define OFFSZ ptr[idx - ZOFFS]
-	
-	int idx = 0;
-
-	{ // z == 0
-		{ // y == 0
-			{ // x == 0
-				BODY(NEIGHBOURX, NEIGHBOURY, NEIGHBOURZ)
-			}
-			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(OFFSX, NEIGHBOURY, NEIGHBOURZ)
-			}
-		}
-
-		for (int y=1; y<CHUNK_SIZE; ++y) {
-			{ // x == 0
-				BODY(NEIGHBOURX, OFFSY, NEIGHBOURZ)
-			}
-			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(OFFSX, OFFSY, NEIGHBOURZ)
-			}
-		}
-	}
-
-	for (int z=1; z<CHUNK_SIZE; ++z) {
-		{ // y == 0
-			{ // x == 0
-				BODY(NEIGHBOURX, NEIGHBOURY, OFFSZ)
-			}
-			for (int x=1; x<CHUNK_SIZE; ++x) { // xyz != 0
-				BODY(OFFSX, NEIGHBOURY, OFFSZ)
-			}
-		}
-
-		for (int y=1; y<CHUNK_SIZE; ++y) {
-			{ // x == 0
-				BODY(NEIGHBOURX, OFFSY, OFFSZ)
-			}
-			for (int x=1; x<CHUNK_SIZE; ++x) { // core loop; xyz != 0
-				BODY(OFFSX, OFFSY, OFFSZ)
-			}
-		}
-	}
-#endif
-}
-#endif
 
 Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 	int3 pos = j.chunk->pos;
@@ -254,47 +103,270 @@ Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 	return nullptr;
 }
 
-void mesh_chunk (RemeshChunkJob& j) {
+#if 1
+block_id read_block (RemeshChunkJob& j, uint32_t subchunk_i, uint32_t block_i, Chunk const* chunk) {
+	if (!chunk)
+		return B_NULL;
+
+	if (chunk->flags & Chunk::SPARSE_VOXELS)
+		return (block_id)chunk->voxel_data; // sparse chunk
+
+	auto& dc = j.chunks->dense_chunks[chunk->voxel_data];
+	if (dc.is_subchunk_sparse(subchunk_i))
+		return (block_id)dc.sparse_data[subchunk_i]; // sparse subchunk
+
+	return j.chunks->dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels[block_i];
+}
+
+#define SCX  1
+#define SCY  SUBCHUNK_COUNT
+#define SCZ (SUBCHUNK_COUNT * SUBCHUNK_COUNT)
+
+#define BX  1
+#define BY  SUBCHUNK_SIZE
+#define BZ (SUBCHUNK_SIZE * SUBCHUNK_SIZE)
+
+void mesh_chunk (RemeshChunkJob& job) {
 	ZoneScoped;
 
-	// neighbour chunks (can be null)
-	auto const* nc_nx = get_neighbour_blocks(j, 0);
-	auto const* nc_ny = get_neighbour_blocks(j, 1);
-	auto const* nc_nz = get_neighbour_blocks(j, 2);
+	{ // X
+		ZoneScopedN("X");
 
-	int idx = 0;
+		auto const* nc_nx = get_neighbour_blocks(job, 1);
 
-	// fast meshing without neighbour chunk access
-	for (int z=0; z<CHUNK_SIZE; ++z) {
-		for (int y=0; y<CHUNK_SIZE; ++y) {
-			for (int x=0; x<CHUNK_SIZE; ++x) {
+		int3 pos;
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE)
+		for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+			uint32_t subchunk_i = SUBCHUNK_IDX(0, sy, sz);
 
-				block_id id = j.chunks->read_block(x,y,z, j.chunk);
+			for (pos.z=sz; pos.z < sz+SUBCHUNK_SIZE; pos.z++)
+			for (pos.y=sy; pos.y < sy+SUBCHUNK_SIZE; pos.y++) {
+				uint32_t block_i = BLOCK_IDX(0, pos.y, pos.z);
+				pos.x = 0;
 
-				{ // X
-					block_id nid = x > 0 ? j.chunks->read_block(x-1, y, z, j.chunk) : (nc_nx ? j.chunks->read_block(CHUNK_SIZE-1, y, z, nc_nx) : B_NULL);
+				block_id nid = read_block(job, subchunk_i + (SUBCHUNK_COUNT-1)*SCX, block_i + (SUBCHUNK_SIZE-1)*BX, nc_nx);
+			
+				if (job.chunk->flags & Chunk::SPARSE_VOXELS) {
+					block_id id = (block_id)job.chunk->voxel_data;
+
 					if (nid != id)
-						face<0>(j, id, nid, idx);
-				}
-				{ // Y
-					block_id nid = y > 0 ? j.chunks->read_block(x, y-1, z, j.chunk) : (nc_ny ? j.chunks->read_block(x, CHUNK_SIZE-1, z, nc_ny) : B_NULL);
-					if (nid != id)
-						face<1>(j, id, nid, idx);
-				}
-				{ // Z
-					block_id nid = z > 0 ? j.chunks->read_block(x, y, z-1, j.chunk) : (nc_nz ? j.chunks->read_block(x, y, CHUNK_SIZE-1, nc_nz) : B_NULL);
-					if (nid != id)
-						face<2>(j, id, nid, idx);
-				}
+						face<0>(job, pos, id, nid);
 
-				if (g_assets.block_meshes.block_meshes[id] >= 0)
-					block_mesh(j, id, g_assets.block_meshes.block_meshes[id], idx);
+				} else {
+					auto& dc = job.chunks->dense_chunks[job.chunk->voxel_data];
 
-				idx++;
+					for (uint32_t j=0; j<SUBCHUNK_COUNT; j++) {
+						uint32_t subi = subchunk_i + j*SCX;
+						if (dc.is_subchunk_sparse(subi)) {
+							block_id id = (block_id)dc.sparse_data[subi];
+
+							if (nid != id)
+								face<0>(job, pos, id, nid);
+							nid = id;
+
+							pos.x += SUBCHUNK_SIZE;
+						} else {
+							auto* pid = &job.chunks->dense_subchunks[ dc.sparse_data[subi] ].voxels[block_i];
+
+							for (uint32_t i=0; i<SUBCHUNK_SIZE; i++) {
+								block_id id = pid[i*BX];
+
+								if (nid != id)
+									face<0>(job, pos, id, nid);
+								nid = id;
+
+								pos.x++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	{ // Y
+		ZoneScopedN("Y");
+
+		auto const* nc_ny = get_neighbour_blocks(job, 1);
+		
+		int3 pos;
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE)
+		for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+			uint32_t subchunk_i = SUBCHUNK_IDX(sx, 0, sz);
+
+			for (pos.z=sz; pos.z < sz+SUBCHUNK_SIZE; pos.z++)
+			for (pos.x=sx; pos.x < sx+SUBCHUNK_SIZE; pos.x++) {
+				uint32_t block_i = BLOCK_IDX(pos.x, 0, pos.z);
+				pos.y = 0;
+
+				block_id nid = read_block(job, subchunk_i + (SUBCHUNK_COUNT-1)*SCY, block_i + (SUBCHUNK_SIZE-1)*BY, nc_ny);
+
+				if (job.chunk->flags & Chunk::SPARSE_VOXELS) {
+					block_id id = (block_id)job.chunk->voxel_data;
+
+					if (nid != id)
+						face<1>(job, pos, id, nid);
+
+				} else {
+					auto& dc = job.chunks->dense_chunks[job.chunk->voxel_data];
+
+					for (uint32_t j=0; j<SUBCHUNK_COUNT; j++) {
+						uint32_t subi = subchunk_i + j*SCY;
+						if (dc.is_subchunk_sparse(subi)) {
+							block_id id = (block_id)dc.sparse_data[subi];
+
+							if (nid != id)
+								face<1>(job, pos, id, nid);
+							nid = id;
+
+							pos.y += SUBCHUNK_SIZE;
+						} else {
+							auto* pid = &job.chunks->dense_subchunks[ dc.sparse_data[subi] ].voxels[block_i];
+
+							for (uint32_t i=0; i<SUBCHUNK_SIZE; i++) {
+								block_id id = pid[i*BY];
+
+								if (nid != id)
+									face<1>(job, pos, id, nid);
+								nid = id;
+
+								pos.y++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	{ // Z
+		ZoneScopedN("Z");
+
+		auto const* nc_nz = get_neighbour_blocks(job, 2);
+
+		int3 pos;
+		for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE)
+		for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+			uint32_t subchunk_i = SUBCHUNK_IDX(sx, sy, 0);
+	
+			for (pos.y=sy; pos.y < sy+SUBCHUNK_SIZE; pos.y++)
+			for (pos.x=sx; pos.x < sx+SUBCHUNK_SIZE; pos.x++) {
+				uint32_t block_i = BLOCK_IDX(pos.x, pos.y, 0);
+				pos.z = 0;
+						
+				block_id nid = read_block(job, subchunk_i + (SUBCHUNK_COUNT-1)*SCZ, block_i + (SUBCHUNK_SIZE-1)*BZ, nc_nz);
+	
+				if (job.chunk->flags & Chunk::SPARSE_VOXELS) {
+					block_id id = (block_id)job.chunk->voxel_data;
+	
+					if (nid != id)
+						face<2>(job, pos, id, nid);
+
+					if (g_assets.block_meshes.block_meshes[id] >= 0) {
+						for (; pos.z < CHUNK_SIZE; pos.z++)
+							block_mesh(job, pos, id, g_assets.block_meshes.block_meshes[id]);
+					}
+	
+				} else {
+					auto& dc = job.chunks->dense_chunks[job.chunk->voxel_data];
+	
+					for (uint32_t j=0; j<SUBCHUNK_COUNT; j++) {
+						uint32_t subi = subchunk_i + j*SCZ;
+						if (dc.is_subchunk_sparse(subi)) {
+							block_id id = (block_id)dc.sparse_data[subi];
+	
+							if (nid != id)
+								face<2>(job, pos, id, nid);
+
+							if (g_assets.block_meshes.block_meshes[id] >= 0) {
+								int end = pos.z + SUBCHUNK_SIZE;
+								for (; pos.z < end; pos.z++)
+									block_mesh(job, pos, id, g_assets.block_meshes.block_meshes[id]);
+							}
+	
+							nid = id;
+
+						} else {
+							auto* pid = &job.chunks->dense_subchunks[ dc.sparse_data[subi] ].voxels[block_i];
+	
+							for (uint32_t i=0; i<SUBCHUNK_SIZE; i++) {
+								block_id id = pid[i*BZ];
+	
+								if (nid != id)
+									face<2>(job, pos, id, nid);
+	
+								if (g_assets.block_meshes.block_meshes[id] >= 0)
+									block_mesh(job, pos, id, g_assets.block_meshes.block_meshes[id]);
+	
+								nid = id;
+	
+								pos.z++;
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 }
+#endif
+
+#if 0
+void mesh_chunk (RemeshChunkJob& job) {
+	ZoneScoped;
+
+	// neighbour chunks (can be null)
+	auto const* nc_nx = get_neighbour_blocks(job, 0);
+	auto const* nc_ny = get_neighbour_blocks(job, 1);
+	auto const* nc_nz = get_neighbour_blocks(job, 2);
+
+	for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
+	for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
+	for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
+		
+		auto sc   = subchunks[sz  , sy  , sx  ];
+		auto scnz = subchunks[sz-1, sy  , sx  ];
+		auto scny = subchunks[sz  , sy-1, sx  ];
+		auto scnx = subchunks[sz  , sy  , sx-1];
+
+		for (int z=0; z<SUBCHUNK_COUNT; ++z) {
+			for (int y=0; y<SUBCHUNK_COUNT; ++y) {
+				{ // x == 0
+					b   = sc[z  , y  , x  ];
+					bnz = z > 0 ? sc[z-1, y  , x  ] : scnz[sz-1, y  , x  ];
+					bny = y > 0 ? sc[z  , y-1, x  ] : scny[z  , sz-1, x  ];
+					bnx = scnx[z  , y  , sz-1];
+
+					if (b != bnz)
+						face(z);
+
+					if (b != bny)
+						face(y);
+
+					if (b != bnx)
+						face(x);
+				}
+
+				for (int x=0; x<SUBCHUNK_COUNT; ++x) {
+					b   = sc[z  , y  , x  ];
+					bnz = z > 0 ? sc[z-1, y  , x  ] : scnz[sz-1, y  , x  ];
+					bny = y > 0 ? sc[z  , y-1, x  ] : scny[z  , sz-1, x  ];
+					bnx = sc[z  , y  , x-1];
+
+					if (b != bnz)
+						face(z);
+
+					if (b != bny)
+						face(y);
+
+					if (b != bnx)
+						face(x);
+				}
+			}
+		}
+	}
+}
+#endif
 
 RemeshChunkJob::RemeshChunkJob (Chunk* chunk, Chunks* chunks, WorldGenerator const& wg, bool mesh_world_border):
 		chunk{chunk}, chunks{chunks},

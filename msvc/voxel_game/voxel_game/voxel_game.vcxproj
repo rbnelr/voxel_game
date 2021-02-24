@@ -249,6 +249,7 @@
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
+    <ClInclude Include="..\..\..\src\noise.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vk_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
     <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />

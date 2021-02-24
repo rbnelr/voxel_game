@@ -155,19 +155,60 @@ struct WorldGenerator {
 	}
 };
 
-struct WorldgenJob {
-	int3					chunk_pos;
-	WorldGenerator const*	wg;
+// TODO: get rid of open_simplex_noise and replace it with a better library that is not object oriented and supports a seed per call
+// ideally also is written with simd usage in mind
+#include "open_simplex_noise/open_simplex_noise.hpp"
 
+namespace worldgen {
+	struct NoisePass {
+		int3					chunk_pos;
+		WorldGenerator const*	wg;
+		OSN::Noise<3>			noise3;
+
+		// output
+	#define LARGE_NOISE_SIZE 4
+	#define LARGE_NOISE_CHUNK_SIZE (CHUNK_SIZE / LARGE_NOISE_SIZE)
+	#define LARGE_NOISE_COUNT (LARGE_NOISE_CHUNK_SIZE +1)
+
+		// NOTE: deriv is opposite of real derivative -> vector pointing to negative values, ie. air, because I prefer it this way around
+		
+		// float value; float3 deriv;
+		float large_noise[LARGE_NOISE_COUNT][LARGE_NOISE_COUNT][LARGE_NOISE_COUNT][4];
+		block_id voxels[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+
+		NoisePass (int3 chunk_pos, WorldGenerator const* wg):
+			chunk_pos{chunk_pos}, wg{wg}, noise3{wg->seed} {
+
+		}
+
+		float noise01 (float3 const& pos, float period, float seed) {
+			float3 p = pos / period; // period is inverse frequency
+
+			return noise3.eval<float>(p.x, p.y, p.z) * 0.5f + 0.5f;
+		}
+		float noise (float3 const& pos, float period, float seed) {
+			//pos += (1103 * float3(53, 211, 157)) * seed; // random prime directional offset to replace lack of seed in OSN noise
+			float3 p = pos / period; // period is inverse frequency
+
+			return noise3.eval<float>(p.x, p.y, p.z / 0.7f) * period; // 0.7 to flatten world
+		}
+
+		float calc_large_noise (float3 const& pos);
+		BlockID cave_noise (float3 const& pos, float large_noise, float3 const& normal);
+
+		void generate ();
+	};
+}
+
+struct WorldgenJob {
 	int						phase;
-	block_id*				voxel_output;
+	worldgen::NoisePass		noise_pass;
+
+	// unfortunately need ctor because OSN::Noise<3> does work in it's ctor, which it shouldn't
+	WorldgenJob (int phase, int3 chunk_pos, WorldGenerator const* wg):
+		phase{phase}, noise_pass{chunk_pos, wg} {}
 
 	void execute ();
-
-	~WorldgenJob () { // handle cases where we destroy the threadpool without its results being read first
-		if (voxel_output)
-			free(voxel_output);
-	}
 };
 
 inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, TPRIO_BACKGROUND, ">> background threadpool"  );

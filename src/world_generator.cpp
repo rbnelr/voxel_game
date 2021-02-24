@@ -3,126 +3,58 @@
 #include "blocks.hpp"
 #include "chunks.hpp"
 
-#include "open_simplex_noise/open_simplex_noise.hpp"
+#include "immintrin.h"
+
+__m128 lerp (__m128 a, __m128 b, float t) {
+	__m128 sub = _mm_sub_ps(b, a);
+	__m128 mul = _mm_mul_ps(sub, _mm_set_ps1(t)); 
+	__m128 add = _mm_add_ps(mul, a); 
+	return add;
+}
 
 namespace worldgen {
-	float heightmap (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world, float* earth_layer) {
-		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs, float range_l, float range_h) {
-			pos = rotate2(ang_offs) * pos;
-			pos /= period; // period is inverse frequency
-			pos += offs;
-
-			float val = osn_noise.eval<float>(pos.x, pos.y);
-			val = map(val, -0.865773f, 0.865772f, range_l,range_h); // normalize into [range_l,range_h] range
-			return val;
-		};
-
-		float elevation;
-		float roughness;
-		float detail;
-
-		int i = 0;
-		{
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			elevation = noise(pos_world, wg.elev_freq, deg(37.17f) * (float)i, offs, -1,+1) * wg.elev_amp;
-
-			++i;
-		}
-		{
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			roughness = noise(pos_world, wg.rough_freq, deg(37.17f) * (float)i, offs, 0,+1);
-
-			++i;
-		}
-
-		detail = 0;
-		for (auto& d : wg.detail) {
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			detail += noise(pos_world, d.freq, deg(37.17f) * (float)i, offs, -1,+1) * d.amp;
-
-			++i;
-		}
-
-		{
-			float2 offs = (i % 3 ? +1 : -1) * 12.34f * (float)i;
-			offs[i % 2] = (i % 2 ? -1 : +1) * 43.21f * (float)i;
-			*earth_layer = noise(pos_world, 48, deg(37.17f) * (float)i, offs, 3,5.5f);
-
-			++i;
-		}
-
-		return (elevation +32) +(roughness * detail);
+	float NoisePass::calc_large_noise (float3 const& pos) {
+		float val = 70;
+		val += -noise(pos, 300, 0) + 30;
+		val += -noise(pos, 180, 1);
+		val += -noise(pos,  70, 2) * 1.5f;
+		return val;
 	}
 
-	BlockID cave_noise (float3 const& pos_world, OSN::Noise<3> const& osn_noise, OSN::Noise<2> const& noise2) {
+	BlockID NoisePass::cave_noise (float3 const& pos, float large_noise, float3 const& normal) {
 		int water_level = 21;
 
-		auto noise01 = [&] (float3 pos, float period, float seed) {
-			pos /= period; // period is inverse frequency
-
-			return osn_noise.eval<float>(pos.x, pos.y, pos.z) * 0.5f + 0.5f;
-		};
-		auto noise = [&] (float3 pos, float period, float seed) {
-			//pos += (1103 * float3(53, 211, 157)) * seed; // random prime directional offset to replace lack of seed in OSN noise
-			pos /= period; // period is inverse frequency
-
-			return osn_noise.eval<float>(pos.x, pos.y, pos.z / 0.7f) * period; // 0.7 to flatten world
-		};
-
-		auto large_freq = [noise] (float3 pos) {
-			float val = 70;
-			val += -noise(pos, 300, 0) + 30;
-			val += -noise(pos, 180, 1);
-			val += -noise(pos,  70, 2) * 1.5f;
-			return val;
-		};
-
-		// large scale
-		float base = large_freq(pos_world);
-
-		if (base > 40)
-			return B_UNBREAKIUM;
-
-		// large normal vector
-		float3 delta;
-		delta.x = base - large_freq(pos_world + float3(1,0,0));
-		delta.y = base - large_freq(pos_world + float3(0,1,0));
-		delta.z = base - large_freq(pos_world + float3(0,0,1));
-		float3 normal = normalize(delta);
+		float base = large_noise;
 
 		// stalag
-		float stalag_freq = 6;
-		float stalag = noise2.eval(pos_world.x / stalag_freq, pos_world.y / stalag_freq) * clamp(map(normal.z, -0.2f, -0.9f));
-		base += stalag*stalag * 40;
-
+		float stalag = noise01(pos / float3(1,1,16), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
+		base += stalag*stalag * 120;
+		
 		// small scale
-		base += noise(pos_world, 4.0f, 4) * 0.3f;
+		base += noise(pos, 4.0f, 4) * 0.3f;
 		//base -= max(noise(pos_world, 20.0f, 3) * 0.9f, 0.0f);
-
+		
 		bool ground = normal.z > 0.55f;
-
+		
 		// erode rock
 		float eroded = base;
-
+		
 		if (!ground && normal.z > -0.6f) {
 			eroded -= 1.2f;
-
-			float3 roughpos = pos_world;
+		
+			float3 roughpos = pos;
 			roughpos.z /= 14;
-
+		
 			float stren = noise01(roughpos, 14, 6);
 			stren = max(stren - 0.1f, 0.0f);
 			stren = stren * stren;
-
+		
 			eroded -= max(noise(roughpos, 3, 6) * 18 * stren, 0.0f);
 		}
 
 		{
 			BlockID bid;
-			if (pos_world.z >= water_level) {
+			if (pos.z >= water_level) {
 				bid = B_AIR;
 			} else {
 				bid = B_WATER;
@@ -148,89 +80,106 @@ namespace worldgen {
 		}
 	}
 
-	float noise_tree_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
-		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
-			pos = rotate2(ang_offs) * pos;
-			pos /= period; // period is inverse frequency
-			pos += offs;
+	float large_noise_get_val (__m128 n) {
+		return _mm_cvtss_f32(n);
+	}
+	float3 large_noise_normalize_derivative (__m128 n) {
+		__m128 dot = _mm_dp_ps(n, n, 0xef); // deriv x*x + y*y + z*z; in all lanes
+		__m128 sqrt = _mm_rsqrt_ps(dot);
+		__m128 res = _mm_mul_ps(n, sqrt);
 
-			float val = osn_noise.eval<float>(pos.x, pos.y);
-			val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
-			return val;
-		};
-
-		float val = noise(pos_world, wg.tree_desity_period, 0,0) * wg.tree_density_amp;
-
-		val = gradient<float>(val, {
-			{ 0.00f,  0						},
-			{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
-			{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
-			{ 0.50f,  4.0f / (32*32)		}, // avg 5 tree in 1 chunk
-			{ 0.75f, 10.0f / (32*32)		}, // avg 15 tree in 1 chunk
-			{ 1.00f, 25.0f / (32*32)		}, // avg 40 tree in 1 chunk
-			});
-
-	#if 0
-		// TODO: use height of block to alter tree density
-		val = gradient<float>(val, {
-			{ 0.00f,  0						},
-			{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
-			{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
-			{ 0.50f,  5.0f / (32*32)		}, // avg 5 tree in 1 chunk
-			{ 0.75f, 15.0f / (32*32)		}, // avg 15 tree in 1 chunk
-			{ 1.00f, 40.0f / (32*32)		}, // avg 40 tree in 1 chunk
-			});
-	#endif
-
-		return val;
+		return *(float3*)&res.m128_f32[1];
 	}
 
-	float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
-			auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
-				pos = rotate2(ang_offs) * pos;
-				pos /= period; // period is inverse frequency
-				pos += offs;
-
-				float val = osn_noise.eval<float>(pos.x, pos.y);
-				val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
-				return val;
-			};
-
-			float valb = noise(pos_world, 4, 0,0) * wg.grass_density_amp / 2;
-			float val = noise(pos_world, wg.grass_desity_period, 0,0) * wg.grass_density_amp;
-
-			return smoothstep( smoothstep(val + valb) );
-		}
-
-	#define POS2IDX(x,y,z) IDX3D(x,y,z, CHUNK_SIZE)
-
-	void noise_pass (WorldgenJob& j) {
+	void NoisePass::generate () {
 		ZoneScoped;
 
-		int3 chunkpos = j.chunk_pos * CHUNK_SIZE;
+		int3 chunkpos = chunk_pos * CHUNK_SIZE;
 
-		OSN::Noise<2> noise2(j.wg->seed);
-		OSN::Noise<3> noise3(j.wg->seed);
+		{ // large noise generate
+			ZoneScopedN("large noise generate");
 
-		block_id* blocks = j.voxel_output;
+			float3 pos_world;
+
+			for (int z=0; z<LARGE_NOISE_COUNT; ++z) {
+				pos_world.z = (float)(z * LARGE_NOISE_SIZE + chunkpos.z);
+
+				for (int y=0; y<LARGE_NOISE_COUNT; ++y) {
+					pos_world.y = (float)(y * LARGE_NOISE_SIZE + chunkpos.y);
+
+					for (int x=0; x<LARGE_NOISE_COUNT; ++x) {
+						pos_world.x = (float)(x * LARGE_NOISE_SIZE + chunkpos.x);
+
+						float val = calc_large_noise(pos_world);
+						
+						// calculate negative numerical derivative, with 1 block offsets
+						float dx = val - calc_large_noise(pos_world + float3(1,0,0));
+						float dy = val - calc_large_noise(pos_world + float3(0,1,0));
+						float dz = val - calc_large_noise(pos_world + float3(0,0,1));
+
+						_mm_store_ps(large_noise[z][y][x], _mm_set_ps(dz,dy,dx, val));
+					}
+				}
+			}
+		}
 
 		{ // 3d noise generate
 			ZoneScopedN("3d noise generate");
 
-			block_id* cur = blocks;
 			float3 pos_world;
 
-			for (int z = chunkpos.z; z < chunkpos.z + CHUNK_SIZE; ++z) {
-				pos_world.z = (float)z;
-				
-				for (int y = chunkpos.y; y < chunkpos.y + CHUNK_SIZE; ++y) {
-					pos_world.y = (float)y;
-					
-					for (int x = chunkpos.x; x < chunkpos.x + CHUNK_SIZE; ++x) {
-						pos_world.x = (float)x;
+			for (int lz=0; lz<LARGE_NOISE_CHUNK_SIZE; ++lz)
+			for (int ly=0; ly<LARGE_NOISE_CHUNK_SIZE; ++ly)
+			for (int lx=0; lx<LARGE_NOISE_CHUNK_SIZE; ++lx) {
 
-						auto bid = cave_noise(pos_world, noise3, noise2);
-						*cur++ = j.wg->bids[bid];
+				auto ln000 = _mm_load_ps(large_noise[lz  ][ly  ][lx  ]);
+				auto ln001 = _mm_load_ps(large_noise[lz  ][ly  ][lx+1]);
+				auto ln010 = _mm_load_ps(large_noise[lz  ][ly+1][lx  ]);
+				auto ln011 = _mm_load_ps(large_noise[lz  ][ly+1][lx+1]);
+				auto ln100 = _mm_load_ps(large_noise[lz+1][ly  ][lx  ]);
+				auto ln101 = _mm_load_ps(large_noise[lz+1][ly  ][lx+1]);
+				auto ln110 = _mm_load_ps(large_noise[lz+1][ly+1][lx  ]);
+				auto ln111 = _mm_load_ps(large_noise[lz+1][ly+1][lx+1]);
+
+				for (int z=0; z<LARGE_NOISE_SIZE; z++) {
+					
+					// interpolate low-res lege noise to get values for individual blocks
+					float tz = (float)z / LARGE_NOISE_SIZE;
+					auto ln00 = lerp(ln000, ln100, tz);
+					auto ln01 = lerp(ln001, ln101, tz);
+					auto ln10 = lerp(ln010, ln110, tz);
+					auto ln11 = lerp(ln011, ln111, tz);
+
+					int cz = lz * LARGE_NOISE_SIZE + z;
+					pos_world.z = (float)(cz + chunkpos.z);
+					
+					for (int y=0; y<LARGE_NOISE_SIZE; y++) {
+						
+						float ty = (float)y / LARGE_NOISE_SIZE;
+						auto ln0  = lerp(ln00, ln10, ty);
+						auto ln1  = lerp(ln01, ln11, ty);
+
+						int cy = ly * LARGE_NOISE_SIZE + y;
+						pos_world.y = (float)(cy + chunkpos.y);
+
+						for (int x=0; x<LARGE_NOISE_SIZE; x++) {
+
+							float tx = (float)x / LARGE_NOISE_SIZE;
+							auto ln    = lerp(ln0, ln1, tx);
+
+							int cx = lx * LARGE_NOISE_SIZE + x;
+							pos_world.x = (float)(cx + chunkpos.x);
+
+							auto large_noise = large_noise_get_val(ln);
+
+							BlockID bid = B_UNBREAKIUM;
+							if (large_noise < 40) {
+								float3 normal = large_noise_normalize_derivative(ln);
+
+								bid = cave_noise(pos_world, large_noise, normal);
+							}
+							voxels[cz][cy][cx] = wg->bids[bid];
+						}
 					}
 				}
 			}
@@ -362,6 +311,59 @@ namespace worldgen {
 	}
 #endif
 
+	float noise_tree_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
+		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
+			pos = rotate2(ang_offs) * pos;
+			pos /= period; // period is inverse frequency
+			pos += offs;
+
+			float val = osn_noise.eval<float>(pos.x, pos.y);
+			val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
+			return val;
+		};
+
+		float val = noise(pos_world, wg.tree_desity_period, 0,0) * wg.tree_density_amp;
+
+		val = gradient<float>(val, {
+			{ 0.00f,  0						},
+			{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
+			{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
+			{ 0.50f,  4.0f / (32*32)		}, // avg 5 tree in 1 chunk
+			{ 0.75f, 10.0f / (32*32)		}, // avg 15 tree in 1 chunk
+			{ 1.00f, 25.0f / (32*32)		}, // avg 40 tree in 1 chunk
+			});
+
+	#if 0
+		// TODO: use height of block to alter tree density
+		val = gradient<float>(val, {
+			{ 0.00f,  0						},
+			{ 0.05f,  1.0f / (5*5 * 32*32)	}, // avg one tree in 5x5 chunks
+			{ 0.25f,  1.0f / (32*32)		}, // avg one tree in 1 chunk
+			{ 0.50f,  5.0f / (32*32)		}, // avg 5 tree in 1 chunk
+			{ 0.75f, 15.0f / (32*32)		}, // avg 15 tree in 1 chunk
+			{ 1.00f, 40.0f / (32*32)		}, // avg 40 tree in 1 chunk
+			});
+	#endif
+
+		return val;
+	}
+	float noise_grass_density (WorldGenerator const& wg, OSN::Noise<2> const& osn_noise, float2 pos_world) {
+		auto noise = [&] (float2 pos, float period, float ang_offs, float2 offs) {
+			pos = rotate2(ang_offs) * pos;
+			pos /= period; // period is inverse frequency
+			pos += offs;
+
+			float val = osn_noise.eval<float>(pos.x, pos.y);
+			val = map(val, -0.865773f, 0.865772f); // normalize into [0,1] range
+			return val;
+		};
+
+		float valb = noise(pos_world, 4, 0,0) * wg.grass_density_amp / 2;
+		float val = noise(pos_world, wg.grass_desity_period, 0,0) * wg.grass_density_amp;
+
+		return smoothstep( smoothstep(val + valb) );
+	}
+	
 	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg) {
 		ZoneScoped;
 		
@@ -453,7 +455,6 @@ namespace worldgen {
 
 void WorldgenJob::execute () {
 	assert(phase == 1);
-	
-	worldgen::noise_pass(*this);
+	noise_pass.generate();
 }
 

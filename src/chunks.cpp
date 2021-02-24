@@ -355,15 +355,6 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 
 //// Chunk system
 
-block_id* alloc_voxel_buffer () {
-	ZoneScopedC(tracy::Color::Crimson);
-	return (block_id*)malloc(sizeof(block_id) * CHUNK_VOXEL_COUNT);
-}
-void free_voxel_buffer (block_id* ptr) {
-	ZoneScopedC(tracy::Color::Crimson);
-	free(ptr);
-}
-
 chunk_id Chunks::alloc_chunk (int3 pos) {
 	ZoneScoped;
 
@@ -592,24 +583,23 @@ void Chunks::update_chunk_loading (Game& game) {
 			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
 			for (int i=0; i<count; ++i) {
 				auto job = std::move(jobs[i]);
-				queued_chunks.erase(job->chunk_pos);
+				auto& chunk_pos = job->noise_pass.chunk_pos;
 
-				auto cid = alloc_chunk(job->chunk_pos);
+				queued_chunks.erase(job->noise_pass.chunk_pos);
+
+				auto cid = alloc_chunk(chunk_pos);
 				auto& chunk = chunks[cid];
 			#if CHUNK_HASHMAP
 				chunks_map.emplace(chunk.pos, cid);
 			#endif
 
-				sparse_chunk_from_worldgen(chunk, job->voxel_output);
-
-				free_voxel_buffer(job->voxel_output);
-				job->voxel_output = nullptr;
+				sparse_chunk_from_worldgen(chunk, &job->noise_pass.voxels[0][0][0]);
 
 				chunk.loadphase = job->phase;
 				chunk.flags |= Chunk::REMESH;
 
 				for (auto& offs : NEIGHBOURS) {
-					auto nid = query_chunk(job->chunk_pos + offs);
+					auto nid = query_chunk(chunk_pos + offs);
 					if (nid != U16_NULL) {
 						assert(chunks[nid].flags != 0);
 						chunks[nid].flags |= Chunk::REMESH;
@@ -639,15 +629,8 @@ void Chunks::update_chunk_loading (Game& game) {
 					if (genchunk.phase == 1) {
 						ZoneScopedN("phase 1 job");
 
-						auto job = std::make_unique<WorldgenJob>();
-						memset(job.get(), 0, sizeof(WorldgenJob)); // zero neighbours etc.
-
-						job->chunk_pos = genchunk.pos;
-						job->wg = &game._threads_world_gen;
-
-						job->phase = genchunk.phase;
-						job->voxel_output = alloc_voxel_buffer();
-
+						auto job = std::make_unique<WorldgenJob>(genchunk.phase, genchunk.pos, &game._threads_world_gen);
+						
 						jobs[count++] = std::move(job);
 
 						queued_chunks.emplace(genchunk.pos, genchunk.phase);

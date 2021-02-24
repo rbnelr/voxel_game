@@ -238,6 +238,9 @@
     <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h">
       <Filter>kisslib</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\noise.hpp">
+      <Filter>game</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
