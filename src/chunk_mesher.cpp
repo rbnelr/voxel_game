@@ -103,7 +103,17 @@ Chunk const* get_neighbour_blocks (RemeshChunkJob& j, int neighbour) {
 	return nullptr;
 }
 
-#if 1
+// offsets of subchunk 3d neighbours in flat buffer
+#define SCX  1
+#define SCY  SUBCHUNK_COUNT
+#define SCZ (SUBCHUNK_COUNT * SUBCHUNK_COUNT)
+
+// offsets of block 3d neighbours in flat buffer
+#define BX  1
+#define BY  SUBCHUNK_SIZE
+#define BZ (SUBCHUNK_SIZE * SUBCHUNK_SIZE)
+
+#if 0
 block_id read_block (RemeshChunkJob& j, uint32_t subchunk_i, uint32_t block_i, Chunk const* chunk) {
 	if (!chunk)
 		return B_NULL;
@@ -118,13 +128,6 @@ block_id read_block (RemeshChunkJob& j, uint32_t subchunk_i, uint32_t block_i, C
 	return j.chunks->dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels[block_i];
 }
 
-#define SCX  1
-#define SCY  SUBCHUNK_COUNT
-#define SCZ (SUBCHUNK_COUNT * SUBCHUNK_COUNT)
-
-#define BX  1
-#define BY  SUBCHUNK_SIZE
-#define BZ (SUBCHUNK_SIZE * SUBCHUNK_SIZE)
 
 void mesh_chunk (RemeshChunkJob& job) {
 	ZoneScoped;
@@ -311,59 +314,79 @@ void mesh_chunk (RemeshChunkJob& job) {
 }
 #endif
 
-#if 0
-void mesh_chunk (RemeshChunkJob& job) {
+#if 1
+block_id* read_subchunk (RemeshChunkJob& j, uint32_t subchunk_i, Chunk const* chunk, block_id& sparse) {
+	if (!chunk) {
+		sparse = B_NULL;
+		return nullptr;
+	}
+
+	if (chunk->flags & Chunk::SPARSE_VOXELS) {
+		sparse = (block_id)chunk->voxel_data;
+		return nullptr; // sparse chunk
+	}
+
+	auto& dc = j.chunks->dense_chunks[chunk->voxel_data];
+	if (dc.is_subchunk_sparse(subchunk_i)) {
+		sparse = (block_id)dc.sparse_data[subchunk_i];
+		return nullptr; // sparse subchunk
+	}
+
+	return j.chunks->dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels; // dense subchunk
+}
+
+void mesh_chunk (RemeshChunkJob& j) {
 	ZoneScoped;
 
 	// neighbour chunks (can be null)
-	auto const* nc_nx = get_neighbour_blocks(job, 0);
-	auto const* nc_ny = get_neighbour_blocks(job, 1);
-	auto const* nc_nz = get_neighbour_blocks(job, 2);
+	auto const* cx = get_neighbour_blocks(j, 0);
+	auto const* cy = get_neighbour_blocks(j, 1);
+	auto const* cz = get_neighbour_blocks(j, 2);
 
-	for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
-	for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
-	for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
-		
-		auto sc   = subchunks[sz  , sy  , sx  ];
-		auto scnz = subchunks[sz-1, sy  , sx  ];
-		auto scny = subchunks[sz  , sy-1, sx  ];
-		auto scnx = subchunks[sz  , sy  , sx-1];
+	//uint32_t subchunk_i = 0;
+	for (int sz = 0; sz < CHUNK_SIZE; sz += SUBCHUNK_SIZE)
+	for (int sy = 0; sy < CHUNK_SIZE; sy += SUBCHUNK_SIZE)
+	for (int sx = 0; sx < CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+		uint32_t subchunk_i = SUBCHUNK_IDX(sx,sy,sz);
 
-		for (int z=0; z<SUBCHUNK_COUNT; ++z) {
-			for (int y=0; y<SUBCHUNK_COUNT; ++y) {
-				{ // x == 0
-					b   = sc[z  , y  , x  ];
-					bnz = z > 0 ? sc[z-1, y  , x  ] : scnz[sz-1, y  , x  ];
-					bny = y > 0 ? sc[z  , y-1, x  ] : scny[z  , sz-1, x  ];
-					bnx = scnx[z  , y  , sz-1];
+		block_id scb;
+		auto sc  = read_subchunk(j, subchunk_i, j.chunk, scb);
 
-					if (b != bnz)
-						face(z);
+		block_id scbz;
+		auto scz = read_subchunk(j, sz > 0 ? subchunk_i-SCZ : subchunk_i + SCZ*(SUBCHUNK_COUNT-1), sz > 0 ? j.chunk : cz, scbz);
+		block_id scby;
+		auto scy = read_subchunk(j, sy > 0 ? subchunk_i-SCY : subchunk_i + SCY*(SUBCHUNK_COUNT-1), sy > 0 ? j.chunk : cy, scby);
+		block_id scbx;
+		auto scx = read_subchunk(j, sx > 0 ? subchunk_i-SCX : subchunk_i + SCX*(SUBCHUNK_COUNT-1), sx > 0 ? j.chunk : cx, scbx);
 
-					if (b != bny)
-						face(y);
+		uint32_t block_i = 0;
 
-					if (b != bnx)
-						face(x);
-				}
+		for (int z = sz; z < sz + SUBCHUNK_SIZE; ++z)
+		for (int y = sy; y < sy + SUBCHUNK_SIZE; ++y)
+		for (int x = sx; x < sx + SUBCHUNK_SIZE; ++x) {
 
-				for (int x=0; x<SUBCHUNK_COUNT; ++x) {
-					b   = sc[z  , y  , x  ];
-					bnz = z > 0 ? sc[z-1, y  , x  ] : scnz[sz-1, y  , x  ];
-					bny = y > 0 ? sc[z  , y-1, x  ] : scny[z  , sz-1, x  ];
-					bnx = sc[z  , y  , x-1];
+			block_id b  = sc ? sc[block_i] : scb;
 
-					if (b != bnz)
-						face(z);
+			block_id bz = (z & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BZ] : scb) : (scz ? scz[block_i + BZ*(SUBCHUNK_SIZE-1)] : scbz);
+			block_id by = (y & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BY] : scb) : (scy ? scy[block_i + BY*(SUBCHUNK_SIZE-1)] : scby);
+			block_id bx = (x & SUBCHUNK_MASK) != 0 ? (sc ? sc[block_i-BX] : scb) : (scx ? scx[block_i + BX*(SUBCHUNK_SIZE-1)] : scbx);
+			
+			int3 pos;
+			pos.z = z;
+			pos.y = y;
+			pos.x = x;
 
-					if (b != bny)
-						face(y);
+			if (b != bx)	face<0>(j, pos, b, bx);
+			if (b != by)	face<1>(j, pos, b, by);
+			if (b != bz)	face<2>(j, pos, b, bz);
 
-					if (b != bnx)
-						face(x);
-				}
-			}
+			auto& bm = g_assets.block_meshes.block_meshes[b];
+			if (bm >= 0)	block_mesh(j, pos, b, bm);
+
+			block_i++;
 		}
+
+		//subchunk_i++;
 	}
 }
 #endif
