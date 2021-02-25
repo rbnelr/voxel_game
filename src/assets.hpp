@@ -69,10 +69,12 @@ struct BlockMeshes {
 
 	// mesh (slice) data
 	std::vector<MeshSlice>			slices;
-	// meshes
+	// list of block meshes, each mesh is sliced up into 'slices' where each slice is has a fixed number of vertices
+	// this is needed to allow for instanced rendering of different meshes in one draw call, called 'merge instancing'
 	std::vector<Mesh>				meshes;
-	// block_id -> mesh lookup
-	std::vector<int>				block_meshes; // block mesh index (-1 => normal block, >=0 => index into block_mesh_info)
+	// LUT -> what mesh each block type uses
+	// (idx == -1 => no block mesh, ie normal block, idx >= 0 => index into block_mesh_info)
+	std::vector<int>				block_meshes;
 
 	void load (json const& blocks_json);
 };

@@ -56,24 +56,32 @@ struct ChunkMeshData {
 	}
 };
 
-struct RemeshingMesh {
-	ChunkMeshData opaque_vertices;
-	ChunkMeshData tranparent_vertices;
-};
-
 struct RemeshChunkJob { // Chunk remesh
-	// input
-	Chunk*					chunk;
-	Chunks*					chunks;
+	//// input data
+	// LUTs
+	BlockTypes::Block const*	block_types;
+	int const*					block_meshes;
+	BlockMeshes::Mesh const*	block_meshes_meshes;
+	BlockTile const*			block_tiles;
 
-	uint64_t				chunk_seed;
-	bool					mesh_world_border;
+	ChunkVoxels*				dense_chunks;
+	SubchunkVoxels*				dense_subchunks;
 
-	// output
-	RemeshingMesh			mesh;
+	Chunk*						chunk;
 
-	RemeshChunkJob (Chunk* chunk, Chunks* chunks, WorldGenerator const& wg,
-		bool draw_world_border);
+	// chunk neighbours (neg dir)
+	Chunk const*				chunk_nx;
+	Chunk const*				chunk_ny;
+	Chunk const*				chunk_nz;
+
+	bool						mesh_world_border;
+	uint64_t					chunk_seed;
+
+	//// output data
+	ChunkMeshData				opaque_vertices;
+	ChunkMeshData				tranparent_vertices;
+
+	RemeshChunkJob (Chunks& chunks, Chunk* chunk, WorldGenerator const& wg, bool mesh_world_border);
 
 	void execute ();
 };

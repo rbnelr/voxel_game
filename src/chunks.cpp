@@ -671,8 +671,7 @@ void Chunks::update_chunk_meshing (Game& game) {
 			}
 
 			if (chunk.flags & Chunk::REMESH) {
-				auto job = std::make_unique<RemeshChunkJob>(
-					&chunk, this, game.world_gen, mesh_world_border);
+				auto job = std::make_unique<RemeshChunkJob>(*this, &chunk, game.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
 		}
@@ -721,8 +720,8 @@ void Chunks::update_chunk_meshing (Game& game) {
 			for (size_t i=0; i<count; ++i) {
 				auto res = std::move(results[i]);
 
-				process_slices(res->mesh.opaque_vertices, res->chunk->opaque_mesh);
-				process_slices(res->mesh.tranparent_vertices, res->chunk->transparent_mesh);
+				process_slices(res->opaque_vertices, res->chunk->opaque_mesh);
+				process_slices(res->tranparent_vertices, res->chunk->transparent_mesh);
 
 				res->chunk->flags &= ~Chunk::REMESH;
 			}
