@@ -219,6 +219,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		} else {
 			_dense_subchunks++;
 
+		#if 0
 			// X faces
 			uint32_t block_i = 0;
 			for (    int z=0; z<SUBCHUNK_SIZE; ++z) {
@@ -279,21 +280,163 @@ void mesh_chunk (RemeshChunkJob& j) {
 					block_i += BX;
 				}
 			}
-				
+
 			// Block meshes
 			block_i = 0;
 			for (int z=0; z<SUBCHUNK_SIZE; ++z)
 			for (int y=0; y<SUBCHUNK_SIZE; ++y)
 			for (int x=0; x<SUBCHUNK_SIZE; ++x) {
-				block_id b  = sc.ptr[block_i];
+				block_id bid  = sc.ptr[block_i];
 
-				auto& bm = j.block_meshes[b];
-				if (bm >= 0) {
-					block_mesh(j, x+sx, y+sy, z+sz, b, bm);
-				}
+				auto& bm = j.block_meshes[bid];
+				if (bm >= 0) block_mesh(j, x+sx, y+sy, z+sz, bid, bm);
 
 				block_i++;
 			}
+		#else
+			uint32_t block_i = 0;
+			{ // z == 0
+				{ // y == 0
+					{ // x == 0
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+						block_id prevy = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
+						block_id prevz = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+
+						if (bid != prevx) face<0>(j, 0+sx, 0+sy, 0+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, 0+sx, 0+sy, 0+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, 0+sx, 0+sy, 0+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, 0+sx, 0+sy, 0+sz, bid, bm);
+
+						block_i++;
+					}
+					for (int x=1; x<SUBCHUNK_SIZE; ++x) {
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = sc.ptr[block_i - BX];
+						block_id prevy = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
+						block_id prevz = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+
+						if (bid != prevx) face<0>(j, x+sx, 0+sy, 0+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, x+sx, 0+sy, 0+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, x+sx, 0+sy, 0+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, x+sx, 0+sy, 0+sz, bid, bm);
+
+						block_i++;
+					}
+				}
+				for (int y=1; y<SUBCHUNK_SIZE; ++y) {
+					{ // x == 0
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+						block_id prevy = sc.ptr[block_i - BY];
+						block_id prevz = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+
+						if (bid != prevx) face<0>(j, 0+sx, y+sy, 0+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, 0+sx, y+sy, 0+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, 0+sx, y+sy, 0+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, 0+sx, y+sy, 0+sz, bid, bm);
+
+						block_i++;
+					}
+					for (int x=1; x<SUBCHUNK_SIZE; ++x) {
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = sc.ptr[block_i - BX];
+						block_id prevy = sc.ptr[block_i - BY];
+						block_id prevz = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+
+						if (bid != prevx) face<0>(j, x+sx, y+sy, 0+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, x+sx, y+sy, 0+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, x+sx, y+sy, 0+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, x+sx, y+sy, 0+sz, bid, bm);
+
+						block_i++;
+					}
+				}
+			}
+			for (int z=1; z<SUBCHUNK_SIZE; ++z) {
+				{ // y == 0
+					{ // x == 0
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+						block_id prevy = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
+						block_id prevz = sc.ptr[block_i - BZ];
+
+						if (bid != prevx) face<0>(j, 0+sx, 0+sy, z+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, 0+sx, 0+sy, z+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, 0+sx, 0+sy, z+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, 0+sx, 0+sy, z+sz, bid, bm);
+
+						block_i++;
+					}
+					for (int x=1; x<SUBCHUNK_SIZE; ++x) {
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = sc.ptr[block_i - BX];
+						block_id prevy = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
+						block_id prevz = sc.ptr[block_i - BZ];
+
+						if (bid != prevx) face<0>(j, x+sx, 0+sy, z+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, x+sx, 0+sy, z+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, x+sx, 0+sy, z+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, x+sx, 0+sy, z+sz, bid, bm);
+
+						block_i++;
+					}
+				}
+				for (int y=1; y<SUBCHUNK_SIZE; ++y) {
+					{ // x == 0
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+						block_id prevy = sc.ptr[block_i - BY];
+						block_id prevz = sc.ptr[block_i - BZ];
+
+						if (bid != prevx) face<0>(j, 0+sx, y+sy, z+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, 0+sx, y+sy, z+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, 0+sx, y+sy, z+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, 0+sx, y+sy, z+sz, bid, bm);
+
+						block_i++;
+					}
+					for (int x=1; x<SUBCHUNK_SIZE; ++x) {
+						block_id bid = sc.ptr[block_i];
+
+						block_id prevx = sc.ptr[block_i - BX];
+						block_id prevy = sc.ptr[block_i - BY];
+						block_id prevz = sc.ptr[block_i - BZ];
+
+						if (bid != prevx) face<0>(j, x+sx, y+sy, z+sz, bid, prevx);
+						if (bid != prevy) face<1>(j, x+sx, y+sy, z+sz, bid, prevy);
+						if (bid != prevz) face<2>(j, x+sx, y+sy, z+sz, bid, prevz);
+
+						auto& bm = j.block_meshes[bid];
+						if (bm >= 0) block_mesh(j, x+sx, y+sy, z+sz, bid, bm);
+
+						block_i++;
+					}
+				}
+			}
+		#endif
+
 		}
 
 		subchunk_i++;
