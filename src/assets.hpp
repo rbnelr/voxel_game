@@ -19,7 +19,8 @@ struct BlockTile {
 // Vertex for rendering chunks via merge instancing
 // one vertex is expanded to a quad (6 vert) of block mesh data
 struct BlockMeshInstance {
-	static constexpr int FIXEDPOINT_FAC = 256;
+	#define BlockMeshInstance_FIXEDPOINT_FAC 256
+	#define BlockMeshInstance_FIXEDPOINT_SHIFT 8
 
 	int16_t		posx, posy, posz; // pos in chunk
 	uint16_t	meshid; // index for merge instancing, this is used to index block meshes
