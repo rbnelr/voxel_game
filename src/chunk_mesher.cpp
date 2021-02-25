@@ -4,16 +4,6 @@
 #include "assets.hpp"
 #include "player.hpp"
 
-#define NOINLINE __declspec(noinline)
-
-int3 pos_from_idx (int idx) {
-	int3 pos;
-	pos.x =  idx & CHUNK_SIZE_MASK;
-	pos.y = (idx >> CHUNK_SIZE_SHIFT  ) & CHUNK_SIZE_MASK;
-	pos.z = (idx >> CHUNK_SIZE_SHIFT*2) & CHUNK_SIZE_MASK;
-	return pos;
-}
-
 void block_mesh (RemeshChunkJob& j, int x, int y, int z, block_id id, int meshid) {
 	// get a 'random' but deterministic value based on block position
 	uint64_t h = hash(int3(x,y,z)) ^ j.chunk_seed;
@@ -217,14 +207,15 @@ void mesh_chunk (RemeshChunkJob& j) {
 				for (int y=0; y<SUBCHUNK_SIZE; ++y) {
 					block_id prev = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
 
-					for (int x=0; x<SUBCHUNK_SIZE; ++x) {
-						block_id bid = sc.ptr[block_i + x*BX];
+					block_id bid0 = sc.ptr[block_i + 0*BX];
+					block_id bid1 = sc.ptr[block_i + 1*BX];
+					block_id bid2 = sc.ptr[block_i + 2*BX];
+					block_id bid3 = sc.ptr[block_i + 3*BX];
 
-						if (bid != prev)
-							face<0>(j, x+sx, y+sy, z+sz, bid, prev);
-
-						prev = bid;
-					}
+					if (bid0 != prev)	face<0>(j, 0+sx, y+sy, z+sz, bid0, prev);
+					if (bid1 != bid0)	face<0>(j, 1+sx, y+sy, z+sz, bid1, bid0);
+					if (bid2 != bid1)	face<0>(j, 2+sx, y+sy, z+sz, bid2, bid1);
+					if (bid3 != bid2)	face<0>(j, 3+sx, y+sy, z+sz, bid3, bid2);
 
 					block_i += BY;
 				}
@@ -236,15 +227,15 @@ void mesh_chunk (RemeshChunkJob& j) {
 				for (int x=0; x<SUBCHUNK_SIZE; ++x) {
 					block_id prev = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
 
-					for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+					block_id bid0 = sc.ptr[block_i + 0*BY];
+					block_id bid1 = sc.ptr[block_i + 1*BY];
+					block_id bid2 = sc.ptr[block_i + 2*BY];
+					block_id bid3 = sc.ptr[block_i + 3*BY];
 
-						block_id bid = sc.ptr[block_i + y*BY];
-
-						if (bid != prev)
-							face<1>(j, x+sx, y+sy, z+sz, bid, prev);
-
-						prev = bid;
-					}
+					if (bid0 != prev)	face<1>(j, x+sx, 0+sy, z+sz, bid0, prev);
+					if (bid1 != bid0)	face<1>(j, x+sx, 1+sy, z+sz, bid1, bid0);
+					if (bid2 != bid1)	face<1>(j, x+sx, 2+sy, z+sz, bid2, bid1);
+					if (bid3 != bid2)	face<1>(j, x+sx, 3+sy, z+sz, bid3, bid2);
 
 					block_i += BX;
 				}
@@ -257,15 +248,15 @@ void mesh_chunk (RemeshChunkJob& j) {
 				for (int x=0; x<SUBCHUNK_SIZE; ++x) {
 					block_id prev = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
 
-					for (int z=0; z<SUBCHUNK_SIZE; ++z) {
+					block_id bid0 = sc.ptr[block_i + 0*BZ];
+					block_id bid1 = sc.ptr[block_i + 1*BZ];
+					block_id bid2 = sc.ptr[block_i + 2*BZ];
+					block_id bid3 = sc.ptr[block_i + 3*BZ];
 
-						block_id bid = sc.ptr[block_i + z*BZ];
-
-						if (bid != prev)
-							face<2>(j, x+sx, y+sy, z+sz, bid, prev);
-
-						prev = bid;
-					}
+					if (bid0 != prev)	face<2>(j, x+sx, y+sy, 0+sz, bid0, prev);
+					if (bid1 != bid0)	face<2>(j, x+sx, y+sy, 1+sz, bid1, bid0);
+					if (bid2 != bid1)	face<2>(j, x+sx, y+sy, 2+sz, bid2, bid1);
+					if (bid3 != bid2)	face<2>(j, x+sx, y+sy, 3+sz, bid3, bid2);
 
 					block_i += BX;
 				}
