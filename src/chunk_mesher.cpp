@@ -92,61 +92,80 @@ void face (RemeshChunkJob& j, int x, int y, int z, block_id id, block_id nid) {
 #define BY  SUBCHUNK_SIZE
 #define BZ (SUBCHUNK_SIZE * SUBCHUNK_SIZE)
 
-block_id* read_subchunk (RemeshChunkJob& j, uint32_t subchunk_i, Chunk const* chunk, block_id& sparse) {
-	if (!chunk) {
-		sparse = B_NULL;
-		return nullptr;
-	}
+#include "immintrin.h"
 
-	if (chunk->flags & Chunk::SPARSE_VOXELS) {
-		sparse = (block_id)chunk->voxel_data;
-		return nullptr; // sparse chunk
-	}
-
-	auto& dc = j.dense_chunks[chunk->voxel_data];
-	if (dc.is_subchunk_sparse(subchunk_i)) {
-		sparse = (block_id)dc.sparse_data[subchunk_i];
-		return nullptr; // sparse subchunk
-	}
-
-	return j.dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels; // dense subchunk
+struct _Chunk {
+	int			sparse;
+	uint32_t	voxel_data;
+};
+_Chunk get_chunk (Chunk const* chunk) {
+	if (chunk == nullptr)
+		return { true, (uint32_t)B_NULL };
+	
+	bool sparse = (chunk->flags & Chunk::SPARSE_VOXELS) != 0;
+	return { sparse, chunk->voxel_data };
 }
 
-struct Subc {
-	block_id* ptr;
-	block_id sparse;
+struct _Subchunk {
+	int			sparse;
+	block_id*	ptr;
 
-	block_id read (uint32_t idx) {
-		return ptr ? ptr[idx] : sparse;
+	block_id read (uint32_t block_i) {
+		return ptr[!sparse ? block_i : 0];
 	}
 };
+_Subchunk get_subchunk (RemeshChunkJob& j, uint32_t subchunk_i, _Chunk& chunk) {
+	if (chunk.sparse)
+		return { true, (block_id*)&chunk.voxel_data };
+
+	auto& dc = j.dense_chunks[chunk.voxel_data];
+	if (dc.is_subchunk_sparse(subchunk_i))
+		return { true, (block_id*)&dc.sparse_data[subchunk_i] }; // sparse subchunk
+
+	return { false, j.dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels }; // dense subchunk
+}
 
 void mesh_chunk (RemeshChunkJob& j) {
 	ZoneScoped;
 
 	int _dense_subchunks = 0;
 
+	// voxel_data of relevant chunks
+	auto chunk  = get_chunk(j.chunk   );
+	auto chunkx = get_chunk(j.chunk_nx);
+	auto chunky = get_chunk(j.chunk_ny);
+	auto chunkz = get_chunk(j.chunk_nz);
+
 	uint32_t subchunk_i = 0;
-	for (int sz = 0; sz < CHUNK_SIZE; sz += SUBCHUNK_SIZE)
-	for (int sy = 0; sy < CHUNK_SIZE; sy += SUBCHUNK_SIZE)
+
+	for (int sz = 0; sz < CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+		int subc_offs_cz = sz > 0 ? -SCZ : SCZ*(SUBCHUNK_COUNT-1);
+		_Chunk* subc_chunkz = sz > 0 ? &chunk : &chunkz;
+
+	for (int sy = 0; sy < CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
+		int subc_offs_cy = sy > 0 ? -SCY : SCY*(SUBCHUNK_COUNT-1);
+		_Chunk* subc_chunky = sy > 0 ? &chunk : &chunky;
+
 	for (int sx = 0; sx < CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+		int subc_offs_cx = sx > 0 ? -SCX : SCX*(SUBCHUNK_COUNT-1);
+		_Chunk* subc_chunkx = sx > 0 ? &chunk : &chunkx;
 
-		Subc sc, scx, scy, scz;
-		sc .ptr = read_subchunk(j, subchunk_i, j.chunk, sc.sparse);
-		scx.ptr = read_subchunk(j, sx > 0 ? subchunk_i-SCX : subchunk_i + SCX*(SUBCHUNK_COUNT-1), sx > 0 ? j.chunk : j.chunk_nx, scx.sparse);
-		scy.ptr = read_subchunk(j, sy > 0 ? subchunk_i-SCY : subchunk_i + SCY*(SUBCHUNK_COUNT-1), sy > 0 ? j.chunk : j.chunk_ny, scy.sparse);
-		scz.ptr = read_subchunk(j, sz > 0 ? subchunk_i-SCZ : subchunk_i + SCZ*(SUBCHUNK_COUNT-1), sz > 0 ? j.chunk : j.chunk_nz, scz.sparse);
+		auto sc  = get_subchunk(j, subchunk_i, chunk);
+		auto scx = get_subchunk(j, subchunk_i + subc_offs_cx, *subc_chunkx);
+		auto scy = get_subchunk(j, subchunk_i + subc_offs_cy, *subc_chunky);
+		auto scz = get_subchunk(j, subchunk_i + subc_offs_cz, *subc_chunkz);
 
-		if (!sc.ptr) {
+		if (sc.sparse) {
+			block_id bid = *sc.ptr;
+
 			// X faces
-			if (!scx.ptr && scx.sparse == sc.sparse) {
+			if (scx.sparse && *scx.ptr == bid) {
 				// both subchunks sparse and cannot generate any faces
 			} else {
 				uint32_t block_i = 0;
 				for (    int z=0; z<SUBCHUNK_SIZE; ++z) {
 					for (int y=0; y<SUBCHUNK_SIZE; ++y) {
 						block_id prev = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
-						block_id bid = sc.sparse;
 						if (bid != prev)
 							face<0>(j, 0+sx, y+sy, z+sz, bid, prev);
 
@@ -156,15 +175,13 @@ void mesh_chunk (RemeshChunkJob& j) {
 			}
 
 			// Y faces
-			if (!scy.ptr && scy.sparse == sc.sparse) {
+			if (scy.sparse && *scy.ptr == bid) {
 				// both subchunks sparse and cannot generate any faces
 			} else {
 				uint32_t block_i = 0;
 				for (    int z=0; z<SUBCHUNK_SIZE; ++z) {
 					for (int x=0; x<SUBCHUNK_SIZE; ++x) {
 						block_id prev = scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
-						block_id bid = sc.sparse;
-
 						if (bid != prev)
 							face<1>(j, x+sx, 0+sy, z+sz, bid, prev);
 
@@ -175,15 +192,13 @@ void mesh_chunk (RemeshChunkJob& j) {
 			}
 
 			// Z faces
-			if (!scz.ptr && scz.sparse == sc.sparse) {
+			if (scz.sparse && *scz.ptr == bid) {
 				// both subchunks sparse and cannot generate any faces
 			} else {
 				uint32_t block_i = 0;
 				for (    int y=0; y<SUBCHUNK_SIZE; ++y) {
 					for (int x=0; x<SUBCHUNK_SIZE; ++x) {
 						block_id prev = scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
-						block_id bid = sc.sparse;
-
 						if (bid != prev)
 							face<2>(j, x+sx, y+sy, 0+sz, bid, prev);
 
@@ -193,13 +208,12 @@ void mesh_chunk (RemeshChunkJob& j) {
 			}
 
 			// Block meshes
-			block_id b = sc.sparse;
-			auto& bm = j.block_meshes[b];
+			auto& bm = j.block_meshes[bid];
 			if (bm >= 0) {
 				for (int z=0; z<SUBCHUNK_SIZE; ++z)
 				for (int y=0; y<SUBCHUNK_SIZE; ++y)
 				for (int x=0; x<SUBCHUNK_SIZE; ++x) {
-					block_mesh(j, x+sx, y+sy, z+sz, b, bm);
+					block_mesh(j, x+sx, y+sy, z+sz, bid, bm);
 				}
 			}
 		} else {
@@ -283,6 +297,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 		}
 
 		subchunk_i++;
+	}
+	}
 	}
 
 	ZoneValue(_dense_subchunks);
