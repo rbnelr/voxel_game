@@ -52,7 +52,7 @@ void Chunks::free_voxels (Chunk& c) {
 }
 
 block_id Chunks::read_block (int x, int y, int z) {
-	ZoneScoped;
+	//ZoneScoped;
 
 	int bx, by, bz;
 	int3 cpos;
@@ -90,7 +90,7 @@ block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
 }
 
 void Chunks::write_block (int x, int y, int z, block_id data) {
-	ZoneScoped;
+	//ZoneScoped;
 
 	int bx, by, bz;
 	int3 cpos;

@@ -373,13 +373,24 @@ namespace worldgen {
 
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
 		auto write_block = [&] (int x, int y, int z, BlockID bid) -> void {
-			chunks.write_block(x,y,z, wg->bids[bid]);
+			int bx, by, bz;
+			int cx, cy, cz;
+			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+
+			chunks.write_block(bx,by,bz, neighbours.neighbours[cz+1][cy+1][cx+1], wg->bids[bid]);
+		};
+		auto read_block = [&] (int x, int y, int z) -> block_id {
+			int bx, by, bz;
+			int cx, cy, cz;
+			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
+
+			return chunks.read_block(bx,by,bz, neighbours.neighbours[cz+1][cy+1][cx+1]);
 		};
 		auto replace_block = [&] (int x, int y, int z, BlockID val) { // for tree placing
-			auto bid = chunks.read_block(x,y,z);
+			auto bid = read_block(x,y,z);
 
 			if (bid == wg->bids[B_AIR] || (val == B_TREE_LOG && bid == wg->bids[B_LEAVES])) { // replace air and water with tree log, replace leaves with tree log
-				chunks.write_block(x,y,z, wg->bids[val]);
+				write_block(x,y,z, val);
 			}
 		};
 
@@ -409,15 +420,10 @@ namespace worldgen {
 		};
 
 		iter_growable_blocks(chunks, chunk, neighbours, wg, [&] (int x, int y, int z, block_id below) {
-			// convert to world coords
-			x += chunkpos.x;
-			y += chunkpos.y;
-			z += chunkpos.z;
-
 			write_block(x,y,z-1, B_GRASS);
 
 			// get a 'random' but deterministic value based on block position
-			uint64_t h = hash(int3(x,y,z), wg->seed);
+			uint64_t h = hash(int3(x + chunkpos.x, y + chunkpos.y, z + chunkpos.z), wg->seed);
 
 			double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 			float rand1 = (float)(h & 0xffffffff) * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
