@@ -125,6 +125,13 @@ _Subchunk get_subchunk (RemeshChunkJob& j, uint32_t subchunk_i, _Chunk& chunk) {
 	return { false, j.dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels }; // dense subchunk
 }
 
+// Chunk meshing optimized for speed
+// works directly with sparse voxel storage
+// makes use of sparseness to _very_ quickly mesh chunks that contain mostly sparse subchunks
+//  numbers: meshing can be as fast as 32us for mostly sparse chunks compared to 0.5ms-2ms for normal chunks
+//    thats a 30x speedup for air and stone chunks! 
+//    and even ragular chunks get some speedup due to empty regions, although currently the overhead makes me slightly slower than a dense 3d arary version was if I remember ~.5ms timings correctly
+
 void mesh_chunk (RemeshChunkJob& j) {
 	ZoneScoped;
 
@@ -219,6 +226,7 @@ void mesh_chunk (RemeshChunkJob& j) {
 		} else {
 			_dense_subchunks++;
 
+			// Seperate loop version
 		#if 0
 			// X faces
 			uint32_t block_i = 0;
@@ -293,7 +301,32 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 				block_i++;
 			}
-		#else
+		#endif
+			// Straight single loop version
+		#if 0
+			uint32_t block_i = 0;
+			for (int z=0; z<SUBCHUNK_SIZE; ++z)
+			for (int y=0; y<SUBCHUNK_SIZE; ++y)
+			for (int x=0; x<SUBCHUNK_SIZE; ++x) {
+				block_id bid = sc.ptr[block_i];
+
+				block_id prevx = x > 0 ? sc.ptr[block_i - BX] : scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+				block_id prevy = y > 0 ? sc.ptr[block_i - BY] : scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
+				block_id prevz = z > 0 ? sc.ptr[block_i - BZ] : scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+
+				if (bid != prevx) face<0>(j, x+sx, y+sy, z+sz, bid, prevx);
+				if (bid != prevy) face<1>(j, x+sx, y+sy, z+sz, bid, prevy);
+				if (bid != prevz) face<2>(j, x+sx, y+sy, z+sz, bid, prevz);
+
+				auto& bm = j.block_meshes[bid];
+				if (bm >= 0) block_mesh(j, x+sx, y+sy, z+sz, bid, bm);
+
+				block_i++;
+			}
+
+		#endif
+			// Fully unrolled for elimination of ternaries in loop version
+		#if 0
 			uint32_t block_i = 0;
 			{ // z == 0
 				{ // y == 0
@@ -434,6 +467,52 @@ void mesh_chunk (RemeshChunkJob& j) {
 						block_i++;
 					}
 				}
+			}
+		#endif
+
+		#if 1
+			uint32_t block_i = 0;
+			for (int z=0; z<SUBCHUNK_SIZE; ++z)
+			for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+
+				block_id prevx = scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
+
+				block_id bid0 = sc.ptr[block_i+0];
+				block_id bid1 = sc.ptr[block_i+1];
+				block_id bid2 = sc.ptr[block_i+2];
+				block_id bid3 = sc.ptr[block_i+3];
+
+				block_id prevy0 = y > 0 ? sc.ptr[block_i+0 - BY] : scy.read(block_i+0 + (SUBCHUNK_SIZE-1)*BY);
+				block_id prevy1 = y > 0 ? sc.ptr[block_i+1 - BY] : scy.read(block_i+1 + (SUBCHUNK_SIZE-1)*BY);
+				block_id prevy2 = y > 0 ? sc.ptr[block_i+2 - BY] : scy.read(block_i+2 + (SUBCHUNK_SIZE-1)*BY);
+				block_id prevy3 = y > 0 ? sc.ptr[block_i+3 - BY] : scy.read(block_i+3 + (SUBCHUNK_SIZE-1)*BY);
+
+				block_id prevz0 = z > 0 ? sc.ptr[block_i+0 - BZ] : scz.read(block_i+0 + (SUBCHUNK_SIZE-1)*BZ);
+				block_id prevz1 = z > 0 ? sc.ptr[block_i+1 - BZ] : scz.read(block_i+1 + (SUBCHUNK_SIZE-1)*BZ);
+				block_id prevz2 = z > 0 ? sc.ptr[block_i+2 - BZ] : scz.read(block_i+2 + (SUBCHUNK_SIZE-1)*BZ);
+				block_id prevz3 = z > 0 ? sc.ptr[block_i+3 - BZ] : scz.read(block_i+3 + (SUBCHUNK_SIZE-1)*BZ);
+
+				if (bid0 != prevx ) face<0>(j, 0+sx, y+sy, z+sz, bid0, prevx );
+				if (bid0 != prevy0) face<1>(j, 0+sx, y+sy, z+sz, bid0, prevy0);
+				if (bid0 != prevz0) face<2>(j, 0+sx, y+sy, z+sz, bid0, prevz0);
+				if (j.block_meshes[bid0] >= 0) block_mesh(j, 0+sx, y+sy, z+sz, bid0, j.block_meshes[bid0]);
+
+				if (bid1 != bid0  ) face<0>(j, 1+sx, y+sy, z+sz, bid1, bid0  );
+				if (bid1 != prevy1) face<1>(j, 1+sx, y+sy, z+sz, bid1, prevy1);
+				if (bid1 != prevz1) face<2>(j, 1+sx, y+sy, z+sz, bid1, prevz1);
+				if (j.block_meshes[bid1] >= 0) block_mesh(j, 1+sx, y+sy, z+sz, bid1, j.block_meshes[bid1]);
+
+				if (bid2 != bid1  ) face<0>(j, 2+sx, y+sy, z+sz, bid2, bid1  );
+				if (bid2 != prevy2) face<1>(j, 2+sx, y+sy, z+sz, bid2, prevy2);
+				if (bid2 != prevz2) face<2>(j, 2+sx, y+sy, z+sz, bid2, prevz2);
+				if (j.block_meshes[bid2] >= 0) block_mesh(j, 2+sx, y+sy, z+sz, bid2, j.block_meshes[bid2]);
+
+				if (bid3 != bid2  ) face<0>(j, 3+sx, y+sy, z+sz, bid3, bid2  );
+				if (bid3 != prevy3) face<1>(j, 3+sx, y+sy, z+sz, bid3, prevy3);
+				if (bid3 != prevz3) face<2>(j, 3+sx, y+sy, z+sz, bid3, prevz3);
+				if (j.block_meshes[bid3] >= 0) block_mesh(j, 3+sx, y+sy, z+sz, bid3, j.block_meshes[bid3]);
+
+				block_i += 4;
 			}
 		#endif
 
