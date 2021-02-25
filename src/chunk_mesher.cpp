@@ -124,6 +124,8 @@ struct Subc {
 void mesh_chunk (RemeshChunkJob& j) {
 	ZoneScoped;
 
+	int _dense_subchunks = 0;
+
 	uint32_t subchunk_i = 0;
 	for (int sz = 0; sz < CHUNK_SIZE; sz += SUBCHUNK_SIZE)
 	for (int sy = 0; sy < CHUNK_SIZE; sy += SUBCHUNK_SIZE)
@@ -201,6 +203,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 				}
 			}
 		} else {
+			_dense_subchunks++;
+
 			// X faces
 			uint32_t block_i = 0;
 			for (    int z=0; z<SUBCHUNK_SIZE; ++z) {
@@ -280,6 +284,8 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 		subchunk_i++;
 	}
+
+	ZoneValue(_dense_subchunks);
 }
 
 void RemeshChunkJob::execute () {
