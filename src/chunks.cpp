@@ -370,16 +370,6 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 		init_mesh(chunk.transparent_mesh);
 	}
 
-#if CHUNK_NEIGHBOUR_PTRS
-	{ // link neigbour ptrs
-		for (int i=0; i<6; ++i) {
-			chunk.neighbours[i] = query_chunk(chunk.pos + NEIGHBOURS[i]);
-			if (chunk.neighbours[i] != U16_NULL)
-				chunks[chunk.neighbours[i]].neighbours[i^1] = id;
-		}
-	}
-#endif
-
 	return id;
 }
 void Chunks::free_chunk (chunk_id id) {
@@ -391,14 +381,15 @@ void Chunks::free_chunk (chunk_id id) {
 	free_mesh(chunk.opaque_mesh);
 	free_mesh(chunk.transparent_mesh);
 
-#if CHUNK_NEIGHBOUR_PTRS
 	{ // link neigbour ptrs
 		for (int i=0; i<6; ++i) {
-			if (chunk.neighbours[i] != U16_NULL)
-				chunks[chunk.neighbours[i]].neighbours[i^1] = U16_NULL;
+			auto nid = chunk.neighbours[i];
+			if (nid != U16_NULL) {
+				chunks[nid].neighbours[i^1] = U16_NULL;
+				chunks[nid].flags |= (Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << (i^1));
+			}
 		}
 	}
-#endif
 
 	memset(&chunk, 0, sizeof(Chunk)); // zero chunk, flags will now indicate that chunk is unallocated
 	chunks.free(id);
@@ -456,40 +447,63 @@ void Chunks::update_chunk_loading (Game& game) {
 			}
 		}
 
-	#if CHUNK_ARROPT
+	#if 0
+		// chunk distance based on dist to box, ie closest point in box is used as distance
 
-		int size = ceili(max(unload_dist / CHUNK_SIZE, 0.0f) * 2 + 1);
-		int3 pos = roundi(game.player.pos / CHUNK_SIZE) - size / 2;
+		float3 const& player_pos = game.player.pos;
 
-		ZoneValue(size*size*size)
+		auto chunk_dist_sqr = [&] (int3 const& pos) {
+			float pos_relx = player_pos.x - pos.x * (float)CHUNK_SIZE;
+			float pos_rely = player_pos.y - pos.y * (float)CHUNK_SIZE;
+			float pos_relz = player_pos.z - pos.z * (float)CHUNK_SIZE;
 
-		chunk_id* chunks_arr;
-		int arrsize = size+2;
-		auto bounds = [&] (int x, int y, int z) {
-			return (uint32_t)(x - pos.x +1) < (uint32_t)arrsize && 
-			       (uint32_t)(y - pos.y +1) < (uint32_t)arrsize &&
-			       (uint32_t)(z - pos.z +1) < (uint32_t)arrsize;
+			float nearestx = clamp(pos_relx, 0.0f, (float)CHUNK_SIZE);
+			float nearesty = clamp(pos_rely, 0.0f, (float)CHUNK_SIZE);
+			float nearestz = clamp(pos_relz, 0.0f, (float)CHUNK_SIZE);
+
+			float offsx = nearestx - pos_relx;
+			float offsy = nearesty - pos_rely;
+			float offsz = nearestz - pos_relz;
+
+			return offsx*offsx + offsy*offsy + offsz*offsz;
 		};
+	#else
+		// simplified distance only based on center
+	#if 0
+		float sz = (float)CHUNK_SIZE;
 
-		auto chunks_arr_get = [&] (int x, int y, int z) -> chunk_id& {
-			assert(bounds(x,y,z));
-			return chunks_arr[IDX3D(x - pos.x +1, y - pos.y +1, z - pos.z +1, arrsize)];
+		float3 const& player_pos = game.player.pos;
+		float3 dist_base = sz/2 - game.player.pos;
+
+		auto chunk_dist_sqr = [&] (int3 const& pos) {
+
+			// combine half size add and point sub because these could be optimized as loop-invariants
+			float offsx = pos.x * sz + dist_base.x;
+			float offsy = pos.y * sz + dist_base.y;
+			float offsz = pos.z * sz + dist_base.z;
+
+			return offsx*offsx + offsy*offsy + offsz*offsz;
 		};
-		{
-			ZoneScopedN("3d array fill");
-			{
-				ZoneScopedN("malloc");
-				chunks_arr = (chunk_id*)malloc(sizeof(chunks_arr) * arrsize*arrsize*arrsize);
-			}
-			memset(chunks_arr, -1, sizeof(chunks_arr) * arrsize*arrsize*arrsize);
+	#else
+		auto player_pos = _mm_load_ps(&game.player.pos.x);
 
-			for (chunk_id cid=0; cid < end(); ++cid) {
-				auto& c = chunks[cid];
-				if (c.flags == 0) continue;
-				if (bounds(c.pos.x, c.pos.y, c.pos.z))
-					chunks_arr_get(c.pos.x, c.pos.y, c.pos.z) = cid;
-			}
-		}
+		auto sz = _mm_set1_ps((float)CHUNK_SIZE);
+		auto szh = _mm_set1_ps((float)CHUNK_SIZE/2);
+
+		auto dist_base = _mm_sub_ps(szh, player_pos);
+
+		auto chunk_dist_sqr = [&] (int3 const& pos) {
+
+			auto ipos = _mm_load_si128((__m128i*)&pos.x);
+			auto fpos = _mm_cvtepi32_ps(ipos);
+
+			auto offs = _mm_fmadd_ps(fpos, sz, dist_base);
+			auto dp = _mm_dp_ps(offs, offs, 0x71);
+
+			return _mm_cvtss_f32(dp);
+		};
+	#endif
+
 	#endif
 
 		{
@@ -505,72 +519,56 @@ void Chunks::update_chunk_loading (Game& game) {
 			if (chunk.flags == 0) continue;
 			chunk._validate_flags();
 
-			float dist_sqr = chunk_dist_sqr(chunk.pos, game.player.pos);
+			float dist_sqr = chunk_dist_sqr(chunk.pos);
 
 			if (dist_sqr <= unload_dist_sqr) {
-				// common case
-
-				if (chunk.loadphase == 1) {
-					
-					worldgen::Neighbours n;
-					
-					bool neighbours_ready = true;
-					for (int z=-1; z<=1; ++z)
-					for (int y=-1; y<=1; ++y)
-					for (int x=-1; x<=1; ++x) {
-
-					#if CHUNK_ARROPT
-						chunk_id nid = chunks_arr_get(chunk.pos.x + offs.x, chunk.pos.y + offs.y, chunk.pos.z + offs.z);
-					#else
-						chunk_id nid = query_chunk(chunk.pos + int3(x,y,z));
-					#endif
-						if (nid == U16_NULL || chunks[nid].loadphase < 1) {
-							neighbours_ready = false;
-							break;
+				// check flags to see if any of the neighbours are still null, which is faster than checking the array
+				if (chunk.flags & Chunk::NEIGHBOUR_NULL_MASK) {
+					for (int i=0; i<6; ++i) {
+						auto nid = chunk.neighbours[i];
+						if (nid == U16_NULL) {
+							// neighbour chunk not yet loaded
+							auto npos = chunk.pos + NEIGHBOURS[i];
+							float ndist_sqr = chunk_dist_sqr(npos);
+							
+							if (ndist_sqr <= load_dist_sqr && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
+								add_chunk_to_generate(npos, ndist_sqr, 1); // note: this creates duplicates because we arrive at the same chunk through two ways
 						}
-
-						n.neighbours[z+1][y+1][x+1] = &chunks[nid];
-					}
-				
-					if (neighbours_ready) {
-						worldgen::object_pass(*this, chunk, n, &game._threads_world_gen);
-
-						chunk.loadphase = 2;
-						chunk.flags |= Chunk::REMESH;
-					}
-				}
-
-				for (int i=0; i<6; ++i) {
-					auto nid = chunk.neighbours[i];
-					if (nid == U16_NULL) {
-						// neighbour chunk not yet loaded
-						auto npos = chunk.pos + NEIGHBOURS[i];
-						float ndist_sqr = chunk_dist_sqr(npos, game.player.pos);
-						bool should_load = ndist_sqr <= load_dist_sqr;
-
-						if (should_load && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
-							add_chunk_to_generate(npos, ndist_sqr, 1); // note: this creates duplicates because we arrive at the same chunk through two ways
 					}
 				}
 			} else {
 				// chunk outside unload radius
-			#if CHUNK_HASHMAP
 				chunks_map.erase(chunk.pos);
-			#endif
 				free_chunk(cid);
 			}
 		}
-
-	#if CHUNK_ARROPT
-		{
-			ZoneScopedN("free");
-			free(chunks_arr);
-		}
-	#endif
 	}
 
 	{
 		ZoneScopedN("process jobs");
+
+		auto update_chunk_phase2_generation = [&] (Chunk& chunk) {
+			if (chunk.loadphase != 1) return;
+
+			worldgen::Neighbours n;
+
+			// check if neighbours are ready yet and build 3x3x3 LUT for faster lookups in worldgen::object_pass() at the same time
+			for (int z=-1; z<=1; ++z)
+			for (int y=-1; y<=1; ++y)
+			for (int x=-1; x<=1; ++x) {
+				chunk_id nid = query_chunk(chunk.pos + int3(x,y,z));
+
+				if (nid == U16_NULL || chunks[nid].loadphase < 1)
+					return; // neighbours not read yet
+
+				n.neighbours[z+1][y+1][x+1] = &chunks[nid];
+			}
+
+			worldgen::object_pass(*this, chunk, n, &game._threads_world_gen);
+
+			chunk.loadphase = 2;
+			chunk.flags |= Chunk::REMESH;
+		};
 
 		{
 			ZoneScopedN("pop jobs");
@@ -581,29 +579,43 @@ void Chunks::update_chunk_loading (Game& game) {
 			std::unique_ptr<WorldgenJob> jobs[64];
 
 			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
-			for (int i=0; i<count; ++i) {
-				auto job = std::move(jobs[i]);
+			for (int jobi=0; jobi<count; ++jobi) {
+				auto job = std::move(jobs[jobi]);
 				auto& chunk_pos = job->noise_pass.chunk_pos;
 
 				queued_chunks.erase(job->noise_pass.chunk_pos);
 
 				auto cid = alloc_chunk(chunk_pos);
 				auto& chunk = chunks[cid];
-			#if CHUNK_HASHMAP
 				chunks_map.emplace(chunk.pos, cid);
-			#endif
 
 				sparse_chunk_from_worldgen(chunk, &job->noise_pass.voxels[0][0][0]);
 
 				chunk.loadphase = job->phase;
 				chunk.flags |= Chunk::REMESH;
 
-				for (auto& offs : NEIGHBOURS) {
-					auto nid = query_chunk(chunk_pos + offs);
-					if (nid != U16_NULL) {
+				// link neighbour ptrs and flag neighbours to be remeshed
+				for (int ni=0; ni<6; ++ni) {
+					auto nid = query_chunk(chunk_pos + NEIGHBOURS[ni]);
+
+					chunk.neighbours[ni] = nid;
+					if (nid == U16_NULL) {
+						chunk.flags |= (Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << ni);
+					} else {
 						assert(chunks[nid].flags != 0);
 						chunks[nid].flags |= Chunk::REMESH;
+						chunks[nid].flags &= ~(Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << (ni^1));
+						chunks[nid].neighbours[ni^1] = cid;
 					}
+				}
+
+				// run phase2 generation where required
+				// TODO: this could possibly be accelerated by keeping a counter of how many neighbours have are ready,
+				// but don't bother because this should be fast enough and will be less bugprone (and not require storing a counter)
+				for (auto& offs : FULL_NEIGHBOURS) {
+					chunk_id nid = query_chunk(chunk.pos + offs);
+					if (nid != U16_NULL)
+						update_chunk_phase2_generation(chunks[nid]);
 				}
 			}
 		}

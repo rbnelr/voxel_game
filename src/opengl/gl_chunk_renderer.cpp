@@ -154,11 +154,13 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	//shad_test->set_uniform("img_size", (float2)r.framebuffer.size);
 	
-	//glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	//glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float4) * cols.size(), cols.data(), GL_STREAM_DRAW);
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+	//{
+	//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
+	//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float4) * cols.size(), cols.data(), GL_STREAM_DRAW);
+	//	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
+	//}
 
-	glBindImageTexture(2, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
 	glDispatchCompute(r.framebuffer.size.x, r.framebuffer.size.y, 1);
 

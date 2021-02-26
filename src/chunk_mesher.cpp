@@ -92,8 +92,6 @@ struct CallCtx {
 	#define BY  SUBCHUNK_SIZE
 	#define BZ (SUBCHUNK_SIZE * SUBCHUNK_SIZE)
 
-	#include "immintrin.h"
-
 	struct _Chunk {
 		int			sparse;
 		uint32_t	voxel_data;

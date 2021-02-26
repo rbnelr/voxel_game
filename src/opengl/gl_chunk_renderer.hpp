@@ -113,7 +113,15 @@ struct Raytracer {
 
 	Shader* shad_test;
 
-	Ssbo ssbo = {"Raytracer.ssbo"};
+	template <typename T>
+	struct SSBO {
+		uint32_t	count; // how many allocated on gpu
+		Ssbo		ssbo;
+
+		SSBO (std::string_view label): ssbo{label} {}
+	};
+
+	SSBO<Chunk> chunks_ssbo = {"Raytracer.chunks_ssbo"};
 
 	bool enable = false;
 
@@ -129,7 +137,7 @@ struct Raytracer {
 	Raytracer (Shaders& shaders) {
 		shad_test = shaders.compile("raytracer_test", {}, {{ COMPUTE_SHADER }});
 
-		{
+		if (0) {
 			int3 count, size;
 
 			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &count.x);
@@ -148,6 +156,8 @@ struct Raytracer {
 			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
 			printf("max local work group invocations %d\n", number);
 		}
+		
+
 	}
 
 	void draw (OpenglRenderer& r, Game& game);

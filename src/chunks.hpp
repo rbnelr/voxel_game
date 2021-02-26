@@ -3,13 +3,19 @@
 #include "blocks.hpp"
 #include "assets.hpp"
 
+#if 0
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		63
+#else
+#define CHUNK_SIZE			32 // size of chunk in blocks per axis
+#define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
+#define CHUNK_SIZE_MASK		31
+#endif
 
 #if 1
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_COUNT		8 // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
 #else
@@ -18,6 +24,10 @@
 #define SUBCHUNK_SHIFT		3
 #define SUBCHUNK_MASK		7
 #endif
+
+static_assert(SUBCHUNK_COUNT == (CHUNK_SIZE / SUBCHUNK_SIZE), "");
+static_assert((1 << SUBCHUNK_SHIFT) == SUBCHUNK_SIZE, "");
+static_assert(SUBCHUNK_MASK == SUBCHUNK_SIZE-1, "");
 
 #define IDX3D(x,y,z, sz) (size_t)(z) * (sz)*(sz) + (size_t)(y) * (sz) + (size_t)(x)
 
@@ -154,29 +164,33 @@ struct ChunkVoxels {
 	}
 };
 
-#define CHUNK_NEIGHBOUR_PTRS 1
-#define CHUNK_HASHMAP 1
-#define CHUNK_ARROPT 0
-
 struct Chunk {
 	enum Flags : uint32_t {
-		ALLOCATED		= 1<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
+		ALLOCATED		= 1u<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
 		//LOADED			= 1<<1, // block data valid and safe to use in main thread
-		SPARSE_VOXELS	= 1<<2, // voxel_data is a single block id instead of a dense_chunk id
-		VOXELS_DIRTY	= 1<<3, // voxels were changed, run checked_sparsify
-		REMESH			= 1<<4, // need remesh due to voxel change, neighbour chunk change, etc.
+		SPARSE_VOXELS	= 1u<<2, // voxel_data is a single block id instead of a dense_chunk id
+		VOXELS_DIRTY	= 1u<<3, // voxels were changed, run checked_sparsify
+		REMESH			= 1u<<4, // need remesh due to voxel change, neighbour chunk change, etc.
+
+		// Flags for if neighbours[i] contains null to skip neighbour loop in iterate chunk loading for performance
+		NEIGHBOUR0_NULL = 1u<<26,
+		NEIGHBOUR1_NULL = 1u<<27,
+		NEIGHBOUR2_NULL = 1u<<28,
+		NEIGHBOUR3_NULL = 1u<<29,
+		NEIGHBOUR4_NULL = 1u<<30,
+		NEIGHBOUR5_NULL = 1u<<31,
 	};
+	static constexpr Flags NEIGHBOUR_NULL_MASK = (Flags)(0b111111u << 26);
 
 	Flags flags;
 	int3 pos;
 
+	chunk_id neighbours[6];
+	// make sure there are still at 4 bytes following this so that 16-byte sse loads of neighbours can never segfault
+
 	uint8_t loadphase;
 	//uint8_t refcount; // how many async jobs are using this chunk data, if > 0 chunk is not allowed to be freed etc.
-
-#if CHUNK_NEIGHBOUR_PTRS
-	chunk_id neighbours[6];
-#endif
-
+	
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
 	ChunkMesh opaque_mesh;
@@ -185,25 +199,15 @@ struct Chunk {
 	void _validate_flags () {
 		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
 		if (flags & VOXELS_DIRTY) assert(flags & REMESH);
+
+		for (int i=0; i<6; ++i) {
+			assert((neighbours[i] == U16_NULL) == ((flags & (NEIGHBOUR0_NULL << i)) != 0));
+		}
 	}
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
-inline float chunk_dist_sqr (int3 const& pos, float3 const& dist_to) {
-	float pos_relx = dist_to.x - pos.x * (float)CHUNK_SIZE;
-	float pos_rely = dist_to.y - pos.y * (float)CHUNK_SIZE;
-	float pos_relz = dist_to.z - pos.z * (float)CHUNK_SIZE;
-
-	float nearestx = clamp(pos_relx, 0.0f, (float)CHUNK_SIZE);
-	float nearesty = clamp(pos_rely, 0.0f, (float)CHUNK_SIZE);
-	float nearestz = clamp(pos_relz, 0.0f, (float)CHUNK_SIZE);
-
-	float offsx = nearestx - pos_relx;
-	float offsy = nearesty - pos_rely;
-	float offsz = nearestz - pos_relz;
-
-	return offsx*offsx + offsy*offsy + offsz*offsz;
-}
+//inline constexpr size_t _chunk_sz = sizeof(Chunk); // only for checking value in intellisense
 
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
 inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
@@ -298,9 +302,7 @@ struct Chunks {
 
 	AllocatorBitset					slices_alloc;
 
-#if CHUNK_HASHMAP
 	chunk_pos_map<chunk_id>			chunks_map;
-#endif
 
 	chunk_pos_map<int>				queued_chunks; // queued for async worldgen, val is phase
 
