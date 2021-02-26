@@ -14,69 +14,81 @@ __m128 lerp (__m128 a, __m128 b, float t) {
 
 namespace worldgen {
 	float NoisePass::calc_large_noise (float3 const& pos) {
-		float val = 70;
-		val += -noise(pos, 300, 0) + 30;
-		val += -noise(pos, 180, 1);
-		val += -noise(pos,  70, 2) * 1.5f;
-		return val;
+		float3 p = pos;
+		// make noise 'flatter' 0.7 to flatten world
+		p.z /= 0.7;
+
+		float depth = wg->base_depth;
+
+		float seed = 0;
+		for (auto& n : wg->large_noise) {
+			float val = noise(p, n.period, seed++) * n.strength;
+			if (n.cutoff) val = max(val, n.cutoff_val);
+
+			depth += val;
+		}
+		return depth;
 	}
 
 	BlockID NoisePass::cave_noise (float3 const& pos, float large_noise, float3 const& normal) {
 		int water_level = 21;
 
-		float base = large_noise;
-
-		// stalag
-		float stalag = noise01(pos / float3(1,1,16), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
-		base += stalag*stalag * 120;
+		float depth = large_noise;
 		
 		// small scale
-		base += noise(pos, 4.0f, 4) * 0.3f;
-		//base -= max(noise(pos_world, 20.0f, 3) * 0.9f, 0.0f);
+		float seed = (float)wg->small_noise.size();
+		for (auto& n : wg->small_noise) {
+			float val = noise(pos, n.period, seed++) * n.strength;
+			if (n.cutoff) val = max(val, n.cutoff_val);
 		
-		bool ground = normal.z > 0.55f;
-		
-		// erode rock
-		float eroded = base;
-		
-		if (!ground && normal.z > -0.6f) {
-			eroded -= 1.2f;
-		
-			float3 roughpos = pos;
-			roughpos.z /= 14;
-		
-			float stren = noise01(roughpos, 14, 6);
-			stren = max(stren - 0.1f, 0.0f);
-			stren = stren * stren;
-		
-			eroded -= max(noise(roughpos, 3, 6) * 18 * stren, 0.0f);
+			depth += val;
 		}
+		
+		// soil cover
+		float ground = clamp(map(normal.z, wg->ground_ang, 1.0f));
+		depth += wg->overhang_stren * clamp(ground * 3); // create small overhangs of earth
 
-		{
-			BlockID bid;
-			if (pos.z >= water_level) {
-				bid = B_AIR;
-			} else {
-				bid = B_WATER;
+		if (depth > 0) {
+
+			if (depth < wg->earth_depth * ground) // thinner earth layer on steeper slopes
+				return B_EARTH;
+
+			// rock
+
+			// erode rock
+			if (normal.z > -0.6f) {
+				float3 roughpos = pos;
+				roughpos.z /= 3;
+
+				float stren = noise01(roughpos, 14, 6);
+				stren = max(stren - 0.1f, 0.0f);
+				//stren = stren * stren;
+
+				depth -= max(noise(roughpos, 3, 6) * 8 * stren, 0.0f);
 			}
 
-			if (base > 0) {
-				// positive -> in rock
-				if (ground && base < 5.0f) {
-					// ground soil
-					bid = B_EARTH;
+			if (depth > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
+				if (depth < wg->rock_depth) {
+					return B_STONE; 
 				} else {
-					// rock
-					if (eroded > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
-						if (base < 10.0f) {
-							bid = B_STONE; 
-						} else {
-							bid = B_HARDSTONE;
-						}
-					}
+					return B_HARDSTONE;
 				}
 			}
-			return bid;
+		}
+
+		// stalagtites
+		float stalag = noise01(pos / float3(1,1,64), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
+		stalag = clamp(map(stalag, 0.4f, 1.0f));
+		stalag = stalag*stalag*stalag * wg->stalag_stren;
+
+		if ((depth + stalag) > 0)
+			return B_STONE;
+
+		// air & water
+		if (pos.z >= water_level) {
+			return B_AIR;
+		} else {
+			return B_WATER;
 		}
 	}
 

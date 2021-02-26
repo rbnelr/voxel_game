@@ -92,23 +92,49 @@ namespace worldgen {
 }
 
 struct WorldGenerator {
+	//SERIALIZE(WorldGenerator,
+	//	seed_str,
+	//	max_depth, base_depth,
+	//	large_noise, small_noise,
+	//	ground_ang
+
 	std_string seed_str = "test2";
 	uint64_t seed;
 
-	float elev_freq = 400, elev_amp = 25;
-	float rough_freq = 220;
+	struct NoiseParam {
+		SERIALIZE(NoiseParam, period, strength, cutoff, cutoff_val)
 
-	struct Detail {
-		float freq, amp;
+		float period = 20;
+		float strength = 1;
+
+		bool cutoff = false;
+		float cutoff_val = 0.0f;
 	};
-	std_vector<Detail> detail = {
-		{ 70, 12 },
-		{ 20,  3 },
-		{  3, 0.14f },
+
+	float max_depth = 40;
+	float base_depth = 25;
+
+	std::vector<NoiseParam> large_noise = {
+		{ 300, -1 },
+		{ 180, -1 },
+		{  70, -1.5f },
 	};
+
+	std::vector<NoiseParam> small_noise = {
+		{ 4, 0.3f },
+		{ 20, 0.9f, true },
+	};
+
+	float overhang_stren = 0.55f;
+	float stalag_stren = 50;
+
+	float ground_ang = 0.55f;
+
+	float earth_depth = 5;
+	float rock_depth = 1;
 
 	float tree_desity_period = 200;
-	float tree_density_amp = 1;
+	float tree_density_amp = 1.5f;
 
 	float grass_desity_period = 40;
 	float grass_density_amp = .5f;
@@ -119,6 +145,29 @@ struct WorldGenerator {
 		bids.load();
 	}
 
+
+	static void imgui_noise_layers (char const* name, std::vector<NoiseParam>& layers) {
+		if (!imgui_push(name)) return;
+
+		int count = (int)layers.size();
+		ImGui::DragInt("count", &count, 0.01f, 0, 20);
+		layers.resize(count);
+
+		for (int i=0; i<(int)layers.size(); ++i) {
+			ImGui::PushID(i);
+			ImGui::DragFloat("freq", &layers[i].period, 0.05f);		ImGui::SameLine();
+			ImGui::DragFloat("amp",  &layers[i].strength,  0.05f);	ImGui::SameLine();
+
+			ImGui::Checkbox("cutoff", &layers[i].cutoff);
+
+			if (layers[i].cutoff) {	ImGui::SameLine();
+			ImGui::DragFloat("cutoff_val",  &layers[i].cutoff_val,  0.05f);
+			}
+			ImGui::PopID();
+		}
+
+		imgui_pop();
+	}
 	void imgui () {
 		if (!imgui_push("WorldGenerator")) return;
 
@@ -128,27 +177,24 @@ struct WorldGenerator {
 
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.2f);
 
-		ImGui::DragFloat("elev_freq", &elev_freq, 0.05f);
-		ImGui::SameLine();
-		ImGui::DragFloat("amp##elev", &elev_amp, 0.05f);
+		ImGui::Separator();
 
-		ImGui::DragFloat("rough_freq", &rough_freq, 0.05f);
+		ImGui::DragFloat("max_depth", &max_depth, 0.1f);
+		ImGui::DragFloat("base_depth", &base_depth, 0.1f);
 
-		for (int i=0; i<(int)detail.size(); ++i) {
-			ImGui::PushID(i);
-				ImGui::DragFloat("freq", &detail[i].freq, 0.05f);
-				ImGui::SameLine();
-				ImGui::DragFloat("amp",  &detail[i].amp,  0.05f);
-			ImGui::PopID();
-		}
+		ImGui::Spacing();
 
-		ImGui::DragFloat("tree_des_per", &tree_desity_period, 0.05f);
-		ImGui::SameLine();
-		ImGui::DragFloat("amp##tree_dens",  &tree_density_amp,  0.05f);
+		ImGui::Spacing();
+		imgui_noise_layers("large_noise", large_noise);
 
-		ImGui::DragFloat("grass_des_per", &grass_desity_period, 0.05f);
-		ImGui::SameLine();
-		ImGui::DragFloat("amp##grass_dens",  &grass_density_amp,  0.05f);
+		ImGui::Spacing();
+		imgui_noise_layers("small_noise", small_noise);
+
+		ImGui::DragFloat("stalag_stren", &stalag_stren, 0.1f);
+		ImGui::DragFloat("overhang_stren", &overhang_stren, 0.1f);
+
+		ImGui::Spacing();
+		ImGui::DragFloat("ground_ang", &ground_ang, 0.01f);
 
 		ImGui::PopItemWidth();
 		imgui_pop();
@@ -190,7 +236,8 @@ namespace worldgen {
 			//pos += (1103 * float3(53, 211, 157)) * seed; // random prime directional offset to replace lack of seed in OSN noise
 			float3 p = pos / period; // period is inverse frequency
 
-			return noise3.eval<float>(p.x, p.y, p.z / 0.7f) * period; // 0.7 to flatten world
+			// adjust noise values because I treat them like a SDF and they seem to be off by a factor of ~4
+			return noise3.eval<float>(p.x, p.y, p.z) * period * 0.25f;
 		}
 
 		float calc_large_noise (float3 const& pos);
