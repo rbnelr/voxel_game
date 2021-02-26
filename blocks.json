@@ -29,12 +29,12 @@
 		},
 
 		"stone": {
-			"tex": [2,0],
+			"tex": [6,0],
 			"tool": "pickaxe",
 			"hardness": 20
 		},
 		"hardstone": {
-			"tex": [11,2],
+			"tex": [7,0],
 			"tool": "pickaxe",
 			"hardness": 30
 		},

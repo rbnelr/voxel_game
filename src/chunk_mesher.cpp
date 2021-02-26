@@ -231,7 +231,7 @@ struct CallCtx {
 			} else {
 				_dense_subchunks++;
 
-				ZoneScopedN("mesh dense subchunk");
+				//ZoneScopedN("mesh dense subchunk");
 
 				// Straight single loop version
 			#if 0

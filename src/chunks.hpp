@@ -3,7 +3,7 @@
 #include "blocks.hpp"
 #include "assets.hpp"
 
-#if 0
+#if 1
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		63
