@@ -162,10 +162,13 @@ struct ChunkVoxels {
 struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED		= 1u<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
-		//LOADED			= 1<<1, // block data valid and safe to use in main thread
-		SPARSE_VOXELS	= 1u<<2, // voxel_data is a single block id instead of a dense_chunk id
-		VOXELS_DIRTY	= 1u<<3, // voxels were changed, run checked_sparsify
-		REMESH			= 1u<<4, // need remesh due to voxel change, neighbour chunk change, etc.
+		
+		SPARSE_VOXELS	= 1u<<1, // voxel_data is a single block id instead of a dense_chunk id
+		
+		VOXELS_DIRTY	= 1u<<2, // voxels were changed, run checked_sparsify
+		REMESH			= 1u<<3, // need remesh due to voxel change, neighbour chunk change, etc.
+
+		LOADED_PHASE2	= 1u<<5, // not set: phase 1
 
 		// Flags for if neighbours[i] contains null to skip neighbour loop in iterate chunk loading for performance
 		NEIGHBOUR0_NULL = 1u<<26,
@@ -183,10 +186,9 @@ struct Chunk {
 	chunk_id neighbours[6];
 	// make sure there are still at 4 bytes following this so that 16-byte sse loads of neighbours can never segfault
 
-	uint8_t loadphase;
-	//uint8_t refcount; // how many async jobs are using this chunk data, if > 0 chunk is not allowed to be freed etc.
-	
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
+	
+	uint16_t _pad; // free space
 
 	slice_id opaque_mesh_slices;
 	slice_id transp_mesh_slices;
@@ -303,7 +305,6 @@ struct BlueNoiseTexture {
 };
 
 struct Chunks {
-	//ScrollingArray<chunk_id>		chunks_arr;
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
 	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
@@ -313,7 +314,7 @@ struct Chunks {
 
 	chunk_pos_map<chunk_id>			chunks_map;
 
-	chunk_pos_map<int>				queued_chunks; // queued for async worldgen, val is phase
+	chunk_pos_set					queued_chunks; // queued for async worldgen
 
 	BlueNoiseTexture				blue_noise_tex;
 
@@ -414,7 +415,6 @@ struct Chunks {
 	// by changing the BUCKET_FAC you increase the amount of vectors needed but increase the accuracy of the sort
 	struct GenChunk {
 		int3 pos;
-		int phase;
 	};
 	std_vector< std_vector<GenChunk> > chunks_to_generate;
 	uint32_t pending_chunks = 0; // chunks waiting to be queued

@@ -201,12 +201,10 @@ namespace worldgen {
 }
 
 struct WorldgenJob {
-	int						phase;
 	worldgen::NoisePass		noise_pass;
 
 	// unfortunately need ctor because OSN::Noise<3> does work in it's ctor, which it shouldn't
-	WorldgenJob (int phase, int3 chunk_pos, WorldGenerator const* wg):
-		phase{phase}, noise_pass{chunk_pos, wg} {}
+	WorldgenJob (int3 chunk_pos, WorldGenerator const* wg): noise_pass{chunk_pos, wg} {}
 
 	void execute ();
 };
