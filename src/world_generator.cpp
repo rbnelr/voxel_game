@@ -27,11 +27,16 @@ namespace worldgen {
 
 			depth += val;
 		}
+		
+		// smaller ridges in wall
+		float cut = noise(pos / float3(4,4,1), 15, seed++);
+		depth -= max(cut * 4, 0.0f);
+
 		return depth;
 	}
 
 	BlockID NoisePass::cave_noise (float3 const& pos, float large_noise, float3 const& normal) {
-		int water_level = 21;
+		int water_level = 23;
 
 		float depth = large_noise;
 		
@@ -43,28 +48,39 @@ namespace worldgen {
 		
 			depth += val;
 		}
+
+		float modifer = noise01(pos / float3(1,1,3), 14, seed++);
 		
+		//float ground = wall;
+		//float ground = clamp(0.3f - abs(normal.z));
+
 		// soil cover
 		float ground = clamp(map(normal.z, wg->ground_ang, 1.0f));
-		depth += wg->overhang_stren * clamp(ground * 3); // create small overhangs of earth
+		depth += wg->earth_overhang_stren * clamp(ground * 3); // create small overhangs of earth
+
+		float beach_lo = water_level - (2 + modifer*2.5f);
+		float beach_hi = water_level + (0.2f + modifer*1.2f);
+		bool beach = pos.z >= beach_lo && pos.z < beach_hi;
 
 		if (depth > 0) {
 
-			if (depth < wg->earth_depth * ground) // thinner earth layer on steeper slopes
-				return B_EARTH;
+			if (depth < wg->earth_depth * ground) {// thinner earth layer on steeper slopes
+				if (beach) return B_SAND;
+				if (pos.z >= water_level) {
+					return B_EARTH;
+				} else {
+					return B_GRAVEL;
+				}
+			}
 
 			// rock
 
 			// erode rock
 			if (normal.z > -0.6f) {
-				float3 roughpos = pos;
-				roughpos.z /= 3;
-
-				float stren = noise01(roughpos, 14, 6);
-				stren = max(stren - 0.1f, 0.0f);
+				float stren = max(modifer - 0.1f, 0.0f);
 				//stren = stren * stren;
-
-				depth -= max(noise(roughpos, 3, 6) * 8 * stren, 0.0f);
+			
+				depth -= max(noise(pos / float3(1,1,3), 3, seed++) * 8 * stren, 0.0f);
 			}
 
 			if (depth > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
@@ -76,14 +92,16 @@ namespace worldgen {
 			}
 		}
 
-		// stalagtites
-		float stalag = noise01(pos / float3(1,1,64), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
-		stalag = clamp(map(stalag, 0.4f, 1.0f));
-		stalag = stalag*stalag*stalag * wg->stalag_stren;
+		// stalactites
+		if (wg->stalac) {
+			float stalac = noise01(pos / float3(1,1,64), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
+			stalac = clamp(map(stalac, 0.4f, 1.0f));
+			stalac = stalac*stalac*stalac * wg->stalac_stren;
 
-		if ((depth + stalag) > 0)
-			return B_STONE;
-
+			if ((depth + stalac) > 0)
+				return B_STONE;
+		}
+		
 		// air & water
 		if (pos.z >= water_level) {
 			return B_AIR;

@@ -206,7 +206,20 @@ struct Screenshots {
 				pitch = 4ull * img_size.x;
 			}
 
-			if (stbi_write_png("../screenshot.png", img_size.x, img_size.y, 4, data, (int)subresource_layout.rowPitch)) {
+
+			time_t t = time(0); // get time now
+			struct tm* now = localtime(&t);
+
+			char timestr [80];
+			strftime(timestr, 80, "%g%m%d-%H%M%S", now); // yy-mm-dd_hh-mm-ss
+
+			static int counter = 0; // counter to avoid overwriting files in edge cases
+			auto filename = prints("../screenshots/screen_%s_%d.jpg", timestr, counter++);
+			counter %= 100;
+
+			stbi_flip_vertically_on_write(false);
+			if (stbi_write_jpg(filename.c_str(), img_size.x, img_size.y, 4, data, 95)) {
+			//if (stbi_write_png(filename.c_str(), img_size.x, img_size.y, 4, data, (int)subresource_layout.rowPitch)) {
 				clog(INFO, "Screenshot taken!");
 			} else {
 				clog(WARNING, "Screenshot error!");

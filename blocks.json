@@ -38,6 +38,17 @@
 			"tool": "pickaxe",
 			"hardness": 30
 		},
+		
+		"sand": {
+			"hardness": 1,
+			"tool": "shovel",
+			"tex": [4,0]
+		},
+		"gravel": {
+			"hardness": 5,
+			"tool": "shovel",
+			"tex": [3,0]
+		},
 
 		"tree_log": {
 			"hardness": 7,

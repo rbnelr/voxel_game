@@ -52,10 +52,15 @@ namespace worldgen {
 		B_AIR			=0,
 		B_UNBREAKIUM	,
 		B_WATER			,
-		B_STONE			,
-		B_HARDSTONE		,
+
 		B_EARTH			,
 		B_GRASS			,
+		B_SAND			,
+		B_GRAVEL		,
+
+		B_STONE			,
+		B_HARDSTONE		,
+
 		B_TREE_LOG		,
 		B_LEAVES		,
 		B_TALLGRASS		,
@@ -69,10 +74,15 @@ namespace worldgen {
 			/*B_AIR			*/ "air",
 			/*B_UNBREAKIUM	*/ "unbreakium",
 			/*B_WATER		*/ "water",
-			/*B_STONE		*/ "stone",
-			/*B_HARDSTONE	*/ "hardstone",
+
 			/*B_EARTH		*/ "earth",
 			/*B_GRASS		*/ "grass",
+			/*B_SAND		*/ "sand",
+			/*B_GRAVEL		*/ "gravel",
+
+			/*B_STONE		*/ "stone",
+			/*B_HARDSTONE	*/ "hardstone",
+
 			/*B_TREE_LOG	*/ "tree_log",
 			/*B_LEAVES		*/ "leaves",
 			/*B_TALLGRASS	*/ "tallgrass",
@@ -125,10 +135,11 @@ struct WorldGenerator {
 		{ 20, 0.9f, true },
 	};
 
-	float overhang_stren = 0.55f;
-	float stalag_stren = 50;
+	bool stalac = true;
+	float stalac_stren = 50;
 
 	float ground_ang = 0.55f;
+	float earth_overhang_stren = 0.55f;
 
 	float earth_depth = 5;
 	float rock_depth = 1;
@@ -190,11 +201,12 @@ struct WorldGenerator {
 		ImGui::Spacing();
 		imgui_noise_layers("small_noise", small_noise);
 
-		ImGui::DragFloat("stalag_stren", &stalag_stren, 0.1f);
-		ImGui::DragFloat("overhang_stren", &overhang_stren, 0.1f);
+		ImGui::Checkbox("stalac", &stalac);
+		ImGui::DragFloat("stalac_stren", &stalac_stren, 0.1f);
 
 		ImGui::Spacing();
 		ImGui::DragFloat("ground_ang", &ground_ang, 0.01f);
+		ImGui::DragFloat("earth_overhang_stren", &earth_overhang_stren, 0.1f);
 
 		ImGui::PopItemWidth();
 		imgui_pop();
