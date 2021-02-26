@@ -68,13 +68,13 @@ struct CallCtx {
 
 		// generate face of our voxel that faces negative direction neighbour
 		if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[bid] < 0) {
-			auto* mesh = b.transparency == TM_TRANSPARENT ? &j.tranparent_vertices : &j.opaque_vertices;
+			auto* mesh = b.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
 			face(j, bid, x,y,z, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
 		}
 
 		// generate face of negative direction neighbour that faces this voxel
 		if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
-			auto* mesh = nb.transparency == TM_TRANSPARENT ? &j.tranparent_vertices : &j.opaque_vertices;
+			auto* mesh = nb.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
 			int nx = AXIS == 0 ? x-1 : x;
 			int ny = AXIS == 1 ? y-1 : y;
 			int nz = AXIS == 2 ? z-1 : z;

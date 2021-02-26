@@ -32,7 +32,7 @@ void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkComman
 	chunks.upload_slices.shrink_to_fit();
 
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight
-		frame.slices_end = chunks.slices_alloc.alloc_end;
+		frame.slices_end = chunks.slices.slots.alloc_end;
 
 		int slices_end = 0;
 		for (auto& f : frames)
@@ -72,14 +72,12 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			a.draw_lists[1].count = 0;
 		}
 
-		auto push_draw_slices = [this] (chunk_id cid, ChunkMesh& mesh, DrawType type) {
-			uint32_t remain_count = mesh.vertex_count;
-			int i = 0;
+		auto push_draw_slices = [&] (chunk_id cid, uint32_t vertex_count, slice_id slices, DrawType type) {
+			uint32_t remain_count = vertex_count;
+			slice_id sliceid = slices;
 			while (remain_count > 0) {
-				slice_id sid = mesh.slices[i++];
-
-				uint16_t alloci = sid / (uint32_t)SLICES_PER_ALLOC;
-				uint16_t slicei = sid % (uint32_t)SLICES_PER_ALLOC;
+				uint16_t alloci = sliceid / (uint32_t)SLICES_PER_ALLOC;
+				uint16_t slicei = sliceid % (uint32_t)SLICES_PER_ALLOC;
 
 				auto& draw_list = allocs[alloci].draw_lists[type];
 
@@ -87,6 +85,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 				draw_list.slices[draw_list.count++] = { draw_vertex_count, slicei, cid };
 
 				remain_count -= draw_vertex_count;
+				sliceid = chunks.slices[sliceid].next;
 			}
 		};
 
@@ -103,7 +102,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			auto& chunk = chunks[cid];
 			if (chunk.flags == 0) continue;
 
-			bool empty = chunk.opaque_mesh.vertex_count == 0 && chunk.transparent_mesh.vertex_count == 0;
+			bool empty = chunk.opaque_mesh_vertex_count == 0 && chunk.transp_mesh_vertex_count == 0;
 
 			float3 lo = (float3)(chunk.pos * CHUNK_SIZE);
 			float3 hi = (float3)((chunk.pos + 1) * CHUNK_SIZE);
@@ -113,8 +112,8 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 			chunks.visualize_chunk(chunk, empty, culled);
 
 			if (!culled) {
-				push_draw_slices(cid, chunk.opaque_mesh, DT_OPAQUE);
-				push_draw_slices(cid, chunk.transparent_mesh, DT_TRANSPARENT);
+				push_draw_slices(cid, chunk.opaque_mesh_vertex_count, chunk.opaque_mesh_slices, DT_OPAQUE);
+				push_draw_slices(cid, chunk.transp_mesh_vertex_count, chunk.transp_mesh_slices, DT_TRANSPARENT);
 			}
 		}
 	}

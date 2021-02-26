@@ -70,16 +70,15 @@ struct ChunkRenderer {
 
 		size_t vertices = 0;
 		size_t slices_total = 0;
+
 		for (chunk_id cid=0; cid<chunks.end(); ++cid) {
 			if (chunks[cid].flags == 0) continue;
 
-			vertices += chunks[cid].opaque_mesh.vertex_count;
-			vertices += chunks[cid].transparent_mesh.vertex_count;
+			vertices += chunks[cid].opaque_mesh_vertex_count;
+			vertices += chunks[cid].transp_mesh_vertex_count;
 
-			for (int i=0; i<MAX_CHUNK_SLICES; ++i)
-				if (chunks[cid].opaque_mesh.slices[i] != U16_NULL) slices_total++;
-			for (int i=0; i<MAX_CHUNK_SLICES; ++i)
-				if (chunks[cid].transparent_mesh.slices[i] != U16_NULL) slices_total++;
+			slices_total += _slices_count(chunks[cid].opaque_mesh_vertex_count);
+			slices_total += _slices_count(chunks[cid].transp_mesh_vertex_count);
 		}
 
 		ImGui::Separator();
@@ -96,7 +95,7 @@ struct ChunkRenderer {
 			(float)(vertices * sizeof(BlockMeshInstance)) / (float)(allocs.size() * ALLOC_SIZE) * 100);
 
 		if (ImGui::TreeNode("slices alloc")) {
-			print_bitset_allocator(chunks.slices_alloc, CHUNK_SLICE_BYTESIZE, ALLOC_SIZE);
+			print_bitset_allocator(chunks.slices.slots, CHUNK_SLICE_BYTESIZE, ALLOC_SIZE);
 			ImGui::TreePop();
 		}
 

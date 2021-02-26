@@ -366,8 +366,7 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 		chunk.pos = pos;
 		//chunk.refcount = 0;
 		init_voxels(chunk);
-		init_mesh(chunk.opaque_mesh);
-		init_mesh(chunk.transparent_mesh);
+		chunk.init_meshes();
 	}
 
 	return id;
@@ -378,8 +377,8 @@ void Chunks::free_chunk (chunk_id id) {
 
 	free_voxels(chunk);
 
-	free_mesh(chunk.opaque_mesh);
-	free_mesh(chunk.transparent_mesh);
+	free_slices(chunk.opaque_mesh_slices);
+	free_slices(chunk.transp_mesh_slices);
 
 	{ // link neigbour ptrs
 		for (int i=0; i<6; ++i) {
@@ -394,6 +393,8 @@ void Chunks::free_chunk (chunk_id id) {
 	memset(&chunk, 0, sizeof(Chunk)); // zero chunk, flags will now indicate that chunk is unallocated
 	chunks.free(id);
 }
+
+#include "immintrin.h"
 
 void Chunks::update_chunk_loading (Game& game) {
 	ZoneScoped;
@@ -696,33 +697,39 @@ void Chunks::update_chunk_meshing (Game& game) {
 		ZoneScopedN("remesh process slices");
 
 		// upload remeshed slices and register them in chunk mesh
-		auto process_slices = [&] (ChunkMeshData& remeshed, ChunkMesh& mesh) {
+		auto process_slices = [&] (ChunkMeshData& remeshed, uint32_t* pvertex_count, slice_id* pslices) {
 			ZoneScopedN("process_slices");
 
-			mesh.vertex_count = remeshed.vertex_count();
-			uint32_t remain_vertices = mesh.vertex_count;
+			*pvertex_count = remeshed.vertex_count();
+			uint32_t remain_vertices = *pvertex_count;
 
-			int slice = 0;
+			slice_id* prev_next = pslices;
+			slice_id sliceid = *prev_next;
+
+			int i = 0;
 			while (remain_vertices > 0) {
-				if (mesh.slices[slice] == U16_NULL)
-					mesh.slices[slice] = slices_alloc.alloc();
+				if (sliceid == U16_NULL) {
+					sliceid = (slice_id)slices.alloc();
+					slices[sliceid].next = U16_NULL;
+					*prev_next = sliceid;
+				}
 
 				uint32_t count = std::min(remain_vertices, (uint32_t)CHUNK_SLICE_LENGTH);
 
 				// queue data to be uploaded for sliceid, data stays valid (malloc'd) until it is processed by the renderer
-				upload_slices.push_back({ mesh.slices[slice], remeshed.slices[slice] });
+				upload_slices.push_back({ sliceid, remeshed.slices[i++] });
 
 				remain_vertices -= count;
 
-				slice++;
+				prev_next = &slices[sliceid].next;
+				sliceid = *prev_next;
 			}
 
 			// free potentially remaining slices no longer needed
-			for (; slice<MAX_CHUNK_SLICES; ++slice) {
-				if (mesh.slices[slice] != U16_NULL)
-					slices_alloc.free(mesh.slices[slice]);
-				mesh.slices[slice] = U16_NULL;
-			}
+			free_slices(sliceid);
+
+			// end linked list before the part that we freed
+			*prev_next = U16_NULL;
 		};
 
 		for (size_t resi=0; resi < remesh_jobs.size();) {
@@ -732,9 +739,9 @@ void Chunks::update_chunk_meshing (Game& game) {
 			for (size_t i=0; i<count; ++i) {
 				auto res = std::move(results[i]);
 
-				process_slices(res->opaque_vertices, res->chunk->opaque_mesh);
-				process_slices(res->tranparent_vertices, res->chunk->transparent_mesh);
-
+				process_slices(res->opaque_vertices, &res->chunk->opaque_mesh_vertex_count, &res->chunk->opaque_mesh_slices);
+				process_slices(res->transp_vertices, &res->chunk->transp_mesh_vertex_count, &res->chunk->transp_mesh_slices);
+				
 				res->chunk->flags &= ~Chunk::REMESH;
 			}
 
@@ -856,11 +863,11 @@ void Chunks::imgui (Renderer* renderer) {
 				ImGui::Text("[%5d] <not allocated>", id);
 			else
 				ImGui::Text("[%5d] %+4d,%+4d,%+4d - %2d, %2d slices", id, chunks[id].pos.x,chunks[id].pos.y,chunks[id].pos.z,
-					chunks[id].opaque_mesh.slices_count(), chunks[id].transparent_mesh.slices_count());
+					_slices_count(chunks[id].opaque_mesh_vertex_count), _slices_count(chunks[id].transp_mesh_vertex_count));
 		}
 		ImGui::TreePop();
 	}
-
+	
 	ImGui::Spacing();
 
 	print_block_allocator(chunks, "chunks alloc");

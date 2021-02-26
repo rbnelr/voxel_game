@@ -15,7 +15,7 @@
 
 #if 1
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		8 // size of chunk in subchunks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
 #else
@@ -61,7 +61,6 @@ typedef uint16_t			chunk_id;
 
 #define MAX_CHUNKS			((1<<16)-1) // one less than POT to allow i<N loop condition and leave -1u as null value
 #define MAX_SLICES			((1<<16)-1) // one less than POT to allow i<N loop condition and leave -1u as null value
-#define MAX_CHUNK_SLICES	32
 
 #define CHUNK_SLICE_BYTESIZE	(64 *KB)
 static_assert(CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance) < ((1<<16)-1), "");
@@ -118,13 +117,9 @@ struct WorldgenJob;
 
 inline constexpr block_id g_null_chunk[CHUNK_VOXEL_COUNT] = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
 
-struct ChunkMesh {
-	uint32_t vertex_count;
-	slice_id slices[MAX_CHUNK_SLICES];
-
-	int slices_count () {
-		return (vertex_count + CHUNK_SLICE_LENGTH-1) / CHUNK_SLICE_LENGTH;
-	}
+// linked list in Chunks::slices
+struct SliceNode {
+	slice_id next;
 };
 
 // 3-Level Sparse storage system for voxels
@@ -193,8 +188,18 @@ struct Chunk {
 	
 	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 
-	ChunkMesh opaque_mesh;
-	ChunkMesh transparent_mesh;
+	slice_id opaque_mesh_slices;
+	slice_id transp_mesh_slices;
+
+	uint32_t opaque_mesh_vertex_count;
+	uint32_t transp_mesh_vertex_count;
+
+	void init_meshes () {
+		opaque_mesh_slices = U16_NULL;
+		transp_mesh_slices = U16_NULL;
+		opaque_mesh_vertex_count = 0;
+		transp_mesh_vertex_count = 0;
+	}
 
 	void _validate_flags () {
 		if ((flags & ALLOCATED) == 0) assert(flags == (Flags)0);
@@ -207,7 +212,11 @@ struct Chunk {
 };
 ENUM_BITFLAG_OPERATORS_TYPE(Chunk::Flags, uint32_t)
 
-//inline constexpr size_t _chunk_sz = sizeof(Chunk); // only for checking value in intellisense
+inline int _slices_count (uint32_t vertex_count) { // just for imgui
+	return (vertex_count + CHUNK_SLICE_LENGTH-1) / CHUNK_SLICE_LENGTH;
+}
+
+inline constexpr size_t _chunk_sz = sizeof(Chunk); // only for checking value in intellisense
 
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
 inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
@@ -300,7 +309,7 @@ struct Chunks {
 	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
 	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
 
-	AllocatorBitset					slices_alloc;
+	BlockAllocator<SliceNode>		slices			= { MAX_SLICES };
 
 	chunk_pos_map<chunk_id>			chunks_map;
 
@@ -319,17 +328,12 @@ struct Chunks {
 		destroy();
 	}
 
-	void init_mesh (ChunkMesh& m) {
-		m.vertex_count = 0;
-		memset(m.slices, -1, sizeof(m.slices));
-	}
-	void free_mesh (ChunkMesh& m) {
-		for (auto& s : m.slices) {
-			if (s != U16_NULL)
-				slices_alloc.free(s);
-			s = U16_NULL;
+	void free_slices (slice_id sid) {
+		while (sid != U16_NULL) {
+			auto next = slices[sid].next;
+			slices.free(sid);
+			sid = next;
 		}
-		m.vertex_count = 0;
 	}
 
 	void init_voxels (Chunk& c);

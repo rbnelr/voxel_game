@@ -14,25 +14,25 @@ struct ChunkMeshData {
 	BlockMeshInstance* next_ptr = nullptr;
 	BlockMeshInstance* alloc_end = nullptr;
 
-	int used_slices = 0;
+	std::vector<ChunkSliceData*> slices;
 
-	uint32_t vertex_count () {
-		return used_slices * CHUNK_SLICE_LENGTH - (uint32_t)(alloc_end - next_ptr);
+	ChunkMeshData () {
+		slices.reserve(32);
 	}
 
-	ChunkSliceData* slices[MAX_CHUNK_SLICES] = {};
+	uint32_t vertex_count () {
+		return (uint32_t)slices.size() * CHUNK_SLICE_LENGTH - (uint32_t)(alloc_end - next_ptr);
+	}
 
 	void alloc_slice () {
 		ZoneScopedC(tracy::Color::Crimson);
-		if (used_slices >= MAX_CHUNK_SLICES)
-			return;
-			//throw std::runtime_error("exceeded MAX_CHUNK_SLICES!");
+
 		auto* s = (ChunkSliceData*)malloc(sizeof(ChunkSliceData));
 
 		next_ptr  = s->verts;
 		alloc_end = s->verts + CHUNK_SLICE_LENGTH;
 
-		slices[used_slices++] = s;
+		slices.push_back(s);
 	}
 	static void free_slice (ChunkSliceData* s) {
 		if (s) {
@@ -43,9 +43,6 @@ struct ChunkMeshData {
 
 	// forceinline because this is doing nothing but an if and a increment 99% of the time, compiler should keep alloc_slice not inlined instead
 	__forceinline BlockMeshInstance* push () {
-		if (used_slices >= MAX_CHUNK_SLICES)
-			return nullptr;
-
 		if (next_ptr != alloc_end) {
 			// likely case
 		} else {
@@ -79,7 +76,7 @@ struct RemeshChunkJob { // Chunk remesh
 
 	//// output data
 	ChunkMeshData				opaque_vertices;
-	ChunkMeshData				tranparent_vertices;
+	ChunkMeshData				transp_vertices;
 
 	RemeshChunkJob (Chunks& chunks, Chunk* chunk, WorldGenerator const& wg, bool mesh_world_border);
 
