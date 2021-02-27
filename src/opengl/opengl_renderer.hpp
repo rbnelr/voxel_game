@@ -131,8 +131,9 @@ public:
 	Sampler			tile_sampler = {"tile_sampler"};
 	Sampler			normal_sampler = {"normal_sampler"};
 
-	Ubo				block_meshes_ubo = {"block_meshes_ubo"};
-	//Ubo				block_tiles_ubo = {"block_tiles_ubo"}; // does not work due to each int in array in struct being padded to hell
+	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
+	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
+
 	Texture2DArray	tile_textures = {"tile_textures"};
 
 	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);

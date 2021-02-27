@@ -15,8 +15,6 @@ layout(location = 0) vs2fs VS {
 	layout(location = 1) in uint	meshid;
 	layout(location = 2) in float	texid;
 	
-	#define MAX_UBO_SIZE (64*1024)
-	
 	uniform vec3 chunk_pos;
 	
 	//
@@ -26,10 +24,9 @@ layout(location = 0) vs2fs VS {
 		vec4 uv;
 	};
 	#define MERGE_INSTANCE_FACTOR 6
-	#define MAX_BLOCK_MESHES (MAX_UBO_SIZE / (48 * MERGE_INSTANCE_FACTOR)) // sizeof(BlockMeshVertex)
 	
-	layout(std140, binding = 1) uniform BlockMeshes {
-		BlockMeshVertex vertices[MAX_BLOCK_MESHES][MERGE_INSTANCE_FACTOR];
+	layout(std430, binding = 1) readonly buffer BlockMeshes {
+		BlockMeshVertex vertices[][MERGE_INSTANCE_FACTOR];
 	} block_meshes;
 	
 	void main () {

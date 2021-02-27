@@ -66,8 +66,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	PipelineState s;
 
 	//
-	bind_ubo(block_meshes_ubo, 1);
-	//bind_ubo(block_tiles_ubo, 2);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
@@ -278,13 +278,19 @@ bool OpenglRenderer::load_textures () {
 
 void OpenglRenderer::load_static_data () {
 
-	upload_ubo(block_meshes_ubo,
-		g_assets.block_meshes.slices.data(),
-		g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]));
 
-	//upload_ubo(block_tiles_ubo,
-	//	g_assets.block_tiles.data(),
-	//	g_assets.block_tiles.size() * sizeof(g_assets.block_tiles[0]));
+	{
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_meshes_ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]),
+		                                       g_assets.block_meshes.slices.data(), GL_STREAM_DRAW);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
+	}
+	{
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_tiles_ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_tiles.size() * sizeof(g_assets.block_tiles[0]),
+		                                       g_assets.block_tiles.data(), GL_STREAM_DRAW);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
+	}
 
 	load_textures();
 }

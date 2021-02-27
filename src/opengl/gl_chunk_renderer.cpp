@@ -178,12 +178,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	static bool inited = false;
 	if (!inited && g_window.frame_counter >= 100) {
 		{
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_tiles_ssbo);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_tiles.size() * sizeof(BlockTile), g_assets.block_tiles.data(), GL_STREAM_DRAW);
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
-		}
-
-		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunks_ssbo.ssbo);

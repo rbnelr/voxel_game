@@ -126,12 +126,10 @@ struct Raytracer {
 	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
 	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
-	Ssbo					block_tiles_ssbo = {"block_tiles_ssbo"};
-
 	bool visualize_iterations = false;
 	int max_iterations = 500;
 
-	bool enable = true;
+	bool enable = 0;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
