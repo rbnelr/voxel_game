@@ -187,7 +187,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 		glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
-		glDispatchCompute(r.framebuffer.size.x, r.framebuffer.size.y, 1);
+		glDispatchCompute(r.framebuffer.size.x / 16, r.framebuffer.size.y / 16, 1);
 
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 

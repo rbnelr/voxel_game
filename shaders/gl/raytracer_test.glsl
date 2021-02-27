@@ -4,7 +4,7 @@
 
 #include "common.glsl"
 
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
@@ -149,7 +149,7 @@ int get_step_face (int cur_axis, vec3 step_delta) {
 }
 
 const float max_dist = 100.0;
-const int max_iter = 32;
+const int max_iter = 100;
 
 uint32_t chunk_id;
 
@@ -254,6 +254,10 @@ void trace_pixel (vec2 px_pos) {
 
 void main () {
 	vec2 pos = gl_GlobalInvocationID.xy;
+
+	// maybe try not to do rays that we do not see (happens due to local group size)
+	if (pos.x >= view.viewport_size.x || pos.y >= view.viewport_size.y)
+		return;
 
 	trace_pixel(pos);
 	//col.rg = pos / view.viewport_size;

@@ -136,7 +136,7 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad_test = shaders.compile("raytracer_test", {}, {{ COMPUTE_SHADER }});
+		shad_test = shaders.compile("raytracer_test", {{"LOCAL_SIZE", "16"}}, {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;
