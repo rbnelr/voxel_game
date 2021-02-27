@@ -4,6 +4,8 @@
 #include "chunk_mesher.hpp"
 #include "opengl_renderer.hpp"
 
+#include "engine/window.hpp" // for frame_counter hack
+
 namespace gl {
 
 void ChunkRenderer::upload_remeshed (Chunks& chunks) {
@@ -149,24 +151,49 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
 
-	glUseProgram(shad_test->prog);
+	if (shad_test) {
+		glUseProgram(shad_test->prog);
 
-	//shad_test->set_uniform("img_size", (float2)r.framebuffer.size);
+		chunk_id camera_chunk;
+		{
+			int3 pos = floori((float3)(game.view.cam_to_world * float4(0,0,0,1)) / (float)CHUNK_SIZE);
+			camera_chunk = game.chunks.query_chunk(pos);
+			if (camera_chunk == U16_NULL)
+				camera_chunk = 0; // ugh what do?
+		}
+
+		shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
 	
-	//{
-	//	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-	//	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float4) * cols.size(), cols.data(), GL_STREAM_DRAW);
-	//	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo);
-	//}
+		static bool inited = false;
+		if (!inited && g_window.frame_counter >= 100) {
+			{
+				glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
+				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, chunks_ssbo.ssbo);
+			}
+			{
+				glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
+				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_chunks.commit_size(), game.chunks.dense_chunks.arr, GL_STREAM_DRAW);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, dense_chunks_ssbo.ssbo);
+			}
+			{
+				glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
+				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_subchunks.commit_size(), game.chunks.dense_subchunks.arr, GL_STREAM_DRAW);
+				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, dense_subchunks_ssbo.ssbo);
+			}
 
-	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+			inited = true;
+		}
 
-	glDispatchCompute(r.framebuffer.size.x, r.framebuffer.size.y, 1);
+		glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glDispatchCompute(r.framebuffer.size.x, r.framebuffer.size.y, 1);
 
-	// TODO: how to unbind framebuffer??
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		// TODO: how to unbind framebuffer??
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	}
 }
 
 } // namespace gl

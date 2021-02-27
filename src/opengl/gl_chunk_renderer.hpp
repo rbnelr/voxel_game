@@ -121,8 +121,10 @@ struct Raytracer {
 	};
 
 	SSBO<Chunk> chunks_ssbo = {"Raytracer.chunks_ssbo"};
+	SSBO<Chunk> dense_chunks_ssbo = {"Raytracer.dense_chunks_ssbo"};
+	SSBO<Chunk> dense_subchunks_ssbo = {"Raytracer.dense_subchunks_ssbo"};
 
-	bool enable = false;
+	bool enable = true;
 
 	void imgui () {
 		ImGui::Separator();

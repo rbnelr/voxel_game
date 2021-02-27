@@ -225,7 +225,10 @@ struct Shaders {
 		s->stages = stages;
 		s->macros = macros;
 
-		s->compile();
+		bool success = s->compile();
+		if (!success) {
+			return nullptr;
+		}
 
 		auto* ptr = s.get();
 		shaders.push_back(std::move(s));

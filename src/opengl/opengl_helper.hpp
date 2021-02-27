@@ -259,6 +259,7 @@ inline void _set_uniform (ShaderUniform& u, float2   val) { assert(u.type == Gls
 inline void _set_uniform (ShaderUniform& u, float3   val) { assert(u.type == GlslType::FLOAT3); glUniform3fv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, float4   val) { assert(u.type == GlslType::FLOAT4); glUniform4fv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, int      val) { assert(u.type == GlslType::INT   ); glUniform1i( u.location, val); }
+inline void _set_uniform (ShaderUniform& u, uint32_t val) { assert(u.type == GlslType::UINT  ); glUniform1ui(u.location, val); }
 inline void _set_uniform (ShaderUniform& u, int2     val) { assert(u.type == GlslType::INT2  ); glUniform2iv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, int3     val) { assert(u.type == GlslType::INT3  ); glUniform3iv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, int4     val) { assert(u.type == GlslType::INT4  ); glUniform4iv(u.location, 1, &val.x); }

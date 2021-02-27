@@ -203,7 +203,7 @@ namespace worldgen {
 							auto large_noise = large_noise_get_val(ln);
 
 							BlockID bid = B_UNBREAKIUM;
-							if (large_noise < 40) {
+							if (large_noise < wg->max_depth) {
 								float3 normal = large_noise_normalize_derivative(ln);
 
 								bid = cave_noise(pos_world, large_noise, normal);
@@ -490,7 +490,6 @@ namespace worldgen {
 }
 
 void WorldgenJob::execute () {
-	assert(phase == 1);
 	noise_pass.generate();
 }
 
