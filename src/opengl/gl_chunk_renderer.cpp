@@ -100,6 +100,8 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		}
 	}
 
+	draw_instances = 0;
+
 	auto draw_slices = [&] (Shader* shader, PipelineState& state, DrawType type, int& drawcount) {
 		if (!shader) return;
 
@@ -127,6 +129,8 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 					glDrawArraysInstancedBaseInstance(GL_TRIANGLES,
 						0, BlockMeshes::MERGE_INSTANCE_FACTOR,
 						draw.vertex_count, draw.slice_idx * CHUNK_SLICE_LENGTH);
+
+					draw_instances += draw.vertex_count;
 				}
 
 				drawcount += draw_list.count;
@@ -194,6 +198,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		}
 
 		inited = true;
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
 
 	int szx = align_up(r.framebuffer.size.x, 16);
@@ -201,9 +207,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glDispatchCompute(szx, szy, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-	// TODO: how to unbind framebuffer??
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 } // namespace gl

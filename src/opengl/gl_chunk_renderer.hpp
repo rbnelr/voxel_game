@@ -65,6 +65,7 @@ struct ChunkRenderer {
 
 	int drawcount_opaque = 0;
 	int drawcount_transparent = 0;
+	size_t draw_instances = 0;
 
 	bool _draw_chunks = true; // allow disabling for debugging
 	
@@ -83,11 +84,16 @@ struct ChunkRenderer {
 			slices_total += _slices_count(chunks[cid].transp_mesh_vertex_count);
 		}
 
+		size_t draw_vertices = draw_instances * BlockMeshes::MERGE_INSTANCE_FACTOR;
+
 		ImGui::Separator();
 
 		ImGui::Text("Drawcalls: opaque: %3d  transparent: %3d (%3d / %3d slices - %3.0f%%)",
 			drawcount_opaque, drawcount_transparent, drawcount_opaque + drawcount_transparent,
 			slices_total, (float)(drawcount_opaque + drawcount_transparent) / slices_total * 100);
+
+		ImGui::Text("Vertex workload : drawn instances: %12s (vertices: %12s)",
+			format_thousands(draw_instances).c_str(), format_thousands(draw_vertices).c_str());
 
 		ImGui::Text("Mesh allocs: %2d  slices: %5d  vertices: %12s",
 			allocs.size(), slices_total, format_thousands(vertices).c_str());
