@@ -428,7 +428,7 @@ void VulkanRenderer::upload_static_data () {
 
 	{
 		Image<srgba8> img;
-		img.load_from_file("textures/atlas.png", &img);
+		img.load_from_file("textures/atlas.png", &img, true);
 		assert(img.size == int2(16*TILEMAP_SIZE));
 
 		// place layers at y dir so ot make the memory contiguous

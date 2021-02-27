@@ -67,6 +67,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	//
 	bind_ubo(block_meshes_ubo, 1);
+	//bind_ubo(block_tiles_ubo, 2);
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
@@ -249,7 +250,7 @@ bool OpenglRenderer::load_textures () {
 			for (int x=0; x<TILEMAP_SIZE.x; ++x) {
 				Image<srgba8>::blit_rect(
 					img, int2(x,y)*16,
-					img_arr, int2(0, (y * TILEMAP_SIZE.x + x) * 16),
+					img_arr, int2(0, ((15-y) * TILEMAP_SIZE.x + x) * 16),
 					16);
 			}
 		}
@@ -273,6 +274,10 @@ void OpenglRenderer::load_static_data () {
 	upload_ubo(block_meshes_ubo,
 		g_assets.block_meshes.slices.data(),
 		g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]));
+
+	//upload_ubo(block_tiles_ubo,
+	//	g_assets.block_tiles.data(),
+	//	g_assets.block_tiles.size() * sizeof(g_assets.block_tiles[0]));
 
 	load_textures();
 }

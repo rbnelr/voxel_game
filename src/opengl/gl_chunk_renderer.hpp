@@ -66,6 +66,8 @@ struct ChunkRenderer {
 	int drawcount_opaque = 0;
 	int drawcount_transparent = 0;
 
+	bool _draw_chunks = true; // allow disabling for debugging
+	
 	void imgui (Chunks& chunks) {
 
 		size_t vertices = 0;
@@ -120,19 +122,20 @@ struct Raytracer {
 		SSBO (std::string_view label): ssbo{label} {}
 	};
 
-	SSBO<Chunk> chunks_ssbo = {"Raytracer.chunks_ssbo"};
-	SSBO<Chunk> dense_chunks_ssbo = {"Raytracer.dense_chunks_ssbo"};
-	SSBO<Chunk> dense_subchunks_ssbo = {"Raytracer.dense_subchunks_ssbo"};
+	SSBO<Chunk>				chunks_ssbo				= {"Raytracer.chunks_ssbo"};
+	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
+	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
+
+	Ssbo block_tiles_ssbo = {"block_tiles_ssbo"};
 
 	bool enable = true;
 
 	void imgui () {
-		ImGui::Separator();
-		//if (!ImGui::TreeNode("Raytracer")) return;
+		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable", &enable);
 
-		//ImGui::TreePop();
+		ImGui::TreePop();
 	}
 
 	Raytracer (Shaders& shaders) {

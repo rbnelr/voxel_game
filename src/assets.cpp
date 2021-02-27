@@ -110,7 +110,7 @@ void BlockMeshes::load (json const& blocks_json) {
 						slices[m.index + j/2].vertices[j%2 * 3 + k] = {
 							roundv( float4(pos.x * scale, pos.y * scale, pos.z * scale, 1.0f) ),
 							roundv( float4(norm.x, norm.y, norm.z, 1.0f) ),
-							roundv( float4(uv.x, 1.0f - uv.y, 0.0f, 1.0f) ),
+							roundv( float4(uv.x, uv.y, 0.0f, 1.0f) ),
 						};
 					}
 				}

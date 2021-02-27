@@ -40,6 +40,7 @@ layout(location = 0) vs2fs VS {
 		vec3 mesh_pos_model		= v.pos.xyz;
 		vec3 mesh_norm_model	= v.normal.xyz;
 		vec2 uv					= v.uv.xy;
+		uv.y = 1.0 - uv.y; // meshes are designed for opengl where uv.y goes up (due to opengl textures being bottom-up)
 	
 		gl_Position =		world_to_clip * vec4(mesh_pos_model + voxel_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =			vec3(uv, texid);

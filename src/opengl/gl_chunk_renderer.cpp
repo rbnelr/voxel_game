@@ -41,7 +41,7 @@ void ChunkRenderer::upload_remeshed (Chunks& chunks) {
 void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("draw_chunks");
-
+	
 	auto& chunks = game.chunks;
 
 	auto& cull_view = chunks.debug_frustrum_culling ? game.player_view : game.view;
@@ -101,6 +101,8 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 	}
 
 	auto draw_slices = [&] (Shader* shader, PipelineState& state, DrawType type, int& drawcount) {
+		if (!shader) return;
+
 		glUseProgram(shader->prog);
 		r.state.set(state);
 
@@ -134,15 +136,17 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		ZoneValue(drawcount);
 	};
 
-	{
-		ZoneScopedN("chunk draw opaque");
-		OGL_TRACE("chunk draw opaque");
-		draw_slices(shad_opaque, state_opaque, DT_OPAQUE, drawcount_opaque);
-	}
-	{
-		ZoneScopedN("chunk draw transparent");
-		OGL_TRACE("chunk draw transparent");
-		draw_slices(shad_transparent, state_transparant, DT_TRANSPARENT, drawcount_transparent);
+	if (_draw_chunks) {
+		{
+			ZoneScopedN("chunk draw opaque");
+			OGL_TRACE("chunk draw opaque");
+			draw_slices(shad_opaque, state_opaque, DT_OPAQUE, drawcount_opaque);
+		}
+		{
+			ZoneScopedN("chunk draw transparent");
+			OGL_TRACE("chunk draw transparent");
+			draw_slices(shad_transparent, state_transparant, DT_TRANSPARENT, drawcount_transparent);
+		}
 	}
 }
 
@@ -150,52 +154,59 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
+	if (!shad_test) return;
 
-	if (shad_test) {
-		glUseProgram(shad_test->prog);
+	glUseProgram(shad_test->prog);
 
-		chunk_id camera_chunk;
-		{
-			int3 pos = floori((float3)(game.view.cam_to_world * float4(0,0,0,1)) / (float)CHUNK_SIZE);
-			camera_chunk = game.chunks.query_chunk(pos);
-			if (camera_chunk == U16_NULL)
-				camera_chunk = 0; // ugh what do?
-		}
-
-		shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
-	
-		static bool inited = false;
-		if (!inited && g_window.frame_counter >= 100) {
-			{
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
-				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, chunks_ssbo.ssbo);
-			}
-			{
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
-				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_chunks.commit_size(), game.chunks.dense_chunks.arr, GL_STREAM_DRAW);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, dense_chunks_ssbo.ssbo);
-			}
-			{
-				glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
-				glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_subchunks.commit_size(), game.chunks.dense_subchunks.arr, GL_STREAM_DRAW);
-				glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, dense_subchunks_ssbo.ssbo);
-			}
-
-			inited = true;
-		}
-
-		glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
-
-		int szx = align_up(r.framebuffer.size.x, 16);
-		int szy = align_up(r.framebuffer.size.y, 16);
-		glDispatchCompute(szx, szy, 1);
-
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		// TODO: how to unbind framebuffer??
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	chunk_id camera_chunk;
+	{
+		int3 pos = floori((float3)(game.view.cam_to_world * float4(0,0,0,1)) / (float)CHUNK_SIZE);
+		camera_chunk = game.chunks.query_chunk(pos);
+		if (camera_chunk == U16_NULL)
+			camera_chunk = 0; // ugh what do?
 	}
+
+	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
+
+	glUniform1i(shad_test->get_uniform_location("tile_textures"), 0);
+		
+	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+
+	static bool inited = false;
+	if (!inited && g_window.frame_counter >= 100) {
+		{
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_tiles_ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_tiles.size() * sizeof(BlockTile), g_assets.block_tiles.data(), GL_STREAM_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
+		}
+
+		{
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunks_ssbo.ssbo);
+		}
+		{
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_chunks.commit_size(), game.chunks.dense_chunks.arr, GL_STREAM_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, dense_chunks_ssbo.ssbo);
+		}
+		{
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_subchunks.commit_size(), game.chunks.dense_subchunks.arr, GL_STREAM_DRAW);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, dense_subchunks_ssbo.ssbo);
+		}
+
+		inited = true;
+	}
+
+	int szx = align_up(r.framebuffer.size.x, 16);
+	int szy = align_up(r.framebuffer.size.y, 16);
+	glDispatchCompute(szx, szy, 1);
+
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	// TODO: how to unbind framebuffer??
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 } // namespace gl
