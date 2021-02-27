@@ -1,10 +1,12 @@
 #version 460 core // for GL_ARB_shader_draw_parameters
-#extension GL_NV_gpu_shader5 : enable
+//#extension GL_ARB_gpu_shader5 : enable
 //#extension GL_EXT_shader_16bit_storage : enable // not supported
 
 #include "common.glsl"
 
 layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+
+#define B_AIR 1
 
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
@@ -18,80 +20,76 @@ layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 #define CHUNK_SPARSE_VOXELS	 4
 
 struct Chunk {
-	uint32_t flags;
+	uint flags;
 	//ivec3 pos;
 	int posx; int posy; int posz;
 
 	//uint16_t neighbours[6];
-	uint32_t _neighbours[3];
+	uint _neighbours[3];
 
 	//uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 	//uint16_t _pad;
 
-	uint32_t _voxel_data;
+	uint _voxel_data;
 
 	//uint16_t opaque_mesh_slices;
 	//uint16_t transp_mesh_slices;
-	uint32_t _transp_mesh_slices;
+	uint _transp_mesh_slices;
 
-	uint32_t opaque_mesh_vertex_count;
-	uint32_t transp_mesh_vertex_count;
+	uint opaque_mesh_vertex_count;
+	uint transp_mesh_vertex_count;
 };
-bool chunk_sparse (in Chunk c) {
-	uint32_t test = (c.flags & CHUNK_SPARSE_VOXELS);
-	return test != 0;
-}
-
-ivec3 get_pos (in Chunk c) {
-	return ivec3(c.posx, c.posy, c.posz);
-}
-uint32_t get_voxel_data (in Chunk c) {
-	return c._voxel_data & 0xffffffffu;
-}
-uint32_t get_neighbour (in Chunk c, int i) {
-	return c._neighbours[i >> 1] >> (i & 1) & 0xffffffffu;
-}
-
-
 struct ChunkVoxels {
 	// data for all subchunks
 	// sparse subchunk:  block_id of all subchunk voxels
 	// dense  subchunk:  id of subchunk
-	uint32_t sparse_data[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT];
+	uint sparse_data[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT];
 
 	// packed bits for all subchunks, where  0: dense subchunk  1: sparse subchunk
-	uint64_t sparse_bits[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT / 64];
+	uint sparse_bits[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT / 32];
 };
-uint32_t get_subchunk_idx (ivec3 pos) {
-	pos >>= SUBCHUNK_SHIFT;
-	uint32_t idx = pos.z << SUBCHUNK_SHIFT*2;
-	idx += pos.y << SUBCHUNK_SHIFT;
-	idx += pos.x;
-	return idx;
-}
-bool is_subchunk_sparse (in ChunkVoxels dc, uint32_t subc_i) {
-	uint64_t test = dc.sparse_bits[subc_i >> 6] & (1ul << (subc_i & 63));
-	return test != 0;
-}
-
-
 struct SubchunkVoxels {
-	uint32_t voxels[SUBCHUNK_SIZE][SUBCHUNK_SIZE][SUBCHUNK_SIZE/2];
+	uint voxels[SUBCHUNK_SIZE][SUBCHUNK_SIZE][SUBCHUNK_SIZE/2];
 };
-uint32_t get_voxel (in SubchunkVoxels sc, ivec3 pos) {
-	ivec3 masked = pos & ivec3(SUBCHUNK_MASK);
-	return sc.voxels[masked.z][masked.y][masked.x >> 1] >> (masked.x&1) & 0xffffffffu;
-}
 
-layout(std430, binding = 1) readonly restrict buffer Chunks {
+layout(std430, binding = 1) readonly buffer Chunks {
 	Chunk chunks[];
 };
-layout(std430, binding = 2) readonly restrict buffer DenseChunks {
+layout(std430, binding = 2) readonly buffer DenseChunks {
 	ChunkVoxels dense_chunks[];
 };
-layout(std430, binding = 3) readonly restrict buffer DenseSubchunks {
+layout(std430, binding = 3) readonly buffer DenseSubchunks {
 	SubchunkVoxels dense_subchunks[];
 };
+
+bool chunk_sparse (uint cid) {
+	uint test = (chunks[cid].flags & CHUNK_SPARSE_VOXELS);
+	return test != 0u;
+}
+ivec3 get_pos (uint cid) {
+	return ivec3(chunks[cid].posx, chunks[cid].posy, chunks[cid].posz);
+}
+uint get_voxel_data (uint cid) {
+	return chunks[cid]._voxel_data & 0xffffu;
+}
+uint get_neighbour (uint cid, int i) {
+	return (chunks[cid]._neighbours[i >> 1] >> ((i & 1) * 16)) & 0xffffu;
+}
+
+int get_subchunk_idx (ivec3 pos) {
+	pos >>= SUBCHUNK_SHIFT;
+	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
+}
+bool is_subchunk_sparse (uint dc_id, int subc_i) {
+	uint test = dense_chunks[dc_id].sparse_bits[subc_i >> 5] & (1u << (subc_i & 31));
+	return test != 0u;
+}
+
+uint get_voxel (uint subc_id, ivec3 pos) {
+	ivec3 masked = pos & ivec3(SUBCHUNK_MASK);
+	uint val = dense_subchunks[subc_id].voxels[masked.z][masked.y][masked.x >> 1];
+	return (val >> ((masked.x & 1) * 16)) & 0xffffu;
+}
 
 
 layout(rgba16f, binding = 4) uniform image2D img;
@@ -149,9 +147,9 @@ int get_step_face (int cur_axis, vec3 step_delta) {
 }
 
 const float max_dist = 100.0;
-const int max_iter = 100;
+const int max_iter = 200;
 
-uint32_t chunk_id;
+uint chunk_id;
 
 bool hit = false;
 vec4 hit_col = vec4(0.8,0.8,0.8, 1.0);
@@ -177,19 +175,40 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 }
 
 bool hit_voxel (ivec3 pos, int entry_face, float dist) {
+	// handle step out of chunk
 	if ( any(or( lessThan(pos, ivec3(0)), greaterThanEqual(pos, ivec3(CHUNK_SIZE)) )) ) {
 		pos &= CHUNK_SIZE_MASK;
 		return false;
 	}
 	
-	if ((chunks[chunk_id].flags & CHUNK_SPARSE_VOXELS) != 0) return false;
-	uint32_t dci = get_voxel_data(chunks[chunk_id]);
+	// read voxel
+	uint bid = 0;
+	{
+		uint chunk_voxdat = get_voxel_data(chunk_id);
+		if (chunk_sparse(chunk_id)) {
+			bid = chunk_voxdat;
+			//DEBUG(vec4(1,0,0,1));
+		} else {
+			int subci = get_subchunk_idx(pos);
 	
-	//dense_chunks[dci]
+			uint sparse_data = dense_chunks[chunk_voxdat].sparse_data[subci];
+			if (is_subchunk_sparse(chunk_voxdat, subci)) {
+				bid = sparse_data;
+				//DEBUG(vec4(0,0,1,1));
+				//return false;
+			} else {
+				bid = get_voxel(sparse_data, pos);
+				//DEBUG(vec4(0,1,0,1));
+				//return false;
+			}
+		}
+	}
 	
-	if (!(pos.x == pos.y || (pos.z == 0 && ((pos.x ^ pos.y) & 1) == 0)))
-		return false; // no hit
-
+	//if (!(pos.x == pos.y || (pos.z == 0 && ((pos.x ^ pos.y) & 1) == 0)))
+	//	return false; // no hit
+	if (bid == B_AIR)
+		return false;
+	
 	vec3 hit_pos_world = ray_pos + ray_dir * dist;
 	
 	vec2 uv = calc_uv(fract(hit_pos_world), entry_face);
@@ -204,7 +223,7 @@ void trace_pixel (vec2 px_pos) {
 	get_ray(px_pos);
 
 	chunk_id = camera_chunk;
-	vec3 chunk_pos = vec3(get_pos(chunks[chunk_id]) * float(CHUNK_SIZE));
+	vec3 chunk_pos = vec3(get_pos(chunk_id) * float(CHUNK_SIZE));
 	ray_pos -= chunk_pos;
 
 	// voxel ray stepping setup
