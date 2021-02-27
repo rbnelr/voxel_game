@@ -73,6 +73,11 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
 	glBindSampler(0, tile_sampler);
 
+	glActiveTexture(GL_TEXTURE0+1);
+	glBindTexture(GL_TEXTURE_2D, heat_gradient);
+	glBindSampler(1, normal_sampler);
+
+
 	// draw before chunks so it shows through transparent blocks
 	if (game.player.selected_block)
 		block_highl.draw(*this, game.player.selected_block);
@@ -265,6 +270,8 @@ bool OpenglRenderer::load_textures () {
 	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+
+	upload_texture(heat_gradient, "textures/heat_gradient.png");
 
 	return true;
 }

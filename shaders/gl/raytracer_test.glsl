@@ -108,17 +108,11 @@ uint get_voxel (uint subc_id, ivec3 pos) {
 
 uniform uint camera_chunk;
 
-uniform sampler2DArray tile_textures;
+uniform sampler2DArray	tile_textures;
 
-vec4 g_col = vec4(0,0,0,0);
-bool _debug_col = false;
-
-void DEBUG (vec4 col) {
-	if (!_debug_col) {
-		g_col = col;
-		_debug_col = true;
-	}
-}
+#if VISUALIZE_ITERATIONS
+uniform sampler2D		heat_gradient;
+#endif
 
 vec3 ray_pos, ray_dir;
 
@@ -142,12 +136,6 @@ void get_ray (vec2 px_pos) {
 	//ray_pos -= vec3(svo_root_pos);
 }
 
-int normalize_float (float val) {
-	if (val > 0) return +1;
-	if (val < 0) return -1;
-	return 0;
-}
-
 const float INF = 1. / 0.;
 
 int find_next_axis (vec3 next) { // index of smallest component
@@ -161,20 +149,20 @@ int get_step_face (int cur_axis, vec3 step_delta) {
 }
 
 const float max_dist = 100.0;
-const int max_iter = 200;
+
+uniform int max_iterations = 200;
 
 uint chunk_id;
 
-ivec3 step_delta;
-vec3 step_dist;
-vec3 next;
-ivec3 cur_voxel;
-int   cur_axis;
-float cur_dist;
+ivec3	step_delta = ivec3(0); // shut up about might be uninitialized
+vec3	step_dist;
+vec3	next;
+ivec3	cur_voxel;
 
+int		cur_axis;
+float	cur_dist;
 
-bool hit = false;
-vec4 hit_col = vec4(0.8,0.8,0.8, 1.0);
+vec4 hit_col = vec4(0,0,0,0);
 
 vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	vec2 uv;
@@ -205,19 +193,29 @@ bool hit_voxel () {
 	// read voxel
 	uint bid = 0;
 	{
+		int step_size = 1;
+		
 		uint chunk_voxdat = get_voxel_data(chunk_id);
 		if (chunk_sparse(chunk_id)) {
+
 			bid = chunk_voxdat;
+			//step_size = CHUNK_SIZE;
 		} else {
+
 			int subci = get_subchunk_idx(cur_voxel);
-	
+			
 			uint sparse_data = dense_chunks[chunk_voxdat].sparse_data[subci];
 			if (is_subchunk_sparse(chunk_voxdat, subci)) {
+
 				bid = sparse_data;
+				//step_size = SUBCHUNK_SIZE;
 			} else {
+
 				bid = get_voxel(sparse_data, cur_voxel);
 			}
 		}
+
+		step_delta = ivec3(sign(ray_dir)) * step_size;
 	}
 	
 	if (bid == B_AIR)
@@ -230,9 +228,11 @@ bool hit_voxel () {
 	vec2 uv = calc_uv(fract(hit_pos_world), entry_face);
 	float texid = float(block_tiles[bid].sides[entry_face]);
 
-	hit_col = texture(tile_textures, vec3(uv, texid));
+	vec4 col = texture(tile_textures, vec3(uv, texid));
+	if (col.a == 0.0)
+		return false;
 
-	hit = true;
+	hit_col = col;
 	return true;
 }
 
@@ -244,13 +244,10 @@ void trace_pixel (vec2 px_pos) {
 	ray_pos -= chunk_pos;
 
 	// voxel ray stepping setup
-	step_delta.x = normalize_float(ray_dir.x);
-	step_delta.y = normalize_float(ray_dir.y);
-	step_delta.z = normalize_float(ray_dir.z);
-
-	step_dist.x = length(ray_dir / abs(ray_dir.x));
-	step_dist.y = length(ray_dir / abs(ray_dir.y));
-	step_dist.z = length(ray_dir / abs(ray_dir.z));
+	vec3 abs_dir = abs(ray_dir);
+	step_dist.x = length(ray_dir / abs_dir.x);
+	step_dist.y = length(ray_dir / abs_dir.y);
+	step_dist.z = length(ray_dir / abs_dir.z);
 
 	vec3 pos_in_block = fract(ray_pos);
 
@@ -261,27 +258,27 @@ void trace_pixel (vec2 px_pos) {
 	// NaN -> Inf
 	next = mix(next, vec3(INF), equal(ray_dir, vec3(0.0)));
 
-	// find the axis of the next voxel step
+	// find the axis of the cur step
 	cur_axis = find_next_axis(next);
 	cur_dist = next[cur_axis];
 
-	//DEBUG(vec4(ray_dir, 1.0));
-
-	int iter = 0;
-	while (!hit_voxel()) {
+	int iterations = 0;
+	while (iterations < max_iterations && !hit_voxel()) {
+		iterations++;
 
 		// find the axis of the cur step
 		cur_axis = find_next_axis(next);
 		cur_dist = next[cur_axis];
-
-		if (iter++ > max_iter) //  || cur_dist > max_dist
-			return; // stop stepping because max_dist is reached
-
+		
 		// clac the distance at which the next voxel step for this axis happens
 		next[cur_axis] += step_dist[cur_axis];
 		// step into the next voxel
 		cur_voxel[cur_axis] += step_delta[cur_axis];
 	}
+
+#if VISUALIZE_ITERATIONS
+	hit_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+#endif
 }
 
 void main () {
@@ -292,11 +289,7 @@ void main () {
 		return;
 
 	trace_pixel(pos);
-	//col.rg = pos / view.viewport_size;
 
-	if (_debug_col)
-		hit_col = g_col;
-	
-	if (pos.x > 200 && hit)
+	if (pos.x > 200)
 		imageStore(img, ivec2(pos), hit_col);
 }

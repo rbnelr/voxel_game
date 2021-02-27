@@ -167,8 +167,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	}
 
 	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
+	shad_test->set_uniform("visualize_iterations", visualize_iterations);
+	shad_test->set_uniform("max_iterations", max_iterations);
 
 	glUniform1i(shad_test->get_uniform_location("tile_textures"), 0);
+	glUniform1i(shad_test->get_uniform_location("heat_gradient"), 1);
 		
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 

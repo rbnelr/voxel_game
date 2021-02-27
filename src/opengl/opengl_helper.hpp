@@ -612,6 +612,26 @@ inline IndexedMesh upload_mesh (std::string_view label,
 	return m;
 }
 
+//// Textures
+
+// upload texture, use with sampler please
+inline bool upload_texture (GLuint tex2d, const char* filename) {
+
+	Image<srgba8> img;
+	if (!img.load_from_file(filename, &img))
+		return false;
+
+	glBindTexture(GL_TEXTURE_2D, tex2d);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, img.size.x, img.size.y, 0,
+		GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return true;
+}
+
 //// Opengl global state management
 
 enum DepthFunc {

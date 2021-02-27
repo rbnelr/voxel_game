@@ -129,6 +129,8 @@ public:
 	Ubo				common_uniforms = {"common_ubo"};
 
 	Sampler			tile_sampler = {"tile_sampler"};
+	Sampler			normal_sampler = {"normal_sampler"};
+
 	Ubo				block_meshes_ubo = {"block_meshes_ubo"};
 	//Ubo				block_tiles_ubo = {"block_tiles_ubo"}; // does not work due to each int in array in struct being padded to hell
 	Texture2DArray	tile_textures = {"tile_textures"};
@@ -137,6 +139,9 @@ public:
 	Raytracer		raytracer		= Raytracer(shaders);
 
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
+
+
+	Texture2D		heat_gradient = {"heat_gradient"};
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;
@@ -164,6 +169,12 @@ public:
 		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
 		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glSamplerParameterf(tile_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+
+		glSamplerParameteri(normal_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(normal_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameterf(normal_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 	}
 	virtual ~OpenglRenderer () {}
 

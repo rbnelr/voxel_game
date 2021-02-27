@@ -126,7 +126,10 @@ struct Raytracer {
 	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
 	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
-	Ssbo block_tiles_ssbo = {"block_tiles_ssbo"};
+	Ssbo					block_tiles_ssbo = {"block_tiles_ssbo"};
+
+	bool visualize_iterations = false;
+	int max_iterations = 500;
 
 	bool enable = true;
 
@@ -135,11 +138,18 @@ struct Raytracer {
 
 		ImGui::Checkbox("enable", &enable);
 
+		if (ImGui::Checkbox("visualize_iterations", &visualize_iterations) && shad_test) {
+			shad_test->macros = {{"LOCAL_SIZE", "16"}, {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}};
+			shad_test->recompile("visualize_iterations toggle", false);
+		}
+
+		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
+
 		ImGui::TreePop();
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad_test = shaders.compile("raytracer_test", {{"LOCAL_SIZE", "16"}}, {{ COMPUTE_SHADER }});
+		shad_test = shaders.compile("raytracer_test", {{"LOCAL_SIZE", "16"}, {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}}, {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;
@@ -161,7 +171,6 @@ struct Raytracer {
 			printf("max local work group invocations %d\n", number);
 		}
 		
-
 	}
 
 	void draw (OpenglRenderer& r, Game& game);
