@@ -11,6 +11,8 @@ Game::Game () {
 	set_thread_priority(TPRIO_MAIN);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
+
+	_threads_world_gen = world_gen; // apply changes loaded by load("debug.json")
 }
 Game::~Game () {
 	ZoneScoped;

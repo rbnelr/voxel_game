@@ -144,8 +144,8 @@ int find_next_axis (vec3 next) { // index of smallest component
 	else												return 2;
 }
 
-int get_step_face (int cur_axis, vec3 step_delta) {
-	return cur_axis*2 +(step_delta[cur_axis] >= 0 ? 1 : 0);
+int get_step_face (int cur_axis) {
+	return cur_axis*2 +(ray_dir[cur_axis] >= 0.0 ? 0 : 1);
 }
 
 const float max_dist = 100.0;
@@ -154,8 +154,9 @@ uniform int max_iterations = 200;
 
 uint chunk_id;
 
-ivec3	step_delta = ivec3(0); // shut up about might be uninitialized
 vec3	step_dist;
+ivec3	step_signs;
+
 vec3	next;
 ivec3	cur_voxel;
 
@@ -180,10 +181,10 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	return uv;
 }
 
-bool hit_voxel () {
+bool hit_voxel (out int step_size) {
 	// handle step out of chunk by checking bits
 	if ((cur_voxel[cur_axis] & ~CHUNK_SIZE_MASK) != 0) {
-		chunk_id = get_neighbour(chunk_id, get_step_face(cur_axis, step_delta));
+		chunk_id = get_neighbour(chunk_id, get_step_face(cur_axis) ^ 1); // ^1 flip dir
 		if (chunk_id == 0xffffu)
 			return true;
 
@@ -193,13 +194,12 @@ bool hit_voxel () {
 	// read voxel
 	uint bid = 0;
 	{
-		int step_size = 1;
-		
 		uint chunk_voxdat = get_voxel_data(chunk_id);
 		if (chunk_sparse(chunk_id)) {
 
 			bid = chunk_voxdat;
 			//step_size = CHUNK_SIZE;
+			step_size = 1;
 		} else {
 
 			int subci = get_subchunk_idx(cur_voxel);
@@ -209,19 +209,19 @@ bool hit_voxel () {
 
 				bid = sparse_data;
 				//step_size = SUBCHUNK_SIZE;
+				step_size = 1;
 			} else {
 
 				bid = get_voxel(sparse_data, cur_voxel);
+				step_size = 1;
 			}
 		}
-
-		step_delta = ivec3(sign(ray_dir)) * step_size;
 	}
 	
 	if (bid == B_AIR)
 		return false;
 
-	int entry_face = get_step_face(cur_axis, step_delta);
+	int entry_face = get_step_face(cur_axis);
 	
 	vec3 hit_pos_world = ray_pos + ray_dir * cur_dist;
 	
@@ -262,18 +262,21 @@ void trace_pixel (vec2 px_pos) {
 	cur_axis = find_next_axis(next);
 	cur_dist = next[cur_axis];
 
+	step_signs = ivec3(sign(ray_dir));
+	int step_size = 10;
+
 	int iterations = 0;
-	while (iterations < max_iterations && !hit_voxel()) {
+	while (iterations < max_iterations && !hit_voxel(step_size)) {
 		iterations++;
 
 		// find the axis of the cur step
 		cur_axis = find_next_axis(next);
 		cur_dist = next[cur_axis];
-		
+
 		// clac the distance at which the next voxel step for this axis happens
-		next[cur_axis] += step_dist[cur_axis];
+		next[cur_axis] += step_dist[cur_axis] * float(step_size);
 		// step into the next voxel
-		cur_voxel[cur_axis] += step_delta[cur_axis];
+		cur_voxel[cur_axis] += step_signs[cur_axis] * step_size;
 	}
 
 #if VISUALIZE_ITERATIONS

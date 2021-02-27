@@ -7,11 +7,13 @@
 #include "assets.hpp"
 
 struct Game {
+	SERIALIZE(Game, world_gen, chunks, flycam, player, activate_flycam)
+
 	bool dbg_pause = false;
 	FPS_Display fps_display;
 
-	WorldGenerator world_gen;
-	WorldGenerator _threads_world_gen = world_gen; // used in threads, do not modify
+	WorldGenerator world_gen; // modified by imgui etc.
+	WorldGenerator _threads_world_gen; // used in threads, do not modify
 
 	Chunks chunks;
 
@@ -21,8 +23,6 @@ struct Game {
 	BlockUpdate block_update;
 
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
-
-	SERIALIZE(Game, flycam, player, activate_flycam, chunks)
 
 	bool activate_flycam = false;
 	bool creative_mode = false;
