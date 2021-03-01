@@ -132,19 +132,24 @@ struct Raytracer {
 	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
 	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
-	bool visualize_iterations = false;
 	int max_iterations = 500;
 
-	int2 compute_local_size = 16;
+	bool visualize_cost = false;
+	bool visualize_warp_iterations = false;
+	bool visualize_warp_reads = false;
 
-	int _im_selection = 5;
-	static constexpr const char* _im_options = "4x4\0" "8x4\0" "8x8\0" "16x8\0" "16x8\0" "16x16\0" "32x16\0" "32x32\0";
-	static constexpr int2 _im_sizes[] = { int2(4,4), int2(8,4), int2(8,8), int2(16,8), int2(16,16), int2(32,16), int2(32,32) };
+	int2 compute_local_size = int2(8,8);
+
+	int _im_selection = 2;
+	static constexpr const char* _im_options = "4x4\0" "8x4\0" "8x8\0" "16x8\0" "16x16\0" "32x16\0";
+	static constexpr int2 _im_sizes[] = { int2(4,4), int2(8,4), int2(8,8), int2(16,8), int2(16,16), int2(32,16), };
 
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
-			     {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}};
+			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
+			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
+			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
 	bool enable = false;
@@ -154,16 +159,22 @@ struct Raytracer {
 
 		ImGui::Checkbox("enable", &enable);
 
-		if (ImGui::Checkbox("visualize_iterations", &visualize_iterations) && shad_test) {
-			shad_test->macros = get_macros();
-			shad_test->recompile("visualize_iterations toggle", false);
-		}
+		bool macro_change = false;
+
+		macro_change = ImGui::Checkbox("visualize_cost", &visualize_cost) || macro_change;
+		ImGui::SameLine();
+		macro_change = ImGui::Checkbox("warp_iterations", &visualize_warp_iterations) || macro_change;
+		ImGui::SameLine();
+		macro_change = ImGui::Checkbox("warp_reads", &visualize_warp_reads) || macro_change;
 
 		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad_test) {
+			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
+		}
 
+		if (macro_change && shad_test) {
 			shad_test->macros = get_macros();
-			shad_test->recompile("visualize_iterations toggle", false);
+			shad_test->recompile("macro_change", false);
 		}
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);

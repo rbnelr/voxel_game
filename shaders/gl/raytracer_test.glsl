@@ -1,6 +1,8 @@
 #version 460 core
 //#extension GL_ARB_gpu_shader5 : enable
 //#extension GL_EXT_shader_16bit_storage : enable // not supported
+#extension GL_KHR_shader_subgroup_arithmetic : enable
+#extension GL_ARB_shader_group_vote : enable
 
 #include "common.glsl"
 
@@ -111,10 +113,6 @@ uniform uint camera_chunk;
 
 uniform sampler2DArray	tile_textures;
 
-#if VISUALIZE_ITERATIONS
-uniform sampler2D		heat_gradient;
-#endif
-
 // get pixel ray in world space based on pixel coord and matricies
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 
@@ -169,8 +167,25 @@ uint chunk_id;
 uint voxel_data;
 uint subchunk_data;
 
+#if VISUALIZE_COST
+	#if VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+		#define WARP_COUNT_IN_WG 2
+		shared uint warp_reads[WARP_COUNT_IN_WG][2];
+		uint local_reads[2];
+	#endif
+
+	uniform sampler2D		heat_gradient;
+#endif
+
 uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 	if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
+
+	#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+		local_reads[0]++;
+		if (subgroupElect())
+			atomicAdd(warp_reads[gl_SubgroupID][0], 1u);
+	#endif
+		
 		voxel_data = get_voxel_data(chunk_id);
 		if (chunk_sparse(chunk_id)) {
 
@@ -182,6 +197,13 @@ uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 	}
 
 	if ((step_mask & ~SUBCHUNK_MASK) != 0) {
+
+	#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+		local_reads[1]++;
+		if (subgroupElect())
+			atomicAdd(warp_reads[gl_SubgroupID][1], 1u);
+	#endif
+
 		int subci = get_subchunk_idx(coord);
 
 		subchunk_data = dense_chunks[voxel_data].sparse_data[subci];
@@ -234,6 +256,7 @@ void trace_pixel (vec2 px_pos) {
 	vec3 proj = ray_pos + ray_dir * 0;
 
 	int step_mask = -1;
+	float dist = 0.0;
 
 	int iterations = 0;
 	while (iterations < max_iterations) {
@@ -246,7 +269,7 @@ void trace_pixel (vec2 px_pos) {
 			break;
 
 		vec3 rel = ray_pos - vec3(coord);
-		//vec3 plane_offs = mix(vec3(step_size) - rel, rel, step(ray_dir, vec3(0.0)));
+		
 		vec3 plane_offs;
 		plane_offs.x = ray_dir.x >= 0.0 ? float(step_size.x) - rel.x : rel.x;
 		plane_offs.y = ray_dir.y >= 0.0 ? float(step_size.x) - rel.y : rel.y;
@@ -255,7 +278,14 @@ void trace_pixel (vec2 px_pos) {
 		vec3 next = rdir * plane_offs;
 		axis = find_next_axis(next);
 
-		proj = ray_pos + ray_dir * next[axis];
+		// fix infinite loop caused by zero-length step caused by stepping exactly onto voxel edge
+		// this causes visual artefact that is less bad, but becomes noticable at large min step dist
+		// this min_step_dist needs to be larger and larger the further we get from the floating point origin
+		// so it is advisable to keep ray_pos relative to the starting chunk
+		float min_step_dist = 0.0001;
+		proj = ray_pos + ray_dir * (dist + max(next[axis] - dist, min_step_dist));
+		
+		dist = next[axis];
 
 		//if (next[axis] > max_dist)
 		//	break;
@@ -276,21 +306,42 @@ void trace_pixel (vec2 px_pos) {
 				break;
 		}
 	}
-
-#if VISUALIZE_ITERATIONS
+	
+#if VISUALIZE_COST
+	#if VISUALIZE_WARP_COST
+	#if VISUALIZE_WARP_READS
+		const uint warp_cost = warp_reads[gl_SubgroupID][0] + warp_reads[gl_SubgroupID][1];
+		const uint local_cost = local_reads[0] + local_reads[1];
+	#else
+		const uint warp_cost = subgroupMax(iterations);
+		const uint local_cost = iterations;
+	#endif
+	float wasted_work = float(warp_cost - local_cost) / float(warp_cost);
+	hit_col = texture(heat_gradient, vec2(wasted_work, 0.5));
+	#else
 	hit_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+	#endif
 #endif
 }
 
 void main () {
-	vec2 pos = gl_GlobalInvocationID.xy;
 
-	// maybe try not to do rays that we do not see (happens due to local group size)
-	if (pos.x >= view.viewport_size.x || pos.y >= view.viewport_size.y)
-		return;
+#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+	if (subgroupElect()) {
+		warp_reads[gl_SubgroupID][0] = 0u;
+		warp_reads[gl_SubgroupID][1] = 0u;
+	}
+	local_reads[0] = 0u;
+	local_reads[1] = 0u;
+#endif
+
+	barrier();
+
+	vec2 pos = gl_GlobalInvocationID.xy;
 
 	trace_pixel(pos);
 
-	//if (pos.x > 200)
+	// maybe try not to do rays that we do not see (happens due to local group size)
+	if (pos.x < view.viewport_size.x && pos.y < view.viewport_size.y)
 		imageStore(img, ivec2(pos), hit_col);
 }

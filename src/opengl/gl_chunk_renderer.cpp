@@ -171,7 +171,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	}
 
 	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
-	shad_test->set_uniform("visualize_iterations", visualize_iterations);
 	shad_test->set_uniform("max_iterations", max_iterations);
 
 	glUniform1i(shad_test->get_uniform_location("tile_textures"), 0);
@@ -202,8 +201,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
 
-	int szx = align_up(r.framebuffer.size.x, compute_local_size.x);
-	int szy = align_up(r.framebuffer.size.y, compute_local_size.y);
+	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
+	int szy = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
 	glDispatchCompute(szx, szy, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
