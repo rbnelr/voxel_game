@@ -948,12 +948,7 @@ struct VoxelRaytrace {
 		else if (	v.y < v.z )					return 1;
 		else									return 2;
 	}
-	int signi (float f) {
-		if      (f > 0) return +1;
-		else if (f < 0) return -1;
-		else            return 0;
-	}
-
+	
 	int3 coord;
 	int step_size = 1;
 
@@ -964,6 +959,7 @@ struct VoxelRaytrace {
 
 		chunk_id cid = chunks->query_chunk(cpos);
 		if (cid == U16_NULL) {
+
 			step_size = CHUNK_SIZE;
 
 			coord.x &= ~CHUNK_SIZE_MASK;
@@ -1027,6 +1023,11 @@ struct VoxelRaytrace {
 		step_dist.y = length(ray_dir / abs(ray_dir.y));
 		step_dist.z = length(ray_dir / abs(ray_dir.z));
 
+		// NaN -> Inf
+		if (ray_dir.x == 0) step_dist.x = INF;
+		if (ray_dir.y == 0) step_dist.y = INF;
+		if (ray_dir.z == 0) step_dist.z = INF;
+
 		int iter = 0;
 
 		while (iter < 100) {
@@ -1041,32 +1042,32 @@ struct VoxelRaytrace {
 			
 			if (bid != B_AIR)
 				return;
-			
+
+			float3 rel = ray_pos - (float3)coord;
+
 			float3 plane_offs;
-			plane_offs.x = ray_dir.x > 0 ? (float)coord.x + step_size - ray_pos.x : ray_pos.x - (float)coord.x;
-			plane_offs.y = ray_dir.y > 0 ? (float)coord.y + step_size - ray_pos.y : ray_pos.y - (float)coord.y;
-			plane_offs.z = ray_dir.z > 0 ? (float)coord.z + step_size - ray_pos.z : ray_pos.z - (float)coord.z;
+			plane_offs.x = ray_dir.x > 0 ? step_size - rel.x : rel.x;
+			plane_offs.y = ray_dir.y > 0 ? step_size - rel.y : rel.y;
+			plane_offs.z = ray_dir.z > 0 ? step_size - rel.z : rel.z;
 
 			float3 next = step_dist * plane_offs;
 			int axis = min_component(next);
 
+			if (next[axis] > max_dist)
+				break;
+
 			float3 proj = ray_pos + ray_dir * next[axis];
 
-			lrgba col = lrgba(0,0,0,1);
-			col[axis] = 1;
-			g_debugdraw.pointx(proj, 0.1f, col);
-
-			ImGui::Text("%c proj: %7.3f, %7.3f, %7.3f", "XYZ"[axis], proj.x, proj.y, proj.z);
+			//lrgba col = lrgba(0,0,0,1);
+			//col[axis] = 1;
+			//g_debugdraw.pointx(proj, 0.1f, col);
+			//
+			//ImGui::Text("%c proj: %7.3f, %7.3f, %7.3f", "XYZ"[axis], proj.x, proj.y, proj.z);
 
 			proj[axis] += ray_dir[axis] > 0 ? 0.5f : -0.5f;
 			coord = floori(proj);
 
-			ImGui::Text("---------------------");
-
-			if (next[axis] > max_dist)
-				break;
-
-			//dist = next[axis];
+			//ImGui::Text("---------------------");
 		}
 	}
 };

@@ -90,6 +90,7 @@ uint get_neighbour (uint cid, int i) {
 }
 
 int get_subchunk_idx (ivec3 pos) {
+	pos &= CHUNK_SIZE_MASK;
 	pos >>= SUBCHUNK_SHIFT;
 	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
 }
@@ -99,9 +100,9 @@ bool is_subchunk_sparse (uint dc_id, int subc_i) {
 }
 
 uint get_voxel (uint subc_id, ivec3 pos) {
-	ivec3 masked = pos & ivec3(SUBCHUNK_MASK);
-	uint val = dense_subchunks[subc_id].voxels[masked.z][masked.y][masked.x >> 1];
-	return (val >> ((masked.x & 1) * 16)) & 0xffffu;
+	pos &= SUBCHUNK_MASK;
+	uint val = dense_subchunks[subc_id].voxels[pos.z][pos.y][pos.x >> 1];
+	return (val >> ((pos.x & 1) * 16)) & 0xffffu;
 }
 
 #define B_AIR 1
@@ -114,10 +115,8 @@ uniform sampler2DArray	tile_textures;
 uniform sampler2D		heat_gradient;
 #endif
 
-vec3 ray_pos, ray_dir;
-
 // get pixel ray in world space based on pixel coord and matricies
-void get_ray (vec2 px_pos) {
+void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 
 	//vec2 px_jitter = rand2(gl_FragCoord.xy) - 0.5;
 	vec2 px_jitter = vec2(0.0);
@@ -131,9 +130,6 @@ void get_ray (vec2 px_pos) {
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
 	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
 	ray_dir = normalize(ray_dir);
-
-	//DEBUG(vec4(ray_dir, 1));
-	//ray_pos -= vec3(svo_root_pos);
 }
 
 const float INF = 1. / 0.;
@@ -144,24 +140,12 @@ int find_next_axis (vec3 next) { // index of smallest component
 	else												return 2;
 }
 
-int get_step_face (int cur_axis) {
-	return cur_axis*2 +(ray_dir[cur_axis] >= 0.0 ? 0 : 1);
+int get_step_face (int axis, vec3 ray_dir) {
+	return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
 }
 
 const float max_dist = 100.0;
-
 uniform int max_iterations = 200;
-
-uint chunk_id;
-
-vec3	step_dist;
-ivec3	step_signs;
-
-vec3	next;
-ivec3	cur_voxel;
-
-int		cur_axis;
-float	cur_dist;
 
 vec4 hit_col = vec4(0,0,0,0);
 
@@ -181,51 +165,40 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	return uv;
 }
 
-bool hit_voxel (out int step_size) {
-	// handle step out of chunk by checking bits
-	if ((cur_voxel[cur_axis] & ~CHUNK_SIZE_MASK) != 0) {
-		chunk_id = get_neighbour(chunk_id, get_step_face(cur_axis) ^ 1); // ^1 flip dir
-		if (chunk_id == 0xffffu)
-			return true;
+uint read_voxel (uint chunk_id, inout ivec3 coord, out float step_size) {
+	ivec3 co = coord % 64;
 
-		cur_voxel &= CHUNK_SIZE_MASK; // make pos chunk relative again
+	uint chunk_voxdat = get_voxel_data(chunk_id);
+	if (chunk_sparse(chunk_id)) {
+
+		coord &= ~CHUNK_SIZE_MASK;
+
+		step_size = float(CHUNK_SIZE);
+		return chunk_voxdat;
 	}
-	
-	// read voxel
-	uint bid = 0;
-	{
-		uint chunk_voxdat = get_voxel_data(chunk_id);
-		if (chunk_sparse(chunk_id)) {
 
-			bid = chunk_voxdat;
-			//step_size = CHUNK_SIZE;
-			step_size = 1;
-		} else {
+	int subci = get_subchunk_idx(co);
 
-			int subci = get_subchunk_idx(cur_voxel);
-			
-			uint sparse_data = dense_chunks[chunk_voxdat].sparse_data[subci];
-			if (is_subchunk_sparse(chunk_voxdat, subci)) {
+	uint sparse_data = dense_chunks[chunk_voxdat].sparse_data[subci];
+	if (is_subchunk_sparse(chunk_voxdat, subci)) {
 
-				bid = sparse_data;
-				//step_size = SUBCHUNK_SIZE;
-				step_size = 1;
-			} else {
+		coord &= ~SUBCHUNK_MASK;
 
-				bid = get_voxel(sparse_data, cur_voxel);
-				step_size = 1;
-			}
-		}
+		step_size = float(SUBCHUNK_SIZE);
+		return sparse_data;
 	}
-	
+
+	step_size = 1.0;
+	return get_voxel(sparse_data, co);
+}
+
+bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir) {
 	if (bid == B_AIR)
 		return false;
 
-	int entry_face = get_step_face(cur_axis);
+	int entry_face = get_step_face(axis, ray_dir);
 	
-	vec3 hit_pos_world = ray_pos + ray_dir * cur_dist;
-	
-	vec2 uv = calc_uv(fract(hit_pos_world), entry_face);
+	vec2 uv = calc_uv(fract(proj), entry_face);
 	float texid = float(block_tiles[bid].sides[entry_face]);
 
 	vec4 col = texture(tile_textures, vec3(uv, texid));
@@ -237,46 +210,61 @@ bool hit_voxel (out int step_size) {
 }
 
 void trace_pixel (vec2 px_pos) {
-	get_ray(px_pos);
+	vec3 ray_pos, ray_dir;
+	get_ray(px_pos, ray_pos, ray_dir);
 
-	chunk_id = camera_chunk;
-	vec3 chunk_pos = vec3(get_pos(chunk_id) * float(CHUNK_SIZE));
-	ray_pos -= chunk_pos;
+	uint chunk_id = camera_chunk;
 
 	// voxel ray stepping setup
-	vec3 abs_dir = abs(ray_dir);
-	step_dist.x = length(ray_dir / abs_dir.x);
-	step_dist.y = length(ray_dir / abs_dir.y);
-	step_dist.z = length(ray_dir / abs_dir.z);
 
-	vec3 pos_in_block = fract(ray_pos);
+	ivec3 coord = ivec3(floor(ray_pos));
 
-	cur_voxel = ivec3(floor(ray_pos));
+	// get how far you have to travel along the ray to move by 1 unit in each axis
+	// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
+	// a zero in ray_dir produces a NaN in step because 0 / 0
+	vec3 step_dist;
+	step_dist.x = length(ray_dir / abs(ray_dir.x));
+	step_dist.y = length(ray_dir / abs(ray_dir.y));
+	step_dist.z = length(ray_dir / abs(ray_dir.z));
 
-	next = step_dist * mix( 1.0 - pos_in_block, pos_in_block, step(ray_dir, vec3(0.0)) );
+	step_dist = mix(step_dist, vec3(INF), equal(ray_dir, vec3(0.0)));
 
-	// NaN -> Inf
-	next = mix(next, vec3(INF), equal(ray_dir, vec3(0.0)));
-
-	// find the axis of the cur step
-	cur_axis = find_next_axis(next);
-	cur_dist = next[cur_axis];
-
-	step_signs = ivec3(sign(ray_dir));
-	int step_size = 10;
+	int axis = 0;
+	vec3 proj = ray_pos + ray_dir * 0;
 
 	int iterations = 0;
-	while (iterations < max_iterations && !hit_voxel(step_size)) {
+	while (iterations < max_iterations) {
 		iterations++;
 
-		// find the axis of the cur step
-		cur_axis = find_next_axis(next);
-		cur_dist = next[cur_axis];
+		float step_size;
+		uint bid = read_voxel(chunk_id, coord, step_size);
 
-		// clac the distance at which the next voxel step for this axis happens
-		next[cur_axis] += step_dist[cur_axis] * float(step_size);
-		// step into the next voxel
-		cur_voxel[cur_axis] += step_signs[cur_axis] * step_size;
+		if (hit_voxel(bid, proj, axis, ray_dir))
+			break;
+
+		vec3 rel = ray_pos - vec3(coord);
+		vec3 plane_offs = mix(vec3(step_size) - rel, rel, step(ray_dir, vec3(0.0)));
+
+		vec3 next = step_dist * plane_offs;
+		axis = find_next_axis(next);
+
+		proj = ray_pos + ray_dir * next[axis];
+
+		//if (next[axis] > max_dist)
+		//	break;
+
+		ivec3 old_coord = coord;
+
+		proj[axis] += sign(ray_dir[axis]) * 0.5f;
+		coord = ivec3(floor(proj));
+
+		ivec3 step_mask = coord ^ old_coord;
+		// handle step out of chunk by checking bits
+		if (any((step_mask & ~ivec3(CHUNK_SIZE_MASK)) != 0)) {
+			chunk_id = get_neighbour(chunk_id, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
+			if (chunk_id == 0xffffu)
+				return;
+		}
 	}
 
 #if VISUALIZE_ITERATIONS
