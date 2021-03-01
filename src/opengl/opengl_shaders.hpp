@@ -215,15 +215,15 @@ struct Shaders {
 	}
 
 	Shader* compile (
-			char const* name,
-			std::initializer_list<MacroDefinition> macros = {},
-			std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
+		char const* name,
+		std::vector<MacroDefinition>&& macros,
+		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
 		ZoneScoped;
 
 		auto s = std::make_unique<Shader>();
 		s->name = name;
 		s->stages = stages;
-		s->macros = macros;
+		s->macros = std::move(macros);
 
 		bool success = s->compile();
 		if (!success) {
@@ -233,6 +233,13 @@ struct Shaders {
 		auto* ptr = s.get();
 		shaders.push_back(std::move(s));
 		return ptr;
+	}
+
+	Shader* compile (
+			char const* name,
+			std::initializer_list<MacroDefinition> macros = {},
+			std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
+		return compile(name, std::vector<MacroDefinition>(macros), stages);
 	}
 };
 

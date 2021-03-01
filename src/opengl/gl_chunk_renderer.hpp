@@ -135,6 +135,18 @@ struct Raytracer {
 	bool visualize_iterations = false;
 	int max_iterations = 500;
 
+	int2 compute_local_size = 16;
+
+	int _im_selection = 5;
+	static constexpr const char* _im_options = "4x4\0" "8x4\0" "8x8\0" "16x8\0" "16x8\0" "16x16\0" "32x16\0" "32x32\0";
+	static constexpr int2 _im_sizes[] = { int2(4,4), int2(8,4), int2(8,8), int2(16,8), int2(16,16), int2(32,16), int2(32,32) };
+
+	std::vector<gl::MacroDefinition> get_macros () {
+		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
+		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
+			     {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}};
+	}
+
 	bool enable = false;
 
 	void imgui () {
@@ -143,7 +155,14 @@ struct Raytracer {
 		ImGui::Checkbox("enable", &enable);
 
 		if (ImGui::Checkbox("visualize_iterations", &visualize_iterations) && shad_test) {
-			shad_test->macros = {{"LOCAL_SIZE", "16"}, {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}};
+			shad_test->macros = get_macros();
+			shad_test->recompile("visualize_iterations toggle", false);
+		}
+
+		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad_test) {
+			compute_local_size = _im_sizes[_im_selection];
+
+			shad_test->macros = get_macros();
 			shad_test->recompile("visualize_iterations toggle", false);
 		}
 
@@ -153,7 +172,7 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad_test = shaders.compile("raytracer_test", {{"LOCAL_SIZE", "16"}, {"VISUALIZE_ITERATIONS", visualize_iterations ? "1":"0"}}, {{ COMPUTE_SHADER }});
+		shad_test = shaders.compile("raytracer_test", get_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;

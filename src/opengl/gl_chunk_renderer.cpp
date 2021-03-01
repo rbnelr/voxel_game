@@ -202,8 +202,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	}
 
-	int szx = align_up(r.framebuffer.size.x, 16);
-	int szy = align_up(r.framebuffer.size.y, 16);
+	int szx = align_up(r.framebuffer.size.x, compute_local_size.x);
+	int szy = align_up(r.framebuffer.size.y, compute_local_size.y);
 	glDispatchCompute(szx, szy, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

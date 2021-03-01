@@ -1021,23 +1021,14 @@ struct VoxelRaytrace {
 			chunk = &chunks->chunks[cid];
 		}
 
-		// get how far you have to travel along the ray to move by 1 unit in each axis
-		// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
-		// a zero in ray_dir produces a NaN in step because 0 / 0
-		float3 step_dist;
-		step_dist.x = length(ray_dir / abs(ray_dir.x));
-		step_dist.y = length(ray_dir / abs(ray_dir.y));
-		step_dist.z = length(ray_dir / abs(ray_dir.z));
-
-		// NaN -> Inf
-		if (ray_dir.x == 0) step_dist.x = INF;
-		if (ray_dir.y == 0) step_dist.y = INF;
-		if (ray_dir.z == 0) step_dist.z = INF;
+		float3 rdir; // reciprocal of ray dir
+		rdir.x = ray_dir.x != 0.0f ? 1.0f / abs(ray_dir.x) : INF;
+		rdir.y = ray_dir.y != 0.0f ? 1.0f / abs(ray_dir.y) : INF;
+		rdir.z = ray_dir.z != 0.0f ? 1.0f / abs(ray_dir.z) : INF;
 
 		int step_mask = -1;
 
 		int iter = 0;
-
 		while (iter < 100) {
 			iter++;
 
@@ -1058,7 +1049,7 @@ struct VoxelRaytrace {
 			plane_offs.y = ray_dir.y > 0 ? step_size - rel.y : rel.y;
 			plane_offs.z = ray_dir.z > 0 ? step_size - rel.z : rel.z;
 
-			float3 next = step_dist * plane_offs;
+			float3 next = rdir * plane_offs;
 			int axis = min_component(next);
 
 			if (next[axis] > max_dist)

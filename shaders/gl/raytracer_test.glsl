@@ -1,10 +1,10 @@
-#version 460 core // for GL_ARB_shader_draw_parameters
+#version 460 core
 //#extension GL_ARB_gpu_shader5 : enable
 //#extension GL_EXT_shader_16bit_storage : enable // not supported
 
 #include "common.glsl"
 
-layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
@@ -225,15 +225,10 @@ void trace_pixel (vec2 px_pos) {
 
 	ivec3 coord = ivec3(floor(ray_pos));
 
-	// get how far you have to travel along the ray to move by 1 unit in each axis
-	// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
-	// a zero in ray_dir produces a NaN in step because 0 / 0
-	vec3 step_dist;
-	step_dist.x = length(ray_dir / abs(ray_dir.x));
-	step_dist.y = length(ray_dir / abs(ray_dir.y));
-	step_dist.z = length(ray_dir / abs(ray_dir.z));
-
-	step_dist = mix(step_dist, vec3(INF), equal(ray_dir, vec3(0.0)));
+	vec3 rdir; // reciprocal of ray dir
+	rdir.x = ray_dir.x != 0.0 ? 1.0 / abs(ray_dir.x) : INF;
+	rdir.y = ray_dir.y != 0.0 ? 1.0 / abs(ray_dir.y) : INF;
+	rdir.z = ray_dir.z != 0.0 ? 1.0 / abs(ray_dir.z) : INF;
 
 	int axis = 0;
 	vec3 proj = ray_pos + ray_dir * 0;
@@ -257,7 +252,7 @@ void trace_pixel (vec2 px_pos) {
 		plane_offs.y = ray_dir.y >= 0.0 ? float(step_size.x) - rel.y : rel.y;
 		plane_offs.z = ray_dir.z >= 0.0 ? float(step_size.x) - rel.z : rel.z;
 
-		vec3 next = step_dist * plane_offs;
+		vec3 next = rdir * plane_offs;
 		axis = find_next_axis(next);
 
 		proj = ray_pos + ray_dir * next[axis];
