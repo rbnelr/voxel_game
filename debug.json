@@ -3,10 +3,10 @@
 		"seed_str": "test2"
 	},
 	"chunks": {
-		"load_radius": 164.0,
+		"load_radius": 300.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": true,
-		"visualize_chunks": true,
+		"visualize_chunks": false,
 		"visualize_subchunks": false,
 		"visualize_radius": true,
 		"debug_frustrum_culling": false
@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				77.08416748046875,
-				19.593074798583984,
-				34.63813781738281
+				-87.9412612915039,
+				216.75686645507813,
+				74.51827239990234
 			],
 			"rot_aer": [
-				2.1340620517730713,
-				-0.19582515954971313,
+				-1.8951971530914307,
+				0.01675635389983654,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,7 +29,7 @@
 			"vfov": 1.2217304706573486,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 3.215322971343994,
+		"base_speed": 44.78553771972656,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0

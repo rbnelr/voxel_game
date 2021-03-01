@@ -251,7 +251,11 @@ void trace_pixel (vec2 px_pos) {
 			break;
 
 		vec3 rel = ray_pos - vec3(coord);
-		vec3 plane_offs = mix(vec3(step_size) - rel, rel, step(ray_dir, vec3(0.0)));
+		//vec3 plane_offs = mix(vec3(step_size) - rel, rel, step(ray_dir, vec3(0.0)));
+		vec3 plane_offs;
+		plane_offs.x = ray_dir.x >= 0.0 ? float(step_size.x) - rel.x : rel.x;
+		plane_offs.y = ray_dir.y >= 0.0 ? float(step_size.x) - rel.y : rel.y;
+		plane_offs.z = ray_dir.z >= 0.0 ? float(step_size.x) - rel.z : rel.z;
 
 		vec3 next = step_dist * plane_offs;
 		axis = find_next_axis(next);
@@ -263,7 +267,8 @@ void trace_pixel (vec2 px_pos) {
 
 		ivec3 old_coord = coord;
 
-		proj[axis] += sign(ray_dir[axis]) * 0.5f;
+		//proj[axis] += sign(ray_dir[axis]) * 0.5f;
+		proj[axis] += ray_dir[axis] >= 0 ? 0.5 : -0.5;
 		coord = ivec3(floor(proj));
 
 		ivec3 step_mask3 = coord ^ old_coord;
@@ -273,7 +278,7 @@ void trace_pixel (vec2 px_pos) {
 		if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
 			chunk_id = get_neighbour(chunk_id, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
 			if (chunk_id == 0xffffu)
-				return;
+				break;
 		}
 	}
 
@@ -291,6 +296,6 @@ void main () {
 
 	trace_pixel(pos);
 
-	if (pos.x > 200)
+	//if (pos.x > 200)
 		imageStore(img, ivec2(pos), hit_col);
 }
