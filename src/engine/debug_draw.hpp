@@ -100,16 +100,19 @@ struct DebugDraw {
 	std::vector<Instance> wire_cubes;
 
 	void clear () {
+		if (lines.size() == 0)
+			lines.shrink_to_fit();
+		if (tris.size() == 0)
+			tris.shrink_to_fit();
+		if (wire_cubes.size() == 0)
+			wire_cubes.shrink_to_fit();
+
 		lines.clear();
-		lines.shrink_to_fit();
-
 		tris.clear();
-		tris.shrink_to_fit();
-
 		wire_cubes.clear();
-		//wire_cubes.shrink_to_fit();
 	}
 
+	void pointx (float3 const& pos, float3 const& size, lrgba const& col);
 	void vector (float3 const& pos, float3 const& dir, lrgba const& col);
 
 	void wire_cube (float3 const& pos, float3 const& size, lrgba const& col);

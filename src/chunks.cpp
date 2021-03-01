@@ -744,16 +744,16 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::SameLine();
 	ImGui::Checkbox("radius", &visualize_radius);
 
-	if (ImGui::BeginPopupContextWindow("Colors")) {
-		imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
-		imgui_ColorEdit("DBG_STAGE1_COL",			&DBG_STAGE1_COL);
-		imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
-		imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
-		imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
-		imgui_ColorEdit("DBG_RADIUS_COL",			&DBG_RADIUS_COL);
-		imgui_ColorEdit("DBG_CHUNK_ARRAY_COL",		&DBG_CHUNK_ARRAY_COL);
-		ImGui::EndPopup();
-	}
+	//if (ImGui::BeginPopupContextWindow("Colors")) {
+	//	imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
+	//	imgui_ColorEdit("DBG_STAGE1_COL",			&DBG_STAGE1_COL);
+	//	imgui_ColorEdit("DBG_SPARSE_CHUNK_COL",		&DBG_SPARSE_CHUNK_COL);
+	//	imgui_ColorEdit("DBG_CULLED_CHUNK_COL",		&DBG_CULLED_CHUNK_COL);
+	//	imgui_ColorEdit("DBG_DENSE_SUBCHUNK_COL",	&DBG_DENSE_SUBCHUNK_COL);
+	//	imgui_ColorEdit("DBG_RADIUS_COL",			&DBG_RADIUS_COL);
+	//	imgui_ColorEdit("DBG_CHUNK_ARRAY_COL",		&DBG_CHUNK_ARRAY_COL);
+	//	ImGui::EndPopup();
+	//}
 
 	ImGui::Checkbox("debug_frustrum_culling", &debug_frustrum_culling);
 
@@ -931,4 +931,150 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 			}
 		}
 	}
+}
+
+
+struct VoxelRaytrace {
+	Chunks* chunks;
+
+	float3 ray_pos;
+	float3 ray_dir;
+	float max_dist = 5;
+
+	static constexpr block_id B_AIR = 1;
+
+	int min_component (float3 v) {
+		if (		v.x < v.y && v.x < v.z )	return 0;
+		else if (	v.y < v.z )					return 1;
+		else									return 2;
+	}
+	int signi (float f) {
+		if      (f > 0) return +1;
+		else if (f < 0) return -1;
+		else            return 0;
+	}
+
+	int3 coord;
+	int step_size = 1;
+
+	block_id read_voxel () {
+		int bx, by, bz;
+		int3 cpos;
+		CHUNK_BLOCK_POS(coord.x,coord.y,coord.z, cpos.x,cpos.y,cpos.z, bx,by,bz);
+
+		chunk_id cid = chunks->query_chunk(cpos);
+		if (cid == U16_NULL) {
+			step_size = CHUNK_SIZE;
+
+			coord.x &= ~CHUNK_SIZE_MASK;
+			coord.y &= ~CHUNK_SIZE_MASK;
+			coord.z &= ~CHUNK_SIZE_MASK;
+
+			return B_NULL;
+		}
+
+		auto& chunk = chunks->chunks[cid];
+		uint32_t voxel_data = chunk.voxel_data;
+
+		if (chunk.flags & Chunk::SPARSE_VOXELS) {
+			step_size = CHUNK_SIZE;
+
+			coord.x &= ~CHUNK_SIZE_MASK;
+			coord.y &= ~CHUNK_SIZE_MASK;
+			coord.z &= ~CHUNK_SIZE_MASK;
+
+			return (block_id)voxel_data; // sparse chunk
+		}
+
+		//chunk_id = chunks->chunks[chunk_id].neighbours[axis*2 + (ray_dir[axis] >= 0 ? 1 : 0)];
+
+		auto& dc = chunks->dense_chunks[voxel_data];
+
+		uint32_t subchunk_i = SUBCHUNK_IDX(bx,by,bz);
+		uint32_t subchunk_data = dc.sparse_data[subchunk_i];
+
+		if (dc.is_subchunk_sparse(subchunk_i)) {
+			step_size = SUBCHUNK_SIZE;
+
+			coord.x &= ~SUBCHUNK_MASK;
+			coord.y &= ~SUBCHUNK_MASK;
+			coord.z &= ~SUBCHUNK_MASK;
+
+			return (block_id)subchunk_data; // sparse subchunk
+		}
+
+		auto& subchunk = chunks->dense_subchunks[subchunk_data];
+
+		step_size = 1;
+		uint32_t block_i = BLOCK_IDX(bx,by,bz);
+		return subchunk.voxels[block_i];
+	}
+
+	void run () {
+		ImGui::DragFloat3("ray_pos", &ray_pos.x, 0.1f);
+		ImGui::DragFloat3("ray_dir", &ray_dir.x, 0.1f);
+		ImGui::DragFloat("max_dist", &max_dist, 0.1f);
+
+		g_debugdraw.vector(ray_pos, ray_dir * max_dist, lrgba(1,0,0,1));
+
+		coord = floori(ray_pos);
+
+		// get how far you have to travel along the ray to move by 1 unit in each axis
+		// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
+		// a zero in ray_dir produces a NaN in step because 0 / 0
+		float3 step_dist;
+		step_dist.x = length(ray_dir / abs(ray_dir.x));
+		step_dist.y = length(ray_dir / abs(ray_dir.y));
+		step_dist.z = length(ray_dir / abs(ray_dir.z));
+
+		int iter = 0;
+
+		while (iter < 100) {
+			iter++;
+
+			block_id bid = read_voxel();
+
+			g_debugdraw.wire_cube((float3)coord + ((float)step_size / 2), (float)step_size * 0.99f, lrgba(0,0,1,1));
+			
+			ImGui::Text("%+3d,%+3d,%+3d: %s %d", coord.x, coord.y, coord.z,
+				g_assets.block_types[bid].name.c_str(), step_size);
+			
+			if (bid != B_AIR)
+				return;
+			
+			float3 plane_offs;
+			plane_offs.x = ray_dir.x > 0 ? (float)coord.x + step_size - ray_pos.x : ray_pos.x - (float)coord.x;
+			plane_offs.y = ray_dir.y > 0 ? (float)coord.y + step_size - ray_pos.y : ray_pos.y - (float)coord.y;
+			plane_offs.z = ray_dir.z > 0 ? (float)coord.z + step_size - ray_pos.z : ray_pos.z - (float)coord.z;
+
+			float3 next = step_dist * plane_offs;
+			int axis = min_component(next);
+
+			float3 proj = ray_pos + ray_dir * next[axis];
+
+			lrgba col = lrgba(0,0,0,1);
+			col[axis] = 1;
+			g_debugdraw.pointx(proj, 0.1f, col);
+
+			ImGui::Text("%c proj: %7.3f, %7.3f, %7.3f", "XYZ"[axis], proj.x, proj.y, proj.z);
+
+			proj[axis] += ray_dir[axis] > 0 ? 0.5f : -0.5f;
+			coord = floori(proj);
+
+			ImGui::Text("---------------------");
+
+			if (next[axis] > max_dist)
+				break;
+
+			//dist = next[axis];
+		}
+	}
+};
+
+void test_rayracy_voxels (Chunks& chunks, float3 ray_pos, float3 ray_dir) {
+	static VoxelRaytrace vr;
+	vr.chunks = &chunks;
+	vr.ray_pos = ray_pos;
+	vr.ray_dir = ray_dir;
+	vr.run();
 }

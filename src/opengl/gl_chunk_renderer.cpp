@@ -180,7 +180,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
 	static bool inited = false;
-	if (!inited && g_window.frame_counter >= 100) {
+	if (!inited && g_window.frame_counter >= 1000) {
 		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);

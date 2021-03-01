@@ -504,3 +504,5 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, float max_dist, Func hit_vo
 		cur_voxel[cur_axis] += step_delta[cur_axis];
 	}
 }
+
+void test_rayracy_voxels (Chunks& chunks, float3 ray_pos, float3 ray_dir);

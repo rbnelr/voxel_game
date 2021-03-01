@@ -72,7 +72,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			renderer->screenshot_imgui(I);
 		ImGui::Spacing();
 
-		if (ImGui::CollapsingHeader("Performance", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (imgui_header("Performance", &imopen.performance)) {
 			fps_display.display_fps(window.input.real_dt, window.input.dt);
 
 			//ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
@@ -80,7 +80,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 		window.input.imgui();
 		
-		if (ImGui::CollapsingHeader("Graphics", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (imgui_header("Graphics", &imopen.graphics)) {
 			if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL\0VULKAN"))
 				g_window.switch_render_backend = true;
 
@@ -88,7 +88,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 				renderer->graphics_imgui(I);
 		}
 
-		if (ImGui::CollapsingHeader("World", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (imgui_header("World", &imopen.world)) {
 
 			if (ImGui::Button("Recreate")) {
 				chunks.destroy();
@@ -98,13 +98,13 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			world_gen.imgui();
 		}
 
-		if (ImGui::CollapsingHeader("Chunks", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (imgui_header("Chunks", &imopen.chunks)) {
 			chunks.imgui(renderer);
 			block_update.imgui();
 		}
 
 		{
-			bool open = ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen);
+			bool open = imgui_header("Entities", &imopen.entities);
 
 			if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
 			if (window.input.buttons[KEY_P].went_down) {
@@ -164,6 +164,8 @@ void Game::update (Window& window, Input& I) {
 	} else {
 		view = player_view;
 	}
+
+	test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
 
 	update_block_edits(I, *this, player, view);
 

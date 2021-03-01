@@ -135,7 +135,7 @@ struct Raytracer {
 	bool visualize_iterations = false;
 	int max_iterations = 500;
 
-	bool enable = 0;
+	bool enable = false;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;

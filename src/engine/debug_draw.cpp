@@ -11,6 +11,24 @@ void DebugDraw::vector (float3 const& pos, float3 const& dir, lrgba const& col) 
 	*out++ = { pos + dir, col };
 }
 
+void DebugDraw::pointx (float3 const& pos, float3 const& size, lrgba const& col) {
+	size_t idx = lines.size();
+	lines.resize(idx + 8);
+	auto* out = &lines[idx];
+
+	*out++ = { pos + size * float3(-1,-1,-1), col };
+	*out++ = { pos + size * float3(+1,+1,+1), col };
+
+	*out++ = { pos + size * float3(+1,-1,-1), col };
+	*out++ = { pos + size * float3(-1,+1,+1), col };
+
+	*out++ = { pos + size * float3(-1,+1,-1), col };
+	*out++ = { pos + size * float3(+1,-1,+1), col };
+
+	*out++ = { pos + size * float3(+1,+1,-1), col };
+	*out++ = { pos + size * float3(-1,-1,+1), col };
+}
+
 void DebugDraw::wire_cube (float3 const& pos, float3 const& size, lrgba const& col) {
 #if 0
 	size_t idx = lines.size();

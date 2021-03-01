@@ -165,13 +165,13 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 	PipelineState s;
 	s.depth_test = true;
-	s.depth_write = false;
+	s.depth_write = true;
 	s.blend_enable = true;
 
 	PipelineState s_occluded;
 	s_occluded.depth_test = true;
 	s_occluded.depth_func = DEPTH_BEHIND;
-	s_occluded.depth_write = false;
+	s_occluded.depth_write = true;
 	s_occluded.blend_enable = true;
 
 	{
@@ -180,12 +180,14 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		glBindVertexArray(vbo_lines.vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_lines.vbo);
 
-		GLsizeiptr vertex_count = g_debugdraw.lines.size() * sizeof(DebugDraw::LineVertex);
-		glBufferData(GL_ARRAY_BUFFER, vertex_count, nullptr, GL_STREAM_DRAW);
-		if (vertex_count > 0) {
-			glBufferData(GL_ARRAY_BUFFER, vertex_count, g_debugdraw.lines.data(), GL_STREAM_DRAW);
+		size_t vertex_count = g_debugdraw.lines.size();
+		GLsizeiptr size = g_debugdraw.lines.size() * sizeof(DebugDraw::LineVertex);
+		
+		glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_STREAM_DRAW);
 
-			{ // lines in front of geometry
+		if (vertex_count > 0) {
+			glBufferData(GL_ARRAY_BUFFER, size, g_debugdraw.lines.data(), GL_STREAM_DRAW);
+			{
 				OGL_TRACE("normal");
 
 				r.state.set(s);
@@ -215,10 +217,13 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		glBindVertexArray(vbo_tris.vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_tris.vbo);
 
-		GLsizeiptr vertex_count = g_debugdraw.tris.size() * sizeof(DebugDraw::TriVertex);
-		glBufferData(GL_ARRAY_BUFFER, vertex_count, nullptr, GL_STREAM_DRAW);
+		size_t vertex_count = g_debugdraw.tris.size();
+		GLsizeiptr size = g_debugdraw.tris.size() * sizeof(DebugDraw::TriVertex);
+
+		glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_STREAM_DRAW);
+
 		if (vertex_count > 0) {
-			glBufferData(GL_ARRAY_BUFFER, vertex_count, g_debugdraw.tris.data(), GL_STREAM_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, size, g_debugdraw.tris.data(), GL_STREAM_DRAW);
 
 			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_count);
 		}
@@ -230,10 +235,13 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		glBindVertexArray(vbo_wire_cube.vao);
 		glBindBuffer(GL_ARRAY_BUFFER, vbo_wire_cube.instance_vbo);
 
-		GLsizeiptr instance_count = g_debugdraw.wire_cubes.size() * sizeof(DebugDraw::Instance);
-		glBufferData(GL_ARRAY_BUFFER, instance_count, nullptr, GL_STREAM_DRAW);
+		size_t instance_count = g_debugdraw.wire_cubes.size();
+		GLsizeiptr size = instance_count * sizeof(DebugDraw::Instance);
+
+		glBufferData(GL_ARRAY_BUFFER, size, nullptr, GL_STREAM_DRAW);
+
 		if (instance_count > 0) {
-			glBufferData(GL_ARRAY_BUFFER, instance_count, g_debugdraw.wire_cubes.data(), GL_STREAM_DRAW);
+			glBufferData(GL_ARRAY_BUFFER, size, g_debugdraw.wire_cubes.data(), GL_STREAM_DRAW);
 
 			r.state.set(s);
 			glUseProgram(shad_wire_cube->prog);

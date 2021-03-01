@@ -4,7 +4,7 @@
 
 layout(location = 0) vs2fs VS {
 	vec3	uvi; // uv + tex_index
-	vec3	normal_cam;
+	//vec3	normal_cam;
 	//float	brightness;
 } vs;
 
@@ -32,12 +32,12 @@ layout(location = 0) vs2fs VS {
 	void main () {
 		BlockMeshVertex v = block_meshes.vertices[meshid][gl_VertexID];
 		vec3 mesh_pos_model		= v.pos.xyz;
-		vec3 mesh_norm_model	= v.normal.xyz;
+		//vec3 mesh_norm_model	= v.normal.xyz;
 		vec2 uv					= v.uv.xy;
 	
 		gl_Position =		view.world_to_clip * vec4(mesh_pos_model + voxel_pos * FIXEDPOINT_FAC + chunk_pos, 1);
 		vs.uvi =			vec3(uv, texid);
-		vs.normal_cam =		mat3(view.world_to_cam) * mesh_norm_model;
+		//vs.normal_cam =		mat3(view.world_to_cam) * mesh_norm_model;
 	}
 #endif
 
@@ -61,7 +61,7 @@ layout(location = 0) vs2fs VS {
 		col = vec4(1.0);
 	#endif
 		
-		vec3 norm = normalize(vs.normal_cam); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
+		//vec3 norm = normalize(vs.normal_cam); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
 		
 		frag_col = col;
 		//frag_normal = vec4(norm.xyz, 1.0); // alpha 1 incase blending happens to never blend normals

@@ -53,6 +53,13 @@ inline void imgui_pop () {
 	g_imgui.tree_depth--;
 }
 
+inline bool imgui_header (const char* label, bool* popen=nullptr) {
+	if (popen) ImGui::SetNextItemOpen(*popen);
+	bool open = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);
+	if (popen) *popen = open;
+	return open;
+}
+
 namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tracked std_string
 	struct _InputTextCallback_UserData {
 		std_string*             Str;

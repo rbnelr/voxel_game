@@ -7,7 +7,13 @@
 #include "assets.hpp"
 
 struct Game {
-	SERIALIZE(Game, world_gen, chunks, flycam, player, activate_flycam)
+	SERIALIZE(Game, world_gen, chunks, flycam, player, activate_flycam, imopen)
+
+	struct ImguiOpen {
+		SERIALIZE(ImguiOpen, performance, graphics, world, chunks, entities)
+		bool performance=true, graphics=true, world=true, chunks=true, entities=true;
+	};
+	ImguiOpen imopen;
 
 	bool dbg_pause = false;
 	FPS_Display fps_display;
