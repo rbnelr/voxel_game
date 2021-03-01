@@ -6,21 +6,21 @@
 		"load_radius": 164.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": true,
-		"visualize_chunks": false,
-		"visualize_subchunks": true,
+		"visualize_chunks": true,
+		"visualize_subchunks": false,
 		"visualize_radius": true,
 		"debug_frustrum_culling": false
 	},
 	"flycam": {
 		"cam": {
 			"pos": [
-				51.40195846557617,
-				11.005608558654785,
-				32.33863830566406
+				77.08416748046875,
+				19.593074798583984,
+				34.63813781738281
 			],
 			"rot_aer": [
-				-0.9799821376800537,
-				0.2244519144296646,
+				2.1340620517730713,
+				-0.19582515954971313,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -36,8 +36,8 @@
 	},
 	"player": {
 		"pos": [
-			58.03327560424805,
-			13.966196060180664,
+			74.6170654296875,
+			15.836423873901367,
 			29.000099182128906
 		],
 		"vel": [
@@ -46,8 +46,8 @@
 			0.0
 		],
 		"rot_ae": [
-			-2.1028201580047607,
-			0.6593841314315796
+			1.6185686588287354,
+			0.25132614374160767
 		],
 		"third_person": false
 	},

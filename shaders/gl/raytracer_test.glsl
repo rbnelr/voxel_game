@@ -165,31 +165,37 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	return uv;
 }
 
-uint read_voxel (uint chunk_id, inout ivec3 coord, out float step_size) {
-	ivec3 co = coord % 64;
+uint chunk_id;
+uint voxel_data;
+uint subchunk_data;
 
-	uint chunk_voxdat = get_voxel_data(chunk_id);
-	if (chunk_sparse(chunk_id)) {
+uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
+	if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
+		voxel_data = get_voxel_data(chunk_id);
+		if (chunk_sparse(chunk_id)) {
 
-		coord &= ~CHUNK_SIZE_MASK;
+			coord &= ~CHUNK_SIZE_MASK;
 
-		step_size = float(CHUNK_SIZE);
-		return chunk_voxdat;
+			step_size = float(CHUNK_SIZE);
+			return voxel_data;
+		}
 	}
 
-	int subci = get_subchunk_idx(co);
+	if ((step_mask & ~SUBCHUNK_MASK) != 0) {
+		int subci = get_subchunk_idx(coord);
 
-	uint sparse_data = dense_chunks[chunk_voxdat].sparse_data[subci];
-	if (is_subchunk_sparse(chunk_voxdat, subci)) {
+		subchunk_data = dense_chunks[voxel_data].sparse_data[subci];
+		if (is_subchunk_sparse(voxel_data, subci)) {
 
-		coord &= ~SUBCHUNK_MASK;
+			coord &= ~SUBCHUNK_MASK;
 
-		step_size = float(SUBCHUNK_SIZE);
-		return sparse_data;
+			step_size = float(SUBCHUNK_SIZE);
+			return subchunk_data;
+		}
 	}
 
 	step_size = 1.0;
-	return get_voxel(sparse_data, co);
+	return get_voxel(subchunk_data, coord);
 }
 
 bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir) {
@@ -213,7 +219,7 @@ void trace_pixel (vec2 px_pos) {
 	vec3 ray_pos, ray_dir;
 	get_ray(px_pos, ray_pos, ray_dir);
 
-	uint chunk_id = camera_chunk;
+	chunk_id = camera_chunk;
 
 	// voxel ray stepping setup
 
@@ -232,12 +238,14 @@ void trace_pixel (vec2 px_pos) {
 	int axis = 0;
 	vec3 proj = ray_pos + ray_dir * 0;
 
+	int step_mask = -1;
+
 	int iterations = 0;
 	while (iterations < max_iterations) {
 		iterations++;
 
 		float step_size;
-		uint bid = read_voxel(chunk_id, coord, step_size);
+		uint bid = read_voxel(step_mask, coord, step_size);
 
 		if (hit_voxel(bid, proj, axis, ray_dir))
 			break;
@@ -258,9 +266,11 @@ void trace_pixel (vec2 px_pos) {
 		proj[axis] += sign(ray_dir[axis]) * 0.5f;
 		coord = ivec3(floor(proj));
 
-		ivec3 step_mask = coord ^ old_coord;
+		ivec3 step_mask3 = coord ^ old_coord;
+		step_mask = step_mask3.x | step_mask3.y | step_mask3.z;
+
 		// handle step out of chunk by checking bits
-		if (any((step_mask & ~ivec3(CHUNK_SIZE_MASK)) != 0)) {
+		if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
 			chunk_id = get_neighbour(chunk_id, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
 			if (chunk_id == 0xffffu)
 				return;

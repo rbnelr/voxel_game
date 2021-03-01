@@ -939,7 +939,7 @@ struct VoxelRaytrace {
 
 	float3 ray_pos;
 	float3 ray_dir;
-	float max_dist = 5;
+	float max_dist = 128;
 
 	static constexpr block_id B_AIR = 1;
 
@@ -948,61 +948,60 @@ struct VoxelRaytrace {
 		else if (	v.y < v.z )					return 1;
 		else									return 2;
 	}
-	
+
+	int get_step_face (int axis) {
+		return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
+	}
+
 	int3 coord;
 	int step_size = 1;
 
-	block_id read_voxel () {
-		int bx, by, bz;
-		int3 cpos;
-		CHUNK_BLOCK_POS(coord.x,coord.y,coord.z, cpos.x,cpos.y,cpos.z, bx,by,bz);
+	Chunk* chunk;
+	uint32_t voxel_data;
+	uint32_t subchunk_data;
 
-		chunk_id cid = chunks->query_chunk(cpos);
-		if (cid == U16_NULL) {
+	block_id read_voxel (int step_mask) {
 
-			step_size = CHUNK_SIZE;
+		if (step_mask & ~CHUNK_SIZE_MASK) {
+			ImGui::Text(">>> Chunk read");
 
-			coord.x &= ~CHUNK_SIZE_MASK;
-			coord.y &= ~CHUNK_SIZE_MASK;
-			coord.z &= ~CHUNK_SIZE_MASK;
+			voxel_data = chunk->voxel_data;
 
-			return B_NULL;
+			if (chunk->flags & Chunk::SPARSE_VOXELS) {
+				step_size = CHUNK_SIZE;
+
+				coord.x &= ~CHUNK_SIZE_MASK;
+				coord.y &= ~CHUNK_SIZE_MASK;
+				coord.z &= ~CHUNK_SIZE_MASK;
+
+				return (block_id)voxel_data; // sparse chunk
+			}
 		}
 
-		auto& chunk = chunks->chunks[cid];
-		uint32_t voxel_data = chunk.voxel_data;
+		if (step_mask & ~SUBCHUNK_MASK) {
+			ImGui::Text(">> Subchunk read");
 
-		if (chunk.flags & Chunk::SPARSE_VOXELS) {
-			step_size = CHUNK_SIZE;
+			auto& dc = chunks->dense_chunks[voxel_data];
 
-			coord.x &= ~CHUNK_SIZE_MASK;
-			coord.y &= ~CHUNK_SIZE_MASK;
-			coord.z &= ~CHUNK_SIZE_MASK;
+			uint32_t subchunk_i = SUBCHUNK_IDX(coord.x & CHUNK_SIZE_MASK, coord.y & CHUNK_SIZE_MASK, coord.z & CHUNK_SIZE_MASK);
+			subchunk_data = dc.sparse_data[subchunk_i];
 
-			return (block_id)voxel_data; // sparse chunk
+			if (dc.is_subchunk_sparse(subchunk_i)) {
+				step_size = SUBCHUNK_SIZE;
+
+				coord.x &= ~SUBCHUNK_MASK;
+				coord.y &= ~SUBCHUNK_MASK;
+				coord.z &= ~SUBCHUNK_MASK;
+
+				return (block_id)subchunk_data; // sparse subchunk
+			}
 		}
-
-		//chunk_id = chunks->chunks[chunk_id].neighbours[axis*2 + (ray_dir[axis] >= 0 ? 1 : 0)];
-
-		auto& dc = chunks->dense_chunks[voxel_data];
-
-		uint32_t subchunk_i = SUBCHUNK_IDX(bx,by,bz);
-		uint32_t subchunk_data = dc.sparse_data[subchunk_i];
-
-		if (dc.is_subchunk_sparse(subchunk_i)) {
-			step_size = SUBCHUNK_SIZE;
-
-			coord.x &= ~SUBCHUNK_MASK;
-			coord.y &= ~SUBCHUNK_MASK;
-			coord.z &= ~SUBCHUNK_MASK;
-
-			return (block_id)subchunk_data; // sparse subchunk
-		}
+		ImGui::Text("> Voxel read");
 
 		auto& subchunk = chunks->dense_subchunks[subchunk_data];
 
 		step_size = 1;
-		uint32_t block_i = BLOCK_IDX(bx,by,bz);
+		uint32_t block_i = BLOCK_IDX(coord.x,coord.y,coord.z);
 		return subchunk.voxels[block_i];
 	}
 
@@ -1014,6 +1013,13 @@ struct VoxelRaytrace {
 		g_debugdraw.vector(ray_pos, ray_dir * max_dist, lrgba(1,0,0,1));
 
 		coord = floori(ray_pos);
+
+		{
+			chunk_id cid = chunks->query_chunk(coord / CHUNK_SIZE);
+			if (cid == U16_NULL)
+				return;
+			chunk = &chunks->chunks[cid];
+		}
 
 		// get how far you have to travel along the ray to move by 1 unit in each axis
 		// (ray_dir / abs(ray_dir.x) normalizes the ray_dir so that its x is 1 or -1
@@ -1028,17 +1034,19 @@ struct VoxelRaytrace {
 		if (ray_dir.y == 0) step_dist.y = INF;
 		if (ray_dir.z == 0) step_dist.z = INF;
 
+		int step_mask = -1;
+
 		int iter = 0;
 
 		while (iter < 100) {
 			iter++;
 
-			block_id bid = read_voxel();
+			block_id bid = read_voxel(step_mask);
 
 			g_debugdraw.wire_cube((float3)coord + ((float)step_size / 2), (float)step_size * 0.99f, lrgba(0,0,1,1));
 			
-			ImGui::Text("%+3d,%+3d,%+3d: %s %d", coord.x, coord.y, coord.z,
-				g_assets.block_types[bid].name.c_str(), step_size);
+			//ImGui::Text("%+3d,%+3d,%+3d: %s %d", coord.x, coord.y, coord.z,
+			//	g_assets.block_types[bid].name.c_str(), step_size);
 			
 			if (bid != B_AIR)
 				return;
@@ -1064,10 +1072,23 @@ struct VoxelRaytrace {
 			//
 			//ImGui::Text("%c proj: %7.3f, %7.3f, %7.3f", "XYZ"[axis], proj.x, proj.y, proj.z);
 
+			int3 old_coord = coord;
+
 			proj[axis] += ray_dir[axis] > 0 ? 0.5f : -0.5f;
 			coord = floori(proj);
 
 			//ImGui::Text("---------------------");
+
+			int3 step_maskv = coord ^ old_coord;
+			step_mask = step_maskv.x | step_maskv.y | step_maskv.z;
+
+			// handle step out of chunk by checking bits
+			if (step_mask & ~CHUNK_SIZE_MASK) {
+				chunk_id cid = chunk->neighbours[get_step_face(axis) ^ 1]; // ^1 flip dir
+				if (cid == U16_NULL)
+					return;
+				chunk = &chunks->chunks[cid];
+			}
 		}
 	}
 };
