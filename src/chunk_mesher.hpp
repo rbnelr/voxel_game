@@ -61,11 +61,11 @@ struct RemeshChunkJob { // Chunk remesh
 	BlockMeshes::Mesh const*	block_meshes_meshes;
 	BlockTile const*			block_tiles;
 
-	ChunkVoxels*				dense_chunks;
-	SubchunkVoxels*				dense_subchunks;
+	Chunks*						chunks;
+	SubchunkNode*				subchunk_nodes;
+	Subchunk*					subchunks;
 
 	Chunk*						chunk;
-
 	// chunk neighbours (neg dir)
 	Chunk const*				chunk_nx;
 	Chunk const*				chunk_ny;
@@ -73,6 +73,9 @@ struct RemeshChunkJob { // Chunk remesh
 
 	bool						mesh_world_border;
 	uint64_t					chunk_seed;
+
+	// internal use; better for performance to write pos into struct right next to other variables than to pass it as another arguement
+	int3						pos;
 
 	//// output data
 	ChunkMeshData				opaque_vertices;

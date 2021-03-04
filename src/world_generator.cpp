@@ -121,107 +121,205 @@ namespace worldgen {
 		return *(float3*)&res.m128_f32[1];
 	}
 
+	void NoisePass::large_noise_generate () {
+		ZoneScoped;
+		int3 chunkpos = chunk_pos * CHUNK_SIZE;
+
+		float3 pos_world;
+		for (int z=0; z<LARGE_NOISE_COUNT; ++z) {
+			pos_world.z = (float)(z * LARGE_NOISE_SIZE + chunkpos.z);
+
+			for (int y=0; y<LARGE_NOISE_COUNT; ++y) {
+				pos_world.y = (float)(y * LARGE_NOISE_SIZE + chunkpos.y);
+
+				for (int x=0; x<LARGE_NOISE_COUNT; ++x) {
+					pos_world.x = (float)(x * LARGE_NOISE_SIZE + chunkpos.x);
+
+					float val = calc_large_noise(pos_world);
+
+					// calculate negative numerical derivative, with 1 block offsets
+					float dx = val - calc_large_noise(pos_world + float3(1,0,0));
+					float dy = val - calc_large_noise(pos_world + float3(0,1,0));
+					float dz = val - calc_large_noise(pos_world + float3(0,0,1));
+
+					_mm_store_ps(large_noise[z][y][x], _mm_set_ps(dz,dy,dx, val));
+				}
+			}
+		}
+	}
+	void NoisePass::voxel_generate () {
+		ZoneScoped;
+		int3 chunkpos = chunk_pos * CHUNK_SIZE;
+		
+		float3 pos_world;
+		for (int lz=0; lz<LARGE_NOISE_CHUNK_SIZE; ++lz)
+		for (int ly=0; ly<LARGE_NOISE_CHUNK_SIZE; ++ly)
+		for (int lx=0; lx<LARGE_NOISE_CHUNK_SIZE; ++lx) {
+
+			auto ln000 = _mm_load_ps(large_noise[lz  ][ly  ][lx  ]);
+			auto ln001 = _mm_load_ps(large_noise[lz  ][ly  ][lx+1]);
+			auto ln010 = _mm_load_ps(large_noise[lz  ][ly+1][lx  ]);
+			auto ln011 = _mm_load_ps(large_noise[lz  ][ly+1][lx+1]);
+			auto ln100 = _mm_load_ps(large_noise[lz+1][ly  ][lx  ]);
+			auto ln101 = _mm_load_ps(large_noise[lz+1][ly  ][lx+1]);
+			auto ln110 = _mm_load_ps(large_noise[lz+1][ly+1][lx  ]);
+			auto ln111 = _mm_load_ps(large_noise[lz+1][ly+1][lx+1]);
+
+			for (int z=0; z<LARGE_NOISE_SIZE; z++) {
+
+				// interpolate low-res lege noise to get values for individual blocks
+				float tz = (float)z / LARGE_NOISE_SIZE;
+				auto ln00 = lerp(ln000, ln100, tz);
+				auto ln01 = lerp(ln001, ln101, tz);
+				auto ln10 = lerp(ln010, ln110, tz);
+				auto ln11 = lerp(ln011, ln111, tz);
+
+				int cz = lz * LARGE_NOISE_SIZE + z;
+				pos_world.z = (float)(cz + chunkpos.z);
+
+				for (int y=0; y<LARGE_NOISE_SIZE; y++) {
+
+					float ty = (float)y / LARGE_NOISE_SIZE;
+					auto ln0  = lerp(ln00, ln10, ty);
+					auto ln1  = lerp(ln01, ln11, ty);
+
+					int cy = ly * LARGE_NOISE_SIZE + y;
+					pos_world.y = (float)(cy + chunkpos.y);
+
+					for (int x=0; x<LARGE_NOISE_SIZE; x++) {
+
+						float tx = (float)x / LARGE_NOISE_SIZE;
+						auto ln    = lerp(ln0, ln1, tx);
+
+						int cx = lx * LARGE_NOISE_SIZE + x;
+						pos_world.x = (float)(cx + chunkpos.x);
+
+						auto large_noise = large_noise_get_val(ln);
+
+						BlockID bid = B_UNBREAKIUM;
+						if (large_noise < wg->max_depth) {
+							float3 normal = large_noise_normalize_derivative(ln);
+
+							bid = cave_noise(pos_world, large_noise, normal);
+						}
+
+						subchunks[IDX3D(cx >> 2, cy >> 2, cz >> 2, CHUNK_SUBCHUNKS)].voxels[SUBCHUNK_IDX(cx & 3, cy & 3, cz & 3)] = wg->bids[bid];
+					}
+				}
+			}
+		}
+	}
+
+	bool NoisePass::sparsify_subtree (int scale, uint32_t* pdata, int3 const& pos) {
+		if (scale == 0) {
+			// leaf subchunks
+			uint32_t idx = IDX3D(pos.x,pos.y,pos.z, CHUNK_SUBCHUNKS);
+
+			auto& sc = subchunks[idx];
+			if (is_sparse(sc)) {
+				*pdata = sc.voxels[0];
+				return true;
+			} else {
+				*pdata = idx;
+				return false;
+			}
+
+		} else {
+			// internal subchunk nodes
+			uint32_t idx = node_count++;
+			auto& scn = nodes[idx];
+
+			scn.children_mask = 0;
+
+			int3 cpos;
+			for (int i=0; i<64; ++i) {
+				int cz = (i >> 4);
+				int cy = (i >> 2) & 3;
+				int cx = (i     ) & 3;
+
+				cpos.z = pos.z*4 + cz;
+				cpos.y = pos.y*4 + cy;
+				cpos.x = pos.x*4 + cx;
+				if (!sparsify_subtree(scale-1, &scn.children[i], cpos))
+					scn.children_mask |= 1ull << i;
+			}
+
+			if (is_sparse(scn)) {
+				*pdata = scn.children[0];
+				return true;
+			} else {
+				*pdata = idx;
+				return false;
+			}
+		}
+	}
+	void NoisePass::sparsify () {
+		ZoneScoped;
+		node_count = 0;
+		root_sparse = sparsify_subtree(2, &root_data, 0);
+	}
+
+	uint32_t copy_subtree (Chunks& chunks, worldgen::NoisePass& np, uint32_t node_idx, int scale) {
+		if (scale == 0) {
+			auto& node = np.subchunks[node_idx];
+
+			uint32_t idx = chunks.subchunks.alloc();
+			auto& sc = chunks.subchunks[idx];
+
+			memcpy(sc.voxels, node.voxels, sizeof(Subchunk));
+
+			return idx;
+		} else {
+			auto& node = np.nodes[node_idx];
+
+			uint32_t idx = chunks.subchunk_nodes.alloc();
+			auto& scn = chunks.subchunk_nodes[idx];
+		
+			scn.children_mask = node.children_mask;
+		
+			for (int i=0; i<64; ++i) {
+				if (node.children_mask & (1ull << i)) {
+					scn.children[i] = copy_subtree(chunks, np, node.children[i], scale-1);
+				} else {
+					scn.children[i] = node.children[i];
+				}
+			}
+
+			return idx;
+		}
+	}
+	void store_voxels_from_worldgen (Chunks& chunks, Chunk& c, worldgen::NoisePass& np) {
+		ZoneScoped;
+
+		//// handle overwriting old voxel data
+		//free_voxels(c);
+		//init_voxels(c);
+
+		assert(c.flags & Chunk::SPARSE_VOXELS);
+
+		if (np.root_sparse) {
+			// whole chunk sparse
+			c.flags |= Chunk::SPARSE_VOXELS;
+			c.voxel_data = np.root_data;
+			return;
+		}
+
+		assert(np.root_data == 0);
+
+		c.flags &= ~Chunk::SPARSE_VOXELS;
+		c.voxel_data = copy_subtree(chunks, np, np.root_data, 2);
+	}
+
 	void NoisePass::generate () {
 		ZoneScoped;
 
-		int3 chunkpos = chunk_pos * CHUNK_SIZE;
-
-		{ // large noise generate
-			ZoneScopedN("large noise generate");
-
-			float3 pos_world;
-
-			for (int z=0; z<LARGE_NOISE_COUNT; ++z) {
-				pos_world.z = (float)(z * LARGE_NOISE_SIZE + chunkpos.z);
-
-				for (int y=0; y<LARGE_NOISE_COUNT; ++y) {
-					pos_world.y = (float)(y * LARGE_NOISE_SIZE + chunkpos.y);
-
-					for (int x=0; x<LARGE_NOISE_COUNT; ++x) {
-						pos_world.x = (float)(x * LARGE_NOISE_SIZE + chunkpos.x);
-
-						float val = calc_large_noise(pos_world);
-						
-						// calculate negative numerical derivative, with 1 block offsets
-						float dx = val - calc_large_noise(pos_world + float3(1,0,0));
-						float dy = val - calc_large_noise(pos_world + float3(0,1,0));
-						float dz = val - calc_large_noise(pos_world + float3(0,0,1));
-
-						_mm_store_ps(large_noise[z][y][x], _mm_set_ps(dz,dy,dx, val));
-					}
-				}
-			}
-		}
-
-		{ // 3d noise generate
-			ZoneScopedN("3d noise generate");
-
-			float3 pos_world;
-
-			for (int lz=0; lz<LARGE_NOISE_CHUNK_SIZE; ++lz)
-			for (int ly=0; ly<LARGE_NOISE_CHUNK_SIZE; ++ly)
-			for (int lx=0; lx<LARGE_NOISE_CHUNK_SIZE; ++lx) {
-
-				auto ln000 = _mm_load_ps(large_noise[lz  ][ly  ][lx  ]);
-				auto ln001 = _mm_load_ps(large_noise[lz  ][ly  ][lx+1]);
-				auto ln010 = _mm_load_ps(large_noise[lz  ][ly+1][lx  ]);
-				auto ln011 = _mm_load_ps(large_noise[lz  ][ly+1][lx+1]);
-				auto ln100 = _mm_load_ps(large_noise[lz+1][ly  ][lx  ]);
-				auto ln101 = _mm_load_ps(large_noise[lz+1][ly  ][lx+1]);
-				auto ln110 = _mm_load_ps(large_noise[lz+1][ly+1][lx  ]);
-				auto ln111 = _mm_load_ps(large_noise[lz+1][ly+1][lx+1]);
-
-				for (int z=0; z<LARGE_NOISE_SIZE; z++) {
-					
-					// interpolate low-res lege noise to get values for individual blocks
-					float tz = (float)z / LARGE_NOISE_SIZE;
-					auto ln00 = lerp(ln000, ln100, tz);
-					auto ln01 = lerp(ln001, ln101, tz);
-					auto ln10 = lerp(ln010, ln110, tz);
-					auto ln11 = lerp(ln011, ln111, tz);
-
-					int cz = lz * LARGE_NOISE_SIZE + z;
-					pos_world.z = (float)(cz + chunkpos.z);
-					
-					for (int y=0; y<LARGE_NOISE_SIZE; y++) {
-						
-						float ty = (float)y / LARGE_NOISE_SIZE;
-						auto ln0  = lerp(ln00, ln10, ty);
-						auto ln1  = lerp(ln01, ln11, ty);
-
-						int cy = ly * LARGE_NOISE_SIZE + y;
-						pos_world.y = (float)(cy + chunkpos.y);
-
-						for (int x=0; x<LARGE_NOISE_SIZE; x++) {
-
-							float tx = (float)x / LARGE_NOISE_SIZE;
-							auto ln    = lerp(ln0, ln1, tx);
-
-							int cx = lx * LARGE_NOISE_SIZE + x;
-							pos_world.x = (float)(cx + chunkpos.x);
-
-							auto large_noise = large_noise_get_val(ln);
-
-							BlockID bid = B_UNBREAKIUM;
-							if (large_noise < wg->max_depth) {
-								float3 normal = large_noise_normalize_derivative(ln);
-
-								bid = cave_noise(pos_world, large_noise, normal);
-							}
-							voxels[cz][cy][cx] = wg->bids[bid];
-						}
-					}
-				}
-			}
-		}
-
+		large_noise_generate();
+		voxel_generate();
+		sparsify();
 	}
 
-#if 1
-
-}
-#include "immintrin.h"
-namespace worldgen {
+#if 0
+	#define SUBC_IDX(x,y,z) (size_t)(z) * SUBCHUNK_COUNT*SUBCHUNK_COUNT + (size_t)(y) * SUBCHUNK_COUNT + (size_t)(x)
 
 	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, Chunk const* c) {
 		assert(c->flags != 0);
@@ -234,7 +332,7 @@ namespace worldgen {
 		} else {
 			auto& dc = chunks.dense_chunks[c->voxel_data];
 
-			uint32_t subchunk_i = IDX3D(sx,sy, z >> SUBCHUNK_SHIFT, SUBCHUNK_COUNT);
+			uint32_t subchunk_i = SUBC_IDX(sx,sy, z >> SUBCHUNK_SHIFT);
 			auto subchunk_val = dc.sparse_data[subchunk_i];
 
 			if (dc.is_subchunk_sparse(subchunk_i)) {
@@ -263,7 +361,7 @@ namespace worldgen {
 		} else {
 			auto& dc = chunks.dense_chunks[c->voxel_data];
 
-			uint32_t subchunk_i = IDX3D(sx,sy,sz, SUBCHUNK_COUNT);
+			uint32_t subchunk_i = SUBC_IDX(sx,sy,sz);
 			auto subchunk_val = dc.sparse_data[subchunk_i];
 
 			if (dc.is_subchunk_sparse(subchunk_i)) {

@@ -156,6 +156,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 //
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
+#if 0
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
 	if (!shad_test) return;
@@ -206,6 +207,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glDispatchCompute(szx, szy, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+#endif
 }
 
 } // namespace gl

@@ -128,9 +128,9 @@ struct Raytracer {
 		SSBO (std::string_view label): ssbo{label} {}
 	};
 
-	SSBO<Chunk>				chunks_ssbo				= {"Raytracer.chunks_ssbo"};
-	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
-	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
+	//SSBO<Chunk>				chunks_ssbo				= {"Raytracer.chunks_ssbo"};
+	//SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
+	//SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
 	int max_iterations = 500;
 
