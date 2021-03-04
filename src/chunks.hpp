@@ -3,16 +3,42 @@
 #include "blocks.hpp"
 #include "assets.hpp"
 
-inline constexpr int CHUNK_SIZE			= 64; // size of chunk in blocks per axis
-inline constexpr int CHUNK_SIZE_SHIFT	= 6; // for pos >> CHUNK_SIZE_SHIFT
-inline constexpr int CHUNK_SIZE_MASK	= CHUNK_SIZE-1;
+#if 1
+#define CHUNK_SIZE			64 // size of chunk in blocks per axis
+#define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
+#define CHUNK_SIZE_MASK		63
+#else
+#define CHUNK_SIZE			32 // size of chunk in blocks per axis
+#define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
+#define CHUNK_SIZE_MASK		31
+#endif
 
-inline constexpr int SUBCHUNK_SIZE		= 4; // size of subchunk in blocks per axis
-inline constexpr int SUBCHUNK_SHIFT		= 2;
-inline constexpr int SUBCHUNK_COUNT		= (CHUNK_SIZE / SUBCHUNK_SIZE); // size of chunk in subchunks per axis
-inline constexpr int SUBCHUNK_MASK		= SUBCHUNK_SIZE-1;
+#if 1
+#define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_SHIFT		2
+#define SUBCHUNK_MASK		3
+#else
+#define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_SHIFT		3
+#define SUBCHUNK_MASK		7
+#endif
 
-inline constexpr int CHUNK_SUBCHUNKS	= CHUNK_SIZE / SUBCHUNK_SIZE;
+static_assert(SUBCHUNK_COUNT == (CHUNK_SIZE / SUBCHUNK_SIZE), "");
+static_assert((1 << SUBCHUNK_SHIFT) == SUBCHUNK_SIZE, "");
+static_assert(SUBCHUNK_MASK == SUBCHUNK_SIZE-1, "");
+
+#define IDX3D(x,y,z, sz) (size_t)(z) * (sz)*(sz) + (size_t)(y) * (sz) + (size_t)(x)
+
+// Get array index of subchunk in chunk data from chunk-relative xyz
+#define SUBCHUNK_IDX(x,y,z) ( (uint32_t)((z) >> SUBCHUNK_SHIFT) * SUBCHUNK_COUNT * SUBCHUNK_COUNT \
+                            + (uint32_t)((y) >> SUBCHUNK_SHIFT) * SUBCHUNK_COUNT \
+                            + (uint32_t)((x) >> SUBCHUNK_SHIFT) )
+// Get array index of block in subchunk from chunk-relative xyz
+#define BLOCK_IDX(x,y,z)  ( (uint32_t)((z) & SUBCHUNK_MASK) * SUBCHUNK_SIZE * SUBCHUNK_SIZE \
+                          + (uint32_t)((y) & SUBCHUNK_MASK) * SUBCHUNK_SIZE \
+                          + (uint32_t)((x) & SUBCHUNK_MASK) )
 
 // Seperate world-block pos into chunk pos and block pos in chunk
 #define CHUNK_BLOCK_POS(X,Y,Z, CX, CY, CZ, BX, BY, BZ) do { \
@@ -24,10 +50,9 @@ inline constexpr int CHUNK_SUBCHUNKS	= CHUNK_SIZE / SUBCHUNK_SIZE;
 		BZ = (Z) & CHUNK_SIZE_MASK; \
 	} while (0)
 
-#define IDX3D(X,Y,Z, SZ) ((Z)*(SZ)*(SZ) + (Y)*(SZ) + (X))
-#define SUBCHUNK_IDX(X,Y,Z) ((Z)*16 + (Y)*4 + (X))
-
-static constexpr int CHUNK_VOXEL_COUNT		= CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE; // number of voxels per chunk
+#define CHUNK_VOXEL_COUNT		(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) // number of voxels per chunk
+#define CHUNK_SUBCHUNK_COUNT	(SUBCHUNK_COUNT * SUBCHUNK_COUNT * SUBCHUNK_COUNT) // number of subchunks per chunk
+#define SUBCHUNK_VOXEL_COUNT	(SUBCHUNK_SIZE * SUBCHUNK_SIZE * SUBCHUNK_SIZE) // number of voxels per subchunk
 
 #define U16_NULL			((uint16_t)-1)
 
@@ -87,9 +112,10 @@ struct Chunks;
 class Renderer;
 struct ChunkSliceData;
 struct WorldgenJob;
-namespace {
-	struct NoisePass;
-}
+
+#define MAX_SUBCHUNKS		((32ull *GB) / sizeof(SubchunkVoxels))
+
+inline constexpr block_id g_null_chunk[CHUNK_VOXEL_COUNT] = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
 
 // linked list in Chunks::slices
 struct SliceNode {
@@ -105,39 +131,33 @@ struct SliceNode {
 // Chunks are currently 64^3 and are the blocks worldgen happens in,
 // which means they can not only be sparse (only 1 block id in entire region) but also additionally unloaded (queries currently return B_NULL)
 
-struct Subchunk {
-	block_id voxels[64]; // [4][4][4]
+struct SubchunkVoxels {
+	block_id voxels[SUBCHUNK_VOXEL_COUNT];
 };
-struct SubchunkNode {
-	uint32_t children[64]; // [4][4][4]
-	uint64_t children_mask;
+struct ChunkVoxels {
+	// data for all subchunks
+	// sparse subchunk:  block_id of all subchunk voxels
+	// dense  subchunk:  id of subchunk
+	uint32_t sparse_data[CHUNK_SUBCHUNK_COUNT];
+
+	// packed bits for all subchunks, where  0: dense subchunk  1: sparse subchunk
+	uint64_t sparse_bits[CHUNK_SUBCHUNK_COUNT / 64];
+
+	// Use comma operator to assert and return value in expression
+#define CHECK_BLOCK(b) (assert((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
+	//#define CHECK_BLOCK(b) ( ((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
+
+	bool is_subchunk_sparse (uint32_t subc_i) {
+		auto test = sparse_bits[subc_i >> 6] & (1ull << (subc_i & 63));
+		return test != 0;
+	}
+	void set_subchunk_sparse (uint32_t subc_i) {
+		sparse_bits[subc_i >> 6] |= 1ull << (subc_i & 63);
+	}
+	void set_subchunk_dense (uint32_t subc_i) {
+		sparse_bits[subc_i >> 6] &= ~(1ull << (subc_i & 63));
+	}
 };
-
-inline bool is_sparse (Subchunk& sc) {
-	block_id val = sc.voxels[0];
-
-	uint64_t packed = (uint64_t)val | ((uint64_t)val << 16) | ((uint64_t)val << 32) | ((uint64_t)val << 48);
-	uint64_t const* packed_ptr = (uint64_t*)sc.voxels;
-
-	for (size_t i=0; i < 64/4; ++i)
-		if (packed_ptr[i] != packed) return false;
-	return true;
-}
-inline bool is_sparse (SubchunkNode& scn) {
-	if (scn.children_mask != 0) return false;
-
-	uint32_t val = scn.children[0];
-
-	uint64_t packed = (uint64_t)val | ((uint64_t)val << 32);
-	uint64_t const* packed_ptr = (uint64_t*)scn.children;
-
-	for (size_t i=0; i < 64/2; ++i)
-		if (packed_ptr[i] != packed) return false;
-	return true;
-}
-
-inline constexpr size_t MAX_SUBCHUNKS       = ((32ull *GB) / sizeof(Subchunk));
-inline constexpr size_t MAX_SUBCHUNK_NODES  = ((32ull *GB) / sizeof(SubchunkNode));
 
 struct Chunk {
 	enum Flags : uint32_t {
@@ -166,8 +186,10 @@ struct Chunk {
 	chunk_id neighbours[6];
 	// make sure there are still at 4 bytes following this so that 16-byte sse loads of neighbours can never segfault
 
-	uint32_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
+	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
 	
+	uint16_t _pad; // free space
+
 	slice_id opaque_mesh_slices;
 	slice_id transp_mesh_slices;
 
@@ -199,18 +221,13 @@ inline int _slices_count (uint32_t vertex_count) { // just for imgui
 inline constexpr size_t _chunk_sz = sizeof(Chunk); // only for checking value in intellisense
 
 inline lrgba DBG_SPARSE_CHUNK_COL	= srgba(  0, 140,   3,  40);
-inline lrgba DBG_CHUNK_COL			= srgba( 25,   0, 128, 255);
-inline lrgba DBG_STAGE1_COL			= srgba( 45, 255,   0, 255);
+inline lrgba DBG_CHUNK_COL			= srgba( 45, 255,   0, 255);
+inline lrgba DBG_STAGE1_COL			= srgba(128,   0, 255, 255);
 
 inline lrgba DBG_CULLED_CHUNK_COL	= srgba(255,   0,   0, 180);
+inline lrgba DBG_DENSE_SUBCHUNK_COL	= srgba(255, 255,   0, 255);
 inline lrgba DBG_RADIUS_COL			= srgba(200,   0,   0, 255);
 inline lrgba DBG_CHUNK_ARRAY_COL	= srgba(  0, 255,   0, 255);
-
-inline lrgba DBG_SUBCHUNK_COLS[]	= {
-	srgba( 80,  30, 200, 255), //  4
-	srgba(168,   0,   0, 255), // 16
-	DBG_CHUNK_COL,             // 64
-};
 
 struct ChunkKey_Hasher {
 	size_t operator() (int3 const& key) const {
@@ -290,8 +307,8 @@ struct BlueNoiseTexture {
 struct Chunks {
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
-	BlockAllocator<SubchunkNode>	subchunk_nodes	= { MAX_SUBCHUNK_NODES };
-	BlockAllocator<Subchunk>		subchunks		= { MAX_SUBCHUNKS };
+	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
+	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
 
 	BlockAllocator<SliceNode>		slices			= { MAX_SLICES };
 
@@ -323,7 +340,13 @@ struct Chunks {
 	void init_voxels (Chunk& c);
 	void free_voxels (Chunk& c);
 
+	void densify_chunk (Chunk& c);
+	void densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val);
+
 	void checked_sparsify_chunk (Chunk& c);
+	bool checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i);
+
+	void sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels);
 
 	Chunk& operator[] (chunk_id id) {
 		return chunks[id];
@@ -373,14 +396,14 @@ struct Chunks {
 	void visualize_chunk (Chunk& chunk, bool empty, bool culled);
 
 	// read a block with a world block pos, returns B_NULL for unloaded chunks
-	block_id read_block  (int x, int y, int z);
-	//
-	void     write_block (int x, int y, int z, block_id bid);
-
+	block_id read_block (int x, int y, int z);
 	// read a block with a chunk block pos
-	block_id read_block  (int x, int y, int z, Chunk const* c);
+	block_id read_block (int x, int y, int z, Chunk const* c);
+
 	// 
-	void     write_block (int x, int y, int z, Chunk* c, block_id bid);
+	void write_block (int x, int y, int z, block_id bid);
+	//
+	void write_block (int x, int y, int z, Chunk* c, block_id bid);
 
 	void write_block_update_chunk_flags (int x, int y, int z, Chunk* c);
 

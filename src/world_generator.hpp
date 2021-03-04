@@ -225,42 +225,21 @@ struct WorldGenerator {
 #include "open_simplex_noise/open_simplex_noise.hpp"
 
 namespace worldgen {
-	inline constexpr int calc_tree_total_nodes () {
-		int total = 0;
-		for (int scale=0; scale<2; ++scale) {
-			int size = 1 << scale*2;
-			total += size*size*size;
-		}
-		return total;
-	} 
-
 	struct NoisePass {
 		int3					chunk_pos;
 		WorldGenerator const*	wg;
 		OSN::Noise<3>			noise3;
 
 		// output
-		static constexpr int LARGE_NOISE_SIZE       = 4;
-		static constexpr int LARGE_NOISE_CHUNK_SIZE = (CHUNK_SIZE / LARGE_NOISE_SIZE);
-		static constexpr int LARGE_NOISE_COUNT      = (LARGE_NOISE_CHUNK_SIZE +1);
+	#define LARGE_NOISE_SIZE 4
+	#define LARGE_NOISE_CHUNK_SIZE (CHUNK_SIZE / LARGE_NOISE_SIZE)
+	#define LARGE_NOISE_COUNT (LARGE_NOISE_CHUNK_SIZE +1)
 
 		// NOTE: deriv is opposite of real derivative -> vector pointing to negative values, ie. air, because I prefer it this way around
 		
 		// float value; float3 deriv;
 		float large_noise[LARGE_NOISE_COUNT][LARGE_NOISE_COUNT][LARGE_NOISE_COUNT][4];
-		//block_id voxels[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
-
-		// sparsifying of the voxels on thread
-		Subchunk subchunks[CHUNK_SUBCHUNKS*CHUNK_SUBCHUNKS*CHUNK_SUBCHUNKS]; // leaf level, written by voxel_generate()
-
-		static constexpr int TREE_TOTAL = calc_tree_total_nodes();
-
-		SubchunkNode nodes[TREE_TOTAL];
-
-		uint32_t root_data;
-		bool     root_sparse;
-
-		int node_count;
+		block_id voxels[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 
 		NoisePass (int3 chunk_pos, WorldGenerator const* wg):
 			chunk_pos{chunk_pos}, wg{wg}, noise3{wg->seed} {
@@ -283,16 +262,8 @@ namespace worldgen {
 		float calc_large_noise (float3 const& pos);
 		BlockID cave_noise (float3 const& pos, float large_noise, float3 const& normal);
 
-		void large_noise_generate ();
-		void voxel_generate ();
-
-		bool sparsify_subtree (int scale, uint32_t* pdata, int3 const& pos);
-		void sparsify ();
-
 		void generate ();
 	};
-
-	void store_voxels_from_worldgen (Chunks& chunks, Chunk& c, worldgen::NoisePass& np);
 }
 
 struct WorldgenJob {

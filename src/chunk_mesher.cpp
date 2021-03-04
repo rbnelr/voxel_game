@@ -4,102 +4,84 @@
 #include "assets.hpp"
 #include "player.hpp"
 
-void block_mesh (RemeshChunkJob& j, block_id bid, int meshid) {
-	// get a 'random' but deterministic value based on block position
-	uint64_t h = hash(j.pos) ^ j.chunk_seed;
-
-	float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
-	float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
-
-	// random 2d offset
-	float rand_offsx = rand1;
-	float rand_offsy = rand2;
-
-	auto& tile = j.block_tiles[bid];
-
-	// get a random deterministic variant
-	int variant = (int)(rand1 * (float)tile.variants); // [0, tile.variants)
-
-	int texid = tile.calc_tex_index((BlockFace)0, variant);
-
-	auto& info = j.block_meshes_meshes[meshid];
-
-	float posx = (float)j.pos.x + (rand_offsx * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
-	float posy = (float)j.pos.y + (rand_offsy * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
-	float posz = (float)j.pos.z;
-
-	int16_t fixd_posx = (int16_t)roundi(posx * BlockMeshInstance_FIXEDPOINT_FAC);
-	int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance_FIXEDPOINT_FAC);
-	int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance_FIXEDPOINT_FAC);
-
-	for (int meshid=info.index; meshid < info.index + info.length; ++meshid) {
-		auto* v = j.opaque_vertices.push();
-		if (!v) return;
-		v->posx = fixd_posx;
-		v->posy = fixd_posy;
-		v->posz = fixd_posz;
-		v->texid = texid;
-		v->meshid = meshid;
-	}
-}
-
-static __forceinline void face (RemeshChunkJob& j, block_id bid, int x, int y, int z, ChunkMeshData* mesh, BlockFace facei) {
-	auto* v = mesh->push();
-	if (!v) return;
-
-	v->posx = (int16_t)(x << BlockMeshInstance_FIXEDPOINT_SHIFT);
-	v->posy = (int16_t)(y << BlockMeshInstance_FIXEDPOINT_SHIFT);
-	v->posz = (int16_t)(z << BlockMeshInstance_FIXEDPOINT_SHIFT);
-	v->texid = j.block_tiles[bid].calc_tex_index(facei, 0);
-	v->meshid = facei;
-}
-
-template <int AXIS>
-void face (RemeshChunkJob& j, block_id bid, block_id nid) {
-	if (!j.mesh_world_border && (bid == B_NULL || nid == B_NULL))
-		return;
-
-	auto& b  = j.block_types[bid];
-	auto& nb = j.block_types[nid];
-
-	// generate face of our voxel that faces negative direction neighbour
-	if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[bid] < 0) {
-		auto* mesh = b.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
-		face(j, bid, j.pos.x, j.pos.y, j.pos.z, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
-	}
-
-	// generate face of negative direction neighbour that faces this voxel
-	if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
-		auto* mesh = nb.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
-		int nx = AXIS == 0 ? j.pos.x-1 : j.pos.x;
-		int ny = AXIS == 1 ? j.pos.y-1 : j.pos.y;
-		int nz = AXIS == 2 ? j.pos.z-1 : j.pos.z;
-		face(j, nid, nx,ny,nz, mesh, (BlockFace)(BF_POS_X + AXIS*2));
-	}
-}
+struct CallCtx {
+	RemeshChunkJob& j;
+	int			x, y, z;
 	
-#if 1
-void mesh_chunk (RemeshChunkJob& j) {
-	ZoneScoped;
+	void block_mesh (block_id bid, int meshid) const {
+		// get a 'random' but deterministic value based on block position
+		uint64_t h = hash(int3(x,y,z)) ^ j.chunk_seed;
 
-	for (int z=0; z<CHUNK_SIZE; ++z) {	j.pos.z = z;
-	for (int y=0; y<CHUNK_SIZE; ++y) {	j.pos.y = y;
-	for (int x=0; x<CHUNK_SIZE; ++x) {	j.pos.x = x;
-		
-		auto bid = j.chunks->read_block(x,y,z, j.chunk);
-		auto nz = z != 0 ? j.chunks->read_block(x,y,z-1, j.chunk) : (j.chunk_nz ? j.chunks->read_block(x,y, CHUNK_SIZE-1, j.chunk_nz) : B_NULL);
-		auto ny = y != 0 ? j.chunks->read_block(x,y-1,z, j.chunk) : (j.chunk_ny ? j.chunks->read_block(x,CHUNK_SIZE-1, z, j.chunk_ny) : B_NULL);
-		auto nx = x != 0 ? j.chunks->read_block(x-1,y,z, j.chunk) : (j.chunk_nx ? j.chunks->read_block(CHUNK_SIZE-1, y,z, j.chunk_nx) : B_NULL);
+		float rand1 = (float)( h        & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
+		float rand2 = (float)((h >> 32) & 0xffffffffull) * (1.0f / (float)(1ull << 32)); // uniform in [0, 1)
 
-		if (bid != nx) face<0>(j, bid, nx);
-		if (bid != ny) face<1>(j, bid, ny);
-		if (bid != nz) face<2>(j, bid, nz);
+		// random 2d offset
+		float rand_offsx = rand1;
+		float rand_offsy = rand2;
 
-		auto& bm = j.block_meshes[bid];
-		if (bm >= 0) block_mesh(j, bid, bm);
-	}}}
-}
-#else
+		auto& tile = j.block_tiles[bid];
+
+		// get a random deterministic variant
+		int variant = (int)(rand1 * (float)tile.variants); // [0, tile.variants)
+
+		int texid = tile.calc_tex_index((BlockFace)0, variant);
+
+		auto& info = j.block_meshes_meshes[meshid];
+
+		float posx = (float)x + (rand_offsx * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
+		float posy = (float)y + (rand_offsy * 2 - 1) * 0.25f * info.offs_strength; // [0,1] -> [-1,+1]
+		float posz = (float)z;
+
+		int16_t fixd_posx = (int16_t)roundi(posx * BlockMeshInstance_FIXEDPOINT_FAC);
+		int16_t fixd_posy = (int16_t)roundi(posy * BlockMeshInstance_FIXEDPOINT_FAC);
+		int16_t fixd_posz = (int16_t)roundi(posz * BlockMeshInstance_FIXEDPOINT_FAC);
+
+		for (int meshid=info.index; meshid < info.index + info.length; ++meshid) {
+			auto* v = j.opaque_vertices.push();
+			if (!v) return;
+			v->posx = fixd_posx;
+			v->posy = fixd_posy;
+			v->posz = fixd_posz;
+			v->texid = texid;
+			v->meshid = meshid;
+		}
+	}
+
+	static __forceinline void face (RemeshChunkJob& j, block_id bid, int x, int y, int z, ChunkMeshData* mesh, BlockFace facei) {
+		auto* v = mesh->push();
+		if (!v) return;
+
+		v->posx = (int16_t)(x << BlockMeshInstance_FIXEDPOINT_SHIFT);
+		v->posy = (int16_t)(y << BlockMeshInstance_FIXEDPOINT_SHIFT);
+		v->posz = (int16_t)(z << BlockMeshInstance_FIXEDPOINT_SHIFT);
+		v->texid = j.block_tiles[bid].calc_tex_index(facei, 0);
+		v->meshid = facei;
+	}
+
+	template <int AXIS>
+	void face (block_id bid, block_id nid) const {
+		if (!j.mesh_world_border && (bid == B_NULL || nid == B_NULL))
+			return;
+
+		auto& b  = j.block_types[bid];
+		auto& nb = j.block_types[nid];
+
+		// generate face of our voxel that faces negative direction neighbour
+		if (b.collision != CM_GAS && nb.transparency != TM_OPAQUE && j.block_meshes[bid] < 0) {
+			auto* mesh = b.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
+			face(j, bid, x,y,z, mesh, (BlockFace)(BF_NEG_X + AXIS*2));
+		}
+
+		// generate face of negative direction neighbour that faces this voxel
+		if (nb.collision != CM_GAS && b.transparency != TM_OPAQUE && j.block_meshes[nid] < 0 && nid != B_NULL) {
+			auto* mesh = nb.transparency == TM_TRANSPARENT ? &j.transp_vertices : &j.opaque_vertices;
+			int nx = AXIS == 0 ? x-1 : x;
+			int ny = AXIS == 1 ? y-1 : y;
+			int nz = AXIS == 2 ? z-1 : z;
+			face(j, nid, nx,ny,nz, mesh, (BlockFace)(BF_POS_X + AXIS*2));
+		}
+	}
+	
 	// offsets of subchunk 3d neighbours in flat buffer
 	#define SCX  1
 	#define SCY  SUBCHUNK_COUNT
@@ -146,12 +128,10 @@ void mesh_chunk (RemeshChunkJob& j) {
 	// makes use of sparseness to _very_ quickly mesh chunks that contain mostly sparse subchunks
 	//  numbers: meshing can be as fast as 32us for mostly sparse chunks compared to 0.5ms-2ms for normal chunks
 	//    thats a 30x speedup for air and stone chunks! 
-	//    and even ragular chunks get some speedup due to empty regions, although currently the overhead makes me slightly slower
-	//    than a dense 3d arary version was if I remember ~.5ms timings correctly
-	//    I could be remembering the numbers for 32^3 chunks though, in which case this would be better
+	//    and even ragular chunks get some speedup due to empty regions, although currently the overhead makes me slightly slower than a dense 3d arary version was if I remember ~.5ms timings correctly
 
 	void mesh_chunk () {
-		ZoneScoped;
+		ZoneScopedN("mesh_chunk");
 
 		int _dense_subchunks = 0;
 
@@ -359,10 +339,11 @@ void mesh_chunk (RemeshChunkJob& j) {
 
 		ZoneValue(_dense_subchunks);
 	}
-#endif
+};
 
 void RemeshChunkJob::execute () {
-	mesh_chunk(*this);
+	CallCtx ctx = { *this };
+	ctx.mesh_chunk();
 }
 
 Chunk const* get_neighbour_blocks (Chunks& chunks, Chunk* chunk, int neighbour) {
@@ -383,10 +364,8 @@ RemeshChunkJob::RemeshChunkJob (Chunks& chunks, Chunk* chunk, WorldGenerator con
 	block_meshes_meshes	= g_assets.block_meshes.meshes.data();
 	block_tiles			= g_assets.block_tiles.data();
 
-	this->chunks			= &chunks;
-
-	this->subchunk_nodes	= &chunks.subchunk_nodes[0];
-	this->subchunks			= &chunks.subchunks[0];
+	this->dense_chunks		= &chunks.dense_chunks[0];
+	this->dense_subchunks	= &chunks.dense_subchunks[0];
 
 	this->chunk = chunk;
 	this->chunk_nx = get_neighbour_blocks(chunks, chunk, 0);
