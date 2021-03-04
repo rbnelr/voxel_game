@@ -132,7 +132,7 @@ struct Raytracer {
 	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
 	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
-	int max_iterations = 500;
+	int max_iterations = 256;
 
 	bool visualize_cost = false;
 	bool visualize_warp_iterations = false;

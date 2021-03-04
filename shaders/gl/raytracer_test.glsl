@@ -108,6 +108,10 @@ uint get_voxel (uint subc_id, ivec3 pos) {
 }
 
 #define B_AIR 1
+#define B_WATER 3
+#define B_MAGMA 11
+#define B_CRYSTAL 14
+#define B_URANIUM 15
 
 uniform uint camera_chunk;
 
@@ -145,7 +149,11 @@ int get_step_face (int axis, vec3 ray_dir) {
 const float max_dist = 100.0;
 uniform int max_iterations = 200;
 
-vec4 hit_col = vec4(0,0,0,0);
+vec4 accum_col = vec4(0,0,0,0);
+
+void add_color (vec4 col) {
+	accum_col += vec4(col.rgb * col.a, col.a) * (1.0 - accum_col.a);
+}
 
 vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	vec2 uv;
@@ -166,6 +174,7 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 uint chunk_id;
 uint voxel_data;
 uint subchunk_data;
+uint cur_bid = 0u;
 
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
@@ -220,7 +229,18 @@ uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 	return get_voxel(subchunk_data, coord);
 }
 
-bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir) {
+float get_alpha_mult (uint bid) {
+	if ( bid == B_WATER   ) return 0.08;
+	return 1.0;
+}
+float get_emmisive_mult (uint bid) {
+	if (      bid == B_MAGMA   ) return  3.0;
+	else if ( bid == B_CRYSTAL ) return 20.0;
+	else if ( bid == B_URANIUM ) return  8.0;
+	return 0.0;
+}
+
+bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir, float step_size) {
 	if (bid == B_AIR)
 		return false;
 
@@ -229,12 +249,16 @@ bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir) {
 	vec2 uv = calc_uv(fract(proj), entry_face);
 	float texid = float(block_tiles[bid].sides[entry_face]);
 
-	vec4 col = texture(tile_textures, vec3(uv, texid));
-	if (col.a == 0.0)
+	vec4 col = textureLod(tile_textures, vec3(uv, texid), 20.0);
+	if (col.a < 0.5)
 		return false;
-
-	hit_col = col;
-	return true;
+	
+	col.a *= get_alpha_mult(bid);
+	
+	col.a *= step_size; // try to account for large steps through subchunks
+	col.a = min(col.a, 1.0);
+	add_color(col);
+	return accum_col.a > 0.95;
 }
 
 void trace_pixel (vec2 px_pos) {
@@ -265,7 +289,7 @@ void trace_pixel (vec2 px_pos) {
 		float step_size;
 		uint bid = read_voxel(step_mask, coord, step_size);
 
-		if (hit_voxel(bid, proj, axis, ray_dir))
+		if (hit_voxel(bid, proj, axis, ray_dir, step_size))
 			break;
 
 		vec3 rel = ray_pos - vec3(coord);
@@ -317,9 +341,9 @@ void trace_pixel (vec2 px_pos) {
 		const uint local_cost = iterations;
 	#endif
 	float wasted_work = float(warp_cost - local_cost) / float(warp_cost);
-	hit_col = texture(heat_gradient, vec2(wasted_work, 0.5));
+	accum_col = texture(heat_gradient, vec2(wasted_work, 0.5));
 	#else
-	hit_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+	accum_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 	#endif
 #endif
 }
@@ -343,5 +367,5 @@ void main () {
 
 	// maybe try not to do rays that we do not see (happens due to local group size)
 	if (pos.x < view.viewport_size.x && pos.y < view.viewport_size.y)
-		imageStore(img, ivec2(pos), hit_col);
+		imageStore(img, ivec2(pos), accum_col);
 }

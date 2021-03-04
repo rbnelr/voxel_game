@@ -48,6 +48,8 @@ namespace worldgen {
 	// so I hardcode block types for now and map them to the ids from blocks.json
 	// Really seems like this is pointless, though
 
+
+
 	enum BlockID : block_id {
 		B_AIR			=0,
 		B_UNBREAKIUM	,
@@ -55,11 +57,20 @@ namespace worldgen {
 
 		B_EARTH			,
 		B_GRASS			,
-		B_SAND			,
-		B_GRAVEL		,
 
 		B_STONE			,
 		B_HARDSTONE		,
+
+		B_SAND			,
+		B_GRAVEL		,
+
+		B_MOSSY_ROCK	,
+		B_ICE			,
+		B_MAGMA			,
+		B_BADROCK		,
+		B_SLIME			,
+		B_CRYSTAL		,
+		B_URANIUM		,
 
 		B_TREE_LOG		,
 		B_LEAVES		,
@@ -77,11 +88,20 @@ namespace worldgen {
 
 			/*B_EARTH		*/ "earth",
 			/*B_GRASS		*/ "grass",
-			/*B_SAND		*/ "sand",
-			/*B_GRAVEL		*/ "gravel",
 
 			/*B_STONE		*/ "stone",
 			/*B_HARDSTONE	*/ "hardstone",
+
+			/*B_SAND		*/ "sand",
+			/*B_GRAVEL		*/ "gravel",
+
+			/*B_MOSSY_ROCK	*/ "mossy_rock",
+			/*B_ICE			*/ "ice",
+			/*B_MAGMA		*/ "magma",
+			/*B_BADROCK		*/ "badrock",
+			/*B_SLIME		*/ "slime",
+			/*B_CRYSTAL		*/ "crystal",
+			/*B_URANIUM		*/ "uranium",
 
 			/*B_TREE_LOG	*/ "tree_log",
 			/*B_LEAVES		*/ "leaves",

@@ -42,6 +42,7 @@ namespace worldgen {
 		
 		// small scale
 		float seed = (float)wg->small_noise.size();
+
 		for (auto& n : wg->small_noise) {
 			float val = noise(pos, n.period, seed++) * n.strength;
 			if (n.cutoff) val = max(val, n.cutoff_val);
@@ -85,8 +86,10 @@ namespace worldgen {
 
 			if (depth > 0) { // eroded cuts air into the 'base' depth, thus exposing depth > 0
 				if (depth < wg->rock_depth) {
+					if (modifer < 0.1f)	return B_URANIUM;
 					return B_STONE; 
 				} else {
+					if (modifer > 0.8f)		return B_MAGMA;
 					return B_HARDSTONE;
 				}
 			}
@@ -99,7 +102,8 @@ namespace worldgen {
 			stalac = stalac*stalac*stalac * wg->stalac_stren;
 
 			if ((depth + stalac) > 0)
-				return B_STONE;
+				//return B_STONE;
+				return B_CRYSTAL;
 		}
 		
 		// air & water

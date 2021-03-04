@@ -165,7 +165,7 @@ void Game::update (Window& window, Input& I) {
 		view = player_view;
 	}
 
-	test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
+	//test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
 
 	update_block_edits(I, *this, player, view);
 

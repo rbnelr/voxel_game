@@ -29,14 +29,14 @@
 		},
 
 		"stone": {
-			"tex": [6,0],
 			"tool": "pickaxe",
-			"hardness": 20
+			"hardness": 20,
+			"tex": [6,0]
 		},
 		"hardstone": {
-			"tex": [7,0],
 			"tool": "pickaxe",
-			"hardness": 30
+			"hardness": 30,
+			"tex": [7,0]
 		},
 		
 		"sand": {
@@ -48,6 +48,42 @@
 			"hardness": 5,
 			"tool": "shovel",
 			"tex": [3,0]
+		},
+
+		"mossy_rock": {
+			"tool": "pickaxe",
+			"hardness": 16,
+			"tex": [8,2]
+		},
+		"ice": {
+			"tool": "pickaxe",
+			"hardness": 16,
+			"tex": [9,2]
+		},
+		"magma": {
+			"tool": "pickaxe",
+			"hardness": 16,
+			"tex": [10,2]
+		},
+		"badrock": {
+			"tool": "pickaxe",
+			"hardness": 10,
+			"tex": [11,2]
+		},
+		"slime": {
+			"tool": "shovel",
+			"hardness": 1,
+			"tex": [12,2]
+		},
+		"crystal": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [9,1]
+		},
+		"uranium": {
+			"tool": "pickaxe",
+			"hardness": 12,
+			"tex": [12,1]
 		},
 
 		"tree_log": {
