@@ -97,38 +97,3 @@ inline std::string preprocessor_insert_macro_defs (std::string const& source, ch
 	result += std::string_view(c, source.size() - (c - source.c_str()));
 	return result;
 }
-
-inline gl::uniform_set parse_shader_uniforms (std::string const& source) {
-	using namespace parse;
-	const auto unif_len = strlen("uniform");
-
-	gl::uniform_set uniforms;
-
-	char const* c = source.c_str();
-	while (c != nullptr && *c != '\0') { // for all uniforms
-		c = strstr(c, "uniform");
-		if (c) {
-			c += unif_len;
-
-			std::string_view typestr, name;
-
-			whitespace(c);
-			identifier(c, &typestr);
-			whitespace(c);
-
-			if (*c == '{') {
-				// UBO
-			} else if (identifier(c, &name)) {
-				auto it = gl::glsl_type_map.find(typestr);
-				if (it == gl::glsl_type_map.end()) {
-					clog(WARNING, "[Shaders] parse_shader_uniforms: Unknown glsl type \"%s\"!", std::string(typestr).c_str());
-				} else {
-					gl::GlslType type = it->second;
-					uniforms.push_back({ std::string(name), type, 0 });
-				}
-			}
-		}
-	}
-
-	return uniforms;
-}

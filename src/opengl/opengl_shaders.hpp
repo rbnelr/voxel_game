@@ -48,8 +48,6 @@ struct Shader {
 			return false;
 		}
 
-		uniforms = parse_shader_uniforms(source);
-
 		// Compile shader stages
 
 		prog = glCreateProgram();
@@ -135,6 +133,32 @@ struct Shader {
 		for (auto stage : compiled_stages) {
 			glDetachShader(prog, stage);
 			glDeleteShader(stage);
+		}
+
+		{
+			GLint uniform_count = 0;
+			glGetProgramiv(prog, GL_ACTIVE_UNIFORMS, &uniform_count);
+			
+			if (uniform_count != 0) {
+				GLint max_name_len = 0;
+				glGetProgramiv(prog, GL_ACTIVE_UNIFORM_MAX_LENGTH, &max_name_len);
+
+				auto uniform_name = std::make_unique<char[]>(max_name_len);
+
+				for (GLint i=0; i<uniform_count; ++i) {
+					GLsizei length = 0;
+					GLsizei count = 0;
+					GLenum 	type = GL_NONE;
+					glGetActiveUniform(prog, i, max_name_len, &length, &count, &type, uniform_name.get());
+
+					ShaderUniform u;
+					u.location = glGetUniformLocation(prog, uniform_name.get());
+					u.name = std::string(uniform_name.get(), length);
+					u.type = type;
+
+					uniforms.emplace_back(std::move(u));
+				}
+			}
 		}
 
 		if (error) {
