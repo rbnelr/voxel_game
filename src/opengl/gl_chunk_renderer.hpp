@@ -152,12 +152,16 @@ struct Raytracer {
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
+	bool inited = false;
+	bool reupload = false;
+
 	bool enable = false;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable", &enable);
+		reupload = ImGui::Button("reupload") || reupload;
 
 		bool macro_change = false;
 

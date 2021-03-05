@@ -172,6 +172,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	static float t = 0.0f;
 	t += g_window.input.real_dt;
+	if (t > 60.0f)
+		t -= 60.0f;
 
 	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
 	shad_test->set_uniform("max_iterations", max_iterations);
@@ -182,27 +184,34 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
-	static bool inited = false;
 	if (!inited && g_window.frame_counter >= 1000) {
+		reupload = true;
+		inited = true;
+	}
+
+	if (reupload) {
 		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), nullptr, GL_STREAM_DRAW);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.chunks.commit_size(), game.chunks.chunks.arr, GL_STREAM_DRAW);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunks_ssbo.ssbo);
 		}
 		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_chunks.commit_size(), nullptr, GL_STREAM_DRAW);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_chunks.commit_size(), game.chunks.dense_chunks.arr, GL_STREAM_DRAW);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, dense_chunks_ssbo.ssbo);
 		}
 		{
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_subchunks.commit_size(), nullptr, GL_STREAM_DRAW);
 			glBufferData(GL_SHADER_STORAGE_BUFFER, game.chunks.dense_subchunks.commit_size(), game.chunks.dense_subchunks.arr, GL_STREAM_DRAW);
 			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, dense_subchunks_ssbo.ssbo);
 		}
 
-		inited = true;
-
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+		reupload = false;
 	}
 
 	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
