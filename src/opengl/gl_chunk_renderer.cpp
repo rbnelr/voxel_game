@@ -170,8 +170,12 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			camera_chunk = 0; // ugh what do?
 	}
 
+	static float t = 0.0f;
+	t += g_window.input.real_dt;
+
 	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
 	shad_test->set_uniform("max_iterations", max_iterations);
+	shad_test->set_uniform("time", t);
 
 	glUniform1i(shad_test->get_uniform_location("tile_textures"), 0);
 	glUniform1i(shad_test->get_uniform_location("heat_gradient"), 1);

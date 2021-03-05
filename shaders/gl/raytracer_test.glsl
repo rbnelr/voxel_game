@@ -1,10 +1,67 @@
-#version 460 core
+﻿#version 460 core
 //#extension GL_ARB_gpu_shader5 : enable
 //#extension GL_EXT_shader_16bit_storage : enable // not supported
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_ARB_shader_group_vote : enable
 
 #include "common.glsl"
+
+
+//// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
+// Gold Noise ©2015 dcerisano@standard3d.com
+// - based on the Golden Ratio
+// - uniform normalized distribution
+// - fastest static noise generator function (also runs at low precision)
+
+float PHI = 1.61803398874989484820459;  // Φ = Golden Ratio   
+
+float gold_noise(in vec2 xy, in float seed){
+	return fract(tan(distance(xy*PHI, xy)*seed)*xy.x);
+}
+///
+
+uniform float time = 0.0;
+
+float seed = time + 1.0;
+
+float rand () {
+	return gold_noise(gl_GlobalInvocationID.xy, seed++);
+}
+vec2 rand2 () {
+	return vec2(rand(), rand());
+}
+vec3 rand3 () {
+	return vec3(rand(), rand(), rand());
+}
+
+#define PI	3.1415926535897932384626433832795
+
+vec3 hemisphere_sample () {
+	// cosine weighted sampling (100% diffuse)
+	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+
+	vec2 uv = rand2();
+
+	float r = sqrt(uv.y);
+	float theta = 2*PI * uv.x;
+
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+
+	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	return dir;
+}
+vec3 get_bounce_dir (vec3 normal) {
+	mat3 tangent_to_world;
+	{
+		vec3 tangent = abs(normal.x) >= 0.98 ? vec3(0,1,0) : vec3(1,0,0);
+		vec3 bitangent = cross(normal, tangent);
+
+		tangent_to_world = mat3(tangent, bitangent, normal);
+	}
+
+	return tangent_to_world * hemisphere_sample();
+}
 
 layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
@@ -18,6 +75,25 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 #define SUBCHUNK_MASK		3
 
 #define CHUNK_SPARSE_VOXELS	 4
+
+
+#define B_AIR 1
+#define B_WATER 3
+#define B_MAGMA 12
+#define B_CRYSTAL 15
+#define B_URANIUM 16
+
+float get_alpha_mult (uint bid) {
+	if (      bid == B_WATER   ) return 0.08;
+	else if ( bid == B_CRYSTAL ) return 0.22;
+	return 1.0;
+}
+float get_emmisive_mult (uint bid) {
+	if (      bid == B_MAGMA   ) return 40.0;
+	else if ( bid == B_CRYSTAL ) return 30.0;
+	else if ( bid == B_URANIUM ) return 60.0;
+	return 0.0;
+}
 
 struct Chunk {
 	uint flags;
@@ -107,12 +183,6 @@ uint get_voxel (uint subc_id, ivec3 pos) {
 	return (val >> ((pos.x & 1) * 16)) & 0xffffu;
 }
 
-#define B_AIR 1
-#define B_WATER 3
-#define B_MAGMA 11
-#define B_CRYSTAL 14
-#define B_URANIUM 15
-
 uniform uint camera_chunk;
 
 uniform sampler2DArray	tile_textures;
@@ -141,7 +211,6 @@ int find_next_axis (vec3 next) { // index of smallest component
 	else if (	next.y < next.z )						return 1;
 	else												return 2;
 }
-
 int get_step_face (int axis, vec3 ray_dir) {
 	return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
 }
@@ -174,7 +243,6 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 uint chunk_id;
 uint voxel_data;
 uint subchunk_data;
-uint cur_bid = 0u;
 
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
@@ -229,31 +297,35 @@ uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 	return get_voxel(subchunk_data, coord);
 }
 
-float get_alpha_mult (uint bid) {
-	if ( bid == B_WATER   ) return 0.08;
-	return 1.0;
-}
-float get_emmisive_mult (uint bid) {
-	if (      bid == B_MAGMA   ) return  3.0;
-	else if ( bid == B_CRYSTAL ) return 20.0;
-	else if ( bid == B_URANIUM ) return  8.0;
-	return 0.0;
-}
+int iterations = 0;
+
+vec3 hit_pos;
+vec3 hit_normal;
+float hit_emiss;
 
 bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir, float step_size) {
 	if (bid == B_AIR)
 		return false;
 
+	hit_pos = proj;
+
 	int entry_face = get_step_face(axis, ray_dir);
 	
 	vec2 uv = calc_uv(fract(proj), entry_face);
+
+	vec3 normal = vec3(0.0);
+	normal[axis] = -sign(ray_dir[axis]);
+	
+	hit_normal = normal;
+
 	float texid = float(block_tiles[bid].sides[entry_face]);
 
-	vec4 col = textureLod(tile_textures, vec3(uv, texid), 20.0);
+	vec4 col = textureLod(tile_textures, vec3(uv, texid), bid == B_WATER ? 20.0 : 0.0);
 	if (col.a < 0.5)
 		return false;
 	
 	col.a *= get_alpha_mult(bid);
+	hit_emiss = get_emmisive_mult(bid);
 	
 	col.a *= step_size; // try to account for large steps through subchunks
 	col.a = min(col.a, 1.0);
@@ -261,14 +333,7 @@ bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir, float step_size) {
 	return accum_col.a > 0.95;
 }
 
-void trace_pixel (vec2 px_pos) {
-	vec3 ray_pos, ray_dir;
-	get_ray(px_pos, ray_pos, ray_dir);
-
-	chunk_id = camera_chunk;
-
-	// voxel ray stepping setup
-
+bool trace_ray (vec3 ray_pos, vec3 ray_dir) {
 	ivec3 coord = ivec3(floor(ray_pos));
 
 	vec3 rdir; // reciprocal of ray dir
@@ -282,7 +347,6 @@ void trace_pixel (vec2 px_pos) {
 	int step_mask = -1;
 	float dist = 0.0;
 
-	int iterations = 0;
 	while (iterations < max_iterations) {
 		iterations++;
 
@@ -290,7 +354,7 @@ void trace_pixel (vec2 px_pos) {
 		uint bid = read_voxel(step_mask, coord, step_size);
 
 		if (hit_voxel(bid, proj, axis, ray_dir, step_size))
-			break;
+			return true;
 
 		vec3 rel = ray_pos - vec3(coord);
 		
@@ -315,14 +379,14 @@ void trace_pixel (vec2 px_pos) {
 		//	break;
 
 		ivec3 old_coord = coord;
-
-		//proj[axis] += sign(ray_dir[axis]) * 0.5f;
-		proj[axis] += ray_dir[axis] >= 0 ? 0.5 : -0.5;
-		coord = ivec3(floor(proj));
-
+		
+		vec3 tmp = proj;
+		tmp[axis] += ray_dir[axis] >= 0 ? 0.5 : -0.5;
+		coord = ivec3(floor(tmp));
+		
 		ivec3 step_mask3 = coord ^ old_coord;
 		step_mask = step_mask3.x | step_mask3.y | step_mask3.z;
-
+		
 		// handle step out of chunk by checking bits
 		if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
 			chunk_id = get_neighbour(chunk_id, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
@@ -330,7 +394,50 @@ void trace_pixel (vec2 px_pos) {
 				break;
 		}
 	}
-	
+
+	return false;
+}
+
+void main () {
+#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+	if (subgroupElect()) {
+		warp_reads[gl_SubgroupID][0] = 0u;
+		warp_reads[gl_SubgroupID][1] = 0u;
+	}
+	local_reads[0] = 0u;
+	local_reads[1] = 0u;
+
+	barrier();
+#endif
+	vec2 pos = gl_GlobalInvocationID.xy;
+
+	chunk_id = camera_chunk;
+
+	vec3 ray_pos, ray_dir;
+	get_ray(pos, ray_pos, ray_dir);
+
+	// primary ray
+	if (trace_ray(ray_pos, ray_dir)) {
+		
+		vec4 albedo = accum_col;
+		vec4 accum = vec4(0.0);
+
+		// secondary rays
+		int rays = 16;
+		for (int i=0; i<rays; ++i) {
+			ray_pos = hit_pos + hit_normal * 0.00001;
+			//ray_dir = reflect(ray_dir, hit_normal);
+			ray_dir = get_bounce_dir(hit_normal);
+		
+			accum_col = vec4(0.0);
+			trace_ray(ray_pos, ray_dir);
+
+			accum += accum_col * hit_emiss;
+		}
+		
+		accum_col = (accum/float(rays) + 0.02) * albedo;
+	}
+
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST
 	#if VISUALIZE_WARP_READS
@@ -340,30 +447,12 @@ void trace_pixel (vec2 px_pos) {
 		const uint warp_cost = subgroupMax(iterations);
 		const uint local_cost = iterations;
 	#endif
-	float wasted_work = float(warp_cost - local_cost) / float(warp_cost);
-	accum_col = texture(heat_gradient, vec2(wasted_work, 0.5));
+		float wasted_work = float(warp_cost - local_cost) / float(warp_cost);
+		accum_col = texture(heat_gradient, vec2(wasted_work, 0.5));
 	#else
-	accum_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+		accum_col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 	#endif
 #endif
-}
-
-void main () {
-
-#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
-	if (subgroupElect()) {
-		warp_reads[gl_SubgroupID][0] = 0u;
-		warp_reads[gl_SubgroupID][1] = 0u;
-	}
-	local_reads[0] = 0u;
-	local_reads[1] = 0u;
-#endif
-
-	barrier();
-
-	vec2 pos = gl_GlobalInvocationID.xy;
-
-	trace_pixel(pos);
 
 	// maybe try not to do rays that we do not see (happens due to local group size)
 	if (pos.x < view.viewport_size.x && pos.y < view.viewport_size.y)
