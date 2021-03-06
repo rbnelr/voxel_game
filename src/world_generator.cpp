@@ -222,11 +222,6 @@ namespace worldgen {
 	}
 
 #if 1
-
-}
-#include "immintrin.h"
-namespace worldgen {
-
 	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, Chunk const* c) {
 		assert(c->flags != 0);
 

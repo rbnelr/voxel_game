@@ -64,47 +64,36 @@ struct BlockPlace {
 
 		imgui_pop();
 	}
-	void update (Input& I, Game& game, Player const& player);
-};
-
-struct InventorySlot {
-	// InventorySlot stores _one_ instance of an Item and a stack size which artifically 'duplicates' the item
-	//  this means that only stateless Items should have a stack size above 1, or else the entire stack would share the state
-	int stack_size = 0;
-	Item item = {};
+	void update (Input& I, Game& game, Player& player);
 };
 
 struct Inventory {
 	bool is_open = false;
 
-	struct Quickbar {
-		InventorySlot slots[10];
+	struct Toolbar {
+		Item slots[10];
 
 		int selected = 0;
 
-		InventorySlot& get_selected () {
-			return slots[selected];
-		}
-		InventorySlot const& get_selected () const {
+		Item& get_selected () {
 			return slots[selected];
 		}
 
-		Quickbar () {
-			slots[0] = { 1, { I_WOOD_SWORD } };
-			slots[1] = { 1, { I_WOOD_PICKAXE } };
-			slots[2] = { 1, { I_WOOD_SHOVEL } };
-			slots[3] = { 1, { (item_id)g_assets.block_types.map_id("earth") } };
-			slots[4] = { 1, { (item_id)g_assets.block_types.map_id("grass") } };
-			slots[5] = { 1, { (item_id)g_assets.block_types.map_id("stone") } };
-			slots[6] = { 1, { (item_id)g_assets.block_types.map_id("tree_log") } };
-			slots[7] = { 1, { (item_id)g_assets.block_types.map_id("leaves") } };
-			slots[8] = { 1, { (item_id)g_assets.block_types.map_id("water") } };
-			//slots[9] = { 1, { (item_id)g_assets.block_types.map_id("torch") } };
-			slots[9] = { 1, { (item_id)g_assets.block_types.map_id("glass") } };
+		Toolbar () {
+			slots[0] = Item::make_item( I_WOOD_SWORD   );
+			slots[1] = Item::make_item( I_WOOD_PICKAXE );
+			slots[2] = Item::make_item( I_WOOD_SHOVEL  );
+			slots[3] = Item::make_block( (item_id)g_assets.block_types.map_id("earth")    , 1 );
+			slots[4] = Item::make_block( (item_id)g_assets.block_types.map_id("grass")    , 1 );
+			slots[5] = Item::make_block( (item_id)g_assets.block_types.map_id("stone")    , 1 );
+			slots[6] = Item::make_block( (item_id)g_assets.block_types.map_id("tree_log") , 1 );
+			slots[7] = Item::make_block( (item_id)g_assets.block_types.map_id("leaves")   , 1 );
+			slots[8] = Item::make_block( (item_id)g_assets.block_types.map_id("water")    , 1 );
+			slots[9] = Item::make_block( (item_id)g_assets.block_types.map_id("glass")    , 1 );
 		}
 	};
 
-	Quickbar quickbar;
+	Toolbar toolbar;
 
 	void update (Input& I);
 };

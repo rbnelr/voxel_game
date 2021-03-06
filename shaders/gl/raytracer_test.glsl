@@ -422,6 +422,17 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
 	return false;
 }
 
+vec3 tonemap (vec3 c) {
+	
+	//c *= 2.0;
+	//c = c / (c + 1.0);
+	
+	//c *= 0.2;
+	//vec3 x = max(vec3(0.0), c -0.004);
+	//c = (x*(6.2*x+.5))/(x*(6.2*x+1.7)+0.06);
+	return c;
+}
+
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
 	if (subgroupElect()) {
@@ -453,7 +464,7 @@ void main () {
 		vec3 light = vec3(0.0);
 		float AO = 0.0;
 		
-		if (true) {
+		if (false) {
 			// Lighting in 64 block radius from emissive blocks
 			vec3 accum = vec3(0.0);
 			int rays = 2;
@@ -469,7 +480,7 @@ void main () {
 			
 			light += (accum/float(rays) + 0.02) * vec3(0.25, 0.04, 1.0)*0.3;
 		}
-		if (true) {
+		if (false) {
 			// fake directional light
 			float accum = 0.0;
 			int rays = 1;
@@ -496,17 +507,18 @@ void main () {
 				
 				Hit sechit;
 				sechit.col = vec4(0.0);
-				if (trace_ray(bounce_pos, get_bounce_dir(hit.normal), 32.0, sechit))
-					accum += hit.col.a;
+				if (trace_ray(bounce_pos, get_bounce_dir(hit.normal), 64.0, sechit))
+					accum += clamp(hit.col.a, 0.0, 1.0);
 			}
 			
 			AO += accum/float(rays);
 		}
 		
-		light += vec3(0.5, 0.8, 1.0) * 0.2 * (1.0 - AO);
+		light += vec3(0.5, 0.8, 1.0) * 0.8 * (1.0 - AO);
 		light += clamp(light, vec3(0.0), vec3(1.0));
 		
 		hit.col.rgb *= light;
+		//hit.col.rgb = vec3(1.0 - AO);
 	}
 
 #if VISUALIZE_COST
@@ -524,7 +536,9 @@ void main () {
 		hit.col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
 	#endif
 #endif
-
+	
+	hit.col.rgb = tonemap(hit.col.rgb);
+	
 	// maybe try not to do rays that we do not see (happens due to local group size)
 	if (pos.x < view.viewport_size.x && pos.y < view.viewport_size.y)
 		imageStore(img, ivec2(pos), hit.col);

@@ -530,6 +530,19 @@ inline Mesh upload_mesh (std::string_view label, T* vertices, size_t vertex_coun
 	return m;
 }
 
+template <typename T> inline void stream_vbo (GLuint vbo, T const* vertices, size_t vertex_count) {
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), nullptr, GL_STREAM_DRAW);
+	if (vertex_count > 0)
+		glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), vertices, GL_STREAM_DRAW);
+
+	// keep bound
+}
+template <typename T> inline void stream_vbo (GLuint vbo, std::vector<T> const& vertices) {
+	stream_vbo(vbo, vertices.data(), vertices.size());
+}
+
 struct IndexedMesh {
 	Vao vao;
 	Vbo vbo;

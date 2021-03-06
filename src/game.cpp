@@ -167,7 +167,9 @@ void Game::update (Window& window, Input& I) {
 
 	//test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
 
-	update_block_edits(I, *this, player, view);
+	player.selected_block.is_selected = false;
+	if (!activate_flycam || creative_mode)
+		update_block_edits(I, *this, player, view);
 
 	block_update.update_blocks(I, chunks);
 
@@ -217,7 +219,7 @@ void Game::raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, float
 
 void Game::apply_damage (SelectedBlock& block, Item& item, bool creative_mode) {
 	assert(block);
-	auto tool_props = item.get_props();
+	auto& tool_props = item.get_props();
 
 	auto hardness = g_assets.block_types[block.hit.bid].hardness;
 

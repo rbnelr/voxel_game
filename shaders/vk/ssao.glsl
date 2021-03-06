@@ -37,7 +37,7 @@ layout(location = 0) vs2fs VS {
 	//	vec3 hemisphere_samples[64];
 	//}
 
-	const int sample_count = 32;
+	const int sample_count = 16;
 	const float min_radius = 0.05;
 	const float max_radius = 0.5;
 	const float base_radius = 0.5;
@@ -151,6 +151,7 @@ layout(location = 0) vs2fs VS {
 			occluded += occl * cutoff_fac;
 		}
 		float fac = 1.0 - occluded / float(sample_count);
+		
 		
 		//frag_col = normal.z;
 		frag_col = pow(fac, 1.0);

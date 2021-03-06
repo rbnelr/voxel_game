@@ -108,7 +108,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		glUseProgram(shader->prog);
 		r.state.set(state);
 
-		glUniform1i(shader->get_uniform_location("tile_textures"), 0);
+		glUniform1i(shader->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");
 
@@ -158,9 +158,9 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
-	if (!shad_test) return;
+	if (!shad) return;
 
-	glUseProgram(shad_test->prog);
+	glUseProgram(shad->prog);
 
 	chunk_id camera_chunk;
 	{
@@ -175,12 +175,12 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	if (t > 60.0f)
 		t -= 60.0f;
 
-	shad_test->set_uniform("camera_chunk", (uint32_t)camera_chunk);
-	shad_test->set_uniform("max_iterations", max_iterations);
-	shad_test->set_uniform("time", t);
+	shad->set_uniform("camera_chunk", (uint32_t)camera_chunk);
+	shad->set_uniform("max_iterations", max_iterations);
+	shad->set_uniform("time", t);
 
-	glUniform1i(shad_test->get_uniform_location("tile_textures"), 0);
-	glUniform1i(shad_test->get_uniform_location("heat_gradient"), 1);
+	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
 		
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 

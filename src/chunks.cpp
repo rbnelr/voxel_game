@@ -238,12 +238,12 @@ void Chunks::checked_sparsify_chunk (Chunk& c) {
 
 // check if subchunk region in CHUNK_SIZE^3 array is sparse
 bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
+#if 1
 	// block id at first voxel
 	block_id bid = *ptr;
 	// 8 bytes packed version to check while row in one line
 	uint64_t packed = (uint64_t)bid | ((uint64_t)bid << 16) | ((uint64_t)bid << 32) | ((uint64_t)bid << 48);
 
-	block_id* in = ptr;
 	uint64_t* copy = (uint64_t*)subc.voxels;
 
 	int is_sparse = 1;
@@ -263,6 +263,25 @@ bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
 		ptr += CHUNK_SIZE * (CHUNK_SIZE - SUBCHUNK_SIZE); // skip ptr ahead to next layer of subchunk
 	}
 	return is_sparse;
+#else
+	block_id bid = *ptr;
+	block_id* copy = subc.voxels;
+
+	int is_sparse = 1;
+
+	for (int z=0; z<SUBCHUNK_SIZE; ++z) {
+		for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+			for (int x=0; x<SUBCHUNK_SIZE; ++x) {
+				is_sparse &= (int)(*ptr == bid);
+
+				*copy++ = *ptr++; // copy into subchunk
+			}
+			ptr += CHUNK_SIZE - SUBCHUNK_SIZE; // skip ptr ahead to next row of subchunk
+		}
+		ptr += CHUNK_SIZE * (CHUNK_SIZE - SUBCHUNK_SIZE); // skip ptr ahead to next layer of subchunk
+	}
+	return is_sparse;
+#endif
 }
 bool check_chunk_sparse (ChunkVoxels& dc) {
 	uint32_t bid = dc.sparse_data[0];

@@ -3,22 +3,17 @@
 #include "blocks.hpp"
 
 enum item_id : uint32_t {
-	I_NULL			=0, // No item
+	I_NULL			=0,
 
-	// All block ids
-
-	I_WOOD_SWORD	=MAX_BLOCK_ID, // Allocate item ids after entire possible block id space, so adding blocks does not shift all item ids
-	I_WOOD_PICKAXE	,
+	I_WOOD_PICKAXE	=MAX_BLOCK_ID,
 	I_WOOD_SHOVEL	,
-
-	ITEM_IDS_COUNT	,
+	I_WOOD_SWORD	,
 };
 
-// Only store names for the actual items even though the item id range include the block ids
-static constexpr const char* ITEM_NAMES[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_SWORD		*/	"wood_sword",
+inline constexpr const char* ITEM_NAMES[] = {
 	/* I_WOOD_PICKAXE	*/	"wood_pickaxe",
 	/* I_WOOD_SHOVEL	*/	"wood_shovel",
+	/* I_WOOD_SWORD		*/	"wood_sword",
 };
 
 struct ItemProperties {
@@ -27,43 +22,66 @@ struct ItemProperties {
 	uint8_t		hardness;
 };
 
-static constexpr ItemProperties FISTS_PROPS		 = { ToolType::FISTS, 32, 4 };
+inline constexpr ItemProperties FISTS_PROPS		 = { ToolType::FISTS, 32, 4 };
 
-static constexpr ItemProperties ITEM_PROPS[ITEM_IDS_COUNT - MAX_BLOCK_ID] = {
-	/* I_WOOD_SWORD		*/	{ ToolType::SWORD		, 32, 4 },
+inline constexpr ItemProperties ITEM_PROPS[] = {
 	/* I_WOOD_PICKAXE	*/	{ ToolType::PICKAXE	, 32, 4 },
+	/* I_WOOD_SWORD		*/	{ ToolType::SWORD	, 32, 4 },
 	/* I_WOOD_SHOVEL	*/	{ ToolType::SHOVEL	, 32, 4 },
 };
+inline constexpr int ITEM_TILES[] = {
+	/* I_WOOD_PICKAXE	*/	{ 0 + 14 * 16 },
+	/* I_WOOD_SWORD		*/	{ 0 + 13 * 16 },
+	/* I_WOOD_SHOVEL	*/	{ 0 + 12 * 16 },
+};
 
-static inline constexpr const char* get_item_name (Assets& assets, item_id id) {
-	if (id < MAX_BLOCK_ID)	return assets.block_types[(block_id)id].name.c_str();
-	else					return ITEM_NAMES[id - MAX_BLOCK_ID];
-}
-static inline constexpr ItemProperties get_item_props (item_id id) {
-	if (id < MAX_BLOCK_ID)	return FISTS_PROPS;
-	else					return ITEM_PROPS[id - MAX_BLOCK_ID];
-}
-
-struct Tool {
+struct ToolState {
 	uint8_t hp = 255;
 };
-
 struct Item {
-	item_id	id = I_NULL;
-
-	// Item state
+	item_id	id;
 	union {
-		Tool tool;
+		struct {
+			uint8_t		count;
+		} block;
+		struct {
+			ToolState	state;
+		} item;
 	};
 
-	ItemProperties get_props () const {
-		return get_item_props(id);
+	bool is_block () {
+		return id != I_NULL && id < MAX_BLOCK_ID;
 	}
 
-	Item () {}
-	Item (item_id id): id{id} {
-		if (id >= MAX_BLOCK_ID) {
-			tool = Tool();
-		}
+	ItemProperties const& get_props () {
+		if (id == I_NULL)			return FISTS_PROPS;
+		else if (id < MAX_BLOCK_ID)	return FISTS_PROPS;
+		else						return ITEM_PROPS[id - MAX_BLOCK_ID];
+	}
+	const char* get_name () {
+		if (id == I_NULL)			return "null";
+		else if (id < MAX_BLOCK_ID)	return g_assets.block_types[(block_id)id].name.c_str();
+		else						return ITEM_NAMES[id - MAX_BLOCK_ID];
+	}
+
+	Item () {
+		memset(this, 0, sizeof(Item));
+	}
+
+	static Item make_item (item_id id, ToolState state={}) {
+		assert(id >= MAX_BLOCK_ID);
+		Item i;
+		i.id = id;
+		i.item.state = state;
+		return i;
+	}
+	static Item make_block (item_id id, uint8_t count) {
+		assert(id < MAX_BLOCK_ID);
+		Item i;
+		i.id = id;
+		i.block.count = count;
+		return i;
 	}
 };
+
+

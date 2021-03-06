@@ -118,7 +118,7 @@ struct ChunkRenderer {
 struct Raytracer {
 	//SERIALIZE(Raytracer, enable)
 
-	Shader* shad_test;
+	Shader* shad;
 
 	template <typename T>
 	struct SSBO {
@@ -171,14 +171,14 @@ struct Raytracer {
 		ImGui::SameLine();
 		macro_change = ImGui::Checkbox("warp_reads", &visualize_warp_reads) || macro_change;
 
-		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad_test) {
+		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad) {
 			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
 		}
 
-		if (macro_change && shad_test) {
-			shad_test->macros = get_macros();
-			shad_test->recompile("macro_change", false);
+		if (macro_change && shad) {
+			shad->macros = get_macros();
+			shad->recompile("macro_change", false);
 		}
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
@@ -187,7 +187,7 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad_test = shaders.compile("raytracer_test", get_macros(), {{ COMPUTE_SHADER }});
+		shad = shaders.compile("raytracer_test", get_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;

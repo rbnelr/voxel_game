@@ -489,5 +489,8 @@
     <None Include="..\..\..\shaders\gl\raytracer_test.glsl">
       <Filter>shaders\gl</Filter>
     </None>
+    <None Include="..\..\..\shaders\gl\gui.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>

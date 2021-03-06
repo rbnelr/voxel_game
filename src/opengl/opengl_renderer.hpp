@@ -48,7 +48,6 @@ struct ViewUniforms {
 		this->viewport_size = (float2)viewport_size;
 	}
 };
-
 struct CommonUniforms {
 	ViewUniforms view;
 
@@ -115,6 +114,72 @@ struct BlockHighlight {
 	void draw (OpenglRenderer& r, SelectedBlock& block);
 };
 
+struct GUIRenderer {
+	Shader*			shad;
+
+	struct GUIVertex {
+		float2 pos;
+		float3 uv; // z is tile texture index, -1 means gui texture
+
+		template <typename ATTRIBS>
+		static void attributes (ATTRIBS& a) {
+			int loc = 0;
+			a.init(sizeof(GUIVertex));
+			a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos", offsetof(GUIVertex, pos));
+			a.template add<AttribMode::FLOAT, decltype(uv )>(loc++, "uv" , offsetof(GUIVertex, uv ));
+		}
+	};
+	VertexBuffer	gui_vbo	= vertex_buffer<GUIVertex>("GUIRenderer.gui_vbo");
+
+	std::vector<GUIVertex> vertex_data;
+
+	struct AtlasUVs {
+		float2 pos;
+		float2 size;
+	};
+	static constexpr AtlasUVs crosshair_uv				= { { 0, 0}, {32,32} };
+	static constexpr AtlasUVs toolbar_uv				= { {32, 0}, {32,32} };
+	static constexpr AtlasUVs toolbar_selected_uv		= { {64, 0}, {32,32} };
+
+	int gui_scale = 4;
+	bool crosshair = false;
+
+	void push_quad (GUIVertex* arr) {
+		size_t idx = vertex_data.size();
+		vertex_data.resize(idx + 6);
+		auto* out = &vertex_data[idx];
+
+		out[0] = arr[1];
+		out[1] = arr[3];
+		out[2] = arr[0];
+		out[3] = arr[0];
+		out[4] = arr[3];
+		out[5] = arr[2];
+	}
+
+	// render quad with pixel coords
+	struct Rect {
+		float2 pos;
+		float2 size;
+	};
+	Rect calc (float2 const& anchor, float2 const& quad_center, float2 const& quad_size) {
+		Rect r;
+		r.pos = anchor + (quad_center - quad_size * 0.5f) * (float)gui_scale;
+		r.size = quad_size * (float)gui_scale;
+		return r;
+	}
+	
+	void draw_gui_quad (Rect const& r, AtlasUVs const& uv);
+	void draw_item_quad (Rect const& r, item_id item);
+
+	GUIRenderer (Shaders& shaders) {
+		shad = shaders.compile("gui");
+	}
+	void draw (OpenglRenderer& r, Input& I, Game& game);
+
+	void draw_gui (Input& I, Game& game);
+};
+
 class OpenglRenderer : public Renderer {
 public:
 	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
@@ -129,20 +194,27 @@ public:
 	Ubo				common_uniforms = {"common_ubo"};
 
 	Sampler			tile_sampler = {"tile_sampler"};
+	Sampler			gui_sampler = {"gui_sampler"};
 	Sampler			normal_sampler = {"normal_sampler"};
 
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
 
-	Texture2DArray	tile_textures = {"tile_textures"};
+	enum TextureUnit : GLint {
+		TILE_TEXTURES=0,
+		GUI_ATLAS,
+		HEAT_GRADIENT,
+	};
+
+	Texture2DArray	tile_textures	= {"tile_textures"};
+	Texture2D		gui_atlas		= {"gui_atlas"};
+	Texture2D		heat_gradient	= {"heat_gradient"};
 
 	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
 	Raytracer		raytracer		= Raytracer(shaders);
 
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
-
-
-	Texture2D		heat_gradient = {"heat_gradient"};
+	GUIRenderer		gui_renderer	= GUIRenderer(shaders);
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;
@@ -171,6 +243,11 @@ public:
 		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
 		glSamplerParameterf(tile_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
+		glSamplerParameteri(gui_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(gui_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -198,7 +275,11 @@ public:
 		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
 
 		ImGui::Separator();
+
 		ImGui::Checkbox("draw_chunks", &chunk_renderer._draw_chunks);
+		ImGui::Checkbox("crosshair", &gui_renderer.crosshair);
+
+		ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
 
 		raytracer.imgui();
 	}

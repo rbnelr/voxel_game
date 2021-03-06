@@ -70,6 +70,7 @@ struct DebugDraw {
 		// top lines
 		4,5,  5,6,  6,7,  7,4,
 	};
+	
 	struct PosVertex {
 		float3 pos;
 

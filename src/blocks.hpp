@@ -25,10 +25,10 @@ NLOHMANN_JSON_SERIALIZE_ENUM(transparency_mode, {{TM_TRANSPARENT, "transparent"}
 enum class ToolType : uint8_t {
 	NONE,
 	FISTS,
-	SWORD,
 	PICKAXE,
-	AXE,
+	SWORD,
 	SHOVEL,
+	AXE,
 };
 NLOHMANN_JSON_SERIALIZE_ENUM(ToolType, {{ToolType::NONE, nullptr}, {ToolType::FISTS, "fists"}, {ToolType::SWORD, "sword"}, {ToolType::PICKAXE, "pickaxe"}, {ToolType::AXE, "axe"}, {ToolType::SHOVEL, "shovel"}})
 

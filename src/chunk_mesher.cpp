@@ -259,28 +259,24 @@ struct CallCtx {
 
 			#if 1
 				// write single sparse value in small dummy buffer to be able to offset ptr without branching
-				block_id scy_dummy[4];
+				block_id scy_dummy[SUBCHUNK_SIZE];
 				block_id* scyptr = scy.ptr;
 				if (scy.sparse) {
 					auto val = *scyptr;
-					scy_dummy[0] = val;
-					scy_dummy[1] = val;
-					scy_dummy[2] = val;
-					scy_dummy[3] = val;
+					for (int i=0; i<SUBCHUNK_SIZE; ++i)
+						scy_dummy[i] = val;
 					// modify copy of ptr, not original because doing that somehow made sparse subchunk code slower; doing copy makes it faster
 					// maybe clobbered value that could be reused in next iteration somehow?
 					scyptr = scy_dummy;
 				}
 
 				// write single sparse value in small dummy buffer to be able to offset ptr without branching
-				block_id scz_dummy[4];
+				block_id scz_dummy[SUBCHUNK_SIZE];
 				block_id* sczptr = scz.ptr;
 				if (scz.sparse) {
 					auto val = *sczptr;
-					scz_dummy[0] = val;
-					scz_dummy[1] = val;
-					scz_dummy[2] = val;
-					scz_dummy[3] = val;
+					for (int i=0; i<SUBCHUNK_SIZE; ++i)
+						scz_dummy[i] = val;
 					sczptr = scz_dummy;
 				}
 
@@ -298,34 +294,36 @@ struct CallCtx {
 						block_id  prevx =                    scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
 
 						x = sx;
-						chunk_id bid = pbid[0];
+
+						block_id bid = pbid[0];
 						if (bid != prevx   ) face<0>(bid, prevx   );
 						if (bid != prevy[0]) face<1>(bid, prevy[0]);
 						if (bid != prevz[0]) face<2>(bid, prevz[0]);
 						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-
 						++x;
+
 						bid = pbid[1];
 						if (bid != pbid[0] ) face<0>(bid, pbid[0] );
 						if (bid != prevy[1]) face<1>(bid, prevy[1]);
 						if (bid != prevz[1]) face<2>(bid, prevz[1]);
 						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-
 						++x;
+
 						bid = pbid[2];
 						if (bid != pbid[1] ) face<0>(bid, pbid[1] );
 						if (bid != prevy[2]) face<1>(bid, prevy[2]);
 						if (bid != prevz[2]) face<2>(bid, prevz[2]);
 						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-
 						++x;
+
 						bid = pbid[3];
 						if (bid != pbid[2] ) face<0>(bid, pbid[2] );
 						if (bid != prevy[3]) face<1>(bid, prevy[3]);
 						if (bid != prevz[3]) face<2>(bid, prevz[3]);
 						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
 
-						block_i += 4;
+						block_i += SUBCHUNK_SIZE;
+
 					}
 				}
 			#endif

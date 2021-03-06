@@ -16,7 +16,7 @@ void BreakBlock::update (Input& I, Game& game, Player& player) {
 	if (!anim_triggered && anim_t > anim_hit_t && inp) {
 		//clog(INFO, "[BreakBlock] anim hit");
 		if (player.selected_block) {
-			game.apply_damage(player.selected_block, player.inventory.quickbar.get_selected().item, game.creative_mode);
+			game.apply_damage(player.selected_block, player.inventory.toolbar.get_selected(), game.creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 		}
 		anim_triggered = true;
@@ -28,18 +28,17 @@ void BreakBlock::update (Input& I, Game& game, Player& player) {
 	}
 }
 
-void BlockPlace::update (Input& I, Game& game, Player const& player) {
-	auto& slot = player.inventory.quickbar.get_selected();
-	auto item = slot.stack_size > 0 ? slot.item.id : I_NULL;
-	bool is_block = item > I_NULL && item < MAX_BLOCK_ID;
+void BlockPlace::update (Input& I, Game& game, Player& player) {
+	auto& item = player.inventory.toolbar.get_selected();
+	bool can_place = item.is_block() && item.block.count > 0;
 
-	bool inp = I.buttons[MOUSE_BUTTON_RIGHT].is_down && player.selected_block && is_block;
+	bool inp = I.buttons[MOUSE_BUTTON_RIGHT].is_down && player.selected_block && can_place;
 	if (inp && anim_t >= anim_speed / repeat_speed) {
 		anim_t = 0;
 	}
 	bool trigger = inp && anim_t == 0;
 
-	if (trigger && player.selected_block && is_block) {
+	if (trigger && player.selected_block && can_place) {
 		int3 offs = 0;
 		if (player.selected_block.hit.face >= 0)
 			offs[player.selected_block.hit.face / 2] = (player.selected_block.hit.face % 2) ? +1 : -1;
@@ -48,8 +47,8 @@ void BlockPlace::update (Input& I, Game& game, Player const& player) {
 
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
-		if (!block_place_is_inside_player || g_assets.block_types[(block_id)item].collision != CM_SOLID) {
-			game.try_place_block(block_place_pos, (block_id)item);
+		if (!block_place_is_inside_player || g_assets.block_types[(block_id)item.id].collision != CM_SOLID) {
+			game.try_place_block(block_place_pos, (block_id)item.id);
 		} else {
 			trigger = false;
 		}
@@ -65,12 +64,12 @@ void BlockPlace::update (Input& I, Game& game, Player const& player) {
 }
 
 void Inventory::update (Input& I) {
-	quickbar.selected -= I.mouse_wheel_delta;
-	quickbar.selected = wrap(quickbar.selected, 0, 10);
+	toolbar.selected -= I.mouse_wheel_delta;
+	toolbar.selected = wrap(toolbar.selected, 0, 10);
 
 	for (int i=0; i<10; ++i) {
 		if (I.buttons[KEY_0 + i].went_down) {
-			quickbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
+			toolbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
 			break; // lowest key counts
 		}
 	}
