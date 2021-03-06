@@ -70,6 +70,19 @@ struct BlockPlace {
 struct Inventory {
 	bool is_open = false;
 
+	struct Backpack {
+		Item slots[10][10];
+
+		Backpack () {
+			for (int bid=1; bid<g_assets.block_types.count(); ++bid) {
+				int i = bid-1;
+				if (i < 10*10) {
+					slots[i/10][i%10] = Item::make_block((item_id)bid, 1);
+				}
+			}
+		}
+	};
+
 	struct Toolbar {
 		Item slots[10];
 
@@ -93,7 +106,13 @@ struct Inventory {
 		}
 	};
 
-	Toolbar toolbar;
+	Backpack	backpack;
+	Toolbar		toolbar;
+	Item		hand; // drag&drop picks up items to the 'hand'
+
+	Inventory () {
+		hand = Item::make_block( (item_id)g_assets.block_types.map_id("badrock"), 1 );
+	}
 
 	void update (Input& I);
 };

@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "player.hpp"
 #include "game.hpp"
+#include "engine/window.hpp"
 
 void BreakBlock::update (Input& I, Game& game, Player& player) {
 	auto& button = I.buttons[MOUSE_BUTTON_LEFT];
@@ -72,6 +73,11 @@ void Inventory::update (Input& I) {
 			toolbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
 			break; // lowest key counts
 		}
+	}
+
+	if (I.buttons[KEY_E].went_down) {
+		is_open = !is_open;
+		I.set_cursor_mode(g_window, is_open);
 	}
 }
 

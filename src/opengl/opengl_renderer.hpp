@@ -120,13 +120,13 @@ struct GUIRenderer {
 	struct GUIVertex {
 		float2 pos;
 		float3 uv; // z is tile texture index, -1 means gui texture
-
+		
 		template <typename ATTRIBS>
 		static void attributes (ATTRIBS& a) {
 			int loc = 0;
 			a.init(sizeof(GUIVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos", offsetof(GUIVertex, pos));
-			a.template add<AttribMode::FLOAT, decltype(uv )>(loc++, "uv" , offsetof(GUIVertex, uv ));
+			a.template add<AttribMode::FLOAT, decltype(pos       )>(loc++, "pos"       , offsetof(GUIVertex, pos       ));
+			a.template add<AttribMode::FLOAT, decltype(uv        )>(loc++, "uv"        , offsetof(GUIVertex, uv        ));
 		}
 	};
 	VertexBuffer	gui_vbo	= vertex_buffer<GUIVertex>("GUIRenderer.gui_vbo");
@@ -137,9 +137,10 @@ struct GUIRenderer {
 		float2 pos;
 		float2 size;
 	};
-	static constexpr AtlasUVs crosshair_uv				= { { 0, 0}, {32,32} };
-	static constexpr AtlasUVs toolbar_uv				= { {32, 0}, {32,32} };
-	static constexpr AtlasUVs toolbar_selected_uv		= { {64, 0}, {32,32} };
+	static constexpr AtlasUVs crosshair_uv				= { {   0, 0}, {32,32} };
+	static constexpr AtlasUVs toolbar_uv				= { {32*1, 0}, {32,32} };
+	static constexpr AtlasUVs toolbar_highl_uv			= { {32*2, 0}, {32,32} };
+	static constexpr AtlasUVs toolbar_selected_uv		= { {32*3, 0}, {32,32} };
 
 	int gui_scale = 4;
 	bool crosshair = false;
@@ -158,19 +159,8 @@ struct GUIRenderer {
 	}
 
 	// render quad with pixel coords
-	struct Rect {
-		float2 pos;
-		float2 size;
-	};
-	Rect calc (float2 const& anchor, float2 const& quad_center, float2 const& quad_size) {
-		Rect r;
-		r.pos = anchor + (quad_center - quad_size * 0.5f) * (float)gui_scale;
-		r.size = quad_size * (float)gui_scale;
-		return r;
-	}
-	
-	void draw_gui_quad (Rect const& r, AtlasUVs const& uv);
-	void draw_item_quad (Rect const& r, item_id item);
+	void draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv);
+	void draw_item_quad (float2 const& pos, float2 const& size, item_id item);
 
 	GUIRenderer (Shaders& shaders) {
 		shad = shaders.compile("gui");
