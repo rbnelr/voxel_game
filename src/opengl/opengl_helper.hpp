@@ -411,6 +411,7 @@ struct VertexAttributes {
 	}
 };
 
+// setup one VAO with a single associated VBO (and optionally EBO)
 template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, GLuint indices_buf=0) {
 	Vao vao = { label };
 	glBindVertexArray(vao);
@@ -430,6 +431,7 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 	return vao;
 }
 
+// VBO (with single associated VAO) and no additional info (like vertex count)
 struct VertexBuffer {
 	Vao vao;
 	Vbo vbo;
@@ -442,6 +444,22 @@ inline VertexBuffer vertex_buffer (std::string_view label) {
 	return v;
 }
 
+// VBO+EBO (with single associated VAO) and no additional info (like vertex count)
+struct IndexedBuffer {
+	Vao vao;
+	Vbo vbo;
+	Ebo ebo;
+};
+template <typename T>
+inline IndexedBuffer indexed_buffer (std::string_view label) {
+	IndexedBuffer ib;
+	ib.vbo = Vbo(label);
+	ib.ebo = Ebo(label);
+	ib.vao = setup_vao<T>(label, ib.vbo, ib.ebo);
+	return ib;
+}
+
+// instance VBO + mesh VBO (with single associated VAO) and no additional info (like vertex count)
 struct InstancedBuffer {
 	Vao vao;
 	Vbo mesh_vbo;
@@ -474,6 +492,7 @@ inline InstancedBuffer instanced_buffer (std::string_view label) {
 	return v;
 }
 
+// instance VBO + mesh VBO&EBO (with single associated VAO) and no additional info (like vertex count)
 struct IndexedInstancedBuffer {
 	Vao vao;
 	Vbo mesh_vbo;
@@ -510,62 +529,74 @@ inline IndexedInstancedBuffer indexed_instanced_buffer (std::string_view label) 
 	return v;
 }
 
+// fill an entire VBO with new data, ie the basic way to upload vertex data
+template <typename T> inline void reupload_vbo (GLuint vbo, T const* vertices, size_t vertex_count, GLenum usage) {
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+	glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), nullptr, usage);
+	if (vertex_count > 0)
+		glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), vertices, usage);
+
+	// keep bound
+}
+// fill an entire EBO with new data, ie the basic way to upload index data
+template <typename IT> inline void reupload_ebo (GLuint vbo, IT const* indices, size_t index_count, GLenum usage) {
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo);
+
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count*sizeof(IT), nullptr, usage);
+	if (index_count > 0)
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count*sizeof(IT), indices, usage);
+
+	// keep bound
+}
+
+template <typename T> inline void stream_buffer (VertexBuffer& vb, std::vector<T> const& vertices) {
+	reupload_vbo(vb.vbo, vertices.data(), vertices.size(), GL_STREAM_DRAW);
+}
+template <typename T, typename IT> inline void stream_buffer (IndexedBuffer& ib, std::vector<T> const& vertices, std::vector<IT> const& indices) {
+	reupload_vbo(ib.vbo, vertices.data(), vertices.size(), GL_STREAM_DRAW);
+	reupload_ebo(ib.ebo, indices.data(), indices.size(), GL_STREAM_DRAW);
+}
+
+// 
 struct Mesh {
-	Vao vao;
-	Vbo vbo;
+	VertexBuffer vb;
 	int vertex_count;
 };
 
 template <typename T>
 inline Mesh upload_mesh (std::string_view label, T* vertices, size_t vertex_count) {
 	Mesh m;
-	m.vbo = Vbo(label);
-	m.vao = setup_vao<T>(label, m.vbo);
+	m.vb = vertex_buffer<T>(label);
 	m.vertex_count = (int)vertex_count;
 
-	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, m.vb.vbo);
 	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(T), vertices, GL_STATIC_DRAW);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	return m;
 }
 
-template <typename T> inline void stream_vbo (GLuint vbo, T const* vertices, size_t vertex_count) {
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-	glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), nullptr, GL_STREAM_DRAW);
-	if (vertex_count > 0)
-		glBufferData(GL_ARRAY_BUFFER, vertex_count*sizeof(T), vertices, GL_STREAM_DRAW);
-
-	// keep bound
-}
-template <typename T> inline void stream_vbo (GLuint vbo, std::vector<T> const& vertices) {
-	stream_vbo(vbo, vertices.data(), vertices.size());
-}
-
+//
 struct IndexedMesh {
-	Vao vao;
-	Vbo vbo;
-	Ebo ebo;
+	IndexedBuffer ib;
 	uint32_t vertex_count;
 	uint32_t index_count;
 };
 
-template <typename T>
+template <typename T, typename IT>
 inline IndexedMesh upload_mesh (std::string_view label,
-		T* vertices, size_t vertex_count, uint16_t* indices, size_t index_count) {
+		T* vertices, size_t vertex_count, IT* indices, size_t index_count) {
 	IndexedMesh m;
-	m.vbo = Vbo(label);
-	m.ebo = Ebo(label);
-	m.vao = setup_vao<T>(label, m.vbo, m.ebo);
+	m.ib = indexed_buffer<T>(label);
 	m.vertex_count = (uint32_t)vertex_count;
 	m.index_count = (uint32_t)index_count;
 
-	glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, m.ib.vbo);
 	glBufferData(GL_ARRAY_BUFFER, vertex_count * sizeof(T), vertices, GL_STATIC_DRAW);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(uint16_t), indices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.ib.ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, index_count * sizeof(IT), indices, GL_STATIC_DRAW);
 	
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

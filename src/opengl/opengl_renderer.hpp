@@ -114,24 +114,28 @@ struct BlockHighlight {
 	void draw (OpenglRenderer& r, SelectedBlock& block);
 };
 
-struct GUIRenderer {
-	Shader*			shad;
+struct GuiRenderer {
+	Shader*			gui_shad;
 
 	struct GUIVertex {
-		float2 pos;
+		float2 pos; // 2d because we display 2d gui
+		float3 normal; // but still 3d normals for a bit of lighting on the pseudo 3d cubes for blocks
 		float3 uv; // z is tile texture index, -1 means gui texture
 		
 		template <typename ATTRIBS>
 		static void attributes (ATTRIBS& a) {
 			int loc = 0;
 			a.init(sizeof(GUIVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos       )>(loc++, "pos"       , offsetof(GUIVertex, pos       ));
-			a.template add<AttribMode::FLOAT, decltype(uv        )>(loc++, "uv"        , offsetof(GUIVertex, uv        ));
+			a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(GUIVertex, pos   ));
+			a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(GUIVertex, normal));
+			a.template add<AttribMode::FLOAT, decltype(uv    )>(loc++, "uv"    , offsetof(GUIVertex, uv    ));
 		}
 	};
-	VertexBuffer	gui_vbo	= vertex_buffer<GUIVertex>("GUIRenderer.gui_vbo");
 
-	std::vector<GUIVertex> vertex_data;
+	IndexedBuffer	gui_ib	= indexed_buffer<GUIVertex>("GUIRenderer.gui_vbo");
+
+	std::vector<GUIVertex> gui_vertex_data;
+	std::vector<uint16_t> gui_index_data;
 
 	struct AtlasUVs {
 		float2 pos;
@@ -145,29 +149,46 @@ struct GUIRenderer {
 	int gui_scale = 4;
 	bool crosshair = false;
 
-	void push_quad (GUIVertex* arr) {
-		size_t idx = vertex_data.size();
-		vertex_data.resize(idx + 6);
-		auto* out = &vertex_data[idx];
+	// allocate vertices for N quads (4 each) and already fill indices for them
+	// order is:
+	//  2 ---- 3
+	//  |   /  |
+	//  |  /   |
+	//  0 ---- 1
+	GUIVertex* push_quads (int N) {
+		size_t base_idx = gui_vertex_data.size();
+		gui_vertex_data.resize(base_idx + 4*N);
+		auto* verts = &gui_vertex_data[base_idx];
 
-		out[0] = arr[1];
-		out[1] = arr[3];
-		out[2] = arr[0];
-		out[3] = arr[0];
-		out[4] = arr[3];
-		out[5] = arr[2];
+		size_t idx_offs = gui_index_data.size();
+		gui_index_data.resize(idx_offs + 6*N);
+		auto* indices = &gui_index_data[idx_offs];
+
+		for (size_t i=0; i<N; ++i) {
+			*indices++ = (uint16_t)(base_idx + i*4) + 1;
+			*indices++ = (uint16_t)(base_idx + i*4) + 3;
+			*indices++ = (uint16_t)(base_idx + i*4) + 0;
+			*indices++ = (uint16_t)(base_idx + i*4) + 0;
+			*indices++ = (uint16_t)(base_idx + i*4) + 3;
+			*indices++ = (uint16_t)(base_idx + i*4) + 2;
+		}
+
+		return verts;
 	}
 
 	// render quad with pixel coords
 	void draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv);
 	void draw_item_quad (float2 const& pos, float2 const& size, item_id item);
 
-	GUIRenderer (Shaders& shaders) {
-		shad = shaders.compile("gui");
+	GuiRenderer (Shaders& shaders) {
+		gui_shad = shaders.compile("gui");
 	}
-	void draw (OpenglRenderer& r, Input& I, Game& game);
+	void draw_gui (OpenglRenderer& r, Input& I, Game& game);
 
-	void draw_gui (Input& I, Game& game);
+	void generate_gui (Input& I, Game& game);
+};
+struct PlayerRenderer {
+	Shader*			_shad;
 };
 
 class OpenglRenderer : public Renderer {
@@ -204,7 +225,7 @@ public:
 	Raytracer		raytracer		= Raytracer(shaders);
 
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
-	GUIRenderer		gui_renderer	= GUIRenderer(shaders);
+	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;

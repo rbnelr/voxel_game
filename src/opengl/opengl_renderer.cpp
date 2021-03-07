@@ -108,7 +108,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
 
 	if (!game.activate_flycam || game.creative_mode)
-		gui_renderer.draw(*this, I, game);
+		gui_renderer.draw_gui(*this, I, game);
 
 	ImGui::End();
 	ctx.imgui_draw();
@@ -157,7 +157,7 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	shad->set_uniform("face_rotation", face_rotation[0]);
 	shad->set_uniform("tint", srgba(40,40,40,240));
 
-	glBindVertexArray(mesh.vao);
+	glBindVertexArray(mesh.ib.vao);
 	draw_submesh(mesh, block_highl);
 	
 	if (block.hit.face >= 0) {
@@ -166,55 +166,84 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	}
 }
 
-void GUIRenderer::draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv) {
-	GUIVertex verts[4];
-	verts[0] = { pos + float2(0,0) * size, float3((uv.pos + float2(0,0) * uv.size) * (1.0f/256), -1) };
-	verts[1] = { pos + float2(1,0) * size, float3((uv.pos + float2(1,0) * uv.size) * (1.0f/256), -1) };
-	verts[2] = { pos + float2(0,1) * size, float3((uv.pos + float2(0,1) * uv.size) * (1.0f/256), -1) };
-	verts[3] = { pos + float2(1,1) * size, float3((uv.pos + float2(1,1) * uv.size) * (1.0f/256), -1) };
-	push_quad(verts);
-}
-
-const float3x3 gui_block_rot = rotate3_X(deg(-78.0f)) * rotate3_Z(deg(12.0f));
-void GUIRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id item) {
-	GUIVertex verts[4];
-	if (item < MAX_BLOCK_ID) {
-
-		static constexpr float scale = 0.39f;
-
-		float tile_idx = (float)g_assets.block_tiles[item].sides[BF_NEG_X];
-		verts[0] = { pos + (float2)(gui_block_rot * float3(-1,+1,-1)*scale + 0.5f) * size, float3(0,0, tile_idx) };
-		verts[1] = { pos + (float2)(gui_block_rot * float3(-1,-1,-1)*scale + 0.5f) * size, float3(1,0, tile_idx) };
-		verts[2] = { pos + (float2)(gui_block_rot * float3(-1,+1,+1)*scale + 0.5f) * size, float3(0,1, tile_idx) };
-		verts[3] = { pos + (float2)(gui_block_rot * float3(-1,-1,+1)*scale + 0.5f) * size, float3(1,1, tile_idx) };
-		push_quad(verts);
-
-		tile_idx = (float)g_assets.block_tiles[item].sides[BF_NEG_Y];
-		verts[0] = { pos + (float2)(gui_block_rot * float3(-1,-1,-1)*scale + 0.5f) * size, float3(0,0, tile_idx) };
-		verts[1] = { pos + (float2)(gui_block_rot * float3(+1,-1,-1)*scale + 0.5f) * size, float3(1,0, tile_idx) };
-		verts[2] = { pos + (float2)(gui_block_rot * float3(-1,-1,+1)*scale + 0.5f) * size, float3(0,1, tile_idx) };
-		verts[3] = { pos + (float2)(gui_block_rot * float3(+1,-1,+1)*scale + 0.5f) * size, float3(1,1, tile_idx) };
-		push_quad(verts);
-
-		tile_idx = (float)g_assets.block_tiles[item].sides[BF_TOP];
-		verts[0] = { pos + (float2)(gui_block_rot * float3(-1,-1,+1)*scale + 0.5f) * size, float3(0,0, tile_idx) };
-		verts[1] = { pos + (float2)(gui_block_rot * float3(+1,-1,+1)*scale + 0.5f) * size, float3(1,0, tile_idx) };
-		verts[2] = { pos + (float2)(gui_block_rot * float3(-1,+1,+1)*scale + 0.5f) * size, float3(0,1, tile_idx) };
-		verts[3] = { pos + (float2)(gui_block_rot * float3(+1,+1,+1)*scale + 0.5f) * size, float3(1,1, tile_idx) };
-		push_quad(verts);
-
-	} else {
-		float tile_idx = (float)ITEM_TILES[item - MAX_BLOCK_ID];
-		verts[0] = { pos + float2(0,0) * size, float3(0,0, tile_idx) };
-		verts[1] = { pos + float2(1,0) * size, float3(1,0, tile_idx) };
-		verts[2] = { pos + float2(0,1) * size, float3(0,1, tile_idx) };
-		verts[3] = { pos + float2(1,1) * size, float3(1,1, tile_idx) };
-		push_quad(verts);
+constexpr float2 _quad[] = { float2(0,0), float2(1,0), float2(0,1), float2(1,1) };
+void GuiRenderer::draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv) {
+	GUIVertex* verts = push_quads(1);
+	for (int i=0; i<4; ++i) {
+		verts[i].pos    = pos + _quad[i] * size;
+		verts[i].normal = float3(0, 0, 1);
+		verts[i].uv     = float3((uv.pos + _quad[i] * uv.size) * (1.0f/256), -1);
 	}
 }
 
-void GUIRenderer::draw_gui (Input& I, Game& game) {
-	vertex_data.clear();
+std::array<GuiRenderer::GUIVertex, 12> build_gui_block_mesh () {
+	static constexpr float scale = 0.39f;
+	const float3x3 rot = rotate3_X(deg(-78.0f)) * rotate3_Z(deg(12.0f));
+	std::array<GuiRenderer::GUIVertex, 12> verts;
+
+	static constexpr float3 corners[] = {
+		float3(-1,+1,-1),
+		float3(-1,-1,-1),
+		float3(-1,+1,+1),
+		float3(-1,-1,+1),
+
+		float3(-1,-1,-1),
+		float3(+1,-1,-1),
+		float3(-1,-1,+1),
+		float3(+1,-1,+1),
+
+		float3(-1,-1,+1),
+		float3(+1,-1,+1),
+		float3(-1,+1,+1),
+		float3(+1,+1,+1),
+	};
+	static constexpr float3 normals[] = {
+		float3(-1,0,0),
+		float3(0,-1,0),
+		float3(0,0,+1),
+	};
+
+	for (int i=0; i<12; ++i) {
+		verts[i] = { (float2)(rot * corners[i]*scale + 0.5f), rot * normals[i/4], float3(_quad[i%4], 0) };
+	}
+	return verts;
+}
+std::array<GuiRenderer::GUIVertex, 12> _gui_block_mesh = build_gui_block_mesh();
+
+void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id item) {
+	if (item < MAX_BLOCK_ID) {
+		GUIVertex* verts = push_quads(3);
+		
+		static constexpr float scale = 0.39f;
+		
+		float tile_idxs[] = {
+			(float)g_assets.block_tiles[item].sides[BF_NEG_X],
+			(float)g_assets.block_tiles[item].sides[BF_NEG_Y],
+			(float)g_assets.block_tiles[item].sides[BF_TOP],
+		};
+		
+		for (int i=0; i<12; ++i) {
+			verts[i] = _gui_block_mesh[i];
+			verts[i].pos    = pos + _gui_block_mesh[i].pos * size;
+			verts[i].normal =       _gui_block_mesh[i].normal;
+			verts[i].uv     = float3(_gui_block_mesh[i].uv.x, _gui_block_mesh[i].uv.y, tile_idxs[i/4]);
+		}
+
+	} else {
+		GUIVertex* verts = push_quads(1);
+		
+		float tile_idx = (float)ITEM_TILES[item - MAX_BLOCK_ID];
+		for (int i=0; i<4; ++i) {
+			verts[i].pos    = pos + _quad[i] * size;
+			verts[i].normal = float3(0, 0, 1);
+			verts[i].uv     = float3(_quad[i], tile_idx);
+		}
+	}
+}
+
+void GuiRenderer::generate_gui (Input& I, Game& game) {
+	gui_vertex_data.clear();
+	gui_index_data.clear();
 
 	float sz = (float)gui_scale;
 
@@ -282,7 +311,7 @@ void GUIRenderer::draw_gui (Input& I, Game& game) {
 		auto& backpack = game.player.inventory.backpack;
 
 		static int w = 10;
-		ImGui::DragInt(">>w", &w, 0.01f);
+		ImGui::DragInt("backpack gui w", &w, 0.05f);
 
 		float2 anchor = screen_center;
 		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
@@ -291,26 +320,26 @@ void GUIRenderer::draw_gui (Input& I, Game& game) {
 			draw_item_quad(I.cursor_pos -4*sz, 16*sz, game.player.inventory.hand.id);
 	}
 }
-void GUIRenderer::draw (OpenglRenderer& r, Input& I, Game& game) {
+void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("gui");
 	
-	draw_gui(I, game);
+	generate_gui(I, game);
 
-	glBindVertexArray(gui_vbo.vao);
-	stream_vbo(gui_vbo.vbo, vertex_data);
+	glBindVertexArray(gui_ib.vao);
+	stream_buffer(gui_ib, gui_vertex_data, gui_index_data);
 
-	if (vertex_data.size() > 0) {
+	if (gui_vertex_data.size() > 0) {
 		PipelineState s;
 		s.depth_test = false;
 		s.blend_enable = true;
 		r.state.set(s);
-		glUseProgram(shad->prog);
+		glUseProgram(gui_shad->prog);
 
-		glUniform1i(shad->get_uniform_location("tex"), OpenglRenderer::GUI_ATLAS);
-		glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+		glUniform1i(gui_shad->get_uniform_location("tex"), OpenglRenderer::GUI_ATLAS);
+		glUniform1i(gui_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 
-		glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertex_data.size());
+		glDrawElements(GL_TRIANGLES, (GLsizei)gui_index_data.size(), GL_UNSIGNED_SHORT, (void*)0);
 	}
 }
 
@@ -332,7 +361,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		OGL_TRACE("draw lines");
 	
 		glBindVertexArray(vbo_lines.vao);
-		stream_vbo(vbo_lines.vbo, g_debugdraw.lines);
+		stream_buffer(vbo_lines, g_debugdraw.lines);
 	
 		if (g_debugdraw.lines.size() > 0) {
 			{
@@ -360,7 +389,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		OGL_TRACE("draw tris");
 	
 		glBindVertexArray(vbo_tris.vao);
-		stream_vbo(vbo_tris.vbo, g_debugdraw.tris);
+		stream_buffer(vbo_tris, g_debugdraw.tris);
 	
 		if (g_debugdraw.tris.size() > 0) {
 			r.state.set(s);
@@ -374,7 +403,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		OGL_TRACE("draw wire cubes");
 	
 		glBindVertexArray(vbo_wire_cube.vao);
-		stream_vbo(vbo_wire_cube.instance_vbo, g_debugdraw.wire_cubes);
+		reupload_vbo(vbo_wire_cube.instance_vbo, g_debugdraw.wire_cubes.data(), g_debugdraw.wire_cubes.size(), GL_STREAM_DRAW);
 		
 		if (g_debugdraw.wire_cubes.size() > 0) {
 			r.state.set(s);

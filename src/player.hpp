@@ -111,7 +111,7 @@ struct Inventory {
 	Item		hand; // drag&drop picks up items to the 'hand'
 
 	Inventory () {
-		hand = Item::make_block( (item_id)g_assets.block_types.map_id("badrock"), 1 );
+		hand = {};
 	}
 
 	void update (Input& I);
