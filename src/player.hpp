@@ -113,8 +113,6 @@ struct Inventory {
 	Inventory () {
 		hand = {};
 	}
-
-	void update (Input& I);
 };
 
 struct Player {
@@ -139,6 +137,16 @@ struct Player {
 	BlockPlace		block_place;
 	Inventory		inventory;
 	SelectedBlock	selected_block;
+
+	struct PlayerInput {
+		bool attack, attack_held;
+		bool build_held;
+
+		float2 move_dir;
+		bool jump_held;
+		bool sprint;
+	};
+	PlayerInput inp;
 
 	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
 
@@ -169,6 +177,8 @@ struct Player {
 	CollisionResponse collison_response;
 
 	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY)); // jump height based on the default gravity, tweaked gravity will change the jump height
+
+	float3x4 head_to_world;
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Player", name)) return;
@@ -207,17 +217,17 @@ struct Player {
 		imgui_pop();
 	}
 
+
+	void update_controls (Input& I, Game& game);
+	void update (Input& I, Game& game);
+
+	void update_movement (Input& I, Game& game);
+
+	Camera_View calc_matricies (Input& I, Chunks& chunks);
+
 	bool calc_ground_contact (Chunks& chunks, bool* stuck);
 
-	void update_movement_controls (Input& I, Chunks& chunks);
-
-	float3x4 head_to_world;
-
-	Camera_View update_post_physics (Input& I, Chunks& chunks);
-
-	void calc_selected_block (SelectedBlock& block, Chunks& chunks, Camera_View& view, float reach, bool creative_mode);
+	void calc_selected_block (SelectedBlock& block, Game& game, Camera_View& view, float reach);
 	float3 calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation);
 
 };
-
-void update_block_edits (Input& I, Game& game, Player& player, Camera_View& view);

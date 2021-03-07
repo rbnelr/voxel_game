@@ -3,9 +3,184 @@
 #include "game.hpp"
 #include "engine/window.hpp"
 
+void Player::update_controls (Input& I, Game& game) {
+	memset(&inp, 0, sizeof(inp));
+
+	if (!game.activate_flycam || game.creative_mode) {
+
+		inp.attack      = !inventory.is_open && I.buttons[MOUSE_BUTTON_LEFT].went_down;
+		inp.attack_held = !inventory.is_open && I.buttons[MOUSE_BUTTON_LEFT].is_down;
+
+		inp.build_held  = !inventory.is_open && I.buttons[MOUSE_BUTTON_RIGHT].is_down;
+
+		inventory.toolbar.selected -= I.mouse_wheel_delta;
+		inventory.toolbar.selected = wrap(inventory.toolbar.selected, 0, 10);
+
+		for (int i=0; i<10; ++i) {
+			if (I.buttons[KEY_0 + i].went_down) {
+				inventory.toolbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
+				break; // lowest key counts
+			}
+		}
+
+		if (I.buttons[KEY_E].went_down) {
+			inventory.is_open = !inventory.is_open;
+			I.set_cursor_mode(g_window, inventory.is_open);
+		}
+	}
+
+	if (!game.activate_flycam) {
+		//// toggle camera view
+		if (I.buttons[KEY_F].went_down)
+			third_person = !third_person;
+
+		inp.move_dir = 0;
+		if (I.buttons[KEY_A].is_down) inp.move_dir.x -= 1;
+		if (I.buttons[KEY_D].is_down) inp.move_dir.x += 1;
+		if (I.buttons[KEY_S].is_down) inp.move_dir.y -= 1;
+		if (I.buttons[KEY_W].is_down) inp.move_dir.y += 1;
+		inp.move_dir = normalizesafe(inp.move_dir);
+
+		inp.jump_held = I.buttons[KEY_SPACE].is_down;
+		inp.sprint    = I.buttons[KEY_LEFT_SHIFT].is_down;
+
+		//// look
+		Camera& cam = third_person ? tps_camera : fps_camera;
+
+		rotate_with_mouselook(I, &rot_ae.x, &rot_ae.y, cam.vfov);
+	}
+}
+
+void Player::update_movement (Input& I, Game& game) {
+	bool stuck;
+	bool grounded = calc_ground_contact(game.chunks, &stuck);
+
+	//// walking
+	float2x2 body_rotation = rotate2(rot_ae.x);
+
+	{
+		float target_speed = inp.sprint ? run_speed : walk_speed;
+		float2 target_vel = body_rotation * (inp.move_dir * target_speed);
+
+
+		float2 delta_vel = target_vel - (float2)vel;
+		float delta_speed = length(delta_vel);
+
+		float accel = delta_speed * walk_accel_proport + walk_accel_base;
+
+		delta_vel = normalizesafe(delta_vel) * min(accel * I.dt, delta_speed);
+		vel += float3(delta_vel, 0);
+	}
+
+#if 0 // movement speed plotting to better develop movement code
+	{
+		static constexpr int COUNT = 128;
+		static float vels[COUNT] = {};
+		static float poss[COUNT] = {};
+		static int cur = 0;
+
+		if (!I.pause_time) {
+			vels[cur] = length((float2)vel);
+			poss[cur++] = pos.x;
+			cur %= COUNT;
+		}
+
+		ImGui::SetNextItemWidth(-1);
+		ImGui::PlotLines("###_debug_vel", vels, COUNT, cur, "player.vel", 0, 15, ImVec2(0, 100));
+
+		ImGui::SetNextItemWidth(-1);
+		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player.pos", -7, 7, ImVec2(0, 100));
+	}
+#endif
+
+	//// jumping
+	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
+	if (inp.jump_held/*went_down*/ && grounded)
+		vel += jump_impulse;
+}
+
+void Player::update (Input& I, Game& game) {
+
+	game.player_view = calc_matricies(I, game.chunks);
+
+	game.view = game.player_view;
+	if (game.activate_flycam)
+		game.view = game.flycam.update(I);
+
+	
+	auto& block = selected_block;
+
+	bool was_selected = block.is_selected;
+	int3 old_pos = block.hit.pos;
+
+	block.is_selected = false;
+
+	if (!game.activate_flycam || game.creative_mode) {
+		calc_selected_block(block, game, game.view, break_block.reach);
+
+		if (!was_selected || !block.is_selected || old_pos != block.hit.pos) {
+			block.damage = 0;
+		}
+
+		break_block.update(I, game, *this);
+		block_place.update(I, game, *this);
+	}
+}
+
+Camera_View Player::calc_matricies (Input& I, Chunks& chunks) {
+	float3x3 body_rotation = rotate3_Z(rot_ae.x);
+	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
+
+	float3x3 head_elevation = rotate3_X(rot_ae.y);
+	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
+
+	float3 cam_pos = 0;
+	if (third_person)
+		cam_pos = calc_third_person_cam_pos(chunks, body_rotation, head_elevation);
+
+	Camera& cam = third_person ? tps_camera : fps_camera;
+
+	float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
+	head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
+
+	Camera_View view;
+	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
+	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
+	view.cam_to_clip = cam.calc_cam_to_clip(I.window_size, &view.frustrum, &view.clip_to_cam);
+	view.clip_near = cam.clip_near;
+	view.clip_far = cam.clip_far;
+	view.calc_frustrum();
+
+	return view;
+}
+
+float3 Player::calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation) {
+	Ray ray;
+	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
+	ray.dir = body_rotation * head_elevation * tps_camera_dir;
+
+	float dist = tps_camera_dist;
+
+	//{
+	//	float hit_dist;
+	//	if (world.raycast_breakable_blocks(world.player.selected_block, ray, dist, false, &hit_dist))
+	//		dist = max(hit_dist - 0.05f, 0.0f);
+	//}
+
+	return tps_camera_base_pos + tps_camera_dir * dist;
+}
+
+void Player::calc_selected_block (SelectedBlock& block, Game& game, Camera_View& view, float reach) {
+	Ray ray;
+	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
+	ray.pos = view.cam_to_world * float3(0,0,0);
+
+	game.raycast_breakable_blocks(block, ray, reach, game.creative_mode);
+}
+
 void BreakBlock::update (Input& I, Game& game, Player& player) {
 	auto& button = I.buttons[MOUSE_BUTTON_LEFT];
-	bool inp = player.selected_block ? button.is_down : button.went_down;
+	bool inp = player.selected_block ? player.inp.attack_held : player.inp.attack;
 
 	float anim_hit_t = 0;
 
@@ -33,7 +208,7 @@ void BlockPlace::update (Input& I, Game& game, Player& player) {
 	auto& item = player.inventory.toolbar.get_selected();
 	bool can_place = item.is_block() && item.block.count > 0;
 
-	bool inp = I.buttons[MOUSE_BUTTON_RIGHT].is_down && player.selected_block && can_place;
+	bool inp = player.inp.build_held && can_place;
 	if (inp && anim_t >= anim_speed / repeat_speed) {
 		anim_t = 0;
 	}
@@ -64,22 +239,7 @@ void BlockPlace::update (Input& I, Game& game, Player& player) {
 	}
 }
 
-void Inventory::update (Input& I) {
-	toolbar.selected -= I.mouse_wheel_delta;
-	toolbar.selected = wrap(toolbar.selected, 0, 10);
-
-	for (int i=0; i<10; ++i) {
-		if (I.buttons[KEY_0 + i].went_down) {
-			toolbar.selected = i == 0 ? 9 : i - 1; // key '1' is actually slot 0, key '0' is slot 9
-			break; // lowest key counts
-		}
-	}
-
-	if (I.buttons[KEY_E].went_down) {
-		is_open = !is_open;
-		I.set_cursor_mode(g_window, is_open);
-	}
-}
+//// Physics
 
 bool Player::calc_ground_contact (Chunks& chunks, bool* stuck) {
 	{ // Check block intersection to see if we are somehow stuck inside a block
@@ -146,136 +306,3 @@ bool Player::calc_ground_contact (Chunks& chunks, bool* stuck) {
 	return grounded;
 }
 
-void Player::update_movement_controls (Input& I, Chunks& chunks) {
-	bool stuck;
-	bool grounded = calc_ground_contact(chunks, &stuck);
-
-	//// toggle camera view
-	if (I.buttons[KEY_F].went_down)
-		third_person = !third_person;
-
-	Camera& cam = third_person ? tps_camera : fps_camera;
-
-	//// look
-	rotate_with_mouselook(I, &rot_ae.x, &rot_ae.y, cam.vfov);
-
-	//// walking
-	float2x2 body_rotation = rotate2(rot_ae.x);
-
-	{
-		float2 input_dir = 0;
-		if (I.buttons[KEY_A].is_down) input_dir.x -= 1;
-		if (I.buttons[KEY_D].is_down) input_dir.x += 1;
-		if (I.buttons[KEY_S].is_down) input_dir.y -= 1;
-		if (I.buttons[KEY_W].is_down) input_dir.y += 1;
-		input_dir = normalizesafe(input_dir);
-
-		bool input_fast = I.buttons[KEY_LEFT_SHIFT].is_down;
-
-		float target_speed = input_fast ? run_speed : walk_speed;
-		float2 target_vel = body_rotation * (input_dir * target_speed);
-
-		
-		float2 delta_vel = target_vel - (float2)vel;
-		float delta_speed = length(delta_vel);
-
-		float accel = delta_speed * walk_accel_proport + walk_accel_base;
-		
-		delta_vel = normalizesafe(delta_vel) * min(accel * I.dt, delta_speed);
-		vel += float3(delta_vel, 0);
-	}
-
-#if 0 // movement speed plotting to better develop movement code
-	{
-		static constexpr int COUNT = 128;
-		static float vels[COUNT] = {};
-		static float poss[COUNT] = {};
-		static int cur = 0;
-
-		if (!I.pause_time) {
-			vels[cur] = length((float2)vel);
-			poss[cur++] = pos.x;
-			cur %= COUNT;
-		}
-
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_vel", vels, COUNT, cur, "player.vel", 0, 15, ImVec2(0, 100));
-
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player.pos", -7, 7, ImVec2(0, 100));
-	}
-#endif
-	
-	//// jumping
-	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
-	if (I.buttons[KEY_SPACE].is_down/*went_down*/ && grounded)
-		vel += jump_impulse;
-}
-
-float3 Player::calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation) {
-	Ray ray;
-	ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
-	ray.dir = body_rotation * head_elevation * tps_camera_dir;
-
-	float dist = tps_camera_dist;
-
-	//{
-	//	float hit_dist;
-	//	if (world.raycast_breakable_blocks(world.player.selected_block, ray, dist, false, &hit_dist))
-	//		dist = max(hit_dist - 0.05f, 0.0f);
-	//}
-
-	return tps_camera_base_pos + tps_camera_dir * dist;
-}
-
-Camera_View Player::update_post_physics (Input& I, Chunks& chunks) {
-	float3x3 body_rotation = rotate3_Z(rot_ae.x);
-	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
-
-	float3x3 head_elevation = rotate3_X(rot_ae.y);
-	float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
-
-	float3 cam_pos = 0;
-	if (third_person)
-		cam_pos = calc_third_person_cam_pos(chunks, body_rotation, head_elevation);
-
-	Camera& cam = third_person ? tps_camera : fps_camera;
-
-	float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
-	head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
-
-	Camera_View view;
-	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
-	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
-	view.cam_to_clip = cam.calc_cam_to_clip(I.window_size, &view.frustrum, &view.clip_to_cam);
-	view.clip_near = cam.clip_near;
-	view.clip_far = cam.clip_far;
-	view.calc_frustrum();
-
-	return view;
-}
-
-void calc_selected_block (SelectedBlock& block, Game& game, Player& player, Camera_View& view, float reach) {
-	Ray ray;
-	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
-	ray.pos = view.cam_to_world * float3(0,0,0);
-
-	game.raycast_breakable_blocks(block, ray, reach, game.creative_mode);
-}
-
-void update_block_edits (Input& I, Game& game, Player& player, Camera_View& view) {
-	auto& block = player.selected_block;
-
-	bool was_selected = block.is_selected;
-	int3 old_pos = block.hit.pos;
-
-	calc_selected_block(block, game, player, view, player.break_block.reach);
-
-	if (!was_selected || !block.is_selected || old_pos != block.hit.pos) {
-		block.damage = 0;
-	}
-
-	player.break_block.update(I, game, player);
-	player.block_place.update(I, game, player);
-	player.inventory.update(I);
-}

@@ -87,14 +87,14 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 #define B_TALLGRASS 20
 
 float get_alpha_mult (uint bid) {
-	//if (      bid == B_WATER   ) return 0.08;
-	//else if ( bid == B_CRYSTAL ) return 0.22;
+	if (      bid == B_WATER   ) return 1.00;
+	else if ( bid == B_CRYSTAL ) return 0.90;
 	return 1.0;
 }
 float get_emmisive_mult (uint bid) {
 	if (      bid == B_MAGMA   ) return 40.0;
-	else if ( bid == B_CRYSTAL ) return 30.0;
-	else if ( bid == B_URANIUM ) return 60.0;
+	else if ( bid == B_CRYSTAL ) return 10.0;
+	else if ( bid == B_URANIUM ) return 20.0;
 	return 0.0;
 }
 
@@ -300,22 +300,17 @@ int iterations = 0;
 struct Hit {
 	vec3	pos;
 	vec3	normal;
-	float	emiss;
+	float	dist;
 	
 	vec4	col;
+	vec3	emiss;
 };
-void add_color (inout Hit h, vec4 col) {
-	h.col += vec4(col.rgb * col.a, col.a) * (1.0 - h.col.a);
-}
 
-bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir, float step_size, inout Hit hit) {
+bool hit_voxel (uint bid, vec3 proj, float dist, int axis, vec3 ray_dir, float step_size, inout Hit hit) {
 	if (bid == B_AIR)
 		return false;
 
 	hit.pos = proj;
-
-	if (bid == B_TALLGRASS && axis == 2)
-		return false;
 	
 	int entry_face = get_step_face(axis, ray_dir);
 	
@@ -327,18 +322,32 @@ bool hit_voxel (uint bid, vec3 proj, int axis, vec3 ray_dir, float step_size, in
 	hit.normal = normal;
 
 	float texid = float(block_tiles[bid].sides[entry_face]);
-
-	vec4 col = textureLod(tile_textures, vec3(uv, texid), bid == B_WATER ? 20.0 : 0.0);
-	if (col.a < 0.5)
-		return false;
+	
+	vec4 col = texture(tile_textures, vec3(uv, texid));
+	
+	if (bid == B_TALLGRASS && axis == 2)
+		col = vec4(0.0);
 	
 	col.a *= get_alpha_mult(bid);
-	hit.emiss = get_emmisive_mult(bid);
 	
-	col.a *= step_size; // try to account for large steps through subchunks
+	vec3 emiss = col.rgb * get_emmisive_mult(bid);
+	col.rgb += emiss;
+	hit.emiss += emiss; // accumulate emitted light
+	
+	col.a *= step_size; // try to account for large steps through subchunks, what's the real formula for this?
+	
 	col.a = min(col.a, 1.0);
-	add_color(hit, col);
-	return hit.col.a > 0.95;
+	
+	// accum color
+	col.a *= 1.0 - hit.col.a;
+	hit.emiss *= 1.0 - hit.col.a;
+	
+	col.rgb *= col.a;
+	hit.col += col;
+	// accum 
+	
+	hit.dist = dist;
+	return hit.col.a > 0.99;
 }
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
@@ -368,15 +377,18 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
 
 	int step_mask = -1;
 	float dist = 0.0;
-
+	
+	float step_size;
+	uint prev_bid = read_voxel(step_mask, coord, step_size);
+	
 	while (iterations < max_iterations) {
 		iterations++;
 
-		float step_size;
 		uint bid = read_voxel(step_mask, coord, step_size);
 
-		if (hit_voxel(bid, proj, axis, ray_dir, step_size, hit))
+		if (prev_bid != bid && hit_voxel(bid, proj, dist, axis, ray_dir, step_size, hit))
 			return true;
+		prev_bid = bid;
 
 		vec3 rel = ray_pos - vec3(coord);
 		
@@ -387,11 +399,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
 
 		vec3 next = rdir * plane_offs;
 		axis = find_next_axis(next);
-
-		// fix infinite loop caused by zero-length step caused by stepping exactly onto voxel edge
-		// this causes visual artefact that is less bad, but becomes noticable at large min step dist
-		// this min_step_dist needs to be larger and larger the further we get from the floating point origin
-		// so it is advisable to keep ray_pos relative to the starting chunk
+		
 		float min_step_dist = 0.0001;
 		proj = ray_pos + ray_dir * (dist + max(next[axis] - dist, min_step_dist));
 		
@@ -404,6 +412,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
 		
 		vec3 tmp = proj;
 		tmp[axis] += ray_dir[axis] >= 0 ? 0.5 : -0.5;
+		
 		coord = ivec3(floor(tmp));
 		
 		ivec3 step_mask3 = coord ^ old_coord;
@@ -433,6 +442,23 @@ vec3 tonemap (vec3 c) {
 	return c;
 }
 
+
+uniform bool  sunlight_enable = true;
+uniform int   sunlight_rays = 2;
+uniform float sunlight_dist = 90.0;
+uniform vec3  sunlight_col = vec3(0.98, 0.92, 0.65) * 1.3;
+
+uniform bool  ambient_enable = true;
+uniform int   ambient_rays = 2;
+uniform float ambient_dist = 10.0;
+uniform vec3  ambient_col = vec3(0.5, 0.8, 1.0) * 0.8;
+
+uniform bool  bouncelight_enable = true;
+uniform int   bouncelight_rays = 2;
+uniform float bouncelight_dist = 30.0;
+
+uniform bool  visualize_light = false;
+
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
 	if (subgroupElect()) {
@@ -454,71 +480,78 @@ void main () {
 	// primary ray
 	Hit hit;
 	hit.col = vec4(0.0);
+	hit.emiss = vec3(0.0);
 	if (trace_ray(ray_pos, ray_dir, INF, hit)) {
 		
 		uint start_chunk = prev_chunk_id;
-		vec3 bounce_pos = hit.pos + hit.normal * 0.00001;
+		vec3 bounce_pos = hit.pos + hit.normal * 0.001;
 		
 		// secondary rays
 		
-		vec3 light = vec3(0.0);
-		float AO = 0.0;
+		vec3 light = vec3(0.00);
 		
-		if (false) {
-			// Lighting in 64 block radius from emissive blocks
-			vec3 accum = vec3(0.0);
-			int rays = 2;
-			for (int i=0; i<rays; ++i) {
-				chunk_id = start_chunk;
-				
-				Hit sechit;
-				sechit.col = vec4(0.0);
-				trace_ray(bounce_pos, get_bounce_dir(hit.normal), 60.0, sechit);
-				
-				accum += sechit.col.rgb * sechit.emiss;
-			}
-			
-			light += (accum/float(rays) + 0.02) * vec3(0.25, 0.04, 1.0)*0.3;
-		}
-		if (false) {
+		if (sunlight_enable) {
 			// fake directional light
 			float accum = 0.0;
-			int rays = 1;
-			for (int i=0; i<rays; ++i) {
+			for (int i=0; i<sunlight_rays; ++i) {
 				chunk_id = start_chunk;
-				
+		
 				ray_dir = normalize(vec3(1,2,3)) + rand3()*0.05;
-				
-				Hit sechit;
-				sechit.col = vec4(0.0);
-				if (trace_ray(bounce_pos, ray_dir, 90.0, sechit))
-					accum += hit.col.a;
+		
+				Hit hit2;
+				hit2.col = vec4(0.0);
+				hit2.emiss = vec3(0.0);
+				if (trace_ray(bounce_pos, ray_dir, sunlight_dist, hit2))
+					accum += hit2.col.a;
 			}
-			
-			light += 1.0 - accum / float(rays);
+		
+			light += (1.0 - accum / float(sunlight_rays)) * sunlight_col;
 		}
 		
-		if (true) {
+		float ambient = 0.5;
+		
+		if (ambient_enable) {
+			
 			// hemisphere AO
 			float accum = 0.0;
-			int rays = 1;
-			for (int i=0; i<rays; ++i) {
+			
+			for (int i=0; i<ambient_rays; ++i) {
 				chunk_id = start_chunk;
 				
-				Hit sechit;
-				sechit.col = vec4(0.0);
-				if (trace_ray(bounce_pos, get_bounce_dir(hit.normal), 64.0, sechit))
-					accum += clamp(hit.col.a, 0.0, 1.0);
+				Hit hit2;
+				hit2.col = vec4(0.0);
+				hit2.emiss = vec3(0.0);
+				if (trace_ray(bounce_pos, get_bounce_dir(hit.normal), ambient_dist, hit2)) {
+					accum += clamp(hit2.col.a, 0.0, 1.0);
+				}
 			}
 			
-			AO += accum/float(rays);
+			ambient = pow(1.0 - accum / float(ambient_rays), 1.5);
 		}
 		
-		light += vec3(0.5, 0.8, 1.0) * 0.8 * (1.0 - AO);
-		light += clamp(light, vec3(0.0), vec3(1.0));
+		light += ambient_col * ambient;
+		
+		if (bouncelight_enable) {
+			// Lighting in 64 block radius from emissive blocks
+			vec3 accum = vec3(0.0);
+			for (int i=0; i<bouncelight_rays; ++i) {
+				chunk_id = start_chunk;
+				
+				Hit hit2;
+				hit2.col = vec4(0.0);
+				hit2.emiss = vec3(0.0);
+				trace_ray(bounce_pos, get_bounce_dir(hit.normal), bouncelight_dist, hit2);
+				
+				accum += hit2.emiss;
+			}
+			
+			light += accum / float(bouncelight_rays);
+		}
 		
 		hit.col.rgb *= light;
-		//hit.col.rgb = vec3(1.0 - AO);
+		
+		if (visualize_light)
+			hit.col.rgb = vec3(light);
 	}
 
 #if VISUALIZE_COST

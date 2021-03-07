@@ -213,6 +213,7 @@ void Assets::load_block_tiles (json const& blocks_json) {
 	}
 }
 
+
 #if 0
 // Can use mTransformation in node tree to avoid having to apply transformations in blender,
 // but for some reason the object names do not appear in the fbx? only the mesh names do
@@ -267,7 +268,7 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 
 					v.pos = float3(pos.x, pos.y, pos.z);
 					v.norm = float3(norm.x, norm.y, norm.z);
-					v.uv = mesh->mTextureCoords[0] ? float2(uv->x, uv->y) : 0;
+					v.uv = mesh->mTextureCoords[0] ? float2(uv->x, uv->y) : 0.0f;
 					v.col = mesh->mColors[0] ? float4(col->r, col->g, col->b, col->a) : lrgba(1,1,1,1);
 				}
 
@@ -292,14 +293,13 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 	return m;
 }
 
-BlockHighlight load_block_highlight_mesh () {
-	BlockHighlight bh;
-
+BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* mesh_buffer) {
 	auto* block_highlight_fbx = aiImportFile("meshes/block_highlight.fbx", aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
 	//print_fbx(block_highlight_fbx);
 	
-	bh.block_highlight = load_subobject(&bh.data, block_highlight_fbx, "block_highlight");
-	bh.face_highlight  = load_subobject(&bh.data, block_highlight_fbx, "face_highlight");
+	BlockHighlightSubmeshes bh;
+	bh.block_highlight = load_subobject(mesh_buffer, block_highlight_fbx, "block_highlight");
+	bh.face_highlight  = load_subobject(mesh_buffer, block_highlight_fbx, "face_highlight");
 
 	aiReleaseImport(block_highlight_fbx);
 	return bh;

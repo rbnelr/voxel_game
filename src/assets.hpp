@@ -5,6 +5,59 @@
 
 inline constexpr int2 TILEMAP_SIZE = int2(16,16);
 
+static constexpr float3 CUBE_CORNERS[6][4] = {
+	// -X face
+	float3(-1,+1,-1),
+	float3(-1,-1,-1),
+	float3(-1,+1,+1),
+	float3(-1,-1,+1),
+	// +X face
+	float3(+1,-1,-1),
+	float3(+1,+1,-1),
+	float3(+1,-1,+1),
+	float3(+1,+1,+1),
+	// -Y face
+	float3(-1,-1,-1),
+	float3(+1,-1,-1),
+	float3(-1,-1,+1),
+	float3(+1,-1,+1),
+	// +Y face
+	float3(+1,-1,-1),
+	float3(-1,-1,-1),
+	float3(+1,-1,+1),
+	float3(-1,-1,+1),
+	// -Z face
+	float3(-1,+1,-1),
+	float3(+1,+1,-1),
+	float3(-1,-1,-1),
+	float3(+1,-1,-1),
+	// +Z face
+	float3(-1,-1,+1),
+	float3(+1,-1,+1),
+	float3(-1,+1,+1),
+	float3(+1,+1,+1),
+};
+static constexpr float3 CUBE_NORMALS[6] = {
+	float3(-1, 0, 0),
+	float3(+1, 0, 0),
+	float3( 0,-1, 0),
+	float3( 0,+1, 0),
+	float3( 0, 0,-1),
+	float3( 0, 0,+1),
+};
+constexpr float2 QUAD_UV[] = {
+	float2(0,0),
+	float2(1,0),
+	float2(0,1),
+	float2(1,1),
+};
+constexpr float2 QUAD_CORNERS[] = {
+	float2(-0.5f,-0.5f),
+	float2(+0.5f,-0.5f),
+	float2(-0.5f,+0.5f),
+	float2(+0.5f,+0.5f),
+};
+
 struct BlockTile {
 	int sides[6] = {}; // texture indices of the textures for the 6 faces of the box
 	
@@ -80,12 +133,32 @@ struct BlockMeshes {
 	void load (json const& blocks_json);
 };
 
+struct PlayerAssets {
+	float3 tool_euler_angles = float3(deg(103), deg(9), deg(-110));
+	float3 tool_offset = float3(-0.485f, -0.095f, -0.2f);
+	float tool_scale = 0.8f;
+
+	Animation<AnimPosRot, AIM_LINEAR> animation = {{
+		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
+		{  8 / 30.0f, float3(0.624f, 1.30f, -0.94f) / 2, AnimRotation::from_euler(deg(33), deg(-8), deg(16)) },
+		{ 13 / 30.0f, float3(0.397f, 1.92f, -1.16f) / 2, AnimRotation::from_euler(deg(22), deg( 1), deg(14)) },
+		}};
+	float anim_hit_t = 8 / 30.0f;
+
+	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
+
+	float3x4 block_mat = (rotate3_X(deg(-39)) * rotate3_Z(deg(-17))) *
+		translate(float3(-0.09f, 0.08f, 0.180f) - 0.15f) * scale(float3(0.3f));
+};
+
 struct Assets {
 	
 	BlockMeshes				block_meshes;
 	std::vector<BlockTile>	block_tiles;
 
 	BlockTypes				block_types;
+
+	PlayerAssets			player;
 
 	void load_block_types (json const& blocks_json);
 	void load_block_tiles (json const& blocks_json);
@@ -104,8 +177,8 @@ struct Assets {
 	}
 };
 
+// global assets because these are needed in a lot of places
 inline Assets g_assets;
-
 
 struct GenericVertex {
 	float3	pos;
@@ -117,10 +190,10 @@ struct GenericVertex {
 	static void attributes (ATTRIBS& a) {
 		int loc = 0;
 		a.init(sizeof(GenericVertex));
-		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos",  offsetof(GenericVertex, pos));
+		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "pos",  offsetof(GenericVertex, pos ));
 		a.template add<AttribMode::FLOAT, decltype(pos)>(loc++, "norm", offsetof(GenericVertex, norm));
-		a.template add<AttribMode::FLOAT, decltype(uv )>(loc++, "uv",   offsetof(GenericVertex, uv));
-		a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col",  offsetof(GenericVertex, col));
+		a.template add<AttribMode::FLOAT, decltype(uv )>(loc++, "uv",   offsetof(GenericVertex, uv  ));
+		a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col",  offsetof(GenericVertex, col ));
 	}
 };
 struct GenericVertexData {
@@ -134,8 +207,11 @@ struct GenericSubmesh {
 	uint32_t	index_count;
 };
 
-struct BlockHighlight {
-	GenericVertexData data;
+struct BlockHighlightSubmeshes {
 	GenericSubmesh block_highlight, face_highlight;
 };
-BlockHighlight load_block_highlight_mesh ();
+BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* mesh_buffer);
+
+//std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* mesh_buffer) {
+//	
+//}

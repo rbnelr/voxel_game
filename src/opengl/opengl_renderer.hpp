@@ -32,7 +32,7 @@ struct ViewUniforms {
 	float    clip_far;
 	float2   viewport_size;
 
-	void set (Camera_View const& view, int2 viewport_size) {
+	void set (Camera_View const& view) {
 		memset(this, 0, sizeof(*this)); // zero padding
 
 		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
@@ -45,15 +45,10 @@ struct ViewUniforms {
 
 		clip_near = view.clip_near;
 		clip_far = view.clip_far;
-		this->viewport_size = (float2)viewport_size;
 	}
 };
 struct CommonUniforms {
 	ViewUniforms view;
-
-	CommonUniforms (Input& I, Game& game, int2 viewport_size) {
-		view.set(game.view, viewport_size);
-	}
 };
 
 class OpenglRenderer;
@@ -97,19 +92,18 @@ struct glDebugDraw {
 };
 
 struct BlockHighlight {
-	Shader*			shad;
-	IndexedMesh		mesh;
-	GenericSubmesh	block_highl, face_highl;
+	Shader*					shad;
+	IndexedMesh				mesh;
+	BlockHighlightSubmeshes	block_highl;
 
 	BlockHighlight (Shaders& shaders) {
 		shad = shaders.compile("block_highlight");
 
-		auto bh = load_block_highlight_mesh();
-		mesh = upload_mesh("block_highlight",
-			bh.data.vertices.data(), bh.data.vertices.size(), bh.data.indices.data(), bh.data.indices.size());
+		GenericVertexData data;
+		block_highl = load_block_highlight_mesh(&data);
 
-		block_highl = bh.block_highlight;
-		face_highl = bh.face_highlight;
+		mesh = upload_mesh("block_highlight",
+			data.vertices.data(), data.vertices.size(), data.indices.data(), data.indices.size());
 	}
 	void draw (OpenglRenderer& r, SelectedBlock& block);
 };
@@ -120,7 +114,7 @@ struct GuiRenderer {
 	struct GUIVertex {
 		float2 pos; // 2d because we display 2d gui
 		float3 normal; // but still 3d normals for a bit of lighting on the pseudo 3d cubes for blocks
-		float3 uv; // z is tile texture index, -1 means gui texture
+		float3 uvi; // z is tile texture index, -1 means gui texture
 		
 		template <typename ATTRIBS>
 		static void attributes (ATTRIBS& a) {
@@ -128,7 +122,7 @@ struct GuiRenderer {
 			a.init(sizeof(GUIVertex));
 			a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(GUIVertex, pos   ));
 			a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(GUIVertex, normal));
-			a.template add<AttribMode::FLOAT, decltype(uv    )>(loc++, "uv"    , offsetof(GUIVertex, uv    ));
+			a.template add<AttribMode::FLOAT, decltype(uvi   )>(loc++, "uvi"   , offsetof(GUIVertex, uvi   ));
 		}
 	};
 
@@ -186,10 +180,21 @@ struct GuiRenderer {
 	}
 	void draw_gui (OpenglRenderer& r, Input& I, Game& game);
 
-	void generate_gui (Input& I, Game& game);
+	void update_gui (Input& I, Game& game);
 };
 struct PlayerRenderer {
-	Shader*			_shad;
+	Shader*			held_block_shad;
+	Shader*			held_item_shad;
+
+	Vao				dummy_vao = {"dummy_vao"};
+
+	PlayerRenderer (Shaders& shaders) {
+		held_block_shad = shaders.compile("held_block");
+		held_item_shad  = shaders.compile("held_item");
+
+	}
+	void draw (OpenglRenderer& r, Game& game);
+
 };
 
 class OpenglRenderer : public Renderer {
@@ -199,11 +204,13 @@ public:
 	StateManager	state;
 	Shaders			shaders;
 
+	CommonUniforms	common_uniforms;
+
 	Framebuffer		framebuffer;
 	bool			trigger_screenshot = false;
 	bool			screenshot_hud = false;
 
-	Ubo				common_uniforms = {"common_ubo"};
+	Ubo				common_uniforms_ubo = {"common_ubo"};
 
 	Sampler			tile_sampler = {"tile_sampler"};
 	Sampler			gui_sampler = {"gui_sampler"};
@@ -223,6 +230,7 @@ public:
 	Texture2D		heat_gradient	= {"heat_gradient"};
 
 	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
+	PlayerRenderer	player_rederer	= PlayerRenderer(shaders);
 	Raytracer		raytracer		= Raytracer(shaders);
 
 	BlockHighlight	block_highl		= BlockHighlight(shaders);

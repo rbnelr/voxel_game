@@ -145,13 +145,12 @@ void Game::update (Window& window, Input& I) {
 
 	g_debugdraw.clear();
 
-	if (!activate_flycam) {
-		player.update_movement_controls(I, chunks);
-	}
+	player.update_controls(I, *this);
 
+	player.update_movement(I, *this);
 	physics.update_player(I.dt, chunks, player);
 
-	player_view = player.update_post_physics(I, chunks);
+	player.update(I, *this);
 
 	auto& sel = player.selected_block;
 	if (sel)
@@ -159,17 +158,7 @@ void Game::update (Window& window, Input& I) {
 	else
 		ImGui::Text("Selected Block: None");
 
-	if (activate_flycam) {
-		view = flycam.update(I);
-	} else {
-		view = player_view;
-	}
-
 	//test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
-
-	player.selected_block.is_selected = false;
-	if (!activate_flycam || creative_mode)
-		update_block_edits(I, *this, player, view);
 
 	block_update.update_blocks(I, chunks);
 
