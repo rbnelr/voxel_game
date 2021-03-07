@@ -141,10 +141,11 @@ struct GuiRenderer {
 		float2 pos;
 		float2 size;
 	};
-	static constexpr AtlasUVs crosshair_uv				= { {   0, 0}, {32,32} };
-	static constexpr AtlasUVs toolbar_uv				= { {32*1, 0}, {32,32} };
-	static constexpr AtlasUVs toolbar_highl_uv			= { {32*2, 0}, {32,32} };
-	static constexpr AtlasUVs toolbar_selected_uv		= { {32*3, 0}, {32,32} };
+	static constexpr AtlasUVs crosshair_uv			= { float2(   0,    0)   ,    32    };
+	static constexpr AtlasUVs frame_uv				= { float2(32*1,    0) +6,    16 +4 };
+	static constexpr AtlasUVs frame_highl_uv		= { float2(32*2,    0) +6,    16 +4 };
+	static constexpr AtlasUVs frame_grabbed_uv		= { float2(32*2, 32*1) +6,    16 +4 };
+	static constexpr AtlasUVs frame_selected_uv		= { float2(32*3,    0) +4,    16 +8 };
 
 	int gui_scale = 4;
 	bool crosshair = false;

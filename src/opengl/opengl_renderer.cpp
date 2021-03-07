@@ -166,19 +166,21 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	}
 }
 
-constexpr float2 _quad[] = { float2(0,0), float2(1,0), float2(0,1), float2(1,1) };
+constexpr float2 _quad[] = { float2(-0.5f,-0.5f), float2(+0.5f,-0.5f), float2(-0.5f,+0.5f), float2(+0.5f,+0.5f) };
+constexpr float2 _quad_uv[] = { float2(0,0), float2(1,0), float2(0,1), float2(1,1) };
+
 void GuiRenderer::draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv) {
 	GUIVertex* verts = push_quads(1);
 	for (int i=0; i<4; ++i) {
 		verts[i].pos    = pos + _quad[i] * size;
 		verts[i].normal = float3(0, 0, 1);
-		verts[i].uv     = float3((uv.pos + _quad[i] * uv.size) * (1.0f/256), -1);
+		verts[i].uv     = float3((uv.pos + _quad_uv[i] * uv.size) * (1.0f/256), -1);
 	}
 }
 
 std::array<GuiRenderer::GUIVertex, 12> build_gui_block_mesh () {
-	static constexpr float scale = 0.39f;
-	const float3x3 rot = rotate3_X(deg(-78.0f)) * rotate3_Z(deg(12.0f));
+	static constexpr float scale = 0.41f;
+	const float3x3 rot = rotate3_X(deg(-82.0f)) * rotate3_Z(deg(8.0f));
 	std::array<GuiRenderer::GUIVertex, 12> verts;
 
 	static constexpr float3 corners[] = {
@@ -204,7 +206,7 @@ std::array<GuiRenderer::GUIVertex, 12> build_gui_block_mesh () {
 	};
 
 	for (int i=0; i<12; ++i) {
-		verts[i] = { (float2)(rot * corners[i]*scale + 0.5f), rot * normals[i/4], float3(_quad[i%4], 0) };
+		verts[i] = { (float2)(rot * corners[i]*scale), rot * normals[i/4], float3(_quad_uv[i%4], 0) };
 	}
 	return verts;
 }
@@ -213,8 +215,6 @@ std::array<GuiRenderer::GUIVertex, 12> _gui_block_mesh = build_gui_block_mesh();
 void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id item) {
 	if (item < MAX_BLOCK_ID) {
 		GUIVertex* verts = push_quads(3);
-		
-		static constexpr float scale = 0.39f;
 		
 		float tile_idxs[] = {
 			(float)g_assets.block_tiles[item].sides[BF_NEG_X],
@@ -236,7 +236,7 @@ void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id
 		for (int i=0; i<4; ++i) {
 			verts[i].pos    = pos + _quad[i] * size;
 			verts[i].normal = float3(0, 0, 1);
-			verts[i].uv     = float3(_quad[i], tile_idx);
+			verts[i].uv     = float3(_quad_uv[i], tile_idx);
 		}
 	}
 }
@@ -252,58 +252,54 @@ void GuiRenderer::generate_gui (Input& I, Game& game) {
 	// calc pixel coords
 
 	if (crosshair) { // crosshair
-		draw_gui_quad(screen_center -16*sz, 32*sz, crosshair_uv);
+		draw_gui_quad(screen_center, 32*sz, crosshair_uv);
 	}
 
-	float frame_sz = 16+4;
+	float frame_sz     = frame_uv.size.x * sz;
+	float sel_frame_sz = frame_selected_uv.size.x * sz;
+	float item_sz      = 16 * sz;
+
 	bool clicked = I.buttons[MOUSE_BUTTON_LEFT].went_down;
-
-	auto draw_selected_slot = [&] (float2 start, int2 const& idx) {
-		float2 pos = start + (float2)idx * frame_sz*sz;
-		draw_gui_quad(pos + (frame_sz/2 - 32/2)*sz, 32*sz, toolbar_selected_uv);
-	};
-	auto draw_slot = [&] (float2 start, int2 const& idx) {
-		float2 pos = start + (float2)idx * frame_sz*sz;
-		
-		float2 offs = I.cursor_pos - pos;
-		bool hovered = I.cursor_enabled && offs.x >= 0.0f && offs.y >= 0.0f && offs.x < frame_sz*sz && offs.y < frame_sz*sz;
-
-		draw_gui_quad(pos + (frame_sz/2 - 32/2)*sz, 32*sz, hovered ? toolbar_highl_uv : toolbar_uv);
-	};
-	auto draw_item = [&] (float2 start, int2 const& idx, Item& item) {
-		auto pos = start + (float2)idx * frame_sz*sz;
-
-		float2 offs = I.cursor_pos - pos;
-		bool hovered = I.cursor_enabled && offs.x >= 0.0f && offs.y >= 0.0f && offs.x < frame_sz*sz && offs.y < frame_sz*sz;
-
-		if (item.id != I_NULL)
-			draw_item_quad(pos + (frame_sz/2 - 16/2)*sz, 16*sz, item.id);
-
-		if (hovered && clicked) {
-			std::swap(item, game.player.inventory.hand);
-			clicked = false; // make sure faulty selection cannot swap item twice?
-		}
-	};
 
 	auto draw_items_grid = [&] (Item* items, int count, int w, int h, float2 const& anchor, int selected=-1) {
 		auto& backpack = game.player.inventory.backpack;
 
-		float2 start = anchor -((float2)int2(w,h)/2 * frame_sz) * sz;
+		float2 start = anchor -(float2)int2(w-1,h-1)/2 * frame_sz;
 
-		for (int i=0; i<count; ++i)
-			draw_slot(start, int2(i%w, h-1 -i/w));
+		int2 hovered_idx = roundi((I.cursor_pos - start) / frame_sz);
 
-		for (int i=0; i<count; ++i)
-			draw_item(start, int2(i%w, h-1 -i/w), items[i]);
+		for (int i=0; i<count; ++i) {
+			int2 idx2 = int2(i%w, h-1 -i/w);
 
-		if (selected >= 0)
-			draw_selected_slot(start, int2(selected%w, h-1 -selected/w));
+			bool hovered = idx2 == hovered_idx;
+			if (hovered && clicked) {
+				std::swap(items[i], game.player.inventory.hand);
+				clicked = false;
+			}
+			auto& tex = hovered ?
+				//(game.player.inventory.hand.id != I_NULL ? frame_grabbed_uv : frame_highl_uv) :
+				frame_highl_uv :
+				frame_uv;
+
+			float2 pos = start + (float2)idx2 * frame_sz;
+			
+			draw_gui_quad(pos, frame_sz, tex);
+
+			if (items[i].id != I_NULL)
+				draw_item_quad(pos, item_sz, items[i].id);
+		}
+
+		if (selected >= 0) {
+			int2 idx2 = int2(selected % w, h-1 - selected / w);
+			float2 pos = start + (float2)idx2 * frame_sz;
+			draw_gui_quad(pos, sel_frame_sz, frame_selected_uv);
+		}
 	};
 
 	{ // toolbar
 		auto& toolbar = game.player.inventory.toolbar;
 
-		float2 anchor = float2(screen_center.x, (frame_sz/2 +1) * sz);
+		float2 anchor = float2(screen_center.x, frame_sz/2 +1*sz);
 		draw_items_grid(toolbar.slots, ARRLEN(toolbar.slots), ARRLEN(toolbar.slots), 1, anchor, toolbar.selected);
 	}
 
@@ -317,7 +313,7 @@ void GuiRenderer::generate_gui (Input& I, Game& game) {
 		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
 
 		if (I.cursor_enabled && game.player.inventory.hand.id != I_NULL)
-			draw_item_quad(I.cursor_pos -4*sz, 16*sz, game.player.inventory.hand.id);
+			draw_item_quad(I.cursor_pos +(item_sz/2), item_sz, game.player.inventory.hand.id);
 	}
 }
 void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
