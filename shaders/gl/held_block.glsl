@@ -9,7 +9,7 @@ layout(location = 0) vs2fs VS {
 
 #ifdef _VERTEX
 	uniform int meshid;
-	uniform int texids[64];
+	uniform float texids[64];
 	uniform mat4 model_to_world;
 
 	struct BlockMeshVertex {

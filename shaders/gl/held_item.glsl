@@ -12,7 +12,7 @@ layout(location = 0) vs2fs VS {
 	layout(location = 1) in vec3 normal;
 	layout(location = 2) in vec2 uv;
 
-	uniform int texid;
+	uniform float texid;
 	uniform mat4 model_to_world;
 
 	void main () {

@@ -93,17 +93,10 @@ struct glDebugDraw {
 
 struct BlockHighlight {
 	Shader*					shad;
-	IndexedMesh				mesh;
 	BlockHighlightSubmeshes	block_highl;
 
 	BlockHighlight (Shaders& shaders) {
 		shad = shaders.compile("block_highlight");
-
-		GenericVertexData data;
-		block_highl = load_block_highlight_mesh(&data);
-
-		mesh = upload_mesh("block_highlight",
-			data.vertices.data(), data.vertices.size(), data.indices.data(), data.indices.size());
 	}
 	void draw (OpenglRenderer& r, SelectedBlock& block);
 };
@@ -177,12 +170,20 @@ struct GuiRenderer {
 struct PlayerRenderer {
 	Shader*			held_block_shad;
 	Shader*			held_item_shad;
+	Shader*			block_damage_shad;
 
 	Vao				dummy_vao = {"dummy_vao"};
 
+	struct BreakingTile {
+		int id;
+		int count;
+	};
+	BreakingTile	damage_tiles = { 15*16 + 6, 10 };
+
 	PlayerRenderer (Shaders& shaders) {
-		held_block_shad = shaders.compile("held_block");
-		held_item_shad  = shaders.compile("held_item");
+		held_block_shad    = shaders.compile("held_block");
+		held_item_shad     = shaders.compile("held_item");
+		block_damage_shad  = shaders.compile("block_damage");
 	}
 	void draw (OpenglRenderer& r, Game& game);
 
@@ -210,8 +211,9 @@ public:
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
 
-	IndexedBuffer				item_mesh_data = indexed_buffer<GenericVertex>("item_mesh_data");
+	IndexedBuffer				mesh_data = indexed_buffer<GenericVertex>("mesh_data");
 	std::vector<GenericSubmesh>	item_meshes;
+	GenericSubmesh				block_damage_mesh;
 
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,
@@ -242,8 +244,8 @@ public:
 		ctx.set_vsync(state);
 	}
 
-	bool load_textures (); // can be reloaded
-	void load_static_data ();
+	bool load_textures (GenericVertexData& mesh_data); // can be reloaded
+	bool load_static_data ();
 
 	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
 		load_static_data();

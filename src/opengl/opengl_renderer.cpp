@@ -28,7 +28,7 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFil
 
 	if (changed_files.contains("textures/atlas.png", FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
 		clog(INFO, "[OpenglRenderer] Reload textures due to file change");
-		try_reloading([&] () { return load_textures(); });
+		try_reloading([&] () { return load_static_data(); });
 	}
 
 	framebuffer.update(I.window_size);
@@ -97,26 +97,28 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 		chunk_renderer.draw_chunks(*this, game);
 
-		player_rederer.draw(*this, game);
-
 		if (raytracer.enable)
 			raytracer.draw(*this, game);
 
-		//
+		player_rederer.draw(*this, game);
+
 		debug_draw.draw(*this);
 	}
 
 	{
 		OGL_TRACE("ui draws");
 
-		common_uniforms.view.viewport_size = (float2)I.window_size;
-		upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
 		{
-			OGL_TRACE("framebuffer.blit");
-			framebuffer.blit(I.window_size);
+			OGL_TRACE("setup");
+			common_uniforms.view.viewport_size = (float2)I.window_size;
+			upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
+			{
+				OGL_TRACE("framebuffer.blit");
+				framebuffer.blit(I.window_size);
+			}
+			glViewport(0,0, I.window_size.x, I.window_size.y);
+			glScissor(0,0, I.window_size.x, I.window_size.y);
 		}
-		glViewport(0,0, I.window_size.x, I.window_size.y);
-		glScissor(0,0, I.window_size.x, I.window_size.y);
 
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
 
@@ -172,7 +174,7 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	shad->set_uniform("model_to_clip", face_rotation[0]);
 	shad->set_uniform("tint", srgba(40,40,40,240));
 
-	glBindVertexArray(mesh.ib.vao);
+	glBindVertexArray(r.mesh_data.vao);
 	draw_submesh(block_highl.block_highlight);
 	
 	if (block.hit.face >= 0) {
@@ -370,7 +372,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			int meshid = g_assets.block_meshes.block_meshes[(block_id)item.id];
 
 			static constexpr int MAX_MESH_SLICES = 64;
-			int texids[MAX_MESH_SLICES] = {};
+			float texids[MAX_MESH_SLICES] = {};
 
 			int count;
 
@@ -379,7 +381,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 
 				count = 6;
 				for (int i=0; i<6; ++i) {
-					texids[i] = tile.calc_tex_index((BlockFace)i, 0);
+					texids[i] = (float)tile.calc_tex_index((BlockFace)i, 0);
 				}
 			} else {
 				auto& bm_info = g_assets.block_meshes.meshes[meshid];
@@ -388,11 +390,11 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 
 				count = bm_info.length;
 				for (int i=0; i<bm_info.length; ++i) {
-					texids[i] = tile.calc_tex_index((BlockFace)0, 0);
+					texids[i] = (float)tile.calc_tex_index((BlockFace)0, 0);
 				}
 			}
 
-			glUniform1iv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
+			glUniform1fv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
 
 			glBindVertexArray(dummy_vao);
 			glDrawArrays(GL_TRIANGLES, 0, count*6);
@@ -404,11 +406,25 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			auto id = (item_id)item.id;
 
 			held_item_shad->set_uniform("model_to_world", (float4x4)(mat * assets.tool_mat));
-			held_item_shad->set_uniform("texid", ITEM_TILES[id - MAX_BLOCK_ID]);
+			held_item_shad->set_uniform("texid", (float)ITEM_TILES[id - MAX_BLOCK_ID]);
 
-			glBindVertexArray(r.item_mesh_data.vao);
+			glBindVertexArray(r.mesh_data.vao);
 			draw_submesh(r.item_meshes[id - MAX_BLOCK_ID]);
 		}
+	}
+
+	auto& block = game.player.selected_block;
+	if (block.is_selected) {
+		glUseProgram(block_damage_shad->prog);
+
+		glBindVertexArray(r.mesh_data.vao);
+
+		int texid = damage_tiles.id + clamp((int)(block.damage * (float)damage_tiles.count), 0, damage_tiles.count-1);
+
+		block_damage_shad->set_uniform("texid", (float)texid);
+		block_damage_shad->set_uniform("pos_world", (float3)block.hit.pos);
+
+		draw_submesh(r.block_damage_mesh);
 	}
 }
 
@@ -486,7 +502,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 }
 
 //// OpenglRenderer
-bool OpenglRenderer::load_textures () {
+bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 
 	{
 		Image<srgba8> img;
@@ -521,8 +537,7 @@ bool OpenglRenderer::load_textures () {
 			};
 
 			GenericVertexData data;
-			item_meshes = generate_item_meshes(&data, get_pixel, ITEM_COUNT, ITEM_TILES);
-			upload_buffer(item_mesh_data, data.vertices, data.indices);
+			item_meshes = generate_item_meshes(&mesh_data, get_pixel, ITEM_COUNT, ITEM_TILES);
 		}
 	}
 
@@ -532,7 +547,7 @@ bool OpenglRenderer::load_textures () {
 	return true;
 }
 
-void OpenglRenderer::load_static_data () {
+bool OpenglRenderer::load_static_data () {
 
 	{
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_meshes_ssbo);
@@ -547,7 +562,18 @@ void OpenglRenderer::load_static_data () {
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
 	}
 
-	load_textures();
+	GenericVertexData data;
+
+	block_highl.block_highl = load_block_highlight_mesh(&data);
+
+	block_damage_mesh = generate_block_damage_mesh(&data);
+
+	if (!load_textures(data))
+		return false;
+
+	upload_buffer(mesh_data, data.vertices, data.indices);
+
+	return true;
 }
 
 } // namespace gl

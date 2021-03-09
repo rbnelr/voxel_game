@@ -5,7 +5,7 @@
 	"chunks": {
 		"load_radius": 600.0,
 		"unload_hyster": 0.0,
-		"mesh_world_border": true,
+		"mesh_world_border": false,
 		"visualize_chunks": false,
 		"visualize_subchunks": false,
 		"visualize_radius": true,
@@ -56,7 +56,7 @@
 		"performance": true,
 		"graphics": true,
 		"world": true,
-		"chunks": false,
+		"chunks": true,
 		"entities": true
 	}
 }

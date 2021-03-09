@@ -226,7 +226,7 @@ struct BlockHighlightSubmeshes {
 BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data);
 
 template <typename FUNC>
-std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* data, FUNC get_pixel, int item_count, int const* item_tiles) {
+inline std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* data, FUNC get_pixel, int item_count, int const* item_tiles) {
 	std::vector<GenericSubmesh> meshes;
 	meshes.resize(item_count);
 
@@ -242,13 +242,8 @@ std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* data, FUNC 
 		uint32_t vertex_count = 0;
 
 		auto quad = [&] (int x, int y, int face) {
-			auto voffs = data->vertices.size();
-			data->vertices.resize(voffs + 4);
-			auto* verts = &data->vertices[voffs];
-
-			auto ioffs = data->indices.size();
-			data->indices.resize(ioffs + 6);
-			auto* indices = &data->indices[ioffs];
+			auto* verts = push_back(data->vertices, 4);
+			auto* indices = push_back(data->indices, 6);
 
 			for (int i=0; i<4; ++i) {
 				auto tex_index = (float)tileid;
@@ -285,4 +280,34 @@ std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* data, FUNC 
 	}
 
 	return meshes;
+}
+
+inline GenericSubmesh generate_block_damage_mesh (GenericVertexData* data) {
+	GenericSubmesh mesh;
+
+	mesh.base_vertex = (uint32_t)data->vertices.size();
+	mesh.index_offs  = (uint32_t)data->indices.size();
+	mesh.index_count = 0;
+
+	uint32_t vertex_count = 0;
+
+	for (int face=0; face<6; ++face) {
+		auto* verts = push_back(data->vertices, 4);
+		auto* indices = push_back(data->indices, 6);
+
+		for (int i=0; i<4; ++i) {
+			verts[i].pos  = CUBE_CORNERS[face][i] * 0.5f + 0.5f;
+			verts[i].norm = CUBE_NORMALS[face];
+			verts[i].uv   = QUAD_UV[i];
+			verts[i].col  = lrgba(1);
+		}
+
+		for (int i=0; i<6; ++i)
+			indices[i] = vertex_count + QUAD_INDICES[i];
+
+		vertex_count += 4;
+		mesh.index_count += 6;
+	}
+
+	return mesh;
 }
