@@ -3,9 +3,10 @@
 #include "blocks.hpp"
 #include "engine/renderer.hpp"
 
+static constexpr int  TILE_SIZE = 16;
 inline constexpr int2 TILEMAP_SIZE = int2(16,16);
 
-static constexpr float3 CUBE_CORNERS[6][4] = {
+inline constexpr float3 CUBE_CORNERS[6][4] = {
 	// -X face
 	float3(-1,+1,-1),
 	float3(-1,-1,-1),
@@ -22,10 +23,10 @@ static constexpr float3 CUBE_CORNERS[6][4] = {
 	float3(-1,-1,+1),
 	float3(+1,-1,+1),
 	// +Y face
-	float3(+1,-1,-1),
-	float3(-1,-1,-1),
-	float3(+1,-1,+1),
-	float3(-1,-1,+1),
+	float3(+1,+1,-1),
+	float3(-1,+1,-1),
+	float3(+1,+1,+1),
+	float3(-1,+1,+1),
 	// -Z face
 	float3(-1,+1,-1),
 	float3(+1,+1,-1),
@@ -37,7 +38,7 @@ static constexpr float3 CUBE_CORNERS[6][4] = {
 	float3(-1,+1,+1),
 	float3(+1,+1,+1),
 };
-static constexpr float3 CUBE_NORMALS[6] = {
+inline constexpr float3 CUBE_NORMALS[6] = {
 	float3(-1, 0, 0),
 	float3(+1, 0, 0),
 	float3( 0,-1, 0),
@@ -45,17 +46,27 @@ static constexpr float3 CUBE_NORMALS[6] = {
 	float3( 0, 0,-1),
 	float3( 0, 0,+1),
 };
-constexpr float2 QUAD_UV[] = {
+inline constexpr float2 QUAD_UV[] = {
 	float2(0,0),
 	float2(1,0),
 	float2(0,1),
 	float2(1,1),
 };
-constexpr float2 QUAD_CORNERS[] = {
+inline constexpr float2 QUAD_CORNERS[] = {
 	float2(-0.5f,-0.5f),
 	float2(+0.5f,-0.5f),
 	float2(-0.5f,+0.5f),
 	float2(+0.5f,+0.5f),
+};
+
+// order is:
+//  2 ---- 3
+//  |   /  |
+//  |  /   |
+//  0 ---- 1
+inline constexpr int QUAD_INDICES[] = {
+	1, 3, 0,
+	0, 3, 2,
 };
 
 struct BlockTile {
@@ -134,10 +145,6 @@ struct BlockMeshes {
 };
 
 struct PlayerAssets {
-	float3 tool_euler_angles = float3(deg(103), deg(9), deg(-110));
-	float3 tool_offset = float3(-0.485f, -0.095f, -0.2f);
-	float tool_scale = 0.8f;
-
 	Animation<AnimPosRot, AIM_LINEAR> animation = {{
 		{  0 / 30.0f, float3(0.686f, 1.01f, -1.18f) / 2, AnimRotation::from_euler(deg(50), deg(-5), deg(15)) },
 		{  8 / 30.0f, float3(0.624f, 1.30f, -0.94f) / 2, AnimRotation::from_euler(deg(33), deg(-8), deg(16)) },
@@ -145,10 +152,17 @@ struct PlayerAssets {
 		}};
 	float anim_hit_t = 8 / 30.0f;
 
-	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
-
 	float3x4 block_mat = (rotate3_X(deg(-39)) * rotate3_Z(deg(-17))) *
 		translate(float3(-0.09f, 0.08f, 0.180f) - 0.15f) * scale(float3(0.3f));
+
+	float3 tool_euler_angles = float3(deg(103), deg(9), deg(-110));
+	float3 tool_offset = float3(-0.895f, -0.485f, -0.2f);
+	float tool_scale = 0.8f;
+
+	float3x4 tool_mat = rotate3_Z(tool_euler_angles.z) * rotate3_Y(tool_euler_angles.y) * rotate3_X(tool_euler_angles.x) *
+		translate(tool_offset) * scale(float3(tool_scale));
+
+	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
 };
 
 struct Assets {
@@ -201,17 +215,74 @@ struct GenericVertexData {
 	std::vector<uint16_t>		indices;
 };
 struct GenericSubmesh {
-	size_t		vertex_offs;
-	size_t		index_offs;
-	uint32_t	vertex_count;
-	uint32_t	index_count;
+	uint32_t	base_vertex; // start index of verticies in GenericVertexData::vertices
+	uint32_t	index_offs;  // start index of indices in GenericVertexData::indices
+	uint32_t	index_count; // number of indices
 };
 
 struct BlockHighlightSubmeshes {
 	GenericSubmesh block_highlight, face_highlight;
 };
-BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* mesh_buffer);
+BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data);
 
-//std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* mesh_buffer) {
-//	
-//}
+template <typename FUNC>
+std::vector<GenericSubmesh> generate_item_meshes (GenericVertexData* data, FUNC get_pixel, int item_count, int const* item_tiles) {
+	std::vector<GenericSubmesh> meshes;
+	meshes.resize(item_count);
+
+	for (int i=0; i<item_count; ++i) {
+		GenericSubmesh& mesh = meshes[i];
+
+		int tileid = item_tiles[i];
+
+		mesh.base_vertex = (uint32_t)data->vertices.size();
+		mesh.index_offs  = (uint32_t)data->indices.size();
+		mesh.index_count = 0;
+
+		uint32_t vertex_count = 0;
+
+		auto quad = [&] (int x, int y, int face) {
+			auto voffs = data->vertices.size();
+			data->vertices.resize(voffs + 4);
+			auto* verts = &data->vertices[voffs];
+
+			auto ioffs = data->indices.size();
+			data->indices.resize(ioffs + 6);
+			auto* indices = &data->indices[ioffs];
+
+			for (int i=0; i<4; ++i) {
+				auto tex_index = (float)tileid;
+
+				float2 pos2 = float2((float)x, (float)y) * (1.0f / TILE_SIZE);
+
+				verts[i].pos  = (CUBE_CORNERS[face][i] * 0.5f + 0.5f) * (1.0f / TILE_SIZE) + float3(pos2, 0.0f);
+				verts[i].norm =  CUBE_NORMALS[face];
+				verts[i].uv   =  QUAD_UV[i] * (1.0f / TILE_SIZE) + pos2;
+				verts[i].col  = lrgba(1);
+			}
+
+			for (int i=0; i<6; ++i)
+				indices[i] = vertex_count + QUAD_INDICES[i];
+
+			vertex_count += 4;
+			mesh.index_count += 6;
+		};
+
+		for (int y=0; y<TILE_SIZE; ++y)
+		for (int x=0; x<TILE_SIZE; ++x) {
+			srgba8 col = get_pixel(x,y, tileid);
+
+			if (col.w == 0) continue;
+
+			quad(x,y, BF_POS_Z);
+			quad(x,y, BF_NEG_Z);
+
+			if (x ==           0 || get_pixel(x-1,y, tileid).w == 0) quad(x,y, BF_NEG_X);
+			if (x == TILE_SIZE-1 || get_pixel(x+1,y, tileid).w == 0) quad(x,y, BF_POS_X);
+			if (y ==           0 || get_pixel(x,y-1, tileid).w == 0) quad(x,y, BF_NEG_Y);
+			if (y == TILE_SIZE-1 || get_pixel(x,y+1, tileid).w == 0) quad(x,y, BF_POS_Y);
+		}
+	}
+
+	return meshes;
+}

@@ -107,7 +107,7 @@ void Player::update (Input& I, Game& game) {
 	if (game.activate_flycam)
 		game.view = game.flycam.update(I);
 
-	
+	//
 	auto& block = selected_block;
 
 	bool was_selected = block.is_selected;

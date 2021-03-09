@@ -44,6 +44,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	glLineWidth(line_width);
 	{
+		OGL_TRACE("set state defaults");
+
 		state.override_poly = wireframe;
 		state.override_cull = wireframe && wireframe_backfaces;
 		state.override_state.poly_mode = POLY_LINE;
@@ -52,70 +54,81 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		state.set_default();
 	}
 
-	memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
-	common_uniforms.view.set(game.view);
-	common_uniforms.view.viewport_size = (float2)framebuffer.size;
-	upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
-
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
-	glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
-	glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
-
-	glClearColor(0,0,0,1);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	PipelineState s;
-
-	//
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
-
-	glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
-	glBindSampler(TILE_TEXTURES, tile_sampler);
-
-	glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
-	glBindTexture(GL_TEXTURE_2D, gui_atlas);
-	glBindSampler(GUI_ATLAS, gui_sampler);
-
-	glActiveTexture(GL_TEXTURE0+HEAT_GRADIENT);
-	glBindTexture(GL_TEXTURE_2D, heat_gradient);
-	glBindSampler(HEAT_GRADIENT, normal_sampler);
-
-
-	// draw before chunks so it shows through transparent blocks
-	if (game.player.selected_block)
-		block_highl.draw(*this, game.player.selected_block);
-
-	chunk_renderer.draw_chunks(*this, game);
-
-	player_rederer.draw(*this, game);
-
-	if (raytracer.enable)
-		raytracer.draw(*this, game);
-
-	//
-	debug_draw.draw(*this);
-
-	common_uniforms.view.viewport_size = (float2)I.window_size;
-	upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
 	{
-		OGL_TRACE("framebuffer.blit");
-		framebuffer.blit(I.window_size);
+		OGL_TRACE("binds");
+
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
+
+		glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
+		glBindSampler(TILE_TEXTURES, tile_sampler);
+
+		glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
+		glBindTexture(GL_TEXTURE_2D, gui_atlas);
+		glBindSampler(GUI_ATLAS, gui_sampler);
+
+		glActiveTexture(GL_TEXTURE0+HEAT_GRADIENT);
+		glBindTexture(GL_TEXTURE_2D, heat_gradient);
+		glBindSampler(HEAT_GRADIENT, normal_sampler);
 	}
-	glViewport(0,0, I.window_size.x, I.window_size.y);
-	glScissor(0,0, I.window_size.x, I.window_size.y);
 
-	if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
+	{
+		OGL_TRACE("3d draws");
+		{
+			OGL_TRACE("setup");
 
-	if (!game.activate_flycam || game.creative_mode)
-		gui_renderer.draw_gui(*this, I, game);
+			memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
+			common_uniforms.view.set(game.view);
+			common_uniforms.view.viewport_size = (float2)framebuffer.size;
+			upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
 
-	ImGui::End();
-	ctx.imgui_draw();
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+			glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
+			glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
 
-	if (trigger_screenshot && screenshot_hud)	take_screenshot(I.window_size);
-	trigger_screenshot = false;
+			glClearColor(0,0,0,1);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		}
+
+		// draw before chunks so it shows through transparent blocks
+		if (game.player.selected_block)
+			block_highl.draw(*this, game.player.selected_block);
+
+		chunk_renderer.draw_chunks(*this, game);
+
+		player_rederer.draw(*this, game);
+
+		if (raytracer.enable)
+			raytracer.draw(*this, game);
+
+		//
+		debug_draw.draw(*this);
+	}
+
+	{
+		OGL_TRACE("ui draws");
+
+		common_uniforms.view.viewport_size = (float2)I.window_size;
+		upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
+		{
+			OGL_TRACE("framebuffer.blit");
+			framebuffer.blit(I.window_size);
+		}
+		glViewport(0,0, I.window_size.x, I.window_size.y);
+		glScissor(0,0, I.window_size.x, I.window_size.y);
+
+		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
+
+		if (!game.activate_flycam || game.creative_mode)
+			gui_renderer.draw_gui(*this, I, game);
+
+		ImGui::End();
+		ctx.imgui_draw();
+
+		if (trigger_screenshot && screenshot_hud)	take_screenshot(I.window_size);
+		trigger_screenshot = false;
+	}
 
 	TracyGpuCollect;
 
@@ -160,11 +173,11 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	shad->set_uniform("tint", srgba(40,40,40,240));
 
 	glBindVertexArray(mesh.ib.vao);
-	draw_submesh(mesh, block_highl.block_highlight);
+	draw_submesh(block_highl.block_highlight);
 	
 	if (block.hit.face >= 0) {
 		shad->set_uniform("face_rotation", face_rotation[ (BlockFace)(block.hit.face >= 0 ? block.hit.face : 0) ]);
-		draw_submesh(mesh, block_highl.face_highlight);
+		draw_submesh(block_highl.face_highlight);
 	}
 }
 
@@ -324,64 +337,78 @@ void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
 }
 
 //// PlayerRenderer
-
-
 void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("player");
-	
-	auto& assets = g_assets.player;
+
 	auto& item = game.player.inventory.toolbar.get_selected();
+	
+	if (item.id != I_NULL) {
+		auto& assets = g_assets.player;
+	
+		float anim_t = game.player.break_block.anim_t != 0 ? game.player.break_block.anim_t : game.player.block_place.anim_t;
+		auto a = assets.animation.calc(anim_t);
 
-	float anim_t = game.player.break_block.anim_t != 0 ? game.player.break_block.anim_t : game.player.block_place.anim_t;
-	auto a = assets.animation.calc(anim_t);
-
-	if (item.is_block()) {
 		PipelineState s;
 		s.depth_test = true;
 		s.blend_enable = true;
 		r.state.set(s);
-		glUseProgram(held_block_shad->prog);
 
-		glUniform1i(held_block_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+		float3x4 mat = game.player.head_to_world * translate(a.pos) * a.rot;
 
-		float3x4 mat = game.player.head_to_world * translate(a.pos) * a.rot * assets.block_mat;
+		if (item.is_block()) {
+			glUseProgram(held_block_shad->prog);
 
-		held_block_shad->set_uniform("model_to_world", (float4x4)mat);
+			glUniform1i(held_block_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 
-		//
-		auto bid = (block_id)item.id;
+			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.block_mat));
 
-		auto& tile = g_assets.block_tiles[bid];
-		int meshid = g_assets.block_meshes.block_meshes[(block_id)item.id];
+			//
+			auto bid = (block_id)item.id;
 
-		static constexpr int MAX_MESH_SLICES = 64;
-		int texids[MAX_MESH_SLICES] = {};
+			auto& tile = g_assets.block_tiles[bid];
+			int meshid = g_assets.block_meshes.block_meshes[(block_id)item.id];
 
-		int count;
+			static constexpr int MAX_MESH_SLICES = 64;
+			int texids[MAX_MESH_SLICES] = {};
 
-		if (meshid < 0) {
-			held_block_shad->set_uniform("meshid", 0);
+			int count;
 
-			count = 6;
-			for (int i=0; i<6; ++i) {
-				texids[i] = tile.calc_tex_index((BlockFace)i, 0);
+			if (meshid < 0) {
+				held_block_shad->set_uniform("meshid", 0);
+
+				count = 6;
+				for (int i=0; i<6; ++i) {
+					texids[i] = tile.calc_tex_index((BlockFace)i, 0);
+				}
+			} else {
+				auto& bm_info = g_assets.block_meshes.meshes[meshid];
+
+				held_block_shad->set_uniform("meshid", bm_info.index);
+
+				count = bm_info.length;
+				for (int i=0; i<bm_info.length; ++i) {
+					texids[i] = tile.calc_tex_index((BlockFace)0, 0);
+				}
 			}
+
+			glUniform1iv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
+
+			glBindVertexArray(dummy_vao);
+			glDrawArrays(GL_TRIANGLES, 0, count*6);
 		} else {
-			auto& bm_info = g_assets.block_meshes.meshes[meshid];
+			glUseProgram(held_item_shad->prog);
+		
+			glUniform1i(held_item_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 
-			held_block_shad->set_uniform("meshid", bm_info.index);
+			auto id = (item_id)item.id;
 
-			count = bm_info.length;
-			for (int i=0; i<bm_info.length; ++i) {
-				texids[i] = tile.calc_tex_index((BlockFace)0, 0);
-			}
+			held_item_shad->set_uniform("model_to_world", (float4x4)(mat * assets.tool_mat));
+			held_item_shad->set_uniform("texid", ITEM_TILES[id - MAX_BLOCK_ID]);
+
+			glBindVertexArray(r.item_mesh_data.vao);
+			draw_submesh(r.item_meshes[id - MAX_BLOCK_ID]);
 		}
-
-		glUniform1iv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
-
-		glBindVertexArray(dummy_vao);
-		glDrawArrays(GL_TRIANGLES, 0, count*6);
 	}
 }
 
@@ -477,14 +504,26 @@ bool OpenglRenderer::load_textures () {
 				16);
 		}
 
-		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
+		{
+			glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
 
-		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_SRGB8_ALPHA8, 16, 16, TILEMAP_SIZE.x * TILEMAP_SIZE.y, 0,
-			GL_RGBA, GL_UNSIGNED_BYTE, img_arr.pixels);
+			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_SRGB8_ALPHA8, 16, 16, TILEMAP_SIZE.x * TILEMAP_SIZE.y, 0,
+				GL_RGBA, GL_UNSIGNED_BYTE, img_arr.pixels);
 
-		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+			glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
-		glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+		}
+
+		{
+			auto get_pixel = [&] (int x, int y, int tileid) {
+				return img_arr.pixels[tileid * 16*16 + y*16 + x];
+			};
+
+			GenericVertexData data;
+			item_meshes = generate_item_meshes(&data, get_pixel, ITEM_COUNT, ITEM_TILES);
+			upload_buffer(item_mesh_data, data.vertices, data.indices);
+		}
 	}
 
 	upload_texture(heat_gradient, "textures/heat_gradient.png");

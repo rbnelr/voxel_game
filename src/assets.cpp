@@ -254,8 +254,8 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 
 			if (subobj.compare(mesh->mName.C_Str()) == 0) {
 
-				m.vertex_offs = data->vertices.size();
-				m.index_offs  = data->indices.size();
+				m.base_vertex = (uint32_t)data->vertices.size();
+				m.index_offs  = (uint32_t)data->indices.size();
 
 				for (unsigned j=0; j<mesh->mNumVertices; ++j) {
 					data->vertices.emplace_back();
@@ -281,8 +281,7 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 					}
 				}
 
-				m.vertex_count = mesh->mNumVertices;
-				m.index_count  = mesh->mNumFaces * 3;
+				m.index_count  = (uint32_t)(mesh->mNumFaces * 3);
 			
 				return m;
 			}
@@ -293,13 +292,13 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 	return m;
 }
 
-BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* mesh_buffer) {
+BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data) {
 	auto* block_highlight_fbx = aiImportFile("meshes/block_highlight.fbx", aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
 	//print_fbx(block_highlight_fbx);
 	
 	BlockHighlightSubmeshes bh;
-	bh.block_highlight = load_subobject(mesh_buffer, block_highlight_fbx, "block_highlight");
-	bh.face_highlight  = load_subobject(mesh_buffer, block_highlight_fbx, "face_highlight");
+	bh.block_highlight = load_subobject(data, block_highlight_fbx, "block_highlight");
+	bh.face_highlight  = load_subobject(data, block_highlight_fbx, "face_highlight");
 
 	aiReleaseImport(block_highlight_fbx);
 	return bh;

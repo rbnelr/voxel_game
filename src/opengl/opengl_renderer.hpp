@@ -10,12 +10,12 @@
 namespace gl {
 
 // mesh has to be bound
-inline void draw_submesh (IndexedMesh& mesh, GenericSubmesh submesh) {
+inline void draw_submesh (GenericSubmesh submesh) {
 	glDrawElementsBaseVertex(GL_TRIANGLES,
 		submesh.index_count, // vertex draw count is how many indicies there are
 		GL_UNSIGNED_SHORT,
 		(void*)(submesh.index_offs * sizeof(uint16_t)), // index offset
-		(GLint)submesh.vertex_offs); // basevertex is the vertex offset
+		(GLint)submesh.base_vertex);
 }
 
 struct ViewUniforms {
@@ -131,6 +131,25 @@ struct GuiRenderer {
 	std::vector<GUIVertex> gui_vertex_data;
 	std::vector<uint16_t> gui_index_data;
 
+	// allocate vertices for N quads (4 each) and already fill indices for them
+	GUIVertex* push_quads (int count) {
+		size_t base_idx = gui_vertex_data.size();
+		gui_vertex_data.resize(base_idx + 4*count);
+		auto* verts = &gui_vertex_data[base_idx];
+
+		size_t idx_offs = gui_index_data.size();
+		gui_index_data.resize(idx_offs + 6*count);
+		auto* indices = &gui_index_data[idx_offs];
+
+		for (int j=0; j<count; ++j) {
+			for (int i=0; i<6; ++i) {
+				*indices++ = (uint16_t)(base_idx + j*4 + QUAD_INDICES[i]);
+			}
+		}
+
+		return verts;
+	}
+
 	struct AtlasUVs {
 		float2 pos;
 		float2 size;
@@ -143,33 +162,6 @@ struct GuiRenderer {
 
 	int gui_scale = 4;
 	bool crosshair = false;
-
-	// allocate vertices for N quads (4 each) and already fill indices for them
-	// order is:
-	//  2 ---- 3
-	//  |   /  |
-	//  |  /   |
-	//  0 ---- 1
-	GUIVertex* push_quads (int N) {
-		size_t base_idx = gui_vertex_data.size();
-		gui_vertex_data.resize(base_idx + 4*N);
-		auto* verts = &gui_vertex_data[base_idx];
-
-		size_t idx_offs = gui_index_data.size();
-		gui_index_data.resize(idx_offs + 6*N);
-		auto* indices = &gui_index_data[idx_offs];
-
-		for (size_t i=0; i<N; ++i) {
-			*indices++ = (uint16_t)(base_idx + i*4) + 1;
-			*indices++ = (uint16_t)(base_idx + i*4) + 3;
-			*indices++ = (uint16_t)(base_idx + i*4) + 0;
-			*indices++ = (uint16_t)(base_idx + i*4) + 0;
-			*indices++ = (uint16_t)(base_idx + i*4) + 3;
-			*indices++ = (uint16_t)(base_idx + i*4) + 2;
-		}
-
-		return verts;
-	}
 
 	// render quad with pixel coords
 	void draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv);
@@ -191,7 +183,6 @@ struct PlayerRenderer {
 	PlayerRenderer (Shaders& shaders) {
 		held_block_shad = shaders.compile("held_block");
 		held_item_shad  = shaders.compile("held_item");
-
 	}
 	void draw (OpenglRenderer& r, Game& game);
 
@@ -218,6 +209,9 @@ public:
 
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
+
+	IndexedBuffer				item_mesh_data = indexed_buffer<GenericVertex>("item_mesh_data");
+	std::vector<GenericSubmesh>	item_meshes;
 
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,

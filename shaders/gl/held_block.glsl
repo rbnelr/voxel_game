@@ -40,14 +40,12 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-
 	uniform sampler2DArray tile_textures;
 
 	const vec3 light_dir_world = normalize(vec3(1.33, 1.7, 5.9));
 	vec3 basic_lighting (vec3 normal_world) {
 		vec3 light = vec3(0.1, 0.15, 0.4) * 0.5;
 		light += vec3(0.9, 0.9, 0.6) * max(dot(normal_world, light_dir_world), 0.0);
-
 		return light;
 	}
 

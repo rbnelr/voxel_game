@@ -36,7 +36,7 @@ layout(location = 0) vs2fs VS {
 		}
 
 	#ifdef _WIREFRAME
-		col = vec4(1.0);
+		col = vec4(0,0,1,1);
 	#endif
 		frag_col = col;
 	}

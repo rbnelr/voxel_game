@@ -550,6 +550,14 @@ template <typename IT> inline void reupload_ebo (GLuint vbo, IT const* indices, 
 	// keep bound
 }
 
+template <typename T> inline void upload_buffer (VertexBuffer& vb, std::vector<T> const& vertices) {
+	reupload_vbo(vb.vbo, vertices.data(), vertices.size(), GL_STATIC_DRAW);
+}
+template <typename T, typename IT> inline void upload_buffer (IndexedBuffer& ib, std::vector<T> const& vertices, std::vector<IT> const& indices) {
+	reupload_vbo(ib.vbo, vertices.data(), vertices.size(), GL_STATIC_DRAW);
+	reupload_ebo(ib.ebo, indices.data(), indices.size(), GL_STATIC_DRAW);
+}
+
 template <typename T> inline void stream_buffer (VertexBuffer& vb, std::vector<T> const& vertices) {
 	reupload_vbo(vb.vbo, vertices.data(), vertices.size(), GL_STREAM_DRAW);
 }

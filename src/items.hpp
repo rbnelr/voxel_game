@@ -9,6 +9,7 @@ enum item_id : uint32_t {
 	I_WOOD_SHOVEL	,
 	I_WOOD_SWORD	,
 };
+inline constexpr int ITEM_COUNT = I_WOOD_SWORD+1 - I_WOOD_PICKAXE;
 
 inline constexpr const char* ITEM_NAMES[] = {
 	/* I_WOOD_PICKAXE	*/	"wood_pickaxe",

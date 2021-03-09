@@ -165,7 +165,7 @@ void Game::update (Window& window, Input& I) {
 	chunks.update_chunk_loading(*this);
 	chunks.update_chunk_meshing(*this);
 
-	if (activate_flycam)
+	if (activate_flycam || player.third_person)
 		g_debugdraw.cylinder(player.pos, player.radius, player.height, lrgba(1,0,1,0.5f));
 
 	ImGui::End();
