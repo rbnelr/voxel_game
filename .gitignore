@@ -1,5 +1,8 @@
-screenshots/
-**/imgui.ini
+*/screenshots/
+*/stb/
+imgui.ini
+*.ini
+todo.txt
 
 *.exe
 *.dll
