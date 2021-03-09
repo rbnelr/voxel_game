@@ -132,17 +132,36 @@ struct Raytracer {
 	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
 	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
 
+	//
 	int max_iterations = 256;
 
 	bool visualize_cost = false;
 	bool visualize_warp_iterations = false;
 	bool visualize_warp_reads = false;
 
-	int2 compute_local_size = int2(8,8);
-
+	//
 	int _im_selection = 2;
 	static constexpr const char* _im_options = "4x4\0" "8x4\0" "8x8\0" "16x8\0" "16x16\0" "32x16\0";
 	static constexpr int2 _im_sizes[] = { int2(4,4), int2(8,4), int2(8,8), int2(16,8), int2(16,16), int2(32,16), };
+
+	int2 compute_local_size = int2(8,8);
+
+	//
+	bool  sunlight_enable = true;
+	int   sunlight_rays = 2;
+	float sunlight_dist = 90.0f;
+	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
+
+	bool  ambient_enable = true;
+	int   ambient_rays = 2;
+	float ambient_dist = 10.0f;
+	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
+
+	bool  bouncelight_enable = true;
+	int   bouncelight_rays = 2;
+	float bouncelight_dist = 30.0f;
+
+	bool  visualize_light = false;
 
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
@@ -183,6 +202,29 @@ struct Raytracer {
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 
+		ImGui::Separator();
+
+		//
+		ImGui::Checkbox("sunlight_enable", &sunlight_enable);
+		ImGui::SliderInt("sunlight_rays", &sunlight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
+		imgui_ColorEdit("sunlight_col", &sunlight_col);
+		ImGui::Spacing();
+
+		ImGui::Checkbox("ambient_enable", &ambient_enable);
+		ImGui::SliderInt("ambient_rays", &ambient_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("ambient_dist", &ambient_dist, 1, 128);
+		imgui_ColorEdit("ambient_col", &ambient_col);
+		ImGui::Spacing();
+
+		ImGui::Checkbox("bouncelight_enable", &bouncelight_enable);
+		ImGui::SliderInt("bouncelight_rays", &bouncelight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("bouncelight_dist", &bouncelight_dist, 1, 128);
+		ImGui::Spacing();
+
+		ImGui::Checkbox("visualize_light", &visualize_light);
+		
+		//
 		ImGui::TreePop();
 	}
 
