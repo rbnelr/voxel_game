@@ -27,13 +27,13 @@ inline constexpr ItemProperties FISTS_PROPS		 = { ToolType::FISTS, 32, 4 };
 
 inline constexpr ItemProperties ITEM_PROPS[] = {
 	/* I_WOOD_PICKAXE	*/	{ ToolType::PICKAXE	, 32, 4 },
-	/* I_WOOD_SWORD		*/	{ ToolType::SWORD	, 32, 4 },
 	/* I_WOOD_SHOVEL	*/	{ ToolType::SHOVEL	, 32, 4 },
+	/* I_WOOD_SWORD		*/	{ ToolType::SWORD	, 32, 4 },
 };
 inline constexpr int ITEM_TILES[] = {
 	/* I_WOOD_PICKAXE	*/	{ 0 + 14 * 16 },
-	/* I_WOOD_SWORD		*/	{ 0 + 13 * 16 },
-	/* I_WOOD_SHOVEL	*/	{ 0 + 12 * 16 },
+	/* I_WOOD_SHOVEL	*/	{ 0 + 13 * 16 },
+	/* I_WOOD_SWORD		*/	{ 0 + 12 * 16 },
 };
 
 struct ToolState {

@@ -100,9 +100,15 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		if (raytracer.enable)
 			raytracer.draw(*this, game);
 
-		player_rederer.draw(*this, game);
-
 		debug_draw.draw(*this);
+
+		if (!game.activate_flycam && !game.player.third_person) {
+			// clear depth buffer to draw first person items on top of everything to avoid clipping into walls
+			glClear(GL_DEPTH_BUFFER_BIT); // NOTE: clobbers the depth buffer, if it's still needed for SSAO etc. we might want to use a second depth buffer instead
+		}
+
+		// draws first and third person player items
+		player_rederer.draw(*this, game);
 	}
 
 	{
@@ -412,20 +418,6 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			draw_submesh(r.item_meshes[id - MAX_BLOCK_ID]);
 		}
 	}
-
-	auto& block = game.player.selected_block;
-	if (block.is_selected) {
-		glUseProgram(block_damage_shad->prog);
-
-		glBindVertexArray(r.mesh_data.vao);
-
-		int texid = damage_tiles.id + clamp((int)(block.damage * (float)damage_tiles.count), 0, damage_tiles.count-1);
-
-		block_damage_shad->set_uniform("texid", (float)texid);
-		block_damage_shad->set_uniform("pos_world", (float3)block.hit.pos);
-
-		draw_submesh(r.block_damage_mesh);
-	}
 }
 
 //// glDebugDraw
@@ -565,8 +557,6 @@ bool OpenglRenderer::load_static_data () {
 	GenericVertexData data;
 
 	block_highl.block_highl = load_block_highlight_mesh(&data);
-
-	block_damage_mesh = generate_block_damage_mesh(&data);
 
 	if (!load_textures(data))
 		return false;

@@ -110,6 +110,15 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 		glUniform1i(shader->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 
+		{
+			auto& block = game.player.selected_block;
+			shader->set_uniform("damage",        block.is_selected ? block.damage : 0.0f);
+			shader->set_uniform("damaged_block", block.is_selected ? block.hit.pos : int3(0));
+
+			shader->set_uniform("damage_tiles_first", (float)r.damage_tiles.first);
+			shader->set_uniform("damage_tiles_count", (float)r.damage_tiles.count);
+		}
+
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");
 
 		drawcount = 0;

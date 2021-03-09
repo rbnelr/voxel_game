@@ -167,18 +167,14 @@ struct GuiRenderer {
 
 	void update_gui (Input& I, Game& game);
 };
+
+// Drawing of meshes that are displayed in first and third person for now
 struct PlayerRenderer {
 	Shader*			held_block_shad;
 	Shader*			held_item_shad;
 	Shader*			block_damage_shad;
 
 	Vao				dummy_vao = {"dummy_vao"};
-
-	struct BreakingTile {
-		int id;
-		int count;
-	};
-	BreakingTile	damage_tiles = { 15*16 + 6, 10 };
 
 	PlayerRenderer (Shaders& shaders) {
 		held_block_shad    = shaders.compile("held_block");
@@ -211,9 +207,14 @@ public:
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
 
+	struct BreakingTile {
+		int first;
+		int count;
+	};
+	BreakingTile	damage_tiles = { 15*16 + 6, 10 };
+
 	IndexedBuffer				mesh_data = indexed_buffer<GenericVertex>("mesh_data");
 	std::vector<GenericSubmesh>	item_meshes;
-	GenericSubmesh				block_damage_mesh;
 
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,

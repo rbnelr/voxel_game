@@ -27,15 +27,12 @@ layout(location = 0) vs2fs VS {
 	void main () {
 		BlockMeshVertex v = block_meshes.vertices[meshid * MERGE_INSTANCE_FACTOR + gl_VertexID];
 
-		vec3 pos    = v.pos.xyz;
-		vec3 normal = v.normal.xyz;
-		vec2 uv     = v.uv.xy;
 		float texid = texids[gl_VertexID / 6];
 
-		gl_Position = view.world_to_clip * (model_to_world * vec4(pos, 1.0));
+		gl_Position = view.world_to_clip * (model_to_world * vec4(v.pos.xyz, 1.0));
 
-		vs.normal = mat3(model_to_world) * normal;
-		vs.uvi = vec3(uv, texid);
+		vs.normal = mat3(model_to_world) * v.normal.xyz;
+		vs.uvi = vec3(v.uv.xy, texid);
 	}
 #endif
 
