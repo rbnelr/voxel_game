@@ -120,17 +120,49 @@ struct Raytracer {
 
 	Shader* shad;
 
-	template <typename T>
 	struct SSBO {
-		size_t	alloc_size;
+		std::string_view label;
+
+		size_t	alloc_size = 0;
 		Ssbo	ssbo;
 
-		SSBO (std::string_view label): ssbo{label} {}
+		SSBO (std::string_view label): label{label} {}
+
+		void resize (size_t new_size, void* data, bool copy=true) {
+			size_t aligned_size = align_up(new_size, 16 * MB); // round up size to avoid constant resizing, ideally only happens sometimes
+			
+			if (alloc_size == aligned_size)
+				return;
+
+			Ssbo new_ssbo = {label};
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_ssbo);
+			glBufferData(GL_SHADER_STORAGE_BUFFER, aligned_size, nullptr, GL_STATIC_DRAW);
+
+			if (copy) {
+				assert((alloc_size > 0) == (ssbo != 0));
+
+				size_t copy_size = std::min(alloc_size, aligned_size);
+				if (copy_size > 0) {
+					glBindBuffer(GL_COPY_READ_BUFFER, ssbo);
+					glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 0, copy_size);
+					glBindBuffer(GL_COPY_READ_BUFFER, 0);
+				}
+
+				if (new_size > copy_size)
+					glBufferSubData(GL_SHADER_STORAGE_BUFFER, copy_size, new_size - copy_size, (char*)data + copy_size);
+			}
+
+			alloc_size = aligned_size;
+			ssbo = std::move(new_ssbo);
+
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+		}
 	};
 
-	SSBO<Chunk>				chunks_ssbo				= {"Raytracer.chunks_ssbo"};
-	SSBO<ChunkVoxels>		chunk_voxels_ssbo		= {"Raytracer.chunk_voxels_ssbo"};
-	SSBO<SubchunkVoxels>	subchunks_ssbo			= {"Raytracer.subchunks_ssbo"};
+	SSBO	chunks_ssbo				= {"Raytracer.chunks_ssbo" };
+	SSBO	chunk_voxels_ssbo		= {"Raytracer.chunk_voxels_ssbo" };
+	SSBO	subchunks_ssbo			= {"Raytracer.subchunks_ssbo" };
 
 	//
 	int max_iterations = 256;
@@ -170,8 +202,6 @@ struct Raytracer {
 			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
-
-	bool init = true;
 
 	bool enable = false;
 

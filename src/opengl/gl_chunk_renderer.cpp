@@ -166,61 +166,34 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer upload changes");
 
-	auto& chunks = game.chunks;
+	chunks_ssbo      .resize( game.chunks.chunks      .commit_size(), game.chunks.chunks      .arr, false );
 
-	size_t size;
-
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
-	
-	size = align_up(game.chunks.chunks.commit_size(), 16 * KB);
-	if (init || size != chunks_ssbo.alloc_size) {
-		chunks_ssbo.alloc_size = size;
-		clog("chunks_ssbo realloc");
-		glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_STREAM_DRAW);
+	// stream chunks data structure every frame, because reacting to changes is hard and it's small enough
+	if (game.chunks.chunks.commit_size() > 0) {
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, game.chunks.chunks.commit_size(), game.chunks.chunks.arr);
 	}
 
-	// stream chunks data structure every frame, because reacting to changes is hard an its small enough
-	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.chunks.commit_size(), chunks.chunks.arr);
+	chunk_voxels_ssbo.resize( game.chunks.chunk_voxels.commit_size(), game.chunks.chunk_voxels.arr );
+	subchunks_ssbo   .resize( game.chunks.subchunks   .commit_size(), game.chunks.subchunks   .arr );
 
-	size = align_up(game.chunks.chunk_voxels.commit_size(), 4 * MB);
-	if (init || size != chunk_voxels_ssbo.alloc_size) {
-		chunk_voxels_ssbo.alloc_size = size;
-		clog("chunk_voxels_ssbo realloc");
+	for (auto cid : game.chunks.upload_voxels) {
+		auto& chunk = game.chunks.chunks[cid];
+
+		auto& dc = game.chunks.chunk_voxels[cid];
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk_voxels_ssbo.ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_STREAM_DRAW);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.chunk_voxels.commit_size(), chunks.chunk_voxels.arr);
-	}
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&dc - (char*)game.chunks.chunk_voxels.arr, sizeof(dc), &dc);
 
-	size = align_up(game.chunks.subchunks.commit_size(), 8 * MB);
-	if (init || size != subchunks_ssbo.alloc_size) {
-		subchunks_ssbo.alloc_size = size;
-		clog("subchunks_ssbo realloc");
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, subchunks_ssbo.ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_STREAM_DRAW);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.subchunks.commit_size(), chunks.subchunks.arr);
-	}
-
-	if (!init) { // only upload individual changes if we did not already reupload all data
-		for (auto cid : chunks.upload_voxels) {
-			auto& chunk = chunks.chunks[cid];
-
-			auto& dc = chunks.chunk_voxels[cid];
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk_voxels_ssbo.ssbo);
-			glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&dc - (char*)chunks.chunk_voxels.arr, sizeof(dc), &dc);
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, subchunks_ssbo.ssbo);
-			for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
-				if (!dc.is_subchunk_sparse(i)) {
-					auto& subc = chunks.subchunks[dc.sparse_data[i]];
-					glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&subc - (char*)chunks.subchunks.arr, sizeof(subc), &subc);
-				}
+		for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
+			if (!dc.is_subchunk_sparse(i)) {
+				auto& subc = game.chunks.subchunks[dc.sparse_data[i]];
+				glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&subc - (char*)game.chunks.subchunks.arr, sizeof(subc), &subc);
 			}
 		}
 	}
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-	init = false;
 }
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {

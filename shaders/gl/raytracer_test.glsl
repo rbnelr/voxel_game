@@ -76,13 +76,17 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 #define CHUNK_SIZE_MASK		31
 #endif
 
+#if 0
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
 #define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
-
-#define CHUNK_SPARSE_VOXELS	 (1<<1)
-
+#else
+#define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
+#define SUBCHUNK_SHIFT		3
+#define SUBCHUNK_MASK		7
+#endif
 
 #define B_AIR 1
 #define B_WATER 3
@@ -111,11 +115,6 @@ struct Chunk {
 
 	//uint16_t neighbours[6];
 	uint _neighbours[3];
-
-	//uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
-	//uint16_t _pad;
-
-	uint _voxel_data;
 
 	//uint16_t opaque_mesh_slices;
 	//uint16_t transp_mesh_slices;
@@ -154,23 +153,16 @@ layout(rgba16f, binding = 3) uniform image2D img;
 layout(std430, binding = 4) readonly buffer Chunks {
 	Chunk chunks[];
 };
-layout(std430, binding = 5) readonly buffer DenseChunks {
-	ChunkVoxels dense_chunks[];
+layout(std430, binding = 5) readonly buffer _ChunkVoxels {
+	ChunkVoxels chunk_voxels[];
 };
-layout(std430, binding = 6) readonly buffer DenseSubchunks {
-	SubchunkVoxels dense_subchunks[];
+layout(std430, binding = 6) readonly buffer Subchunks {
+	SubchunkVoxels subchunks[];
 };
 
 //
-bool chunk_sparse (uint cid) {
-	uint test = (chunks[cid].flags & CHUNK_SPARSE_VOXELS);
-	return test != 0u;
-}
 ivec3 get_pos (uint cid) {
 	return ivec3(chunks[cid].posx, chunks[cid].posy, chunks[cid].posz);
-}
-uint get_voxel_data (uint cid) {
-	return chunks[cid]._voxel_data & 0xffffu;
 }
 uint get_neighbour (uint cid, int i) {
 	return (chunks[cid]._neighbours[i >> 1] >> ((i & 1) * 16)) & 0xffffu;
@@ -181,14 +173,14 @@ int get_subchunk_idx (ivec3 pos) {
 	pos >>= SUBCHUNK_SHIFT;
 	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
 }
-bool is_subchunk_sparse (uint dc_id, int subc_i) {
-	uint test = dense_chunks[dc_id].sparse_bits[subc_i >> 5] & (1u << (subc_i & 31));
+bool is_subchunk_sparse (uint cid, int subc_i) {
+	uint test = chunk_voxels[cid].sparse_bits[subc_i >> 5] & (1u << (subc_i & 31));
 	return test != 0u;
 }
 
 uint get_voxel (uint subc_id, ivec3 pos) {
 	pos &= SUBCHUNK_MASK;
-	uint val = dense_subchunks[subc_id].voxels[pos.z][pos.y][pos.x >> 1];
+	uint val = subchunks[subc_id].voxels[pos.z][pos.y][pos.x >> 1];
 	return (val >> ((pos.x & 1) * 16)) & 0xffffu;
 }
 
@@ -244,7 +236,6 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 }
 
 uint chunk_id;
-uint voxel_data;
 uint subchunk_data;
 uint prev_chunk_id;
 
@@ -261,20 +252,6 @@ uint prev_chunk_id;
 uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 	if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
 
-	#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
-		local_reads[0]++;
-		if (subgroupElect())
-			atomicAdd(warp_reads[gl_SubgroupID][0], 1u);
-	#endif
-		
-		voxel_data = get_voxel_data(chunk_id);
-		if (chunk_sparse(chunk_id)) {
-
-			coord &= ~CHUNK_SIZE_MASK;
-
-			step_size = float(CHUNK_SIZE);
-			return voxel_data;
-		}
 	}
 
 	if ((step_mask & ~SUBCHUNK_MASK) != 0) {
@@ -287,8 +264,8 @@ uint read_voxel (int step_mask, inout ivec3 coord, out float step_size) {
 
 		int subci = get_subchunk_idx(coord);
 
-		subchunk_data = dense_chunks[voxel_data].sparse_data[subci];
-		if (is_subchunk_sparse(voxel_data, subci)) {
+		subchunk_data = chunk_voxels[chunk_id].sparse_data[subci];
+		if (is_subchunk_sparse(chunk_id, subci)) {
 
 			coord &= ~SUBCHUNK_MASK;
 
@@ -428,6 +405,13 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
 
 		// handle step out of chunk by checking bits
 		if ((step_mask & ~CHUNK_SIZE_MASK) != 0) {
+		
+		#if VISUALIZE_COST && VISUALIZE_WARP_COST && VISUALIZE_WARP_READS
+			local_reads[0]++;
+			if (subgroupElect())
+				atomicAdd(warp_reads[gl_SubgroupID][0], 1u);
+		#endif
+
 			chunk_id = get_neighbour(chunk_id, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
 			if (chunk_id == 0xffffu)
 				break;
