@@ -235,23 +235,29 @@ struct CallCtx {
 				// Straight single loop version
 			#if 0
 				uint32_t block_i = 0;
-				for (int z=0; z<SUBCHUNK_SIZE; ++z)
-				for (int y=0; y<SUBCHUNK_SIZE; ++y)
-				for (int x=0; x<SUBCHUNK_SIZE; ++x) {
-					block_id bid = sc.ptr[block_i];
+				for (int bz=0; bz<SUBCHUNK_SIZE; ++bz) {
+					z = sz + bz;
+					for (int by=0; by<SUBCHUNK_SIZE; ++by) {
+						y = sy + by;
+						for (int bx=0; bx<SUBCHUNK_SIZE; ++bx) {
+							x = sx + bx;
 
-					block_id prevx = x > 0 ? sc.ptr[block_i - BX] : scx.read(block_i + (SUBCHUNK_SIZE-1)*BX);
-					block_id prevy = y > 0 ? sc.ptr[block_i - BY] : scy.read(block_i + (SUBCHUNK_SIZE-1)*BY);
-					block_id prevz = z > 0 ? sc.ptr[block_i - BZ] : scz.read(block_i + (SUBCHUNK_SIZE-1)*BZ);
+							block_id bid = sc.ptr[block_i];
 
-					if (bid != prevx) face<0>(j, x+sx, y+sy, z+sz, bid, prevx);
-					if (bid != prevy) face<1>(j, x+sx, y+sy, z+sz, bid, prevy);
-					if (bid != prevz) face<2>(j, x+sx, y+sy, z+sz, bid, prevz);
+							block_id prevz = bz > 0 ? sc.ptr[block_i - BZ] : scz.ptr[scz.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BZ];
+							block_id prevy = by > 0 ? sc.ptr[block_i - BY] : scy.ptr[scy.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BY];
+							block_id prevx = bx > 0 ? sc.ptr[block_i - BX] : scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
 
-					auto& bm = j.block_meshes[bid];
-					if (bm >= 0) block_mesh(j, x+sx, y+sy, z+sz, bid, bm);
+							if (bid != prevx) face<0>(bid, prevx);
+							if (bid != prevy) face<1>(bid, prevy);
+							if (bid != prevz) face<2>(bid, prevz);
 
-					block_i++;
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+						}
+					}
 				}
 
 			#endif
@@ -330,6 +336,187 @@ struct CallCtx {
 
 						block_i += SUBCHUNK_SIZE;
 					}
+				}
+			#endif
+
+			#if 0
+				uint32_t block_i = 0;
+
+				{
+					z = sz;
+					{
+						y = sy;
+						{
+							x = sx;
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = scy.ptr[scy.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = scz.ptr[scz.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+
+						for (int bx=1; bx<SUBCHUNK_SIZE; ++bx) {
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = sc.ptr[block_i - BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = scy.ptr[scy.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = scz.ptr[scz.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+						y++;
+					}
+
+					for (int by=1; by<SUBCHUNK_SIZE; ++by) {
+						{
+							x = sx;
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = sc.ptr[block_i - BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = scz.ptr[scz.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+
+						for (int bx=1; bx<SUBCHUNK_SIZE; ++bx) {
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = sc.ptr[block_i - BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = sc.ptr[block_i - BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = scz.ptr[scz.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+						y++;
+					}
+					z++;
+				}
+
+				for (int bz=1; bz<SUBCHUNK_SIZE; ++bz) {
+					{
+						y = sy;
+						{
+							x = sx;
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = scy.ptr[scy.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = sc.ptr[block_i - BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+
+						for (int bx=1; bx<SUBCHUNK_SIZE; ++bx) {
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = sc.ptr[block_i - BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = scy.ptr[scy.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = sc.ptr[block_i - BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+						y++;
+					}
+
+					for (int by=1; by<SUBCHUNK_SIZE; ++by) {
+						{
+							x = sx;
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = scx.ptr[scx.sparse ? 0 : block_i + (SUBCHUNK_SIZE-1)*BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = sc.ptr[block_i - BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = sc.ptr[block_i - BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+
+						for (int bx=1; bx<SUBCHUNK_SIZE; ++bx) {
+							block_id bid = sc.ptr[block_i];
+
+							block_id prevx = sc.ptr[block_i - BX];
+							if (bid != prevx) face<0>(bid, prevx);
+
+							block_id prevy = sc.ptr[block_i - BY];
+							if (bid != prevy) face<1>(bid, prevy);
+
+							block_id prevz = sc.ptr[block_i - BZ];
+							if (bid != prevz) face<2>(bid, prevz);
+
+							auto& bm = j.block_meshes[bid];
+							if (bm >= 0) block_mesh(bid, bm);
+
+							block_i++;
+							x++;
+						}
+						y++;
+					}
+					z++;
 				}
 			#endif
 
