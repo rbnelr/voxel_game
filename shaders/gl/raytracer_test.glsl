@@ -75,7 +75,7 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
 
-#define CHUNK_SPARSE_VOXELS	 4
+#define CHUNK_SPARSE_VOXELS	 (1<<1)
 
 
 #define B_AIR 1

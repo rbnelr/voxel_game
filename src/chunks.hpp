@@ -428,6 +428,8 @@ struct Chunks {
 	};
 	std_vector<UploadSlice> upload_slices;
 
+	std_vector<chunk_id> upload_voxels; // VOXELS_DIRTY of this frame
+
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);
 

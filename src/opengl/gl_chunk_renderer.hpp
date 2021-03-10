@@ -122,8 +122,8 @@ struct Raytracer {
 
 	template <typename T>
 	struct SSBO {
-		uint32_t	count; // how many allocated on gpu
-		Ssbo		ssbo;
+		size_t	alloc_size;
+		Ssbo	ssbo;
 
 		SSBO (std::string_view label): ssbo{label} {}
 	};
@@ -171,16 +171,14 @@ struct Raytracer {
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
-	bool inited = false;
-	bool reupload = false;
+	bool init = true;
 
-	bool enable = false;
+	bool enable = true;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable", &enable);
-		reupload = ImGui::Button("reupload") || reupload;
 
 		bool macro_change = false;
 
@@ -252,6 +250,8 @@ struct Raytracer {
 		}
 		
 	}
+
+	void upload_changes (OpenglRenderer& r, Game& game);
 
 	void draw (OpenglRenderer& r, Game& game);
 };

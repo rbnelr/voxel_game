@@ -28,9 +28,6 @@ void ChunkRenderer::upload_remeshed (VulkanRenderer& r, Chunks& chunks, VkComman
 		ChunkMeshData::free_slice(slice.data);
 	}
 
-	chunks.upload_slices.clear();
-	chunks.upload_slices.shrink_to_fit();
-
 	{ // free allocation blocks if they are no longer needed by any of the frames in flight
 		frame.slices_end = chunks.slices.slots.alloc_end;
 

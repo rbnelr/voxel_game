@@ -134,7 +134,7 @@ void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
 }
 
 void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
-	c->flags |= Chunk::REMESH|Chunk::VOXELS_DIRTY;
+	c->flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
 	auto flag_neighbour = [&] (int x, int y, int z) {
 		//auto nid = chunks_arr.checked_get(x,y,z);
@@ -232,7 +232,7 @@ void Chunks::checked_sparsify_chunk (Chunk& c) {
 	DBG_MEMSET(&dc, DBG_MEMSET_FREED, sizeof(dc));
 	dense_chunks.free(c.voxel_data);
 
-	c.flags |= Chunk::SPARSE_VOXELS;
+	c.flags |= Chunk::SPARSE_VOXELS | Chunk::VOXELS_DIRTY;
 	c.voxel_data = (uint16_t)bid;
 }
 
@@ -600,7 +600,7 @@ void Chunks::update_chunk_loading (Game& game) {
 
 				sparse_chunk_from_worldgen(chunk, &job->noise_pass.voxels[0][0][0]);
 
-				chunk.flags |= Chunk::REMESH;
+				chunk.flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
 				// link neighbour ptrs and flag neighbours to be remeshed
 				for (int ni=0; ni<6; ++ni) {
@@ -673,6 +673,12 @@ void Chunks::update_chunk_loading (Game& game) {
 void Chunks::update_chunk_meshing (Game& game) {
 	ZoneScoped;
 
+	upload_slices.clear();
+	upload_slices.shrink_to_fit();
+
+	upload_voxels.clear();
+	upload_voxels.shrink_to_fit();
+
 	std::vector<std::unique_ptr<RemeshChunkJob>> remesh_jobs;
 
 	{
@@ -683,6 +689,8 @@ void Chunks::update_chunk_meshing (Game& game) {
 			chunk._validate_flags();
 			
 			if (chunk.flags & Chunk::VOXELS_DIRTY) {
+				upload_voxels.push_back(id);
+
 				checked_sparsify_chunk(chunk);
 				chunk.flags &= ~Chunk::VOXELS_DIRTY;
 			}

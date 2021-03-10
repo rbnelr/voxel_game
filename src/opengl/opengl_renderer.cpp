@@ -37,10 +37,8 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFil
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	ImGui::Begin("Debug");
 
-	{
-		OGL_TRACE("upload_remeshed");
-		chunk_renderer.upload_remeshed(game.chunks);
-	}
+	chunk_renderer.upload_remeshed(game.chunks);
+	raytracer.upload_changes(*this, game);
 
 	glLineWidth(line_width);
 	{
