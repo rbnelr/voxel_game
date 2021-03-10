@@ -106,7 +106,7 @@ void ChunkRenderer::draw_chunks (VulkanWindowContext& ctx, VkCommandBuffer cmds,
 
 			bool culled = empty || frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 			
-			chunks.visualize_chunk(chunk, empty, culled);
+			chunks.visualize_chunk(cid, chunk, empty, culled);
 
 			if (!culled) {
 				push_draw_slices(cid, chunk.opaque_mesh_vertex_count, chunk.opaque_mesh_slices, DT_OPAQUE);

@@ -300,9 +300,9 @@ inline auto background_threadpool = Threadpool<WorldgenJob>(background_threads, 
 namespace worldgen {
 	// Faster voxel access in 3x3x3 chunk region than hashmap-based global chunk lookup
 	struct Neighbours {
-		Chunk* neighbours[3][3][3];
+		chunk_id neighbours[3][3][3];
 
-		Chunk* get (int x, int y, int z) {
+		chunk_id get (int x, int y, int z) {
 			return neighbours[z+1][y+1][x+1];
 		}
 
@@ -315,11 +315,11 @@ namespace worldgen {
 			int cx, cy, cz;
 			CHUNK_BLOCK_POS(x,y,z, cx,cy,cz, bx,by,bz);
 
-			Chunk const* chunk = neighbours[cz+1][cy+1][cx+1];
+			chunk_id chunk = neighbours[cz+1][cy+1][cx+1];
 			return chunks.read_block(bx,by,bz, chunk);
 		}
 	};
 
 
-	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg);
+	void object_pass (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg);
 }

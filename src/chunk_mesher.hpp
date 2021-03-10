@@ -61,15 +61,15 @@ struct RemeshChunkJob { // Chunk remesh
 	BlockMeshes::Mesh const*	block_meshes_meshes;
 	BlockTile const*			block_tiles;
 
-	ChunkVoxels*				dense_chunks;
-	SubchunkVoxels*				dense_subchunks;
+	ChunkVoxels*				chunk_voxels;
+	SubchunkVoxels*				subchunks;
 
-	Chunk*						chunk;
+	chunk_id					chunk;
 
 	// chunk neighbours (neg dir)
-	Chunk const*				chunk_nx;
-	Chunk const*				chunk_ny;
-	Chunk const*				chunk_nz;
+	chunk_id					chunk_nx;
+	chunk_id					chunk_ny;
+	chunk_id					chunk_nz;
 
 	bool						mesh_world_border;
 	uint64_t					chunk_seed;
@@ -78,7 +78,7 @@ struct RemeshChunkJob { // Chunk remesh
 	ChunkMeshData				opaque_vertices;
 	ChunkMeshData				transp_vertices;
 
-	RemeshChunkJob (Chunks& chunks, Chunk* chunk, WorldGenerator const& wg, bool mesh_world_border);
+	RemeshChunkJob (Chunks& chunks, chunk_id cid, WorldGenerator const& wg, bool mesh_world_border);
 
 	void execute ();
 };

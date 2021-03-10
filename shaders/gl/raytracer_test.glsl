@@ -66,12 +66,18 @@ vec3 get_bounce_dir (vec3 normal) {
 
 layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
+#if 1
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
 #define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
 #define CHUNK_SIZE_MASK		63
+#else
+#define CHUNK_SIZE			32 // size of chunk in blocks per axis
+#define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
+#define CHUNK_SIZE_MASK		31
+#endif
 
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		16 // size of chunk in subchunks per axis
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
 

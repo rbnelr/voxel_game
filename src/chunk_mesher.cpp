@@ -96,12 +96,11 @@ struct CallCtx {
 		int			sparse;
 		uint32_t	voxel_data;
 	};
-	_Chunk get_chunk (Chunk const* chunk) {
-		if (chunk == nullptr)
+	_Chunk get_chunk (chunk_id cid) {
+		if (cid == U16_NULL)
 			return { true, (uint32_t)B_NULL };
 	
-		bool sparse = (chunk->flags & Chunk::SPARSE_VOXELS) != 0;
-		return { sparse, chunk->voxel_data };
+		return { false, cid };
 	}
 
 	struct _Subchunk {
@@ -116,11 +115,11 @@ struct CallCtx {
 		if (chunk.sparse)
 			return { true, (block_id*)&chunk.voxel_data };
 
-		auto& dc = j.dense_chunks[chunk.voxel_data];
+		auto& dc = j.chunk_voxels[chunk.voxel_data];
 		if (dc.is_subchunk_sparse(subchunk_i))
 			return { true, (block_id*)&dc.sparse_data[subchunk_i] }; // sparse subchunk
 
-		return { false, j.dense_subchunks[ dc.sparse_data[subchunk_i] ].voxels }; // dense subchunk
+		return { false, j.subchunks[ dc.sparse_data[subchunk_i] ].voxels }; // dense subchunk
 	}
 
 	// Chunk meshing optimized for speed
@@ -344,32 +343,34 @@ void RemeshChunkJob::execute () {
 	ctx.mesh_chunk();
 }
 
-Chunk const* get_neighbour_blocks (Chunks& chunks, Chunk* chunk, int neighbour) {
-	int3 pos = chunk->pos;
+chunk_id get_neighbour_blocks (Chunks& chunks, Chunk& chunk, int neighbour) {
+	int3 pos = chunk.pos;
 	pos[neighbour] -= 1;
 
 	//auto nid = j.chunks->chunks_arr.checked_get(pos.x, pos.y, pos.z);
 	auto nid = chunks.query_chunk(pos);
 	if (nid != U16_NULL && chunks[nid].flags != 0) {
-		return &chunks[nid];
+		return nid;
 	}
-	return nullptr;
+	return U16_NULL;
 }
 
-RemeshChunkJob::RemeshChunkJob (Chunks& chunks, Chunk* chunk, WorldGenerator const& wg, bool mesh_world_border) {
+RemeshChunkJob::RemeshChunkJob (Chunks& chunks, chunk_id cid, WorldGenerator const& wg, bool mesh_world_border) {
 	block_types			= g_assets.block_types.blocks.data();
 	block_meshes		= g_assets.block_meshes.block_meshes.data();
 	block_meshes_meshes	= g_assets.block_meshes.meshes.data();
 	block_tiles			= g_assets.block_tiles.data();
 
-	this->dense_chunks		= &chunks.dense_chunks[0];
-	this->dense_subchunks	= &chunks.dense_subchunks[0];
+	this->chunk_voxels		= chunks.chunk_voxels.arr;
+	this->subchunks			= chunks.subchunks.arr;
 
-	this->chunk = chunk;
+	auto& chunk = chunks.chunks[cid];
+
+	this->chunk    = cid;
 	this->chunk_nx = get_neighbour_blocks(chunks, chunk, 0);
 	this->chunk_ny = get_neighbour_blocks(chunks, chunk, 1);
 	this->chunk_nz = get_neighbour_blocks(chunks, chunk, 2);
 
 	this->mesh_world_border = mesh_world_border;
-	chunk_seed = wg.seed ^ hash(chunk->pos * CHUNK_SIZE);
+	chunk_seed = wg.seed ^ hash(chunk.pos * CHUNK_SIZE);
 }

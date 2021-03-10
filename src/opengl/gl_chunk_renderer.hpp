@@ -129,8 +129,8 @@ struct Raytracer {
 	};
 
 	SSBO<Chunk>				chunks_ssbo				= {"Raytracer.chunks_ssbo"};
-	SSBO<ChunkVoxels>		dense_chunks_ssbo		= {"Raytracer.dense_chunks_ssbo"};
-	SSBO<SubchunkVoxels>	dense_subchunks_ssbo	= {"Raytracer.dense_subchunks_ssbo"};
+	SSBO<ChunkVoxels>		chunk_voxels_ssbo		= {"Raytracer.chunk_voxels_ssbo"};
+	SSBO<SubchunkVoxels>	subchunks_ssbo			= {"Raytracer.subchunks_ssbo"};
 
 	//
 	int max_iterations = 256;
@@ -149,17 +149,17 @@ struct Raytracer {
 	//
 	bool  sunlight_enable = true;
 	int   sunlight_rays = 2;
-	float sunlight_dist = 90.0f;
+	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
 	bool  ambient_enable = true;
 	int   ambient_rays = 2;
-	float ambient_dist = 10.0f;
+	float ambient_dist = 64;
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
 
 	bool  bouncelight_enable = true;
 	int   bouncelight_rays = 2;
-	float bouncelight_dist = 30.0f;
+	float bouncelight_dist = 50;
 
 	bool  visualize_light = false;
 
@@ -173,7 +173,7 @@ struct Raytracer {
 
 	bool init = true;
 
-	bool enable = true;
+	bool enable = false;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -203,24 +203,28 @@ struct Raytracer {
 		ImGui::Separator();
 
 		//
-		ImGui::Checkbox("sunlight_enable", &sunlight_enable);
-		ImGui::SliderInt("sunlight_rays", &sunlight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
-		ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
-		imgui_ColorEdit("sunlight_col", &sunlight_col);
-		ImGui::Spacing();
+		if (ImGui::TreeNodeEx("lighting")) {
+			ImGui::Checkbox("sunlight_enable", &sunlight_enable);
+			ImGui::SliderInt("sunlight_rays", &sunlight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
+			imgui_ColorEdit("sunlight_col", &sunlight_col);
+			ImGui::Spacing();
 
-		ImGui::Checkbox("ambient_enable", &ambient_enable);
-		ImGui::SliderInt("ambient_rays", &ambient_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
-		ImGui::SliderFloat("ambient_dist", &ambient_dist, 1, 128);
-		imgui_ColorEdit("ambient_col", &ambient_col);
-		ImGui::Spacing();
+			ImGui::Checkbox("ambient_enable", &ambient_enable);
+			ImGui::SliderInt("ambient_rays", &ambient_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SliderFloat("ambient_dist", &ambient_dist, 1, 128);
+			imgui_ColorEdit("ambient_col", &ambient_col);
+			ImGui::Spacing();
 
-		ImGui::Checkbox("bouncelight_enable", &bouncelight_enable);
-		ImGui::SliderInt("bouncelight_rays", &bouncelight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
-		ImGui::SliderFloat("bouncelight_dist", &bouncelight_dist, 1, 128);
-		ImGui::Spacing();
+			ImGui::Checkbox("bouncelight_enable", &bouncelight_enable);
+			ImGui::SliderInt("bouncelight_rays", &bouncelight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SliderFloat("bouncelight_dist", &bouncelight_dist, 1, 128);
+			ImGui::Spacing();
 
-		ImGui::Checkbox("visualize_light", &visualize_light);
+			ImGui::Checkbox("visualize_light", &visualize_light);
+
+			ImGui::TreePop();
+		}
 		
 		//
 		ImGui::TreePop();

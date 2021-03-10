@@ -19,36 +19,29 @@ void Chunks::destroy () {
 			free_chunk(cid);
 	}
 	assert(chunks.count == 0);
-	assert(dense_chunks.count == 0);
-	assert(dense_subchunks.count == 0);
+	assert(chunk_voxels.count == 0);
+	assert(subchunks.count == 0);
 	//chunks_arr = ScrollingArray<chunk_id>();
 
 	chunks_map.clear();
 	queued_chunks.clear();
 }
 
-void Chunks::init_voxels (Chunk& chunk) {
-	chunk.flags |= Chunk::SPARSE_VOXELS;
-	chunk.voxel_data = B_NULL;
-}
-void Chunks::free_voxels (Chunk& c) {
+void Chunks::free_voxels (chunk_id cid, Chunk& chunk) {
 	ZoneScoped;
 
-	if (c.flags & Chunk::SPARSE_VOXELS)
-		return; // sparse chunk
-
-	auto& dc = dense_chunks[c.voxel_data];
+	auto& vox = chunk_voxels[cid];
 
 	for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
-		if (!dc.is_subchunk_sparse(i)) {
-			auto& subchunk = dense_subchunks[ dc.sparse_data[i] ];
+		if (!vox.is_subchunk_sparse(i)) {
+			auto& subchunk = subchunks[ vox.sparse_data[i] ];
 			DBG_MEMSET(&subchunk, DBG_MEMSET_FREED, sizeof(subchunk));
-			dense_subchunks.free(dc.sparse_data[i]);
+			subchunks.free(vox.sparse_data[i]);
 		}
 	}
 
-	DBG_MEMSET(&dc, DBG_MEMSET_FREED, sizeof(dc));
-	dense_chunks.free(c.voxel_data);
+	DBG_MEMSET(&vox, DBG_MEMSET_FREED, sizeof(vox));
+	chunk_voxels.free(cid);
 }
 
 block_id Chunks::read_block (int x, int y, int z) {
@@ -63,24 +56,19 @@ block_id Chunks::read_block (int x, int y, int z) {
 	if (cid == U16_NULL)
 		return B_NULL;
 
-	return read_block(bx,by,bz, &chunks[cid]);
+	return read_block(bx,by,bz, cid);
 }
 
-block_id Chunks::read_block (int x, int y, int z, Chunk const* c) {
-	assert(c->flags != 0);
-
-	if (c->flags & Chunk::SPARSE_VOXELS)
-		return (block_id)c->voxel_data; // sparse chunk
-
-	auto& dc = dense_chunks[c->voxel_data];
+block_id Chunks::read_block (int x, int y, int z, chunk_id cid) {
+	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
-	auto subchunk_val = dc.sparse_data[subchunk_i];
+	auto subchunk_val = vox.sparse_data[subchunk_i];
 
-	if (dc.is_subchunk_sparse(subchunk_i))
+	if (vox.is_subchunk_sparse(subchunk_i))
 		return CHECK_BLOCK( (block_id)subchunk_val ); // sparse subchunk
 
-	auto& subchunk = dense_subchunks[subchunk_val];
+	auto& subchunk = subchunks[subchunk_val];
 
 	auto blocki = BLOCK_IDX(x,y,z);
 	assert(blocki >= 0 && blocki < SUBCHUNK_VOXEL_COUNT);
@@ -103,34 +91,26 @@ void Chunks::write_block (int x, int y, int z, block_id data) {
 	if (cid == U16_NULL)
 		return;
 
-	write_block(bx,by,bz, &chunks[cid], data);
+	write_block(bx,by,bz, cid, data);
 }
 
-void Chunks::write_block (int x, int y, int z, Chunk* c, block_id data) {
-	assert(c->flags != 0);
-
-	if (c->flags & Chunk::SPARSE_VOXELS) {
-		if (data == (block_id)c->voxel_data)
-			return; // chunk stays sparse
-		densify_chunk(*c); // sparse chunk, allocate dense chunk
-	}
-
-	auto& dc = dense_chunks[c->voxel_data];
+void Chunks::write_block (int x, int y, int z, chunk_id cid, block_id data) {
+	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
-	uint32_t& subchunk_val = dc.sparse_data[subchunk_i];
+	uint32_t& subchunk_val = vox.sparse_data[subchunk_i];
 
-	if (dc.is_subchunk_sparse(subchunk_i)) {
+	if (vox.is_subchunk_sparse(subchunk_i)) {
 		if (data == (block_id)subchunk_val)
 			return; // chunk stays sparse
-		densify_subchunk(dc, subchunk_i, subchunk_val); // sparse subchunk, allocate dense subchunk
+		densify_subchunk(vox, subchunk_i, subchunk_val); // sparse subchunk, allocate dense subchunk
 	}
 
-	auto& subchunk = dense_subchunks[subchunk_val];
+	auto& subchunk = subchunks[subchunk_val];
 	auto blocki = BLOCK_IDX(x,y,z);
 	subchunk.voxels[blocki] = data;
 
-	write_block_update_chunk_flags(x,y,z, c);
+	write_block_update_chunk_flags(x,y,z, &chunks[cid]);
 }
 
 void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
@@ -154,37 +134,21 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	if (z == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z+1);
 }
 
-void Chunks::densify_chunk (Chunk& c) {
+void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i, uint32_t& subchunk_val) {
 	ZoneScoped;
-
-	block_id bid = (block_id)c.voxel_data;
-
-	c.voxel_data = (uint16_t)dense_chunks.alloc();
-	c.flags &= ~Chunk::SPARSE_VOXELS;
-
-	auto& dc = dense_chunks[c.voxel_data];
-
-	memset(dc.sparse_bits, -1, sizeof(dc.sparse_bits)); // init to sparse subchunks
-
-	for (uint16_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i)
-		dc.sparse_data[i] = (uint32_t)bid;
-}
-void Chunks::densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val) {
-	ZoneScoped;
-
-	dc.set_subchunk_dense(subchunk_i);
+	vox.set_subchunk_dense(subchunk_i);
 
 	block_id bid = (block_id)subchunk_val;
 
-	subchunk_val = dense_subchunks.alloc();
-	auto& subchunk = dense_subchunks[subchunk_val];
+	subchunk_val = subchunks.alloc();
+	auto& subchunk = subchunks[subchunk_val];
 
 	for (uint32_t i=0; i<SUBCHUNK_VOXEL_COUNT; ++i)
 		subchunk.voxels[i] = (uint32_t)bid;
 }
 
-bool Chunks::checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i) {
-	auto& subchunk = dense_subchunks[ dc.sparse_data[subchunk_i] ];
+bool Chunks::checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i) {
+	auto& subchunk = subchunks[ vox.sparse_data[subchunk_i] ];
 	
 	block_id bid = subchunk.voxels[0];
 	for (int i=1; i<SUBCHUNK_VOXEL_COUNT; ++i) {
@@ -194,46 +158,22 @@ bool Chunks::checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i) {
 	// Subchunk sparse
 
 	DBG_MEMSET(&subchunk, DBG_MEMSET_FREED, sizeof(subchunk));
-	dense_subchunks.free(dc.sparse_data[subchunk_i]);
+	subchunks.free(vox.sparse_data[subchunk_i]);
 
-	dc.sparse_data[subchunk_i] = bid;
-	dc.set_subchunk_sparse(subchunk_i);
+	vox.sparse_data[subchunk_i] = bid;
+	vox.set_subchunk_sparse(subchunk_i);
 
 	return true;
 }
 
-void Chunks::checked_sparsify_chunk (Chunk& c) {
-	if (c.flags & Chunk::SPARSE_VOXELS)
-		return; // chunk already sparse
-
+void Chunks::checked_sparsify_chunk (chunk_id cid) {
 	ZoneScoped;
+	auto& vox = chunk_voxels[cid];
 
-	auto& dc = dense_chunks[c.voxel_data];
-
-	bool sparse_chunk = true;
-	block_id bid;
-
-	{ // subc_i=0 spacial case to avoid extra branch in loop
-		if (!dc.is_subchunk_sparse(0))
-			sparse_chunk = checked_sparsify_subchunk(dc, 0);
-		if (sparse_chunk)
-			bid = (block_id)dc.sparse_data[0];
+	for (uint16_t subc_i=0; subc_i<CHUNK_SUBCHUNK_COUNT; ++subc_i) {
+		if (!vox.is_subchunk_sparse(subc_i))
+			checked_sparsify_subchunk(vox, subc_i);
 	}
-	for (uint16_t subc_i=1; subc_i<CHUNK_SUBCHUNK_COUNT; ++subc_i) {
-		if (!dc.is_subchunk_sparse(subc_i))
-			sparse_chunk = checked_sparsify_subchunk(dc, subc_i) && sparse_chunk;
-		sparse_chunk = sparse_chunk && (bid == (block_id)dc.sparse_data[subc_i]);
-	}
-
-	if (!sparse_chunk)
-		return;
-	// Chunk completely sparse
-
-	DBG_MEMSET(&dc, DBG_MEMSET_FREED, sizeof(dc));
-	dense_chunks.free(c.voxel_data);
-
-	c.flags |= Chunk::SPARSE_VOXELS | Chunk::VOXELS_DIRTY;
-	c.voxel_data = (uint16_t)bid;
 }
 
 // check if subchunk region in CHUNK_SIZE^3 array is sparse
@@ -283,41 +223,17 @@ bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
 	return is_sparse;
 #endif
 }
-bool check_chunk_sparse (ChunkVoxels& dc) {
-	uint32_t bid = dc.sparse_data[0];
-	uint64_t packed = (uint64_t)bid | ((uint64_t)bid << 32);
 
-	uint64_t* ptr = (uint64_t*)dc.sparse_data;
-	for (int i=0; i<CHUNK_SUBCHUNK_COUNT/2; ++i) {
-		if (*ptr != packed)
-			return false; // chunk not fully sparse
-		ptr++;
-	}
-
-	return true; // chunk contains only <bid> voxels
-}
-
-void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
+void Chunks::sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels) {
 	ZoneScoped;
 
-	// handle overwriting old voxel data
-	free_voxels(c);
-	init_voxels(c);
-
-	assert(c.flags & Chunk::SPARSE_VOXELS);
-
-	// Allocate dense chunk data as a buffer (buffer will be freed again if chunks turns out to be sparse)
-	c.voxel_data = dense_chunks.alloc();
-	c.flags &= ~Chunk::SPARSE_VOXELS;
-	auto& dc = dense_chunks[c.voxel_data];
+	auto& vox = chunk_voxels[cid];
 	
 	// init all subchunks to be sparse, because most tend to be sparse
-	memset(dc.sparse_bits, -1, sizeof(dc.sparse_bits));
+	memset(vox.sparse_bits, -1, sizeof(vox.sparse_bits));
 
 	// allocate one temp subchunk to copy data into while scanning (instead of a scanning loop + copy loop)
-	auto temp_subc = dense_subchunks.alloc();
-
-	bool chunk_sparse = true;
+	auto temp_subc = subchunks.alloc();
 
 	block_id* ptr = raw_voxels;
 
@@ -326,21 +242,19 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 		for (int sy=0; sy<SUBCHUNK_COUNT; sy++) {
 			for (int sx=0; sx<SUBCHUNK_COUNT; sx++) {
 
-				bool subchunk_sparse = process_subchunk_region(ptr, dense_subchunks[temp_subc]);
+				bool subchunk_sparse = process_subchunk_region(ptr, subchunks[temp_subc]);
 
 				if (subchunk_sparse) {
 					// store sparse block id into sparse storage
-					dc.sparse_data[subc_i] = (uint32_t)*ptr;
+					vox.sparse_data[subc_i] = (uint32_t)*ptr;
 					// reuse temp subchunk, ie do nothing
 				} else {
 					// store the dense temp subchunk into our dense chunk, and allocate a new temp subchunk
 					// thus avoiding a second copy
-					dc.sparse_data[subc_i] = temp_subc;
-					temp_subc = dense_subchunks.alloc();
+					vox.sparse_data[subc_i] = temp_subc;
+					temp_subc = subchunks.alloc();
 
-					dc.set_subchunk_dense(subc_i);
-
-					chunk_sparse = false; // chunk cannot be sparse with non-sparse subchunks
+					vox.set_subchunk_dense(subc_i);
 				}
 
 				subc_i++;
@@ -353,23 +267,7 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 	}
 
 	// free the single unneeded temp subchunk
-	dense_subchunks.free(temp_subc);
-
-	if (chunk_sparse) {
-		// no non-sparse subchunks, but subchunks could still be sparse with different block types
-		// check if they are all the same type
-
-		if (check_chunk_sparse(dc)) {
-			// chunk fully sparse
-
-			block_id bid = dc.sparse_data[0];
-
-			dense_chunks.free(c.voxel_data); // free buffer now that chunk turned out sparse
-			
-			c.voxel_data = bid;
-			c.flags |= Chunk::SPARSE_VOXELS;
-		}
-	}
+	subchunks.free(temp_subc);
 }
 
 //// Chunk system
@@ -377,24 +275,24 @@ void Chunks::sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels) {
 chunk_id Chunks::alloc_chunk (int3 pos) {
 	ZoneScoped;
 
-	chunk_id id = chunks.alloc();
-	auto& chunk = chunks[id];
+	chunk_id cid = chunks.alloc();
+	auto& chunk = chunks[cid];
+
+	auto vid = chunk_voxels.alloc();
+	assert(vid == cid);
 
 	{ // init
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
 		//chunk.refcount = 0;
-		init_voxels(chunk);
 		chunk.init_meshes();
 	}
 
-	return id;
+	return cid;
 }
-void Chunks::free_chunk (chunk_id id) {
+void Chunks::free_chunk (chunk_id cid) {
 	ZoneScoped;
-	auto& chunk = chunks[id];
-
-	free_voxels(chunk);
+	auto& chunk = chunks[cid];
 
 	free_slices(chunk.opaque_mesh_slices);
 	free_slices(chunk.transp_mesh_slices);
@@ -409,8 +307,10 @@ void Chunks::free_chunk (chunk_id id) {
 		}
 	}
 
+	free_voxels(cid, chunk);
+
 	memset(&chunk, 0, sizeof(Chunk)); // zero chunk, flags will now indicate that chunk is unallocated
-	chunks.free(id);
+	chunks.free(cid);
 }
 
 #include "immintrin.h"
@@ -557,7 +457,8 @@ void Chunks::update_chunk_loading (Game& game) {
 	{
 		ZoneScopedN("process jobs");
 
-		auto update_chunk_phase2_generation = [&] (Chunk& chunk) {
+		auto update_chunk_phase2_generation = [&] (chunk_id cid) {
+			auto& chunk = chunks[cid];
 			if (chunk.flags & Chunk::LOADED_PHASE2) return;
 
 			worldgen::Neighbours n;
@@ -571,10 +472,10 @@ void Chunks::update_chunk_loading (Game& game) {
 				if (nid == U16_NULL)
 					return; // neighbours not read yet
 
-				n.neighbours[z+1][y+1][x+1] = &chunks[nid];
+				n.neighbours[z+1][y+1][x+1] = nid;
 			}
 
-			worldgen::object_pass(*this, chunk, n, &game._threads_world_gen);
+			worldgen::object_pass(*this, cid, n, &game._threads_world_gen);
 
 			chunk.flags |= Chunk::LOADED_PHASE2 | Chunk::REMESH;
 		};
@@ -598,7 +499,7 @@ void Chunks::update_chunk_loading (Game& game) {
 				auto& chunk = chunks[cid];
 				chunks_map.emplace(chunk.pos, cid);
 
-				sparse_chunk_from_worldgen(chunk, &job->noise_pass.voxels[0][0][0]);
+				sparse_chunk_from_worldgen(cid, chunk, &job->noise_pass.voxels[0][0][0]);
 
 				chunk.flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
@@ -623,7 +524,7 @@ void Chunks::update_chunk_loading (Game& game) {
 				for (auto& offs : FULL_NEIGHBOURS) {
 					chunk_id nid = query_chunk(chunk.pos + offs);
 					if (nid != U16_NULL)
-						update_chunk_phase2_generation(chunks[nid]);
+						update_chunk_phase2_generation(nid);
 				}
 			}
 		}
@@ -684,19 +585,19 @@ void Chunks::update_chunk_meshing (Game& game) {
 	{
 		ZoneScopedN("remesh iterate chunks");
 
-		for (chunk_id id = 0; id<end(); ++id) {
-			auto& chunk = chunks[id];
+		for (chunk_id cid = 0; cid<end(); ++cid) {
+			auto& chunk = chunks[cid];
 			chunk._validate_flags();
 			
 			if (chunk.flags & Chunk::VOXELS_DIRTY) {
-				upload_voxels.push_back(id);
+				upload_voxels.push_back(cid);
 
-				checked_sparsify_chunk(chunk);
+				checked_sparsify_chunk(cid);
 				chunk.flags &= ~Chunk::VOXELS_DIRTY;
 			}
 
 			if (chunk.flags & Chunk::REMESH) {
-				auto job = std::make_unique<RemeshChunkJob>(*this, &chunk, game.world_gen, mesh_world_border);
+				auto job = std::make_unique<RemeshChunkJob>(*this, cid, game.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
 		}
@@ -750,11 +651,12 @@ void Chunks::update_chunk_meshing (Game& game) {
 
 			for (size_t i=0; i<count; ++i) {
 				auto res = std::move(results[i]);
+				auto& chunk = chunks[res->chunk];
 
-				process_slices(res->opaque_vertices, &res->chunk->opaque_mesh_vertex_count, &res->chunk->opaque_mesh_slices);
-				process_slices(res->transp_vertices, &res->chunk->transp_mesh_vertex_count, &res->chunk->transp_mesh_slices);
+				process_slices(res->opaque_vertices, &chunk.opaque_mesh_vertex_count, &chunk.opaque_mesh_slices);
+				process_slices(res->transp_vertices, &chunk.transp_mesh_vertex_count, &chunk.transp_mesh_slices);
 				
-				res->chunk->flags &= ~Chunk::REMESH;
+				chunk.flags &= ~Chunk::REMESH;
 			}
 
 			resi += count;
@@ -817,51 +719,42 @@ void Chunks::imgui (Renderer* renderer) {
 
 	uint64_t block_volume = chunks.count * (uint64_t)CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 	uint64_t block_mem = 0;
-	int chunks_dense = 0;
 	int chunks_loaded = 0;
-
-	int subc_count = 0; // sparse chunks do not count, so essentially the number of either stored sparse subchunk block ids or dense subchunks
-	int dense_subc = dense_subchunks.count;
 
 	for (chunk_id id = 0; id < end(); ++id) {
 		if ((chunks[id].flags & Chunk::ALLOCATED) == 0) continue;
-
-		if ((chunks[id].flags & Chunk::SPARSE_VOXELS) == 0) {
-			chunks_dense++;
-			subc_count += CHUNK_SUBCHUNK_COUNT;
-			block_mem += sizeof(block_id) * CHUNK_VOXEL_COUNT;
-		}
 
 		if (chunks[id].flags != 0)
 			chunks_loaded++;
 	}
 
-	int sparse_chunks = chunks_loaded - chunks_dense;
+	int subc_count = chunks_loaded * CHUNK_SUBCHUNK_COUNT;
+	int dense_subc = subchunks.count;
 	int sparse_subc = subc_count - dense_subc;
 
 	// memory actually used for voxel data
 	uint64_t dense_vox_mem = dense_subc * sizeof(SubchunkVoxels);
-	dense_vox_mem += (sparse_subc + sparse_chunks) * sizeof(block_id); // include memory used to effectively store sparse voxel data
-																	   // memory actually commited in memory
-	uint64_t total_vox_mem = chunks.commit_size() + dense_chunks.commit_size() + dense_subchunks.commit_size();
+	dense_vox_mem += sparse_subc * sizeof(block_id); // include memory used to effectively store sparse voxel data
+	
+	// memory actually commited in memory
+	uint64_t total_vox_mem = chunks.commit_size() + chunk_voxels.commit_size() + subchunks.commit_size();
 	uint64_t overhead = total_vox_mem - dense_vox_mem;
 
-	uint64_t sparse_voxels = (sparse_chunks * (uint64_t)CHUNK_VOXEL_COUNT) + (sparse_subc * (uint64_t)SUBCHUNK_VOXEL_COUNT);
+	uint64_t sparse_voxels = sparse_subc * (uint64_t)SUBCHUNK_VOXEL_COUNT;
 
 	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
 
 	//ImGui::Text("3D Array     : %4d^3 chunks %4d KB",
 	//	chunks_arr.size, sizeof(chunk_id) * chunks_arr.size*chunks_arr.size*chunks_arr.size / KB);
 
-	ImGui::Text("Chunks       : %4d chunks  %7s M vox volume %4d KB chunk RAM (%6.2f %% usage)",
+	ImGui::Text("Chunks       : %4d chunks  %5s MVox volume %4d KB chunk RAM (%6.2f %% usage)",
 		chunks.count, format_thousands(block_volume / MB).c_str(),
 		(int)(chunks.commit_size()/KB), chunks.usage() * 100);
-	ImGui::Text("Sparse chunks: %5d / %5d dense (%6.2f %%)  %6d KB dense chunk RAM (%6.2f %% usage)",
-		chunks_dense, chunks_loaded, (float)chunks_dense / (float)chunks_loaded * 100,
-		(int)(dense_chunks.commit_size()/KB), dense_chunks.usage() * 100);
+	ImGui::Text("Chunk Voxels :                        %6d KB chunk voxel RAM (%6.2f %% usage)",
+		(int)(chunk_voxels.commit_size()/KB), chunk_voxels.usage() * 100);
 	ImGui::Text("Subchunks    : %4dk / %4dk dense (%6.2f %%)  %6d MB dense subchunk RAM (%6.2f %% usage)",
 		dense_subc/KB, subc_count/KB, (float)dense_subc / (float)subc_count * 100,
-		(int)(dense_subchunks.commit_size()/MB), dense_subchunks.usage() * 100);
+		(int)(subchunks.commit_size()/MB), subchunks.usage() * 100);
 	
 	ImGui::Spacing();
 	ImGui::Text("Sparseness   : %6d M / %6d M vox sparse (%6.2f %%)  %3d MB total RAM  %4d KB overhead (%6.2f %%)",
@@ -883,8 +776,8 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::Spacing();
 
 	print_block_allocator(chunks, "chunks alloc");
-	print_block_allocator(dense_chunks, "dense_chunks alloc");
-	print_block_allocator(dense_subchunks, "dense_subchunks alloc");
+	print_block_allocator(chunk_voxels, "chunk_voxels alloc");
+	print_block_allocator(subchunks, "subchunks alloc");
 
 	ImGui::Spacing();
 	
@@ -915,7 +808,7 @@ void Chunks::imgui (Renderer* renderer) {
 		renderer->chunk_renderer_imgui(*this);
 }
 
-void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
+void Chunks::visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culled) {
 	lrgba const* col = &DBG_CHUNK_COL;
 	float size = 1.0f;
 
@@ -929,9 +822,6 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 
 		if (chunk.flags & Chunk::LOADED_PHASE2) {
 			col = &DBG_CHUNK_COL;
-			if (chunk.flags & Chunk::SPARSE_VOXELS) {
-				col = &DBG_SPARSE_CHUNK_COL;
-			}
 		} else {
 			col = &DBG_STAGE1_COL;
 		}
@@ -942,14 +832,14 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 
 	g_debugdraw.wire_cube(((float3)chunk.pos + 0.5f) * CHUNK_SIZE, (float3)CHUNK_SIZE * size * 0.997f, *col);
 
-	if (visualize_chunks && visualize_subchunks && (chunk.flags & Chunk::SPARSE_VOXELS) == 0) {
-		auto& dc = dense_chunks[chunk.voxel_data];
+	if (visualize_chunks && visualize_subchunks) {
+		auto& vox = chunk_voxels[cid];
 
 		uint32_t subc_i = 0;
 		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
 			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
 				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-					if (!dc.is_subchunk_sparse(subc_i)) {
+					if (!vox.is_subchunk_sparse(subc_i)) {
 						float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
 						g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
 					}
@@ -958,163 +848,4 @@ void Chunks::visualize_chunk (Chunk& chunk, bool empty, bool culled) {
 			}
 		}
 	}
-}
-
-
-struct VoxelRaytrace {
-	Chunks* chunks;
-
-	float3 ray_pos;
-	float3 ray_dir;
-	float max_dist = 128;
-
-	static constexpr block_id B_AIR = 1;
-
-	int min_component (float3 v) {
-		if (		v.x < v.y && v.x < v.z )	return 0;
-		else if (	v.y < v.z )					return 1;
-		else									return 2;
-	}
-
-	int get_step_face (int axis) {
-		return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
-	}
-
-	int3 coord;
-	int step_size = 1;
-
-	Chunk* chunk;
-	uint32_t voxel_data;
-	uint32_t subchunk_data;
-
-	block_id read_voxel (int step_mask) {
-
-		if (step_mask & ~CHUNK_SIZE_MASK) {
-			ImGui::Text(">>> Chunk read");
-
-			voxel_data = chunk->voxel_data;
-
-			if (chunk->flags & Chunk::SPARSE_VOXELS) {
-				step_size = CHUNK_SIZE;
-
-				coord.x &= ~CHUNK_SIZE_MASK;
-				coord.y &= ~CHUNK_SIZE_MASK;
-				coord.z &= ~CHUNK_SIZE_MASK;
-
-				return (block_id)voxel_data; // sparse chunk
-			}
-		}
-
-		if (step_mask & ~SUBCHUNK_MASK) {
-			ImGui::Text(">> Subchunk read");
-
-			auto& dc = chunks->dense_chunks[voxel_data];
-
-			uint32_t subchunk_i = SUBCHUNK_IDX(coord.x & CHUNK_SIZE_MASK, coord.y & CHUNK_SIZE_MASK, coord.z & CHUNK_SIZE_MASK);
-			subchunk_data = dc.sparse_data[subchunk_i];
-
-			if (dc.is_subchunk_sparse(subchunk_i)) {
-				step_size = SUBCHUNK_SIZE;
-
-				coord.x &= ~SUBCHUNK_MASK;
-				coord.y &= ~SUBCHUNK_MASK;
-				coord.z &= ~SUBCHUNK_MASK;
-
-				return (block_id)subchunk_data; // sparse subchunk
-			}
-		}
-		ImGui::Text("> Voxel read");
-
-		auto& subchunk = chunks->dense_subchunks[subchunk_data];
-
-		step_size = 1;
-		uint32_t block_i = BLOCK_IDX(coord.x,coord.y,coord.z);
-		return subchunk.voxels[block_i];
-	}
-
-	void run () {
-		ImGui::DragFloat3("ray_pos", &ray_pos.x, 0.1f);
-		ImGui::DragFloat3("ray_dir", &ray_dir.x, 0.1f);
-		ImGui::DragFloat("max_dist", &max_dist, 0.1f);
-
-		g_debugdraw.vector(ray_pos, ray_dir * max_dist, lrgba(1,0,0,1));
-
-		coord = floori(ray_pos);
-
-		{
-			chunk_id cid = chunks->query_chunk(coord / CHUNK_SIZE);
-			if (cid == U16_NULL)
-				return;
-			chunk = &chunks->chunks[cid];
-		}
-
-		float3 rdir; // reciprocal of ray dir
-		rdir.x = ray_dir.x != 0.0f ? 1.0f / abs(ray_dir.x) : INF;
-		rdir.y = ray_dir.y != 0.0f ? 1.0f / abs(ray_dir.y) : INF;
-		rdir.z = ray_dir.z != 0.0f ? 1.0f / abs(ray_dir.z) : INF;
-
-		int step_mask = -1;
-
-		int iter = 0;
-		while (iter < 100) {
-			iter++;
-
-			block_id bid = read_voxel(step_mask);
-
-			g_debugdraw.wire_cube((float3)coord + ((float)step_size / 2), (float)step_size * 0.99f, lrgba(0,0,1,1));
-			
-			//ImGui::Text("%+3d,%+3d,%+3d: %s %d", coord.x, coord.y, coord.z,
-			//	g_assets.block_types[bid].name.c_str(), step_size);
-			
-			if (bid != B_AIR)
-				return;
-
-			float3 rel = ray_pos - (float3)coord;
-
-			float3 plane_offs;
-			plane_offs.x = ray_dir.x > 0 ? step_size - rel.x : rel.x;
-			plane_offs.y = ray_dir.y > 0 ? step_size - rel.y : rel.y;
-			plane_offs.z = ray_dir.z > 0 ? step_size - rel.z : rel.z;
-
-			float3 next = rdir * plane_offs;
-			int axis = min_component(next);
-
-			if (next[axis] > max_dist)
-				break;
-
-			float3 proj = ray_pos + ray_dir * next[axis];
-
-			//lrgba col = lrgba(0,0,0,1);
-			//col[axis] = 1;
-			//g_debugdraw.pointx(proj, 0.1f, col);
-			//
-			//ImGui::Text("%c proj: %7.3f, %7.3f, %7.3f", "XYZ"[axis], proj.x, proj.y, proj.z);
-
-			int3 old_coord = coord;
-
-			proj[axis] += ray_dir[axis] > 0 ? 0.5f : -0.5f;
-			coord = floori(proj);
-
-			//ImGui::Text("---------------------");
-
-			int3 step_maskv = coord ^ old_coord;
-			step_mask = step_maskv.x | step_maskv.y | step_maskv.z;
-
-			// handle step out of chunk by checking bits
-			if (step_mask & ~CHUNK_SIZE_MASK) {
-				chunk_id cid = chunk->neighbours[get_step_face(axis) ^ 1]; // ^1 flip dir
-				if (cid == U16_NULL)
-					return;
-				chunk = &chunks->chunks[cid];
-			}
-		}
-	}
-};
-
-void test_rayracy_voxels (Chunks& chunks, float3 ray_pos, float3 ray_dir) {
-	static VoxelRaytrace vr;
-	vr.chunks = &chunks;
-	vr.ray_pos = ray_pos;
-	vr.ray_dir = ray_dir;
-	vr.run();
 }

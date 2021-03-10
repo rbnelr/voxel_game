@@ -222,70 +222,45 @@ namespace worldgen {
 	}
 
 #if 1
-	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, Chunk const* c) {
-		assert(c->flags != 0);
+	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, chunk_id cid) {
+		auto& vox = chunks.chunk_voxels[cid];
 
-		block_id sparse;
+		uint32_t subchunk_i = IDX3D(sx,sy, z >> SUBCHUNK_SHIFT, SUBCHUNK_COUNT);
+		auto subchunk_val = vox.sparse_data[subchunk_i];
 
-		if (c->flags & Chunk::SPARSE_VOXELS) {
-			// sparse chunk
-			sparse = (block_id)c->voxel_data;
+		if (vox.is_subchunk_sparse(subchunk_i)) {
+			// sparse subchunk
+			return _mm256_set1_epi16((short)subchunk_val);
 		} else {
-			auto& dc = chunks.dense_chunks[c->voxel_data];
+			// dense subchunk
+			auto& subchunk = chunks.subchunks[subchunk_val];
 
-			uint32_t subchunk_i = IDX3D(sx,sy, z >> SUBCHUNK_SHIFT, SUBCHUNK_COUNT);
-			auto subchunk_val = dc.sparse_data[subchunk_i];
-
-			if (dc.is_subchunk_sparse(subchunk_i)) {
-				// sparse subchunk
-				sparse = (block_id)subchunk_val;
-			} else {
-				// dense subchunk
-				auto& subchunk = chunks.dense_subchunks[subchunk_val];
-
-				auto blocki = BLOCK_IDX(0,0,z);
-				return _mm256_load_si256((__m256i*)&subchunk.voxels[blocki]);
-			}
+			auto blocki = BLOCK_IDX(0,0,z);
+			return _mm256_load_si256((__m256i*)&subchunk.voxels[blocki]);
 		}
-
-		// sparse
-		return _mm256_set1_epi16((short)sparse);
 	}
-	void _read_subchunk (Chunks& chunks, int sx, int sy, int sz, Chunk const* c, __m256i* planes) {
-		assert(c->flags != 0);
+	void _read_subchunk (Chunks& chunks, int sx, int sy, int sz, chunk_id cid, __m256i* planes) {
+		auto& vox = chunks.chunk_voxels[cid];
 
-		block_id sparse;
+		uint32_t subchunk_i = IDX3D(sx,sy,sz, SUBCHUNK_COUNT);
+		auto subchunk_val = vox.sparse_data[subchunk_i];
 
-		if (c->flags & Chunk::SPARSE_VOXELS) {
-			// sparse chunk
-			sparse = (block_id)c->voxel_data;
+		if (vox.is_subchunk_sparse(subchunk_i)) {
+			// sparse subchunk
+			auto plane = _mm256_set1_epi16((short)subchunk_val);
+			for (int z=0; z<4; ++z)
+				planes[z] = plane;
 		} else {
-			auto& dc = chunks.dense_chunks[c->voxel_data];
+			// dense subchunk
+			auto& subchunk = chunks.subchunks[subchunk_val];
 
-			uint32_t subchunk_i = IDX3D(sx,sy,sz, SUBCHUNK_COUNT);
-			auto subchunk_val = dc.sparse_data[subchunk_i];
-
-			if (dc.is_subchunk_sparse(subchunk_i)) {
-				// sparse subchunk
-				sparse = (block_id)subchunk_val;
-			} else {
-				// dense subchunk
-				auto& subchunk = chunks.dense_subchunks[subchunk_val];
-
-				for (int z=0; z<4; ++z)
-					planes[z] = _mm256_load_si256((__m256i*)&subchunk.voxels[z*16]);
-				return;
-			}
+			for (int z=0; z<4; ++z)
+				planes[z] = _mm256_load_si256((__m256i*)&subchunk.voxels[z*16]);
 		}
-
-		// sparse
-		auto plane = _mm256_set1_epi16((short)sparse);
-		for (int z=0; z<4; ++z)
-			planes[z] = plane;
 	}
 
 	template <typename FUNC>
-	void iter_growable_blocks (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
+	void iter_growable_blocks (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
 		auto air   = _mm256_set1_epi16(wg->bids[B_AIR]);
 		auto earth = _mm256_set1_epi16(wg->bids[B_EARTH]);
 		
@@ -295,7 +270,7 @@ namespace worldgen {
 
 			for (int sz=0; sz<SUBCHUNK_COUNT; ++sz) {
 				__m256i subc[4];
-				_read_subchunk(chunks, sx,sy,sz, &chunk, subc);
+				_read_subchunk(chunks, sx,sy,sz, cid, subc);
 
 				for (int z=0; z<4; ++z) {
 					auto cur = subc[z];
@@ -322,13 +297,13 @@ namespace worldgen {
 	}
 #else
 	template <typename FUNC>
-	void iter_growable_blocks (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
+	void iter_growable_blocks (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
 		for (int y=0; y<CHUNK_SIZE; ++y)
 		for (int x=0; x<CHUNK_SIZE; ++x) {
 			auto below = chunks.read_block(x,y, CHUNK_SIZE-1, neighbours.get(0,0,-1));
 
 			for (int z=0; z<CHUNK_SIZE; ++z) {
-				auto bid = chunks.read_block(x,y,z, &chunk);
+				auto bid = chunks.read_block(x,y,z, cid);
 
 				if (bid == wg->bids[B_AIR] && below == wg->bids[B_EARTH]) {
 					block(x, y, z, below);
@@ -393,12 +368,12 @@ namespace worldgen {
 		return smoothstep( smoothstep(val + valb) );
 	}
 	
-	void object_pass (Chunks& chunks, Chunk& chunk, Neighbours& neighbours, WorldGenerator const* wg) {
+	void object_pass (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg) {
 		ZoneScoped;
 		
 		OSN::Noise<2> noise(wg->seed);
 
-		int3 chunkpos = chunk.pos * CHUNK_SIZE;
+		int3 chunkpos = chunks.chunks[cid].pos * CHUNK_SIZE;
 
 		// write block with coord relative to this chunk, writes outside of this chunk are ignored
 		auto write_block = [&] (int x, int y, int z, BlockID bid) -> void {
@@ -448,11 +423,16 @@ namespace worldgen {
 			place_block_ellipsoid(float3(x + 0.5f, y + 0.5f, z + height-0.5f), float3(leaf_r, leaf_r, height/2.5f), B_LEAVES);
 		};
 
-		iter_growable_blocks(chunks, chunk, neighbours, wg, [&] (int x, int y, int z, block_id below) {
+		iter_growable_blocks(chunks, cid, neighbours, wg, [&] (int x, int y, int z, block_id below) {
 			write_block(x,y,z-1, B_GRASS);
 
+			int3 wpos;
+			wpos.x = x + chunkpos.x;
+			wpos.y = y + chunkpos.y;
+			wpos.z = z + chunkpos.z;
+
 			// get a 'random' but deterministic value based on block position
-			uint64_t h = hash(int3(x + chunkpos.x, y + chunkpos.y, z + chunkpos.z), wg->seed);
+			uint64_t h = hash(wpos, wg->seed);
 
 			double rand = (double)h * (1.0 / (double)(uint64_t)-1); // uniform in [0, 1]
 			float rand1 = (float)(h & 0xffffffff) * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
@@ -471,11 +451,11 @@ namespace worldgen {
 			};
 
 			//
-			float2 pos2 = float2((float)x, (float)y);
+			float2 pos2 = float2((float)wpos.x, (float)wpos.y);
 			float tree_density  = noise_tree_density (*wg, noise, pos2);
 			float grass_density = noise_grass_density(*wg, noise, pos2);
 
-			if (chunks.blue_noise_tex.sample(x,y,z) < tree_density) {
+			if (chunks.blue_noise_tex.sample(wpos.x, wpos.y, wpos.z) < tree_density) {
 				place_tree(x,y,z, lerp(6, 10, rand1), lerp(0.8f, 1.2f, rand2));
 			}
 			else if (chance(grass_density)) {

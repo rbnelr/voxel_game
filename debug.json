@@ -3,7 +3,7 @@
 		"seed_str": "test2"
 	},
 	"chunks": {
-		"load_radius": 600.0,
+		"load_radius": 478.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				64.06278228759766,
-				79.11868286132813,
-				30.95952033996582
+				126.65030670166016,
+				146.12986755371094,
+				60.53242874145508
 			],
 			"rot_aer": [
-				2.586085557937622,
-				-0.3179992437362671,
+				2.113100290298462,
+				-0.0052361274138092995,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,7 +29,7 @@
 			"vfov": 1.2217304706573486,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 27.568744659423828,
+		"base_speed": 12.00000286102295,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -51,7 +51,7 @@
 		],
 		"third_person": false
 	},
-	"activate_flycam": false,
+	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
 		"graphics": true,

@@ -163,12 +163,10 @@ struct Chunk {
 	enum Flags : uint32_t {
 		ALLOCATED		= 1u<<0, // Set when chunk was allocated, exists so that zero-inited memory allocated by BlockAllocator is interpreted as unallocated chunks (so we can simply iterate over the memory while checking flags)
 		
-		SPARSE_VOXELS	= 1u<<1, // voxel_data is a single block id instead of a dense_chunk id
-		
-		VOXELS_DIRTY	= 1u<<2, // voxels were changed, run checked_sparsify
-		REMESH			= 1u<<3, // need remesh due to voxel change, neighbour chunk change, etc.
+		VOXELS_DIRTY	= 1u<<1, // voxels were changed, run checked_sparsify
+		REMESH			= 1u<<2, // need remesh due to voxel change, neighbour chunk change, etc.
 
-		LOADED_PHASE2	= 1u<<5, // not set: phase 1
+		LOADED_PHASE2	= 1u<<3, // not set: phase 1
 
 		// Flags for if neighbours[i] contains null to skip neighbour loop in iterate chunk loading for performance
 		NEIGHBOUR0_NULL = 1u<<26,
@@ -185,10 +183,6 @@ struct Chunk {
 
 	chunk_id neighbours[6];
 	// make sure there are still at 4 bytes following this so that 16-byte sse loads of neighbours can never segfault
-
-	uint16_t voxel_data; // if SPARSE_VOXELS: non-null block id   if !SPARSE_VOXELS: id to dense_chunks
-	
-	uint16_t _pad; // free space
 
 	slice_id opaque_mesh_slices;
 	slice_id transp_mesh_slices;
@@ -307,8 +301,8 @@ struct BlueNoiseTexture {
 struct Chunks {
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
-	BlockAllocator<ChunkVoxels>		dense_chunks	= { MAX_CHUNKS };
-	BlockAllocator<SubchunkVoxels>	dense_subchunks	= { MAX_SUBCHUNKS };
+	BlockAllocator<ChunkVoxels>		chunk_voxels	= { MAX_CHUNKS }; // TODO: get rid of alloc bitset here;  always same id as chunk, ie. this is just a SOA array together with chunks
+	BlockAllocator<SubchunkVoxels>	subchunks		= { MAX_SUBCHUNKS };
 
 	BlockAllocator<SliceNode>		slices			= { MAX_SLICES };
 
@@ -337,16 +331,14 @@ struct Chunks {
 		}
 	}
 
-	void init_voxels (Chunk& c);
-	void free_voxels (Chunk& c);
+	void free_voxels (chunk_id cid, Chunk& chunk);
 
-	void densify_chunk (Chunk& c);
-	void densify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i, uint32_t& subchunk_val);
+	void densify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i, uint32_t& subchunk_val);
 
-	void checked_sparsify_chunk (Chunk& c);
-	bool checked_sparsify_subchunk (ChunkVoxels& dc, uint32_t subchunk_i);
+	void checked_sparsify_chunk (chunk_id cid);
+	bool checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i);
 
-	void sparse_chunk_from_worldgen (Chunk& c, block_id* raw_voxels);
+	void sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels);
 
 	Chunk& operator[] (chunk_id id) {
 		return chunks[id];
@@ -357,7 +349,7 @@ struct Chunks {
 	}
 
 	chunk_id alloc_chunk (int3 pos);
-	void free_chunk (chunk_id id);
+	void free_chunk (chunk_id cid);
 
 	// for renderer switch
 	void renderer_switch () {
@@ -393,17 +385,17 @@ struct Chunks {
 
 	void imgui (Renderer* renderer);
 
-	void visualize_chunk (Chunk& chunk, bool empty, bool culled);
+	void visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culled);
 
 	// read a block with a world block pos, returns B_NULL for unloaded chunks
 	block_id read_block (int x, int y, int z);
 	// read a block with a chunk block pos
-	block_id read_block (int x, int y, int z, Chunk const* c);
+	block_id read_block (int x, int y, int z, chunk_id cid);
 
 	// 
 	void write_block (int x, int y, int z, block_id bid);
 	//
-	void write_block (int x, int y, int z, Chunk* c, block_id bid);
+	void write_block (int x, int y, int z, chunk_id cid, block_id bid);
 
 	void write_block_update_chunk_flags (int x, int y, int z, Chunk* c);
 
@@ -506,5 +498,3 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, float max_dist, Func hit_vo
 		cur_voxel[cur_axis] += step_delta[cur_axis];
 	}
 }
-
-void test_rayracy_voxels (Chunks& chunks, float3 ray_pos, float3 ray_dir);

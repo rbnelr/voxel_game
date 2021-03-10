@@ -89,7 +89,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 			bool culled = empty || frustrum_cull_aabb(cull_view.frustrum, lo.x, lo.y, lo.z, hi.x, hi.y, hi.z);
 
-			chunks.visualize_chunk(chunk, empty, culled);
+			chunks.visualize_chunk(cid, chunk, empty, culled);
 
 			if (!culled) {
 				push_draw_slices(cid, chunk.opaque_mesh_vertex_count, chunk.opaque_mesh_slices, DT_OPAQUE);
@@ -182,39 +182,37 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 	// stream chunks data structure every frame, because reacting to changes is hard an its small enough
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.chunks.commit_size(), chunks.chunks.arr);
 
-	size = align_up(game.chunks.dense_chunks.commit_size(), 4 * MB);
-	if (init || size != dense_chunks_ssbo.alloc_size) {
-		dense_chunks_ssbo.alloc_size = size;
-		clog("dense_chunks_ssbo realloc");
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
+	size = align_up(game.chunks.chunk_voxels.commit_size(), 4 * MB);
+	if (init || size != chunk_voxels_ssbo.alloc_size) {
+		chunk_voxels_ssbo.alloc_size = size;
+		clog("chunk_voxels_ssbo realloc");
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk_voxels_ssbo.ssbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_STREAM_DRAW);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.dense_chunks.commit_size(), chunks.dense_chunks.arr);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.chunk_voxels.commit_size(), chunks.chunk_voxels.arr);
 	}
 
-	size = align_up(game.chunks.dense_subchunks.commit_size(), 8 * MB);
-	if (init || size != dense_subchunks_ssbo.alloc_size) {
-		dense_subchunks_ssbo.alloc_size = size;
-		clog("dense_subchunks_ssbo realloc");
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
+	size = align_up(game.chunks.subchunks.commit_size(), 8 * MB);
+	if (init || size != subchunks_ssbo.alloc_size) {
+		subchunks_ssbo.alloc_size = size;
+		clog("subchunks_ssbo realloc");
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, subchunks_ssbo.ssbo);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, size, nullptr, GL_STREAM_DRAW);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.dense_subchunks.commit_size(), chunks.dense_subchunks.arr);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, chunks.subchunks.commit_size(), chunks.subchunks.arr);
 	}
 
 	if (!init) { // only upload individual changes if we did not already reupload all data
 		for (auto cid : chunks.upload_voxels) {
 			auto& chunk = chunks.chunks[cid];
 
-			if (chunk.flags & Chunk::SPARSE_VOXELS) continue;
+			auto& dc = chunks.chunk_voxels[cid];
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunk_voxels_ssbo.ssbo);
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&dc - (char*)chunks.chunk_voxels.arr, sizeof(dc), &dc);
 
-			auto& dc = chunks.dense_chunks[chunk.voxel_data];
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_chunks_ssbo.ssbo);
-			glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&dc - (char*)chunks.dense_chunks.arr, sizeof(dc), &dc);
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, dense_subchunks_ssbo.ssbo);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, subchunks_ssbo.ssbo);
 			for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
 				if (!dc.is_subchunk_sparse(i)) {
-					auto& subc = chunks.dense_subchunks[dc.sparse_data[i]];
-					glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&subc - (char*)chunks.dense_subchunks.arr, sizeof(subc), &subc);
+					auto& subc = chunks.subchunks[dc.sparse_data[i]];
+					glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)&subc - (char*)chunks.subchunks.arr, sizeof(subc), &subc);
 				}
 			}
 		}
@@ -272,8 +270,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunks_ssbo.ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, dense_chunks_ssbo.ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, dense_subchunks_ssbo.ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, chunk_voxels_ssbo.ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, subchunks_ssbo.ssbo);
 
 	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	int szy = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
