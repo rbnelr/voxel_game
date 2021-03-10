@@ -294,35 +294,41 @@ struct CallCtx {
 
 						x = sx;
 
-						block_id bid = pbid[0];
-						if (bid != prevx   ) face<0>(bid, prevx   );
-						if (bid != prevy[0]) face<1>(bid, prevy[0]);
-						if (bid != prevz[0]) face<2>(bid, prevz[0]);
-						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-						++x;
+						for (int bx=0; bx<SUBCHUNK_SIZE; bx += 4) {
+							block_id bid = pbid[bx+0];
+							if (bid != prevx      ) face<0>(bid, prevx      );
+							if (bid != prevy[bx+0]) face<1>(bid, prevy[bx+0]);
+							if (bid != prevz[bx+0]) face<2>(bid, prevz[bx+0]);
+							if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
+							++x;
+							prevx = bid;
 
-						bid = pbid[1];
-						if (bid != pbid[0] ) face<0>(bid, pbid[0] );
-						if (bid != prevy[1]) face<1>(bid, prevy[1]);
-						if (bid != prevz[1]) face<2>(bid, prevz[1]);
-						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-						++x;
+							bid = pbid[bx+1];
+							if (bid != prevx      ) face<0>(bid, prevx      );
+							if (bid != prevy[bx+1]) face<1>(bid, prevy[bx+1]);
+							if (bid != prevz[bx+1]) face<2>(bid, prevz[bx+1]);
+							if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
+							++x;
+							prevx = bid;
 
-						bid = pbid[2];
-						if (bid != pbid[1] ) face<0>(bid, pbid[1] );
-						if (bid != prevy[2]) face<1>(bid, prevy[2]);
-						if (bid != prevz[2]) face<2>(bid, prevz[2]);
-						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
-						++x;
+							bid = pbid[bx+2];
+							if (bid != prevx      ) face<0>(bid, prevx      );
+							if (bid != prevy[bx+2]) face<1>(bid, prevy[bx+2]);
+							if (bid != prevz[bx+2]) face<2>(bid, prevz[bx+2]);
+							if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
+							++x;
+							prevx = bid;
 
-						bid = pbid[3];
-						if (bid != pbid[2] ) face<0>(bid, pbid[2] );
-						if (bid != prevy[3]) face<1>(bid, prevy[3]);
-						if (bid != prevz[3]) face<2>(bid, prevz[3]);
-						if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
+							bid = pbid[bx+3];
+							if (bid != prevx    ) face<0>(bid, prevx        );
+							if (bid != prevy[bx+3]) face<1>(bid, prevy[bx+3]);
+							if (bid != prevz[bx+3]) face<2>(bid, prevz[bx+3]);
+							if (bms[bid] >= 0) block_mesh(bid, bms[bid]);
+							++x;
+							prevx = bid;
+						}
 
 						block_i += SUBCHUNK_SIZE;
-
 					}
 				}
 			#endif

@@ -222,76 +222,56 @@ namespace worldgen {
 	}
 
 #if 1
-	__m256i _read_subchunk_plane (Chunks& chunks, int sx, int sy, int z, chunk_id cid) {
-		auto& vox = chunks.chunk_voxels[cid];
+#define SCZ (SUBCHUNK_COUNT*SUBCHUNK_COUNT)
 
-		uint32_t subchunk_i = IDX3D(sx,sy, z >> SUBCHUNK_SHIFT, SUBCHUNK_COUNT);
-		auto subchunk_val = vox.sparse_data[subchunk_i];
-
-		if (vox.is_subchunk_sparse(subchunk_i)) {
-			// sparse subchunk
-			return _mm256_set1_epi16((short)subchunk_val);
-		} else {
-			// dense subchunk
-			auto& subchunk = chunks.subchunks[subchunk_val];
-
-			auto blocki = BLOCK_IDX(0,0,z);
-			return _mm256_load_si256((__m256i*)&subchunk.voxels[blocki]);
-		}
-	}
-	void _read_subchunk (Chunks& chunks, int sx, int sy, int sz, chunk_id cid, __m256i* planes) {
-		auto& vox = chunks.chunk_voxels[cid];
-
-		uint32_t subchunk_i = IDX3D(sx,sy,sz, SUBCHUNK_COUNT);
-		auto subchunk_val = vox.sparse_data[subchunk_i];
-
-		if (vox.is_subchunk_sparse(subchunk_i)) {
-			// sparse subchunk
-			auto plane = _mm256_set1_epi16((short)subchunk_val);
-			for (int z=0; z<4; ++z)
-				planes[z] = plane;
-		} else {
-			// dense subchunk
-			auto& subchunk = chunks.subchunks[subchunk_val];
-
-			for (int z=0; z<4; ++z)
-				planes[z] = _mm256_load_si256((__m256i*)&subchunk.voxels[z*16]);
-		}
-	}
+#define BZ (SUBCHUNK_SIZE*SUBCHUNK_SIZE)
+#define BY SUBCHUNK_SIZE
 
 	template <typename FUNC>
 	void iter_growable_blocks (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg, FUNC block) {
-		auto air   = _mm256_set1_epi16(wg->bids[B_AIR]);
-		auto earth = _mm256_set1_epi16(wg->bids[B_EARTH]);
+		block_id air   = wg->bids[B_AIR];
+		block_id earth = wg->bids[B_EARTH];
 		
-		for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
-		for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
-			auto below = _read_subchunk_plane(chunks, sx,sy, CHUNK_SIZE-1, neighbours.get(0,0,-1));
+		auto& vox   = chunks.chunk_voxels[cid];
+		auto& voxnz = chunks.chunk_voxels[neighbours.get(0,0,-1)];
 
-			for (int sz=0; sz<SUBCHUNK_COUNT; ++sz) {
-				__m256i subc[4];
-				_read_subchunk(chunks, sx,sy,sz, cid, subc);
+		uint32_t subchunk_i = 0;
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
+			ChunkVoxels& prev_vox = sz > 0 ? vox : voxnz;
+			uint32_t    prev_offs = sz > 0 ? -SCZ : +SCZ * (SUBCHUNK_COUNT-1); // offset
 
-				for (int z=0; z<4; ++z) {
-					auto cur = subc[z];
+			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE)
+			for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
 
-					auto a = _mm256_cmpeq_epi16(cur,   air);
-					auto b = _mm256_cmpeq_epi16(below, earth);
-					auto c = _mm256_testz_si256(a, b); // 1: all !=   0: any ==
+				uint32_t prev_subchunk_i = subchunk_i + prev_offs;
 
-					if (c == 0) {
-						auto ab = _mm256_and_si256(a, b);
+				bool      prev_sparse = prev_vox.is_subchunk_sparse( prev_subchunk_i );
+				uint32_t  prev_val    = prev_vox.sparse_data[        prev_subchunk_i ];
 
-						for (int y=0; y<4; ++y)
-						for (int x=0; x<4; ++x) {
-							int i = y*4 + x;
-							if (ab.m256i_u16[i])
-								block(sx*4 + x, sy*4 + y, sz*4 + z, cur.m256i_u16[i]);
+				bool      sparse      = vox     .is_subchunk_sparse( subchunk_i     );
+				uint32_t  val         = vox     .sparse_data[        subchunk_i     ];
+
+				if (!prev_sparse || !sparse || (prev_val == earth && val == air)) {
+					uint32_t block_i = 0;
+					for (int by=0; by<SUBCHUNK_SIZE; ++by)
+					for (int bx=0; bx<SUBCHUNK_SIZE; ++bx) {
+
+						block_id below = prev_sparse ? (block_id)prev_val : chunks.subchunks[prev_val].voxels[block_i + BZ * (SUBCHUNK_SIZE-1)];
+						
+						for (int bz=0; bz < (sparse ? 1 : SUBCHUNK_SIZE); ++bz) {
+							block_id bid = sparse ? val : chunks.subchunks[val].voxels[block_i + bz*BZ];
+
+							if (bid == air && below == earth)
+								block(sx+bx, sy+by, sz+bz, below);
+
+							below = bid;
 						}
-					}
 
-					below = cur;
+						block_i++;
+					}
 				}
+
+				subchunk_i++;
 			}
 		}
 	}

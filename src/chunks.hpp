@@ -13,7 +13,7 @@
 #define CHUNK_SIZE_MASK		31
 #endif
 
-#if 1
+#if 0
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
 #define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2

@@ -740,12 +740,7 @@ void Chunks::imgui (Renderer* renderer) {
 	uint64_t total_vox_mem = chunks.commit_size() + chunk_voxels.commit_size() + subchunks.commit_size();
 	uint64_t overhead = total_vox_mem - dense_vox_mem;
 
-	uint64_t sparse_voxels = sparse_subc * (uint64_t)SUBCHUNK_VOXEL_COUNT;
-
 	// NOTE: using 1024 based units even for non-memory numbers because all our counts are power of two based, so results in simpler numbers
-
-	//ImGui::Text("3D Array     : %4d^3 chunks %4d KB",
-	//	chunks_arr.size, sizeof(chunk_id) * chunks_arr.size*chunks_arr.size*chunks_arr.size / KB);
 
 	ImGui::Text("Chunks       : %4d chunks  %5s MVox volume %4d KB chunk RAM (%6.2f %% usage)",
 		chunks.count, format_thousands(block_volume / MB).c_str(),
@@ -757,8 +752,8 @@ void Chunks::imgui (Renderer* renderer) {
 		(int)(subchunks.commit_size()/MB), subchunks.usage() * 100);
 	
 	ImGui::Spacing();
-	ImGui::Text("Sparseness   : %6d M / %6d M vox sparse (%6.2f %%)  %3d MB total RAM  %4d KB overhead (%6.2f %%)",
-		sparse_voxels/MB, block_volume/MB, (float)sparse_voxels / block_volume * 100, total_vox_mem/MB, overhead/KB, (float)overhead / total_vox_mem * 100);
+	ImGui::Text("Sparseness   : %3d MB total RAM  %4d KB overhead (%6.2f %%)",
+		total_vox_mem/MB, overhead/KB, (float)overhead / total_vox_mem * 100);
 
 	ImGui::Spacing();
 
