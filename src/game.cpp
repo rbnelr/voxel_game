@@ -158,7 +158,7 @@ void Game::update (Window& window, Input& I) {
 	else
 		ImGui::Text("Selected Block: None");
 
-	//test_rayracy_voxels(chunks, player_view.cam_to_world * float3(0), (float3x3)player_view.cam_to_world * float3(0, 0, -1));
+	_dev_raycast(chunks, player_view);
 
 	block_update.update_blocks(I, chunks);
 

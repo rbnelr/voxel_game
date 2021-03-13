@@ -844,3 +844,137 @@ void Chunks::visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culle
 		}
 	}
 }
+
+int get_axis (float3 const& next) {
+	if (next.x <= next.y && next.x <= next.z) return 0;
+	else if (               next.y <= next.z) return 1;
+	else                                      return 2;
+}
+
+void _dev_raycast (Chunks& chunks, Camera_View& view) {
+	float3 ray_pos = view.cam_to_world * float3(0);
+	float3 ray_dir = (float3x3)view.cam_to_world * float3(0,0,-1);
+
+	static float max_dist = 30.0f;
+	ImGui::DragFloat("max_dist", &max_dist, 0.1f);
+
+	g_debugdraw.vector(ray_pos, ray_dir * max_dist, lrgba(1,0,0,1));
+
+	int3 sign;
+	sign.x = signbit(ray_dir.x) ? -1 : 1;
+	sign.y = signbit(ray_dir.y) ? -1 : 1;
+	sign.z = signbit(ray_dir.z) ? -1 : 1;
+
+	float3 rdir;
+	rdir.x = ray_dir.x != 0.0f ? 1.0f / abs(ray_dir.x) : INF;
+	rdir.y = ray_dir.y != 0.0f ? 1.0f / abs(ray_dir.y) : INF;
+	rdir.z = ray_dir.z != 0.0f ? 1.0f / abs(ray_dir.z) : INF;
+
+	float3 posfloor = floor(ray_pos);
+
+	int3 coord = int3(posfloor);
+	float3 next;
+	{
+		float3 rel = ray_pos - posfloor;
+		next.x = rdir.x * (ray_dir.x >= 0.0f ? 1.0f - rel.x : rel.x);
+		next.y = rdir.y * (ray_dir.y >= 0.0f ? 1.0f - rel.y : rel.y);
+		next.z = rdir.z * (ray_dir.z >= 0.0f ? 1.0f - rel.z : rel.z);
+	}
+
+	int3 scoord = floori(ray_pos / (float)SUBCHUNK_SIZE) * SUBCHUNK_SIZE;
+	float3 snext;
+	{
+		float3 rel = ray_pos - (float3)scoord;
+		snext.x = rdir.x * (ray_dir.x >= 0.0f ? (float)SUBCHUNK_SIZE - rel.x : rel.x);
+		snext.y = rdir.y * (ray_dir.y >= 0.0f ? (float)SUBCHUNK_SIZE - rel.y : rel.y);
+		snext.z = rdir.z * (ray_dir.z >= 0.0f ? (float)SUBCHUNK_SIZE - rel.z : rel.z);
+	}
+
+	int iterations = 0;
+	while (iterations++ < 1000) {
+
+		float sdist = min(min(snext.x, snext.y), snext.z);
+		int saxis = get_axis(snext);
+
+		chunk_id chunkid = chunks.query_chunk(scoord / CHUNK_SIZE);
+		if (chunkid == U16_NULL)
+			break;
+
+		int3 pos = scoord & CHUNK_SIZE_MASK;
+
+		auto& vox = chunks.chunk_voxels[chunkid];
+		auto subc_i = SUBCHUNK_IDX(pos.x, pos.y, pos.z);
+
+		// dist >= stop_dist comparison relies on exact value, fudge values by half a 1m step to make it work despite float error
+		float3 fudged_sdist = snext - (rdir * 0.5f);
+		float3 stop_dist = min(float3(max_dist), fudged_sdist);
+
+		static const char* fmts2[] = {"--- <%7.3f> %7.3f  %7.3f  - %7.3f", ">>>  %7.3f <%7.3f> %7.3f  - %7.3f", ">>>  %7.3f  %7.3f <%7.3f>  - %7.3f"};
+		static const char* fmts1[] = {">>  <%7.3f> %7.3f  %7.3f", ">>   %7.3f <%7.3f> %7.3f", ">>   %7.3f  %7.3f <%7.3f>"};
+		ImGui::Text(fmts2[saxis], snext.x, snext.y, snext.z, stop_dist);
+
+		lrgba col = lrgba(0,0,0,1);
+		col[saxis] = 1;
+		g_debugdraw.point(ray_pos + ray_dir * sdist, 0.25f, col);
+		
+		float size = (float)SUBCHUNK_SIZE;
+		g_debugdraw.wire_cube((float3)scoord + size*0.5f, size*0.95f, lrgba(0,0,1,1));
+
+		auto data = vox.sparse_data[subc_i];
+		if (vox.is_subchunk_sparse(subc_i)) {
+			block_id bid = (block_id)data;
+
+			float sz = 0;
+
+			for (;;) {
+				float dist = min(min(next.x, next.y), next.z);
+				int axis = get_axis(next);
+
+				ImGui::Text(fmts1[axis], next.x, next.y, next.z);
+
+				g_debugdraw.wire_cube((float3)coord + 0.5f, lerp(0.8f, 0.95f, sz), lrgba(0,1,0,1));
+				sz = clamp(sz + 0.1f);
+
+				coord[axis] += sign[axis];
+				next[axis] += rdir[axis];
+
+				if (dist >= stop_dist[axis])
+					break;
+			}
+
+		} else {
+
+			float sz = 0;
+
+			for (;;) {
+				float dist = min(min(next.x, next.y), next.z);
+				int axis = get_axis(next);
+
+				int3 pos = coord & SUBCHUNK_MASK;
+
+				block_id bid = chunks.subchunks[data].voxels[BLOCK_IDX(pos.x, pos.y, pos.z)];
+
+				ImGui::Text(fmts1[axis], next.x, next.y, next.z);
+
+				lrgba col = lrgba(0,0,0,1);
+				col[axis] = 1;
+				g_debugdraw.point(ray_pos + ray_dir * dist, 0.15f, col);
+		
+				g_debugdraw.wire_cube((float3)coord + 0.5f, lerp(0.8f, 0.95f, sz), lrgba(0,0,1,1));
+				sz = clamp(sz + 0.1f);
+				
+				coord[axis] += sign[axis];
+				next[axis] += rdir[axis];
+
+				if (dist >= stop_dist[axis])
+					break;
+			}
+		}
+
+		scoord[saxis] += sign[saxis] * SUBCHUNK_SIZE;
+		snext [saxis] += rdir[saxis] * (float)SUBCHUNK_SIZE;
+
+		if (sdist > max_dist)
+			break;
+	}
+}

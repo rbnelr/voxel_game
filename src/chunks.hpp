@@ -122,15 +122,6 @@ struct SliceNode {
 	slice_id next;
 };
 
-// 3-Level Sparse storage system for voxels
-// this system is similar to how a octree would work
-// but instead of every power of two being a size at which regions can be sparse
-// this system has 'chunks' and 2nd level 'subchunks' which can store their contents sparsely
-// 3-Level because 1st level is a sparse chunk, 2nd is a sparse subchunk, 3rd is a fully dense voxel
-//   Chunk-Subchunk-Block vs Chunk-Block vs 128-64-32-16-8-4-2-1 (Octree)
-// Chunks are currently 64^3 and are the blocks worldgen happens in,
-// which means they can not only be sparse (only 1 block id in entire region) but also additionally unloaded (queries currently return B_NULL)
-
 struct SubchunkVoxels {
 	block_id voxels[SUBCHUNK_VOXEL_COUNT];
 };
@@ -498,3 +489,5 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, float max_dist, Func hit_vo
 		cur_voxel[cur_axis] += step_delta[cur_axis];
 	}
 }
+
+void _dev_raycast (Chunks& chunks, Camera_View& view);

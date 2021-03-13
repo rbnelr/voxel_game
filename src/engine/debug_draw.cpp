@@ -11,7 +11,7 @@ void DebugDraw::vector (float3 const& pos, float3 const& dir, lrgba const& col) 
 	*out++ = { pos + dir, col };
 }
 
-void DebugDraw::pointx (float3 const& pos, float3 const& size, lrgba const& col) {
+void DebugDraw::point (float3 const& pos, float3 const& size, lrgba const& col) {
 	size_t idx = lines.size();
 	lines.resize(idx + 8);
 	auto* out = &lines[idx];

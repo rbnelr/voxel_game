@@ -140,7 +140,8 @@ struct Raytracer {
 			glBufferData(GL_SHADER_STORAGE_BUFFER, aligned_size, nullptr, GL_STATIC_DRAW);
 
 			if (copy) {
-				assert((alloc_size > 0) == (ssbo != 0));
+				if (alloc_size)
+					assert(ssbo != 0);
 
 				size_t copy_size = std::min(alloc_size, aligned_size);
 				if (copy_size > 0) {

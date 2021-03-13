@@ -240,11 +240,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
 		
-	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, chunks_ssbo.ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunk_voxels_ssbo.ssbo);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, subchunks_ssbo.ssbo);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, chunks_ssbo.ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, chunk_voxels_ssbo.ssbo);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, subchunks_ssbo.ssbo);
+	glBindImageTexture(6, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
 	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	int szy = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;

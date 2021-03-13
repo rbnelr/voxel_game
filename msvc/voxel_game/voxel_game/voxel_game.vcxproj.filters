@@ -498,5 +498,8 @@
     <None Include="..\..\..\shaders\gl\held_block.glsl">
       <Filter>shaders\gl</Filter>
     </None>
+    <None Include="..\..\..\shaders\gl\rand.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>

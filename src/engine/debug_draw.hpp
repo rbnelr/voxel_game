@@ -113,7 +113,7 @@ struct DebugDraw {
 		wire_cubes.clear();
 	}
 
-	void pointx (float3 const& pos, float3 const& size, lrgba const& col);
+	void point (float3 const& pos, float3 const& size, lrgba const& col);
 	void vector (float3 const& pos, float3 const& dir, lrgba const& col);
 
 	void wire_cube (float3 const& pos, float3 const& size, lrgba const& col);
