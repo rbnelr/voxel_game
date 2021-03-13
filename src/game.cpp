@@ -158,7 +158,7 @@ void Game::update (Window& window, Input& I) {
 	else
 		ImGui::Text("Selected Block: None");
 
-	_dev_raycast(chunks, player_view);
+	//_dev_raycast(chunks, player_view);
 
 	block_update.update_blocks(I, chunks);
 

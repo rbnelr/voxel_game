@@ -204,12 +204,10 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	glUseProgram(shad->prog);
 
-	chunk_id camera_chunk;
+	uint32_t camera_chunk;
 	{
 		int3 pos = floori((float3)(game.view.cam_to_world * float4(0,0,0,1)) / (float)CHUNK_SIZE);
 		camera_chunk = game.chunks.query_chunk(pos);
-		if (camera_chunk == U16_NULL)
-			camera_chunk = 0; // ugh what do?
 	}
 
 	static float t = 0.0f;
@@ -217,7 +215,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	if (t > 60.0f)
 		t -= 60.0f;
 
-	shad->set_uniform("camera_chunk", (uint32_t)camera_chunk);
+	shad->set_uniform("camera_chunk", camera_chunk);
 	shad->set_uniform("max_iterations", max_iterations);
 	shad->set_uniform("time", t);
 

@@ -211,6 +211,12 @@ struct Shader {
 		if (i >= 0)
 			_set_uniform(uniforms[i], val);
 	}
+	template <typename T>
+	inline void set_uniform_array (std::string_view const& name, T const* values, int arr_count) {
+		int i = indexof(uniforms, name, _findUniform);
+		if (i >= 0)
+			_set_uniform(uniforms[i], values, arr_count);
+	}
 };
 
 struct Shaders {

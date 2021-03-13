@@ -108,7 +108,6 @@ uint get_neighbour (uint cid, int i) {
 }
 
 int get_subchunk_idx (ivec3 pos) {
-	pos &= CHUNK_SIZE_MASK;
 	pos >>= SUBCHUNK_SHIFT;
 	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
 }
@@ -118,7 +117,6 @@ bool is_subchunk_sparse (uint cid, int subc_i) {
 }
 
 uint get_voxel (uint subc_id, ivec3 pos) {
-	pos &= SUBCHUNK_MASK;
 	uint val = subchunks[subc_id].voxels[pos.z][pos.y][pos.x >> 1];
 	return (val >> ((pos.x & 1) * 16)) & 0xffffu;
 }
@@ -154,7 +152,7 @@ uniform float bouncelight_dist = 30.0;
 uniform bool  visualize_light = false;
 
 // get pixel ray in world space based on pixel coord and matricies
-void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
+void get_ray (vec2 px_pos, out uint cam_chunk, out vec3 ray_pos, out vec3 ray_dir) {
 
 	//vec2 px_jitter = rand2(gl_FragCoord.xy) - 0.5;
 	vec2 px_jitter = vec2(0.0);
@@ -173,6 +171,14 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
 	// all rays starts exactly on the camera
 	ray_pos = (view.cam_to_world * vec4(0,0,0,1)).xyz;
+	
+	// try to fix edge case where camera is on exactly a chunk boundary
+	// this is not ideal at all, and can cause artefacts
+	if (fract(ray_pos.x / float(CHUNK_SIZE)) == 0.0) ray_pos.x += 0.0001;
+	if (fract(ray_pos.y / float(CHUNK_SIZE)) == 0.0) ray_pos.y += 0.0001;
+	if (fract(ray_pos.z / float(CHUNK_SIZE)) == 0.0) ray_pos.z += 0.0001;
+	
+	cam_chunk = camera_chunk;
 }
 
 int get_axis (bvec3 axis_mask) {
@@ -209,11 +215,14 @@ struct Hit {
 	vec4	col;
 };
 
-bool hit_voxel (uint bid, uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, inout Hit hit) {
+bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, inout Hit hit) {
+	if (prev_bid == 0) prev_bid = bid;
+	
 	if (prev_bid == bid && (bid != B_LEAVES && bid != B_TALLGRASS))
 		return false;
 	if (bid == B_AIR)
 		bid = prev_bid;
+	prev_bid = bid;
 	
 	hit.pos = ray_pos + ray_dir * dist;
 	
@@ -242,123 +251,121 @@ bool hit_voxel (uint bid, uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist,
 	return hit.col.a > 0.99;
 }
 
+#define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
+
 bool trace_ray (uint chunkid, vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
-	vec3 floorpos = floor(ray_pos);
-	ivec3 coord = ivec3(floorpos);
 	
-	vec3 rdir; // reciprocal of ray dir
+	ivec3 sign;
+	sign.x = ray_dir.x >= 0.0 ? 1 : -1;
+	sign.y = ray_dir.y >= 0.0 ? 1 : -1;
+	sign.z = ray_dir.z >= 0.0 ? 1 : -1;
+
+	vec3 rdir;
 	rdir.x = ray_dir.x != 0.0 ? 1.0 / abs(ray_dir.x) : INF;
 	rdir.y = ray_dir.y != 0.0 ? 1.0 / abs(ray_dir.y) : INF;
 	rdir.z = ray_dir.z != 0.0 ? 1.0 / abs(ray_dir.z) : INF;
 
-	vec3 next;
+	vec3 scoordf = floor(ray_pos / SUBCHUNK_SIZEf) * SUBCHUNK_SIZEf;
+	ivec3 scoord = ivec3(scoordf);
+
+	vec3 snext;
 	{
-		vec3 rel = ray_pos - floorpos;
-		next = rdir * mix(1.0 - rel, rel, step(ray_dir, vec3(0.0)));
+		vec3 rel = ray_pos - scoordf;
+		snext.x = rdir.x * (ray_dir.x >= 0.0 ? SUBCHUNK_SIZEf - rel.x : rel.x);
+		snext.y = rdir.y * (ray_dir.y >= 0.0 ? SUBCHUNK_SIZEf - rel.y : rel.y);
+		snext.z = rdir.z * (ray_dir.z >= 0.0 ? SUBCHUNK_SIZEf - rel.z : rel.z);
 	}
-	vec3 subc_next;
-	{
-		vec3 rel = ray_pos - floor(ray_pos / 8.0) * 8.0;
-		subc_next = rdir * mix(8.0 - rel, rel, step(ray_dir, vec3(0.0)));
-	}
-	
-	float dist = min(min(next.x, next.y), next.z);
-	bvec3 axes = equal(vec3(dist), next);
-	
+
+	int stepmask;
+	float dist = 0; 
+	int axis = 0;
+
 	uint prev_bid = 0;
-	while (chunkid != 0xffffu) { // for chunks
+
+	while (chunkid != 0xffffu) {
 		
-		coord &= ivec3(CHUNK_SIZE_MASK);
+		scoord &= CHUNK_SIZE_MASK;
 		
-		for (;;) { // for subchunks
-			
-			float subc_dist = min(min(subc_next.x, subc_next.y), subc_next.z);
-			bvec3 subc_axes = equal(vec3(subc_dist), subc_next);
-			
-			
-			int subci = get_subchunk_idx(coord);
+		do {
+			int subci = get_subchunk_idx(scoord);
 			
 			uint subchunk_data = chunk_voxels[chunkid].sparse_data[subci];
 			if (is_subchunk_sparse(chunkid, subci)) {
-				
-				if (subc_dist > max_dist || iterations++ >= max_iterations)
-					return false;
-				
 				uint bid = subchunk_data;
 				
-				if (prev_bid == 0) prev_bid = bid;
-				if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, subc_dist, get_axis(subc_axes), hit))
+				if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, hit))
 					return true;
-				prev_bid = bid;
 				
-				vec3 steps;
-				if (     next.x + rdir.x*0.0 >= subc_dist - 0.01) steps.x = 0.0;
-				else if (next.x + rdir.x*1.0 >= subc_dist - 0.01) steps.x = 1.0;
-				else if (next.x + rdir.x*2.0 >= subc_dist - 0.01) steps.x = 2.0;
-				else if (next.x + rdir.x*3.0 >= subc_dist - 0.01) steps.x = 3.0;
-				else if (next.x + rdir.x*4.0 >= subc_dist - 0.01) steps.x = 4.0;
-				
-				if (     next.y + rdir.y*0.0 >= subc_dist - 0.01) steps.y = 0.0;
-				else if (next.y + rdir.y*1.0 >= subc_dist - 0.01) steps.y = 1.0;
-				else if (next.y + rdir.y*2.0 >= subc_dist - 0.01) steps.y = 2.0;
-				else if (next.y + rdir.y*3.0 >= subc_dist - 0.01) steps.y = 3.0;
-				else if (next.y + rdir.y*4.0 >= subc_dist - 0.01) steps.y = 4.0;
-				
-				if (     next.z + rdir.z*0.0 >= subc_dist - 0.01) steps.z = 0.0;
-				else if (next.z + rdir.z*1.0 >= subc_dist - 0.01) steps.z = 1.0;
-				else if (next.z + rdir.z*2.0 >= subc_dist - 0.01) steps.z = 2.0;
-				else if (next.z + rdir.z*3.0 >= subc_dist - 0.01) steps.z = 3.0;
-				else if (next.z + rdir.z*4.0 >= subc_dist - 0.01) steps.z = 4.0;
-				
-				//vec3 steps = floor( (vec3(subc_dist) -next) / rdir );
-				axes = subc_axes;
-				
-				next += rdir * steps;
-				coord += ivec3(sign(ray_dir) * steps);
-				
-				//dist = min(min(next.x, next.y), next.z);
-				//axes = equal(vec3(dist), next);
-				//
-				//next += mix(vec3(0.0), rdir, axes);
-				//coord += mix(ivec3(0), ivec3(sign(ray_dir)), axes);
-				
+				if (++iterations >= max_iterations || dist >= max_dist)
+					return false; // max dist reached
+
 			} else {
 				
-				for (;;) { // for voxels
-					
-					if (dist > max_dist || iterations++ >= max_iterations)
-						return false;
-					
+				#if 1
+				vec3 proj = ray_pos + ray_dir * dist;
+				if (dist > 0.0)
+					proj[axis] += ray_dir[axis] >= 0 ? 0.5 : -0.5;
+				vec3 coordf = floor(proj);
+				#else
+				vec3 coordf = floor(ray_pos + ray_dir * (dist + 0.0001));
+				#endif
+				
+				ivec3 coord = ivec3(coordf);
+
+				vec3 next;
+				{
+					vec3 rel = ray_pos - coordf;
+					next.x = rdir.x * (ray_dir.x >= 0.0f ? 1.0f - rel.x : rel.x);
+					next.y = rdir.y * (ray_dir.y >= 0.0f ? 1.0f - rel.y : rel.y);
+					next.z = rdir.z * (ray_dir.z >= 0.0f ? 1.0f - rel.z : rel.z);
+				}
+				
+				coord &= SUBCHUNK_MASK;
+				
+				do {
 					uint bid = get_voxel(subchunk_data, coord);
 					
-					if (prev_bid == 0) prev_bid = bid;
-					if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, get_axis(axes), hit))
+					if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, hit))
 						return true;
 					prev_bid = bid;
 					
+					//
 					dist = min(min(next.x, next.y), next.z);
-					axes = equal(vec3(dist), next);
+					bvec3 mask = equal(vec3(dist), next);
 					
-					next += mix(vec3(0.0), rdir, axes);
-					coord += mix(ivec3(0), ivec3(sign(ray_dir)), axes);
+					axis = get_axis(mask);
 					
-					if (dist >= subc_dist)
-						break;
-				}
+					coord += mix(ivec3(0.0), sign, mask);
+					next  += mix( vec3(0.0), rdir, mask);
+					//coord[axis] += sign[axis]; // this seems to actally slow us down
+					//next[axis] += rdir[axis];
+					
+					if (++iterations >= max_iterations || dist >= max_dist)
+						break; // max dist reached
+					
+					stepmask = coord.x | coord.y | coord.z;
+				} while ((stepmask & ~SUBCHUNK_MASK) == 0);
+				//} while (dist < sdist - 0.0001);
+				
+				// stepped out of subchunk
 			}
+
+			dist = min(min(snext.x, snext.y), snext.z);
+			bvec3 mask = equal(vec3(dist), snext);
 			
-			subc_next += mix(vec3(0.0), rdir, subc_axes) * 8.0;
+			axis = get_axis(mask);
 			
-			int step_mask = coord.x | coord.y | coord.z;
-			if ((step_mask & ~CHUNK_SIZE_MASK) != 0)
-				break;
-		}
+			scoord += mix(ivec3(0.0), sign * SUBCHUNK_SIZE, mask);
+			snext  += mix( vec3(0.0), rdir * SUBCHUNK_SIZEf, mask);
+			//scoord[saxis] += sign[saxis] * SUBCHUNK_SIZE;
+			//snext [saxis] += rdir[saxis] * SUBCHUNK_SIZEf;
+
+			stepmask = scoord.x | scoord.y | scoord.z;
+		} while ((stepmask & ~CHUNK_SIZE_MASK) == 0);
 		
-		return false;
-		//// step to next chunk
-		//chunkid = get_neighbour(chunkid, get_step_face(axis, ray_dir) ^ 1); // ^1 flip dir
+		// stepped out of chunk
+		chunkid = get_neighbour(chunkid, get_step_face(axis, ray_dir) ^ 1);
 	}
-	
 	return false;
 }
 
@@ -394,13 +401,14 @@ void main () {
 	vec2 pos = gl_GlobalInvocationID.xy;
 	
 	vec3 ray_pos, ray_dir;
-	get_ray(pos, ray_pos, ray_dir);
+	uint cam_chunk;
+	get_ray(pos, cam_chunk, ray_pos, ray_dir);
 
 	// primary ray
 	Hit hit;
 	hit.col = vec4(0.0);
 	//hit.emiss = vec3(0.0);
-	if (trace_ray(camera_chunk, ray_pos, ray_dir, INF, hit)) {
+	if (trace_ray(cam_chunk, ray_pos, ray_dir, INF, hit)) {
 	//	
 	//	vec3 bounce_pos = hit.pos + hit.normal * 0.001;
 	//	
