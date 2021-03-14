@@ -215,7 +215,7 @@ inline void _set_uniform (ShaderUniform& u, float2x2 const* values, int arr_coun
 inline void _set_uniform (ShaderUniform& u, float3x3 const* values, int arr_count) { assert(u.type == GL_FLOAT_MAT3   ); glUniformMatrix3fv(u.location, arr_count, GL_FALSE, &values->arr[0].x); }
 inline void _set_uniform (ShaderUniform& u, float4x4 const* values, int arr_count) { assert(u.type == GL_FLOAT_MAT4   ); glUniformMatrix4fv(u.location, arr_count, GL_FALSE, &values->arr[0].x); }
 
-inline void _set_uniform (ShaderUniform& u, bool     const& val) { assert(u.type == GL_FLOAT        ); glUniform1i(u.location, val ? GL_TRUE : GL_FALSE); }
+inline void _set_uniform (ShaderUniform& u, bool     const& val) { assert(u.type == GL_BOOL         ); glUniform1i(u.location, val ? GL_TRUE : GL_FALSE); }
 inline void _set_uniform (ShaderUniform& u, float    const& val) { assert(u.type == GL_FLOAT        ); glUniform1f(u.location, val); }
 inline void _set_uniform (ShaderUniform& u, float2   const& val) { assert(u.type == GL_FLOAT_VEC2   ); glUniform2fv(u.location, 1, &val.x); }
 inline void _set_uniform (ShaderUniform& u, float3   const& val) { assert(u.type == GL_FLOAT_VEC3   ); glUniform3fv(u.location, 1, &val.x); }

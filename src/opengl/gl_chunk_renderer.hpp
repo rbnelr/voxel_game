@@ -168,6 +168,8 @@ struct Raytracer {
 	//
 	int max_iterations = 256;
 
+	bool rand_seed_time = true;
+
 	bool visualize_cost = false;
 	bool visualize_warp_iterations = false;
 	bool visualize_warp_reads = false;
@@ -185,14 +187,12 @@ struct Raytracer {
 	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
-	bool  ambient_enable = true;
-	int   ambient_rays = 2;
-	float ambient_dist = 64;
-	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
-
 	bool  bouncelight_enable = true;
 	int   bouncelight_rays = 2;
 	float bouncelight_dist = 50;
+
+	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
+	float ambient_factor = 0.05f;
 
 	bool  visualize_light = false;
 
@@ -210,6 +210,9 @@ struct Raytracer {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable", &enable);
+
+		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
+		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
 
 		bool macro_change = false;
 
@@ -229,8 +232,6 @@ struct Raytracer {
 			shad->recompile("macro_change", false);
 		}
 
-		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
-
 		ImGui::Separator();
 
 		//
@@ -241,9 +242,7 @@ struct Raytracer {
 			imgui_ColorEdit("sunlight_col", &sunlight_col);
 			ImGui::Spacing();
 
-			ImGui::Checkbox("ambient_enable", &ambient_enable);
-			ImGui::SliderInt("ambient_rays", &ambient_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
-			ImGui::SliderFloat("ambient_dist", &ambient_dist, 1, 128);
+			ImGui::SliderFloat("ambient_factor", &ambient_factor, 0, 1.0f, "%f", ImGuiSliderFlags_Logarithmic);
 			imgui_ColorEdit("ambient_col", &ambient_col);
 			ImGui::Spacing();
 

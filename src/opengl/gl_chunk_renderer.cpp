@@ -210,24 +210,16 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		camera_chunk = game.chunks.query_chunk(pos);
 	}
 
-	static float t = 0.0f;
-	t += g_window.input.real_dt;
-	if (t > 60.0f)
-		t -= 60.0f;
-
 	shad->set_uniform("camera_chunk", camera_chunk);
 	shad->set_uniform("max_iterations", max_iterations);
-	shad->set_uniform("time", t);
+	shad->set_uniform("rand_frame_index", rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
 
 	shad->set_uniform("sunlight_enable", sunlight_enable);
 	shad->set_uniform("sunlight_rays",   sunlight_rays);
 	shad->set_uniform("sunlight_dist",   sunlight_dist);
 	shad->set_uniform("sunlight_col",    sunlight_col);
 
-	shad->set_uniform("ambient_enable", ambient_enable);
-	shad->set_uniform("ambient_rays",   ambient_rays);
-	shad->set_uniform("ambient_dist",   ambient_dist);
-	shad->set_uniform("ambient_col",    ambient_col);
+	shad->set_uniform("ambient_light",  ambient_col * ambient_factor);
 
 	shad->set_uniform("bouncelight_enable", bouncelight_enable);
 	shad->set_uniform("bouncelight_rays",   bouncelight_rays);
