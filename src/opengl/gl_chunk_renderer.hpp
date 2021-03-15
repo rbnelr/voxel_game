@@ -186,8 +186,9 @@ struct Raytracer {
 	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
-	bool  bouncelight_enable = true;
-	float bouncelight_dist = 64;
+	bool  bounces_enable = true;
+	float bounces_max_dist = 64;
+	int   bounces_max_count = 4;
 
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
 	float ambient_factor = 0.00f;
@@ -245,8 +246,9 @@ struct Raytracer {
 			imgui_ColorEdit("ambient_col", &ambient_col);
 			ImGui::Spacing();
 
-			ImGui::Checkbox("bouncelight_enable", &bouncelight_enable);
-			ImGui::SliderFloat("bouncelight_dist", &bouncelight_dist, 1, 128);
+			ImGui::Checkbox("bounces_enable", &bounces_enable);
+			ImGui::SliderFloat("bounces_max_dist", &bounces_max_dist, 1, 128);
+			ImGui::SliderInt("bounces_max_count", &bounces_max_count, 1, 16);
 			ImGui::Spacing();
 
 			ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);

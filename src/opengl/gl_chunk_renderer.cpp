@@ -210,21 +210,22 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		camera_chunk = game.chunks.query_chunk(pos);
 	}
 
-	shad->set_uniform("camera_chunk", camera_chunk);
-	shad->set_uniform("max_iterations", max_iterations);
-	shad->set_uniform("rand_frame_index", rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
+	shad->set_uniform("camera_chunk",       camera_chunk);
+	shad->set_uniform("max_iterations",     max_iterations);
+	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
 
-	shad->set_uniform("sunlight_enable", sunlight_enable);
-	shad->set_uniform("sunlight_dist",   sunlight_dist);
-	shad->set_uniform("sunlight_col",    sunlight_col);
+	shad->set_uniform("sunlight_enable",    sunlight_enable);
+	shad->set_uniform("sunlight_dist",      sunlight_dist);
+	shad->set_uniform("sunlight_col",       sunlight_col);
 
-	shad->set_uniform("ambient_light",  ambient_col * ambient_factor);
+	shad->set_uniform("ambient_light",      ambient_col * ambient_factor);
 
-	shad->set_uniform("bouncelight_enable", bouncelight_enable);
-	shad->set_uniform("bouncelight_dist",   bouncelight_dist);
+	shad->set_uniform("bounces_enable",     bounces_enable);
+	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
+	shad->set_uniform("bounces_max_count",  bounces_max_count);
 
-	shad->set_uniform("rays",			rays);
-	shad->set_uniform("visualize_light", visualize_light);
+	shad->set_uniform("rays",               rays);
+	shad->set_uniform("visualize_light",    visualize_light);
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
