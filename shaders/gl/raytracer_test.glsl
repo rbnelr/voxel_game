@@ -165,17 +165,32 @@ uniform sampler2D		heat_gradient;
 #endif
 
 uniform bool  sunlight_enable = true;
-uniform int   sunlight_rays = 2;
 uniform float sunlight_dist = 90.0;
 uniform vec3  sunlight_col = vec3(0.98, 0.92, 0.65) * 1.3;
 
 uniform vec3  ambient_light;
 
 uniform bool  bouncelight_enable = true;
-uniform int   bouncelight_rays = 2;
 uniform float bouncelight_dist = 30.0;
 
+uniform int   rays = 1;
+
 uniform bool  visualize_light = false;
+
+const vec3 sun_dir = normalize(vec3(-1,2,3));
+const float sun_dir_rand = 0.05;
+
+//
+struct Hit {
+	vec3	pos;
+	vec3	normal;
+	uint	chunkid;
+	float	dist;
+	vec3	col;
+	vec3	emiss;
+};
+
+int iterations = 0;
 
 // get pixel ray in world space based on pixel coord and matricies
 void get_ray (vec2 px_pos, out uint cam_chunk, out vec3 ray_pos, out vec3 ray_dir) {
@@ -231,19 +246,7 @@ vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	return uv;
 }
 
-int iterations = 0;
-
-struct Hit {
-	// location
-	vec3	pos;
-	vec3	normal;
-	uint	chunkid;
-	// material
-	vec4	col;
-	vec3	emissive; // multiplier to col
-};
-
-bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, inout Hit hit) {
+bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, uint chunkid, out Hit hit) {
 	if (bid == B_LEAVES || bid == B_TALLGRASS) {
 		if (prev_bid == 0)
 			return false;
@@ -256,16 +259,11 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float
 		bid = prev_bid;
 	prev_bid = bid;
 	
-	hit.pos = ray_pos + ray_dir * dist;
-	
 	int entry_face = get_step_face(axis, ray_dir);
 	
-	vec2 uv = calc_uv(fract(hit.pos), entry_face);
+	hit.pos = ray_pos + ray_dir * dist;
 
-	vec3 normal = vec3(0.0);
-	normal[axis] = -sign(ray_dir[axis]);
-	
-	hit.normal = normal;
+	vec2 uv = calc_uv(fract(hit.pos), entry_face);
 
 	float texid = float(block_tiles[bid].sides[entry_face]);
 	
@@ -275,21 +273,23 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float
 	if (bid == B_TALLGRASS && axis == 2)
 		col = vec4(0.0);
 	
-	// accum color
-	col.a *= 1.0 - hit.col.a;
+	if (col.a <= 0.001)
+		return false;
 	
-	hit.col.rgb += col.rgb * col.a;
-	hit.col.a += col.a;
+	hit.normal = vec3(0.0);
+	hit.normal[axis] = -sign(ray_dir[axis]);
 	
-	hit.emissive += (col.rgb * col.a) * get_emmisive(bid);
-	
-	return hit.col.a > 0.99;
+	hit.chunkid = chunkid;
+	hit.dist = dist;
+	hit.col = col.rgb;
+	hit.emiss = col.rgb * get_emmisive(bid);
+	return true;
 }
 
-#define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, uint chunkid, float max_dist, out Hit hit) {
 
-bool trace_ray (uint chunkid, vec3 ray_pos, vec3 ray_dir, float max_dist, inout Hit hit) {
-	
+	#define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
+
 	ivec3 sign;
 	sign.x = ray_dir.x >= 0.0 ? 1 : -1;
 	sign.y = ray_dir.y >= 0.0 ? 1 : -1;
@@ -328,10 +328,9 @@ bool trace_ray (uint chunkid, vec3 ray_pos, vec3 ray_dir, float max_dist, inout 
 			if (is_subchunk_sparse(chunkid, subci)) {
 				uint bid = subchunk_data;
 				
-				if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, hit)) {
-					hit.chunkid = prev_chunkid;
+				if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, prev_chunkid, hit))
 					return true;
-				}
+
 				prev_bid = bid;
 				prev_chunkid = chunkid;
 				
@@ -368,10 +367,9 @@ bool trace_ray (uint chunkid, vec3 ray_pos, vec3 ray_dir, float max_dist, inout 
 				do {
 					uint bid = get_voxel(subchunk_data, coord);
 					
-					if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, hit)) {
-						hit.chunkid = prev_chunkid;
+					if (hit_voxel(bid, prev_bid, ray_pos, ray_dir, dist, axis, prev_chunkid, hit))
 						return true;
-					}
+
 					prev_bid = bid;
 					prev_chunkid = chunkid;
 					
@@ -417,65 +415,28 @@ bool trace_ray (uint chunkid, vec3 ray_pos, vec3 ray_dir, float max_dist, inout 
 }
 
 vec3 tonemap (vec3 c) {
-	
+
 	//c *= 2.0;
 	//c = c / (c + 1.0);
-	
+
 	//c *= 0.2;
 	//vec3 x = max(vec3(0.0), c -0.004);
 	//c = (x*(6.2*x+.5))/(x*(6.2*x+1.7)+0.06);
 	return c;
 }
 
-const vec3 sun_dir = normalize(vec3(-1,2,3));
-const float sun_dir_rand = 0.05;
-
-vec3 collect_sun_light (vec3 pos, vec3 normal, uint chunkid) {
-	float accum = 0.0;
-	
-	for (int i=0; i<sunlight_rays; ++i) {
+vec3 collect_sunlight (vec3 pos, vec3 normal, uint chunkid) {
+	if (sunlight_enable) {
 		vec3 dir = sun_dir + rand3()*sun_dir_rand;
-		float d = dot(dir, normal);
+		float cos = dot(dir, normal);
 		
-		if (d > 0.0) {
+		if (cos > 0.0) {
 			Hit hit;
-			hit.col = vec4(0.0);
-			hit.emissive = vec3(0.0);
-			trace_ray(chunkid, pos, dir, sunlight_dist, hit);
-			accum += (1.0 - hit.col.a) * d;
+			if (!trace_ray(pos, dir, chunkid, sunlight_dist, hit))
+				return sunlight_col * cos;
 		}
 	}
-	
-	accum /= float(sunlight_rays);
-	return accum * sunlight_col;
-}
-vec3 collect_bounce_light (vec3 pos, vec3 normal, uint chunkid) {
-	mat3 tangent_to_world = get_tangent_to_world(normal);
-	
-	vec3 accum = vec3(0.0); // alpha is total contribution
-	
-	for (int i=0; i<bouncelight_rays; ++i) {
-		vec3 dir = tangent_to_world * hemisphere_sample();
-		float d = dot(dir, normal);
-		d = max(d, 0.0);
-		
-		Hit hit;
-		hit.col = vec4(0.0);
-		hit.emissive = vec3(0.0);
-		if (trace_ray(chunkid, pos, dir, bouncelight_dist, hit)) {
-			
-			vec3 pos2 = hit.pos + hit.normal * 0.0005;
-			
-			vec3 light = vec3(0.0);
-			if (sunlight_enable)
-				light += collect_sun_light(pos2, hit.normal, hit.chunkid);
-			
-			accum += hit.col.rgb * light * d + hit.emissive;
-		}
-	}
-	
-	accum /= float(bouncelight_rays);
-	return accum;
+	return vec3(0.0);
 }
 
 void main () {
@@ -487,35 +448,50 @@ void main () {
 	barrier();
 #endif
 
+	vec2 pos = vec2(gl_GlobalInvocationID.xy);
+
+	// maybe try not to do rays that we do not see (happens due to local group size)
+	if (pos.x >= view.viewport_size.x || pos.y >= view.viewport_size.y)
+		return;
+
 	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
 	
-	vec2 pos = vec2(gl_GlobalInvocationID.xy);
-	
-	vec3 ray_pos, ray_dir;
-	uint cam_chunk;
-	get_ray(pos, cam_chunk, ray_pos, ray_dir);
-
-	// primary ray
-	Hit hit;
-	hit.col = vec4(0.0);
-	hit.emissive = vec3(0.0);
-	if (trace_ray(cam_chunk, ray_pos, ray_dir, INF, hit)) {
+	vec3 col = vec3(0.0);
+	for (int i=0; i<rays; ++i) {
+		// primary ray
+		vec3 ray_pos, ray_dir;
+		uint cam_chunk;
+		get_ray(pos, cam_chunk, ray_pos, ray_dir);
 		
-		vec3 pos2 = hit.pos + hit.normal * 0.0005;
-		
-		vec3 light = vec3(0.0);
-		if (sunlight_enable)
-			light += collect_sun_light(pos2, hit.normal, hit.chunkid);
-		
-		if (bouncelight_enable)
-			light += collect_bounce_light(pos2, hit.normal, hit.chunkid);
-		
-		hit.col.rgb *= light + ambient_light;
-		
-		if (visualize_light)
-			hit.col.rgb = vec3(light);
+		Hit hit;
+		if (trace_ray(ray_pos, ray_dir, cam_chunk, INF, hit)) {
+			hit.pos += hit.normal * 0.001;
+			
+			vec3 light = ambient_light;
+			light += collect_sunlight(hit.pos, hit.normal, hit.chunkid);
+			
+			mat3 tangent_to_world = get_tangent_to_world(hit.normal);
+			
+			if (bouncelight_enable) {
+				vec3 dir = tangent_to_world * hemisphere_sample(); // already cos weighted
+				
+				Hit hit2;
+				if (trace_ray(hit.pos, dir, hit.chunkid, bouncelight_dist, hit2)) {
+					vec3 light2 = collect_sunlight(hit2.pos, hit2.normal, hit2.chunkid);
+					
+					light += hit2.emiss;
+					light += hit2.col * light2;
+				}
+			}
+			
+			if (visualize_light)
+				hit.col = vec3(1.0);
+			
+			col += hit.emiss;
+			col += hit.col * light;
+		}
 	}
-	hit.col.rgb += hit.emissive;
+	col *= 1.0 / float(rays);
 
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST
@@ -523,15 +499,10 @@ void main () {
 		const uint local_cost = iterations;
 		
 		float wasted_work = float(warp_cost - local_cost) / float(warp_cost);
-		hit.col = texture(heat_gradient, vec2(wasted_work, 0.5));
+		col = texture(heat_gradient, vec2(wasted_work, 0.5)).rgb;
 	#else
-		hit.col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5));
+		col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5)).rgb;
 	#endif
 #endif
-	
-	vec3 col = tonemap(hit.col.rgb);
-	
-	// maybe try not to do rays that we do not see (happens due to local group size)
-	if (pos.x < view.viewport_size.x && pos.y < view.viewport_size.y)
-		imageStore(img, ivec2(pos), vec4(col, 1.0));
+	imageStore(img, ivec2(pos), vec4(tonemap(col), 1.0));
 }

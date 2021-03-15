@@ -166,7 +166,7 @@ struct Raytracer {
 	SSBO	subchunks_ssbo			= {"Raytracer.subchunks_ssbo" };
 
 	//
-	int max_iterations = 256;
+	int max_iterations = 512;
 
 	bool rand_seed_time = true;
 
@@ -183,16 +183,16 @@ struct Raytracer {
 
 	//
 	bool  sunlight_enable = true;
-	int   sunlight_rays = 2;
 	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
 	bool  bouncelight_enable = true;
-	int   bouncelight_rays = 2;
-	float bouncelight_dist = 50;
+	float bouncelight_dist = 64;
 
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
-	float ambient_factor = 0.05f;
+	float ambient_factor = 0.00f;
+
+	int   rays = 1;
 
 	bool  visualize_light = false;
 
@@ -237,7 +237,6 @@ struct Raytracer {
 		//
 		if (ImGui::TreeNodeEx("lighting")) {
 			ImGui::Checkbox("sunlight_enable", &sunlight_enable);
-			ImGui::SliderInt("sunlight_rays", &sunlight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
 			imgui_ColorEdit("sunlight_col", &sunlight_col);
 			ImGui::Spacing();
@@ -247,10 +246,10 @@ struct Raytracer {
 			ImGui::Spacing();
 
 			ImGui::Checkbox("bouncelight_enable", &bouncelight_enable);
-			ImGui::SliderInt("bouncelight_rays", &bouncelight_rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::SliderFloat("bouncelight_dist", &bouncelight_dist, 1, 128);
 			ImGui::Spacing();
 
+			ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::Checkbox("visualize_light", &visualize_light);
 
 			ImGui::TreePop();

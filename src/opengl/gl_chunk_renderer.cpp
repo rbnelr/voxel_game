@@ -215,16 +215,15 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("rand_frame_index", rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
 
 	shad->set_uniform("sunlight_enable", sunlight_enable);
-	shad->set_uniform("sunlight_rays",   sunlight_rays);
 	shad->set_uniform("sunlight_dist",   sunlight_dist);
 	shad->set_uniform("sunlight_col",    sunlight_col);
 
 	shad->set_uniform("ambient_light",  ambient_col * ambient_factor);
 
 	shad->set_uniform("bouncelight_enable", bouncelight_enable);
-	shad->set_uniform("bouncelight_rays",   bouncelight_rays);
 	shad->set_uniform("bouncelight_dist",   bouncelight_dist);
 
+	shad->set_uniform("rays",			rays);
 	shad->set_uniform("visualize_light", visualize_light);
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
