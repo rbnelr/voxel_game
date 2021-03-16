@@ -566,8 +566,6 @@ void main () {
 				break;
 			} else {
 				
-				//hit.normal = normalize(vec3(sin(hit.pos.y * 6.0), 0, 16));
-				
 				float reflect_fac = fresnel(-ray.dir, hit.normal, water_F0);
 				
 				float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;

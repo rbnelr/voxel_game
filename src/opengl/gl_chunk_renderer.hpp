@@ -186,7 +186,7 @@ struct Raytracer {
 	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
-	bool  bounces_enable = true;
+	bool  bounces_enable = false;
 	float bounces_max_dist = 64;
 	int   bounces_max_count = 4;
 
@@ -262,7 +262,7 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad = shaders.compile("raytracer_test", get_macros(), {{ COMPUTE_SHADER }});
+		shad = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;

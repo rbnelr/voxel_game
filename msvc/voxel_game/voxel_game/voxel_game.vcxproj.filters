@@ -486,9 +486,6 @@
     <None Include="..\..\..\shaders\gl\debug_wire_cube.glsl">
       <Filter>shaders\gl</Filter>
     </None>
-    <None Include="..\..\..\shaders\gl\raytracer_test.glsl">
-      <Filter>shaders\gl</Filter>
-    </None>
     <None Include="..\..\..\shaders\gl\gui.glsl">
       <Filter>shaders\gl</Filter>
     </None>
@@ -499,6 +496,9 @@
       <Filter>shaders\gl</Filter>
     </None>
     <None Include="..\..\..\shaders\gl\rand.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\raytracer.glsl">
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>

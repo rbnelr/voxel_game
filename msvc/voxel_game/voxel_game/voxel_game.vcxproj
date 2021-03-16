@@ -463,7 +463,7 @@
     <None Include="..\..\..\shaders\gl\held_block.glsl" />
     <None Include="..\..\..\shaders\gl\held_item.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
-    <None Include="..\..\..\shaders\gl\raytracer_test.glsl" />
+    <None Include="..\..\..\shaders\gl\raytracer.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />
     <None Include="..\..\..\shaders\vk\chunks.glsl" />
     <None Include="..\..\..\shaders\vk\common.glsl" />
