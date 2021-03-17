@@ -245,21 +245,18 @@ namespace worldgen {
 
 				uint32_t prev_subchunk_i = subchunk_i + prev_offs;
 
-				bool      prev_sparse = prev_vox.is_subchunk_sparse( prev_subchunk_i );
-				uint32_t  prev_val    = prev_vox.sparse_data[        prev_subchunk_i ];
+				uint32_t  prev_val    = prev_vox.subchunks[prev_subchunk_i];
+				uint32_t  val         = vox     .subchunks[subchunk_i];
 
-				bool      sparse      = vox     .is_subchunk_sparse( subchunk_i     );
-				uint32_t  val         = vox     .sparse_data[        subchunk_i     ];
-
-				if (!prev_sparse || !sparse || (prev_val == earth && val == air)) {
+				if (!(prev_val & SUBC_SPARSE_BIT) || !(val & SUBC_SPARSE_BIT) || (prev_val == earth && val == air)) {
 					uint32_t block_i = 0;
 					for (int by=0; by<SUBCHUNK_SIZE; ++by)
 					for (int bx=0; bx<SUBCHUNK_SIZE; ++bx) {
 
-						block_id below = prev_sparse ? (block_id)prev_val : chunks.subchunks[prev_val].voxels[block_i + BZ * (SUBCHUNK_SIZE-1)];
+						block_id below = (prev_val & SUBC_SPARSE_BIT) ? (block_id)(prev_val & ~SUBC_SPARSE_BIT) : chunks.subchunks[prev_val].voxels[block_i + BZ * (SUBCHUNK_SIZE-1)];
 						
-						for (int bz=0; bz < (sparse ? 1 : SUBCHUNK_SIZE); ++bz) {
-							block_id bid = sparse ? val : chunks.subchunks[val].voxels[block_i + bz*BZ];
+						for (int bz=0; bz < ((val & SUBC_SPARSE_BIT) ? 1 : SUBCHUNK_SIZE); ++bz) {
+							block_id bid = (val & SUBC_SPARSE_BIT) ? (block_id)(val & ~SUBC_SPARSE_BIT) : chunks.subchunks[val].voxels[block_i + bz*BZ];
 
 							if (bid == air && below == earth)
 								block(sx+bx, sy+by, sz+bz, below);

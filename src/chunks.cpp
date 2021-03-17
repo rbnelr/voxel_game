@@ -33,10 +33,11 @@ void Chunks::free_voxels (chunk_id cid, Chunk& chunk) {
 	auto& vox = chunk_voxels[cid];
 
 	for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
-		if (!vox.is_subchunk_sparse(i)) {
-			auto& subchunk = subchunks[ vox.sparse_data[i] ];
+		auto subc = vox.subchunks[i];
+		if ((subc & SUBC_SPARSE_BIT) == 0) {
+			auto& subchunk = subchunks[subc];
 			DBG_MEMSET(&subchunk, DBG_MEMSET_FREED, sizeof(subchunk));
-			subchunks.free(vox.sparse_data[i]);
+			subchunks.free(subc);
 		}
 	}
 
@@ -63,12 +64,12 @@ block_id Chunks::read_block (int x, int y, int z, chunk_id cid) {
 	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
-	auto subchunk_val = vox.sparse_data[subchunk_i];
+	auto subc = vox.subchunks[subchunk_i];
 
-	if (vox.is_subchunk_sparse(subchunk_i))
-		return CHECK_BLOCK( (block_id)subchunk_val ); // sparse subchunk
+	if (subc & SUBC_SPARSE_BIT)
+		return CHECK_BLOCK( (block_id)(subc & ~SUBC_SPARSE_BIT) ); // sparse subchunk
 
-	auto& subchunk = subchunks[subchunk_val];
+	auto& subchunk = subchunks[subc];
 
 	auto blocki = BLOCK_IDX(x,y,z);
 	assert(blocki >= 0 && blocki < SUBCHUNK_VOXEL_COUNT);
@@ -98,15 +99,15 @@ void Chunks::write_block (int x, int y, int z, chunk_id cid, block_id data) {
 	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
-	uint32_t& subchunk_val = vox.sparse_data[subchunk_i];
+	auto& subc = vox.subchunks[subchunk_i];
 
-	if (vox.is_subchunk_sparse(subchunk_i)) {
-		if (data == (block_id)subchunk_val)
+	if (subc & SUBC_SPARSE_BIT) {
+		if (data == (block_id)(subc & ~SUBC_SPARSE_BIT))
 			return; // chunk stays sparse
-		densify_subchunk(vox, subchunk_i, subchunk_val); // sparse subchunk, allocate dense subchunk
+		densify_subchunk(vox,subc); // sparse subchunk, allocate dense subchunk
 	}
 
-	auto& subchunk = subchunks[subchunk_val];
+	auto& subchunk = subchunks[subc];
 	auto blocki = BLOCK_IDX(x,y,z);
 	subchunk.voxels[blocki] = data;
 
@@ -134,21 +135,21 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	if (z == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z+1);
 }
 
-void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i, uint32_t& subchunk_val) {
+void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t& subc) {
 	ZoneScoped;
-	vox.set_subchunk_dense(subchunk_i);
+	assert(subc & SUBC_SPARSE_BIT);
+	block_id bid = (block_id)(subc & ~SUBC_SPARSE_BIT);
 
-	block_id bid = (block_id)subchunk_val;
-
-	subchunk_val = subchunks.alloc();
-	auto& subchunk = subchunks[subchunk_val];
+	subc = subchunks.alloc();
+	auto& subchunk = subchunks[subc];
 
 	for (uint32_t i=0; i<SUBCHUNK_VOXEL_COUNT; ++i)
-		subchunk.voxels[i] = (uint32_t)bid;
+		subchunk.voxels[i] = bid;
 }
 
-bool Chunks::checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i) {
-	auto& subchunk = subchunks[ vox.sparse_data[subchunk_i] ];
+bool Chunks::checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t& subc) {
+	assert((subc & SUBC_SPARSE_BIT) == 0);
+	auto& subchunk = subchunks[subc];
 	
 	block_id bid = subchunk.voxels[0];
 	for (int i=1; i<SUBCHUNK_VOXEL_COUNT; ++i) {
@@ -158,11 +159,9 @@ bool Chunks::checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i) {
 	// Subchunk sparse
 
 	DBG_MEMSET(&subchunk, DBG_MEMSET_FREED, sizeof(subchunk));
-	subchunks.free(vox.sparse_data[subchunk_i]);
+	subchunks.free(subc);
 
-	vox.sparse_data[subchunk_i] = bid;
-	vox.set_subchunk_sparse(subchunk_i);
-
+	subc = (uint32_t)bid | SUBC_SPARSE_BIT;
 	return true;
 }
 
@@ -171,8 +170,8 @@ void Chunks::checked_sparsify_chunk (chunk_id cid) {
 	auto& vox = chunk_voxels[cid];
 
 	for (uint16_t subc_i=0; subc_i<CHUNK_SUBCHUNK_COUNT; ++subc_i) {
-		if (!vox.is_subchunk_sparse(subc_i))
-			checked_sparsify_subchunk(vox, subc_i);
+		if ((vox.subchunks[subc_i] & SUBC_SPARSE_BIT) == 0)
+			checked_sparsify_subchunk(vox, vox.subchunks[subc_i]);
 	}
 }
 
@@ -229,9 +228,6 @@ void Chunks::sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* r
 
 	auto& vox = chunk_voxels[cid];
 	
-	// init all subchunks to be sparse, because most tend to be sparse
-	memset(vox.sparse_bits, -1, sizeof(vox.sparse_bits));
-
 	// allocate one temp subchunk to copy data into while scanning (instead of a scanning loop + copy loop)
 	auto temp_subc = subchunks.alloc();
 
@@ -246,15 +242,13 @@ void Chunks::sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* r
 
 				if (subchunk_sparse) {
 					// store sparse block id into sparse storage
-					vox.sparse_data[subc_i] = (uint32_t)*ptr;
+					vox.subchunks[subc_i] = (uint32_t)*ptr | SUBC_SPARSE_BIT;
 					// reuse temp subchunk, ie do nothing
 				} else {
 					// store the dense temp subchunk into our dense chunk, and allocate a new temp subchunk
 					// thus avoiding a second copy
-					vox.sparse_data[subc_i] = temp_subc;
+					vox.subchunks[subc_i] = temp_subc;
 					temp_subc = subchunks.alloc();
-
-					vox.set_subchunk_dense(subc_i);
 				}
 
 				subc_i++;
@@ -834,7 +828,7 @@ void Chunks::visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culle
 		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
 			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
 				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-					if (!vox.is_subchunk_sparse(subc_i)) {
+					if ((vox.subchunks[subc_i] & SUBC_SPARSE_BIT) == 0) {
 						float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
 						g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
 					}
@@ -912,9 +906,9 @@ void _dev_raycast (Chunks& chunks, Camera_View& view) {
 			auto& vox = chunks.chunk_voxels[chunkid];
 			auto subc_i = SUBCHUNK_IDX(scoord.x, scoord.y, scoord.z);
 
-			auto data = vox.sparse_data[subc_i];
-			if (vox.is_subchunk_sparse(subc_i)) {
-				block_id bid = (block_id)data;
+			auto subc = vox.subchunks[subc_i];
+			if ((subc & SUBC_SPARSE_BIT) == 0) {
+				block_id bid = (block_id)(subc & ~SUBC_SPARSE_BIT);
 
 				if (iterations++ >= 1000)
 					return;
@@ -941,7 +935,7 @@ void _dev_raycast (Chunks& chunks, Camera_View& view) {
 					float t1 = min(min(next.x, next.y), next.z);
 					int axis = get_axis(next);
 					
-					block_id bid = chunks.subchunks[data].voxels[BLOCK_IDX(coord.x, coord.y, coord.z)];
+					block_id bid = chunks.subchunks[subc].voxels[BLOCK_IDX(coord.x, coord.y, coord.z)];
 					
 					if (iterations++ >= 1000)
 						return;

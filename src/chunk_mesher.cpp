@@ -116,10 +116,12 @@ struct CallCtx {
 			return { true, (block_id*)&chunk.voxel_data };
 
 		auto& dc = j.chunk_voxels[chunk.voxel_data];
-		if (dc.is_subchunk_sparse(subchunk_i))
-			return { true, (block_id*)&dc.sparse_data[subchunk_i] }; // sparse subchunk
 
-		return { false, j.subchunks[ dc.sparse_data[subchunk_i] ].voxels }; // dense subchunk
+		auto& subc = dc.subchunks[subchunk_i];
+		if (subc & SUBC_SPARSE_BIT)
+			return { true, (block_id*)&subc }; // sparse subchunk
+
+		return { false, j.subchunks[subc].voxels }; // dense subchunk
 	}
 
 	// Chunk meshing optimized for speed

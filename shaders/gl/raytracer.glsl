@@ -98,14 +98,10 @@ struct Chunk {
 	uint opaque_mesh_vertex_count;
 	uint transp_mesh_vertex_count;
 };
-struct ChunkVoxels {
-	// data for all subchunks
-	// sparse subchunk:  block_id of all subchunk voxels
-	// dense  subchunk:  id of subchunk
-	uint sparse_data[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT];
 
-	// packed bits for all subchunks, where  0: dense subchunk  1: sparse subchunk
-	uint sparse_bits[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT / 32];
+#define SUBC_SPARSE_BIT 0x80000000u
+struct ChunkVoxels {
+	uint subchunks[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT];
 };
 struct SubchunkVoxels {
 	uint voxels[SUBCHUNK_SIZE][SUBCHUNK_SIZE][SUBCHUNK_SIZE/2];
@@ -146,10 +142,6 @@ uint get_neighbour (uint cid, int i) {
 int get_subchunk_idx (ivec3 pos) {
 	pos >>= SUBCHUNK_SHIFT;
 	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
-}
-bool is_subchunk_sparse (uint cid, int subc_i) {
-	uint test = chunk_voxels[cid].sparse_bits[subc_i >> 5] & (1u << (subc_i & 31));
-	return test != 0u;
 }
 
 uint get_voxel (uint subc_id, ivec3 pos) {
@@ -309,10 +301,9 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, uint 
 	return true;
 }
 
+#define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
+
 bool trace_ray (Ray ray, out Hit hit) {
-
-	#define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
-
 	ivec3 sign;
 	sign.x = ray.dir.x >= 0.0 ? 1 : -1;
 	sign.y = ray.dir.y >= 0.0 ? 1 : -1;
@@ -348,9 +339,9 @@ bool trace_ray (Ray ray, out Hit hit) {
 		do {
 			int subci = get_subchunk_idx(scoord);
 			
-			uint subchunk_data = chunk_voxels[ray.chunkid].sparse_data[subci];
-			if (is_subchunk_sparse(ray.chunkid, subci)) {
-				uint bid = subchunk_data;
+			uint subchunk = chunk_voxels[ray.chunkid].subchunks[subci];
+			if ((subchunk & SUBC_SPARSE_BIT) != 0) {
+				uint bid = subchunk & ~SUBC_SPARSE_BIT;
 				
 				if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, prev_chunkid, dist, axis, hit))
 					return true;
@@ -389,7 +380,7 @@ bool trace_ray (Ray ray, out Hit hit) {
 				coord &= SUBCHUNK_MASK;
 				
 				do {
-					uint bid = get_voxel(subchunk_data, coord);
+					uint bid = get_voxel(subchunk, coord);
 					
 					if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, prev_chunkid, dist, axis, hit))
 						return true;

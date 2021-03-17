@@ -30,6 +30,17 @@ namespace gl {
 #define OGL_TRACE(name) TracyGpuZone(name)
 #endif
 
+#define GL_PRINT_INT(pname) do { \
+		int i; \
+		glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &i); \
+		printf(#pname ": %d\n", i); \
+	} while (0)
+
+// GL_PRINT_INT(GL_MAX_TEXTURE_BUFFER_SIZE);
+// GL_PRINT_INT(GL_MAX_TEXTURE_SIZE);
+// GL_PRINT_INT(GL_MAX_3D_TEXTURE_SIZE);
+// GL_PRINT_INT(GL_MAX_RECTANGLE_TEXTURE_SIZE);
+
 inline void gl_enable (GLenum cap, bool on) {
 	if (on)
 		glEnable(cap);

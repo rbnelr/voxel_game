@@ -113,8 +113,6 @@ class Renderer;
 struct ChunkSliceData;
 struct WorldgenJob;
 
-#define MAX_SUBCHUNKS		((32ull *GB) / sizeof(SubchunkVoxels))
-
 inline constexpr block_id g_null_chunk[CHUNK_VOXEL_COUNT] = {}; // chunk data filled with B_NULL to optimize meshing with non-loaded neighbours
 
 // linked list in Chunks::slices
@@ -122,33 +120,20 @@ struct SliceNode {
 	slice_id next;
 };
 
+static constexpr uint32_t SUBC_SPARSE_BIT = 0x80000000u;
+
 struct SubchunkVoxels {
 	block_id voxels[SUBCHUNK_VOXEL_COUNT];
 };
 struct ChunkVoxels {
-	// data for all subchunks
-	// sparse subchunk:  block_id of all subchunk voxels
-	// dense  subchunk:  id of subchunk
-	uint32_t sparse_data[CHUNK_SUBCHUNK_COUNT];
-
-	// packed bits for all subchunks, where  0: dense subchunk  1: sparse subchunk
-	uint64_t sparse_bits[CHUNK_SUBCHUNK_COUNT / 64];
-
-	// Use comma operator to assert and return value in expression
-#define CHECK_BLOCK(b) (assert((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
-	//#define CHECK_BLOCK(b) ( ((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
-
-	bool is_subchunk_sparse (uint32_t subc_i) {
-		auto test = sparse_bits[subc_i >> 6] & (1ull << (subc_i & 63));
-		return test != 0;
-	}
-	void set_subchunk_sparse (uint32_t subc_i) {
-		sparse_bits[subc_i >> 6] |= 1ull << (subc_i & 63);
-	}
-	void set_subchunk_dense (uint32_t subc_i) {
-		sparse_bits[subc_i >> 6] &= ~(1ull << (subc_i & 63));
-	}
+	uint32_t subchunks[CHUNK_SUBCHUNK_COUNT];
 };
+
+inline constexpr uint32_t MAX_SUBCHUNKS = (uint32_t)( (32ull *GB) / sizeof(SubchunkVoxels) );
+
+// Use comma operator to assert and return value in expression
+#define CHECK_BLOCK(b) (assert((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
+//#define CHECK_BLOCK(b) ( ((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
 
 struct Chunk {
 	enum Flags : uint32_t {
@@ -324,10 +309,10 @@ struct Chunks {
 
 	void free_voxels (chunk_id cid, Chunk& chunk);
 
-	void densify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i, uint32_t& subchunk_val);
+	void densify_subchunk (ChunkVoxels& vox, uint32_t& subc);
 
 	void checked_sparsify_chunk (chunk_id cid);
-	bool checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t subchunk_i);
+	bool checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t& subc);
 
 	void sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels);
 
