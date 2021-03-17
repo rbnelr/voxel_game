@@ -170,6 +170,23 @@ public:
 
 	operator GLuint () const { return sampler; }
 };
+class Texture1D {
+	GLuint tex = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Texture1D, tex);
+
+	Texture1D () {} // not allocated
+	Texture1D (std::string_view label) { // allocate
+		glGenTextures(1, &tex);
+		glBindTexture(GL_TEXTURE_1D, tex);
+		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
+	}
+	~Texture1D () {
+		if (tex) glDeleteTextures(1, &tex);
+	}
+
+	operator GLuint () const { return tex; }
+};
 class Texture2D {
 	GLuint tex = 0;
 public:
@@ -187,6 +204,24 @@ public:
 
 	operator GLuint () const { return tex; }
 };
+class Texture3D {
+	GLuint tex = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Texture3D, tex);
+
+	Texture3D () {} // not allocated
+	Texture3D (std::string_view label) { // allocate
+		glGenTextures(1, &tex);
+		glBindTexture(GL_TEXTURE_3D, tex);
+		OGL_DBG_LABEL(GL_TEXTURE, tex, label);
+	}
+	~Texture3D () {
+		if (tex) glDeleteTextures(1, &tex);
+	}
+
+	operator GLuint () const { return tex; }
+};
+
 class Texture2DArray {
 	GLuint tex = 0;
 public:

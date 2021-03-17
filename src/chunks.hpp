@@ -15,15 +15,19 @@
 
 #if 0
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
-#else
+#elif 1
 #define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		3
 #define SUBCHUNK_MASK		7
+#else
+#define SUBCHUNK_SIZE		16 // size of subchunk in blocks per axis
+#define SUBCHUNK_SHIFT		4
+#define SUBCHUNK_MASK		15
 #endif
+
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 
 static_assert(SUBCHUNK_COUNT == (CHUNK_SIZE / SUBCHUNK_SIZE), "");
 static_assert((1 << SUBCHUNK_SHIFT) == SUBCHUNK_SIZE, "");

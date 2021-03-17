@@ -57,15 +57,15 @@ mat3 get_tangent_to_world (vec3 normal) {
 
 #if 0
 #define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		2
 #define SUBCHUNK_MASK		3
 #else
 #define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 #define SUBCHUNK_SHIFT		3
 #define SUBCHUNK_MASK		7
 #endif
+
+#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 
 #define B_AIR 1
 #define B_WATER 3
@@ -100,12 +100,6 @@ struct Chunk {
 };
 
 #define SUBC_SPARSE_BIT 0x80000000u
-struct ChunkVoxels {
-	uint subchunks[SUBCHUNK_COUNT*SUBCHUNK_COUNT*SUBCHUNK_COUNT];
-};
-struct SubchunkVoxels {
-	uint voxels[SUBCHUNK_SIZE][SUBCHUNK_SIZE][SUBCHUNK_SIZE/2];
-};
 
 // common_ubo       binding = 0
 // block_meshes_ubo binding = 1
@@ -122,14 +116,26 @@ layout(std430, binding = 2) readonly buffer BlockTiles {
 layout(std430, binding = 3) readonly buffer Chunks {
 	Chunk chunks[];
 };
-layout(std430, binding = 4) readonly buffer _ChunkVoxels {
-	ChunkVoxels chunk_voxels[];
-};
-layout(std430, binding = 5) readonly buffer Subchunks {
-	SubchunkVoxels subchunks[];
-};
 
-layout(rgba16f, binding = 6) uniform image2D img;
+layout(rgba16f, binding = 4) uniform image2D img;
+
+uniform usampler3D	chunk_voxels;
+uniform usampler3D	subchunk_voxels;
+
+#define TEX3D_SIZE			2048 // max width, height, depth for 3d textures
+
+#define SUBCHUNK_TEX_COUNT	(TEX3D_SIZE / SUBCHUNK_SIZE) // max num of subchunks in one axis for tex
+#define SUBCHUNK_TEX_SHIFT	8
+#define SUBCHUNK_TEX_MASK	((SUBCHUNK_TEX_COUNT-1) << SUBCHUNK_SHIFT)
+
+// subchunk id to 3d tex offset (including subchunk_size multiplication)
+ivec3 subchunk_id_to_texcoords (uint id) {
+	ivec3 coord;
+	coord.x = int((id << (SUBCHUNK_TEX_SHIFT*0 + SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
+	coord.y = int((id >> (SUBCHUNK_TEX_SHIFT*1 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
+	coord.z = int((id >> (SUBCHUNK_TEX_SHIFT*2 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
+	return coord;
+}
 
 //
 ivec3 get_pos (uint cid) {
@@ -137,16 +143,6 @@ ivec3 get_pos (uint cid) {
 }
 uint get_neighbour (uint cid, int i) {
 	return (chunks[cid]._neighbours[i >> 1] >> ((i & 1) * 16)) & 0xffffu;
-}
-
-int get_subchunk_idx (ivec3 pos) {
-	pos >>= SUBCHUNK_SHIFT;
-	return pos.z * SUBCHUNK_COUNT*SUBCHUNK_COUNT + pos.y * SUBCHUNK_COUNT + pos.x;
-}
-
-uint get_voxel (uint subc_id, ivec3 pos) {
-	uint val = subchunks[subc_id].voxels[pos.z][pos.y][pos.x >> 1];
-	return (val >> ((pos.x & 1) * 16)) & 0xffffu;
 }
 
 uniform sampler2DArray	tile_textures;
@@ -336,10 +332,11 @@ bool trace_ray (Ray ray, out Hit hit) {
 	while (ray.chunkid != 0xffffu) {
 		scoord &= CHUNK_SIZE_MASK;
 		
+		ivec3 chunk_offs = subchunk_id_to_texcoords(ray.chunkid);
+		
 		do {
-			int subci = get_subchunk_idx(scoord);
+			uint subchunk = texelFetch(chunk_voxels, chunk_offs + (scoord >> SUBCHUNK_SHIFT), 0).r;
 			
-			uint subchunk = chunk_voxels[ray.chunkid].subchunks[subci];
 			if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 				uint bid = subchunk & ~SUBC_SPARSE_BIT;
 				
@@ -357,6 +354,8 @@ bool trace_ray (Ray ray, out Hit hit) {
 			#endif
 
 			} else {
+				
+				ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
 				
 				#if 1
 				vec3 proj = ray.pos + ray.dir * dist;
@@ -380,7 +379,7 @@ bool trace_ray (Ray ray, out Hit hit) {
 				coord &= SUBCHUNK_MASK;
 				
 				do {
-					uint bid = get_voxel(subchunk, coord);
+					uint bid = texelFetch(subchunk_voxels, subc_offs + coord, 0).r;
 					
 					if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, prev_chunkid, dist, axis, hit))
 						return true;
