@@ -163,7 +163,7 @@ struct WorldGenerator {
 	};
 
 	bool stalac = true;
-	float stalac_stren = 50;
+	float stalac_dens = 0.001f;
 
 	float ground_ang = 0.55f;
 	float earth_overhang_stren = 0.55f;
@@ -229,7 +229,7 @@ struct WorldGenerator {
 		imgui_noise_layers("small_noise", small_noise);
 
 		ImGui::Checkbox("stalac", &stalac);
-		ImGui::DragFloat("stalac_stren", &stalac_stren, 0.1f);
+		ImGui::DragFloat("stalac_dens", &stalac_dens, 0.1f);
 
 		ImGui::Spacing();
 		ImGui::DragFloat("ground_ang", &ground_ang, 0.01f);
