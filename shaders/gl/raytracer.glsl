@@ -7,9 +7,41 @@
 layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "common.glsl"
+#include "rand.glsl"
 
 #define PI	3.1415926535897932384626433832795
 #define INF (1. / 0.)
+
+float fresnel (vec3 view, vec3 norm, float F0) {
+	float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
+	float x2 = x*x;
+	return F0 + ((1.0 - F0) * x2 * x2 * x);
+}
+
+vec3 hemisphere_sample () {
+	// cosine weighted sampling (100% diffuse)
+	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+	
+	vec2 uv = rand2();
+	
+	float r = sqrt(uv.y);
+	float theta = 2*PI * uv.x;
+	
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	
+	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	return dir;
+}
+
+// TODO: could optimize this to be precalculated for all normals, since we currently only have 6
+mat3 get_tangent_to_world (vec3 normal) {
+	vec3 tangent = abs(normal.x) >= 0.9 ? vec3(0,1,0) : vec3(1,0,0);
+	vec3 bitangent = cross(normal, tangent);
+	tangent = cross(bitangent, normal);
+	
+	return mat3(tangent, bitangent, normal);
+}
 
 #if 1
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
@@ -124,12 +156,47 @@ uniform sampler2D		heat_gradient;
 	#endif
 #endif
 
+uniform bool  sunlight_enable = true;
+uniform float sunlight_dist = 90.0;
+uniform vec3  sunlight_col = vec3(0.98, 0.92, 0.65) * 1.3;
+
+uniform vec3  ambient_light;
+
+uniform bool  bounces_enable = true;
+uniform float bounces_max_dist = 30.0;
+uniform int   bounces_max_count = 8;
+
+uniform int   rays = 1;
+
+uniform bool  visualize_light = false;
+
+const vec3 sun_pos = vec3(-28, 67, 102);
+const float sun_pos_size = 4.0;
+
+const vec3 sun_dir = normalize(vec3(-1,2,3));
+const float sun_dir_rand = 0.05;
+
+const float water_F0 = 0.2;
+const float water_IOR = 1.333;
+const float air_IOR = 1.0;
+
 //
 struct Ray {
 	vec3	pos;
 	vec3	dir;
 	uint	chunkid;
 	float	max_dist;
+};
+
+struct Hit {
+	vec3	pos;
+	vec3	normal;
+	uint	chunkid;
+	float	dist;
+	uint	bid;
+	uint	prev_bid;
+	vec3	col;
+	vec3	emiss;
 };
 
 int iterations = 0;
@@ -182,32 +249,45 @@ vec2 calc_uv (vec3 pos, int entry_face) {
 	return uv;
 }
 
-bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, out vec3 hit_col) {
+bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, uint chunkid, float dist, int axis, out Hit hit) {
 	if (prev_bid == 0 || (prev_bid == bid && !(bid == B_LEAVES || bid == B_TALLGRASS)))
 		return false;
 	
 	if (bid == B_AIR)
 		bid = prev_bid;
 	
-	vec3 hit_pos = ray_pos + ray_dir * dist;
+	hit.pos = ray_pos + ray_dir * dist;
 
 	int entry_face = get_step_face(axis, ray_dir);
-	vec2 uv = calc_uv(hit_pos, entry_face);
+	vec2 uv = calc_uv(hit.pos, entry_face);
 	
-	float texid = float(block_tiles[bid].sides[entry_face]);
+	uint tex_bid = bid == B_AIR ? prev_bid : bid;
+	float texid = float(block_tiles[tex_bid].sides[entry_face]);
 	
 	vec4 col = texture(tile_textures, vec3(uv, texid), 0.0);
+	
+	if (tex_bid == B_TALLGRASS && axis == 2)
+		col = vec4(0.0);
 	
 	if (col.a <= 0.001)
 		return false;
 	
-	hit_col = col.rgb;
+	hit.bid = bid;
+	hit.prev_bid = prev_bid;
+	
+	hit.normal = vec3(0.0);
+	hit.normal[axis] = -sign(ray_dir[axis]);
+	
+	hit.chunkid = chunkid;
+	hit.dist = dist;
+	hit.col = col.rgb;
+	hit.emiss = col.rgb * get_emmisive(bid);
 	return true;
 }
 
 #define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
 
-bool trace_ray (Ray ray, out vec3 hit_col) {
+bool trace_ray (Ray ray, out Hit hit) {
 	if (ray.chunkid == 0xffffu)
 		return false;
 	
@@ -222,6 +302,7 @@ bool trace_ray (Ray ray, out vec3 hit_col) {
 	int axis;
 	uint prev_bid = 0;
 	uint subchunk;
+	uint prev_chunkid = ray.chunkid;
 	int stepmask = -1;
 	int stepsize = SUBCHUNK_SIZE;
 	
@@ -260,7 +341,7 @@ bool trace_ray (Ray ray, out vec3 hit_col) {
 			bid = texelFetch(subchunk_voxels, subc_offs + (coord & SUBCHUNK_MASK), 0).r;
 		}
 		
-		if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, dist, axis, hit_col))
+		if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, prev_chunkid, dist, axis, hit))
 			return true;
 		prev_bid = bid;
 		
@@ -301,6 +382,7 @@ bool trace_ray (Ray ray, out vec3 hit_col) {
 			stepmask = old_coord ^ coord.z;
 		}
 		
+		prev_chunkid = ray.chunkid;
 		if ((stepmask & ~CHUNK_SIZE_MASK) != 0) {
 			// stepped out of chunk
 			ray.chunkid = get_neighbour(ray.chunkid, get_step_face(axis, ray.dir) ^ 1);
@@ -310,6 +392,43 @@ bool trace_ray (Ray ray, out vec3 hit_col) {
 	}
 	
 	return false;
+}
+
+vec3 collect_sunlight (Hit hit) {
+	if (sunlight_enable) {
+		Ray r;
+		r.pos = hit.pos;
+		r.chunkid = hit.chunkid;
+		
+		#if 0
+		// directional sun
+		r.dir = sun_dir + rand3()*sun_dir_rand;
+		float cos = dot(r.dir, hit.normal);
+		
+		if (cos > 0.0) {
+			Hit hit;
+			r.max_dist = sunlight_dist;
+			if (!trace_ray(r, hit))
+				return sunlight_col * cos;
+		}
+		#else
+		// point sun
+		vec3 offs = (sun_pos + (rand3()-0.5) * sun_pos_size) - hit.pos;
+		float dist = length(offs);
+		r.dir = normalize(offs);
+		
+		float cos = dot(r.dir, hit.normal);
+		float atten = 10000.0 / (dist*dist);
+		
+		if (cos > 0.0) {
+			Hit hit;
+			r.max_dist = dist - sun_pos_size*0.5;
+			if (!trace_ray(r, hit))
+				return sunlight_col * cos * atten;
+		}
+		#endif
+	}
+	return vec3(0.0);
 }
 
 void main () {
@@ -327,13 +446,99 @@ void main () {
 	if (pos.x >= view.viewport_size.x || pos.y >= view.viewport_size.y)
 		return;
 	
-	Ray ray;
-	get_ray(pos, ray.chunkid, ray.pos, ray.dir);
-	ray.max_dist = INF;
+	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
+	
+	vec3 col = vec3(0.0);
+	for (int i=0; i<rays; ++i) {
+		// primary ray
+		Ray ray;
+		get_ray(pos, ray.chunkid, ray.pos, ray.dir);
+		ray.max_dist = INF;
 		
-	vec3 col;
-	if (!trace_ray(ray, col))
-		col = vec3(0.0);
+		for (int j=0; j<2; ++j) {
+			Hit hit;
+			if (!trace_ray(ray, hit))
+				break;
+			
+			hit.pos += hit.normal * 0.001;
+			
+			vec3 light = ambient_light;
+			light += collect_sunlight(hit);
+			
+			if (bounces_enable) {
+				
+				Ray ray2;
+				ray2.pos = hit.pos;
+				ray2.chunkid = hit.chunkid;
+				ray2.max_dist = bounces_max_dist;
+				
+				vec3 cur_normal = hit.normal;
+				vec3 contrib = vec3(1.0);
+				
+				for (int j=0; j<bounces_max_count; ++j) {
+					ray2.dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+					
+					Hit hit2;
+					if (!trace_ray(ray2, hit2))
+						break;
+					
+					vec3 light2 = collect_sunlight(hit2);
+					
+					light += hit2.emiss;
+					light += hit2.col * light2;
+					
+					ray2.pos = hit2.pos += hit2.normal * 0.001;
+					ray2.chunkid = hit2.chunkid;
+					ray2.max_dist -= hit2.dist;
+					
+					cur_normal = hit2.normal;
+					contrib *= hit2.col;
+				}
+			}
+			
+			if (visualize_light)
+				hit.col = vec3(1.0);
+			
+			bool water = hit.bid == B_WATER || hit.prev_bid == B_WATER;
+			bool air = hit.bid == B_AIR || hit.prev_bid == B_AIR;
+			bool surface = water && air;
+			
+			if (!surface) {
+				
+				col += hit.emiss;
+				col += hit.col * light;
+				
+				break;
+			} else {
+				
+				//hit.normal = normalize(vec3(sin(hit.pos.y * 6.0), 0, 16));
+				
+				float reflect_fac = fresnel(-ray.dir, hit.normal, water_F0);
+				
+				float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;
+				
+				vec3 reflect_dir = reflect(ray.dir, hit.normal);
+				vec3 refract_dir = refract(ray.dir, hit.normal, eta);
+				
+				if (dot(refract_dir, refract_dir) == 0.0) {
+					// total internal reflection, ie. outside of snells window
+					reflect_fac = 1.0;
+				}
+				
+				if (rand() <= reflect_fac) {
+					// reflect
+					ray.pos = hit.pos;
+					ray.dir = reflect_dir;
+				} else {
+					// refract
+					ray.pos = hit.pos - 2.0 * hit.normal * 0.001;
+					ray.dir = refract_dir;
+				}
+				ray.chunkid = hit.chunkid;
+			}
+		}
+	}
+	col *= 1.0 / float(rays);
 	
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST
