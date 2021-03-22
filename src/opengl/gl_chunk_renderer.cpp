@@ -166,31 +166,29 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer upload changes");
 
-	chunks_ssbo      .resize( game.chunks.chunks      .commit_size(), false );
-
-	// stream chunks data structure every frame, because reacting to changes in neighbour ptrs is hard and it's small enough
-	if (game.chunks.chunks.commit_size() > 0) {
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, chunks_ssbo.ssbo);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, game.chunks.chunks.commit_size(), game.chunks.chunks.arr);
-	}
-
-	chunk_voxels_tex .resize(game.chunks.chunk_voxels.slots.alloc_end);
-	subchunks_tex    .resize(game.chunks.subchunks.slots.alloc_end);
+	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
 
 	for (auto cid : game.chunks.upload_voxels) {
 		auto& chunk = game.chunks.chunks[cid];
 
-		glBindTexture(GL_TEXTURE_3D, chunk_voxels_tex.tex);
+		glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
 
 		auto& vox = game.chunks.chunk_voxels[cid];
-		chunk_voxels_tex.upload(cid, vox.subchunks);
 
-		glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
+		int3 pos = chunk.pos + 16;
+		if (all(pos >= 0 && pos < 32)) {
+			glTexSubImage3D(GL_TEXTURE_3D, 0,
+				pos.x*SUBCHUNK_COUNT, pos.y*SUBCHUNK_COUNT, pos.z*SUBCHUNK_COUNT,
+				SUBCHUNK_COUNT, SUBCHUNK_COUNT, SUBCHUNK_COUNT,
+				GL_RED_INTEGER, GL_UNSIGNED_INT, vox.subchunks);
+		}
+
+		glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
 
 		for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
 			auto subc = vox.subchunks[i];
 			if ((subc & SUBC_SPARSE_BIT) == 0) {
-				subchunks_tex.upload(subc, game.chunks.subchunks[subc].voxels);
+				voxels_tex.upload(subc, game.chunks.subchunks[subc].voxels);
 			}
 		}
 	}
@@ -203,7 +201,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
 	
-	if (!shad) return;
+	if (!shad->prog) return;
 
 	glUseProgram(shad->prog);
 
@@ -233,17 +231,15 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
 		
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, chunks_ssbo.ssbo);
-
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::CHUNK_VOXELS);
-	glBindTexture(GL_TEXTURE_3D, chunk_voxels_tex.tex);
-	glUniform1i(shad->get_uniform_location("chunk_voxels"), OpenglRenderer::CHUNK_VOXELS);
-
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNK_VOXELS);
+	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
-	glUniform1i(shad->get_uniform_location("subchunk_voxels"), OpenglRenderer::SUBCHUNK_VOXELS);
+	glUniform1i(shad->get_uniform_location("subchunks_tex"), OpenglRenderer::SUBCHUNKS_TEX);
 
-	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
+	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
+	glUniform1i(shad->get_uniform_location("voxels_tex"), OpenglRenderer::VOXELS_TEX);
+
+	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
 	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	int szy = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;

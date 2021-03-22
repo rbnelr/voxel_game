@@ -219,8 +219,8 @@ public:
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,
 		
-		CHUNK_VOXELS,
-		SUBCHUNK_VOXELS,
+		SUBCHUNKS_TEX,
+		VOXELS_TEX,
 
 		GUI_ATLAS,
 		HEAT_GRADIENT,

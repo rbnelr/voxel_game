@@ -139,42 +139,16 @@ struct Raytracer {
 		return coord;
 	}
 
-	struct SSBO {
-		std::string_view label;
+	struct SubchunksTexture {
+		Texture3D	tex;
 
-		size_t	alloc_size = 0;
-		Ssbo	ssbo;
+		SubchunksTexture () {
+			tex = {"Raytracer.subchunks_tex"};
 
-		SSBO (std::string_view label): label{label} {}
+			glTextureStorage3D(tex, 1, GL_R32UI, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
 
-		void resize (size_t new_size, bool copy=true) {
-			size_t aligned_size = align_up(new_size, (size_t)(16 * MB)); // round up size to avoid constant resizing, ideally only happens sometimes
-			aligned_size = std::max(aligned_size, (size_t)(16 * MB));
-
-			if (alloc_size == aligned_size)
-				return;
-
-			Ssbo new_ssbo = {label};
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_ssbo);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, aligned_size, nullptr, GL_STATIC_DRAW);
-
-			if (copy) {
-				if (alloc_size)
-					assert(ssbo != 0);
-
-				size_t copy_size = std::min(alloc_size, aligned_size);
-				if (copy_size > 0) {
-					glBindBuffer(GL_COPY_READ_BUFFER, ssbo);
-					glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 0, copy_size);
-					glBindBuffer(GL_COPY_READ_BUFFER, 0);
-				}
-			}
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-			alloc_size = aligned_size;
-			ssbo = std::move(new_ssbo);
+			GLuint val = SUBC_SPARSE_BIT | (uint32_t)B_NULL;
+			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
 		}
 	};
 
@@ -201,18 +175,18 @@ struct Raytracer {
 			clog(INFO, ">> Resized %s 3d texture to %dx%dx%d (%d MB)", label.c_str(), TEX3D_SIZE, TEX3D_SIZE, layers*SZ, (int)(sz / MB));
 
 			glTextureStorage3D(new_tex, 1, sizeof(T) == 2 ? GL_R16UI : GL_R32UI, TEX3D_SIZE, TEX3D_SIZE, layers*SZ);
-			
+
 			{ // copy old tex data to new bigger tex
 				if (alloc_layers)
 					assert(tex != 0);
-			
+
 				uint32_t copy_layers = std::min(alloc_layers, layers);
 				if (copy_layers > 0) {
 					glCopyImageSubData(tex,     GL_TEXTURE_3D, 0, 0,0,0,
-					                   new_tex, GL_TEXTURE_3D, 0, 0,0,0, TEX3D_SIZE, TEX3D_SIZE, copy_layers*SZ);
+						new_tex, GL_TEXTURE_3D, 0, 0,0,0, TEX3D_SIZE, TEX3D_SIZE, copy_layers*SZ);
 				}
 			}
-			
+
 			alloc_layers = layers;
 			tex = std::move(new_tex);
 		}
@@ -226,10 +200,9 @@ struct Raytracer {
 		}
 	};
 
-	SSBO chunks_ssbo			= {"Raytracer.chunks" };
+	SubchunksTexture						subchunks_tex;
 
-	VoxTexture<uint32_t, SUBCHUNK_COUNT>	chunk_voxels_tex = {"Raytracer.chunk_voxels" };
-	VoxTexture<block_id, SUBCHUNK_SIZE>		subchunks_tex = {"Raytracer.subchunks_voxels" };
+	VoxTexture<block_id, SUBCHUNK_SIZE>		voxels_tex = {"Raytracer.voxels_tex" };
 
 	//
 	int max_iterations = 512;

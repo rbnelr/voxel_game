@@ -163,6 +163,9 @@ struct Shader {
 
 		if (error) {
 			clog(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
+
+			glDeleteProgram(prog);
+			prog = 0;
 		}
 		return !error;
 	}
@@ -256,9 +259,6 @@ struct Shaders {
 		s->macros = std::move(macros);
 
 		bool success = s->compile();
-		if (!success) {
-			return nullptr;
-		}
 
 		auto* ptr = s.get();
 		shaders.push_back(std::move(s));
