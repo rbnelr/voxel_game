@@ -162,14 +162,13 @@ struct Ray {
 };
 
 struct Hit {
-	//vec3	pos;
-	//vec3	normal;
-	//uint	chunkid;
-	//float	dist;
-	//uint	bid;
-	//uint	prev_bid;
+	vec3	pos;
+	vec3	normal;
+	float	dist;
+	uint	bid;
+	uint	prev_bid;
 	vec3	col;
-	//vec3	emiss;
+	vec3	emiss;
 };
 
 int iterations = 0;
@@ -239,28 +238,22 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float
 	if (col.a <= 0.001)
 		return false;
 	
-	//hit.pos = hit_pos;
-	//hit.normal = vec3(0.0);
-	//hit.normal[axis] = -sign(ray_dir[axis]);
-	//
-	//hit.bid = bid;
-	//hit.prev_bid = prev_bid;
-	//
-	//hit.chunkid = chunkid;
-	//hit.dist = dist;
+	hit.pos = hit_pos;
+	hit.normal = vec3(0.0);
+	hit.normal[axis] = -sign(ray_dir[axis]);
+	
+	hit.bid = bid;
+	hit.prev_bid = prev_bid;
+	
+	hit.dist = dist;
 	hit.col = col.rgb;
-	//hit.emiss = col.rgb * get_emmisive(bid);
+	hit.emiss = col.rgb * get_emmisive(bid);
 	return true;
 }
 
 #define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
 
 #if 1
-int get_axis (bvec3 axis_mask) {
-	if (     axis_mask.x) return 0;
-	else if (axis_mask.y) return 1;
-	else                  return 2;
-}
 bool trace_ray (Ray ray, out Hit hit) {
 	vec3 rdir;
 	rdir.x = ray.dir.x != 0.0 ? 1.0 / abs(ray.dir.x) : INF;
@@ -530,12 +523,11 @@ vec3 tonemap (vec3 c) {
 	return c;
 }
 
-#if 0
+#if 1
 vec3 collect_sunlight (Hit hit) {
 	if (sunlight_enable) {
 		Ray r;
 		r.pos = hit.pos;
-		r.chunkid = hit.chunkid;
 		
 		#if 0
 		// directional sun
@@ -586,7 +578,7 @@ void main () {
 
 	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
 	
-	#if 1
+	#if 0
 	Ray ray;
 	get_ray(pos, ray.pos, ray.dir);
 	ray.max_dist = INF;
@@ -680,7 +672,6 @@ void main () {
 					ray.pos = hit.pos - 2.0 * hit.normal * 0.001;
 					ray.dir = refract_dir;
 				}
-				ray.chunkid = hit.chunkid;
 			}
 		}
 	}
