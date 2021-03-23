@@ -193,11 +193,6 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
 }
 
-int get_axis (bvec3 axis_mask) {
-	if (     axis_mask.x) return 0;
-	else if (axis_mask.y) return 1;
-	else                  return 2;
-}
 int get_step_face (int axis, vec3 ray_dir) {
 	return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
 }
@@ -260,44 +255,46 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float
 
 #define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
 
+#if 1
+int get_axis (bvec3 axis_mask) {
+	if (     axis_mask.x) return 0;
+	else if (axis_mask.y) return 1;
+	else                  return 2;
+}
 bool trace_ray (Ray ray, out Hit hit) {
-	ivec3 sign;
-	sign.x = ray.dir.x >= 0.0 ? 1 : -1;
-	sign.y = ray.dir.y >= 0.0 ? 1 : -1;
-	sign.z = ray.dir.z >= 0.0 ? 1 : -1;
-
 	vec3 rdir;
 	rdir.x = ray.dir.x != 0.0 ? 1.0 / abs(ray.dir.x) : INF;
 	rdir.y = ray.dir.y != 0.0 ? 1.0 / abs(ray.dir.y) : INF;
 	rdir.z = ray.dir.z != 0.0 ? 1.0 / abs(ray.dir.z) : INF;
 
-	vec3 scoordf = floor(ray.pos / SUBCHUNK_SIZEf) * SUBCHUNK_SIZEf;
-	ivec3 scoord = ivec3(scoordf);
-
-	vec3 snext;
+	ivec3 coord;
+	vec3 next;
 	{
-		vec3 rel = ray.pos - scoordf;
-		snext.x = rdir.x * (ray.dir.x >= 0.0 ? SUBCHUNK_SIZEf - rel.x : rel.x);
-		snext.y = rdir.y * (ray.dir.y >= 0.0 ? SUBCHUNK_SIZEf - rel.y : rel.y);
-		snext.z = rdir.z * (ray.dir.z >= 0.0 ? SUBCHUNK_SIZEf - rel.z : rel.z);
+		vec3 coordf = floor(ray.pos / SUBCHUNK_SIZEf) * SUBCHUNK_SIZEf;
+		coord = ivec3(coordf);
+
+		vec3 rel = ray.pos - coordf;
+		next.x = rdir.x * (ray.dir.x >= 0.0 ? SUBCHUNK_SIZEf - rel.x : rel.x);
+		next.y = rdir.y * (ray.dir.y >= 0.0 ? SUBCHUNK_SIZEf - rel.y : rel.y);
+		next.z = rdir.z * (ray.dir.z >= 0.0 ? SUBCHUNK_SIZEf - rel.z : rel.z);
 	}
 
 	int stepmask;
 	float dist = 0; 
 	int axis = 0;
-
+	
 	uint prev_bid = 0;
 	
-	scoord += 16 * CHUNK_SIZE;
-	
-	if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
-		return false;
-	
 	for (;;) {
-		//scoord &= CHUNK_SIZE_MASK;
-		scoord &= (64 << 5) -1;
+		uint subchunk;
+		{
+			ivec3 _coord = coord + 16 * CHUNK_SIZE;
 		
-		uint subchunk = texelFetch(subchunks_tex, scoord >> SUBCHUNK_SHIFT, 0).r;
+			if (!all(lessThan(uvec3(_coord), uvec3(32 * CHUNK_SIZE))))
+				return false;
+			
+			subchunk = texelFetch(subchunks_tex, _coord >> SUBCHUNK_SHIFT, 0).r;
+		}
 		
 		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 			uint bid = subchunk & ~SUBC_SPARSE_BIT;
@@ -316,34 +313,50 @@ bool trace_ray (Ray ray, out Hit hit) {
 			if (subgroupElect())
 				atomicAdd(warp_iter[gl_SubgroupID], 1u);
 		#endif
-
+			
+			dist = min(min(next.x, next.y), next.z);
+			
+			if (next.x == dist) {
+				axis = 0;
+				
+				coord.x += (ray.dir.x >= 0.0 ? 1 : -1) * SUBCHUNK_SIZE;
+				next.x  += rdir.x * SUBCHUNK_SIZEf;
+			} else if (next.y == dist) {
+				axis = 1;
+				
+				coord.y += (ray.dir.y >= 0.0 ? 1 : -1) * SUBCHUNK_SIZE;
+				next.y  += rdir.y * SUBCHUNK_SIZEf;
+			} else {
+				axis = 2;
+				
+				coord.z += (ray.dir.z >= 0.0 ? 1 : -1) * SUBCHUNK_SIZE;
+				next.z  += rdir.z * SUBCHUNK_SIZEf;
+			}
+			
 		} else {
 			
 			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
 			
-			#if 1
-			vec3 proj = ray.pos + ray.dir * dist;
-			if (dist > 0.0)
-				proj[axis] += ray.dir[axis] >= 0 ? 0.5 : -0.5;
-			vec3 coordf = floor(proj);
-			#else
-			vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
-			#endif
-			
-			ivec3 coord = ivec3(coordf);
-			
-			vec3 next;
 			{
+				#if 1
+				vec3 proj = ray.pos + ray.dir * dist;
+				if (dist > 0.0)
+					proj[axis] += ray.dir[axis] >= 0 ? 0.5 : -0.5;
+				vec3 coordf = floor(proj);
+				#else
+				vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
+				#endif
+				
+				coord = ivec3(coordf);
+				
 				vec3 rel = ray.pos - coordf;
 				next.x = rdir.x * (ray.dir.x >= 0.0f ? 1.0f - rel.x : rel.x);
 				next.y = rdir.y * (ray.dir.y >= 0.0f ? 1.0f - rel.y : rel.y);
 				next.z = rdir.z * (ray.dir.z >= 0.0f ? 1.0f - rel.z : rel.z);
 			}
 			
-			coord &= SUBCHUNK_MASK;
-			
-			do {
-				uint bid = texelFetch(voxels_tex, subc_offs + coord, 0).r;
+			for (;;) {
+				uint bid = texelFetch(voxels_tex, subc_offs + (coord & SUBCHUNK_MASK), 0).r;
 				
 				if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, dist, axis, hit))
 					return true;
@@ -352,12 +365,32 @@ bool trace_ray (Ray ray, out Hit hit) {
 				
 				//
 				dist = min(min(next.x, next.y), next.z);
-				bvec3 mask = equal(vec3(dist), next);
 				
-				axis = get_axis(mask);
-				
-				coord += mix(ivec3(0.0), sign, mask);
-				next  += mix( vec3(0.0), rdir, mask);
+				if (next.x == dist) {
+					axis = 0;
+					
+					int old_coord = coord.x;
+					coord.x += (ray.dir.x >= 0.0 ? 1 : -1) * 1;
+					next.x  += rdir.x * 1.0f;
+					
+					stepmask = old_coord ^ coord.x;
+				} else if (next.y == dist) {
+					axis = 1;
+					
+					int old_coord = coord.y;
+					coord.y += (ray.dir.y >= 0.0 ? 1 : -1) * 1;
+					next.y  += rdir.y * 1.0f;
+					
+					stepmask = old_coord ^ coord.y;
+				} else {
+					axis = 2;
+					
+					int old_coord = coord.z;
+					coord.z += (ray.dir.z >= 0.0 ? 1 : -1) * 1;
+					next.z  += rdir.z * 1.0f;
+					
+					stepmask = old_coord ^ coord.z;
+				}
 				
 				if (++iterations >= max_iterations || dist >= ray.max_dist)
 					return false; // max dist reached
@@ -366,27 +399,125 @@ bool trace_ray (Ray ray, out Hit hit) {
 					atomicAdd(warp_iter[gl_SubgroupID], 1u);
 			#endif
 				
-				stepmask = coord.x | coord.y | coord.z;
-			} while ((stepmask & ~SUBCHUNK_MASK) == 0);
-			//} while (dist < sdist - 0.0001);
+				if ((stepmask & ~SUBCHUNK_MASK) != 0)
+					break;
+			}
 			
 			// stepped out of subchunk
+			
+			coord &= ~SUBCHUNK_MASK;
+			
+			ivec3 planecoord = coord + ivec3(SUBCHUNK_SIZE) * ivec3((~floatBitsToUint(ray.dir)) >> 31);
+			next = rdir * abs(ray.pos - vec3(planecoord));
 		}
-		
-		dist = min(min(snext.x, snext.y), snext.z);
-		bvec3 mask = equal(vec3(dist), snext);
-		
-		axis = get_axis(mask);
-		
-		scoord += mix(ivec3(0.0), sign * SUBCHUNK_SIZE, mask);
-		snext  += mix( vec3(0.0), rdir * SUBCHUNK_SIZEf, mask);
-		
-		if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
-			return false;
 	}
 	
 	return false;
 }
+#else
+bool trace_ray (Ray ray, out Hit hit) {
+	
+	vec3 rdir;
+	rdir.x = ray.dir.x != 0.0 ? 1.0 / abs(ray.dir.x) : INF;
+	rdir.y = ray.dir.y != 0.0 ? 1.0 / abs(ray.dir.y) : INF;
+	rdir.z = ray.dir.z != 0.0 ? 1.0 / abs(ray.dir.z) : INF;
+	
+	ivec3 coord = ivec3(floor(ray.pos / SUBCHUNK_SIZEf)) * SUBCHUNK_SIZE;
+	
+	float dist = 0; 
+	int axis;
+	uint prev_bid = 0;
+	uint subchunk;
+	int stepmask = -1;
+	int stepsize = SUBCHUNK_SIZE;
+	
+	for (;;) {
+		if ((stepmask & ~SUBCHUNK_MASK) != 0) {
+			coord &= ~SUBCHUNK_MASK;
+			
+			ivec3 scoord = coord + 16 * CHUNK_SIZE;
+			
+			if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
+				return false;
+			
+			subchunk = texelFetch(subchunks_tex, scoord >> SUBCHUNK_SHIFT, 0).r;
+		}
+		
+		uint bid;
+		
+		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
+			stepsize = SUBCHUNK_SIZE;
+			
+			bid = subchunk & ~SUBC_SPARSE_BIT;
+			
+			if (bid == 0)
+				return false; // unloaded chunk
+		} else {
+			if ((stepmask & ~SUBCHUNK_MASK) != 0) {
+				// TODO: projection has precision problem when hitting edge exactly I think (white dots in iteration visualization) -> inf loop
+				#if 1
+				vec3 proj = ray.pos + ray.dir * dist;
+				//proj += mix(vec3(0.0), sign(ray.dir) * 0.5, axis_mask);
+				if (dist > 0.0)
+					proj[axis] += sign(ray.dir[axis]) * 0.5;
+				vec3 coordf = floor(proj);
+				#else
+				vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
+				#endif
+				
+				coord = ivec3(coordf);
+			}
+			stepsize = 1;
+			
+			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
+			bid = texelFetch(voxels_tex, subc_offs + (coord & SUBCHUNK_MASK), 0).r;
+		}
+		
+		if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, dist, axis, hit))
+			return true;
+		prev_bid = bid;
+		
+		if (++iterations >= max_iterations || dist >= ray.max_dist)
+			return false; // max dist reached
+		
+		vec3 next;
+		{
+			ivec3 planecoord = coord + ivec3(stepsize) * ivec3((~floatBitsToUint(ray.dir)) >> 31);
+			next = rdir * abs(ray.pos - vec3(planecoord));
+		}
+		
+		dist = min(min(next.x, next.y), next.z);
+		
+		if (next.x == dist) {
+			axis = 0;
+			
+			int old_coord = coord.x;
+			coord.x += (ray.dir.x >= 0.0 ? 1 : -1) * stepsize;
+			next.x  += rdir.x * float(stepsize);
+			
+			stepmask = old_coord ^ coord.x;
+		} else if (next.y == dist) {
+			axis = 1;
+			
+			int old_coord = coord.y;
+			coord.y += (ray.dir.y >= 0.0 ? 1 : -1) * stepsize;
+			next.y  += rdir.y * float(stepsize);
+			
+			stepmask = old_coord ^ coord.y;
+		} else {
+			axis = 2;
+			
+			int old_coord = coord.z;
+			coord.z += (ray.dir.z >= 0.0 ? 1 : -1) * stepsize;
+			next.z  += rdir.z * float(stepsize);
+			
+			stepmask = old_coord ^ coord.z;
+		}
+	}
+	
+	return false;
+}
+#endif
 
 vec3 tonemap (vec3 c) {
 
