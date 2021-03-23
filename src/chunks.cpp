@@ -61,6 +61,8 @@ block_id Chunks::read_block (int x, int y, int z) {
 }
 
 block_id Chunks::read_block (int x, int y, int z, chunk_id cid) {
+	assert(x >= 0 && y >= 0 && z >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE);
+
 	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
@@ -96,6 +98,8 @@ void Chunks::write_block (int x, int y, int z, block_id data) {
 }
 
 void Chunks::write_block (int x, int y, int z, chunk_id cid, block_id data) {
+	assert(x >= 0 && y >= 0 && z >= 0 && x < CHUNK_SIZE && y < CHUNK_SIZE && z < CHUNK_SIZE);
+
 	auto& vox = chunk_voxels[cid];
 
 	uint32_t subchunk_i = SUBCHUNK_IDX(x,y,z);
@@ -398,7 +402,7 @@ void Chunks::update_chunk_loading (Game& game) {
 
 		auto chunk_dist_sqr = [&] (int3 const& pos) {
 
-			auto ipos = _mm_load_si128((__m128i*)&pos.x);
+			auto ipos = _mm_loadu_si128((__m128i*)&pos.x);
 			auto fpos = _mm_cvtepi32_ps(ipos);
 
 			auto offs = _mm_fmadd_ps(fpos, sz, dist_base);
@@ -478,11 +482,10 @@ void Chunks::update_chunk_loading (Game& game) {
 			ZoneScopedN("pop jobs");
 
 			static constexpr int MAX_REMESH_PER_THREAD_FRAME = 3;
-			static const int LOAD_LIMIT = parallelism_threads * MAX_REMESH_PER_THREAD_FRAME;
 
 			std::unique_ptr<WorldgenJob> jobs[64];
 
-			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)LOAD_LIMIT, ARRLEN(jobs)));
+			int count = (int)background_threadpool.results.pop_n(jobs, std::min((size_t)parallelism_threads * MAX_REMESH_PER_THREAD_FRAME, ARRLEN(jobs)));
 			for (int jobi=0; jobi<count; ++jobi) {
 				auto job = std::move(jobs[jobi]);
 				auto& chunk_pos = job->noise_pass.chunk_pos;

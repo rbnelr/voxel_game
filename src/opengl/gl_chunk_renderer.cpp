@@ -171,14 +171,15 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 	for (auto cid : game.chunks.upload_voxels) {
 		auto& chunk = game.chunks.chunks[cid];
 
+		glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
+
 		auto& vox = game.chunks.chunk_voxels[cid];
 
 		int3 pos = chunk.pos + 16;
-		if (pos.x >= 0 && pos.y >= 0 && pos.z >= 0 && pos.x < 32 && pos.y < 32 && pos.z < 32) {
-			glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
-
+		if (all(pos >= 0 && pos < 32)) {
 			glTexSubImage3D(GL_TEXTURE_3D, 0,
-				pos.x*SUBCHUNK_COUNT, pos.y*SUBCHUNK_COUNT, pos.z*SUBCHUNK_COUNT, SUBCHUNK_COUNT, SUBCHUNK_COUNT, SUBCHUNK_COUNT,
+				pos.x*SUBCHUNK_COUNT, pos.y*SUBCHUNK_COUNT, pos.z*SUBCHUNK_COUNT,
+				SUBCHUNK_COUNT, SUBCHUNK_COUNT, SUBCHUNK_COUNT,
 				GL_RED_INTEGER, GL_UNSIGNED_INT, vox.subchunks);
 		}
 
@@ -229,7 +230,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
-	
+		
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
 	glUniform1i(shad->get_uniform_location("subchunks_tex"), OpenglRenderer::SUBCHUNKS_TEX);

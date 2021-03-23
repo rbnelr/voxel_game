@@ -1,4 +1,6 @@
 ﻿#version 460 core
+//#extension GL_ARB_gpu_shader5 : enable
+//#extension GL_EXT_shader_16bit_storage : enable // not supported
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_ARB_shader_group_vote : enable
@@ -160,13 +162,14 @@ struct Ray {
 };
 
 struct Hit {
-	vec3	pos;
-	vec3	normal;
-	float	dist;
-	uint	bid;
-	uint	prev_bid;
+	//vec3	pos;
+	//vec3	normal;
+	//uint	chunkid;
+	//float	dist;
+	//uint	bid;
+	//uint	prev_bid;
 	vec3	col;
-	vec3	emiss;
+	//vec3	emiss;
 };
 
 int iterations = 0;
@@ -174,7 +177,9 @@ int iterations = 0;
 // get pixel ray in world space based on pixel coord and matricies
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
-	vec2 ndc = (px_pos + 0.5) / view.viewport_size * 2.0 - 1.0;
+	vec2 px_jitter = rand2();
+	vec2 ndc = (px_pos + px_jitter) / view.viewport_size * 2.0 - 1.0;
+	//vec2 ndc = (px_pos + 0.5) / view.viewport_size * 2.0 - 1.0;
 	
 	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
 
@@ -188,19 +193,23 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
 }
 
-int get_step_face (int axis, vec3 ray_dir) {
-	return axis*2 + (ray_dir[axis] >= 0.0 ? 0 : 1);
+int get_axis (bvec3 axis_mask) {
+	if (     axis_mask.x) return 0;
+	else if (axis_mask.y) return 1;
+	else                  return 2;
 }
-vec2 calc_uv (vec3 pos, int entry_face) {
+int get_step_face (int axis, vec3 ray_dir) {
+	return axis*2 +(ray_dir[axis] >= 0.0 ? 0 : 1);
+}
+vec2 calc_uv (vec3 pos_fract, int entry_face) {
 	vec2 uv;
 	if (entry_face / 2 == 0) {
-		uv = pos.yz;
+		uv = pos_fract.yz;
 	} else if (entry_face / 2 == 1) {
-		uv = pos.xz;
+		uv = pos_fract.xz;
 	} else {
-		uv = pos.xy;
+		uv = pos_fract.xy;
 	}
-	uv = fract(uv);
 
 	if (entry_face == 0 || entry_face == 3)  uv.x = 1.0 - uv.x;
 	if (entry_face == 4)                     uv.y = 1.0 - uv.y;
@@ -209,148 +218,47 @@ vec2 calc_uv (vec3 pos, int entry_face) {
 }
 
 bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float dist, int axis, out Hit hit) {
-	if (prev_bid == 0 || (prev_bid == bid && !(bid == B_LEAVES || bid == B_TALLGRASS)))
-		return false;
+	if (bid == B_LEAVES || bid == B_TALLGRASS) {
+		if (prev_bid == 0)
+			return false;
+	} else {
+		if (prev_bid == 0 || prev_bid == bid)
+			return false;
+	}
 	
-	if (bid == B_AIR)
-		bid = prev_bid;
-	
-	hit.pos = ray_pos + ray_dir * dist;
-
 	int entry_face = get_step_face(axis, ray_dir);
-	vec2 uv = calc_uv(hit.pos, entry_face);
+	
+	vec3 hit_pos = ray_pos + ray_dir * dist;
+
+	vec2 uv = calc_uv(fract(hit_pos), entry_face);
 	
 	uint tex_bid = bid == B_AIR ? prev_bid : bid;
 	float texid = float(block_tiles[tex_bid].sides[entry_face]);
 	
+	//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
 	vec4 col = texture(tile_textures, vec3(uv, texid), 0.0);
 	
-	if (tex_bid == B_TALLGRASS && axis == 2)
-		col = vec4(0.0);
+	//if (tex_bid == B_TALLGRASS && axis == 2)
+	//	col = vec4(0.0);
 	
 	if (col.a <= 0.001)
 		return false;
 	
-	hit.bid = bid;
-	hit.prev_bid = prev_bid;
-	
-	hit.normal = vec3(0.0);
-	hit.normal[axis] = -sign(ray_dir[axis]);
-	
-	hit.dist = dist;
+	//hit.pos = hit_pos;
+	//hit.normal = vec3(0.0);
+	//hit.normal[axis] = -sign(ray_dir[axis]);
+	//
+	//hit.bid = bid;
+	//hit.prev_bid = prev_bid;
+	//
+	//hit.chunkid = chunkid;
+	//hit.dist = dist;
 	hit.col = col.rgb;
-	hit.emiss = col.rgb * get_emmisive(bid);
+	//hit.emiss = col.rgb * get_emmisive(bid);
 	return true;
 }
 
 #define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
-
-#if 0
-bool trace_ray (Ray ray, out Hit hit) {
-	
-	ivec3 coord = ivec3(floor(ray.pos / SUBCHUNK_SIZEf)) * SUBCHUNK_SIZE;
-	
-	coord += ivec3(16 * CHUNK_SIZE);
-	if (!all(lessThan(uvec3(coord), uvec3(32 * CHUNK_SIZE))))
-		return false;
-	
-	vec3 rdir;
-	rdir.x = ray.dir.x != 0.0 ? 1.0 / abs(ray.dir.x) : INF;
-	rdir.y = ray.dir.y != 0.0 ? 1.0 / abs(ray.dir.y) : INF;
-	rdir.z = ray.dir.z != 0.0 ? 1.0 / abs(ray.dir.z) : INF;
-	
-	float dist = 0; 
-	int axis;
-	uint prev_bid = 0;
-	uint subchunk;
-	int stepmask = -1;
-	int stepsize = SUBCHUNK_SIZE;
-	
-	for (;;) {
-		if ((stepmask & ~SUBCHUNK_MASK) != 0) {
-			//if (!all(lessThan(uvec3(coord), uvec3(32 * CHUNK_SIZE))))
-			//	return false;
-			
-			subchunk = texelFetch(subchunks_tex, coord >> SUBCHUNK_SHIFT, 0).r;
-		}
-		
-		uint bid;
-		
-		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-			stepsize = SUBCHUNK_SIZE;
-			
-			bid = subchunk & ~SUBC_SPARSE_BIT;
-		} else {
-			if ((stepmask & ~SUBCHUNK_MASK) != 0) {
-				// TODO: projection has precision problem when hitting edge exactly I think (white dots in iteration visualization) -> inf loop
-				#if 1
-				vec3 proj = ray.pos + ray.dir * dist;
-				//proj += mix(vec3(0.0), sign(ray.dir) * 0.5, axis_mask);
-				if (dist > 0.0)
-					proj[axis] += sign(ray.dir[axis]) * 0.5;
-				vec3 coordf = floor(proj);
-				#else
-				vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
-				#endif
-				
-				coord = ivec3(coordf);
-			}
-			stepsize = 1;
-			
-			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
-			bid = texelFetch(voxels_tex, subc_offs + (coord & SUBCHUNK_MASK), 0).r;
-		}
-		
-		if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, dist, axis, hit))
-			return true;
-		prev_bid = bid;
-		
-		if (++iterations >= max_iterations || dist >= ray.max_dist)
-			return false; // max dist reached
-		
-		vec3 next;
-		{
-			ivec3 planecoord = coord + ivec3(stepsize) * ivec3((~floatBitsToUint(ray.dir)) >> 31);
-			next = rdir * abs(ray.pos - vec3(planecoord));
-		}
-		
-		dist = min(min(next.x, next.y), next.z);
-		
-		if (next.x == dist) {
-			axis = 0;
-			
-			int old_coord = coord.x;
-			coord.x += (ray.dir.x >= 0.0 ? 1 : -1) * stepsize;
-			next.x  += rdir.x * float(stepsize);
-			
-			stepmask = old_coord ^ coord.x;
-		} else if (next.y == dist) {
-			axis = 1;
-			
-			int old_coord = coord.y;
-			coord.y += (ray.dir.y >= 0.0 ? 1 : -1) * stepsize;
-			next.y  += rdir.y * float(stepsize);
-			
-			stepmask = old_coord ^ coord.y;
-		} else {
-			axis = 2;
-			
-			int old_coord = coord.z;
-			coord.z += (ray.dir.z >= 0.0 ? 1 : -1) * stepsize;
-			next.z  += rdir.z * float(stepsize);
-			
-			stepmask = old_coord ^ coord.z;
-		}
-	}
-	
-	return false;
-}
-#else
-int get_axis (bvec3 mask) {
-	if (     mask.x) return 0;
-	else if (mask.y) return 1;
-	else             return 2;
-}
 
 bool trace_ray (Ray ray, out Hit hit) {
 	ivec3 sign;
@@ -380,16 +288,22 @@ bool trace_ray (Ray ray, out Hit hit) {
 
 	uint prev_bid = 0;
 	
-	scoord -= 16 * CHUNK_SIZE;
+	scoord += 16 * CHUNK_SIZE;
+	
+	if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
+		return false;
 	
 	for (;;) {
-		if (!all(lessThan(uvec3(scoord), uvec3(16 * CHUNK_SIZE))))
-			return false;
+		//scoord &= CHUNK_SIZE_MASK;
+		scoord &= (64 << 5) -1;
 		
 		uint subchunk = texelFetch(subchunks_tex, scoord >> SUBCHUNK_SHIFT, 0).r;
 		
 		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 			uint bid = subchunk & ~SUBC_SPARSE_BIT;
+			
+			if (bid == 0)
+				return false; // unloaded chunk
 			
 			if (hit_voxel(bid, prev_bid, ray.pos, ray.dir, dist, axis, hit))
 				return true;
@@ -466,16 +380,31 @@ bool trace_ray (Ray ray, out Hit hit) {
 		
 		scoord += mix(ivec3(0.0), sign * SUBCHUNK_SIZE, mask);
 		snext  += mix( vec3(0.0), rdir * SUBCHUNK_SIZEf, mask);
+		
+		if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
+			return false;
 	}
 	
 	return false;
 }
-#endif
 
+vec3 tonemap (vec3 c) {
+
+	//c *= 2.0;
+	//c = c / (c + 1.0);
+
+	//c *= 0.2;
+	//vec3 x = max(vec3(0.0), c -0.004);
+	//c = (x*(6.2*x+.5))/(x*(6.2*x+1.7)+0.06);
+	return c;
+}
+
+#if 0
 vec3 collect_sunlight (Hit hit) {
 	if (sunlight_enable) {
 		Ray r;
 		r.pos = hit.pos;
+		r.chunkid = hit.chunkid;
 		
 		#if 0
 		// directional sun
@@ -507,6 +436,7 @@ vec3 collect_sunlight (Hit hit) {
 	}
 	return vec3(0.0);
 }
+#endif
 
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
@@ -522,7 +452,7 @@ void main () {
 	// maybe try not to do rays that we do not see (happens due to local group size)
 	if (pos.x >= view.viewport_size.x || pos.y >= view.viewport_size.y)
 		return;
-	
+
 	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
 	
 	#if 1
@@ -531,6 +461,7 @@ void main () {
 	ray.max_dist = INF;
 	
 	vec3 col = vec3(0.0);
+	
 	Hit hit;
 	if (trace_ray(ray, hit))
 		col = hit.col;
@@ -597,8 +528,6 @@ void main () {
 				break;
 			} else {
 				
-				//hit.normal = normalize(vec3(sin(hit.pos.y * 6.0), 0, 16));
-				
 				float reflect_fac = fresnel(-ray.dir, hit.normal, water_F0);
 				
 				float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;
@@ -620,12 +549,13 @@ void main () {
 					ray.pos = hit.pos - 2.0 * hit.normal * 0.001;
 					ray.dir = refract_dir;
 				}
+				ray.chunkid = hit.chunkid;
 			}
 		}
 	}
 	col *= 1.0 / float(rays);
 	#endif
-	
+
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST
 		const uint warp_cost = warp_iter[gl_SubgroupID];
@@ -637,5 +567,5 @@ void main () {
 		col = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5)).rgb;
 	#endif
 #endif
-	imageStore(img, ivec2(pos), vec4(col, 1.0));
+	imageStore(img, ivec2(pos), vec4(tonemap(col), 1.0));
 }

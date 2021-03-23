@@ -139,12 +139,12 @@ struct Raytracer {
 		return coord;
 	}
 
-	struct SubchunksTex {
+	struct SubchunksTexture {
 		Texture3D	tex;
 
-		SubchunksTex () {
-			tex = {"Raytracer.subchunks_tex;"};
-			
+		SubchunksTexture () {
+			tex = {"Raytracer.subchunks_tex"};
+
 			glTextureStorage3D(tex, 1, GL_R32UI, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
 
 			GLuint val = SUBC_SPARSE_BIT | (uint32_t)B_NULL;
@@ -175,18 +175,18 @@ struct Raytracer {
 			clog(INFO, ">> Resized %s 3d texture to %dx%dx%d (%d MB)", label.c_str(), TEX3D_SIZE, TEX3D_SIZE, layers*SZ, (int)(sz / MB));
 
 			glTextureStorage3D(new_tex, 1, sizeof(T) == 2 ? GL_R16UI : GL_R32UI, TEX3D_SIZE, TEX3D_SIZE, layers*SZ);
-			
+
 			{ // copy old tex data to new bigger tex
 				if (alloc_layers)
 					assert(tex != 0);
-			
+
 				uint32_t copy_layers = std::min(alloc_layers, layers);
 				if (copy_layers > 0) {
 					glCopyImageSubData(tex,     GL_TEXTURE_3D, 0, 0,0,0,
-					                   new_tex, GL_TEXTURE_3D, 0, 0,0,0, TEX3D_SIZE, TEX3D_SIZE, copy_layers*SZ);
+						new_tex, GL_TEXTURE_3D, 0, 0,0,0, TEX3D_SIZE, TEX3D_SIZE, copy_layers*SZ);
 				}
 			}
-			
+
 			alloc_layers = layers;
 			tex = std::move(new_tex);
 		}
@@ -200,7 +200,8 @@ struct Raytracer {
 		}
 	};
 
-	SubchunksTex							subchunks_tex;
+	SubchunksTexture						subchunks_tex;
+
 	VoxTexture<block_id, SUBCHUNK_SIZE>		voxels_tex = {"Raytracer.voxels_tex" };
 
 	//
@@ -322,26 +323,36 @@ struct Raytracer {
 			printf("max local work group invocations %d\n", number);
 		}
 
-		//if (1) {
-		//	int3 count, size;
-		//
-		//	glGetIntegeriv(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &count.x);
-		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &count.y);
-		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &count.z);
-		//
-		//	printf("max global (total) work group count (%d, %d, %d)\n", count.x, count.y, count.z);
-		//
-		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &size.x);
-		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &size.y);
-		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &size.z);
-		//
-		//	printf("max local (in one shader) work group size (%d, %d, %d)\n", size.x, size.y, size.z);
-		//
-		//	int number;
-		//	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
-		//	printf("max local work group invocations %d\n", number);
-		//}
+		if (0) {
+			
+			int max_sparse_texture_size;
+			int max_sparse_3d_texture_size;
+			int max_sparse_array_texture_layers;
+			int sparse_texture_full_array_cube_mipmaps;
 
+			glGetIntegerv(GL_MAX_SPARSE_TEXTURE_SIZE_ARB                 , &max_sparse_texture_size);
+			glGetIntegerv(GL_MAX_SPARSE_3D_TEXTURE_SIZE_ARB              , &max_sparse_3d_texture_size);
+			glGetIntegerv(GL_MAX_SPARSE_ARRAY_TEXTURE_LAYERS_ARB         , &max_sparse_array_texture_layers);
+			glGetIntegerv(GL_SPARSE_TEXTURE_FULL_ARRAY_CUBE_MIPMAPS_ARB  , &sparse_texture_full_array_cube_mipmaps);
+
+			GLint page_sizes;
+			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_NUM_VIRTUAL_PAGE_SIZES_ARB, 1, &page_sizes);
+
+			std::vector<GLint> sizes_x(page_sizes), sizes_y(page_sizes), sizes_z(page_sizes);
+			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_X_ARB, page_sizes, sizes_x.data());
+			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_Y_ARB, page_sizes, sizes_y.data());
+			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_Z_ARB, page_sizes, sizes_z.data());
+
+			Texture3D tex = {"test"};
+
+			glBindTexture(GL_TEXTURE_3D, tex);
+			glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
+			glTexParameteri(GL_TEXTURE_3D, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
+
+			glTextureStorage3D(tex, 1, GL_R32UI, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
+			
+			printf("...\n");
+		}
 	}
 
 	void upload_changes (OpenglRenderer& r, Game& game);
