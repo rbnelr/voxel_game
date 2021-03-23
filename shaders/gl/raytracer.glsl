@@ -253,7 +253,7 @@ bool hit_voxel (uint bid, inout uint prev_bid, vec3 ray_pos, vec3 ray_dir, float
 
 #define SUBCHUNK_SIZEf float(SUBCHUNK_SIZE)
 
-#if 1
+#if 0
 bool trace_ray (Ray ray, out Hit hit) {
 	vec3 rdir;
 	rdir.x = ray.dir.x != 0.0 ? 1.0 / abs(ray.dir.x) : INF;
@@ -331,18 +331,10 @@ bool trace_ray (Ray ray, out Hit hit) {
 			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
 			
 			{
-				#if 1
 				vec3 proj = ray.pos + ray.dir * dist;
-				if (dist > 0.0)
-					proj[axis] += ray.dir[axis] >= 0 ? 0.5 : -0.5;
-				vec3 coordf = floor(proj);
-				#else
-				vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
-				#endif
+				coord = clamp(ivec3(floor(proj)), coord, coord + ivec3(SUBCHUNK_SIZE-1));
 				
-				coord = ivec3(coordf);
-				
-				vec3 rel = ray.pos - coordf;
+				vec3 rel = ray.pos - vec3(coord);
 				next.x = rdir.x * (ray.dir.x >= 0.0f ? 1.0f - rel.x : rel.x);
 				next.y = rdir.y * (ray.dir.y >= 0.0f ? 1.0f - rel.y : rel.y);
 				next.z = rdir.z * (ray.dir.z >= 0.0f ? 1.0f - rel.z : rel.z);
@@ -422,7 +414,8 @@ bool trace_ray (Ray ray, out Hit hit) {
 	uint prev_bid = 0;
 	uint subchunk;
 	int stepmask = -1;
-	int stepsize = SUBCHUNK_SIZE;
+	
+	vec3 next;
 	
 	for (;;) {
 		if ((stepmask & ~SUBCHUNK_MASK) != 0) {
@@ -438,6 +431,7 @@ bool trace_ray (Ray ray, out Hit hit) {
 		
 		uint bid;
 		
+		int stepsize;
 		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 			stepsize = SUBCHUNK_SIZE;
 			
@@ -447,18 +441,8 @@ bool trace_ray (Ray ray, out Hit hit) {
 				return false; // unloaded chunk
 		} else {
 			if ((stepmask & ~SUBCHUNK_MASK) != 0) {
-				// TODO: projection has precision problem when hitting edge exactly I think (white dots in iteration visualization) -> inf loop
-				#if 1
 				vec3 proj = ray.pos + ray.dir * dist;
-				//proj += mix(vec3(0.0), sign(ray.dir) * 0.5, axis_mask);
-				if (dist > 0.0)
-					proj[axis] += sign(ray.dir[axis]) * 0.5;
-				vec3 coordf = floor(proj);
-				#else
-				vec3 coordf = floor(ray.pos + ray.dir * (dist + 0.001));
-				#endif
-				
-				coord = ivec3(coordf);
+				coord = clamp(ivec3(floor(proj)), coord, coord + ivec3(SUBCHUNK_SIZE -1));
 			}
 			stepsize = 1;
 			
@@ -470,16 +454,19 @@ bool trace_ray (Ray ray, out Hit hit) {
 			return true;
 		prev_bid = bid;
 		
-		if (++iterations >= max_iterations || dist >= ray.max_dist)
-			return false; // max dist reached
-		
-		vec3 next;
 		{
 			ivec3 planecoord = coord + ivec3(stepsize) * ivec3((~floatBitsToUint(ray.dir)) >> 31);
 			next = rdir * abs(ray.pos - vec3(planecoord));
 		}
 		
 		dist = min(min(next.x, next.y), next.z);
+		
+	#if VISUALIZE_COST && VISUALIZE_WARP_COST
+		if (subgroupElect())
+			atomicAdd(warp_iter[gl_SubgroupID], 1u);
+	#endif
+		if (++iterations >= max_iterations || dist >= ray.max_dist)
+			return false; // max dist reached
 		
 		if (next.x == dist) {
 			axis = 0;
