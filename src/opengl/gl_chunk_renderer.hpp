@@ -139,42 +139,16 @@ struct Raytracer {
 		return coord;
 	}
 
-	struct SSBO {
-		std::string_view label;
+	struct SubchunksTex {
+		Texture3D	tex;
 
-		size_t	alloc_size = 0;
-		Ssbo	ssbo;
+		SubchunksTex () {
+			tex = {"Raytracer.subchunks_tex;"};
+			
+			glTextureStorage3D(tex, 1, GL_R32UI, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
 
-		SSBO (std::string_view label): label{label} {}
-
-		void resize (size_t new_size, bool copy=true) {
-			size_t aligned_size = align_up(new_size, (size_t)(16 * MB)); // round up size to avoid constant resizing, ideally only happens sometimes
-			aligned_size = std::max(aligned_size, (size_t)(16 * MB));
-
-			if (alloc_size == aligned_size)
-				return;
-
-			Ssbo new_ssbo = {label};
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_ssbo);
-			glBufferData(GL_SHADER_STORAGE_BUFFER, aligned_size, nullptr, GL_STATIC_DRAW);
-
-			if (copy) {
-				if (alloc_size)
-					assert(ssbo != 0);
-
-				size_t copy_size = std::min(alloc_size, aligned_size);
-				if (copy_size > 0) {
-					glBindBuffer(GL_COPY_READ_BUFFER, ssbo);
-					glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 0, copy_size);
-					glBindBuffer(GL_COPY_READ_BUFFER, 0);
-				}
-			}
-
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-			alloc_size = aligned_size;
-			ssbo = std::move(new_ssbo);
+			GLuint val = SUBC_SPARSE_BIT | (uint32_t)B_NULL;
+			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
 		}
 	};
 
@@ -226,10 +200,8 @@ struct Raytracer {
 		}
 	};
 
-	SSBO chunks_ssbo			= {"Raytracer.chunks" };
-
-	VoxTexture<uint32_t, SUBCHUNK_COUNT>	chunk_voxels_tex = {"Raytracer.chunk_voxels" };
-	VoxTexture<block_id, SUBCHUNK_SIZE>		subchunks_tex = {"Raytracer.subchunks_voxels" };
+	SubchunksTex							subchunks_tex;
+	VoxTexture<block_id, SUBCHUNK_SIZE>		voxels_tex = {"Raytracer.voxels_tex" };
 
 	//
 	int max_iterations = 512;
@@ -349,7 +321,27 @@ struct Raytracer {
 			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
 			printf("max local work group invocations %d\n", number);
 		}
-		
+
+		//if (1) {
+		//	int3 count, size;
+		//
+		//	glGetIntegeriv(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &count.x);
+		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &count.y);
+		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &count.z);
+		//
+		//	printf("max global (total) work group count (%d, %d, %d)\n", count.x, count.y, count.z);
+		//
+		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &size.x);
+		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &size.y);
+		//	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &size.z);
+		//
+		//	printf("max local (in one shader) work group size (%d, %d, %d)\n", size.x, size.y, size.z);
+		//
+		//	int number;
+		//	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
+		//	printf("max local work group invocations %d\n", number);
+		//}
+
 	}
 
 	void upload_changes (OpenglRenderer& r, Game& game);
