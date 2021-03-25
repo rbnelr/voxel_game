@@ -168,11 +168,6 @@ void Window::open_window () {
 				glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);
 
 			} break;
-			case RenderBackend::VULKAN: {
-
-				glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-			} break;
 		}
 
 		glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE); // keep app visible when clicking on second monitor while in fullscreen

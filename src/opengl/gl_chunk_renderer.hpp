@@ -232,19 +232,22 @@ struct Raytracer {
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
 	float ambient_factor = 0.00f;
 
-	int   rays = 1;
+	//int   rays = 1;
 
 	bool  visualize_light = false;
+
+	bool  only_primary_rays = true;
 
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
+			     {"ONLY_PRIMARY_RAYS", only_primary_rays ? "1":"0"},
 			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
-	bool enable = false;
+	bool enable = true;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -266,6 +269,8 @@ struct Raytracer {
 			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
 		}
+
+		macro_change = ImGui::Checkbox("only_primary_rays", &only_primary_rays) || macro_change;
 
 		if (macro_change && shad) {
 			shad->macros = get_macros();
@@ -290,10 +295,24 @@ struct Raytracer {
 			ImGui::SliderInt("bounces_max_count", &bounces_max_count, 1, 16);
 			ImGui::Spacing();
 
-			ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
+			//ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::Checkbox("visualize_light", &visualize_light);
 
 			ImGui::TreePop();
+		}
+
+		if (ImGui::Button("Dump PTX")) {
+			GLsizei length;
+			glGetProgramiv(shad->prog, GL_PROGRAM_BINARY_LENGTH, &length);
+
+			char* buf = (char*)malloc(length);
+
+			GLenum format;
+			glGetProgramBinary(shad->prog, length, &length, &format, buf);
+
+			save_binary_file("../raytracer.glsl.asm", buf, length);
+
+			free(buf);
 		}
 		
 		//

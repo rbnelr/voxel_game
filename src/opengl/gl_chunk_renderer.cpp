@@ -225,7 +225,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
 	shad->set_uniform("bounces_max_count",  bounces_max_count);
 
-	shad->set_uniform("rays",               rays);
+	//shad->set_uniform("rays",               rays);
 	shad->set_uniform("visualize_light",    visualize_light);
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
@@ -233,17 +233,22 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
-	glUniform1i(shad->get_uniform_location("subchunks_tex"), OpenglRenderer::SUBCHUNKS_TEX);
 
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
 	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
-	glUniform1i(shad->get_uniform_location("voxels_tex"), OpenglRenderer::VOXELS_TEX);
+
+	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
+	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
 
 	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
 
-	int szx = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
-	int szy = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
-	glDispatchCompute(szx, szy, 1);
+	int2 dispatch_size;
+	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
+	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
+
+	shad->set_uniform("dispatch_size", dispatch_size);
+
+	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }

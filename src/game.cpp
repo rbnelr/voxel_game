@@ -81,8 +81,8 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		window.input.imgui();
 		
 		if (imgui_header("Graphics", &imopen.graphics)) {
-			if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL\0VULKAN"))
-				g_window.switch_render_backend = true;
+			//if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL"))
+			//	g_window.switch_render_backend = true;
 
 			if (renderer)
 				renderer->graphics_imgui(I);

@@ -104,8 +104,8 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -127,8 +127,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -150,8 +150,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -173,8 +173,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\vulkan_sdk\Lib;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;vulkan-1.lib;shaderc_shared.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;portaudio_x64.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -204,7 +204,6 @@
     <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="..\..\..\src\imgui\imgui_impl_vulkan.h" />
     <ClInclude Include="..\..\..\src\items.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\allocator.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\animation.hpp" />
@@ -250,14 +249,6 @@
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
     <ClInclude Include="..\..\..\src\noise.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vk_chunk_renderer.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_debug_drawer.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_renderer.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_helper.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_screenshot.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_shaders.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_staging.hpp" />
-    <ClInclude Include="..\..\..\src\vulkan\vulkan_window.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -362,7 +353,6 @@
     <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\..\..\src\imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="..\..\..\src\imgui\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\allocator.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\collision.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\file_io.cpp" />
@@ -404,41 +394,6 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\vk_chunk_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\vulkan_helper.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-      </PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">
-      </PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-      </PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">
-      </PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\vulkan_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\vulkan\vulkan_window.cpp" />
     <ClCompile Include="..\..\..\src\world_generator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -465,15 +420,6 @@
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />
-    <None Include="..\..\..\shaders\vk\chunks.glsl" />
-    <None Include="..\..\..\shaders\vk\common.glsl" />
-    <None Include="..\..\..\shaders\vk\debug.glsl" />
-    <None Include="..\..\..\shaders\vk\debug_lines.glsl" />
-    <None Include="..\..\..\shaders\vk\debug_tris.glsl" />
-    <None Include="..\..\..\shaders\vk\noise.glsl" />
-    <None Include="..\..\..\shaders\vk\rescale.glsl" />
-    <None Include="..\..\..\shaders\vk\ssao.glsl" />
-    <None Include="..\..\..\shaders\vk\util.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

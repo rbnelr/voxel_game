@@ -15,7 +15,6 @@ enum class AttribMode {
 
 enum class RenderBackend : int {
 	OPENGL=0,
-	VULKAN,
 };
 
 // Contols for in what builds to output debug info, st in this file to allow window.cpp to use these too
