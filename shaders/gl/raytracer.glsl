@@ -94,6 +94,11 @@ layout(std430, binding = 2) readonly buffer BlockTiles {
 };
 
 layout(rgba16f, binding = 3) uniform image2D img;
+uniform sampler2D prev_framebuffer;
+
+uniform mat4 prev_world2clip;
+
+uniform float reprojection_alpha = 0.05;
 
 #define SUBC_SPARSE_BIT 0x80000000u
 
@@ -173,8 +178,9 @@ int iterations = 0;
 // get pixel ray in world space based on pixel coord and matricies
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
-	vec2 px_jitter = rand2();
-	vec2 ndc = (px_pos + px_jitter) / view.viewport_size * 2.0 - 1.0;
+	//vec2 px_center = rand2();
+	vec2 px_center = vec2(0.5);
+	vec2 ndc = (px_pos + px_center) / view.viewport_size * 2.0 - 1.0;
 	//vec2 ndc = (px_pos + 0.5) / view.viewport_size * 2.0 - 1.0;
 	
 	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
@@ -432,24 +438,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	return did_hit;
 }
 
-vec3 tonemap (vec3 c) {
-
-	//c *= 2.0;
-	//c = c / (c + 1.0);
-
-	//c *= 0.2;
-	//vec3 x = max(vec3(0.0), c -0.004);
-	//c = (x*(6.2*x+.5))/(x*(6.2*x+1.7)+0.06);
-	return c;
-}
-
 #if !ONLY_PRIMARY_RAYS
 bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	for (int j=0; j<2; ++j) {
 		if (!trace_ray(ray_pos, ray_dir, max_dist, hit))
 			break;
-		
-		hit.pos += hit.normal * 0.001;
 		
 		bool water = hit.bid == B_WATER || hit.prev_bid == B_WATER;
 		bool air = hit.bid == B_AIR || hit.prev_bid == B_AIR;
@@ -474,11 +467,11 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		
 		if (rand() <= reflect_fac) {
 			// reflect
-			ray_pos = hit.pos;
+			ray_pos = hit.pos + hit.normal * 0.001;
 			ray_dir = reflect_dir;
 		} else {
 			// refract
-			ray_pos = hit.pos - 2.0 * hit.normal * 0.001;
+			ray_pos = hit.pos + hit.normal * 0.001;
 			ray_dir = refract_dir;
 		}
 		max_dist -= hit.dist;
@@ -487,31 +480,31 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 	return false;
 }
 
-vec3 collect_sunlight (Hit hit) {
+vec3 collect_sunlight (vec3 pos, vec3 normal) {
 	if (sunlight_enable) {
 		#if 0
 		// directional sun
 		vec3 dir = sun_dir + rand3()*sun_dir_rand;
-		float cos = dot(dir, hit.normal);
+		float cos = dot(dir, normal);
 		
 		if (cos > 0.0) {
 			Hit hit2;
-			if (!trace_ray(hit.pos, dir, sunlight_dist, hit2))
+			if (!trace_ray(pos, dir, sunlight_dist, hit2))
 				return sunlight_col * cos;
 		}
 		#else
 		// point sun
-		vec3 offs = (sun_pos + (rand3()-0.5) * sun_pos_size) - hit.pos;
+		vec3 offs = (sun_pos + (rand3()-0.5) * sun_pos_size) - pos;
 		float dist = length(offs);
 		vec3 dir = normalize(offs);
 		
-		float cos = dot(dir, hit.normal);
+		float cos = dot(dir, normal);
 		float atten = 10000.0 / (dist*dist);
 		
 		if (cos > 0.0) {
 			Hit hit2;
 			float max_dist = dist - sun_pos_size*0.5;
-			if (!trace_ray(hit.pos, dir, max_dist, hit2))
+			if (!trace_ray(pos, dir, max_dist, hit2))
 				return sunlight_col * cos * atten;
 		}
 		#endif
@@ -539,46 +532,49 @@ void main () {
 	
 	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
 	
-	vec3 col = vec3(0.0);
-	
 	#if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	Hit hit;
-	if (trace_ray(ray_pos, ray_dir, INF, hit))
-		col = hit.col;
+	bool did_hit = trace_ray(ray_pos, ray_dir, INF, hit);
+	vec3 col = did_hit ? hit.col : vec3(0.0);
 	
 	#else
 	// primary ray
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
+	vec3 col = vec3(0.0);
+	
 	Hit hit;
-	if (trace_ray_refl_refr(ray_pos, ray_dir, INF, hit)) {
+	bool did_hit = trace_ray_refl_refr(ray_pos, ray_dir, INF, hit);
+	if (did_hit) {
+		vec3 pos = hit.pos + hit.normal * 0.001;
+		
 		vec3 light = ambient_light;
-		light += collect_sunlight(hit);
+		light += collect_sunlight(pos, hit.normal);
 		
 		if (bounces_enable) {
 			
-			vec3 pos = hit.pos;
 			float max_dist = bounces_max_dist;
 			
 			vec3 cur_normal = hit.normal;
 			vec3 contrib = vec3(1.0);
 			
 			for (int j=0; j<bounces_max_count; ++j) {
+				pos += cur_normal * 0.001;
 				vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
 				
 				Hit hit2;
 				if (!trace_ray_refl_refr(pos, dir, max_dist, hit2))
 					break;
 				
-				vec3 light2 = collect_sunlight(hit2);
+				vec3 light2 = collect_sunlight(pos, cur_normal);
 				
 				light += (hit2.emiss + hit2.col * light2) * contrib;
 				
-				pos = hit2.pos += hit2.normal * 0.001;
+				pos = hit2.pos + hit2.normal * 0.001;
 				max_dist -= hit2.dist;
 				
 				cur_normal = hit2.normal;
@@ -592,6 +588,18 @@ void main () {
 		col += hit.emiss + hit.col * light;
 	}
 	#endif
+	
+	if (did_hit && hit.bid != B_WATER && hit.bid != B_AIR) {
+		vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
+		prev_clip.xyz /= prev_clip.w;
+		
+		vec2 uv = prev_clip.xy * 0.5 + 0.5;
+		if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
+			vec3 prev_col = texture(prev_framebuffer, uv).rgb;
+			
+			col = mix(prev_col, col, vec3(reprojection_alpha));
+		}
+	}
 
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST
@@ -605,5 +613,5 @@ void main () {
 	#endif
 #endif
 	
-	imageStore(img, ivec2(pxpos), vec4(tonemap(col), 1.0));
+	imageStore(img, ivec2(pxpos), vec4(col, 1.0));
 }

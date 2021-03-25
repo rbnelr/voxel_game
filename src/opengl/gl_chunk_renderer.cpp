@@ -200,36 +200,13 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
-	
-	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
-	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
-	cur_frambuffer ^= 1;
 
-	//{
-	//	if (curr_img.size != r.framebuffer.size) {
-	//		if (curr_img.tex) // delete old
-	//			glDeleteTextures(1, &curr_img.tex);
-	//
-	//		curr_img.size = r.framebuffer.size;
-	//
-	//		// create new (textures created with glTexStorage2D cannot be resized)
-	//		glGenTextures(1, &curr_img.tex);
-	//		glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, curr_img.size.x, curr_img.size.y);
-	//	}
-	//}
-
-	auto shad = frag_raytracer ? shader_frag : shader;
 	if (!shad->prog) return;
 
 	glUseProgram(shad->prog);
 
-	uint32_t camera_chunk;
-	{
-		int3 pos = floori((float3)(game.view.cam_to_world * float4(0,0,0,1)) / (float)CHUNK_SIZE);
-		camera_chunk = game.chunks.query_chunk(pos);
-	}
+	shad->set_uniform("reprojection_alpha", reprojection_alpha);
 
-	shad->set_uniform("camera_chunk",       camera_chunk);
 	shad->set_uniform("max_iterations",     max_iterations);
 	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
 
@@ -243,15 +220,15 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
 	shad->set_uniform("bounces_max_count",  bounces_max_count);
 
-
 	//shad->set_uniform("rays",               rays);
 	shad->set_uniform("visualize_light",    visualize_light);
 
 	shad->set_uniform("water_F0",           water_F0);
 
+
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
-		
+
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
 	glBindSampler(OpenglRenderer::SUBCHUNKS_TEX, r.normal_sampler_wrap);
@@ -259,31 +236,43 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
 	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
 	glBindSampler(OpenglRenderer::VOXELS_TEX, r.normal_sampler_wrap);
-
+	
 	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
 	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
 
-	if (!frag_raytracer)
-		glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+	//
+	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
+	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
+
+	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::PREV_FRAMEBUFFER);
+	curr_img.resize(r.framebuffer.size, cur_frambuffer);
+
+	cur_frambuffer ^= 1;
+
+	glBindTexture(GL_TEXTURE_2D, prev_img.tex);
+	glBindSampler(OpenglRenderer::PREV_FRAMEBUFFER, r.normal_sampler);
+	glUniform1i(shad->get_uniform_location("prev_framebuffer"), OpenglRenderer::PREV_FRAMEBUFFER);
+
+	glBindImageTexture(3, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	
+
 	int2 dispatch_size;
 	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
 
 	shad->set_uniform("dispatch_size", dispatch_size);
+	
+	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
 
-	PipelineState s;
-	s.depth_test = false;
-	s.blend_enable = false;
-	s.depth_write = true;
-	r.state.set(s);
+	shad->set_uniform("prev_world2clip", init ? world2clip : prev_world2clip);
 
-	if (frag_raytracer) {
-		glBindVertexArray(dummy_vao);
-		glDrawArrays(GL_TRIANGLES, 0, 3); 
-	} else {
-		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-	}
+	prev_world2clip = world2clip;
+	init = false;
+
+	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+
+	int2 sz = r.framebuffer.size;
+	glBlitNamedFramebuffer(curr_img.fbo, r.framebuffer.fbo, 0,0,sz.x,sz.y, 0,0,sz.x,sz.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }

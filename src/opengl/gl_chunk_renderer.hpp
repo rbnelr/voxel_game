@@ -118,9 +118,7 @@ struct ChunkRenderer {
 struct Raytracer {
 	//SERIALIZE(Raytracer, enable)
 
-	Shader* shader;
-	Shader* shader_frag;
-	Vao dummy_vao = {"dummy_vao"};
+	Shader* shad;
 
 	static constexpr int TEX3D_SIZE = 2048; // width, height for 3d textures
 
@@ -208,12 +206,47 @@ struct Raytracer {
 
 	struct FramebufferTex {
 		GLuint tex = 0;
+		GLuint fbo;
 		int2   size;
+
+		void resize (int2 new_size, int idx) {
+			if (tex == 0 || size != new_size) {
+				if (tex) { // delete old
+					glDeleteTextures(1, &tex);
+					glDeleteFramebuffers(1, &fbo);
+				}
+
+				size = new_size;
+
+				// create new (textures created with glTexStorage2D cannot be resized)
+				glGenTextures(1, &tex);
+
+				glBindTexture(GL_TEXTURE_2D, tex);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, size.x, size.y);
+				glBindTexture(GL_TEXTURE_2D, 0);
+
+				glGenFramebuffers(1, &fbo);
+				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+
+				OGL_DBG_LABEL(GL_TEXTURE    , tex, prints("Raytracer.framebuffers[%d].tex", idx).c_str());
+				OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, prints("Raytracer.framebuffers[%d].fbo", idx).c_str());
+
+				GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				if (status != GL_FRAMEBUFFER_COMPLETE) {
+					fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+				}
+				glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			}
+		}
 	};
 	FramebufferTex framebuffers[2];
 	int cur_frambuffer = 0;
 
-	bool frag_raytracer = false;
+	float reprojection_alpha = 0.05;
+
+	float4x4 prev_world2clip;
+	bool init = true;
 
 	//
 	int max_iterations = 512;
@@ -267,7 +300,7 @@ struct Raytracer {
 
 		ImGui::Checkbox("enable", &enable);
 
-		ImGui::Checkbox("frag_raytracer", &frag_raytracer);
+		ImGui::SliderFloat("reprojection_alpha", &reprojection_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
@@ -280,20 +313,16 @@ struct Raytracer {
 		ImGui::SameLine();
 		macro_change = ImGui::Checkbox("warp_reads", &visualize_warp_reads) || macro_change;
 
-		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shader) {
+		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad) {
 			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
 		}
 
 		macro_change = ImGui::Checkbox("only_primary_rays", &only_primary_rays) || macro_change;
 
-		if (macro_change && shader) {
-			shader->macros = get_macros();
-			shader->recompile("macro_change", false);
-		}
-		if (macro_change && shader_frag) {
-			shader_frag->macros = get_macros();
-			shader_frag->recompile("macro_change", false);
+		if (macro_change && shad) {
+			shad->macros = get_macros();
+			shad->recompile("macro_change", false);
 		}
 
 		ImGui::Separator();
@@ -324,12 +353,12 @@ struct Raytracer {
 
 		if (ImGui::Button("Dump PTX")) {
 			GLsizei length;
-			glGetProgramiv(shader->prog, GL_PROGRAM_BINARY_LENGTH, &length);
+			glGetProgramiv(shad->prog, GL_PROGRAM_BINARY_LENGTH, &length);
 
 			char* buf = (char*)malloc(length);
 
 			GLenum format;
-			glGetProgramBinary(shader->prog, length, &length, &format, buf);
+			glGetProgramBinary(shad->prog, length, &length, &format, buf);
 
 			save_binary_file("../raytracer.glsl.asm", buf, length);
 
@@ -341,8 +370,7 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shader = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
-		shader_frag = shaders.compile("raytracer_frag", get_macros());
+		shad = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;

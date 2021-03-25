@@ -89,15 +89,15 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
-		if (!raytracer.enable)
-			chunk_renderer.draw_chunks(*this, game);
+		if (raytracer.enable)
+			raytracer.draw(*this, game);
 
 		// draw before chunks so it shows through transparent blocks
 		if (game.player.selected_block)
 			block_highl.draw(*this, game.player.selected_block);
 
-		if (raytracer.enable)
-			raytracer.draw(*this, game);
+		if (!raytracer.enable)
+			chunk_renderer.draw_chunks(*this, game);
 
 		debug_draw.draw(*this);
 

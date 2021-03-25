@@ -863,6 +863,8 @@ struct Framebuffer {
 			glDeleteTextures(1, &depth);
 			glDeleteFramebuffers(1, &fbo);
 
+			glActiveTexture(GL_TEXTURE0); // try clobber consistent texture at least
+
 			// create new (textures created with glTexStorage2D cannot be resized)
 			glGenTextures(1, &color);
 			glBindTexture(GL_TEXTURE_2D, color);
@@ -878,6 +880,10 @@ struct Framebuffer {
 			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+
+			OGL_DBG_LABEL(GL_TEXTURE, color, "Framebuffer.color");
+			OGL_DBG_LABEL(GL_TEXTURE, depth, "Framebuffer.depth");
+			OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, "Framebuffer.fbo");
 
 			GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 			if (status != GL_FRAMEBUFFER_COMPLETE) {

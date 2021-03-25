@@ -220,10 +220,11 @@ public:
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,
 		GUI_ATLAS=1,
-		
-		SUBCHUNKS_TEX=2,
-		VOXELS_TEX=3,
-		HEAT_GRADIENT=4,
+
+		PREV_FRAMEBUFFER=2,
+		SUBCHUNKS_TEX,
+		VOXELS_TEX,
+		HEAT_GRADIENT,
 	};
 
 	Texture2DArray	tile_textures	= {"tile_textures"};
