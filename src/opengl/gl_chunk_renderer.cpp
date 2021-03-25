@@ -201,6 +201,24 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 	OGL_TRACE("raytracer_test");
 	
+	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
+	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
+	cur_frambuffer ^= 1;
+
+	//{
+	//	if (curr_img.size != r.framebuffer.size) {
+	//		if (curr_img.tex) // delete old
+	//			glDeleteTextures(1, &curr_img.tex);
+	//
+	//		curr_img.size = r.framebuffer.size;
+	//
+	//		// create new (textures created with glTexStorage2D cannot be resized)
+	//		glGenTextures(1, &curr_img.tex);
+	//		glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, curr_img.size.x, curr_img.size.y);
+	//	}
+	//}
+
+	auto shad = frag_raytracer ? shader_frag : shader;
 	if (!shad->prog) return;
 
 	glUseProgram(shad->prog);
@@ -225,30 +243,47 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
 	shad->set_uniform("bounces_max_count",  bounces_max_count);
 
+
 	//shad->set_uniform("rays",               rays);
 	shad->set_uniform("visualize_light",    visualize_light);
+
+	shad->set_uniform("water_F0",           water_F0);
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
 		
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
+	glBindSampler(OpenglRenderer::SUBCHUNKS_TEX, r.normal_sampler_wrap);
 
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
 	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
+	glBindSampler(OpenglRenderer::VOXELS_TEX, r.normal_sampler_wrap);
 
 	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
 	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
 
-	glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
-
+	if (!frag_raytracer)
+		glBindImageTexture(3, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, r.framebuffer.color_format);
+	
 	int2 dispatch_size;
 	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
 
 	shad->set_uniform("dispatch_size", dispatch_size);
 
-	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	PipelineState s;
+	s.depth_test = false;
+	s.blend_enable = false;
+	s.depth_write = true;
+	r.state.set(s);
+
+	if (frag_raytracer) {
+		glBindVertexArray(dummy_vao);
+		glDrawArrays(GL_TRIANGLES, 0, 3); 
+	} else {
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	}
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }

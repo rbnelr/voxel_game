@@ -118,7 +118,9 @@ struct ChunkRenderer {
 struct Raytracer {
 	//SERIALIZE(Raytracer, enable)
 
-	Shader* shad;
+	Shader* shader;
+	Shader* shader_frag;
+	Vao dummy_vao = {"dummy_vao"};
 
 	static constexpr int TEX3D_SIZE = 2048; // width, height for 3d textures
 
@@ -204,6 +206,15 @@ struct Raytracer {
 
 	VoxTexture<block_id, SUBCHUNK_SIZE>		voxels_tex = {"Raytracer.voxels_tex" };
 
+	struct FramebufferTex {
+		GLuint tex = 0;
+		int2   size;
+	};
+	FramebufferTex framebuffers[2];
+	int cur_frambuffer = 0;
+
+	bool frag_raytracer = false;
+
 	//
 	int max_iterations = 512;
 
@@ -232,6 +243,8 @@ struct Raytracer {
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
 	float ambient_factor = 0.00f;
 
+	float water_F0 = 0.6f;
+
 	//int   rays = 1;
 
 	bool  visualize_light = false;
@@ -254,6 +267,8 @@ struct Raytracer {
 
 		ImGui::Checkbox("enable", &enable);
 
+		ImGui::Checkbox("frag_raytracer", &frag_raytracer);
+
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
 
@@ -265,16 +280,20 @@ struct Raytracer {
 		ImGui::SameLine();
 		macro_change = ImGui::Checkbox("warp_reads", &visualize_warp_reads) || macro_change;
 
-		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad) {
+		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shader) {
 			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
 		}
 
 		macro_change = ImGui::Checkbox("only_primary_rays", &only_primary_rays) || macro_change;
 
-		if (macro_change && shad) {
-			shad->macros = get_macros();
-			shad->recompile("macro_change", false);
+		if (macro_change && shader) {
+			shader->macros = get_macros();
+			shader->recompile("macro_change", false);
+		}
+		if (macro_change && shader_frag) {
+			shader_frag->macros = get_macros();
+			shader_frag->recompile("macro_change", false);
 		}
 
 		ImGui::Separator();
@@ -298,17 +317,19 @@ struct Raytracer {
 			//ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::Checkbox("visualize_light", &visualize_light);
 
+			ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
+			
 			ImGui::TreePop();
 		}
 
 		if (ImGui::Button("Dump PTX")) {
 			GLsizei length;
-			glGetProgramiv(shad->prog, GL_PROGRAM_BINARY_LENGTH, &length);
+			glGetProgramiv(shader->prog, GL_PROGRAM_BINARY_LENGTH, &length);
 
 			char* buf = (char*)malloc(length);
 
 			GLenum format;
-			glGetProgramBinary(shad->prog, length, &length, &format, buf);
+			glGetProgramBinary(shader->prog, length, &length, &format, buf);
 
 			save_binary_file("../raytracer.glsl.asm", buf, length);
 
@@ -320,7 +341,8 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
+		shader = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
+		shader_frag = shaders.compile("raytracer_frag", get_macros());
 
 		if (0) {
 			int3 count, size;

@@ -1,10 +1,17 @@
 ﻿#version 460 core
+
+#ifdef _VERTEX
+void main () {
+	gl_Position = vec4(vec2(gl_VertexID & 1, gl_VertexID & 2) * 4.0 - 1.0, 0.0, 1.0);
+}
+#endif
+
+#ifdef _FRAGMENT
+
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
 #extension GL_KHR_shader_subgroup_arithmetic : enable
 #extension GL_ARB_shader_group_vote : enable
 #endif
-
-layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "common.glsl"
 #include "rand.glsl"
@@ -173,7 +180,7 @@ int iterations = 0;
 // get pixel ray in world space based on pixel coord and matricies
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
-	vec2 px_jitter = rand2();
+	vec2 px_jitter = rand2() - 0.5;
 	vec2 ndc = (px_pos + px_jitter) / view.viewport_size * 2.0 - 1.0;
 	//vec2 ndc = (px_pos + 0.5) / view.viewport_size * 2.0 - 1.0;
 	
@@ -520,7 +527,7 @@ vec3 collect_sunlight (Hit hit) {
 }
 #endif
 
-uniform ivec2 dispatch_size;
+out vec4 frag_col;
 
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
@@ -531,19 +538,14 @@ void main () {
 	barrier();
 #endif
 	
-	uvec2 pxpos = gl_GlobalInvocationID.xy;
-	
-	// maybe try not to do rays that we do not see (happens due to local group size)
-	if (pxpos.x >= view.viewport_size.x || pxpos.y >= view.viewport_size.y)
-		return;
-	
-	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
+	vec2 pxpos = gl_FragCoord.xy;
+	srand((int(pxpos.y) << 16) + int(pxpos.x)); // convert 2d pixel index to 1d value
 	
 	vec3 col = vec3(0.0);
 	
 	#if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	get_ray(pxpos, ray_pos, ray_dir);
 	
 	Hit hit;
 	if (trace_ray(ray_pos, ray_dir, INF, hit))
@@ -605,5 +607,7 @@ void main () {
 	#endif
 #endif
 	
-	imageStore(img, ivec2(pxpos), vec4(tonemap(col), 1.0));
+	frag_col = vec4(tonemap(col), 1.0);
 }
+#endif
+

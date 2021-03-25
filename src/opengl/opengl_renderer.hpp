@@ -203,6 +203,7 @@ public:
 	Sampler			tile_sampler = {"tile_sampler"};
 	Sampler			gui_sampler = {"gui_sampler"};
 	Sampler			normal_sampler = {"normal_sampler"};
+	Sampler			normal_sampler_wrap = {"normal_sampler_wrap"};
 
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
@@ -218,12 +219,11 @@ public:
 
 	enum TextureUnit : GLint {
 		TILE_TEXTURES=0,
+		GUI_ATLAS=1,
 		
-		SUBCHUNKS_TEX,
-		VOXELS_TEX,
-
-		GUI_ATLAS,
-		HEAT_GRADIENT,
+		SUBCHUNKS_TEX=2,
+		VOXELS_TEX=3,
+		HEAT_GRADIENT=4,
 	};
 
 	Texture2DArray	tile_textures	= {"tile_textures"};
@@ -274,6 +274,12 @@ public:
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glSamplerParameterf(normal_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+
+		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameterf(normal_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 	}
 	virtual ~OpenglRenderer () {}
 
