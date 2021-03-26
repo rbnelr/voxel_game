@@ -276,7 +276,7 @@ struct Raytracer {
 	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
 	float ambient_factor = 0.00f;
 
-	float water_F0 = 0.6f;
+	float water_F0 = 0.05f;
 
 	//int   rays = 1;
 

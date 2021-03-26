@@ -75,9 +75,9 @@ mat3 get_tangent_to_world (vec3 normal) {
 #define B_TALLGRASS 20
 
 float get_emmisive (uint bid) {
-	if (      bid == B_MAGMA   ) return 8.0;
-	else if ( bid == B_CRYSTAL ) return	4.0;
-	else if ( bid == B_URANIUM ) return 4.0;
+	if (      bid == B_MAGMA   ) return  8.0;
+	else if ( bid == B_CRYSTAL ) return	22.0;
+	else if ( bid == B_URANIUM ) return  4.0;
 	return 0.0;
 }
 
@@ -589,16 +589,23 @@ void main () {
 	}
 	#endif
 	
-	if (did_hit && hit.bid != B_WATER && hit.bid != B_AIR) {
+	uint hit_id = 0;
+	if (did_hit) {
 		vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
 		prev_clip.xyz /= prev_clip.w;
 		
 		vec2 uv = prev_clip.xy * 0.5 + 0.5;
 		if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
-			vec3 prev_col = texture(prev_framebuffer, uv).rgb;
+			vec4 prev_val = texture(prev_framebuffer, uv);
 			
-			col = mix(prev_col, col, vec3(reprojection_alpha));
+			vec3 prev_col = prev_val.rgb;
+			uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
+			
+			if (prev_bid == hit.bid)
+				col = mix(prev_col, col, vec3(reprojection_alpha));
 		}
+		
+		hit_id = hit.bid;
 	}
 
 #if VISUALIZE_COST
@@ -613,5 +620,5 @@ void main () {
 	#endif
 #endif
 	
-	imageStore(img, ivec2(pxpos), vec4(col, 1.0));
+	imageStore(img, ivec2(pxpos), vec4(col, unpackHalf2x16(hit_id).x));
 }
