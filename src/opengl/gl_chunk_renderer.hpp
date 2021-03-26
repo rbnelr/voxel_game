@@ -243,7 +243,7 @@ struct Raytracer {
 	FramebufferTex framebuffers[2];
 	int cur_frambuffer = 0;
 
-	float reprojection_alpha = 0.05;
+	float taa_alpha = 0.05;
 
 	float4x4 prev_world2clip;
 	bool init = true;
@@ -300,7 +300,7 @@ struct Raytracer {
 
 		ImGui::Checkbox("enable", &enable);
 
-		ImGui::SliderFloat("reprojection_alpha", &reprojection_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);

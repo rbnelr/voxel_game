@@ -205,7 +205,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	glUseProgram(shad->prog);
 
-	shad->set_uniform("reprojection_alpha", reprojection_alpha);
+	shad->set_uniform("taa_alpha",          taa_alpha);
 
 	shad->set_uniform("max_iterations",     max_iterations);
 	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);

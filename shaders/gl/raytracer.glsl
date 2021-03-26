@@ -98,7 +98,7 @@ uniform sampler2D prev_framebuffer;
 
 uniform mat4 prev_world2clip;
 
-uniform float reprojection_alpha = 0.05;
+uniform float taa_alpha = 0.05;
 
 #define SUBC_SPARSE_BIT 0x80000000u
 
@@ -216,15 +216,56 @@ vec2 calc_uv (vec3 pos_fract, int axis, int entry_face) {
 	return uv;
 }
 
-#if 1
-bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
-		inout uint prev_bid, inout uint bid, inout float dist, inout int axis) {
+bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
+		vec3 ray_pos, vec3 ray_dir, ivec3 flipmask, out Hit hit) {
+	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
+		return false;
+	
+	vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
+	
+	int entry_face = get_step_face(axis, flipmask);
+	vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
+	
+	uint tex_bid = bid == B_AIR ? prev_bid : bid;
+	float texid = float(block_tiles[tex_bid].sides[entry_face]);
+	
+	//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
+	vec4 col = texture(tile_textures, vec3(uv, texid), 0.0);
+	
+	if (tex_bid == B_TALLGRASS && axis == 2)
+		col = vec4(0.0);
+	
+	if (col.a <= 0.001)
+		return false;
+	
+	hit.pos = hit_pos;
+	hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
+	
+	hit.bid = bid;
+	hit.prev_bid = prev_bid;
+	
+	hit.dist = dist;
+	hit.col = col.rgb;
+	hit.emiss = col.rgb * get_emmisive(hit.bid);
+	return true;
+}
+
+#if 0
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	
+	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
+	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
+	
+	ray_dir = abs(ray_dir);
 	
 	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
 	ivec3 coord = ivec3(floor(ray_pos / float(SUBCHUNK_SIZE))) * SUBCHUNK_SIZE;
 	
-	prev_bid = 0;
-	bid = 0;
+	float dist = 0; 
+	int axis;
+	
+	uint prev_bid = 0;
+	uint bid = 0;
 	
 	for (;;) {
 		uint subchunk;
@@ -242,7 +283,8 @@ bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
 			
 			if (bid == 0)
 				return false; // unloaded chunk
-			if (prev_bid != 0 && prev_bid != bid)
+			
+			if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
 				return true;
 			prev_bid = bid;
 			
@@ -280,7 +322,7 @@ bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
 			for (;;) {
 				bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
 				
-				if (prev_bid != 0 && prev_bid != bid)
+				if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
 					return true;
 				prev_bid = bid;
 				
@@ -320,14 +362,21 @@ bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
 	}
 }
 #else
-bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
-		inout uint prev_bid, inout uint bid, inout float dist, inout int axis) {
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	
+	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
+	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
+	
+	ray_dir = abs(ray_dir);
 	
 	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
 	ivec3 coord = ivec3(floor(ray_pos / float(SUBCHUNK_SIZE))) * SUBCHUNK_SIZE;
 	
-	prev_bid = 0;
-	bid = 0;
+	float dist = 0; 
+	int axis;
+	
+	uint prev_bid = 0;
+	uint bid = 0;
 	
 	uint subchunk;
 	int new_coord = 0;
@@ -363,7 +412,7 @@ bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
 			bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
 		}
 		
-		if (prev_bid != 0 && prev_bid != bid)
+		if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
 			return true;
 		prev_bid = bid;
 		
@@ -397,46 +446,6 @@ bool dda_trace (vec3 ray_pos, vec3 ray_dir, float max_dist, ivec3 flipmask,
 	}
 }
 #endif
-
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
-	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
-	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
-	
-	ray_dir = abs(ray_dir);
-	
-	float dist = 0; 
-	int axis;
-	
-	bool did_hit = dda_trace(ray_pos, ray_dir, max_dist, flipmask,
-		hit.prev_bid, hit.bid, dist, axis);
-	
-	if (did_hit) {
-		vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
-		
-		int entry_face = get_step_face(axis, flipmask);
-		vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
-		
-		//uint tex_bid = hit.bid == B_AIR ? prev_bid : hit.bid;
-		float texid = float(block_tiles[hit.bid].sides[entry_face]);
-		
-		//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
-		vec4 col = texture(tile_textures, vec3(uv, texid), 0.0);
-		
-		//if (tex_bid == B_TALLGRASS && axis == 2)
-		//	col = vec4(0.0);
-		
-		//if (col.a <= 0.001)
-		//	return false;
-		
-		hit.pos = hit_pos;
-		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
-		
-		hit.dist = dist;
-		hit.col = col.rgb;
-		hit.emiss = col.rgb * get_emmisive(hit.bid);
-	}
-	return did_hit;
-}
 
 #if !ONLY_PRIMARY_RAYS
 bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
@@ -499,7 +508,7 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 		vec3 dir = normalize(offs);
 		
 		float cos = dot(dir, normal);
-		float atten = 10000.0 / (dist*dist);
+		float atten = 16000.0 / (dist*dist);
 		
 		if (cos > 0.0) {
 			Hit hit2;
@@ -602,7 +611,7 @@ void main () {
 			uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
 			
 			if (prev_bid == hit.bid)
-				col = mix(prev_col, col, vec3(reprojection_alpha));
+				col = mix(prev_col, col, vec3(taa_alpha));
 		}
 		
 		hit_id = hit.bid;
