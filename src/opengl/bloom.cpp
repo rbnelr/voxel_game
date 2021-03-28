@@ -34,7 +34,7 @@ namespace gl {
 
 			glActiveTexture(GL_TEXTURE0);
 			glUniform1i(p.shad->get_uniform_location("input_tex"), 0);
-			glBindSampler(0, r.post_sampler);
+			glBindSampler(0, r.bloom_sampler);
 			glBindTexture(GL_TEXTURE_2D, input_tex);
 
 			glActiveTexture(GL_TEXTURE1);

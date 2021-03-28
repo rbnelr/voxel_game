@@ -850,8 +850,22 @@ struct Framebuffer {
 		}
 	}
 
-	static constexpr auto color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8
-	static constexpr auto depth_format = GL_DEPTH_COMPONENT32F;
+	static constexpr GLenum color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8
+	static constexpr GLenum depth_format = GL_DEPTH_COMPONENT32F;
+	static constexpr bool color_mips = true;
+
+	int calc_mipmaps (int w, int h) {
+		int count = 0;
+		for (;;) {
+			count++;
+			if (w == 1 && h == 1)
+				break;
+
+			w = max(w / 2, 1);
+			h = max(h / 2, 1);
+		}
+		return count;
+	}
 
 	void update (int2 window_size) {
 		auto old_size = size;
@@ -865,12 +879,16 @@ struct Framebuffer {
 
 			glActiveTexture(GL_TEXTURE0); // try clobber consistent texture at least
 
-			// create new (textures created with glTexStorage2D cannot be resized)
+			GLint levels = 1;
+			if (color_mips)
+				levels = calc_mipmaps(size.x, size.y);
+
+			// create new
 			glGenTextures(1, &color);
 			glBindTexture(GL_TEXTURE_2D, color);
-			glTexStorage2D(GL_TEXTURE_2D, 1, color_format, size.x, size.y);
+			glTexStorage2D(GL_TEXTURE_2D, levels, color_format, size.x, size.y);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels-1);
 			glBindTexture(GL_TEXTURE_2D, 0);
 
 			glGenTextures(1, &depth);

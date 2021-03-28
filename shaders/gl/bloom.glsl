@@ -89,7 +89,7 @@ vec3 hsv2rgb (vec3 c) {
 	uniform float strength = 0.2;
 	
 	#if PASS == 0
-		#define DIR(offs) vec2((offs) * stepsz.x * 2.0, 0.0)
+		#define DIR vec2(1.0, 0.0)
 		
 		vec3 fcutoff (vec3 col) {
 			col *= exposure;
@@ -102,7 +102,7 @@ vec3 hsv2rgb (vec3 c) {
 			return col;
 		}
 	#else
-		#define DIR(offs) vec2(0.0, (offs) * stepsz.y)
+		#define DIR vec2(0.0, 1.0)
 		
 		vec3 fcutoff (vec3 col) {
 			return col;
@@ -111,14 +111,34 @@ vec3 hsv2rgb (vec3 c) {
 	
 	out vec3 frag_col;
 	void main () {
-		vec3 col = fcutoff(textureLod(input_tex, vs_uv, 0.0).rgb);
+		float offs = 0.0;
+		float size = 1.0;
+		float growfac = 1.3;
+		
+	#if PASS == 0
+		vec2 gradx = vec2(size * stepsz.x, 0.0);
+		vec2 grady = vec2(0.0, stepsz.y);
+	#else
+		vec2 gradx = vec2(stepsz.x, 0.0);
+		vec2 grady = vec2(0.0, size * stepsz.y);
+	#endif
+		
+		vec3 col = fcutoff(textureGrad(input_tex, vs_uv, gradx, grady).rgb);
 		col *= texelFetch(gaussian_kernel, 0, 0).r;
 		
 		for (int x=1; x <= radius; ++x) {
+		#if PASS == 0
+			gradx.x = size * stepsz.x;
+		#else
+			grady.y = size * stepsz.y;
+		#endif
+			
+			offs += size;
+			size *= growfac;
+			
 			float weight = texelFetch(gaussian_kernel, x, 0).r;
-			float offs = pow(float(x), 1.4);
-			col += fcutoff(textureLod(input_tex, vs_uv + DIR(+offs), 0.0).rgb) * weight;
-			col += fcutoff(textureLod(input_tex, vs_uv + DIR(-offs), 0.0).rgb) * weight;
+			col += fcutoff(textureGrad(input_tex, vs_uv + offs * DIR * stepsz, gradx, grady).rgb) * weight;
+			col += fcutoff(textureGrad(input_tex, vs_uv - offs * DIR * stepsz, gradx, grady).rgb) * weight;
 		}
 		
 		frag_col = col;

@@ -62,10 +62,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
 		glBindSampler(TILE_TEXTURES, tile_sampler);
 
-		glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
-		glBindTexture(GL_TEXTURE_2D, gui_atlas);
-		glBindSampler(GUI_ATLAS, gui_sampler);
-
 		glActiveTexture(GL_TEXTURE0+HEAT_GRADIENT);
 		glBindTexture(GL_TEXTURE_2D, heat_gradient);
 		glBindSampler(HEAT_GRADIENT, normal_sampler);
@@ -111,9 +107,15 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("post passes");
 		
+		{
+			OGL_TRACE("generate framebuffer mips");
+			glBindTexture(GL_TEXTURE_2D, framebuffer.color);
+			glGenerateMipmap(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+
 		if (bloom_renderer.enable)
 			bloom_renderer.apply_bloom(*this, framebuffer);
-
 
 		{
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -163,7 +165,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 			glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
 			glBindTexture(GL_TEXTURE_2D, gui_atlas);
-			glBindSampler(GUI_ATLAS, gui_sampler);
+			glBindSampler(GUI_ATLAS, gui_renderer.gui_sampler);
 		}
 
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
