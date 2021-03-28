@@ -1,13 +1,16 @@
 #pragma once
 #include "common.hpp"
+#include "engine/camera.hpp"
 #include "world_generator.hpp"
 #include "block_update.hpp"
-#include "engine/camera.hpp"
 #include "player.hpp"
 #include "assets.hpp"
 
 struct Game {
-	SERIALIZE(Game, world_gen, chunks, flycam, player, activate_flycam, imopen)
+#define SERIALIZE_NORMAL     world_gen, chunks, flycam, player, activate_flycam, imopen
+
+	friend void to_json (nlohmann::ordered_json& j, const Game& t);
+	friend void from_json (const nlohmann::ordered_json& j, Game& t);
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, performance, graphics, world, chunks, entities)

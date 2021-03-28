@@ -236,6 +236,7 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\bloom.hpp" />
     <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
@@ -368,11 +369,24 @@
     <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
-    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\bloom.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
-    <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp" />
-    <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
     <ClCompile Include="..\..\..\src\physics.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
@@ -409,6 +423,7 @@
     <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
     <None Include="..\..\..\shaders\gl\block_highlight.glsl" />
+    <None Include="..\..\..\shaders\gl\bloom.glsl" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
@@ -417,6 +432,7 @@
     <None Include="..\..\..\shaders\gl\gui.glsl" />
     <None Include="..\..\..\shaders\gl\held_block.glsl" />
     <None Include="..\..\..\shaders\gl\held_item.glsl" />
+    <None Include="..\..\..\shaders\gl\postprocess.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />

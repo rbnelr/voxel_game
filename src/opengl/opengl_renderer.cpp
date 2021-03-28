@@ -74,8 +74,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("3d draws");
 		{
-			OGL_TRACE("setup");
-
 			memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
 			common_uniforms.view.set(game.view);
 			common_uniforms.view.viewport_size = (float2)framebuffer.size;
@@ -111,18 +109,61 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	}
 
 	{
+		OGL_TRACE("post passes");
+		
+		if (bloom_renderer.enable)
+			bloom_renderer.apply_bloom(*this, framebuffer);
+
+
+		{
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+			glViewport(0,0, I.window_size.x, I.window_size.y);
+			glScissor(0,0, I.window_size.x, I.window_size.y);
+
+			{
+				common_uniforms.view.viewport_size = (float2)I.window_size;
+				upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
+			}
+		}
+
+		{
+			OGL_TRACE("postprocess");
+			glUseProgram(post_shad->prog);
+
+			PipelineState s;
+			s.blend_enable = false;
+			s.depth_test = false;
+			s.depth_write = false;
+			state.set(s);
+
+			GLuint textures[] = { framebuffer.color, bloom_renderer.passes[1].color };
+			const char* textures_uniforms[] = { "main_color", "bloom" };
+			for (int i=0; i<ARRLEN(textures); ++i) {
+				glActiveTexture(GL_TEXTURE0 + i);
+				glBindTexture(GL_TEXTURE_2D, textures[i]);
+				glBindSampler(i, post_sampler);
+				glUniform1i(post_shad->get_uniform_location(textures_uniforms[i]), i);
+			}
+
+			post_shad->set_uniform("enable_bloom", bloom_renderer.enable);
+			post_shad->set_uniform("exposure", bloom_renderer.exposure);
+
+			glDrawArrays(GL_TRIANGLES, 0, 3); // full screen triangle
+		}
+	}
+
+	{
 		OGL_TRACE("ui draws");
 
 		{
-			OGL_TRACE("setup");
-			common_uniforms.view.viewport_size = (float2)I.window_size;
-			upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
-			{
-				OGL_TRACE("framebuffer.blit");
-				framebuffer.blit(I.window_size);
-			}
-			glViewport(0,0, I.window_size.x, I.window_size.y);
-			glScissor(0,0, I.window_size.x, I.window_size.y);
+			glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
+			glBindSampler(TILE_TEXTURES, tile_sampler);
+
+			glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
+			glBindTexture(GL_TEXTURE_2D, gui_atlas);
+			glBindSampler(GUI_ATLAS, gui_sampler);
 		}
 
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);

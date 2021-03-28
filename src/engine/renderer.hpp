@@ -31,6 +31,9 @@ class Renderer {
 public:
 	virtual ~Renderer () {}
 
+	virtual void deserialize (nlohmann::ordered_json const& j) = 0;
+	virtual void serialize (nlohmann::ordered_json& j) = 0;
+
 	virtual bool get_vsync () = 0;
 	virtual void set_vsync (bool state) = 0;
 

@@ -5,6 +5,7 @@
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 #include "gl_chunk_renderer.hpp"
+#include "bloom.hpp"
 #include "engine/input.hpp"
 
 namespace gl {
@@ -54,6 +55,8 @@ struct CommonUniforms {
 class OpenglRenderer;
 
 struct glDebugDraw {
+	SERIALIZE(glDebugDraw, draw_occluded, occluded_alpha)
+
 	VertexBuffer vbo_lines	= vertex_buffer<DebugDraw::LineVertex>("DebugDraw.vbo_lines");
 	VertexBuffer vbo_tris	= vertex_buffer<DebugDraw::TriVertex> ("DebugDraw.vbo_tris");
 
@@ -187,6 +190,11 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, bloom_renderer, line_width, debug_draw)
+
+	virtual void deserialize (nlohmann::ordered_json const& j) { j.get_to(*this); }
+	virtual void serialize (nlohmann::ordered_json& j) { j = *this; }
+
 	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
 	StateManager	state;
@@ -198,11 +206,23 @@ public:
 	bool			trigger_screenshot = false;
 	bool			screenshot_hud = false;
 
+	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
+	PlayerRenderer	player_rederer	= PlayerRenderer(shaders);
+	Raytracer		raytracer		= Raytracer(shaders);
+
+	BlockHighlight	block_highl		= BlockHighlight(shaders);
+	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
+
+	BloomRenderer	bloom_renderer	= BloomRenderer(shaders);
+
+	Shader*			post_shad = shaders.compile("postprocess");
+
 	Ubo				common_uniforms_ubo = {"common_ubo"};
 
 	Sampler			tile_sampler = {"tile_sampler"};
 	Sampler			gui_sampler = {"gui_sampler"};
 	Sampler			normal_sampler = {"normal_sampler"};
+	Sampler			post_sampler = {"post_sampler"};
 	Sampler			normal_sampler_wrap = {"normal_sampler_wrap"};
 
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
@@ -230,13 +250,6 @@ public:
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		heat_gradient	= {"heat_gradient"};
-
-	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
-	PlayerRenderer	player_rederer	= PlayerRenderer(shaders);
-	Raytracer		raytracer		= Raytracer(shaders);
-
-	BlockHighlight	block_highl		= BlockHighlight(shaders);
-	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;
@@ -269,6 +282,13 @@ public:
 		glSamplerParameteri(gui_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameterf(gui_sampler, GL_TEXTURE_MAX_ANISOTROPY, 1);
+
+		glSamplerParameteri(post_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(post_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(post_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(post_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameterf(post_sampler, GL_TEXTURE_MAX_ANISOTROPY, 1);
 
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glSamplerParameteri(normal_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -310,6 +330,7 @@ public:
 		ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
 
 		raytracer.imgui();
+		bloom_renderer.imgui();
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {

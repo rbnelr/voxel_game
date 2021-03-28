@@ -75,9 +75,9 @@ mat3 get_tangent_to_world (vec3 normal) {
 #define B_TALLGRASS 20
 
 float get_emmisive (uint bid) {
-	if (      bid == B_MAGMA   ) return  8.0;
-	else if ( bid == B_CRYSTAL ) return	22.0;
-	else if ( bid == B_URANIUM ) return  4.0;
+	if (      bid == B_MAGMA   ) return 7.0;
+	else if ( bid == B_CRYSTAL ) return 10.0;
+	else if ( bid == B_URANIUM ) return 3.2;
 	return 0.0;
 }
 

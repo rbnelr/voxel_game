@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				84.16951751708984,
-				53.176597595214844,
-				31.58712387084961
+				62.54254913330078,
+				57.889678955078125,
+				27.518218994140625
 			],
 			"rot_aer": [
-				1.4669740200042725,
-				0.17647652328014374,
+				1.3257787227630615,
+				0.1321825087070465,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -58,5 +58,38 @@
 		"world": true,
 		"chunks": true,
 		"entities": true
+	},
+	"renderer_opengl": {
+		"chunk_renderer": {
+			"_draw_chunks": true
+		},
+		"raytracer": {
+			"enable": true,
+			"max_iterations": 512,
+			"rand_seed_time": true,
+			"sunlight_enable": false,
+			"sunlight_dist": 90.0,
+			"sunlight_col": [
+				1.2739999294281006,
+				1.1960008144378662,
+				0.8449998497962952
+			],
+			"bounces_enable": true,
+			"bounces_max_dist": 128.0,
+			"bounces_max_count": 4,
+			"only_primary_rays": false,
+			"taa_alpha": 0.05000000074505806
+		},
+		"bloom_renderer": {
+			"enable": true,
+			"radius": 86,
+			"cutoff": 1.850000023841858,
+			"strength": 0.44999998807907104
+		},
+		"line_width": 1.0,
+		"debug_draw": {
+			"draw_occluded": false,
+			"occluded_alpha": 0.30000001192092896
+		}
 	}
 }

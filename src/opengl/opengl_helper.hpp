@@ -869,12 +869,17 @@ struct Framebuffer {
 			glGenTextures(1, &color);
 			glBindTexture(GL_TEXTURE_2D, color);
 			glTexStorage2D(GL_TEXTURE_2D, 1, color_format, size.x, size.y);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 			glBindTexture(GL_TEXTURE_2D, 0);
 
 			glGenTextures(1, &depth);
 			glBindTexture(GL_TEXTURE_2D, depth);
 			glTexStorage2D(GL_TEXTURE_2D, 1, depth_format, size.x, size.y);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 			glBindTexture(GL_TEXTURE_2D, 0);
+
 
 			glGenFramebuffers(1, &fbo);
 			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
@@ -885,25 +890,12 @@ struct Framebuffer {
 			OGL_DBG_LABEL(GL_TEXTURE, depth, "Framebuffer.depth");
 			OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, "Framebuffer.fbo");
 
-			GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-			if (status != GL_FRAMEBUFFER_COMPLETE) {
-				fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
-			}
+			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			//if (status != GL_FRAMEBUFFER_COMPLETE) {
+			//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+			//}
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
-	}
-
-	void blit (int2 window_size) {
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // default FBO
-
-		// TODO: using blit here, but if a post processing pass is desired the rescaling (sampling) can also just be done in our post shader
-		glBlitFramebuffer(
-			0, 0, size.x, size.y,
-			0, 0, window_size.x, window_size.y,
-			GL_COLOR_BUFFER_BIT, nearest ? GL_NEAREST : GL_LINEAR);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 };
 

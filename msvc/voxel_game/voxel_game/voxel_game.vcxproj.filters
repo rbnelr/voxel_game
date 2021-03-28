@@ -214,6 +214,9 @@
     <ClInclude Include="..\..\..\src\noise.hpp">
       <Filter>game</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\bloom.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -348,6 +351,9 @@
     <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash3.cpp">
       <Filter>kisslib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\bloom.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -424,6 +430,12 @@
       <Filter>shaders\gl</Filter>
     </None>
     <None Include="..\..\..\shaders\gl\raytracer.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\bloom.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\postprocess.glsl">
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>

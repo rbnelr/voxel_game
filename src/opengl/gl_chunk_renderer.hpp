@@ -9,6 +9,8 @@ namespace gl {
 class OpenglRenderer;
 
 struct ChunkRenderer {
+	SERIALIZE(ChunkRenderer, _draw_chunks)
+
 	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
 	static constexpr int SLICES_PER_ALLOC = (int)(ALLOC_SIZE / CHUNK_SLICE_BYTESIZE);
 
@@ -116,7 +118,10 @@ struct ChunkRenderer {
 };
 
 struct Raytracer {
-	//SERIALIZE(Raytracer, enable)
+	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
+		sunlight_enable, sunlight_dist, sunlight_col,
+		bounces_enable, bounces_max_dist, bounces_max_count,
+		only_primary_rays, taa_alpha)
 
 	Shader* shad;
 
