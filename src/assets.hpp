@@ -83,12 +83,13 @@ struct BlockTile {
 // Vertex for rendering chunks via merge instancing
 // one vertex is expanded to a quad (6 vert) of block mesh data
 struct BlockMeshInstance {
-	#define BlockMeshInstance_FIXEDPOINT_FAC 256
-	#define BlockMeshInstance_FIXEDPOINT_SHIFT 8
+#define BlockMeshInstance_FIXEDPOINT_FAC 256
+#define BlockMeshInstance_FIXEDPOINT_SHIFT 8
 
 	int16_t		posx, posy, posz; // pos in chunk
 	uint16_t	meshid; // index for merge instancing, this is used to index block meshes
 	uint16_t	texid; // texture array id based on block id
+	uint16_t	_pad; // padding to allow reading as buffer in compute shader which does not support 16 bit ints
 
 	template <typename ATTRIBS>
 	static void attributes (ATTRIBS& a) {

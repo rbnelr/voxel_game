@@ -43,7 +43,7 @@ struct Shader {
 		std::string filename = prints("shaders/gl/%s.glsl", name.c_str());
 
 		// Load shader base source file
-		if (!preprocess_include_file(filename.c_str(), &source, &src_files)) {
+		if (!preprocess_include_file(name.c_str(), filename.c_str(), &source, &src_files)) {
 			clog(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
 			return false;
 		}

@@ -66,9 +66,8 @@ typedef uint16_t			chunk_id;
 #define MAX_CHUNKS			((1<<16)-1) // one less than POT to allow i<N loop condition and leave -1u as null value
 #define MAX_SLICES			((1<<16)-1) // one less than POT to allow i<N loop condition and leave -1u as null value
 
-#define CHUNK_SLICE_BYTESIZE	(64 *KB)
-static_assert(CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance) < ((1<<16)-1), "");
-static constexpr uint16_t CHUNK_SLICE_LENGTH = CHUNK_SLICE_BYTESIZE / sizeof(BlockMeshInstance);
+static constexpr uint16_t CHUNK_SLICE_LENGTH = 16 * 1024;
+static constexpr size_t CHUNK_SLICE_SIZE = CHUNK_SLICE_LENGTH * sizeof(BlockMeshInstance);
 
 static constexpr int3 NEIGHBOURS[6] = {
 	int3(-1,0,0), int3(+1,0,0),

@@ -11,24 +11,50 @@ class OpenglRenderer;
 struct ChunkRenderer {
 	SERIALIZE(ChunkRenderer, _draw_chunks)
 
-	static constexpr uint64_t ALLOC_SIZE = 64 * (1024ull * 1024); // size of vram allocations
-	static constexpr int SLICES_PER_ALLOC = (int)(ALLOC_SIZE / CHUNK_SLICE_BYTESIZE);
+	static constexpr int SLICES_PER_ALLOC = 1024;
+	static constexpr size_t ALLOC_SIZE = SLICES_PER_ALLOC * CHUNK_SLICE_SIZE; // size of vram allocations
+
+	static constexpr size_t LIGHTING_VBO_SLICE_SIZE = CHUNK_SLICE_LENGTH * sizeof(float4);
+	static constexpr size_t LIGHTING_VBO_SIZE = SLICES_PER_ALLOC * LIGHTING_VBO_SLICE_SIZE;
 
 	enum DrawType { DT_OPAQUE=0, DT_TRANSPARENT=1 };
 
 	struct AllocBlock {
 		Vao vao;
 		Vbo vbo;
+		Vbo lighting_vbo;
 
 		AllocBlock () {
 			ZoneScopedC(tracy::Color::Crimson);
 			OGL_TRACE("AllocBlock()");
 
 			vbo = Vbo("ChunkRenderer.AllocBlock.vbo");
-			vao = setup_vao<BlockMeshInstance>("ChunkRenderer.vao", vbo);
 
+			//vao = setup_vao<BlockMeshInstance>("ChunkRenderer.vao", vbo);
+			vao = { "ChunkRenderer.vao" };
+			glBindVertexArray(vao);
+
+			//
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
 			glBufferData(GL_ARRAY_BUFFER, ALLOC_SIZE, nullptr, GL_STREAM_DRAW);
+
+			VertexAttributes a;
+			BlockMeshInstance::attributes(a);
+
+			//
+			lighting_vbo = Vbo("ChunkRenderer.AllocBlock.lighting_vbo");
+
+			glBindBuffer(GL_ARRAY_BUFFER, lighting_vbo);
+			glBufferData(GL_ARRAY_BUFFER, LIGHTING_VBO_SIZE, nullptr, GL_STREAM_DRAW);
+
+			int loc = 3;
+			glEnableVertexAttribArray(loc);
+			glVertexAttribPointer(loc, 4, GL_FLOAT, false, sizeof(float4), 0);
+			glVertexAttribDivisor(loc, 1);
+
+
+			glBindVertexArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
 		struct DrawList {
@@ -105,7 +131,7 @@ struct ChunkRenderer {
 			(float)(vertices * sizeof(BlockMeshInstance)) / (float)(allocs.size() * ALLOC_SIZE) * 100);
 
 		if (ImGui::TreeNode("slices alloc")) {
-			print_bitset_allocator(chunks.slices.slots, CHUNK_SLICE_BYTESIZE, ALLOC_SIZE);
+			print_bitset_allocator(chunks.slices.slots, CHUNK_SLICE_SIZE, ALLOC_SIZE);
 			ImGui::TreePop();
 		}
 
@@ -124,6 +150,7 @@ struct Raytracer {
 		only_primary_rays, taa_alpha)
 
 	Shader* shad;
+	Shader* shad_lighting;
 
 	static constexpr int TEX3D_SIZE = 2048; // width, height for 3d textures
 
@@ -298,6 +325,15 @@ struct Raytracer {
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
+	int lighting_workgroup_size = 64;
+
+	std::vector<gl::MacroDefinition> get_lighting_macros () {
+		return { {"WORKGROUP_SIZE", prints("%d", lighting_workgroup_size)},
+			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
+			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
+			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
+	}
+
 	bool enable = true;
 
 	void imgui () {
@@ -376,6 +412,7 @@ struct Raytracer {
 
 	Raytracer (Shaders& shaders) {
 		shad = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
+		shad_lighting = shaders.compile("rt_lighting", get_lighting_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;
@@ -431,7 +468,9 @@ struct Raytracer {
 
 	void upload_changes (OpenglRenderer& r, Game& game);
 
+	void setup_shader (OpenglRenderer& r, Shader* shad);
 	void draw (OpenglRenderer& r, Game& game);
+	void compute_lighting (OpenglRenderer& r, Game& game);
 };
 
 

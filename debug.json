@@ -6,21 +6,21 @@
 		"load_radius": 500.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
-		"visualize_chunks": false,
-		"visualize_subchunks": true,
+		"visualize_chunks": true,
+		"visualize_subchunks": false,
 		"visualize_radius": true,
 		"debug_frustrum_culling": false
 	},
 	"flycam": {
 		"cam": {
 			"pos": [
-				62.54254913330078,
-				57.889678955078125,
-				27.518218994140625
+				66.44097137451172,
+				61.31410217285156,
+				29.49781608581543
 			],
 			"rot_aer": [
-				1.3257787227630615,
-				0.1321825087070465,
+				0.1990525722503662,
+				-0.2747672498226166,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -64,7 +64,7 @@
 			"_draw_chunks": true
 		},
 		"raytracer": {
-			"enable": true,
+			"enable": false,
 			"max_iterations": 512,
 			"rand_seed_time": true,
 			"sunlight_enable": false,
@@ -81,7 +81,7 @@
 			"taa_alpha": 0.05000000074505806
 		},
 		"bloom_renderer": {
-			"enable": true,
+			"enable": false,
 			"radius": 86,
 			"cutoff": 1.850000023841858,
 			"strength": 0.44999998807907104

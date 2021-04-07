@@ -83,6 +83,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
+		raytracer.compute_lighting(*this, game);
+
 		if (raytracer.enable)
 			raytracer.draw(*this, game);
 

@@ -11,7 +11,7 @@ inline std::string operator+ (std::string_view const& l, std::string_view const&
 	return s;
 }
 
-inline bool preprocess_include_file (char const* filename, std::string* result, std::vector<std::string>* src_files) {
+inline bool preprocess_include_file (char const* shader_name, char const* filename, std::string* result, std::vector<std::string>* src_files) {
 	using namespace parse;
 	const auto inc_len = strlen("include");
 
@@ -20,7 +20,7 @@ inline bool preprocess_include_file (char const* filename, std::string* result, 
 
 	std::string source;
 	if (!kiss::load_text_file(filename, &source)) {
-		clog(ERROR, "[Shaders] \"%s\": could not find file \"%s\"!", filename);
+		clog(ERROR, "[Shaders] \"%s\": could not find file \"%s\"!", shader_name, filename);
 		return false;
 	}
 
@@ -49,7 +49,7 @@ inline bool preprocess_include_file (char const* filename, std::string* result, 
 
 				std::string_view inc_filename;
 				if (!quoted_string(c, &inc_filename)) {
-					clog(ERROR, "[Shaders] \"%s\": could not find file \"%s\"!", filename);
+					clog(ERROR, "[Shaders] \"%s\": expected filename in include at line %d!", shader_name, line_no);
 					success = false;
 				} else {
 
@@ -57,7 +57,7 @@ inline bool preprocess_include_file (char const* filename, std::string* result, 
 
 					prints(result, "#line 1 \"%s\"\n", inc_filepath.c_str());
 
-					if (!preprocess_include_file(inc_filepath.c_str(), result, src_files)) // include file text instead of ' #include "filename" '
+					if (!preprocess_include_file(shader_name, inc_filepath.c_str(), result, src_files)) // include file text instead of ' #include "filename" '
 						success = false;
 
 					prints(result, "#line %d \"%s\"\n", line_no, filename);

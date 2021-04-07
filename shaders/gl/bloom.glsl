@@ -112,33 +112,16 @@ vec3 hsv2rgb (vec3 c) {
 	out vec3 frag_col;
 	void main () {
 		float offs = 0.0;
-		float size = 1.0;
-		float growfac = 1.3;
 		
-	#if PASS == 0
-		vec2 gradx = vec2(size * stepsz.x, 0.0);
-		vec2 grady = vec2(0.0, stepsz.y);
-	#else
-		vec2 gradx = vec2(stepsz.x, 0.0);
-		vec2 grady = vec2(0.0, size * stepsz.y);
-	#endif
-		
-		vec3 col = fcutoff(textureGrad(input_tex, vs_uv, gradx, grady).rgb);
+		vec3 col = fcutoff(texture(input_tex, vs_uv).rgb);
 		col *= texelFetch(gaussian_kernel, 0, 0).r;
 		
 		for (int x=1; x <= radius; ++x) {
-		#if PASS == 0
-			gradx.x = size * stepsz.x;
-		#else
-			grady.y = size * stepsz.y;
-		#endif
-			
-			offs += size;
-			size *= growfac;
+			offs += 1;
 			
 			float weight = texelFetch(gaussian_kernel, x, 0).r;
-			col += fcutoff(textureGrad(input_tex, vs_uv + offs * DIR * stepsz, gradx, grady).rgb) * weight;
-			col += fcutoff(textureGrad(input_tex, vs_uv - offs * DIR * stepsz, gradx, grady).rgb) * weight;
+			col += fcutoff(texture(input_tex, vs_uv + offs * DIR * stepsz).rgb) * weight;
+			col += fcutoff(texture(input_tex, vs_uv - offs * DIR * stepsz).rgb) * weight;
 		}
 		
 		frag_col = col;

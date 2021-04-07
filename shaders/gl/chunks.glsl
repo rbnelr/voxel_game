@@ -5,6 +5,7 @@
 layout(location = 0) vs2fs VS {
 	vec3	uvi; // uv + tex_index
 	//vec3	normal_cam;
+	vec3	lighting;
 	float	damage_tile; // -1 for no damage render
 } vs;
 
@@ -14,6 +15,8 @@ layout(location = 0) vs2fs VS {
 	layout(location = 0) in vec3	voxel_pos; // pos of voxel instance in chunk
 	layout(location = 1) in uint	meshid;
 	layout(location = 2) in float	texid;
+	
+	layout(location = 3) in vec3	lighting;
 	
 	uniform vec3 chunk_pos;
 	
@@ -62,6 +65,7 @@ layout(location = 0) vs2fs VS {
 		gl_Position =		view.world_to_clip * vec4(mesh_pos_model + vox_pos_world, 1);
 		vs.uvi =			vec3(uv, texid);
 		//vs.normal_cam =		mat3(view.world_to_cam) * mesh_norm_model;
+		vs.lighting =		lighting;
 		vs.damage_tile =	calc_damage_tile(vox_pos_world);
 	}
 #endif
@@ -81,6 +85,8 @@ layout(location = 0) vs2fs VS {
 			discard;
 		col.a = 1.0;
 	#endif
+		
+		col.rgb *= vs.lighting;
 		
 		if (vs.damage_tile >= 0.0) {
 			float dmg_tint = texture(tile_textures, vec3(vs.uvi.xy, vs.damage_tile)).r;

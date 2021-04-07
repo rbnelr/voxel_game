@@ -52,8 +52,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			a.draw_lists[1].count = 0;
 		}
 
-		auto push_draw_slices = [&] (chunk_id cid, uint32_t vertex_count, slice_id slices, DrawType type) {
-			uint32_t remain_count = vertex_count;
+		auto push_draw_slices = [&] (chunk_id cid, uint32_t remain_count, slice_id slices, DrawType type) {
 			slice_id sliceid = slices;
 			while (sliceid != U16_NULL) {
 				uint16_t alloci = sliceid / (uint32_t)SLICES_PER_ALLOC;
@@ -197,12 +196,8 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 	glBindTexture(GL_TEXTURE_3D, 0);
 }
 
-void Raytracer::draw (OpenglRenderer& r, Game& game) {
-	ZoneScoped;
-	OGL_TRACE("raytracer_test");
-
-	if (!shad->prog) return;
-
+// setup common state for rt_util.glsl
+void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
 	glUseProgram(shad->prog);
 
 	shad->set_uniform("taa_alpha",          taa_alpha);
@@ -236,9 +231,18 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
 	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
 	glBindSampler(OpenglRenderer::VOXELS_TEX, r.normal_sampler_wrap);
-	
+
 	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
 	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
+}
+
+void Raytracer::draw (OpenglRenderer& r, Game& game) {
+	ZoneScoped;
+	OGL_TRACE("raytracer.draw");
+
+	if (!shad->prog) return;
+
+	setup_shader(r, shad);
 
 	//
 	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
@@ -260,10 +264,9 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
 	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
 
-	shad->set_uniform("dispatch_size", dispatch_size);
-	
 	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
 
+	shad->set_uniform("dispatch_size", dispatch_size);
 	shad->set_uniform("prev_world2clip", init ? world2clip : prev_world2clip);
 
 	prev_world2clip = world2clip;
@@ -275,6 +278,59 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBlitNamedFramebuffer(curr_img.fbo, r.framebuffer.fbo, 0,0,sz.x,sz.y, 0,0,sz.x,sz.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
+	ZoneScoped;
+	OGL_TRACE("raytracer.compute_lighting");
+
+	if (!shad_lighting->prog) return;
+
+	setup_shader(r, shad_lighting);
+
+	auto compute_slice = [&] (chunk_id cid, uint16_t alloci, uint16_t slicei, uint32_t vertex_count) {
+		if (vertex_count > 0) {
+			auto& alloc = r.chunk_renderer.allocs[alloci];
+
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
+
+			shad_lighting->set_uniform("vertex_count", vertex_count);
+
+			int dispatch_size = (vertex_count + (lighting_workgroup_size -1)) / lighting_workgroup_size;
+			glDispatchCompute(dispatch_size, 1, 1);
+		}
+	};
+
+	auto compute_slices = [&] (chunk_id cid, uint32_t remain_count, slice_id slices) {
+		slice_id sliceid = slices;
+		while (sliceid != U16_NULL) {
+			uint16_t alloci = sliceid / (uint32_t)r.chunk_renderer.SLICES_PER_ALLOC;
+			uint16_t slicei = sliceid % (uint32_t)r.chunk_renderer.SLICES_PER_ALLOC;
+
+			uint32_t vertex_count = std::min(remain_count, (uint32_t)CHUNK_SLICE_LENGTH);
+
+			compute_slice(cid, alloci, slicei, vertex_count);
+
+			remain_count -= vertex_count;
+			sliceid = game.chunks.slices[sliceid].next;
+		}
+	};
+
+	chunk_id cid = 0;
+	{
+		if (cid < game.chunks.end() && game.chunks[cid].flags != 0) {
+			auto& chunk = game.chunks[cid];
+
+			bool empty = chunk.opaque_mesh_vertex_count == 0 && chunk.transp_mesh_vertex_count == 0;
+			if (!empty) {
+				compute_slices(cid, chunk.opaque_mesh_vertex_count, chunk.opaque_mesh_slices);
+				compute_slices(cid, chunk.transp_mesh_vertex_count, chunk.transp_mesh_slices);
+			}
+		}
+	}
+
+	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 }
 
 } // namespace gl

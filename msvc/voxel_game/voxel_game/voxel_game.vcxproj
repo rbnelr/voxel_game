@@ -435,7 +435,11 @@
     <None Include="..\..\..\shaders\gl\postprocess.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_lighting.glsl" />
     <None Include="..\..\..\shaders\gl\util.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\..\shaders\gl\raytracing_util.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
