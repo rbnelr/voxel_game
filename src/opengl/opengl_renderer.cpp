@@ -38,7 +38,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	ImGui::Begin("Debug");
 
 	chunk_renderer.upload_remeshed(game.chunks);
-	raytracer.upload_changes(*this, game);
+	raytracer.upload_changes(*this, game, I);
 
 	glLineWidth(line_width);
 	{
@@ -83,7 +83,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
-		raytracer.compute_lighting(*this, game);
+		if (raytracer.enable_rt_lighting)
+			raytracer.compute_lighting(*this, game);
 
 		if (raytracer.enable)
 			raytracer.draw(*this, game);

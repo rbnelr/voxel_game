@@ -161,9 +161,16 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 }
 
 //
-void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
+void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	ZoneScoped;
 	OGL_TRACE("raytracer upload changes");
+
+	if (I.buttons[KEY_R].went_down)
+		enable = !enable;
+
+	// lazy init these to allow json changes to affect the macros
+	if (!shad)			shad = r.shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
+	if (!shad_lighting)	shad_lighting = r.shaders.compile("rt_lighting", get_lighting_macros(), {{ COMPUTE_SHADER }});
 
 	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
 

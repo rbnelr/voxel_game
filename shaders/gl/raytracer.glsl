@@ -21,16 +21,18 @@ uniform uint rand_frame_index = 0;
 uniform ivec2 dispatch_size;
 
 // get pixel ray in world space based on pixel coord and matricies
-void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
+bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
-	//vec2 px_center = rand2();
-	vec2 px_center = vec2(0.5);
-	vec2 ndc = (px_pos + px_center) / view.viewport_size * 2.0 - 1.0;
-	//vec2 ndc = (px_pos + 0.5) / view.viewport_size * 2.0 - 1.0;
+#if 1 // Normal camera projection
+
+	//vec2 px_center = px_pos + rand2();
+	vec2 px_center = px_pos + vec2(0.5);
+	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
 	
 	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
 
 	// TODO: can't get optimization to one single clip_to_world mat mul to work, why?
+	// -> clip_to_cam needs translation  cam_to_world needs to _not_ have translation
 	vec3 cam = (view.clip_to_cam * clip).xyz;
 
 	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
@@ -38,6 +40,37 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
 	// ray starts on the near plane
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
+	
+	return true;
+
+#else // 360 Sphere Projections
+	
+	vec2 px_center = (px_pos + vec2(0.5)) / view.viewport_size; // [0,1]
+	
+	#if 0 // Equirectangular projection
+		float lon = (px_center.x - 0.5) * PI*2;
+		float lat = (px_center.y - 0.5) * PI;
+	#else // Mollweide projection
+		float x = px_center.x * 2.0 - 1.0;
+		float y = px_center.y * 2.0 - 1.0;
+		
+		if ((x*x + y*y) > 1.0)
+			return false;
+		
+		float theta = asin(y);
+		
+		float lon = (PI * x) / cos(theta);
+		float lat = asin((2.0 * theta + sin(2.0 * theta)) / PI);
+	#endif
+	
+	float c = cos(lat);
+	vec3 dir_cam = vec3(c * sin(lon), sin(lat), -c * cos(lon));
+	
+	ray_dir = (view.cam_to_world * vec4(dir_cam, 0)).xyz;
+	ray_pos = (view.cam_to_world * vec4(0,0,0,1)).xyz;
+
+	return true;
+#endif
 }
 
 void main () {
@@ -59,21 +92,21 @@ void main () {
 	
 	#if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	Hit hit;
-	bool did_hit = trace_ray(ray_pos, ray_dir, INF, hit);
+	bool did_hit = bray && trace_ray(ray_pos, ray_dir, INF, hit);
 	vec3 col = did_hit ? hit.col : vec3(0.0);
 	
 	#else
 	// primary ray
 	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	vec3 col = vec3(0.0);
 	
 	Hit hit;
-	bool did_hit = trace_ray_refl_refr(ray_pos, ray_dir, INF, hit);
+	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, INF, hit);
 	if (did_hit) {
 		vec3 pos = hit.pos + hit.normal * 0.001;
 		

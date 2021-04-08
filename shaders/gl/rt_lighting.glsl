@@ -13,6 +13,7 @@ layout(local_size_x = LOCAL_SIZE_X) in;
 
 #define ONLY_PRIMARY_RAYS 0
 
+#define RT_LIGHT 1
 #include "rt_util.glsl"
 
 struct BlockMeshInstance {
@@ -81,9 +82,6 @@ void main () {
 	vec3 pos;
 	mat3 TBN;
 	get_face(idx, pos, TBN);
-	
-	//lighting.instances[idx] = vec4(float(idx) / 6000.0);
-	//lighting.instances[idx] = vec4(vec3((pos.x - 64.0) / 64.0), 1.0);
 	
 	vec3 col = vec3(0.0);
 	

@@ -140,7 +140,13 @@ bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
 	int entry_face = get_step_face(axis, flipmask);
 	vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
 	
+	#ifdef RT_LIGHT
+	if (bid == B_AIR)
+		return false;
+	uint tex_bid = bid;
+	#else
 	uint tex_bid = bid == B_AIR ? prev_bid : bid;
+	#endif
 	float texid = float(block_tiles[tex_bid].sides[entry_face]);
 	
 	//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
@@ -174,7 +180,13 @@ void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
 	int entry_face = get_step_face(axis, flipmask);
 	vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
 	
+	#ifdef RT_LIGHT
+	if (bid == B_AIR)
+		return;
+	uint tex_bid = bid;
+	#else
 	uint tex_bid = bid == B_AIR ? prev_bid : bid;
+	#endif
 	float texid = float(block_tiles[tex_bid].sides[entry_face]);
 	
 	float a = textureLod(tile_textures, vec3(uv, texid), 20.0).a;

@@ -144,13 +144,13 @@ struct ChunkRenderer {
 };
 
 struct Raytracer {
-	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
+	SERIALIZE(Raytracer, enable, enable_rt_lighting, max_iterations, rand_seed_time,
 		sunlight_enable, sunlight_dist, sunlight_col,
 		bounces_enable, bounces_max_dist, bounces_max_count,
 		only_primary_rays, taa_alpha)
 
-	Shader* shad;
-	Shader* shad_lighting;
+	Shader* shad = nullptr;
+	Shader* shad_lighting = nullptr;
 
 	static constexpr int TEX3D_SIZE = 2048; // width, height for 3d textures
 
@@ -336,7 +336,7 @@ struct Raytracer {
 	}
 
 	int lighting_workgroup_size = 64;
-	int lighting_samples = 16;
+	int lighting_samples = 8;
 	int lighting_update_r = 1;
 
 	std::vector<gl::MacroDefinition> get_lighting_macros () {
@@ -348,11 +348,12 @@ struct Raytracer {
 	}
 
 	bool enable = true;
+	bool enable_rt_lighting = true;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-		ImGui::Checkbox("enable", &enable);
+		ImGui::Checkbox("enable [R]", &enable);
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 
@@ -413,6 +414,8 @@ struct Raytracer {
 			ImGui::TreePop();
 		}
 
+		ImGui::Checkbox("enable_rt_lighting", &enable_rt_lighting);
+
 		if (ImGui::TreeNodeEx("cached_lighting")) {
 			ImGui::SliderInt("lighting_samples", &lighting_samples, 1, 128);
 			ImGui::SliderInt("lighting_update_r", &lighting_update_r, 0, 5);
@@ -447,8 +450,6 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders) {
-		shad = shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
-		shad_lighting = shaders.compile("rt_lighting", get_lighting_macros(), {{ COMPUTE_SHADER }});
 
 		if (0) {
 			int3 count, size;
@@ -502,7 +503,7 @@ struct Raytracer {
 		}
 	}
 
-	void upload_changes (OpenglRenderer& r, Game& game);
+	void upload_changes (OpenglRenderer& r, Game& game, Input& I);
 
 	void setup_shader (OpenglRenderer& r, Shader* shad);
 	void draw (OpenglRenderer& r, Game& game);
