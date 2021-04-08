@@ -21,7 +21,6 @@ layout(location = 0) vs2fs VS {
 
 #ifdef _FRAGMENT
 	uniform sampler2D tex;
-	uniform sampler2DArray tile_textures;
 
 	const vec3 light_dir = normalize(vec3(0.33, 1.7, 5.9));
 

@@ -10,8 +10,6 @@ layout(location = 0) vs2fs VS {
 } vs;
 
 #ifdef _VERTEX
-	#define FIXEDPOINT_FAC (1.0 / 256.0)
-	
 	layout(location = 0) in vec3	voxel_pos; // pos of voxel instance in chunk
 	layout(location = 1) in uint	meshid;
 	layout(location = 2) in float	texid;
@@ -43,17 +41,6 @@ layout(location = 0) vs2fs VS {
 	}
 
 	//
-	struct BlockMeshVertex {
-		vec4 pos;
-		vec4 normal;
-		vec4 uv;
-	};
-	#define MERGE_INSTANCE_FACTOR 6
-	
-	layout(std430, binding = 1) readonly buffer BlockMeshes {
-		BlockMeshVertex vertices[][MERGE_INSTANCE_FACTOR];
-	} block_meshes;
-	
 	void main () {
 		BlockMeshVertex v = block_meshes.vertices[meshid][gl_VertexID];
 		vec3 mesh_pos_model		= v.pos.xyz;
@@ -72,9 +59,7 @@ layout(location = 0) vs2fs VS {
 
 #ifdef _FRAGMENT
 	#define ALPHA_TEST_THRES 127.0
-
-	uniform sampler2DArray tile_textures;
-
+	
 	layout(location = 0) out vec4 frag_col;
 	//layout(location = 1) out vec4 frag_normal;
 	void main () {
@@ -87,6 +72,7 @@ layout(location = 0) vs2fs VS {
 	#endif
 		
 		col.rgb *= vs.lighting;
+		//col.rgb = vs.lighting;
 		
 		if (vs.damage_tile >= 0.0) {
 			float dmg_tint = texture(tile_textures, vec3(vs.uvi.xy, vs.damage_tile)).r;

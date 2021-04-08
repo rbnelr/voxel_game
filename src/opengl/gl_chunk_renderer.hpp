@@ -301,6 +301,15 @@ struct Raytracer {
 	float sunlight_dist = 90;
 	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
 
+	float3 sunlight_pos = float3(-28, 67, 102);
+	float sun_pos_size = 4.0;
+
+	float2 sunlight_ang = float2(deg(60), deg(35));
+	float sun_dir_rand = 0.05;
+
+	bool sunlight_mode = 1;
+
+
 	bool  bounces_enable = false;
 	float bounces_max_dist = 64;
 	int   bounces_max_count = 4;
@@ -320,15 +329,19 @@ struct Raytracer {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
 			     {"ONLY_PRIMARY_RAYS", only_primary_rays ? "1":"0"},
+			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
 			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
 	int lighting_workgroup_size = 64;
+	int lighting_samples = 16;
+	int lighting_update_r = 1;
 
 	std::vector<gl::MacroDefinition> get_lighting_macros () {
 		return { {"WORKGROUP_SIZE", prints("%d", lighting_workgroup_size)},
+			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
 			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
@@ -361,19 +374,27 @@ struct Raytracer {
 
 		macro_change = ImGui::Checkbox("only_primary_rays", &only_primary_rays) || macro_change;
 
-		if (macro_change && shad) {
-			shad->macros = get_macros();
-			shad->recompile("macro_change", false);
-		}
-
 		ImGui::Separator();
 
 		//
-		if (ImGui::TreeNodeEx("lighting")) {
+		if (ImGui::TreeNodeEx("real_time_lighting")) {
 			ImGui::Checkbox("sunlight_enable", &sunlight_enable);
 			ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
 			imgui_ColorEdit("sunlight_col", &sunlight_col);
+
+			ImGui::DragFloat3("sunlight_pos", &sunlight_pos.x, 0.25f);
+			ImGui::DragFloat("sun_pos_size", &sun_pos_size, 0.1f, 0, 100, "%f", ImGuiSliderFlags_Logarithmic);
+
+			ImGui::SliderAngle("sunlight_ang.x", &sunlight_ang.x, -180, +180);
+			ImGui::SliderAngle("sunlight_ang.y", &sunlight_ang.y, -90, +90);
+			ImGui::DragFloat("sun_dir_rand", &sun_dir_rand, 0.001f, 0, 0.5f, "%f", ImGuiSliderFlags_Logarithmic);
+
+			macro_change = ImGui::Checkbox("sunlight_mode", &sunlight_mode) || macro_change;
+
 			ImGui::Spacing();
+
+			float2 sunlight_ang = float2(deg(0), deg(40));
+			float sun_dir_rand = 4.0;
 
 			ImGui::SliderFloat("ambient_factor", &ambient_factor, 0, 1.0f, "%f", ImGuiSliderFlags_Logarithmic);
 			imgui_ColorEdit("ambient_col", &ambient_col);
@@ -392,7 +413,22 @@ struct Raytracer {
 			ImGui::TreePop();
 		}
 
-		if (ImGui::Button("Dump PTX")) {
+		if (ImGui::TreeNodeEx("cached_lighting")) {
+			ImGui::SliderInt("lighting_samples", &lighting_samples, 1, 128);
+			ImGui::SliderInt("lighting_update_r", &lighting_update_r, 0, 5);
+			
+			ImGui::TreePop();
+		}
+
+		if (macro_change && shad) {
+			shad->macros = get_macros();
+			shad->recompile("macro_change", false);
+
+			shad_lighting->macros = get_lighting_macros();
+			shad_lighting->recompile("macro_change", false);
+		}
+
+		if (ImGui::Button("Dump asm")) {
 			GLsizei length;
 			glGetProgramiv(shad->prog, GL_PROGRAM_BINARY_LENGTH, &length);
 

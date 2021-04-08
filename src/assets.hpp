@@ -85,12 +85,10 @@ struct BlockTile {
 struct BlockMeshInstance {
 #define BlockMeshInstance_FIXEDPOINT_FAC 256
 #define BlockMeshInstance_FIXEDPOINT_SHIFT 8
-
 	int16_t		posx, posy, posz; // pos in chunk
 	uint16_t	meshid; // index for merge instancing, this is used to index block meshes
 	uint16_t	texid; // texture array id based on block id
-	uint16_t	_pad; // padding to allow reading as buffer in compute shader which does not support 16 bit ints
-
+	
 	template <typename ATTRIBS>
 	static void attributes (ATTRIBS& a) {
 		int loc = 0;
@@ -105,6 +103,7 @@ struct BlockMeshVertex {
 	// all as float4 to avoid std140 layout problems
 	float4		pos;
 	float4		normal;
+	float4		tangent;
 	float4		uv;
 
 	//template <typename ATTRIBS>

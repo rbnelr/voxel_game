@@ -6,8 +6,9 @@
 
 layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
+#define RAND_SEED_TIME 1
+
 #include "rt_util.glsl"
-#include "common.glsl"
 
 layout(rgba16f, binding = 3) uniform image2D img;
 uniform sampler2D prev_framebuffer;
@@ -16,7 +17,7 @@ uniform mat4 prev_world2clip;
 
 uniform float taa_alpha = 0.05;
 
-
+uniform uint rand_frame_index = 0;
 uniform ivec2 dispatch_size;
 
 // get pixel ray in world space based on pixel coord and matricies
@@ -54,7 +55,7 @@ void main () {
 	if (pxpos.x >= view.viewport_size.x || pxpos.y >= view.viewport_size.y)
 		return;
 	
-	srand((gl_GlobalInvocationID.y << 16) + gl_GlobalInvocationID.x); // convert 2d pixel index to 1d value
+	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
 	
 	#if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
@@ -87,7 +88,6 @@ void main () {
 			vec3 contrib = vec3(1.0);
 			
 			for (int j=0; j<bounces_max_count; ++j) {
-				pos += cur_normal * 0.001;
 				vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
 				
 				Hit hit2;

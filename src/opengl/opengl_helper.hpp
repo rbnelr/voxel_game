@@ -791,36 +791,43 @@ struct StateManager {
 		glPolygonMode(GL_FRONT_AND_BACK, o.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
 	}
 
-	void set (PipelineState const& s) {
-		auto o = _override(s);
+	// set opengl drawing state to a set of values, where only changes are applied
+	// no overrides to not break fullscreen quads etc.
+	void set_no_override (PipelineState const& s) {
+		if (state.depth_test != s.depth_test)
+			gl_enable(GL_DEPTH_TEST, s.depth_test);
+		if (state.depth_func != s.depth_func)
+			glDepthFunc(map_depth_func(s.depth_func));
+		if (state.depth_write != s.depth_write)
+			glDepthMask(s.depth_write ? GL_TRUE : GL_FALSE);
 
-		if (state.depth_test != o.depth_test)
-			gl_enable(GL_DEPTH_TEST, o.depth_test);
-		if (state.depth_func != o.depth_func)
-			glDepthFunc(map_depth_func(o.depth_func));
-		if (state.depth_write != o.depth_write)
-			glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
+		if (state.scissor_test != s.scissor_test)
+			gl_enable(GL_SCISSOR_TEST, s.scissor_test);
 
-		if (state.scissor_test != o.scissor_test)
-			gl_enable(GL_SCISSOR_TEST, o.scissor_test);
-
-		if (state.culling != o.culling)
-			gl_enable(GL_CULL_FACE, o.culling);
-		if (state.culling != o.culling)
-			glCullFace(o.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
+		if (state.culling != s.culling)
+			gl_enable(GL_CULL_FACE, s.culling);
+		if (state.culling != s.culling)
+			glCullFace(s.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
 
 		// blending
-		if (state.blend_enable != o.blend_enable)
-			gl_enable(GL_BLEND, o.blend_enable);
-		if (state.blend_func.equation != o.blend_func.equation)
-			glBlendEquation(o.blend_func.equation);
-		if (state.blend_func.sfactor != o.blend_func.sfactor || state.blend_func.dfactor != o.blend_func.dfactor)
-			glBlendFunc(o.blend_func.sfactor, o.blend_func.dfactor);
+		if (state.blend_enable != s.blend_enable)
+			gl_enable(GL_BLEND, s.blend_enable);
+		if (state.blend_func.equation != s.blend_func.equation)
+			glBlendEquation(s.blend_func.equation);
+		if (state.blend_func.sfactor != s.blend_func.sfactor || state.blend_func.dfactor != s.blend_func.dfactor)
+			glBlendFunc(s.blend_func.sfactor, s.blend_func.dfactor);
 
-		if (state.poly_mode != o.poly_mode)
-			glPolygonMode(GL_FRONT_AND_BACK, o.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
+		if (state.poly_mode != s.poly_mode)
+			glPolygonMode(GL_FRONT_AND_BACK, s.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
 
-		state = o;
+		state = s;
+	}
+
+	// set opengl drawing state to a set of values, where only changes are applied
+	// override for wireframe etc. are applied to these
+	void set (PipelineState const& s) {
+		auto o = _override(s);
+		set_no_override(o);
 	}
 };
 

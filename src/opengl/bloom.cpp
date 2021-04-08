@@ -13,7 +13,7 @@ namespace gl {
 		s.blend_enable = false;
 		s.depth_test = false;
 		s.depth_write = false;
-		r.state.set(s);
+		r.state.set_no_override(s);
 
 		glViewport(0,0, size.x, size.y);
 		glScissor (0,0, size.x, size.y);

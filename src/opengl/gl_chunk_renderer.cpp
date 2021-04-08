@@ -209,6 +209,13 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
 	shad->set_uniform("sunlight_dist",      sunlight_dist);
 	shad->set_uniform("sunlight_col",       sunlight_col);
 
+	float3 sun_dir = rotate3_Z(sunlight_ang.x) * rotate3_X(sunlight_ang.y) * float3(0,+1,0);
+
+	shad->set_uniform("sun_pos",            sunlight_pos);
+	shad->set_uniform("sun_pos_size",       sun_pos_size);
+	shad->set_uniform("sun_dir",            sun_dir);
+	shad->set_uniform("sun_dir_rand",       sun_dir_rand);
+
 	shad->set_uniform("ambient_light",      ambient_col * ambient_factor);
 
 	shad->set_uniform("bounces_enable",     bounces_enable);
@@ -288,6 +295,8 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 
 	setup_shader(r, shad_lighting);
 
+	size_t faces_computed = 0;
+
 	auto compute_slice = [&] (chunk_id cid, uint16_t alloci, uint16_t slicei, uint32_t vertex_count) {
 		if (vertex_count > 0) {
 			auto& alloc = r.chunk_renderer.allocs[alloci];
@@ -299,6 +308,8 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 
 			int dispatch_size = (vertex_count + (lighting_workgroup_size -1)) / lighting_workgroup_size;
 			glDispatchCompute(dispatch_size, 1, 1);
+
+			faces_computed += vertex_count;
 		}
 	};
 
@@ -317,9 +328,20 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 		}
 	};
 
-	chunk_id cid = 0;
-	{
-		if (cid < game.chunks.end() && game.chunks[cid].flags != 0) {
+	int3 floored = floori(game.player.pos / CHUNK_SIZE);
+	int3 start = floored - lighting_update_r;
+	int3 end   = floored + lighting_update_r;
+
+	shad_lighting->set_uniform("samples", lighting_samples);
+
+	for (int z=start.z; z<=end.z; ++z)
+	for (int y=start.y; y<=end.y; ++y)
+	for (int x=start.x; x<=end.x; ++x) {
+		chunk_id cid = game.chunks.query_chunk(int3(x,y,z));
+
+		shad_lighting->set_uniform("chunk_pos", (float3)int3(x,y,z) * CHUNK_SIZE);
+
+		if (cid != U16_NULL && game.chunks[cid].flags != 0) {
 			auto& chunk = game.chunks[cid];
 
 			bool empty = chunk.opaque_mesh_vertex_count == 0 && chunk.transp_mesh_vertex_count == 0;
@@ -329,6 +351,8 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 			}
 		}
 	}
+
+	ImGui::Text("faces_computed: %d", faces_computed);
 
 	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 }

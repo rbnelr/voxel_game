@@ -139,7 +139,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			s.blend_enable = false;
 			s.depth_test = false;
 			s.depth_write = false;
-			state.set(s);
+			state.set_no_override(s);
 
 			GLuint textures[] = { framebuffer.color, bloom_renderer.passes[1].color };
 			const char* textures_uniforms[] = { "main_color", "bloom" };

@@ -38,18 +38,16 @@ float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 #endif
 
-uniform uint rand_frame_index = 0;
-
 uint rand_state = 0;
 
-void srand (uint pixel_index) {
-	rand_state = wang_hash(pixel_index) ^ wang_hash(rand_frame_index);
+// seed using 3 indices (eg. pixel pos + time, world voxel position)
+void srand (uint x, uint y, uint z) {
+	rand_state = wang_hash(wang_hash(wang_hash(x) ^ y) ^ z);
 }
 
 uint irand () {
 	rand_state = wang_hash(rand_state);
 	return rand_state;
-	
 }
 
 const float MAX_UINT = 1.0 / float(0xffffffffU);

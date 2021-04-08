@@ -182,14 +182,12 @@ struct GuiRenderer {
 struct PlayerRenderer {
 	Shader*			held_block_shad;
 	Shader*			held_item_shad;
-	Shader*			block_damage_shad;
 
 	Vao				dummy_vao = {"dummy_vao"};
 
 	PlayerRenderer (Shaders& shaders) {
 		held_block_shad    = shaders.compile("held_block");
 		held_item_shad     = shaders.compile("held_item");
-		block_damage_shad  = shaders.compile("block_damage");
 	}
 	void draw (OpenglRenderer& r, Game& game);
 

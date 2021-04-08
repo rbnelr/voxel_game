@@ -66,6 +66,9 @@ void Assets::load_block_types (json const& blocks_json) {
 	block_types.air_id = block_types.map_id("air");
 }
 
+// why was I rounding here?
+// maybe I was just paranoid about blender having floats be slightly off?
+// anyway, rounding to 1/256 should not hurt I think (even normals?)
 float4 roundv (float4 v) {
 	v *= 256.0f;
 	v = kissmath::round(v);
@@ -76,7 +79,7 @@ float4 roundv (float4 v) {
 void BlockMeshes::load (json const& blocks_json) {
 	ZoneScoped;
 
-	auto* scene = aiImportFile("meshes/block_meshes.fbx", aiProcess_Triangulate | aiProcess_JoinIdenticalVertices);
+	auto* scene = aiImportFile("meshes/block_meshes.fbx", aiProcess_Triangulate | aiProcess_CalcTangentSpace); // aiProcess_JoinIdenticalVertices
 	if (!scene)
 		throw std::runtime_error("meshes/block_meshes.fbx not found!");
 
@@ -105,11 +108,13 @@ void BlockMeshes::load (json const& blocks_json) {
 
 						auto pos = mesh->mVertices[index];
 						auto norm = mesh->mNormals[index];
+						auto tang = mesh->mTangents[index];
 						auto uv = mesh->mTextureCoords[0][index];
 
 						slices[m.index + j/2].vertices[j%2 * 3 + k] = {
 							roundv( float4(pos.x * scale, pos.y * scale, pos.z * scale, 1.0f) ),
 							roundv( float4(norm.x, norm.y, norm.z, 1.0f) ),
+							roundv( float4(tang.x, tang.y, tang.z, 1.0f) ),
 							roundv( float4(uv.x, uv.y, 0.0f, 1.0f) ),
 						};
 					}
