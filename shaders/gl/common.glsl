@@ -96,11 +96,11 @@ layout(std140, binding = 0) uniform Common {
 	View view;
 };
 
-layout(std430, binding = 1) readonly buffer BlockMeshes {
+layout(std430, binding = 1) restrict readonly buffer BlockMeshes {
 	BlockMeshVertex vertices[][MERGE_INSTANCE_FACTOR];
 } block_meshes;
 
-layout(std430, binding = 2) readonly buffer BlockTiles {
+layout(std430, binding = 2) restrict readonly buffer BlockTiles {
 	BlockTile block_tiles[];
 };
 

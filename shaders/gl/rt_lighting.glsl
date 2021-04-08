@@ -22,17 +22,20 @@ struct BlockMeshInstance {
 	uint16_t	texid; // texture array id based on block id
 };
 
-layout(std430, binding = 3) readonly buffer SliceInstaces {
+layout(std430, binding = 3) restrict readonly buffer SliceInstaces {
 	BlockMeshInstance instances[];
 } faces;
 
-layout(std430, binding = 4) writeonly buffer SliceLighting {
+layout(std430, binding = 4) restrict buffer SliceLighting {
 	vec4 instances[];
 } lighting;
 
 uniform vec3 chunk_pos;
 
 uniform uint vertex_count;
+
+uniform float taa_alpha = 0.05;
+uniform uint rand_frame_index = 0;
 
 // get face from slice instances, return position of (negative axis corner) quad
 // and matrix to offset positions on quad or to rotate direction vectors
@@ -45,7 +48,10 @@ void get_face (uint idx, out vec3 pos, out mat3 TBN) {
 	pos = round(pos); // round jittered coords to get back voxel coord
 	
 	// seed rng with world integer coord of voxel
-	srand(int(pos.x) * 12 + meshid, int(pos.y), int(pos.z));
+	srand(
+		int(pos.x) * 13 + meshid,
+		int(pos.y) * 3 + rand_frame_index * 6151, // arbitary primes
+		int(pos.z));
 	
 	vec3 normal = block_meshes.vertices[meshid][0].normal.xyz;
 	vec3 tangent = block_meshes.vertices[meshid][0].tangent.xyz;
@@ -67,14 +73,6 @@ void get_face (uint idx, out vec3 pos, out mat3 TBN) {
 uniform int samples = 16;
 
 void main () {
-#if VISUALIZE_COST && VISUALIZE_WARP_COST
-	if (subgroupElect()) {
-		warp_iter[gl_SubgroupID] = 0u;
-	}
-
-	barrier();
-#endif
-	
 	uint idx = gl_GlobalInvocationID.x;
 	if (idx >= vertex_count)
 		return;
@@ -123,5 +121,6 @@ void main () {
 	
 	col /= float(samples);
 	
-	lighting.instances[idx] = vec4(col, 1.0);
+	vec3 prev = lighting.instances[idx].rgb;
+	lighting.instances[idx] = vec4(mix(prev, col, taa_alpha), 1.0);
 }

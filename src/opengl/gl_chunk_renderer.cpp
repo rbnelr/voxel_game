@@ -204,10 +204,10 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 }
 
 // setup common state for rt_util.glsl
-void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
+void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 	glUseProgram(shad->prog);
 
-	shad->set_uniform("taa_alpha",          taa_alpha);
+	shad->set_uniform("taa_alpha",          rt_light ? taa_alpha_rt_light : taa_alpha);
 
 	shad->set_uniform("max_iterations",     max_iterations);
 	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
@@ -256,7 +256,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	if (!shad->prog) return;
 
-	setup_shader(r, shad);
+	setup_shader(r, shad, false);
 
 	//
 	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
@@ -300,7 +300,7 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 
 	if (!shad_lighting->prog) return;
 
-	setup_shader(r, shad_lighting);
+	setup_shader(r, shad_lighting, true);
 
 	size_t faces_computed = 0;
 

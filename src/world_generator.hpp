@@ -48,8 +48,6 @@ namespace worldgen {
 	// so I hardcode block types for now and map them to the ids from blocks.json
 	// Really seems like this is pointless, though
 
-
-
 	enum BlockID : block_id {
 		B_AIR			=0,
 		B_UNBREAKIUM	,

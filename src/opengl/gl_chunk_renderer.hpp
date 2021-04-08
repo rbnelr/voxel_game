@@ -276,6 +276,7 @@ struct Raytracer {
 	int cur_frambuffer = 0;
 
 	float taa_alpha = 0.05;
+	float taa_alpha_rt_light = 0.01;
 
 	float4x4 prev_world2clip;
 	bool init = true;
@@ -341,10 +342,7 @@ struct Raytracer {
 
 	std::vector<gl::MacroDefinition> get_lighting_macros () {
 		return { {"WORKGROUP_SIZE", prints("%d", lighting_workgroup_size)},
-			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
-			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
-			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
+			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"} };
 	}
 
 	bool enable = true;
@@ -356,6 +354,7 @@ struct Raytracer {
 		ImGui::Checkbox("enable [R]", &enable);
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("taa_alpha_rt_light", &taa_alpha_rt_light, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
@@ -505,7 +504,7 @@ struct Raytracer {
 
 	void upload_changes (OpenglRenderer& r, Game& game, Input& I);
 
-	void setup_shader (OpenglRenderer& r, Shader* shad);
+	void setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light);
 	void draw (OpenglRenderer& r, Game& game);
 	void compute_lighting (OpenglRenderer& r, Game& game);
 };
