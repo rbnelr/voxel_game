@@ -22,11 +22,11 @@ struct BlockMeshInstance {
 	uint16_t	texid; // texture array id based on block id
 };
 
-layout(std430, binding = 3) restrict readonly buffer SliceInstaces {
+layout(std430, binding = 4) restrict readonly buffer SliceInstaces {
 	BlockMeshInstance instances[];
 } faces;
 
-layout(std430, binding = 4) restrict buffer SliceLighting {
+layout(std430, binding = 5) restrict buffer SliceLighting {
 	vec4 instances[];
 } lighting;
 
@@ -37,9 +37,11 @@ uniform uint vertex_count;
 uniform float taa_alpha = 0.05;
 uniform uint rand_frame_index = 0;
 
+uniform ivec3 _dbg_ray_pos;
+
 // get face from slice instances, return position of (negative axis corner) quad
 // and matrix to offset positions on quad or to rotate direction vectors
-void get_face (uint idx, out vec3 pos, out mat3 TBN) {
+void get_face (uint idx, out vec3 pos, out vec3 face_center, out mat3 TBN) {
 	BlockMeshInstance inst = faces.instances[idx];
 	
 	pos = vec3(inst.posx, inst.posy, inst.posz) * FIXEDPOINT_FAC + chunk_pos;
@@ -67,7 +69,7 @@ void get_face (uint idx, out vec3 pos, out mat3 TBN) {
 	vec3 bitangent = cross(normal, tangent);
 	
 	TBN = mat3(tangent, bitangent, normal);
-	pos += ((a+b)+(c+d)+(e+f)) * 0.1666667;
+	face_center = pos + ((a+b)+(c+d)+(e+f)) * 0.1666667;
 }
 
 uniform int samples = 16;
@@ -77,15 +79,20 @@ void main () {
 	if (idx >= vertex_count)
 		return;
 	
-	vec3 pos;
+	vec3 vox_pos;
+	vec3 face_center;
 	mat3 TBN;
-	get_face(idx, pos, TBN);
+	get_face(idx, vox_pos, face_center, TBN);
+	
+	_dbg_ray = update_debug_rays && all(equal(ivec3(vox_pos), _dbg_ray_pos));
+	if (_dbg_ray) line_drawer_init();
 	
 	vec3 col = vec3(0.0);
 	
 	for (int i=0; i<samples; ++i) {
 		vec2 offs = rand2() - 0.5;
-		vec3 ray_pos = TBN * vec3(offs, 0.005) + pos;
+		//vec2 offs = vec2(0);
+		vec3 ray_pos = TBN * vec3(offs, 0.005) + face_center;
 		
 		iterations = 0;
 		vec3 light = collect_sunlight(ray_pos, TBN[2]);
@@ -104,14 +111,14 @@ void main () {
 				if (!trace_ray_refl_refr(ray_pos, dir, max_dist, hit2))
 					break;
 				
-				vec3 light2 = collect_sunlight(ray_pos, cur_normal);
-				
-				light += (hit2.emiss + hit2.col * light2) * contrib;
-				
 				ray_pos = hit2.pos + hit2.normal * 0.001;
 				max_dist -= hit2.dist;
 				
 				cur_normal = hit2.normal;
+				
+				vec3 light2 = collect_sunlight(ray_pos, cur_normal);
+				
+				light += (hit2.emiss + hit2.col * light2) * contrib;
 				contrib *= hit2.col;
 			}
 		}

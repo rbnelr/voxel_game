@@ -416,8 +416,9 @@ inline constexpr GLenum _get_gltype (ScalarType type) {
 	};
 */
 struct VertexAttributes {
-	GLsizei stride;
-	bool instanced;
+	GLsizei	stride;
+	bool	instanced;
+	size_t	buffer_offset = 0;
 
 	void init (size_t vertex_size, bool instanced=false) {
 		stride = (GLsizei)vertex_size;
@@ -452,9 +453,9 @@ struct VertexAttributes {
 		GLenum type = _get_gltype(T);
 
 		if (AttribI)
-			glVertexAttribIPointer((GLuint)location, N, type, stride, (void*)offset);
+			glVertexAttribIPointer((GLuint)location, N, type, stride, (void*)(offset + buffer_offset));
 		else
-			glVertexAttribPointer((GLuint)location, N, type, normalized, stride, (void*)offset);
+			glVertexAttribPointer((GLuint)location, N, type, normalized, stride, (void*)(offset + buffer_offset));
 
 		if (instanced)
 			glVertexAttribDivisor((GLuint)location, 1); // vertex attribute is per-instance
@@ -471,7 +472,7 @@ struct VertexAttributes {
 };
 
 // setup one VAO with a single associated VBO (and optionally EBO)
-template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, GLuint indices_buf=0) {
+template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, GLuint indices_buf=0, GLuint vbo_offset=0) {
 	Vao vao = { label };
 	glBindVertexArray(vao);
 
@@ -480,6 +481,7 @@ template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, 
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buf);
 
 	VertexAttributes a;
+	a.buffer_offset = vbo_offset;
 	T::attributes(a);
 
 	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
@@ -624,6 +626,40 @@ template <typename T, typename IT> inline void stream_buffer (IndexedBuffer& ib,
 	reupload_vbo(ib.vbo, vertices.data(), vertices.size(), GL_STREAM_DRAW);
 	reupload_ebo(ib.ebo, indices.data(), indices.size(), GL_STREAM_DRAW);
 }
+
+typedef struct {
+	uint32_t  count;
+	uint32_t  instanceCount;
+	uint32_t  first;
+	uint32_t  baseInstance;
+} glDrawArraysIndirectCommand;
+
+template <typename T>
+struct IndirectVertexDrawer {
+	Vao vao;
+	Vbo vbo;
+	int max_count = 0;
+
+	IndirectVertexDrawer (std::string_view label) {
+		vbo = Vbo(label);
+		vao = setup_vao<T>(label, vbo, 0, sizeof(glDrawArraysIndirectCommand));
+	}
+	
+	void resize (int new_max_count) {
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glDrawArraysIndirectCommand) + new_max_count * sizeof(T), nullptr, GL_STREAM_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		max_count = new_max_count;
+	}
+
+	void clear () {
+		glDrawArraysIndirectCommand cmd = {};
+		cmd.instanceCount = 1;
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cmd), &cmd);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
+};
 
 // 
 struct Mesh {

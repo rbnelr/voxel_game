@@ -200,8 +200,11 @@ void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
 	alpha -= a * alpha;
 }
 
+bool _dbg_ray = false;
+uniform bool update_debug_rays = false;
+
 #if 0
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
 	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -312,7 +315,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	}
 }
 #else
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
 	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -397,7 +400,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 }
 #endif
 
-float trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
+float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_dist) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
 	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -483,7 +486,20 @@ float trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
 		}
 	}
 	
+	hit_dist = dist;
 	return max(alpha, 0.0);
+}
+
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	bool did_hit = _trace_ray(ray_pos, ray_dir, max_dist, hit);
+	if (_dbg_ray) dbg_draw_vector(ray_pos, ray_dir*(did_hit ? hit.dist : min(max_dist, 5000.0)), vec4(1,0,0,1));
+	return did_hit;
+}
+float trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
+	float dist;
+	float alpha = _trace_sunray(ray_pos, ray_dir, max_dist, dist);
+	if (_dbg_ray) dbg_draw_vector(ray_pos, ray_dir*dist, vec4(1,1,0,1));
+	return alpha;
 }
 
 #if !ONLY_PRIMARY_RAYS

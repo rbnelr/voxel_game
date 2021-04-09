@@ -31,6 +31,48 @@ struct View {
 	vec2 viewport_size;
 };
 
+//// Debug Line Rendering
+
+struct glDrawArraysIndirectCommand {
+	uint count;
+	uint instanceCount;
+	uint first;
+	uint baseInstance;
+};
+struct IndirectLineDrawerVertex {
+	vec4 pos;
+	vec4 col;
+};
+
+layout(std430, binding = 1) restrict buffer IndirectLineDrawer {
+	glDrawArraysIndirectCommand  cmd;
+	IndirectLineDrawerVertex     vertices[];
+} _line_drawer;
+uniform uint _line_drawer_max_vertices = 1024;
+
+void line_drawer_init () {
+	_line_drawer.cmd.count         = 0;
+	_line_drawer.cmd.instanceCount = 1;
+	_line_drawer.cmd.first         = 0;
+	_line_drawer.cmd.baseInstance  = 0;
+}
+void dbg_draw_vector (vec3 pos, vec3 dir, vec4 col) {
+	if (_line_drawer.cmd.count < _line_drawer_max_vertices) {
+		uint idx = _line_drawer.cmd.count;
+		
+		_line_drawer.vertices[idx].pos = vec4(pos, 0);
+		_line_drawer.vertices[idx].col = col;
+		idx++;
+		
+		_line_drawer.vertices[idx].pos = vec4(pos + dir, 0);
+		_line_drawer.vertices[idx].col = col;
+		idx++;
+		
+		_line_drawer.cmd.count = idx;
+		//_line_drawer.cmd.count = idx % _line_drawer_max_vertices;
+	}
+}
+
 //// Voxel world
 
 #if 1
@@ -96,11 +138,11 @@ layout(std140, binding = 0) uniform Common {
 	View view;
 };
 
-layout(std430, binding = 1) restrict readonly buffer BlockMeshes {
+layout(std430, binding = 2) restrict readonly buffer BlockMeshes {
 	BlockMeshVertex vertices[][MERGE_INSTANCE_FACTOR];
 } block_meshes;
 
-layout(std430, binding = 2) restrict readonly buffer BlockTiles {
+layout(std430, binding = 3) restrict readonly buffer BlockTiles {
 	BlockTile block_tiles[];
 };
 

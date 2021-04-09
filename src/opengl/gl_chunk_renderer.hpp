@@ -326,6 +326,9 @@ struct Raytracer {
 
 	bool  only_primary_rays = true;
 
+	bool  update_debug_rays = false;
+	bool  clear_debug_rays = false;
+
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
@@ -352,6 +355,9 @@ struct Raytracer {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable [R]", &enable);
+
+		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
+		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SliderFloat("taa_alpha_rt_light", &taa_alpha_rt_light, 0,1, "%f", ImGuiSliderFlags_Logarithmic);

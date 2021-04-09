@@ -55,8 +55,17 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("binds");
 
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
+		//{ // init debug_draw.indirect_lines
+		//	glDrawArraysIndirectCommand cmd = {};
+		//	cmd.instanceCount = 1;
+		//	glBindBuffer(GL_ARRAY_BUFFER, debug_draw.indirect_lines.vbo);
+		//	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cmd), &cmd);
+		//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+		//}
+
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, debug_draw.indirect_lines.vbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_meshes_ssbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, block_tiles_ssbo);
 
 		glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
@@ -506,6 +515,20 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 				glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
 			}
 		}
+	}
+
+	{
+		OGL_TRACE("draw lines indirect");
+
+		glBindVertexArray(indirect_lines.vao);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_lines.vbo);
+
+		r.state.set(s);
+		glUseProgram(shad_lines->prog);
+
+		glDrawArraysIndirect(GL_LINES, (void*)0);
+
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	}
 
 	{

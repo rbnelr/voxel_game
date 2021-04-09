@@ -10,7 +10,7 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "rt_util.glsl"
 
-layout(rgba16f, binding = 3) uniform image2D img;
+layout(rgba16f, binding = 4) uniform image2D img;
 uniform sampler2D prev_framebuffer;
 
 uniform mat4 prev_world2clip;
@@ -88,6 +88,9 @@ void main () {
 	if (pxpos.x >= view.viewport_size.x || pxpos.y >= view.viewport_size.y)
 		return;
 	
+	_dbg_ray = update_debug_rays && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
+	if (_dbg_ray) line_drawer_init();
+	
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
 	
 	#if ONLY_PRIMARY_RAYS
@@ -127,14 +130,14 @@ void main () {
 				if (!trace_ray_refl_refr(pos, dir, max_dist, hit2))
 					break;
 				
-				vec3 light2 = collect_sunlight(pos, cur_normal);
-				
-				light += (hit2.emiss + hit2.col * light2) * contrib;
-				
 				pos = hit2.pos + hit2.normal * 0.001;
 				max_dist -= hit2.dist;
 				
 				cur_normal = hit2.normal;
+				
+				vec3 light2 = collect_sunlight(pos, cur_normal);
+				
+				light += (hit2.emiss + hit2.col * light2) * contrib;
 				contrib *= hit2.col;
 			}
 		}

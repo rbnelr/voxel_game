@@ -168,6 +168,14 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	if (I.buttons[KEY_R].went_down)
 		enable = !enable;
 
+	if (I.buttons[KEY_T].went_down) {
+		update_debug_rays = !update_debug_rays;
+	}
+	if (clear_debug_rays || update_debug_rays) {
+		r.debug_draw.indirect_lines.clear();
+		clear_debug_rays = false;
+	}
+
 	// lazy init these to allow json changes to affect the macros
 	if (!shad)			shad = r.shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
 	if (!shad_lighting)	shad_lighting = r.shaders.compile("rt_lighting", get_lighting_macros(), {{ COMPUTE_SHADER }});
@@ -271,7 +279,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBindSampler(OpenglRenderer::PREV_FRAMEBUFFER, r.normal_sampler);
 	glUniform1i(shad->get_uniform_location("prev_framebuffer"), OpenglRenderer::PREV_FRAMEBUFFER);
 
-	glBindImageTexture(3, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(4, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	
 
 	int2 dispatch_size;
@@ -279,6 +287,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
 
 	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+
+	shad->set_uniform("update_debug_rays",  update_debug_rays);
 
 	shad->set_uniform("dispatch_size", dispatch_size);
 	shad->set_uniform("prev_world2clip", init ? world2clip : prev_world2clip);
@@ -304,14 +314,18 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 
 	size_t faces_computed = 0;
 
+	shad_lighting->set_uniform("_dbg_ray_pos", game.player.selected_block.hit.pos);
+
+	int _slice_i = 0;
 	auto compute_slice = [&] (chunk_id cid, uint16_t alloci, uint16_t slicei, uint32_t vertex_count) {
 		if (vertex_count > 0) {
 			auto& alloc = r.chunk_renderer.allocs[alloci];
 
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
 
 			shad_lighting->set_uniform("vertex_count", vertex_count);
+			shad_lighting->set_uniform("update_debug_rays", _slice_i++ == 0 && update_debug_rays); // only draw for first slice
 
 			int dispatch_size = (vertex_count + (lighting_workgroup_size -1)) / lighting_workgroup_size;
 			glDispatchCompute(dispatch_size, 1, 1);
