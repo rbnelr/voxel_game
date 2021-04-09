@@ -61,6 +61,7 @@ void dbg_draw_vector (vec3 pos, vec3 dir, vec4 col) {
 		uint idx = _line_drawer.cmd.count;
 		
 		_line_drawer.vertices[idx].pos = vec4(pos, 0);
+		//_line_drawer.vertices[idx].pos = vec4(pos + dir * 0.97, 0);
 		_line_drawer.vertices[idx].col = col;
 		idx++;
 		

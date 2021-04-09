@@ -50,10 +50,10 @@ uint irand () {
 	return rand_state;
 }
 
-const float MAX_UINT = 1.0 / float(0xffffffffU);
+const float _rand_scale = 1.0 / 4294967296.0; // 2^32 instead of 2^32-1 to generate [0,1) range instead of [0,1]
 
 float rand () {
-	return float(irand()) * MAX_UINT;
+	return float(irand()) * _rand_scale;
 }
 vec2 rand2 () {
 	return vec2(rand(), rand());

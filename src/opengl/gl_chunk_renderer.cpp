@@ -171,7 +171,7 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	if (I.buttons[KEY_T].went_down) {
 		update_debug_rays = !update_debug_rays;
 	}
-	if (clear_debug_rays || update_debug_rays) {
+	if (clear_debug_rays) { //  || update_debug_rays
 		r.debug_draw.indirect_lines.clear();
 		clear_debug_rays = false;
 	}

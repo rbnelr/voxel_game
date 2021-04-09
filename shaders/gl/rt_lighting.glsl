@@ -104,9 +104,13 @@ void main () {
 			vec3 cur_normal = TBN[2];
 			vec3 contrib = vec3(1.0);
 			
+			#if 1
+			vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample_stratified(i, samples);
+			#else
+			vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+			#endif
+			
 			for (int j=0; j<bounces_max_count; ++j) {
-				vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
-				
 				Hit hit2;
 				if (!trace_ray_refl_refr(ray_pos, dir, max_dist, hit2))
 					break;
@@ -115,6 +119,8 @@ void main () {
 				max_dist -= hit2.dist;
 				
 				cur_normal = hit2.normal;
+				
+				dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
 				
 				vec3 light2 = collect_sunlight(ray_pos, cur_normal);
 				

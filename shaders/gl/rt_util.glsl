@@ -15,14 +15,50 @@ vec3 hemisphere_sample () {
 	// cosine weighted sampling (100% diffuse)
 	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
 	
-	vec2 uv = rand2();
+	// takes a uniform sample on a disc (x,y)
+	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
 	
+	// random sampling (Monte Carlo)
+	vec2 uv = rand2(); // uniform sample in [0,1) square
+	
+	// map square to disc, preserving uniformity
 	float r = sqrt(uv.y);
 	float theta = 2*PI * uv.x;
 	
 	float x = r * cos(theta);
 	float y = r * sin(theta);
 	
+	// map (project) disc up to hemisphere,
+	// turning uniform distribution into cosine weighted distribution
+	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	return dir;
+}
+vec3 hemisphere_sample_stratified (int i, int n) {
+	// cosine weighted sampling (100% diffuse)
+	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+	
+	// takes a uniform sample on a disc (x,y)
+	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
+	
+	// stratified sampling (Quasi Monte Carlo)
+	int Nx = 4;
+	ivec2 strata = ivec2(i % Nx, i / Nx);
+	
+	float scale = 1.0 / float(Nx);
+	
+	vec2 uv = rand2(); // uniform sample in [0,1) square
+	//uv = (vec2(strata) + 0.5) * scale;
+	uv = (vec2(strata) + uv) * scale;
+	
+	// map square to disc, preserving uniformity
+	float r = sqrt(uv.y);
+	float theta = 2*PI * uv.x;
+	
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	
+	// map (project) disc up to hemisphere,
+	// turning uniform distribution into cosine weighted distribution
 	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
 	return dir;
 }
