@@ -22,11 +22,11 @@ struct BlockMeshInstance {
 	uint16_t	texid; // texture array id based on block id
 };
 
-layout(std430, binding = 4) restrict readonly buffer SliceInstaces {
+layout(std430, binding = 5) restrict readonly buffer SliceInstaces {
 	BlockMeshInstance instances[];
 } faces;
 
-layout(std430, binding = 5) restrict buffer SliceLighting {
+layout(std430, binding = 6) restrict buffer SliceLighting {
 	vec4 instances[];
 } lighting;
 

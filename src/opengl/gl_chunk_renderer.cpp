@@ -185,30 +185,38 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	for (auto cid : game.chunks.upload_voxels) {
 		auto& chunk = game.chunks.chunks[cid];
 
-		glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
-
 		auto& vox = game.chunks.chunk_voxels[cid];
 
-		int3 pos = chunk.pos + 16;
-		if (all(pos >= 0 && pos < 32)) {
+		int3 pos = chunk.pos + GPU_WORLD_SIZE/2;
+		if ( (unsigned)(pos.x) < GPU_WORLD_SIZE &&
+			 (unsigned)(pos.y) < GPU_WORLD_SIZE &&
+			 (unsigned)(pos.z) < GPU_WORLD_SIZE ) {
+
+			glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
+
 			glTexSubImage3D(GL_TEXTURE_3D, 0,
 				pos.x*SUBCHUNK_COUNT, pos.y*SUBCHUNK_COUNT, pos.z*SUBCHUNK_COUNT,
 				SUBCHUNK_COUNT, SUBCHUNK_COUNT, SUBCHUNK_COUNT,
 				GL_RED_INTEGER, GL_UNSIGNED_INT, vox.subchunks);
-		}
 
-		glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
+			glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
 
-		for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
-			auto subc = vox.subchunks[i];
-			if ((subc & SUBC_SPARSE_BIT) == 0) {
-				voxels_tex.upload(subc, game.chunks.subchunks[subc].voxels);
+			for (uint32_t i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
+				auto subc = vox.subchunks[i];
+				if ((subc & SUBC_SPARSE_BIT) == 0) {
+					voxels_tex.upload(subc, game.chunks.subchunks[subc].voxels);
+				}
 			}
+
+			octree.rebuild_chunk(game.chunks, cid, pos);
 		}
 	}
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_3D, 0);
+
+	if (octree.debug_draw_octree)
+		octree.debug_draw();
 }
 
 // setup common state for rt_util.glsl
@@ -256,6 +264,8 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 
 	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
 	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, octree.ssbo);
 }
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
@@ -279,7 +289,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBindSampler(OpenglRenderer::PREV_FRAMEBUFFER, r.normal_sampler);
 	glUniform1i(shad->get_uniform_location("prev_framebuffer"), OpenglRenderer::PREV_FRAMEBUFFER);
 
-	glBindImageTexture(4, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(5, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	
 
 	int2 dispatch_size;
@@ -321,8 +331,8 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 		if (vertex_count > 0) {
 			auto& alloc = r.chunk_renderer.allocs[alloci];
 
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
 
 			shad_lighting->set_uniform("vertex_count", vertex_count);
 			shad_lighting->set_uniform("update_debug_rays", _slice_i++ == 0 && update_debug_rays); // only draw for first slice

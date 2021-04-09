@@ -76,11 +76,39 @@ mat3 get_tangent_to_world (vec3 normal) {
 
 uniform usampler3D	voxels[2];
 
+#define WORLD_SIZE			16 // number of chunks for fixed subchunk texture (for now)
+
 #define TEX3D_SIZE			2048 // max width, height, depth for 3d textures
 
 #define SUBCHUNK_TEX_COUNT	(TEX3D_SIZE / SUBCHUNK_SIZE) // max num of subchunks in one axis for tex
 #define SUBCHUNK_TEX_SHIFT	8
 #define SUBCHUNK_TEX_MASK	((SUBCHUNK_TEX_COUNT-1) << SUBCHUNK_SHIFT)
+
+
+#define CHUNK_OCTREE_LAYERS  CHUNK_SIZE_SHIFT
+
+/*
+struct Node {
+	// bitmask for child data
+	// 0: child is air
+	// 1: child is completely or partially non-air
+	uint8_t data;
+	// bitmask for 8 child sparseness
+	// 0: child is entirely the air or entirely non-air
+	// 1: child is partially non-air (ray needs to recurse further into octree)
+	uint8_t mask;
+
+	// 0: this node is leaf node and has no children (because node is 2x2x2 or child_mask==0)
+	uint16_t child_ptr;
+};*/
+
+struct ChunkOctree {
+	uint32_t nodes[WORLD_SIZE][WORLD_SIZE][WORLD_SIZE];
+};
+layout(std430, binding = 4) restrict readonly buffer Octree {
+	ChunkOctree chunks[]; // uint is Node
+} octree;
+
 
 // subchunk id to 3d tex offset (including subchunk_size multiplication)
 ivec3 subchunk_id_to_texcoords (uint id) {
@@ -171,6 +199,9 @@ bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
 	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
 		return false;
 	
+	if (bid == B_AIR)
+		return false;
+	
 	vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
 	
 	int entry_face = get_step_face(axis, flipmask);
@@ -188,11 +219,12 @@ bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
 	//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
 	vec4 col = texture(tile_textures, vec3(uv, texid));
 	
-	if (tex_bid == B_TALLGRASS && axis == 2)
-		col = vec4(0.0);
+	//if (tex_bid == B_TALLGRASS && axis == 2)
+	//	col = vec4(0.0);
 	
-	if (col.a <= 0.001)
-		return false;
+	col.a = 1;
+	//if (col.a <= 0.001)
+	//	return false;
 	
 	hit.pos = hit_pos;
 	hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
@@ -210,6 +242,12 @@ void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
 		vec3 ray_pos, vec3 ray_dir, ivec3 flipmask, inout float alpha) {
 	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
 		return;
+	
+	if (bid == B_AIR)
+		return;
+	
+	alpha = 0.0;
+	return;
 	
 	vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
 	
@@ -239,6 +277,8 @@ void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
 bool _dbg_ray = false;
 uniform bool update_debug_rays = false;
 
+#if 0 // sparse voxel storage raytracer
+
 #if 0
 bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
@@ -259,9 +299,9 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	for (;;) {
 		uint subchunk;
 		{
-			ivec3 _coord = (coord ^ flipmask) + 16 * CHUNK_SIZE;
+			ivec3 _coord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
 		
-			if (!all(lessThan(uvec3(_coord), uvec3(32 * CHUNK_SIZE))))
+			if (!all(lessThan(uvec3(_coord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
 				return false;
 			
 			subchunk = texelFetch(voxels[0], _coord >> SUBCHUNK_SHIFT, 0).r;
@@ -374,9 +414,9 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		if ((new_coord & SUBCHUNK_MASK) == 0) {
 			coord &= ~SUBCHUNK_MASK;
 			
-			ivec3 scoord = (coord ^ flipmask) + 16 * CHUNK_SIZE;
+			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
 			
-			if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
+			if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
 				return false;
 			
 			subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
@@ -436,6 +476,107 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 }
 #endif
 
+#else // Octree raytracer
+
+bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	
+	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
+	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
+	
+	ray_dir = abs(ray_dir);
+	
+	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
+	
+	// coord of child octant
+	ivec3 coord = ivec3(floor(ray_pos / float(32.0))) * 32;
+	
+	// exit dist of child octant
+	vec3 t1v = rdir * (vec3(coord + 32.0) - ray_pos);
+	float t1 = min(min(t1v.x, t1v.y), t1v.z);
+	
+	int axis;
+	if (t1 == t1v.x) {
+		axis = 0;
+		coord.x += 32;
+	} else if (t1 == t1v.y) {
+		axis = 1;
+		coord.y += 32;
+	} else {
+		axis = 2;
+		coord.z += 32;
+	}
+	
+	hit.col = vec3(t1 / 64.0);
+	return true;
+	
+	/*
+	for (;;) {
+		if ((new_coord & SUBCHUNK_MASK) == 0) {
+			coord &= ~SUBCHUNK_MASK;
+			
+			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
+			
+			if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
+				return false;
+			
+			subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
+		}
+		
+		int stepsize;
+		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
+			stepsize = SUBCHUNK_SIZE;
+			
+			bid = subchunk & ~SUBC_SPARSE_BIT;
+			
+			if (bid == 0)
+				return false; // unloaded chunk
+		} else {
+			if ((new_coord & SUBCHUNK_MASK) == 0) {
+				vec3 proj = ray_pos + ray_dir * dist;
+				coord = clamp(ivec3(floor(proj)), coord, coord + ivec3(SUBCHUNK_SIZE -1));
+			}
+			stepsize = 1;
+			
+			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
+			bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
+		}
+		
+		if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
+			return true;
+		prev_bid = bid;
+		
+		vec3 next = rdir * (vec3(coord + stepsize) - ray_pos);
+		
+		dist = min(min(next.x, next.y), next.z);
+		
+	#if VISUALIZE_COST && VISUALIZE_WARP_COST
+		if (subgroupElect())
+			atomicAdd(warp_iter[gl_SubgroupID], 1u);
+	#endif
+		if (++iterations >= max_iterations || dist >= max_dist)
+			return false; // max dist reached
+		
+		if (next.x == dist) {
+			axis = 0;
+			
+			coord.x += stepsize;
+			new_coord = coord.x;
+		} else if (next.y == dist) {
+			axis = 1;
+			
+			coord.y += stepsize;
+			new_coord = coord.y;
+		} else {
+			axis = 2;
+			
+			coord.z += stepsize;
+			new_coord = coord.z;
+		}
+	}*/
+}
+
+#endif
+
 float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_dist) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -461,9 +602,9 @@ float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_d
 		if ((new_coord & SUBCHUNK_MASK) == 0) {
 			coord &= ~SUBCHUNK_MASK;
 			
-			ivec3 scoord = (coord ^ flipmask) + 16 * CHUNK_SIZE;
+			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
 			
-			if (!all(lessThan(uvec3(scoord), uvec3(32 * CHUNK_SIZE))))
+			if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
 				break;
 			
 			subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;

@@ -1,4 +1,6 @@
 ﻿#version 460 core
+#extension GL_NV_gpu_shader5 : enable // for uint16_t, uint8_t
+
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
 	#extension GL_KHR_shader_subgroup_arithmetic : enable
 	#extension GL_ARB_shader_group_vote : enable
@@ -10,7 +12,7 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "rt_util.glsl"
 
-layout(rgba16f, binding = 4) uniform image2D img;
+layout(rgba16f, binding = 5) uniform image2D img;
 uniform sampler2D prev_framebuffer;
 
 uniform mat4 prev_world2clip;
