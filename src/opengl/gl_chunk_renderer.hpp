@@ -340,7 +340,7 @@ struct Raytracer {
 	}
 
 	int lighting_workgroup_size = 64;
-	int lighting_samples = 8;
+	int lighting_samples = 16;
 	int lighting_update_r = 1;
 
 	std::vector<gl::MacroDefinition> get_lighting_macros () {

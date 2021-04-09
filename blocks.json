@@ -90,13 +90,13 @@
 			"hardness": 7,
 			"tool": "axe",
 			"transparency": "partial",
-			"mesh": "log",
+			//"mesh": "log",
 			"offs-strength": 0.2,
 			"tex": { "top-bottom": [0,1], "side": [0,2] }
 		},
 		"leaves": {
 			"hardness": 2,
-			"mesh": "X-leaves",
+			//"mesh": "X-leaves",
 			"tex": [2,1],
 			"transparency": "alpha_test"
 		},

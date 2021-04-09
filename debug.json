@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				58.570133209228516,
-				51.16181182861328,
-				25.939241409301758
+				171.32559204101563,
+				88.84124755859375,
+				87.97871398925781
 			],
 			"rot_aer": [
-				-1.3445026874542236,
-				-0.6069684624671936,
+				-2.249760627746582,
+				-0.07821158319711685,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,16 +29,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 2.61165714263916,
+		"base_speed": 8.485296249389648,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			58.82164001464844,
-			54.911746978759766,
-			24.000099182128906
+			194.12489318847656,
+			62.82099533081055,
+			63.000099182128906
 		],
 		"vel": [
 			0.0,
@@ -67,7 +67,7 @@
 			"enable": false,
 			"enable_rt_lighting": true,
 			"max_iterations": 512,
-			"rand_seed_time": false,
+			"rand_seed_time": true,
 			"sunlight_enable": false,
 			"sunlight_dist": 90.0,
 			"sunlight_col": [
@@ -76,7 +76,7 @@
 				0.8449998497962952
 			],
 			"bounces_enable": true,
-			"bounces_max_dist": 1.0,
+			"bounces_max_dist": 128.0,
 			"bounces_max_count": 4,
 			"only_primary_rays": false,
 			"taa_alpha": 0.06978300213813782
