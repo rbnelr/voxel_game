@@ -26,7 +26,6 @@ uniform ivec2 dispatch_size;
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
 #if 1 // Normal camera projection
-
 	//vec2 px_center = px_pos + rand2();
 	vec2 px_center = px_pos + vec2(0.5);
 	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
@@ -90,20 +89,23 @@ void main () {
 	if (pxpos.x >= view.viewport_size.x || pxpos.y >= view.viewport_size.y)
 		return;
 	
+#if DEBUG_RAYS
 	_dbg_ray = update_debug_rays && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 	if (_dbg_ray) line_drawer_init();
+#endif
 	
-	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
+	bool was_reflected = false;
 	
-	#if ONLY_PRIMARY_RAYS
+#if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	Hit hit;
-	bool did_hit = bray && trace_ray(ray_pos, ray_dir, INF, hit);
+	bool did_hit = bray && trace_ray(ray_pos, ray_dir, INF, hit, false);
 	vec3 col = did_hit ? hit.col : vec3(0.0);
+#else
+	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
 	
-	#else
 	// primary ray
 	vec3 ray_pos, ray_dir;
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
@@ -111,8 +113,6 @@ void main () {
 	vec3 col = vec3(0.0);
 	
 	Hit hit;
-	bool was_reflected;
-	
 	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, INF, hit, was_reflected);
 	if (did_hit) {
 		vec3 pos = hit.pos + hit.normal * 0.001;
@@ -152,7 +152,7 @@ void main () {
 		
 		col += hit.emiss + hit.col * light;
 	}
-	#endif
+#endif
 	
 	uint hit_id = 0;
 	if (did_hit && !was_reflected) {

@@ -84,8 +84,10 @@ void main () {
 	mat3 TBN;
 	get_face(idx, vox_pos, face_center, TBN);
 	
+	#if DEBUG_RAYS
 	_dbg_ray = update_debug_rays && all(equal(ivec3(vox_pos), _dbg_ray_pos));
 	if (_dbg_ray) line_drawer_init();
+	#endif
 	
 	vec3 col = vec3(0.0);
 	
@@ -94,7 +96,6 @@ void main () {
 		//vec2 offs = vec2(0);
 		vec3 ray_pos = TBN * vec3(offs, 0.005) + face_center;
 		
-		iterations = 0;
 		vec3 light = collect_sunlight(ray_pos, TBN[2]);
 		
 		if (bounces_enable) {
