@@ -326,7 +326,6 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 
 	shad_lighting->set_uniform("_dbg_ray_pos", game.player.selected_block.hit.pos);
 
-	int _slice_i = 0;
 	auto compute_slice = [&] (chunk_id cid, uint16_t alloci, uint16_t slicei, uint32_t vertex_count) {
 		if (vertex_count > 0) {
 			auto& alloc = r.chunk_renderer.allocs[alloci];
@@ -335,7 +334,7 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
 
 			shad_lighting->set_uniform("vertex_count", vertex_count);
-			shad_lighting->set_uniform("update_debug_rays", _slice_i++ == 0 && update_debug_rays); // only draw for first slice
+			shad_lighting->set_uniform("update_debug_rays", update_debug_rays); // only draw for first slice
 
 			int dispatch_size = (vertex_count + (lighting_workgroup_size -1)) / lighting_workgroup_size;
 			glDispatchCompute(dispatch_size, 1, 1);

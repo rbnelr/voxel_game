@@ -71,7 +71,7 @@ layout(location = 0) vs2fs VS {
 		col.a = 1.0;
 	#endif
 		
-		//col.rgb *= vs.lighting;
+		col.rgb *= vs.lighting;
 		//col.rgb = vs.lighting;
 		
 		if (vs.damage_tile >= 0.0) {

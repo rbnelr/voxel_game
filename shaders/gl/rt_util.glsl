@@ -394,7 +394,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		// get octree cell size of current octree level
 		int size = 1 << mip;
-		coord &= ~(size-1);
+		coord &= ~(size-1); // coord = bitfieldInsert(coord, ivec3(0), 0, mip);
 		
 		// calculate both entry and exit distances of current octree cell
 		vec3 t0v = rdir * (vec3(coord       ) - ray_pos);
@@ -419,7 +419,11 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			flipped >>= mip;
 			uint childmask = texelFetch(octree, flipped >> 1, mip).r;
 			
-			int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
+			//int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
+			int i = flipped.x & 1;
+			i = bitfieldInsert(i, flipped.y, 1, 1);
+			i = bitfieldInsert(i, flipped.z, 2, 1);
+			
 			vox = (childmask & (1u << i)) != 0;
 		}
 		
