@@ -79,23 +79,14 @@ uniform usampler3D	voxels[2];
 #define WORLD_SIZE			16 // number of chunks for fixed subchunk texture (for now)
 
 #define TEX3D_SIZE			2048 // max width, height, depth for 3d textures
+#define TEX3D_SIZE_SHIFT	11
 
 #define SUBCHUNK_TEX_COUNT	(TEX3D_SIZE / SUBCHUNK_SIZE) // max num of subchunks in one axis for tex
-#define SUBCHUNK_TEX_SHIFT	8
-#define SUBCHUNK_TEX_MASK	((SUBCHUNK_TEX_COUNT-1) << SUBCHUNK_SHIFT)
+#define SUBCHUNK_TEX_SHIFT	(TEX3D_SIZE_SHIFT - SUBCHUNK_SHIFT)
 
 #define CHUNK_OCTREE_LAYERS  CHUNK_SIZE_SHIFT
 
 uniform usampler3D	octree;
-
-// subchunk id to 3d tex offset (including subchunk_size multiplication)
-ivec3 subchunk_id_to_texcoords (uint id) {
-	ivec3 coord;
-	coord.x = int((id << (SUBCHUNK_TEX_SHIFT*0 + SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
-	coord.y = int((id >> (SUBCHUNK_TEX_SHIFT*1 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
-	coord.z = int((id >> (SUBCHUNK_TEX_SHIFT*2 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK);
-	return coord;
-}
 
 uniform int max_iterations = 200;
 
@@ -133,12 +124,6 @@ const float water_IOR = 1.333;
 const float air_IOR = 1.0;
 
 //
-struct Ray {
-	vec3	pos;
-	vec3	dir;
-	float	max_dist;
-};
-
 struct Hit {
 	vec3	pos;
 	vec3	normal;
@@ -151,23 +136,23 @@ struct Hit {
 
 int iterations = 0;
 
-int get_step_face (int axis, ivec3 flipmask) {
-	if (axis == 0)		return flipmask.x == 0 ? 0 : 1;
-	else if (axis == 1)	return flipmask.y == 0 ? 2 : 3;
-	else				return flipmask.z == 0 ? 4 : 5;
+uint get_step_face (bvec3 axismask, ivec3 flipmask) {
+	if (axismask.x)      return flipmask.x == 0 ? 0 : 1;
+	else if (axismask.y) return flipmask.y == 0 ? 2 : 3;
+	else                 return flipmask.z == 0 ? 4 : 5;
 }
-vec2 calc_uv (vec3 pos_fract, int axis, int entry_face) {
+vec2 calc_uv (vec3 pos_fract, bvec3 axismask, uint entry_face) {
 	vec2 uv;
-	if (axis == 0) {
+	if (axismask.x) {
 		uv = pos_fract.yz;
-	} else if (axis == 1) {
+	} else if (axismask.y) {
 		uv = pos_fract.xz;
 	} else {
 		uv = pos_fract.xy;
 	}
 
-	if (entry_face == 0 || entry_face == 3)  uv.x = 1.0 - uv.x;
-	if (entry_face == 4)                     uv.y = 1.0 - uv.y;
+	if (entry_face == 0u || entry_face == 3u)  uv.x = 1.0 - uv.x;
+	if (entry_face == 4u)                      uv.y = 1.0 - uv.y;
 
 	return uv;
 }
@@ -175,276 +160,28 @@ vec2 calc_uv (vec3 pos_fract, int axis, int entry_face) {
 bool _dbg_ray = false;
 uniform bool update_debug_rays = false;
 
-#if 0 // sparse voxel storage raytracer
-bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
-		vec3 ray_pos, vec3 ray_dir, ivec3 flipmask, out Hit hit) {
-	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
-		return false;
-	
-	if (bid == B_AIR)
-		return false;
-	
-	vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
-	
-	int entry_face = get_step_face(axis, flipmask);
-	vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
-	
-	#ifdef RT_LIGHT
-	if (bid == B_AIR)
-		return false;
-	uint tex_bid = bid;
-	#else
-	uint tex_bid = bid == B_AIR ? prev_bid : bid;
-	#endif
-	float texid = float(block_tiles[tex_bid].sides[entry_face]);
-	
-	//vec4 col = textureLod(tile_textures, vec3(uv, texid), log2(dist) - 5.8);
-	vec4 col = texture(tile_textures, vec3(uv, texid));
-	
-	//if (tex_bid == B_TALLGRASS && axis == 2)
-	//	col = vec4(0.0);
-	
-	col.a = 1;
-	//if (col.a <= 0.001)
-	//	return false;
-	
-	hit.pos = hit_pos;
-	hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
-	
-	hit.bid = bid;
-	hit.prev_bid = prev_bid;
-	
-	hit.dist = dist;
-	hit.col = col.rgb;
-	hit.emiss = col.rgb * get_emmisive(hit.bid);
-	return true;
-}
-
-void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
-		vec3 ray_pos, vec3 ray_dir, ivec3 flipmask, inout float alpha) {
-	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
-		return;
-	
-	if (bid == B_AIR)
-		return;
-	
-	alpha = 0.0;
-	return;
-	
-	vec3 hit_pos = (ray_pos + ray_dir * dist) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
-	
-	int entry_face = get_step_face(axis, flipmask);
-	vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
-	
-	#ifdef RT_LIGHT
-	if (bid == B_AIR)
-		return;
-	uint tex_bid = bid;
-	#else
-	uint tex_bid = bid == B_AIR ? prev_bid : bid;
-	#endif
-	float texid = float(block_tiles[tex_bid].sides[entry_face]);
-	
-	float a = textureLod(tile_textures, vec3(uv, texid), 20.0).a;
-	
-	if (tex_bid == B_TALLGRASS && axis == 2)
-		a = 0.0;
-	
-	if (a <= 0.001)
-		return;
-	
-	alpha -= a * alpha;
-}
-
-bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
-	
-	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
-	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
-	
-	ray_dir = abs(ray_dir);
-	
-	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
-	ivec3 coord = ivec3(floor(ray_pos / float(SUBCHUNK_SIZE))) * SUBCHUNK_SIZE;
-	
-	float dist = 0; 
-	int axis;
-	
-	uint prev_bid = 0;
-	uint bid = 0;
-	
-	uint subchunk;
-	int new_coord = 0;
-	
-	for (;;) {
-	#if VISUALIZE_COST
-		++iterations;
-		#if VISUALIZE_WARP_COST
-			if (subgroupElect())
-				atomicAdd(warp_iter[gl_SubgroupID], 1u);
-		#endif
-	#endif
-		if (dist >= max_dist)
-			return false; // max dist reached
-		
-		if ((new_coord & SUBCHUNK_MASK) == 0) {
-			coord &= ~SUBCHUNK_MASK;
-			
-			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
-			
-			if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
-				return false;
-			
-			subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
-		}
-		
-		int stepsize;
-		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-			stepsize = SUBCHUNK_SIZE;
-			
-			bid = subchunk & ~SUBC_SPARSE_BIT;
-			
-			if (bid == 0)
-				return false; // unloaded chunk
-		} else {
-			if ((new_coord & SUBCHUNK_MASK) == 0) {
-				vec3 proj = ray_pos + ray_dir * dist;
-				coord = clamp(ivec3(floor(proj)), coord, coord + ivec3(SUBCHUNK_SIZE -1));
-			}
-			stepsize = 1;
-			
-			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
-			bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
-		}
-		
-		if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
-			return true;
-		prev_bid = bid;
-		
-		vec3 next = rdir * (vec3(coord + stepsize) - ray_pos);
-		
-		dist = min(min(next.x, next.y), next.z);
-		
-		if (next.x == dist) {
-			axis = 0;
-			
-			coord.x += stepsize;
-			new_coord = coord.x;
-		} else if (next.y == dist) {
-			axis = 1;
-			
-			coord.y += stepsize;
-			new_coord = coord.y;
-		} else {
-			axis = 2;
-			
-			coord.z += stepsize;
-			new_coord = coord.z;
-		}
-	}
-}
-
-float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_dist) {
-	
-	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
-	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
-	
-	ray_dir = abs(ray_dir);
-	
-	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
-	ivec3 coord = ivec3(floor(ray_pos / float(SUBCHUNK_SIZE))) * SUBCHUNK_SIZE;
-	
-	float dist = 0; 
-	int axis;
-	
-	uint prev_bid = 0;
-	uint bid = 0;
-	
-	uint subchunk;
-	int new_coord = 0;
-	
-	float alpha = 1.0;
-	
-	for (;;) {
-		if ((new_coord & SUBCHUNK_MASK) == 0) {
-			coord &= ~SUBCHUNK_MASK;
-			
-			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2) * CHUNK_SIZE;
-			
-			if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
-				break;
-			
-			subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
-		}
-		
-		int stepsize;
-		if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-			stepsize = SUBCHUNK_SIZE;
-			
-			bid = subchunk & ~SUBC_SPARSE_BIT;
-			
-			if (bid == 0)
-				break; // unloaded chunk
-		} else {
-			if ((new_coord & SUBCHUNK_MASK) == 0) {
-				vec3 proj = ray_pos + ray_dir * dist;
-				coord = clamp(ivec3(floor(proj)), coord, coord + ivec3(SUBCHUNK_SIZE -1));
-			}
-			stepsize = 1;
-			
-			ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
-			bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
-		}
-		
-		hit_voxel_sun(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, alpha);
-		if (alpha <= 0.001)
-			break;
-		prev_bid = bid;
-		
-		vec3 next = rdir * (vec3(coord + stepsize) - ray_pos);
-		
-		dist = min(min(next.x, next.y), next.z);
-		
-	#if VISUALIZE_COST && VISUALIZE_WARP_COST
-		if (subgroupElect())
-			atomicAdd(warp_iter[gl_SubgroupID], 1u);
-	#endif
-		if (dist >= max_dist)
-			break; // max dist reached
-		
-		if (next.x == dist) {
-			axis = 0;
-			
-			coord.x += stepsize;
-			new_coord = coord.x;
-		} else if (next.y == dist) {
-			axis = 1;
-			
-			coord.y += stepsize;
-			new_coord = coord.y;
-		} else {
-			axis = 2;
-			
-			coord.z += stepsize;
-			new_coord = coord.z;
-		}
-	}
-	
-	hit_dist = dist;
-	return max(alpha, 0.0);
-}
-#else // Octree raytracer
-uint read_bid (ivec3 coord) {
-	ivec3 scoord = (coord & ~SUBCHUNK_MASK);
-	if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
+uint read_bid (uvec3 coord) {
+	uvec3 scoord = coord & ~SUBCHUNK_MASK;
+	if (!all(lessThan(scoord, uvec3(WORLD_SIZE * CHUNK_SIZE))))
 		return 0;
 	
-	uint subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
+	uint subchunk = texelFetch(voxels[0], ivec3(scoord >> SUBCHUNK_SHIFT), 0).r;
 	
 	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 		return subchunk & ~SUBC_SPARSE_BIT;
 	} else {
-		ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
-		return texelFetch(voxels[1], subc_offs + (coord & SUBCHUNK_MASK), 0).r;
+		
+		// subchunk id to 3d tex offset (including subchunk_size multiplication)
+		// ie. split subchunk id into 3 sets of SUBCHUNK_TEX_SHIFT bits
+		uvec3 subc_offs;
+		subc_offs.x = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*0, SUBCHUNK_TEX_SHIFT);
+		subc_offs.y = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*1, SUBCHUNK_TEX_SHIFT);
+		subc_offs.z = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*2, SUBCHUNK_TEX_SHIFT);
+		
+		// equivalent to  (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
+		scoord = bitfieldInsert(coord, subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT);
+		
+		return texelFetch(voxels[1], ivec3(scoord), 0).r;
 	}
 }
 
@@ -455,7 +192,7 @@ bool __trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, bool 
 	
 	// flip coordinate space for ray such that ray dir is all positive
 	// keep track of this flip via flipmask
-	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
+	ivec3 flipmask = mix(ivec3(0u), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
 	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
 	
 	ray_dir = abs(ray_dir);
@@ -466,11 +203,11 @@ bool __trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, bool 
 	// starting cell is where ray is
 	ivec3 coord = ivec3(floor(ray_pos));
 	
-	int axis = 0;
-	float t0;
-	
 	// start at highest level of octree
-	int mip = CHUNK_OCTREE_LAYERS-1;
+	uint mip = uint(CHUNK_OCTREE_LAYERS-1);
+	
+	bvec3 axismask = bvec3(false);
+	float t0;
 	
 	for (;;) {
 		
@@ -496,30 +233,32 @@ bool __trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, bool 
 		t0 = max(t0, 0.0);
 		
 		bool vox;
-		{
+		{ // read octree cell
 			// flip coord back into original coordinate space
-			ivec3 flipped = (coord ^ flipmask);
+			uvec3 flipped = uvec3(coord ^ flipmask);
 			
 			// handle both stepping out of 3d texture and reaching max ray distance
-			if ( !all(lessThan(uvec3(flipped), uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
+			if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
 				 t1 >= max_dist )
 				return false;
 			
 			// read octree cell
 			flipped >>= mip;
-			uint childmask = texelFetch(octree, flipped >> 1, mip).r;
+			uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
 			
-			//int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
-			int i = flipped.x & 1;
+			//flipped &= 1u;
+			//uint i = flipped.z*4u + (flipped.y*2u + flipped.x);
+			uint i = flipped.x & 1u;
 			i = bitfieldInsert(i, flipped.y, 1, 1);
 			i = bitfieldInsert(i, flipped.z, 2, 1);
 			
 			vox = (childmask & (1u << i)) != 0;
+			//vox = bitfieldExtract(childmask, int(i), 1) != 0; // slower
 		}
 		
 		if (vox) {
 			// non-air octree cell
-			if (mip == 0) 
+			if (mip == 0u)
 				break; // found solid leaf voxel
 			
 			// decend octree
@@ -535,60 +274,33 @@ bool __trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, bool 
 		} else {
 			// air octree cell, continue stepping
 			
-		#if 1 // better performance
-		
 			// step into next cell via relevant axis
-			int stepbit;
-			if (t1v.x == t1) {
-				axis = 0;
-				
-				int old = coord.x;
-				coord.x += size;
-				// determine which bit has changed during increment
-				stepbit = coord.x ^ old;
-				
-			} else if (t1v.y == t1) {
-				axis = 1;
-				
-				int old = coord.y;
-				coord.y += size;
-				stepbit = coord.y ^ old;
-			} else {
-				axis = 2;
-				
-				int old = coord.z;
-				coord.z += size;
-				stepbit = coord.z ^ old;
-			}
-		#else
-			bvec3 axismask = equal(t1v, vec3(t1));
-			
+			axismask = equal(t1v, vec3(t1));
 			ivec3 old = coord;
-			coord = mix(coord, coord + size, axismask);
 			
-			ivec3 stepbits = old ^ coord;
-			int stepbit = stepbits.x | stepbits.y | stepbits.z;
+			if (axismask.x)       coord.x += size;
+			else if (axismask.y)  coord.y += size;
+			else                  coord.z += size;
 			
-			ivec3 masked = mix(ivec3(0), ivec3(0,1,2), axismask);
-			axis = masked.x + masked.y + masked.z;
-		#endif
+			// determine which bit has changed during increment
+			int stepbit = (coord.x ^ old.x) | (coord.y ^ old.y) | (coord.z ^ old.z);
 			
 			// determine highest changed octree parent by scanning for MSB that was changed
-			mip = min(findMSB(uint(stepbit)), CHUNK_OCTREE_LAYERS-1);
+			mip = min(findMSB(uint(stepbit)), uint(CHUNK_OCTREE_LAYERS-1));
 		}
 	}
 	
 	if (!sunray) {
 		// arrived at solid leaf voxel, read block id from seperate data structure
-		uint bid = read_bid(coord ^ flipmask);
+		uint bid = read_bid(uvec3(coord ^ flipmask));
 		
 		{ // calcualte surface hit info
 			vec3 hit_pos = (ray_pos + ray_dir * t0) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
 			// make ray not relative to world texture again
 			hit_pos -= float(WORLD_SIZE/2 * CHUNK_SIZE);
 		
-			int entry_face = get_step_face(axis, flipmask);
-			vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
+			uint entry_face = get_step_face(axismask, flipmask);
+			vec2 uv = calc_uv(fract(hit_pos), axismask, entry_face);
 			
 			float texid = float(block_tiles[bid].sides[entry_face]);
 			
@@ -596,7 +308,7 @@ bool __trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, bool 
 			col.a = 1;
 			
 			hit.pos = hit_pos;
-			hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
+			hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), axismask);
 			
 			hit.bid = bid;
 			hit.prev_bid = 0; // don't know, could read
@@ -623,8 +335,6 @@ float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_d
 	}
 }
 
-#endif
-
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	bool did_hit = _trace_ray(ray_pos, ray_dir, max_dist, hit);
 	if (_dbg_ray) dbg_draw_vector(ray_pos, ray_dir*(did_hit ? hit.dist : min(max_dist, 5000.0)), vec4(1,0,0,1));
@@ -638,7 +348,8 @@ float trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
 }
 
 #if !ONLY_PRIMARY_RAYS
-bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected) {
+#if 0
 	for (int j=0; j<2; ++j) {
 		if (!trace_ray(ray_pos, ray_dir, max_dist, hit))
 			break;
@@ -651,8 +362,6 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		
 		if (!water_surface)
 			return true;
-		
-		//col += hit.col * light * 0.1;
 		
 		float reflect_fac = fresnel(-ray_dir, hit.normal, water_F0);
 		
@@ -679,6 +388,20 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 	}
 	
 	return false;
+#else
+	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, hit);
+	if (did_hit && hit.bid == B_WATER) {
+		// reflect
+		ray_pos = hit.pos + hit.normal * 0.001;
+		ray_dir = reflect(ray_dir, hit.normal);
+		max_dist -= hit.dist;
+		
+		was_reflected = true;
+		return trace_ray(ray_pos, ray_dir, max_dist, hit);
+	}
+	was_reflected = false;
+	return did_hit;
+#endif
 }
 
 vec3 collect_sunlight (vec3 pos, vec3 normal) {

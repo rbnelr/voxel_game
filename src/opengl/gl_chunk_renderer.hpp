@@ -432,9 +432,6 @@ struct Raytracer {
 	float bounces_max_dist = 64;
 	int   bounces_max_count = 4;
 
-	lrgb  ambient_col = lrgb(0.5, 0.8, 1.0) * 0.8;
-	float ambient_factor = 0.00f;
-
 	float water_F0 = 0.05f;
 
 	//int   rays = 1;
@@ -518,10 +515,6 @@ struct Raytracer {
 
 			float2 sunlight_ang = float2(deg(0), deg(40));
 			float sun_dir_rand = 4.0;
-
-			ImGui::SliderFloat("ambient_factor", &ambient_factor, 0, 1.0f, "%f", ImGuiSliderFlags_Logarithmic);
-			imgui_ColorEdit("ambient_col", &ambient_col);
-			ImGui::Spacing();
 
 			ImGui::Checkbox("bounces_enable", &bounces_enable);
 			ImGui::SliderFloat("bounces_max_dist", &bounces_max_dist, 1, 128);

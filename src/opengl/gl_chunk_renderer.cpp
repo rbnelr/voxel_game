@@ -236,8 +236,6 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 	shad->set_uniform("sun_dir",            sun_dir);
 	shad->set_uniform("sun_dir_rand",       sun_dir_rand);
 
-	shad->set_uniform("ambient_light",      ambient_col * ambient_factor);
-
 	shad->set_uniform("bounces_enable",     bounces_enable);
 	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
 	shad->set_uniform("bounces_max_count",  bounces_max_count);

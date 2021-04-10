@@ -111,7 +111,9 @@ void main () {
 	vec3 col = vec3(0.0);
 	
 	Hit hit;
-	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, INF, hit);
+	bool was_reflected;
+	
+	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, INF, hit, was_reflected);
 	if (did_hit) {
 		vec3 pos = hit.pos + hit.normal * 0.001;
 		
@@ -129,7 +131,8 @@ void main () {
 				vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
 				
 				Hit hit2;
-				if (!trace_ray_refl_refr(pos, dir, max_dist, hit2))
+				bool was_reflected2;
+				if (!trace_ray_refl_refr(pos, dir, max_dist, hit2, was_reflected2))
 					break;
 				
 				pos = hit2.pos + hit2.normal * 0.001;
@@ -152,7 +155,7 @@ void main () {
 	#endif
 	
 	uint hit_id = 0;
-	if (did_hit) {
+	if (did_hit && !was_reflected) {
 		vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
 		prev_clip.xyz /= prev_clip.w;
 		

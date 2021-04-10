@@ -112,7 +112,8 @@ void main () {
 			
 			for (int j=0; j<bounces_max_count; ++j) {
 				Hit hit2;
-				if (!trace_ray_refl_refr(ray_pos, dir, max_dist, hit2))
+				bool was_reflected;
+				if (!trace_ray_refl_refr(ray_pos, dir, max_dist, hit2, was_reflected))
 					break;
 				
 				ray_pos = hit2.pos + hit2.normal * 0.001;
