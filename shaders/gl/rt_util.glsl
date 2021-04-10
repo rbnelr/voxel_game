@@ -344,7 +344,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 }
 #else // Octree raytracer
 uint read_bid (ivec3 coord) {
-	ivec3 scoord = (coord & ~SUBCHUNK_MASK) + (WORLD_SIZE/2) * CHUNK_SIZE;
+	ivec3 scoord = (coord & ~SUBCHUNK_MASK);
 	if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
 		return 0;
 	
@@ -358,40 +358,28 @@ uint read_bid (ivec3 coord) {
 	}
 }
 
-int _get_step_face (bvec3 axismask, ivec3 flipmask) {
-	if (axismask.x)			return flipmask.x == 0 ? 0 : 1;
-	else if (axismask.y)	return flipmask.y == 0 ? 2 : 3;
-	else					return flipmask.z == 0 ? 4 : 5;
-}
-vec2 _calc_uv (vec3 pos_fract, bvec3 axismask, int entry_face) {
-	vec2 uv;
-	if (axismask.x) {
-		uv = pos_fract.yz;
-	} else if (axismask.y) {
-		uv = pos_fract.xz;
-	} else {
-		uv = pos_fract.xy;
-	}
-
-	if (entry_face == 0 || entry_face == 3)  uv.x = 1.0 - uv.x;
-	if (entry_face == 4)                     uv.y = 1.0 - uv.y;
-
-	return uv;
-}
-
 bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
+	// make ray relative to world texture
+	ray_pos += float(WORLD_SIZE/2 * CHUNK_SIZE);
+	
+	// flip coordinate space for ray such that ray dir is all positive
+	// keep track of this flip via flipmask
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
 	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
 	
 	ray_dir = abs(ray_dir);
 	
+	// precompute part of plane projection equation
 	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
+	
+	// starting cell is where ray is
 	ivec3 coord = ivec3(floor(ray_pos));
 	
-	bvec3 axismask = bvec3(false);
+	int axis = 0;
 	float t0;
 	
+	// start at highest level of octree
 	int mip = CHUNK_OCTREE_LAYERS-1;
 	
 	for (;;) {
@@ -404,57 +392,67 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		#endif
 	#endif
 		
-		// get octree cell size of current mip
+		// get octree cell size of current octree level
 		int size = 1 << mip;
 		coord &= ~(size-1);
 		
-		// project both entry and exit of cell
+		// calculate both entry and exit distances of current octree cell
 		vec3 t0v = rdir * (vec3(coord       ) - ray_pos);
 		vec3 t1v = rdir * (vec3(coord + size) - ray_pos);
 		t0 = max(max(t0v.x, t0v.y), t0v.z);
 		float t1 = min(min(t1v.x, t1v.y), t1v.z);
 		
-		t0 = max(t0, 0.0); // handle rays starting in a cell
+		// handle rays starting in a cell (hit at distance 0)
+		t0 = max(t0, 0.0);
 		
 		bool vox;
 		{
-			ivec3 scoord = (coord ^ flipmask) + (WORLD_SIZE/2 * CHUNK_SIZE);
+			// flip coord back into original coordinate space
+			ivec3 flipped = (coord ^ flipmask);
 			
-			// handle stepping out of 3d texture and reaching max distance
-			if ( !all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
+			// handle both stepping out of 3d texture and reaching max ray distance
+			if ( !all(lessThan(uvec3(flipped), uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
 				 t1 >= max_dist )
 				return false;
 			
-			scoord >>= mip;
+			// read octree cell
+			flipped >>= mip;
+			uint childmask = texelFetch(octree, flipped >> 1, mip).r;
 			
-			uint childmask = texelFetch(octree, scoord >> 1, mip).r;
-			
-			int i = (scoord.x&1) | ((scoord.y&1) << 1) | ((scoord.z&1) << 2);
+			int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
 			vox = (childmask & (1u << i)) != 0;
 		}
 		
 		if (vox) {
 			// non-air octree cell
 			if (mip == 0) 
-				break;
+				break; // found solid leaf voxel
 			
+			// decend octree
 			mip--;
 			ivec3 child_size = ivec3(1 << mip);
 			
+			// upate coord by determining which child octant is entered first
+			// by comparing ray hit against middle plane hits
 			vec3 tmidv = rdir * (vec3(coord + child_size) - ray_pos);
 			
 			coord = mix(coord, coord + child_size, lessThan(tmidv, vec3(t0)));
 			
 		} else {
+			// air octree cell, continue stepping
 			
-		#if 0 // better performance
+		#if 1 // better performance
+		
+			// step into next cell via relevant axis
 			int stepbit;
 			if (t1v.x == t1) {
 				axis = 0;
 				
 				int old = coord.x;
 				coord.x += size;
+				// determine which bit has changed during increment
 				stepbit = coord.x ^ old;
+				
 			} else if (t1v.y == t1) {
 				axis = 1;
 				
@@ -469,7 +467,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 				stepbit = coord.z ^ old;
 			}
 		#else
-			axismask = equal(t1v, vec3(t1));
+			bvec3 axismask = equal(t1v, vec3(t1));
 			
 			ivec3 old = coord;
 			coord = mix(coord, coord + size, axismask);
@@ -477,22 +475,25 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			ivec3 stepbits = old ^ coord;
 			int stepbit = stepbits.x | stepbits.y | stepbits.z;
 			
-			//if (axismask.x)      axis = 0;
-			//else if (axismask.y) axis = 1;
-			//else                 axis = 2;
+			ivec3 masked = mix(ivec3(0), ivec3(0,1,2), axismask);
+			axis = masked.x + masked.y + masked.z;
 		#endif
 			
+			// determine highest changed octree parent by scanning for MSB that was changed
 			mip = min(findMSB(uint(stepbit)), CHUNK_OCTREE_LAYERS-1);
 		}
 	}
 	
+	// arrived at solid leaf voxel, read block id from seperate data structure
 	uint bid = read_bid(coord ^ flipmask);
 	
-	{ // hit voxel
+	{ // calcualte surface hit info
 		vec3 hit_pos = (ray_pos + ray_dir * t0) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
+		// make ray not relative to world texture again
+		hit_pos -= float(WORLD_SIZE/2 * CHUNK_SIZE);
 	
-		int entry_face = _get_step_face(axismask, flipmask);
-		vec2 uv = _calc_uv(fract(hit_pos), axismask, entry_face);
+		int entry_face = get_step_face(axis, flipmask);
+		vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
 		
 		float texid = float(block_tiles[bid].sides[entry_face]);
 		
@@ -500,7 +501,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		col.a = 1;
 		
 		hit.pos = hit_pos;
-		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), axismask);
+		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
 		
 		hit.bid = bid;
 		hit.prev_bid = 0; // don't know, could read
