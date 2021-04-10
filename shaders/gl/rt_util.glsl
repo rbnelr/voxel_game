@@ -316,14 +316,9 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			bid = texelFetch(voxels[1], subc_offs + ((coord ^ flipmask) & SUBCHUNK_MASK), 0).r;
 		}
 		
-		if (bid != B_AIR) {
-			hit.col = vec3(dist / 256.0);
+		if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
 			return true;
-		}
-	
-		//if (hit_voxel(bid, prev_bid, axis, dist, ray_pos, ray_dir, flipmask, hit))
-		//	return true;
-		//prev_bid = bid;
+		prev_bid = bid;
 		
 		vec3 next = rdir * (vec3(coord + stepsize) - ray_pos);
 		
@@ -348,6 +343,21 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	}
 }
 #else // Octree raytracer
+uint read_bid (ivec3 coord) {
+	ivec3 scoord = (coord & ~SUBCHUNK_MASK) + (WORLD_SIZE/2) * CHUNK_SIZE;
+	if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
+		return 0;
+	
+	uint subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
+	
+	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
+		return subchunk & ~SUBC_SPARSE_BIT;
+	} else {
+		ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
+		return texelFetch(voxels[1], subc_offs + (coord & SUBCHUNK_MASK), 0).r;
+	}
+}
+
 bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -358,7 +368,8 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
 	ivec3 coord = ivec3(floor(ray_pos));
 	
-	int axis;
+	int axis = 0;
+	float t0;
 	
 	int mip = CHUNK_OCTREE_LAYERS-1;
 	
@@ -379,7 +390,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		// project both entry and exit of cell
 		vec3 t0v = rdir * (vec3(coord       ) - ray_pos);
 		vec3 t1v = rdir * (vec3(coord + size) - ray_pos);
-		float t0 = max(max(t0v.x, t0v.y), t0v.z);
+		t0 = max(max(t0v.x, t0v.y), t0v.z);
 		float t1 = min(min(t1v.x, t1v.y), t1v.z);
 		
 		t0 = max(t0, 0.0); // handle rays starting in a cell
@@ -403,10 +414,8 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		if (vox) {
 			// non-air octree cell
-			if (mip == 0) {
-				hit.col = vec3(t0 / 256.0);
-				return true;
-			}
+			if (mip == 0) 
+				break;
 			
 			mip--;
 			
@@ -440,6 +449,31 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			
 			mip = min(findMSB(uint(stepmask)), CHUNK_OCTREE_LAYERS-1);
 		}
+	}
+	
+	uint bid = read_bid(coord ^ flipmask);
+	
+	{ // hit voxel
+		vec3 hit_pos = (ray_pos + ray_dir * t0) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
+	
+		int entry_face = get_step_face(axis, flipmask);
+		vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
+		
+		float texid = float(block_tiles[bid].sides[entry_face]);
+		
+		vec4 col = texture(tile_textures, vec3(uv, texid));
+		col.a = 1;
+		
+		hit.pos = hit_pos;
+		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
+		
+		hit.bid = bid;
+		hit.prev_bid = 0; // don't know, could read
+		
+		hit.dist = t0;
+		hit.col = col.rgb;
+		hit.emiss = col.rgb * get_emmisive(hit.bid);
+		return true;
 	}
 }
 #endif

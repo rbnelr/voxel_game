@@ -267,12 +267,12 @@ public:
 		SUBCHUNKS_TEX,
 		VOXELS_TEX,
 		OCTREE_TEX,
-		HEAT_GRADIENT,
+		GRADIENT,
 	};
 
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
-	Texture2D		heat_gradient	= {"heat_gradient"};
+	Texture2D		gradient		= {"gradient"};
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;

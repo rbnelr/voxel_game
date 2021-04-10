@@ -71,9 +71,9 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
 		glBindSampler(TILE_TEXTURES, tile_sampler);
 
-		glActiveTexture(GL_TEXTURE0+HEAT_GRADIENT);
-		glBindTexture(GL_TEXTURE_2D, heat_gradient);
-		glBindSampler(HEAT_GRADIENT, normal_sampler);
+		glActiveTexture(GL_TEXTURE0+GRADIENT);
+		glBindTexture(GL_TEXTURE_2D, gradient);
+		glBindSampler(GRADIENT, normal_sampler);
 	}
 
 	{
@@ -601,7 +601,8 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 		}
 	}
 
-	upload_texture(heat_gradient, "textures/heat_gradient.png");
+	// heat_gradient.png   rainbow_gradient.png   blue_red_gradient.png
+	upload_texture(gradient, "textures/rainbow_gradient.png");
 	upload_texture(gui_atlas, "textures/gui.png");
 
 	return true;

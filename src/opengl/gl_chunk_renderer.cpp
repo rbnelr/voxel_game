@@ -249,7 +249,7 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
-	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::HEAT_GRADIENT);
+	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::GRADIENT);
 
 	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
 	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
