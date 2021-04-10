@@ -358,6 +358,27 @@ uint read_bid (ivec3 coord) {
 	}
 }
 
+int _get_step_face (bvec3 axismask, ivec3 flipmask) {
+	if (axismask.x)			return flipmask.x == 0 ? 0 : 1;
+	else if (axismask.y)	return flipmask.y == 0 ? 2 : 3;
+	else					return flipmask.z == 0 ? 4 : 5;
+}
+vec2 _calc_uv (vec3 pos_fract, bvec3 axismask, int entry_face) {
+	vec2 uv;
+	if (axismask.x) {
+		uv = pos_fract.yz;
+	} else if (axismask.y) {
+		uv = pos_fract.xz;
+	} else {
+		uv = pos_fract.xy;
+	}
+
+	if (entry_face == 0 || entry_face == 3)  uv.x = 1.0 - uv.x;
+	if (entry_face == 4)                     uv.y = 1.0 - uv.y;
+
+	return uv;
+}
+
 bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -368,7 +389,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
 	ivec3 coord = ivec3(floor(ray_pos));
 	
-	int axis = 0;
+	bvec3 axismask = bvec3(false);
 	float t0;
 	
 	int mip = CHUNK_OCTREE_LAYERS-1;
@@ -418,36 +439,50 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 				break;
 			
 			mip--;
+			ivec3 child_size = ivec3(1 << mip);
 			
-			vec3 tmidv = rdir * (vec3(coord + size/2) - ray_pos);
+			vec3 tmidv = rdir * (vec3(coord + child_size) - ray_pos);
 			
-			if (tmidv.x < t0) coord.x += size/2;
-			if (tmidv.y < t0) coord.y += size/2;
-			if (tmidv.z < t0) coord.z += size/2;
+			coord = mix(coord, coord + child_size, lessThan(tmidv, vec3(t0)));
 			
 		} else {
-			int stepmask;
+			
+		#if 0 // better performance
+			int stepbit;
 			if (t1v.x == t1) {
 				axis = 0;
 				
 				int old = coord.x;
 				coord.x += size;
-				stepmask = coord.x ^ old;
+				stepbit = coord.x ^ old;
 			} else if (t1v.y == t1) {
 				axis = 1;
 				
 				int old = coord.y;
 				coord.y += size;
-				stepmask = coord.y ^ old;
+				stepbit = coord.y ^ old;
 			} else {
 				axis = 2;
 				
 				int old = coord.z;
 				coord.z += size;
-				stepmask = coord.z ^ old;
+				stepbit = coord.z ^ old;
 			}
+		#else
+			axismask = equal(t1v, vec3(t1));
 			
-			mip = min(findMSB(uint(stepmask)), CHUNK_OCTREE_LAYERS-1);
+			ivec3 old = coord;
+			coord = mix(coord, coord + size, axismask);
+			
+			ivec3 stepbits = old ^ coord;
+			int stepbit = stepbits.x | stepbits.y | stepbits.z;
+			
+			//if (axismask.x)      axis = 0;
+			//else if (axismask.y) axis = 1;
+			//else                 axis = 2;
+		#endif
+			
+			mip = min(findMSB(uint(stepbit)), CHUNK_OCTREE_LAYERS-1);
 		}
 	}
 	
@@ -456,8 +491,8 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	{ // hit voxel
 		vec3 hit_pos = (ray_pos + ray_dir * t0) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
 	
-		int entry_face = get_step_face(axis, flipmask);
-		vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
+		int entry_face = _get_step_face(axismask, flipmask);
+		vec2 uv = _calc_uv(fract(hit_pos), axismask, entry_face);
 		
 		float texid = float(block_tiles[bid].sides[entry_face]);
 		
@@ -465,7 +500,7 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		col.a = 1;
 		
 		hit.pos = hit_pos;
-		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
+		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), axismask);
 		
 		hit.bid = bid;
 		hit.prev_bid = 0; // don't know, could read
