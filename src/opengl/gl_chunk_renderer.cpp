@@ -214,9 +214,6 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 	glBindTexture(GL_TEXTURE_3D, 0);
-
-	if (octree.debug_draw_octree)
-		octree.debug_draw();
 }
 
 // setup common state for rt_util.glsl
@@ -265,7 +262,10 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
 	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, octree.ssbo);
+	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::OCTREE_TEX);
+	glBindTexture(GL_TEXTURE_3D, octree.tex);
+	//glBindSampler(OpenglRenderer::OCTREE_TEX, r.normal_sampler_wrap);
+	glUniform1i(shad->get_uniform_location("octree"), OpenglRenderer::OCTREE_TEX);
 }
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
@@ -289,7 +289,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBindSampler(OpenglRenderer::PREV_FRAMEBUFFER, r.normal_sampler);
 	glUniform1i(shad->get_uniform_location("prev_framebuffer"), OpenglRenderer::PREV_FRAMEBUFFER);
 
-	glBindImageTexture(5, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(4, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	
 
 	int2 dispatch_size;
@@ -331,8 +331,8 @@ void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
 		if (vertex_count > 0) {
 			auto& alloc = r.chunk_renderer.allocs[alloci];
 
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
 
 			shad_lighting->set_uniform("vertex_count", vertex_count);
 			shad_lighting->set_uniform("update_debug_rays", _slice_i++ == 0 && update_debug_rays); // only draw for first slice

@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				42.630828857421875,
-				51.097293853759766,
-				62.27182388305664
+				-89.6531982421875,
+				66.99898529052734,
+				59.54510498046875
 			],
 			"rot_aer": [
-				2.657575845718384,
-				-0.36058416962623596,
+				-1.1504626274108887,
+				0.010378805920481682,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,7 +29,7 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 6.000014305114746,
+		"base_speed": 6.0000152587890625,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -66,7 +66,7 @@
 		"raytracer": {
 			"enable": true,
 			"enable_rt_lighting": false,
-			"max_iterations": 512,
+			"max_iterations": 179,
 			"rand_seed_time": true,
 			"sunlight_enable": false,
 			"sunlight_dist": 90.0,

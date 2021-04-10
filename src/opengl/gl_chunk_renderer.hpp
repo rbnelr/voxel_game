@@ -149,39 +149,16 @@ struct ChunkOctrees {
 	static constexpr int MAX_NODES = 1<<16;
 	static constexpr int CHUNK_OCTREE_LAYERS = CHUNK_SIZE_SHIFT;
 
-	struct Node {
-		// bitmask for child data
-		// 0: child is air
-		// 1: child is completely or partially non-air
-		uint8_t data;
-		// bitmask for 8 child sparseness
-		// 0: child is entirely the air or entirely non-air
-		// 1: child is partially non-air (ray needs to recurse further into octree)
-		uint8_t mask;
+	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE * CHUNK_SIZE/2;
 
-		// 0: this node is leaf node and has no children (because node is 2x2x2 or child_mask==0)
-		uint16_t child_ptr;
-	};
-	struct ChunkOctree {
-		Node nodes[MAX_NODES];
-	};
-
-	struct Data {
-		ChunkOctree chunks[GPU_WORLD_SIZE][GPU_WORLD_SIZE][GPU_WORLD_SIZE];
-	};
-	Data* data = nullptr;
-
-	Ssbo ssbo = {"RT.octrees"};
+	Texture3D tex = {"RT.octrees"};
 
 	ChunkOctrees () {
-		data = (Data*)calloc(1,sizeof(Data));
+		glTextureStorage3D(tex, CHUNK_OCTREE_LAYERS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Data), nullptr, GL_STREAM_DRAW);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-	}
-	~ChunkOctrees () {
-		free(data);
+		uint8_t val = 0;
+		for (int layer=0; layer<CHUNK_OCTREE_LAYERS; ++layer)
+			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
 	}
 
 	struct OctreeBuilder {
@@ -190,66 +167,38 @@ struct ChunkOctrees {
 
 			nodes contains:
 
-			Node[32][32][32]
-			Node[16][16][16]
-			Node[ 8][ 8][ 8]
-			Node[ 4][ 4][ 4]
-			Node[ 2][ 2][ 2]
-			Node[ 1][ 1][ 1]
+			voxel[32][32][32]
+			voxel[16][16][16]
+			voxel[ 8][ 8][ 8]
+			voxel[ 4][ 4][ 4]
+			voxel[ 2][ 2][ 2]
+			voxel[ 1][ 1][ 1]
 
 			offsets contains: nodes start index for every layer (32-layer, 16-layer, ...)
 		*/
 
 		int offsets[CHUNK_OCTREE_LAYERS];
-		std::vector<Node> nodes;
+		std::vector<uint8_t> voxels;
 
-		Node& get_node (int layer, int x, int y, int z) {
-			return nodes[offsets[layer] + IDX3D(x,y,z, (CHUNK_SIZE/2) >> layer)];
+		uint8_t& get_vox (int layer, int x, int y, int z) {
+			return voxels[offsets[layer] + IDX3D(x,y,z, (CHUNK_SIZE/2) >> layer)];
 		}
 
-		ChunkOctree* chunk;
 		int node_count;
 
 		OctreeBuilder () {
 			int count = 0;
 
-			int size = CHUNK_SIZE;
-			int layer = 0;
-			while (size > 1) {
-				size /= 2;
-
-				offsets[layer++] = count;
+			for (int layer=CHUNK_OCTREE_LAYERS-1; layer>=0; --layer) {
+				int size = (CHUNK_SIZE/2) >> layer;
+				offsets[layer] = count;
 				count += size*size*size;
 			}
-			assert(layer == CHUNK_OCTREE_LAYERS);
 
-			nodes.resize(count);
+			voxels.resize(count);
 		}
 	};
 	OctreeBuilder builder;
-
-	void _recurse_sparsify (uint16_t node_idx, int layer, int3 const& pos) {
-		auto node = builder.get_node(layer, pos.x,pos.y,pos.z);
-	
-		node.child_ptr = 0;
-		if (node.mask !=0 && layer > 0) {
-			if (builder.node_count+8 > MAX_NODES) return;
-			node.child_ptr = (uint16_t)builder.node_count;
-			builder.node_count += 8;
-			
-			int3 cpos;
-			for (int i=0; i<8; ++i) {
-				if (node.mask & (1<<i)) {
-					cpos.x = pos.x*2 + ( i    &1);
-					cpos.y = pos.y*2 + ((i>>1)&1);
-					cpos.z = pos.z*2 +  (i>>2);
-					_recurse_sparsify(node.child_ptr + i, layer-1, cpos);
-				}
-			}
-		}
-		
-		builder.chunk->nodes[node_idx] = node;
-	}
 
 	void rebuild_chunk (Chunks& chunks, chunk_id cid, int3 cpos) {
 		ZoneScoped;
@@ -261,12 +210,12 @@ struct ChunkOctrees {
 			for (int z=0; z<CHUNK_SIZE/2; z++)
 			for (int y=0; y<CHUNK_SIZE/2; y++)
 			for (int x=0; x<CHUNK_SIZE/2; x++) {
-				Node n = {};
+				uint8_t mask = 0;
 				for (int i=0; i<8; ++i) {
 					auto vox = chunks.read_block(x*2 + (i&1), y*2 + ((i>>1)&1), z*2 + (i>>2), cid);
-					n.data |= (vox != bid_air ? 1:0) << i;
+					mask |= (vox != bid_air ? 1:0) << i;
 				}
-				builder.get_node(0, x,y,z) = n;
+				builder.get_vox(0, x,y,z) = mask;
 			}
 		}
 
@@ -279,88 +228,33 @@ struct ChunkOctrees {
 				for (int z=0; z<size; z++)
 				for (int y=0; y<size; y++)
 				for (int x=0; x<size; x++) {
-					Node n = {};
+					uint8_t mask = 0;
 					for (int i=0; i<8; ++i) {
-						auto child = builder.get_node(layer-1, x*2 + (i&1), y*2 + ((i>>1)&1), z*2 + (i>>2));
-						// child data bit is if child has any soild octants ie. has any data bit set
-						n.data |= (child.data != 0 ? 1:0) << i;
-						// child mask bit is if child needs to be recursed into by ray
-						// this is true if child itself has children or if child is partially air/non-air (not completely air/non-air)
-						n.mask |= (child.mask != 0 || (child.data != 0 && child.data != 0xff) ? 1:0) << i;
+						auto child = builder.get_vox(layer-1, x*2 + (i&1), y*2 + ((i>>1)&1), z*2 + (i>>2));
+						mask |= (child != 0 ? 1:0) << i;
 					}
-					builder.get_node(layer, x,y,z) = n;
+					builder.get_vox(layer, x,y,z) = mask;
 				}
 			}
 		}
 
-		{
-			ZoneScopedN("sparsify");
+		glBindTexture(GL_TEXTURE_3D, tex);
 
-			builder.node_count = 0;
-			builder.chunk = &data->chunks[cpos.z][cpos.y][cpos.x];
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // required for the higher mip leves
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
 
-			int node_idx = builder.node_count++;
-			_recurse_sparsify((uint16_t)node_idx, CHUNK_OCTREE_LAYERS-1, 0);
-
-			Node* start = &builder.chunk->nodes[builder.node_count];
-			Node* end = &builder.chunk->nodes[MAX_NODES];
-			memset(start, 0, (end-start)*sizeof(Node)); // defensivly clear end old data
+		for (int layer=0; layer<CHUNK_OCTREE_LAYERS; ++layer) {
+			int size = (CHUNK_SIZE/2) >> layer;
+			glTexSubImage3D(GL_TEXTURE_3D, layer,
+				cpos.x*size, cpos.y*size, cpos.z*size,
+				size, size, size,
+				GL_RED_INTEGER, GL_UNSIGNED_BYTE, &builder.voxels[builder.offsets[layer]]);
 		}
 
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo);
-		glBufferSubData(GL_SHADER_STORAGE_BUFFER, (char*)builder.chunk - (char*)data, sizeof(ChunkOctree), builder.chunk);
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-	}
+		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, CHUNK_OCTREE_LAYERS-1);
 
-	bool debug_draw_octree = true;
-	int debug_draw_r = 1;
-
-	struct DbgDrawChunk {
-		ChunkOctree* data;
-		float3 pos_world;
-	};
-	static constexpr lrgba _cols[] = {
-		lrgba(1,0,0,1),
-		lrgba(0,1,0,1),
-		lrgba(0,0,1,1),
-		lrgba(1,1,0,1),
-		lrgba(1,0,1,1),
-		lrgba(0,1,1,1),
-		lrgba(0.5f,1,1,1),
-		lrgba(1,0.5f,1,1),
-		lrgba(1,1,0.5f,1),
-	};
-	static void _debug_draw_chunk (DbgDrawChunk& chunk, uint16_t node_idx, int layer, int3 const& pos) {
-		auto node = chunk.data->nodes[node_idx];
-		
-		int3 cpos;
-		for (int i=0; i<8; ++i) {
-			cpos.x = pos.x + (( i    &1) << layer);
-			cpos.y = pos.y + (((i>>1)&1) << layer);
-			cpos.z = pos.z + ( (i>>2)    << layer);
-
-			if (node.data & (1 << i)) {
-				float sizef = (float)(1 << layer);
-				g_debugdraw.wire_cube(chunk.pos_world + (float3)cpos + sizef*0.5f, sizef*0.99f, _cols[layer]);
-			}
-
-			assert((node.mask != 0) == (node.child_ptr != 0));
-			if (node.mask & (1 << i) && layer > 5)
-				_debug_draw_chunk(chunk, node.child_ptr + i, layer-1, cpos);
-		}
-	}
-
-	void debug_draw () {
-		int start = GPU_WORLD_SIZE/2 - debug_draw_r;
-		int end = GPU_WORLD_SIZE/2 + debug_draw_r;
-
-		for (int z=start; z<end; z++)
-		for (int y=start; y<end; y++)
-		for (int x=start; x<end; x++) {
-			float3 pos = ((float3)int3(x,y,z) - GPU_WORLD_SIZE/2) * CHUNK_SIZE;
-			DbgDrawChunk chunk = { &data->chunks[z][y][x], pos };
-			_debug_draw_chunk(chunk, 0, CHUNK_OCTREE_LAYERS-1, 0);
-		}
+		glBindTexture(GL_TEXTURE_3D, 0);
 	}
 };
 
@@ -578,9 +472,6 @@ struct Raytracer {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable [R]", &enable);
-
-		ImGui::Checkbox("debug_draw_octree", &octree.debug_draw_octree);
-		ImGui::SliderInt("debug_draw_octree_r", &octree.debug_draw_r, 1, GPU_WORLD_SIZE/2);
 
 		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
 		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;

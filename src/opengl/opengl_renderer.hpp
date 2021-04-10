@@ -266,6 +266,7 @@ public:
 		PREV_FRAMEBUFFER=2,
 		SUBCHUNKS_TEX,
 		VOXELS_TEX,
+		OCTREE_TEX,
 		HEAT_GRADIENT,
 	};
 
@@ -289,6 +290,11 @@ public:
 	bool load_static_data ();
 
 	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
+
+		// I never align my pixel rows
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
 		load_static_data();
 
 		float max_aniso = 1.0f;
