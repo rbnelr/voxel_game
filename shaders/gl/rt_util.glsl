@@ -172,6 +172,10 @@ vec2 calc_uv (vec3 pos_fract, int axis, int entry_face) {
 	return uv;
 }
 
+bool _dbg_ray = false;
+uniform bool update_debug_rays = false;
+
+#if 0 // sparse voxel storage raytracer
 bool hit_voxel (uint bid, uint prev_bid, int axis, float dist,
 		vec3 ray_pos, vec3 ray_dir, ivec3 flipmask, out Hit hit) {
 	if (prev_bid == 0 || (bid == prev_bid && (bid != B_LEAVES && bid != B_TALLGRASS)))
@@ -252,10 +256,6 @@ void hit_voxel_sun (uint bid, uint prev_bid, int axis, float dist,
 	alpha -= a * alpha;
 }
 
-bool _dbg_ray = false;
-uniform bool update_debug_rays = false;
-
-#if 0 // sparse voxel storage raytracer
 bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
@@ -342,181 +342,6 @@ bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		}
 	}
 }
-#else // Octree raytracer
-uint read_bid (ivec3 coord) {
-	ivec3 scoord = (coord & ~SUBCHUNK_MASK);
-	if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
-		return 0;
-	
-	uint subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
-	
-	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-		return subchunk & ~SUBC_SPARSE_BIT;
-	} else {
-		ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
-		return texelFetch(voxels[1], subc_offs + (coord & SUBCHUNK_MASK), 0).r;
-	}
-}
-
-bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
-	
-	// make ray relative to world texture
-	ray_pos += float(WORLD_SIZE/2 * CHUNK_SIZE);
-	
-	// flip coordinate space for ray such that ray dir is all positive
-	// keep track of this flip via flipmask
-	ivec3 flipmask = mix(ivec3(0), ivec3(-1), lessThan(ray_dir, vec3(0.0)));
-	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(ray_dir, vec3(0.0)));
-	
-	ray_dir = abs(ray_dir);
-	
-	// precompute part of plane projection equation
-	vec3 rdir = mix(1.0 / ray_dir, vec3(INF), equal(ray_dir, vec3(0.0)));
-	
-	// starting cell is where ray is
-	ivec3 coord = ivec3(floor(ray_pos));
-	
-	int axis = 0;
-	float t0;
-	
-	// start at highest level of octree
-	int mip = CHUNK_OCTREE_LAYERS-1;
-	
-	for (;;) {
-		
-	#if VISUALIZE_COST
-		++iterations;
-		#if VISUALIZE_WARP_COST
-			if (subgroupElect())
-				atomicAdd(warp_iter[gl_SubgroupID], 1u);
-		#endif
-	#endif
-		
-		// get octree cell size of current octree level
-		int size = 1 << mip;
-		coord &= ~(size-1); // coord = bitfieldInsert(coord, ivec3(0), 0, mip);
-		
-		// calculate both entry and exit distances of current octree cell
-		vec3 t0v = rdir * (vec3(coord       ) - ray_pos);
-		vec3 t1v = rdir * (vec3(coord + size) - ray_pos);
-		t0 = max(max(t0v.x, t0v.y), t0v.z);
-		float t1 = min(min(t1v.x, t1v.y), t1v.z);
-		
-		// handle rays starting in a cell (hit at distance 0)
-		t0 = max(t0, 0.0);
-		
-		bool vox;
-		{
-			// flip coord back into original coordinate space
-			ivec3 flipped = (coord ^ flipmask);
-			
-			// handle both stepping out of 3d texture and reaching max ray distance
-			if ( !all(lessThan(uvec3(flipped), uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
-				 t1 >= max_dist )
-				return false;
-			
-			// read octree cell
-			flipped >>= mip;
-			uint childmask = texelFetch(octree, flipped >> 1, mip).r;
-			
-			//int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
-			int i = flipped.x & 1;
-			i = bitfieldInsert(i, flipped.y, 1, 1);
-			i = bitfieldInsert(i, flipped.z, 2, 1);
-			
-			vox = (childmask & (1u << i)) != 0;
-		}
-		
-		if (vox) {
-			// non-air octree cell
-			if (mip == 0) 
-				break; // found solid leaf voxel
-			
-			// decend octree
-			mip--;
-			ivec3 child_size = ivec3(1 << mip);
-			
-			// upate coord by determining which child octant is entered first
-			// by comparing ray hit against middle plane hits
-			vec3 tmidv = rdir * (vec3(coord + child_size) - ray_pos);
-			
-			coord = mix(coord, coord + child_size, lessThan(tmidv, vec3(t0)));
-			
-		} else {
-			// air octree cell, continue stepping
-			
-		#if 1 // better performance
-		
-			// step into next cell via relevant axis
-			int stepbit;
-			if (t1v.x == t1) {
-				axis = 0;
-				
-				int old = coord.x;
-				coord.x += size;
-				// determine which bit has changed during increment
-				stepbit = coord.x ^ old;
-				
-			} else if (t1v.y == t1) {
-				axis = 1;
-				
-				int old = coord.y;
-				coord.y += size;
-				stepbit = coord.y ^ old;
-			} else {
-				axis = 2;
-				
-				int old = coord.z;
-				coord.z += size;
-				stepbit = coord.z ^ old;
-			}
-		#else
-			bvec3 axismask = equal(t1v, vec3(t1));
-			
-			ivec3 old = coord;
-			coord = mix(coord, coord + size, axismask);
-			
-			ivec3 stepbits = old ^ coord;
-			int stepbit = stepbits.x | stepbits.y | stepbits.z;
-			
-			ivec3 masked = mix(ivec3(0), ivec3(0,1,2), axismask);
-			axis = masked.x + masked.y + masked.z;
-		#endif
-			
-			// determine highest changed octree parent by scanning for MSB that was changed
-			mip = min(findMSB(uint(stepbit)), CHUNK_OCTREE_LAYERS-1);
-		}
-	}
-	
-	// arrived at solid leaf voxel, read block id from seperate data structure
-	uint bid = read_bid(coord ^ flipmask);
-	
-	{ // calcualte surface hit info
-		vec3 hit_pos = (ray_pos + ray_dir * t0) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0.0)));
-		// make ray not relative to world texture again
-		hit_pos -= float(WORLD_SIZE/2 * CHUNK_SIZE);
-	
-		int entry_face = get_step_face(axis, flipmask);
-		vec2 uv = calc_uv(fract(hit_pos), axis, entry_face);
-		
-		float texid = float(block_tiles[bid].sides[entry_face]);
-		
-		vec4 col = texture(tile_textures, vec3(uv, texid));
-		col.a = 1;
-		
-		hit.pos = hit_pos;
-		hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(flipmask, ivec3(0))), equal(ivec3(axis), ivec3(0,1,2)));
-		
-		hit.bid = bid;
-		hit.prev_bid = 0; // don't know, could read
-		
-		hit.dist = t0;
-		hit.col = col.rgb;
-		hit.emiss = col.rgb * get_emmisive(hit.bid);
-		return true;
-	}
-}
-#endif
 
 float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_dist) {
 	
@@ -607,6 +432,214 @@ float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float hit_d
 	hit_dist = dist;
 	return max(alpha, 0.0);
 }
+
+#else // Octree raytracer
+uint read_bid (ivec3 coord) {
+	ivec3 scoord = (coord & ~SUBCHUNK_MASK);
+	if (!all(lessThan(uvec3(scoord), uvec3(WORLD_SIZE * CHUNK_SIZE))))
+		return 0;
+	
+	uint subchunk = texelFetch(voxels[0], scoord >> SUBCHUNK_SHIFT, 0).r;
+	
+	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
+		return subchunk & ~SUBC_SPARSE_BIT;
+	} else {
+		ivec3 subc_offs = subchunk_id_to_texcoords(subchunk);
+		return texelFetch(voxels[1], subc_offs + (coord & SUBCHUNK_MASK), 0).r;
+	}
+}
+
+struct RaytraceParams {
+	vec3 ray_pos;
+	vec3 ray_dir;
+	ivec3 flipmask;
+	
+	ivec3 coord;
+	int axis;
+	float t0, t1;
+};
+Hit hit_voxel (in RaytraceParams p) {
+	// arrived at solid leaf voxel, read block id from seperate data structure
+	uint bid = read_bid(p.coord ^ p.flipmask);
+	
+	// calcualte surface hit info
+	vec3 hit_pos = (p.ray_pos + p.ray_dir * p.t0) * mix(vec3(-1), vec3(1), equal(p.flipmask, ivec3(0.0)));
+	// make ray not relative to world texture again
+	hit_pos -= float(WORLD_SIZE/2 * CHUNK_SIZE);
+
+	int entry_face = get_step_face(p.axis, p.flipmask);
+	vec2 uv = calc_uv(fract(hit_pos), p.axis, entry_face);
+	
+	float texid = float(block_tiles[bid].sides[entry_face]);
+	
+	vec4 col = texture(tile_textures, vec3(uv, texid));
+	col.a = 1;
+	
+	Hit hit;
+	hit.pos = hit_pos;
+	hit.normal = mix(vec3(0.0), mix(ivec3(+1), ivec3(-1), equal(p.flipmask, ivec3(0))), equal(ivec3(p.axis), ivec3(0,1,2)));
+	
+	hit.bid = bid;
+	hit.prev_bid = 0; // don't know, could read
+	
+	hit.dist = p.t0;
+	hit.col = col.rgb;
+	hit.emiss = col.rgb * get_emmisive(hit.bid);
+	return hit;
+}
+
+bool inner_trace_ray (float max_dist, inout RaytraceParams p) {
+	
+	// make ray relative to world texture
+	p.ray_pos += float(WORLD_SIZE/2 * CHUNK_SIZE);
+	
+	// flip coordinate space for ray such that ray dir is all positive
+	// keep track of this flip via flipmask
+	p.flipmask = mix(ivec3(0), ivec3(-1), lessThan(p.ray_dir, vec3(0.0)));
+	p.ray_pos   *= mix(vec3(1), vec3(-1), lessThan(p.ray_dir, vec3(0.0)));
+	
+	p.ray_dir = abs(p.ray_dir);
+	
+	// precompute part of plane projection equation
+	vec3 rdir = mix(1.0 / p.ray_dir, vec3(INF), equal(p.ray_dir, vec3(0.0)));
+	
+	// starting cell is where ray is
+	p.coord = ivec3(floor(p.ray_pos));
+	
+	p.axis = 0;
+	
+	// start at highest level of octree
+	int mip = CHUNK_OCTREE_LAYERS-1;
+	
+	for (;;) {
+		
+	#if VISUALIZE_COST
+		++iterations;
+		#if VISUALIZE_WARP_COST
+			if (subgroupElect())
+				atomicAdd(warp_iter[gl_SubgroupID], 1u);
+		#endif
+	#endif
+		
+		// get octree cell size of current octree level
+		int size = 1 << mip;
+		p.coord &= ~(size-1); // p.coord = bitfieldInsert(p.coord, ivec3(0), 0, mip);
+		
+		// calculate both entry and exit distances of current octree cell
+		vec3 t0v = rdir * (vec3(p.coord       ) - p.ray_pos);
+		vec3 t1v = rdir * (vec3(p.coord + size) - p.ray_pos);
+		p.t0 = max(max(t0v.x, t0v.y), t0v.z);
+		p.t1 = min(min(t1v.x, t1v.y), t1v.z);
+		
+		// handle rays starting in a cell (hit at distance 0)
+		p.t0 = max(p.t0, 0.0);
+		
+		bool vox;
+		{
+			// flip coord back into original coordinate space
+			ivec3 flipped = (p.coord ^ p.flipmask);
+			
+			// handle both stepping out of 3d texture and reaching max ray distance
+			if ( !all(lessThan(uvec3(flipped), uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
+				 p.t1 >= max_dist )
+				return false;
+			
+			// read octree cell
+			flipped >>= mip;
+			uint childmask = texelFetch(octree, flipped >> 1, mip).r;
+			
+			//int i = (flipped.x&1) | ((flipped.y&1) << 1) | ((flipped.z&1) << 2);
+			int i = flipped.x & 1;
+			i = bitfieldInsert(i, flipped.y, 1, 1);
+			i = bitfieldInsert(i, flipped.z, 2, 1);
+			
+			vox = (childmask & (1u << i)) != 0;
+		}
+		
+		if (vox) {
+			// non-air octree cell
+			if (mip == 0) 
+				return true; // found solid leaf voxel
+			
+			// decend octree
+			mip--;
+			ivec3 child_size = ivec3(1 << mip);
+			
+			// upate coord by determining which child octant is entered first
+			// by comparing ray hit against middle plane hits
+			vec3 tmidv = rdir * (vec3(p.coord + child_size) - p.ray_pos);
+			
+			p.coord = mix(p.coord, p.coord + child_size, lessThan(tmidv, vec3(p.t0)));
+			
+		} else {
+			// air octree cell, continue stepping
+			
+		#if 1 // better performance
+		
+			// step into next cell via relevant axis
+			int stepbit;
+			if (t1v.x == p.t1) {
+				p.axis = 0;
+				
+				int old = p.coord.x;
+				p.coord.x += size;
+				// determine which bit has changed during increment
+				stepbit = p.coord.x ^ old;
+				
+			} else if (t1v.y == p.t1) {
+				p.axis = 1;
+				
+				int old = p.coord.y;
+				p.coord.y += size;
+				stepbit = p.coord.y ^ old;
+			} else {
+				p.axis = 2;
+				
+				int old = p.coord.z;
+				p.coord.z += size;
+				stepbit = p.coord.z ^ old;
+			}
+		#else
+			bvec3 axismask = equal(t1v, vec3(t1));
+			
+			ivec3 old = coord;
+			coord = mix(coord, coord + size, axismask);
+			
+			ivec3 stepbits = old ^ coord;
+			int stepbit = stepbits.x | stepbits.y | stepbits.z;
+			
+			ivec3 masked = mix(ivec3(0), ivec3(0,1,2), axismask);
+			axis = masked.x + masked.y + masked.z;
+		#endif
+			
+			// determine highest changed octree parent by scanning for MSB that was changed
+			mip = min(findMSB(uint(stepbit)), CHUNK_OCTREE_LAYERS-1);
+		}
+	}
+}
+
+bool _trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	RaytraceParams p;
+	p.ray_pos = ray_pos;
+	p.ray_dir = ray_dir;
+	if (inner_trace_ray(max_dist, p)) {
+		hit = hit_voxel(p);
+		return true;
+	}
+	return false;
+}
+float _trace_sunray (vec3 ray_pos, vec3 ray_dir, float max_dist, out float dist) {
+	RaytraceParams p;
+	p.ray_pos = ray_pos;
+	p.ray_dir = ray_dir;
+	if (inner_trace_ray(max_dist, p)) {
+		dist = p.t0;
+		return 1.0;
+	}
+	dist = max_dist;
+	return 0.0;
+}
+#endif
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	bool did_hit = _trace_ray(ray_pos, ray_dir, max_dist, hit);
