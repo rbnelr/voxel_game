@@ -16,11 +16,8 @@ layout(rgba16f, binding = 4) uniform image2D img;
 uniform sampler2D prev_framebuffer;
 
 uniform mat4 prev_world2clip;
-
 uniform float taa_alpha = 0.05;
-
 uniform uint rand_frame_index = 0;
-uniform ivec2 dispatch_size;
 
 // get pixel ray in world space based on pixel coord and matricies
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
@@ -86,7 +83,7 @@ void main () {
 	uvec2 pxpos = gl_GlobalInvocationID.xy;
 	
 	// maybe try not to do rays that we do not see (happens due to local group size)
-	if (pxpos.x >= view.viewport_size.x || pxpos.y >= view.viewport_size.y)
+	if (pxpos.x >= uint(view.viewport_size.x) || pxpos.y >= uint(view.viewport_size.y))
 		return;
 	
 #if DEBUG_RAYS

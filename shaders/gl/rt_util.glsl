@@ -30,11 +30,13 @@ uniform sampler2D		heat_gradient;
 	#endif
 #endif
 
-#define DEBUG_RAYS 1
+#define DEBUG_RAYS 0
 #if DEBUG_RAYS
 bool _dbg_ray = false;
 uniform bool update_debug_rays = false;
 #endif
+
+#define REFLECTIONS 0
 
 //
 struct Hit {
@@ -47,10 +49,10 @@ struct Hit {
 	vec3	emiss;
 };
 
-uint get_step_face (bvec3 axismask, ivec3 flipmask) {
-	if (axismask.x)      return flipmask.x == 0 ? 0 : 1;
-	else if (axismask.y) return flipmask.y == 0 ? 2 : 3;
-	else                 return flipmask.z == 0 ? 4 : 5;
+uint get_step_face (bvec3 axismask, vec3 ray_dir) {
+	if (axismask.x)      return ray_dir.x >= 0.0 ? 0 : 1;
+	else if (axismask.y) return ray_dir.y >= 0.0 ? 2 : 3;
+	else                 return ray_dir.z >= 0.0 ? 4 : 5;
 }
 vec2 calc_uv (vec3 pos_fract, bvec3 axismask, uint entry_face) {
 	vec2 uv;
@@ -100,13 +102,16 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	
 	// flip coordinate space for ray such that ray dir is all positive
 	// keep track of this flip via flipmask
-	ivec3 flipmask = mix(ivec3(0u), ivec3(-1), lessThan(dir, vec3(0.0)));
-	ray_pos       *= mix(vec3(1), vec3(-1), lessThan(dir, vec3(0.0)));
+	bvec3 ray_negative = lessThan(dir, vec3(0.0));
+	ray_pos       *= mix(vec3(1), vec3(-1), ray_negative);
 	
+	ivec3 flipmask = mix(ivec3(0u), ivec3(-1), ray_negative);
 	
 	// precompute part of plane projection equation
-	vec3 abs_dir = abs(dir);
-	vec3 rdir = mix(1.0 / abs_dir, vec3(INF), equal(abs_dir, vec3(0.0)));
+	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
+	// due to mad instruction
+	vec3 inv_dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
+	vec3 bias = inv_dir * -ray_pos;
 	
 	// starting cell is where ray is
 	ivec3 coord = ivec3(floor(ray_pos));
@@ -115,11 +120,9 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	uint mip = uint(CHUNK_OCTREE_LAYERS-1);
 	
 	bvec3 axismask = bvec3(false);
-	float t0;
-	bool did_hit;
+	float dist = 0.0;
 	
 	for (;;) {
-		
 	#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
@@ -130,70 +133,62 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		
 		// get octree cell size of current octree level
 		int size = 1 << mip;
-		coord &= ~(size-1); // coord = bitfieldInsert(coord, ivec3(0), 0, mip);
+		coord &= ~(size-1);
+		//coord = bitfieldInsert(coord, ivec3(0), 0, int(mip));
 		
-		// calculate both entry and exit distances of current octree cell
-		vec3 t0v = rdir * (vec3(coord       ) - ray_pos);
-		vec3 t1v = rdir * (vec3(coord + size) - ray_pos);
-		t0 = max(max(t0v.x, t0v.y), t0v.z);
-		float t1 = min(min(t1v.x, t1v.y), t1v.z);
+		// flip coord back into original coordinate space
+		uvec3 flipped = uvec3(coord ^ flipmask);
 		
-		// handle rays starting in a cell (hit at distance 0)
-		t0 = max(t0, 0.0);
+		// handle both stepping out of 3d texture and reaching max ray distance
+		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
+			 dist >= max_dist )
+			return false;
 		
-		bool vox;
-		{ // read octree cell
-			// flip coord back into original coordinate space
-			uvec3 flipped = uvec3(coord ^ flipmask);
-			
-			// handle both stepping out of 3d texture and reaching max ray distance
-			if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
-				 t1 >= max_dist ) {
-				did_hit = false;
-				break;
-			}
-			
-			// read octree cell
-			flipped >>= mip;
-			uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
-			
-			//flipped &= 1u;
-			//uint i = flipped.z*4u + (flipped.y*2u + flipped.x);
-			uint i = flipped.x & 1u;
-			i = bitfieldInsert(i, flipped.y, 1, 1);
-			i = bitfieldInsert(i, flipped.z, 2, 1);
-			
-			vox = (childmask & (1u << i)) != 0;
-			//vox = bitfieldExtract(childmask, int(i), 1) != 0; // slower
-		}
+		// read octree cell
+		flipped >>= mip;
+		uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
 		
-		if (vox) {
-			// non-air octree cell
-			if (mip == 0u) {
-				did_hit = true; // found solid leaf voxel
-				break;
-			}
+		//flipped &= 1u;
+		//uint i = flipped.z*4u + (flipped.y*2u + flipped.x);
+		uint i = flipped.x & 1u;
+		i = bitfieldInsert(i, flipped.y, 1, 1);
+		i = bitfieldInsert(i, flipped.z, 2, 1);
+		
+		if ((childmask & (1u << i)) != 0) {
+			// non-air octree cell 
+			if (mip == 0u)
+				break; // found solid leaf voxel
 			
 			// decend octree
 			mip--;
-			int child_size = 1 << mip;
+			size = 1 << mip;
+			
+			ivec3 next_coord = coord + size;
 			
 			// upate coord by determining which child octant is entered first
 			// by comparing ray hit against middle plane hits
-			vec3 tmidv = rdir * (vec3(coord + child_size) - ray_pos);
+			vec3 tmidv = inv_dir * vec3(next_coord) + bias;
 			
-			coord += mix(ivec3(0), ivec3(child_size), lessThan(tmidv, vec3(t0)));
+			coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
 			
 		} else {
 			// air octree cell, continue stepping
 			
-			// step into next cell via relevant axis
-			axismask = equal(t1v, vec3(t1));
-			ivec3 old = coord;
+			ivec3 next_coord = coord + size;
 			
-			if (axismask.x)       coord.x += size;
-			else if (axismask.y)  coord.y += size;
-			else                  coord.z += size;
+			// calculate entry distances of next octree cell
+			vec3 t0v = inv_dir * vec3(next_coord) + bias;
+			dist = min(min(t0v.x, t0v.y), t0v.z);
+			
+			// step into next cell via relevant axis
+			axismask.x = t0v.x == dist;
+			axismask.y = t0v.y == dist && !axismask.x;
+			axismask.z = !axismask.x && !axismask.y;
+			//axismask.y = t0v.y == dist;
+			//axismask.z = t0v.z == dist;
+			
+			ivec3 old = coord;
+			coord = mix(coord, next_coord, axismask);
 			
 			// determine which bit has changed during increment
 			int stepbit = (coord.x ^ old.x) | (coord.y ^ old.y) | (coord.z ^ old.z);
@@ -203,14 +198,14 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		}
 	}
 	
-	if (did_hit && !sunray) {
+	if (!sunray) {
 		// arrived at solid leaf voxel, read block id from seperate data structure
 		uint bid = read_bid(uvec3(coord ^ flipmask));
 		
 		{ // calcualte surface hit info
-			vec3 hit_pos = pos + dir * t0;
+			vec3 hit_pos = pos + dir * dist;
 		
-			uint entry_face = get_step_face(axismask, flipmask);
+			uint entry_face = get_step_face(axismask, dir);
 			vec2 uv = calc_uv(fract(hit_pos), axismask, entry_face);
 			
 			float texid = float(block_tiles[bid].sides[entry_face]);
@@ -223,17 +218,12 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			hit.bid = bid;
 			hit.prev_bid = 0; // don't know, could read
 			
-			hit.dist = t0;
+			hit.dist = dist;
 			hit.col = col.rgb;
 			hit.emiss = col.rgb * get_emmisive(hit.bid);
 		}
 	}
-	
-	#if DEBUG_RAYS
-	if (_dbg_ray) dbg_draw_vector(pos, dir * t0, sunray ? vec4(1,1,0,1) : vec4(1,0,0,1));
-	#endif
-	
-	return did_hit;
+	return true;
 }
 
 #if !ONLY_PRIMARY_RAYS
@@ -371,6 +361,8 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 	return false;
 #else
 	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, hit, false);
+
+#if REFLECTIONS
 	if (did_hit && hit.bid == B_WATER) {
 		// reflect
 		ray_pos = hit.pos + hit.normal * 0.001;
@@ -380,6 +372,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		was_reflected = true;
 		return trace_ray(ray_pos, ray_dir, max_dist, hit, false);
 	}
+#endif
 	was_reflected = false;
 	return did_hit;
 #endif
