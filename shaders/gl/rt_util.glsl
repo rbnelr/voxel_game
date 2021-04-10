@@ -586,9 +586,11 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		if (!trace_ray(ray_pos, ray_dir, max_dist, hit))
 			break;
 		
-		bool water = hit.bid == B_WATER || hit.prev_bid == B_WATER;
-		bool air = hit.bid == B_AIR || hit.prev_bid == B_AIR;
-		bool water_surface = water && air;
+		//bool water = hit.bid == B_WATER || hit.prev_bid == B_WATER;
+		//bool air = hit.bid == B_AIR || hit.prev_bid == B_AIR;
+		//bool water_surface = water && air;
+		
+		bool water_surface = hit.bid == B_WATER;
 		
 		if (!water_surface)
 			return true;
