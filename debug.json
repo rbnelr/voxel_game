@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-104.88182830810547,
-				65.23887634277344,
-				65.8576431274414
+				139.0387420654297,
+				11.33621883392334,
+				81.8371810913086
 			],
 			"rot_aer": [
-				-1.2038129568099976,
-				-0.09104162454605103,
+				2.0674002170562744,
+				-0.05228487402200699,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,16 +29,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 59.09495544433594,
+		"base_speed": 31.66822052001953,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			57.69115447998047,
-			52.207942962646484,
-			24.000099182128906
+			121.4681625366211,
+			-7.219208240509033,
+			78.0000991821289
 		],
 		"vel": [
 			0.0,
@@ -68,18 +68,18 @@
 			"enable_rt_lighting": false,
 			"max_iterations": 179,
 			"rand_seed_time": true,
-			"sunlight_enable": true,
+			"sunlight_enable": false,
 			"sunlight_dist": 90.0,
 			"sunlight_col": [
 				1.2739999294281006,
 				1.1960008144378662,
 				0.8449998497962952
 			],
-			"bounces_enable": false,
+			"bounces_enable": true,
 			"bounces_max_dist": 128.0,
 			"bounces_max_count": 4,
 			"only_primary_rays": true,
-			"taa_alpha": 1.0
+			"taa_alpha": 0.04753600060939789
 		},
 		"bloom_renderer": {
 			"enable": false,

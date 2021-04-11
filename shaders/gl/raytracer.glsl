@@ -91,7 +91,7 @@ void main () {
 	if (_dbg_ray) line_drawer_init();
 #endif
 	
-	bool was_reflected = false;
+	uint hit_id = 0;
 	
 #if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
@@ -106,54 +106,56 @@ void main () {
 	// primary ray
 	vec3 ray_pos, ray_dir;
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
+	float max_dist = INF;
+	
+	vec3 first_hit_pos;
+	uint first_hit_bid;
+	bool was_reflected = false;
 	
 	vec3 col = vec3(0.0);
 	
 	Hit hit;
-	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, INF, hit, was_reflected);
+	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected);
 	if (did_hit) {
-		vec3 pos = hit.pos + hit.normal * 0.001;
+		first_hit_pos = hit.pos;
+		first_hit_bid = hit.bid;
 		
-		vec3 light = ambient_light;
-		light += collect_sunlight(pos, hit.normal);
-		
-		if (bounces_enable) {
-			
-			float max_dist = bounces_max_dist;
-			
-			vec3 cur_normal = hit.normal;
-			vec3 contrib = vec3(1.0);
-			
-			for (int j=0; j<bounces_max_count; ++j) {
-				vec3 dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
-				
-				Hit hit2;
-				bool was_reflected2;
-				if (!trace_ray_refl_refr(pos, dir, max_dist, hit2, was_reflected2))
-					break;
-				
-				pos = hit2.pos + hit2.normal * 0.001;
-				max_dist -= hit2.dist;
-				
-				cur_normal = hit2.normal;
-				
-				vec3 light2 = collect_sunlight(pos, cur_normal);
-				
-				light += (hit2.emiss + hit2.col * light2) * contrib;
-				contrib *= hit2.col;
-			}
-		}
+		ray_pos = hit.pos + hit.normal * 0.001;
 		
 		if (visualize_light)
 			hit.col = vec3(1.0);
 		
+		vec3 light = collect_sunlight(ray_pos, hit.normal);
 		col += hit.emiss + hit.col * light;
+		
+		if (bounces_enable) {
+			max_dist = bounces_max_dist;
+			
+			vec3 cur_normal = hit.normal;
+			vec3 contrib = hit.col;
+			
+			for (int j=0; j<bounces_max_count; ++j) {
+				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+				
+				bool was_reflected2;
+				if (!trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected2))
+					break;
+				
+				ray_pos = hit.pos + hit.normal * 0.001;
+				max_dist -= hit.dist;
+				
+				cur_normal = hit.normal;
+				
+				light = collect_sunlight(ray_pos, cur_normal);
+				
+				col += (hit.emiss + hit.col * light) * contrib;
+				contrib *= hit.col;
+			}
+		}
 	}
-#endif
 	
-	uint hit_id = 0;
 	if (did_hit && !was_reflected) {
-		vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
+		vec4 prev_clip = prev_world2clip * vec4(first_hit_pos, 1.0);
 		prev_clip.xyz /= prev_clip.w;
 		
 		vec2 uv = prev_clip.xy * 0.5 + 0.5;
@@ -163,12 +165,13 @@ void main () {
 			vec3 prev_col = prev_val.rgb;
 			uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
 			
-			if (prev_bid == hit.bid)
+			if (prev_bid == first_hit_bid)
 				col = mix(prev_col, col, vec3(taa_alpha));
 		}
 		
-		hit_id = hit.bid;
+		hit_id = first_hit_bid;
 	}
+#endif
 
 #if VISUALIZE_COST
 	#if VISUALIZE_WARP_COST

@@ -7,7 +7,8 @@
 
 uniform usampler3D	voxels[2];
 
-#define WORLD_SIZE			16 // number of chunks for fixed subchunk texture (for now)
+#define WORLD_CHUNKS		16 // number of chunks for fixed subchunk texture (for now)
+#define WORLD_SIZE			(WORLD_CHUNKS * CHUNK_SIZE)
 
 #define TEX3D_SIZE			2048 // max width, height, depth for 3d textures
 #define TEX3D_SIZE_SHIFT	11
@@ -95,17 +96,19 @@ uint read_bid (uvec3 coord) {
 	}
 }
 
+const float FLIPMASK = WORLD_SIZE-1;
+const float WORLD_SIZEf = float(WORLD_SIZE);
+const float WORLD_SIZE_HALF = WORLD_SIZEf * 0.5;
+
 bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	
 	// make ray relative to world texture
-	vec3 ray_pos = pos + float(WORLD_SIZE/2 * CHUNK_SIZE);
+	vec3 ray_pos = pos + WORLD_SIZE_HALF;
 	
-	// flip coordinate space for ray such that ray dir is all positive
-	// keep track of this flip via flipmask
-	bvec3 ray_negative = lessThan(dir, vec3(0.0));
-	ray_pos       *= mix(vec3(1), vec3(-1), ray_negative);
+	bvec3 ray_neg = lessThan(dir, vec3(0.0));
+	ray_pos = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
 	
-	ivec3 flipmask = mix(ivec3(0u), ivec3(-1), ray_negative);
+	ivec3 flipmask = mix(ivec3(0u), ivec3(FLIPMASK), ray_neg);
 	
 	// precompute part of plane projection equation
 	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
@@ -136,7 +139,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		uvec3 flipped = uvec3(coord ^ flipmask);
 		
 		// handle both stepping out of 3d texture and reaching max ray distance
-		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) || // TODO: this check could be avoided if the octree went up to 1x1x1, then it would be a step out up from max mip
+		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE))) || // TODO: this check could be avoided if the octree went up to 1x1x1, then it would be a step out up from max mip
 			 dist >= max_dist )
 			return false;
 		
@@ -177,8 +180,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			axismask.x = t0v.x == dist;
 			axismask.y = t0v.y == dist && !axismask.x;
 			axismask.z = !axismask.x && !axismask.y;
-			//axismask.y = t0v.y == dist;
-			//axismask.z = t0v.z == dist;
 			
 			coord = mix(coord, next_coord, axismask);
 			
@@ -188,7 +189,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			mip = min(findLSB(uint(stepcoord)), uint(CHUNK_OCTREE_LAYERS-1));
 			
 			coord &= -1 << mip;
-			//coord = bitfieldInsert(coord, ivec3(0), 0, int(mip)); slower
 		}
 	}
 	
