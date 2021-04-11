@@ -118,6 +118,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	
 	// start at highest level of octree
 	uint mip = uint(CHUNK_OCTREE_LAYERS-1);
+	coord &= -1 << mip;
 	
 	bvec3 axismask = bvec3(false);
 	float dist = 0.0;
@@ -131,16 +132,11 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		#endif
 	#endif
 		
-		// get octree cell size of current octree level
-		int size = 1 << mip;
-		coord &= ~(size-1);
-		//coord = bitfieldInsert(coord, ivec3(0), 0, int(mip));
-		
 		// flip coord back into original coordinate space
 		uvec3 flipped = uvec3(coord ^ flipmask);
 		
 		// handle both stepping out of 3d texture and reaching max ray distance
-		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) ||
+		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE * CHUNK_SIZE))) || // TODO: this check could be avoided if the octree went up to 1x1x1, then it would be a step out up from max mip
 			 dist >= max_dist )
 			return false;
 		
@@ -161,9 +157,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			
 			// decend octree
 			mip--;
-			size = 1 << mip;
-			
-			ivec3 next_coord = coord + size;
+			ivec3 next_coord = coord + (1 << mip);
 			
 			// upate coord by determining which child octant is entered first
 			// by comparing ray hit against middle plane hits
@@ -173,8 +167,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			
 		} else {
 			// air octree cell, continue stepping
-			
-			ivec3 next_coord = coord + size;
+			ivec3 next_coord = coord + (1 << mip);
 			
 			// calculate entry distances of next octree cell
 			vec3 t0v = inv_dir * vec3(next_coord) + bias;
@@ -187,14 +180,15 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			//axismask.y = t0v.y == dist;
 			//axismask.z = t0v.z == dist;
 			
-			ivec3 old = coord;
 			coord = mix(coord, next_coord, axismask);
 			
-			// determine which bit has changed during increment
-			int stepbit = (coord.x ^ old.x) | (coord.y ^ old.y) | (coord.z ^ old.z);
+			int stepcoord = axismask.x ? coord.x : coord.z;
+			stepcoord = axismask.y ? coord.y : stepcoord;
 			
-			// determine highest changed octree parent by scanning for MSB that was changed
-			mip = min(findMSB(uint(stepbit)), uint(CHUNK_OCTREE_LAYERS-1));
+			mip = min(findLSB(uint(stepcoord)), uint(CHUNK_OCTREE_LAYERS-1));
+			
+			coord &= -1 << mip;
+			//coord = bitfieldInsert(coord, ivec3(0), 0, int(mip)); slower
 		}
 	}
 	
