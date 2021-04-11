@@ -429,6 +429,8 @@
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
     <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
     <None Include="..\..\..\shaders\gl\debug_wire_cube.glsl" />
+    <None Include="..\..\..\shaders\gl\fullscreen_triangle.glsl" />
+    <None Include="..\..\..\shaders\gl\gpu_voxels.glsl" />
     <None Include="..\..\..\shaders\gl\gui.glsl" />
     <None Include="..\..\..\shaders\gl\held_block.glsl" />
     <None Include="..\..\..\shaders\gl\held_item.glsl" />
@@ -436,9 +438,8 @@
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
     <None Include="..\..\..\shaders\gl\rt_lighting.glsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\..\..\shaders\gl\raytracing_util.txt" />
+    <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_util.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

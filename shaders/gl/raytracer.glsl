@@ -12,7 +12,7 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "rt_util.glsl"
 
-layout(rgba16f, binding = 4) uniform image2D img;
+layout(rgba16f, binding = 4) writeonly restrict uniform image2D img;
 uniform sampler2D prev_framebuffer;
 
 uniform mat4 prev_world2clip;

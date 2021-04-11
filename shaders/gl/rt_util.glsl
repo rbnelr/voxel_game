@@ -1,23 +1,10 @@
 
 #include "common.glsl"
+#include "gpu_voxels.glsl"
 #include "rand.glsl"
 
 #define PI	3.1415926535897932384626433832795
 #define INF (1. / 0.)
-
-uniform usampler3D	voxels[2];
-
-#define WORLD_CHUNKS		16 // number of chunks for fixed subchunk texture (for now)
-#define WORLD_SIZE			(WORLD_CHUNKS * CHUNK_SIZE)
-
-#define TEX3D_SIZE			2048 // max width, height, depth for 3d textures
-#define TEX3D_SIZE_SHIFT	11
-
-#define SUBCHUNK_TEX_SHIFT	(TEX3D_SIZE_SHIFT - SUBCHUNK_SHIFT)
-
-#define CHUNK_OCTREE_LAYERS  CHUNK_SIZE_SHIFT
-
-uniform usampler3D	octree;
 
 #if VISUALIZE_COST
 int iterations = 0;
@@ -37,7 +24,7 @@ bool _dbg_ray = false;
 uniform bool update_debug_rays = false;
 #endif
 
-#define REFLECTIONS 0
+#define REFLECTIONS 1
 
 //
 struct Hit {
@@ -71,62 +58,45 @@ vec2 calc_uv (vec3 pos_fract, bvec3 axismask, uint entry_face) {
 	return uv;
 }
 
-uint read_bid (uvec3 coord) {
-	uvec3 scoord = coord & ~SUBCHUNK_MASK;
-	if (!all(lessThan(scoord, uvec3(WORLD_SIZE * CHUNK_SIZE))))
-		return 0;
-	
-	uint subchunk = texelFetch(voxels[0], ivec3(scoord >> SUBCHUNK_SHIFT), 0).r;
-	
-	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-		return subchunk & ~SUBC_SPARSE_BIT;
-	} else {
-		
-		// subchunk id to 3d tex offset (including subchunk_size multiplication)
-		// ie. split subchunk id into 3 sets of SUBCHUNK_TEX_SHIFT bits
-		uvec3 subc_offs;
-		subc_offs.x = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*0, SUBCHUNK_TEX_SHIFT);
-		subc_offs.y = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*1, SUBCHUNK_TEX_SHIFT);
-		subc_offs.z = bitfieldExtract(subchunk, SUBCHUNK_TEX_SHIFT*2, SUBCHUNK_TEX_SHIFT);
-		
-		// equivalent to  (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
-		scoord = bitfieldInsert(coord, subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT);
-		
-		return texelFetch(voxels[1], ivec3(scoord), 0).r;
-	}
-}
-
 const float FLIPMASK = WORLD_SIZE-1;
 const float WORLD_SIZEf = float(WORLD_SIZE);
 const float WORLD_SIZE_HALF = WORLD_SIZEf * 0.5;
 
-bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
+#define RECONSTRUCT_RAY 0
+
+bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { // func state 8 regs
+	#if !RECONSTRUCT_RAY
+	vec3 oldpos = pos;
+	vec3 olddir = dir;
+	#endif
 	
 	// make ray relative to world texture
-	vec3 ray_pos = pos + WORLD_SIZE_HALF;
+	pos += WORLD_SIZE_HALF;
 	
 	bvec3 ray_neg = lessThan(dir, vec3(0.0));
-	ray_pos = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
+	pos = mix(pos, WORLD_SIZEf - pos, ray_neg);
 	
 	ivec3 flipmask = mix(ivec3(0u), ivec3(FLIPMASK), ray_neg);
+	
+	// starting cell is where ray is
+	ivec3 coord = ivec3(floor(pos));
 	
 	// precompute part of plane projection equation
 	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
 	// due to mad instruction
-	vec3 inv_dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
-	vec3 bias = inv_dir * -ray_pos;
+	dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
+	pos = dir * -pos;
 	
-	// starting cell is where ray is
-	ivec3 coord = ivec3(floor(ray_pos));
-	
-	// start at highest level of octree
-	uint mip = uint(CHUNK_OCTREE_LAYERS-1);
+	// start at some level of octree
+	// best to start at 0 if camera on surface
+	// and best at higher levels if camera were in a large empty region
+	uint mip = 0;// uint(OCTREE_LAYERS-1);
 	coord &= -1 << mip;
 	
 	bvec3 axismask = bvec3(false);
 	float dist = 0.0;
 	
-	for (;;) {
+	for (;;) { // loop state 17 regs
 	#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
@@ -153,7 +123,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		i = bitfieldInsert(i, flipped.y, 1, 1);
 		i = bitfieldInsert(i, flipped.z, 2, 1);
 		
-		if ((childmask & (1u << i)) != 0) {
+		if ((childmask & (1u << i)) != 0) { // loop temps ~6 regs
 			// non-air octree cell 
 			if (mip == 0u)
 				break; // found solid leaf voxel
@@ -164,7 +134,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			
 			// upate coord by determining which child octant is entered first
 			// by comparing ray hit against middle plane hits
-			vec3 tmidv = inv_dir * vec3(next_coord) + bias;
+			vec3 tmidv = dir * vec3(next_coord) + pos;
 			
 			coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
 			
@@ -173,7 +143,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			ivec3 next_coord = coord + (1 << mip);
 			
 			// calculate entry distances of next octree cell
-			vec3 t0v = inv_dir * vec3(next_coord) + bias;
+			vec3 t0v = dir * vec3(next_coord) + pos;
 			dist = min(min(t0v.x, t0v.y), t0v.z);
 			
 			// step into next cell via relevant axis
@@ -186,36 +156,40 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			int stepcoord = axismask.x ? coord.x : coord.z;
 			stepcoord = axismask.y ? coord.y : stepcoord;
 			
-			mip = min(findLSB(uint(stepcoord)), uint(CHUNK_OCTREE_LAYERS-1));
+			mip = min(findLSB(uint(stepcoord)), uint(OCTREE_LAYERS-1));
 			
 			coord &= -1 << mip;
 		}
 	}
 	
+	#if RECONSTRUCT_RAY
+	pos = -(pos / dir);
+	pos = mix(WORLD_SIZEf - pos, pos, equal(flipmask, ivec3(0)));
+	pos -= WORLD_SIZE_HALF;
+	
+	dir = (1.0 / dir) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0)));
+	#else
+	pos = oldpos;
+	dir = olddir;
+	#endif
+	
 	if (!sunray) {
 		// arrived at solid leaf voxel, read block id from seperate data structure
-		uint bid = read_bid(uvec3(coord ^ flipmask));
+		hit.bid = read_bid(uvec3(coord ^ flipmask));
+		hit.prev_bid = 0; // don't know, could read
 		
-		{ // calcualte surface hit info
-			vec3 hit_pos = pos + dir * dist;
+		// calcualte surface hit info
+		hit.dist = dist;
+		hit.pos = pos + dir * dist;
+		hit.normal = mix(vec3(0.0), -sign(dir), axismask);
 		
-			uint entry_face = get_step_face(axismask, dir);
-			vec2 uv = calc_uv(fract(hit_pos), axismask, entry_face);
-			
-			float texid = float(block_tiles[bid].sides[entry_face]);
-			
-			vec3 col = texture(tile_textures, vec3(uv, texid)).rgb;
-			
-			hit.pos = hit_pos;
-			hit.normal = mix(vec3(0.0), -sign(dir), axismask);
-			
-			hit.bid = bid;
-			hit.prev_bid = 0; // don't know, could read
-			
-			hit.dist = dist;
-			hit.col = col.rgb;
-			hit.emiss = col.rgb * get_emmisive(hit.bid);
-		}
+		uint entry_face = get_step_face(axismask, dir);
+		vec2 uv = calc_uv(fract(hit.pos), axismask, entry_face);
+		
+		float texid = float(block_tiles[hit.bid].sides[entry_face]);
+		
+		hit.col = texture(tile_textures, vec3(uv, texid)).rgb;
+		hit.emiss = hit.col * get_emmisive(hit.bid);
 	}
 	return true;
 }

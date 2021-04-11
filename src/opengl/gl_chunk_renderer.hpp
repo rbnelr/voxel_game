@@ -143,119 +143,38 @@ struct ChunkRenderer {
 
 };
 
-static constexpr int GPU_WORLD_SIZE = 16;
+static constexpr int GPU_WORLD_SIZE_CHUNKS = 16;
+static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
 struct ChunkOctrees {
-	static constexpr int MAX_NODES = 1<<16;
-	static constexpr int CHUNK_OCTREE_LAYERS = CHUNK_SIZE_SHIFT;
+	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE/2;
+	static constexpr int OCTREE_LAYERS = get_const_log2((uint32_t)TEX_WIDTH)+1;
 
-	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE * CHUNK_SIZE/2;
+	Texture3D tex = {"RT.octree"};
+	Shader* octree_filter;
+	Shader* octree_filter_mip0;
 
-	Texture3D tex = {"RT.octrees"};
+	ChunkOctrees (Shaders& shaders) {
+		octree_filter      = shaders.compile("rt_octree_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
+		octree_filter_mip0 = shaders.compile("rt_octree_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
 
-	ChunkOctrees () {
-		glTextureStorage3D(tex, CHUNK_OCTREE_LAYERS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureStorage3D(tex, OCTREE_LAYERS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 
 		uint8_t val = 0;
-		for (int layer=0; layer<CHUNK_OCTREE_LAYERS; ++layer)
+		for (int layer=0; layer<OCTREE_LAYERS; ++layer)
 			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
 	}
 
-	struct OctreeBuilder {
-		/*	Temporary buffer for building SVO that's not yet sparse
-			final step is to sparsify it, by recursing this structure and copying out the relevant nodes
+	uint8_t temp_buffer[CHUNK_SIZE/2][CHUNK_SIZE/2][CHUNK_SIZE/2];
 
-			nodes contains:
+	void rebuild_chunk (Chunks& chunks, chunk_id cid, int3 const& cpos);
 
-			voxel[32][32][32]
-			voxel[16][16][16]
-			voxel[ 8][ 8][ 8]
-			voxel[ 4][ 4][ 4]
-			voxel[ 2][ 2][ 2]
-			voxel[ 1][ 1][ 1]
+	static constexpr int OCTREE_FILTER_LOCAL_SIZE = 4;
+	// how many octree layers to filter per uploaded chunk (rest are done once per frame, instead of per chunk)
+	// only compute mips until size is == OCTREE_FILTER_LOCAL_SIZE, to not waste dispatches for workgroups with only 1 or 2 active threads
+	static constexpr int OCTREE_FILTER_CHUNK_LAYERS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / OCTREE_FILTER_LOCAL_SIZE))+1;
 
-			offsets contains: nodes start index for every layer (32-layer, 16-layer, ...)
-		*/
-
-		int offsets[CHUNK_OCTREE_LAYERS];
-		std::vector<uint8_t> voxels;
-
-		uint8_t& get_vox (int layer, int x, int y, int z) {
-			return voxels[offsets[layer] + IDX3D(x,y,z, (CHUNK_SIZE/2) >> layer)];
-		}
-
-		int node_count;
-
-		OctreeBuilder () {
-			int count = 0;
-
-			for (int layer=CHUNK_OCTREE_LAYERS-1; layer>=0; --layer) {
-				int size = (CHUNK_SIZE/2) >> layer;
-				offsets[layer] = count;
-				count += size*size*size;
-			}
-
-			voxels.resize(count);
-		}
-	};
-	OctreeBuilder builder;
-
-	void rebuild_chunk (Chunks& chunks, chunk_id cid, int3 cpos) {
-		ZoneScoped;
-		
-		{
-			ZoneScopedN("fill layer 0");
-			auto bid_air = g_assets.block_types.map_id("air");
-
-			for (int z=0; z<CHUNK_SIZE/2; z++)
-			for (int y=0; y<CHUNK_SIZE/2; y++)
-			for (int x=0; x<CHUNK_SIZE/2; x++) {
-				uint8_t mask = 0;
-				for (int i=0; i<8; ++i) {
-					auto vox = chunks.read_block(x*2 + (i&1), y*2 + ((i>>1)&1), z*2 + (i>>2), cid);
-					mask |= (vox != bid_air ? 1:0) << i;
-				}
-				builder.get_vox(0, x,y,z) = mask;
-			}
-		}
-
-		{
-			ZoneScopedN("fill other layers");
-
-			for (int layer=1; layer<CHUNK_OCTREE_LAYERS; ++layer) {
-
-				int size = (CHUNK_SIZE/2) >> layer;
-				for (int z=0; z<size; z++)
-				for (int y=0; y<size; y++)
-				for (int x=0; x<size; x++) {
-					uint8_t mask = 0;
-					for (int i=0; i<8; ++i) {
-						auto child = builder.get_vox(layer-1, x*2 + (i&1), y*2 + ((i>>1)&1), z*2 + (i>>2));
-						mask |= (child != 0 ? 1:0) << i;
-					}
-					builder.get_vox(layer, x,y,z) = mask;
-				}
-			}
-		}
-
-		glBindTexture(GL_TEXTURE_3D, tex);
-
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1); // required for the higher mip leves
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-
-		for (int layer=0; layer<CHUNK_OCTREE_LAYERS; ++layer) {
-			int size = (CHUNK_SIZE/2) >> layer;
-			glTexSubImage3D(GL_TEXTURE_3D, layer,
-				cpos.x*size, cpos.y*size, cpos.z*size,
-				size, size, size,
-				GL_RED_INTEGER, GL_UNSIGNED_BYTE, &builder.voxels[builder.offsets[layer]]);
-		}
-
-		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
-		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, CHUNK_OCTREE_LAYERS-1);
-
-		glBindTexture(GL_TEXTURE_3D, 0);
-	}
+	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
 };
 
 struct Raytracer {
@@ -267,40 +186,29 @@ struct Raytracer {
 	Shader* shad = nullptr;
 	Shader* shad_lighting = nullptr;
 
-	static constexpr int TEX3D_SIZE = 2048; // width, height for 3d textures
-
-	static constexpr int SUBCHUNK_TEX_COUNT = TEX3D_SIZE / SUBCHUNK_SIZE; // max num of subchunks in one axis for tex
-	
-	static constexpr int SUBCHUNK_TEX_SHIFT = 8;
-	static constexpr int SUBCHUNK_TEX_MASK  = (SUBCHUNK_TEX_COUNT-1) << SUBCHUNK_SHIFT;
-
-	static_assert((1 << SUBCHUNK_TEX_SHIFT) == SUBCHUNK_TEX_COUNT, "");
-	static_assert(SUBCHUNK_SIZE == SUBCHUNK_COUNT, "");
-
-	// subchunk id to 3d tex offset (including subchunk_size multiplication)
-	static int3 subchunk_id_to_texcoords (uint32_t id) {
-		int3 coord;
-		coord.x = (id << (SUBCHUNK_TEX_SHIFT*0 + SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK;
-		coord.y = (id >> (SUBCHUNK_TEX_SHIFT*1 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK;
-		coord.z = (id >> (SUBCHUNK_TEX_SHIFT*2 - SUBCHUNK_SHIFT)) & SUBCHUNK_TEX_MASK;
-		return coord;
-	}
-
 	struct SubchunksTexture {
 		Texture3D	tex;
 
 		SubchunksTexture () {
 			tex = {"RT.subchunks"};
 
-			glTextureStorage3D(tex, 1, GL_R32UI, GPU_WORLD_SIZE*SUBCHUNK_COUNT, GPU_WORLD_SIZE*SUBCHUNK_COUNT, GPU_WORLD_SIZE*SUBCHUNK_COUNT);
+			glTextureStorage3D(tex, 1, GL_R32UI, GPU_WORLD_SIZE/SUBCHUNK_SIZE, GPU_WORLD_SIZE/SUBCHUNK_SIZE, GPU_WORLD_SIZE/SUBCHUNK_SIZE);
 
 			GLuint val = SUBC_SPARSE_BIT | (uint32_t)B_NULL;
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
 		}
 	};
 
-	template <typename T, int SZ>
+	template <typename T>
 	struct VoxTexture {
+		static constexpr int VOXTEX_SIZE = 2048;
+		static constexpr int VOXTEX_SIZE_SHIFT = 11;
+
+		static constexpr int VOXTEX_COUNT = VOXTEX_SIZE / SUBCHUNK_SIZE;
+
+		static constexpr int VOXTEX_MASK  = VOXTEX_COUNT -1; // max num of subchunks in one axis for tex
+		static constexpr int VOXTEX_SHIFT = VOXTEX_SIZE_SHIFT - SUBCHUNK_SHIFT;
+
 		std::string label;
 
 		uint32_t	alloc_layers = 0;
@@ -309,7 +217,7 @@ struct Raytracer {
 		VoxTexture (std::string_view label): label{label} {}
 
 		void resize (uint32_t new_count) {
-			uint32_t layer_sz = (TEX3D_SIZE/SZ) * (TEX3D_SIZE/SZ);
+			uint32_t layer_sz = VOXTEX_COUNT*VOXTEX_COUNT;
 			// round up size to avoid constant resizing, ideally only happens sometimes
 			uint32_t layers = std::max((new_count + (layer_sz-1)) / layer_sz, 1u);
 
@@ -318,10 +226,10 @@ struct Raytracer {
 
 			Texture3D new_tex = { (std::string_view)label };
 
-			size_t sz = (size_t)TEX3D_SIZE * TEX3D_SIZE * layers*SZ * sizeof(T);
-			clog(INFO, ">> Resized %s 3d texture to %dx%dx%d (%d MB)", label.c_str(), TEX3D_SIZE, TEX3D_SIZE, layers*SZ, (int)(sz / MB));
+			size_t sz = (size_t)VOXTEX_SIZE * VOXTEX_SIZE * layers*SUBCHUNK_SIZE * sizeof(T);
+			clog(INFO, ">> Resized %s 3d texture to %dx%dx%d (%d MB)", label.c_str(), VOXTEX_SIZE, VOXTEX_SIZE, layers*SUBCHUNK_SIZE, (int)(sz / MB));
 
-			glTextureStorage3D(new_tex, 1, sizeof(T) == 2 ? GL_R16UI : GL_R32UI, TEX3D_SIZE, TEX3D_SIZE, layers*SZ);
+			glTextureStorage3D(new_tex, 1, sizeof(T) == 2 ? GL_R16UI : GL_R32UI, VOXTEX_SIZE, VOXTEX_SIZE, layers*SUBCHUNK_SIZE);
 
 			{ // copy old tex data to new bigger tex
 				if (alloc_layers)
@@ -330,7 +238,7 @@ struct Raytracer {
 				uint32_t copy_layers = std::min(alloc_layers, layers);
 				if (copy_layers > 0) {
 					glCopyImageSubData(tex,     GL_TEXTURE_3D, 0, 0,0,0,
-						new_tex, GL_TEXTURE_3D, 0, 0,0,0, TEX3D_SIZE, TEX3D_SIZE, copy_layers*SZ);
+						new_tex, GL_TEXTURE_3D, 0, 0,0,0, VOXTEX_SIZE, VOXTEX_SIZE, copy_layers*SUBCHUNK_SIZE);
 				}
 			}
 
@@ -339,19 +247,24 @@ struct Raytracer {
 		}
 
 		void upload (uint32_t idx, T* data) {
-			int3 coord = subchunk_id_to_texcoords(idx);
+			int3 coord;
+			coord.x = ((idx >> (VOXTEX_SHIFT*0)) & VOXTEX_MASK) << SUBCHUNK_SHIFT;
+			coord.y = ((idx >> (VOXTEX_SHIFT*1)) & VOXTEX_MASK) << SUBCHUNK_SHIFT;
+			coord.z = ((idx >> (VOXTEX_SHIFT*2)) & VOXTEX_MASK) << SUBCHUNK_SHIFT;
 
 			glTexSubImage3D(GL_TEXTURE_3D, 0,
-				coord.x, coord.y, coord.z, SZ, SZ, SZ,
+				coord.x, coord.y, coord.z, SUBCHUNK_SIZE, SUBCHUNK_SIZE, SUBCHUNK_SIZE,
 				GL_RED_INTEGER, sizeof(T) == 2 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT, data);
 		}
 	};
 
-	SubchunksTexture						subchunks_tex;
+	SubchunksTexture			subchunks_tex;
 
-	VoxTexture<block_id, SUBCHUNK_SIZE>		voxels_tex = {"RT.voxels" };
+	VoxTexture<block_id>		voxels_tex = {"RT.voxels" };
 
-	ChunkOctrees							octree;
+	ChunkOctrees				octree;
+
+	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
 	struct FramebufferTex {
 		GLuint tex = 0;
@@ -564,8 +477,7 @@ struct Raytracer {
 		ImGui::TreePop();
 	}
 
-	Raytracer (Shaders& shaders) {
-
+	Raytracer (Shaders& shaders): octree(shaders) {
 		if (0) {
 			int3 count, size;
 

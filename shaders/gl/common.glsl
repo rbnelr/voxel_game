@@ -74,48 +74,6 @@ void dbg_draw_vector (vec3 pos, vec3 dir, vec4 col) {
 	}
 }
 
-//// Voxel world
-
-#if 1
-#define CHUNK_SIZE			64 // size of chunk in blocks per axis
-#define CHUNK_SIZE_SHIFT	6 // for pos >> CHUNK_SIZE_SHIFT
-#define CHUNK_SIZE_MASK		63
-#else
-#define CHUNK_SIZE			32 // size of chunk in blocks per axis
-#define CHUNK_SIZE_SHIFT	5 // for pos >> CHUNK_SIZE_SHIFT
-#define CHUNK_SIZE_MASK		31
-#endif
-
-#if 0
-#define SUBCHUNK_SIZE		4 // size of subchunk in blocks per axis
-#define SUBCHUNK_SHIFT		2
-#define SUBCHUNK_MASK		3
-#else
-#define SUBCHUNK_SIZE		8 // size of subchunk in blocks per axis
-#define SUBCHUNK_SHIFT		3
-#define SUBCHUNK_MASK		7
-#endif
-
-#define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
-
-#define SUBC_SPARSE_BIT 0x80000000u
-
-#define B_AIR 1
-#define B_WATER 3
-#define B_MAGMA 12
-#define B_CRYSTAL 15
-#define B_URANIUM 16
-#define B_LEAVES 18
-#define B_TORCH 19
-#define B_TALLGRASS 20
-
-float get_emmisive (uint bid) {
-	if (      bid == B_MAGMA   ) return 7.0;
-	else if ( bid == B_CRYSTAL ) return 10.0;
-	else if ( bid == B_URANIUM ) return 3.2;
-	return 0.0;
-}
-
 #define FIXEDPOINT_FAC (1.0 / 256.0)
 
 #define MERGE_INSTANCE_FACTOR 6
@@ -133,8 +91,6 @@ struct BlockTile {
 	int variants;
 };
 
-
-////
 layout(std140, binding = 0) uniform Common {
 	View view;
 };

@@ -438,10 +438,17 @@
     <None Include="..\..\..\shaders\gl\rt_lighting.glsl">
       <Filter>shaders\gl</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\..\..\shaders\gl\raytracing_util.txt">
+    <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl">
       <Filter>shaders\gl</Filter>
-    </Text>
+    </None>
+    <None Include="..\..\..\shaders\gl\fullscreen_triangle.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\gpu_voxels.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\rt_util.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>
