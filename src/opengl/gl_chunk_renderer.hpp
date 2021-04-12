@@ -14,47 +14,22 @@ struct ChunkRenderer {
 	static constexpr int SLICES_PER_ALLOC = 1024;
 	static constexpr size_t ALLOC_SIZE = SLICES_PER_ALLOC * CHUNK_SLICE_SIZE; // size of vram allocations
 
-	static constexpr size_t LIGHTING_VBO_SLICE_SIZE = CHUNK_SLICE_LENGTH * sizeof(float4);
-	static constexpr size_t LIGHTING_VBO_SIZE = SLICES_PER_ALLOC * LIGHTING_VBO_SLICE_SIZE;
-
 	enum DrawType { DT_OPAQUE=0, DT_TRANSPARENT=1 };
 
 	struct AllocBlock {
 		Vao vao;
 		Vbo vbo;
-		Vbo lighting_vbo;
 
 		AllocBlock () {
 			ZoneScopedC(tracy::Color::Crimson);
 			OGL_TRACE("AllocBlock()");
 
 			vbo = Vbo("ChunkRenderer.AllocBlock.vbo");
-
-			//vao = setup_vao<BlockMeshInstance>("ChunkRenderer.vao", vbo);
-			vao = { "ChunkRenderer.vao" };
-			glBindVertexArray(vao);
+			vao = setup_vao<BlockMeshInstance>("ChunkRenderer.vao", vbo);
 
 			//
 			glBindBuffer(GL_ARRAY_BUFFER, vbo);
 			glBufferData(GL_ARRAY_BUFFER, ALLOC_SIZE, nullptr, GL_STREAM_DRAW);
-
-			VertexAttributes a;
-			BlockMeshInstance::attributes(a);
-
-			//
-			lighting_vbo = Vbo("ChunkRenderer.AllocBlock.lighting_vbo");
-
-			glBindBuffer(GL_ARRAY_BUFFER, lighting_vbo);
-			glBufferData(GL_ARRAY_BUFFER, LIGHTING_VBO_SIZE, nullptr, GL_STREAM_DRAW);
-
-			int loc = 3;
-			glEnableVertexAttribArray(loc);
-			glVertexAttribPointer(loc, 4, GL_FLOAT, false, sizeof(float4), 0);
-			glVertexAttribDivisor(loc, 1);
-
-
-			glBindVertexArray(0);
-			glBindBuffer(GL_ARRAY_BUFFER, 0);
 		}
 
 		struct DrawList {
@@ -178,13 +153,12 @@ struct ChunkOctrees {
 };
 
 struct Raytracer {
-	SERIALIZE(Raytracer, enable, enable_rt_lighting, max_iterations, rand_seed_time,
+	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
 		sunlight_enable, sunlight_dist, sunlight_col,
 		bounces_enable, bounces_max_dist, bounces_max_count,
 		only_primary_rays, taa_alpha)
 
 	Shader* shad = nullptr;
-	Shader* shad_lighting = nullptr;
 
 	struct SubchunksTexture {
 		Texture3D	tex;
@@ -305,8 +279,7 @@ struct Raytracer {
 	FramebufferTex framebuffers[2];
 	int cur_frambuffer = 0;
 
-	float taa_alpha = 0.05;
-	float taa_alpha_rt_light = 0.01;
+	float taa_alpha = 0.05;\
 
 	float4x4 prev_world2clip;
 	bool init = true;
@@ -347,8 +320,6 @@ struct Raytracer {
 
 	float water_F0 = 0.05f;
 
-	//int   rays = 1;
-
 	bool  visualize_light = false;
 
 	bool  only_primary_rays = true;
@@ -366,17 +337,7 @@ struct Raytracer {
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
 	}
 
-	int lighting_workgroup_size = 64;
-	int lighting_samples = 16;
-	int lighting_update_r = 1;
-
-	std::vector<gl::MacroDefinition> get_lighting_macros () {
-		return { {"WORKGROUP_SIZE", prints("%d", lighting_workgroup_size)},
-			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"} };
-	}
-
 	bool enable = true;
-	bool enable_rt_lighting = true;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -387,7 +348,6 @@ struct Raytracer {
 		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
-		ImGui::SliderFloat("taa_alpha_rt_light", &taa_alpha_rt_light, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
@@ -442,21 +402,9 @@ struct Raytracer {
 			ImGui::TreePop();
 		}
 
-		ImGui::Checkbox("enable_rt_lighting", &enable_rt_lighting);
-
-		if (ImGui::TreeNodeEx("cached_lighting")) {
-			ImGui::SliderInt("lighting_samples", &lighting_samples, 1, 128);
-			ImGui::SliderInt("lighting_update_r", &lighting_update_r, 0, 5);
-			
-			ImGui::TreePop();
-		}
-
 		if (macro_change && shad) {
 			shad->macros = get_macros();
 			shad->recompile("macro_change", false);
-
-			shad_lighting->macros = get_lighting_macros();
-			shad_lighting->recompile("macro_change", false);
 		}
 
 		if (ImGui::Button("Dump asm")) {
@@ -532,9 +480,8 @@ struct Raytracer {
 
 	void upload_changes (OpenglRenderer& r, Game& game, Input& I);
 
-	void setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light);
+	void setup_shader (OpenglRenderer& r, Shader* shad);
 	void draw (OpenglRenderer& r, Game& game);
-	void compute_lighting (OpenglRenderer& r, Game& game);
 };
 
 

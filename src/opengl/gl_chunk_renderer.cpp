@@ -177,8 +177,7 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 
 	// lazy init these to allow json changes to affect the macros
 	if (!shad)			shad = r.shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
-	if (!shad_lighting)	shad_lighting = r.shaders.compile("rt_lighting", get_lighting_macros(), {{ COMPUTE_SHADER }});
-
+	
 	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
 
 	if (game.chunks.upload_voxels.empty())
@@ -326,10 +325,10 @@ void Raytracer::bind_voxel_textures (OpenglRenderer& r, Shader* shad) {
 	glUniform1i(shad->get_uniform_location("octree"), OpenglRenderer::OCTREE_TEX);
 }
 // setup common state for rt_util.glsl
-void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
+void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
 	glUseProgram(shad->prog);
 
-	shad->set_uniform("taa_alpha",          rt_light ? taa_alpha_rt_light : taa_alpha);
+	shad->set_uniform("taa_alpha",          taa_alpha);
 
 	shad->set_uniform("max_iterations",     max_iterations);
 	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
@@ -372,7 +371,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	if (!shad->prog) return;
 
-	setup_shader(r, shad, false);
+	setup_shader(r, shad);
 
 	//
 	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
@@ -410,79 +409,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	glBlitNamedFramebuffer(curr_img.fbo, r.framebuffer.fbo, 0,0,sz.x,sz.y, 0,0,sz.x,sz.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-}
-
-void Raytracer::compute_lighting (OpenglRenderer& r, Game& game) {
-	ZoneScoped;
-	OGL_TRACE("raytracer.compute_lighting");
-
-	if (!shad_lighting->prog) return;
-
-	setup_shader(r, shad_lighting, true);
-
-	size_t faces_computed = 0;
-
-	shad_lighting->set_uniform("_dbg_ray_pos", game.player.selected_block.hit.pos);
-
-	auto compute_slice = [&] (chunk_id cid, uint16_t alloci, uint16_t slicei, uint32_t vertex_count) {
-		if (vertex_count > 0) {
-			auto& alloc = r.chunk_renderer.allocs[alloci];
-
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, alloc.vbo, slicei * CHUNK_SLICE_SIZE, CHUNK_SLICE_SIZE);
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 5, alloc.lighting_vbo, slicei * ChunkRenderer::LIGHTING_VBO_SLICE_SIZE, ChunkRenderer::LIGHTING_VBO_SLICE_SIZE);
-
-			shad_lighting->set_uniform("vertex_count", vertex_count);
-			shad_lighting->set_uniform("update_debug_rays", update_debug_rays); // only draw for first slice
-
-			int dispatch_size = (vertex_count + (lighting_workgroup_size -1)) / lighting_workgroup_size;
-			glDispatchCompute(dispatch_size, 1, 1);
-
-			faces_computed += vertex_count;
-		}
-	};
-
-	auto compute_slices = [&] (chunk_id cid, uint32_t remain_count, slice_id slices) {
-		slice_id sliceid = slices;
-		while (sliceid != U16_NULL) {
-			uint16_t alloci = sliceid / (uint32_t)r.chunk_renderer.SLICES_PER_ALLOC;
-			uint16_t slicei = sliceid % (uint32_t)r.chunk_renderer.SLICES_PER_ALLOC;
-
-			uint32_t vertex_count = std::min(remain_count, (uint32_t)CHUNK_SLICE_LENGTH);
-
-			compute_slice(cid, alloci, slicei, vertex_count);
-
-			remain_count -= vertex_count;
-			sliceid = game.chunks.slices[sliceid].next;
-		}
-	};
-
-	int3 floored = floori(game.player.pos / CHUNK_SIZE);
-	int3 start = floored - lighting_update_r;
-	int3 end   = floored + lighting_update_r;
-
-	shad_lighting->set_uniform("samples", lighting_samples);
-
-	for (int z=start.z; z<=end.z; ++z)
-	for (int y=start.y; y<=end.y; ++y)
-	for (int x=start.x; x<=end.x; ++x) {
-		chunk_id cid = game.chunks.query_chunk(int3(x,y,z));
-
-		shad_lighting->set_uniform("chunk_pos", (float3)int3(x,y,z) * CHUNK_SIZE);
-
-		if (cid != U16_NULL && game.chunks[cid].flags != 0) {
-			auto& chunk = game.chunks[cid];
-
-			bool empty = chunk.opaque_mesh_vertex_count == 0 && chunk.transp_mesh_vertex_count == 0;
-			if (!empty) {
-				compute_slices(cid, chunk.opaque_mesh_vertex_count, chunk.opaque_mesh_slices);
-				compute_slices(cid, chunk.transp_mesh_vertex_count, chunk.transp_mesh_slices);
-			}
-		}
-	}
-
-	ImGui::Text("faces_computed: %d", faces_computed);
-
-	glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 }
 
 } // namespace gl
