@@ -102,7 +102,7 @@ vec3 hsv2rgb (vec3 c) {
 			return col;
 		}
 	#else
-		#define DIR vec2(0.0, 1.0)
+		#define DIR vec2(0.0, 0.5)
 		
 		vec3 fcutoff (vec3 col) {
 			return col;
@@ -116,12 +116,15 @@ vec3 hsv2rgb (vec3 c) {
 		vec3 col = fcutoff(texture(input_tex, vs_uv).rgb);
 		col *= texelFetch(gaussian_kernel, 0, 0).r;
 		
+		float sz = 1.0;
+		float lod = 2.0;
+		
 		for (int x=1; x <= radius; ++x) {
-			offs += 1;
+			offs += sz;
 			
 			float weight = texelFetch(gaussian_kernel, x, 0).r;
-			col += fcutoff(texture(input_tex, vs_uv + offs * DIR * stepsz).rgb) * weight;
-			col += fcutoff(texture(input_tex, vs_uv - offs * DIR * stepsz).rgb) * weight;
+			col += fcutoff(textureLod(input_tex, vs_uv + offs * DIR * stepsz, lod).rgb) * weight;
+			col += fcutoff(textureLod(input_tex, vs_uv - offs * DIR * stepsz, lod).rgb) * weight;
 		}
 		
 		frag_col = col;

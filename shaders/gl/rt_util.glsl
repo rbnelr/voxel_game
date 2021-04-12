@@ -90,7 +90,8 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 	// start at some level of octree
 	// best to start at 0 if camera on surface
 	// and best at higher levels if camera were in a large empty region
-	uint mip = 0;// uint(OCTREE_LAYERS-1);
+	//uint mip = 0;
+	uint mip = uint(OCTREE_MIPS-1);
 	coord &= -1 << mip;
 	
 	bvec3 axismask = bvec3(false);
@@ -107,11 +108,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 		
 		// flip coord back into original coordinate space
 		uvec3 flipped = uvec3(coord ^ flipmask);
-		
-		// handle both stepping out of 3d texture and reaching max ray distance
-		if ( !all(lessThan(flipped, uvec3(WORLD_SIZE))) || // TODO: this check could be avoided if the octree went up to 1x1x1, then it would be a step out up from max mip
-			 dist >= max_dist )
-			return false;
 		
 		// read octree cell
 		flipped >>= mip;
@@ -156,9 +152,12 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 			int stepcoord = axismask.x ? coord.x : coord.z;
 			stepcoord = axismask.y ? coord.y : stepcoord;
 			
-			mip = min(findLSB(uint(stepcoord)), uint(OCTREE_LAYERS-1));
+			mip = min(findLSB(uint(stepcoord)), uint(OCTREE_MIPS-1));
 			
 			coord &= -1 << mip;
+			
+			if (uint(stepcoord) >= uint(WORLD_SIZE) || dist >= max_dist)
+				return false;
 		}
 	}
 	

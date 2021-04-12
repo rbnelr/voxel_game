@@ -49,9 +49,9 @@ float get_emmisive (uint bid) {
 
 #define VOXTEX_TEX_SHIFT	(VOXTEX_SIZE_SHIFT - SUBCHUNK_SHIFT)
 
-#define SUBC_SPARSE_BIT 0x80000000u
+#define SUBC_SPARSE_BIT		0x80000000u
 
-#define OCTREE_LAYERS		10
+#define OCTREE_MIPS			(10 - 2) // -2 for to the upper octree level be 4^3 texels
 
 uniform usampler3D	voxels[2];
 uniform usampler3D	octree;

@@ -148,7 +148,16 @@ static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
 struct ChunkOctrees {
 	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE/2;
-	static constexpr int OCTREE_LAYERS = get_const_log2((uint32_t)TEX_WIDTH)+1;
+
+	static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
+
+	// let the upper octree level be 4^3 texels, since these level are rarely relevant
+	// this avoids compute workgroups which only have 1 active thread
+	static constexpr int OCTREE_MIPS = get_const_log2((uint32_t)TEX_WIDTH / 4)+1;
+
+	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
+	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
+	static constexpr int OCTREE_FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
 
 	Texture3D tex = {"RT.octree"};
 	Shader* octree_filter;
@@ -158,21 +167,12 @@ struct ChunkOctrees {
 		octree_filter      = shaders.compile("rt_octree_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
 		octree_filter_mip0 = shaders.compile("rt_octree_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
 
-		glTextureStorage3D(tex, OCTREE_LAYERS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureStorage3D(tex, OCTREE_MIPS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 
 		uint8_t val = 0;
-		for (int layer=0; layer<OCTREE_LAYERS; ++layer)
+		for (int layer=0; layer<OCTREE_MIPS; ++layer)
 			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
 	}
-
-	uint8_t temp_buffer[CHUNK_SIZE/2][CHUNK_SIZE/2][CHUNK_SIZE/2];
-
-	void rebuild_chunk (Chunks& chunks, chunk_id cid, int3 const& cpos);
-
-	static constexpr int OCTREE_FILTER_LOCAL_SIZE = 4;
-	// how many octree layers to filter per uploaded chunk (rest are done once per frame, instead of per chunk)
-	// only compute mips until size is == OCTREE_FILTER_LOCAL_SIZE, to not waste dispatches for workgroups with only 1 or 2 active threads
-	static constexpr int OCTREE_FILTER_CHUNK_LAYERS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / OCTREE_FILTER_LOCAL_SIZE))+1;
 
 	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
 };
