@@ -126,9 +126,7 @@ struct ChunkOctrees {
 
 	static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
 
-	// let the upper octree level be 4^3 texels, since these level are rarely relevant
-	// this avoids compute workgroups which only have 1 active thread
-	static constexpr int OCTREE_MIPS = get_const_log2((uint32_t)TEX_WIDTH / 4)+1;
+	static constexpr int OCTREE_MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
 
 	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads

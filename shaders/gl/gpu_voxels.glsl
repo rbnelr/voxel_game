@@ -51,7 +51,7 @@ float get_emmisive (uint bid) {
 
 #define SUBC_SPARSE_BIT		0x80000000u
 
-#define OCTREE_MIPS			(10 - 2) // -2 for to the upper octree level be 4^3 texels
+#define OCTREE_MIPS			10
 
 uniform usampler3D	voxels[2];
 uniform usampler3D	octree;

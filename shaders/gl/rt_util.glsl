@@ -73,6 +73,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 	// make ray relative to world texture
 	pos += WORLD_SIZE_HALF;
 	
+	
 	bvec3 ray_neg = lessThan(dir, vec3(0.0));
 	pos = mix(pos, WORLD_SIZEf - pos, ray_neg);
 	
@@ -152,12 +153,12 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 			int stepcoord = axismask.x ? coord.x : coord.z;
 			stepcoord = axismask.y ? coord.y : stepcoord;
 			
-			mip = min(findLSB(uint(stepcoord)), uint(OCTREE_MIPS-1));
+			mip = findLSB(uint(stepcoord));
+			
+			if (mip >= uint(OCTREE_MIPS) || dist >= max_dist)
+				return false;
 			
 			coord &= -1 << mip;
-			
-			if (uint(stepcoord) >= uint(WORLD_SIZE) || dist >= max_dist)
-				return false;
 		}
 	}
 	
