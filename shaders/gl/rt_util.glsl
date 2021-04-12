@@ -286,6 +286,23 @@ uniform float water_F0 = 0.6;
 const float water_IOR = 1.333;
 const float air_IOR = 1.0;
 
+uniform sampler2D water_normal;
+
+uniform float water_normal_time = 0.0; // wrap on some integer to avoid losing precision over time
+uniform float water_normal_scale = 0.1;
+uniform float water_normal_strength = 0.05;
+
+vec3 sample_water_normal (vec3 pos_world) {
+	vec2 uv1 = (pos_world.xy + water_normal_time * 0.2) * water_normal_scale;
+	vec2 uv2 = (pos_world.xy + -water_normal_time * 0.2) * water_normal_scale * 0.5;
+	uv2.xy = uv2.yx;
+	
+	vec2 a = texture(water_normal, uv1).rg * 2.0 - 1.0;
+	vec2 b = texture(water_normal, uv2).rg * 2.0 - 1.0;
+	//
+	return normalize(vec3((a+b) * water_normal_strength, 1.0));
+}
+
 bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected) {
 #if 0
 	for (int j=0; j<2; ++j) {
@@ -300,6 +317,9 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		
 		if (!water_surface)
 			return true;
+		
+		if (hit.normal.z > 0.0)
+			hit.normal = sample_water_normal(hit.pos);
 		
 		float reflect_fac = fresnel(-ray_dir, hit.normal, water_F0);
 		
@@ -332,9 +352,22 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 #if REFLECTIONS
 	if (did_hit && hit.bid == B_WATER) {
 		// reflect
-		ray_pos = hit.pos + hit.normal * 0.001;
-		ray_dir = reflect(ray_dir, hit.normal);
+		
+		vec3 normal_map = hit.normal;
+		
+		#ifndef RT_LIGHT
+		if (hit.normal.z > 0.0)
+			normal_map = sample_water_normal(hit.pos);
+		#endif
+		
+		ray_pos = hit.pos + normal_map * 0.001;
+		ray_dir = reflect(ray_dir, normal_map);
 		max_dist -= hit.dist;
+		
+		if (dot(ray_dir, hit.normal) < 0.0) {
+			hit.col = vec3(0,0,0); // can't reflect below water (normal_map vector was
+			return true;
+		}
 		
 		was_reflected = true;
 		return trace_ray(ray_pos, ray_dir, max_dist, hit, false);

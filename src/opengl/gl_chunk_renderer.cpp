@@ -352,10 +352,15 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad, bool rt_light) {
 	//shad->set_uniform("rays",               rays);
 	shad->set_uniform("visualize_light",    visualize_light);
 
-	shad->set_uniform("water_F0",           water_F0);
+	static float time = 0;
+	time += g_window.input.dt;
+	time = fmodf(time, 100.0f);
 
+	shad->set_uniform("water_F0",           water_F0);
+	shad->set_uniform("water_normal_time",  time);
 
 	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+	glUniform1i(shad->get_uniform_location("water_normal"), OpenglRenderer::WATER_NORMAL);
 	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::GRADIENT);
 
 	bind_voxel_textures(r, shad);
