@@ -58,47 +58,61 @@ vec2 calc_uv (vec3 pos_fract, bvec3 axismask, uint entry_face) {
 	return uv;
 }
 
-const float FLIPMASK = WORLD_SIZE-1;
 const float WORLD_SIZEf = float(WORLD_SIZE);
+const float INV_WORLD_SIZEf = 1.0 / float(WORLD_SIZE);
 const float WORLD_SIZE_HALF = WORLD_SIZEf * 0.5;
 
-#define RECONSTRUCT_RAY 0
+const uint SIGNEXP_MASK     = 0xff800000u;
+const uint MANTISSA_MASK    = 0x007fffffu;
 
-bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { // func state 8 regs
-	#if !RECONSTRUCT_RAY
-	vec3 oldpos = pos;
-	vec3 olddir = dir;
-	#endif
+const int MANTISSA_BITS = 23;
+const int MANTISSA_SHIFT = MANTISSA_BITS - OCTREE_MIPS;
+
+const uint ROUND_MASK = 0xffffffffu << MANTISSA_SHIFT;
+const uint FLOAT_OCTREE_SIZE = 1u << MANTISSA_SHIFT;
+
+#define TOUINT floatBitsToUint
+#define TOFLOAT uintBitsToFloat
+
+bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
+	// make ray relative to world texture and bring coordinates into [1.0, 2.0] float space
+	// for float mantissa optimization (avoid int -> float conversion for projection)
+	// basially treat float mantissa like integer for stepping but use the whole float for projection calculations
+	vec3 coord = pos + WORLD_SIZE_HALF;
+	coord = coord * INV_WORLD_SIZEf + 1.0; // to [1.0, 2.0]
+	coord = clamp(coord, 1.0, 2.0);
 	
-	// make ray relative to world texture
-	pos += WORLD_SIZE_HALF;
-	
-	
+	// flip coordinate space such that ray is always positive (simplifies stepping logic)
+	// keep track of flip via flipmask
 	bvec3 ray_neg = lessThan(dir, vec3(0.0));
-	pos = mix(pos, WORLD_SIZEf - pos, ray_neg);
+	coord = mix(coord, 3.0 - coord, ray_neg);
 	
-	ivec3 flipmask = mix(ivec3(0u), ivec3(FLIPMASK), ray_neg);
-	
-	// starting cell is where ray is
-	ivec3 coord = ivec3(floor(pos));
+	uvec3 flipmask = mix(uvec3(0u), uvec3(MANTISSA_MASK), ray_neg);
 	
 	// precompute part of plane projection equation
 	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
 	// due to mad instruction
-	dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
-	pos = dir * -pos;
+	// multiply in WORLD_SIZEf to make distances be in world space
+	vec3 inv_dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0))) * WORLD_SIZEf;
+	vec3 bias = inv_dir * -coord;
+	
+	// starting cell is where ray is
 	
 	// start at some level of octree
-	// best to start at 0 if camera on surface
-	// and best at higher levels if camera were in a large empty region
-	//uint mip = 0;
-	uint mip = uint(OCTREE_MIPS-1);
-	coord &= -1 << mip;
+	// -best to start at 0 if camera on surface
+	// -best at higher levels if camera were in a large empty region
+	uint mip = 0;
+	//uint mip = uint(OCTREE_MIPS-1);
+	
+	// round down to start cell of octree
+	coord = TOFLOAT(TOUINT(coord) & (ROUND_MASK << mip));
 	
 	bvec3 axismask = bvec3(false);
 	float dist = 0.0;
 	
-	for (;;) { // loop state 17 regs
+	int it = 0;
+	
+	for (;;) {
 	#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
@@ -107,11 +121,12 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 		#endif
 	#endif
 		
-		// flip coord back into original coordinate space
-		uvec3 flipped = uvec3(coord ^ flipmask);
+		// get current original coordinate space
+		int bits = OCTREE_MIPS - int(mip);
+		int offs = MANTISSA_BITS - bits;
+		uvec3 flipped = bitfieldExtract(TOUINT(coord) ^ flipmask, offs, bits);
 		
 		// read octree cell
-		flipped >>= mip;
 		uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
 		
 		//flipped &= 1u;
@@ -120,27 +135,27 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 		i = bitfieldInsert(i, flipped.y, 1, 1);
 		i = bitfieldInsert(i, flipped.z, 2, 1);
 		
-		if ((childmask & (1u << i)) != 0) { // loop temps ~6 regs
-			// non-air octree cell 
+		if ((childmask & (1u << i)) != 0) {
+			// non-air octree cell
 			if (mip == 0u)
 				break; // found solid leaf voxel
 			
 			// decend octree
 			mip--;
-			ivec3 next_coord = coord + (1 << mip);
+			vec3 next_coord = TOFLOAT(TOUINT(coord) + (FLOAT_OCTREE_SIZE << mip));
 			
 			// upate coord by determining which child octant is entered first
 			// by comparing ray hit against middle plane hits
-			vec3 tmidv = dir * vec3(next_coord) + pos;
+			vec3 tmidv = inv_dir * next_coord + bias;
 			
 			coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
 			
 		} else {
 			// air octree cell, continue stepping
-			ivec3 next_coord = coord + (1 << mip);
+			vec3 next_coord = TOFLOAT(TOUINT(coord) + (FLOAT_OCTREE_SIZE << mip));
 			
 			// calculate entry distances of next octree cell
-			vec3 t0v = dir * vec3(next_coord) + pos;
+			vec3 t0v = inv_dir * next_coord + bias;
 			dist = min(min(t0v.x, t0v.y), t0v.z);
 			
 			// step into next cell via relevant axis
@@ -150,32 +165,25 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) { 
 			
 			coord = mix(coord, next_coord, axismask);
 			
-			int stepcoord = axismask.x ? coord.x : coord.z;
-			stepcoord = axismask.y ? coord.y : stepcoord;
+			uint stepcoord = axismask.x ? TOUINT(coord.x) : TOUINT(coord.z);
+			stepcoord = axismask.y ? TOUINT(coord.y) : stepcoord;
 			
-			mip = findLSB(uint(stepcoord));
+			mip = findLSB(stepcoord >> MANTISSA_SHIFT);
+			
+			coord = TOFLOAT(TOUINT(coord) & (ROUND_MASK << mip));
 			
 			if (mip >= uint(OCTREE_MIPS) || dist >= max_dist)
 				return false;
-			
-			coord &= -1 << mip;
 		}
 	}
 	
-	#if RECONSTRUCT_RAY
-	pos = -(pos / dir);
-	pos = mix(WORLD_SIZEf - pos, pos, equal(flipmask, ivec3(0)));
-	pos -= WORLD_SIZE_HALF;
-	
-	dir = (1.0 / dir) * mix(vec3(-1), vec3(1), equal(flipmask, ivec3(0)));
-	#else
-	pos = oldpos;
-	dir = olddir;
-	#endif
-	
 	if (!sunray) {
+		int bits = OCTREE_MIPS - int(mip);
+		int offs = MANTISSA_BITS - bits;
+		uvec3 flipped = bitfieldExtract(TOUINT(coord) ^ flipmask, offs, bits);
+		
 		// arrived at solid leaf voxel, read block id from seperate data structure
-		hit.bid = read_bid(uvec3(coord ^ flipmask));
+		hit.bid = read_bid(flipped);
 		hit.prev_bid = 0; // don't know, could read
 		
 		// calcualte surface hit info
