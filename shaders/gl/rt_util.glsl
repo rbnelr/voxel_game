@@ -37,30 +37,8 @@ struct Hit {
 	vec3	emiss;
 };
 
-uint get_step_face (bvec3 axismask, vec3 ray_dir) {
-	if (axismask.x)      return ray_dir.x >= 0.0 ? 0 : 1;
-	else if (axismask.y) return ray_dir.y >= 0.0 ? 2 : 3;
-	else                 return ray_dir.z >= 0.0 ? 4 : 5;
-}
-vec2 calc_uv (vec3 pos_fract, bvec3 axismask, uint entry_face) {
-	vec2 uv;
-	if (axismask.x) {
-		uv = pos_fract.yz;
-	} else if (axismask.y) {
-		uv = pos_fract.xz;
-	} else {
-		uv = pos_fract.xy;
-	}
-
-	if (entry_face == 0u || entry_face == 3u)  uv.x = 1.0 - uv.x;
-	if (entry_face == 4u)                      uv.y = 1.0 - uv.y;
-
-	return uv;
-}
-
 const float WORLD_SIZEf = float(WORLD_SIZE);
 const float INV_WORLD_SIZEf = 1.0 / float(WORLD_SIZE);
-const float WORLD_SIZE_HALF = WORLD_SIZEf * 0.5;
 
 const uint SIGNEXP_MASK     = 0xff800000u;
 const uint MANTISSA_MASK    = 0x007fffffu;
@@ -69,7 +47,7 @@ const int MANTISSA_BITS = 23;
 const int MANTISSA_SHIFT = MANTISSA_BITS - OCTREE_MIPS;
 
 const uint ROUND_MASK = 0xffffffffu << MANTISSA_SHIFT;
-const uint FLOAT_OCTREE_SIZE = 1u << MANTISSA_SHIFT;
+const uint VOXEL_SIZE = 1u << MANTISSA_SHIFT;
 
 #define TOUINT floatBitsToUint
 #define TOFLOAT uintBitsToFloat
@@ -78,8 +56,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	// make ray relative to world texture and bring coordinates into [1.0, 2.0] float space
 	// for float mantissa optimization (avoid int -> float conversion for projection)
 	// basially treat float mantissa like integer for stepping but use the whole float for projection calculations
-	vec3 coord = pos + WORLD_SIZE_HALF;
-	coord = coord * INV_WORLD_SIZEf + 1.0; // to [1.0, 2.0]
+	vec3 coord = pos * INV_WORLD_SIZEf + 1.0; // to [1.0, 2.0]
 	coord = clamp(coord, 1.0, 2.0);
 	
 	// flip coordinate space such that ray is always positive (simplifies stepping logic)
@@ -107,33 +84,39 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	// round down to start cell of octree
 	coord = TOFLOAT(TOUINT(coord) & (ROUND_MASK << mip));
 	
-	bvec3 axismask = bvec3(false);
 	float dist = 0.0;
 	
-	int it = 0;
-	
 	for (;;) {
-	#if VISUALIZE_COST
+		#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
-			if (subgroupElect())
-				atomicAdd(warp_iter[gl_SubgroupID], 1u);
+		if (subgroupElect()) atomicAdd(warp_iter[gl_SubgroupID], 1u);
 		#endif
-	#endif
-		
+		#endif
+	
+		#if 1 // faster in my case
 		// get current original coordinate space
-		int bits = OCTREE_MIPS - int(mip);
-		int offs = MANTISSA_BITS - bits;
-		uvec3 flipped = bitfieldExtract(TOUINT(coord) ^ flipmask, offs, bits);
+		int bits = OCTREE_MIPS - int(mip); // 1 sub
+		int offs = (MANTISSA_BITS - OCTREE_MIPS) + int(mip); // 1 add
+		uvec3 flipped = bitfieldExtract(TOUINT(coord) ^ flipmask, offs, bits); // 3 xor 3 bfe
 		
 		// read octree cell
-		uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
+		uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r; // 3 rshft
 		
-		//flipped &= 1u;
-		//uint i = flipped.z*4u + (flipped.y*2u + flipped.x);
-		uint i = flipped.x & 1u;
-		i = bitfieldInsert(i, flipped.y, 1, 1);
-		i = bitfieldInsert(i, flipped.z, 2, 1);
+		uint i = flipped.x & 1u; // 1 and
+		i = bitfieldInsert(i, flipped.y, 1, 1); // 1 bfe
+		i = bitfieldInsert(i, flipped.z, 2, 1); // 1 bfe
+		#else
+		uvec3 flipped = TOUINT(coord) ^ flipmask; // 3 xors
+		
+		int bits = (OCTREE_MIPS-1) - int(mip); // 1 sub
+		int offs = (MANTISSA_BITS - OCTREE_MIPS) + int(mip); // 1 add
+		uvec3 texcoord = bitfieldExtract(flipped, offs + 1, bits); // 1 add + 3 BFE
+		uvec3 bitcoord = bitfieldExtract(flipped, offs, 1); // 3 BFE
+		
+		uint childmask = texelFetch(octree, ivec3(texcoord), int(mip)).r;
+		uint i = (bitcoord.z << 2) | ((bitcoord.y << 1) | bitcoord.x); // 2 mad or 2 LSHL_OR best case
+		#endif
 		
 		if ((childmask & (1u << i)) != 0) {
 			// non-air octree cell
@@ -142,7 +125,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			
 			// decend octree
 			mip--;
-			vec3 next_coord = TOFLOAT(TOUINT(coord) + (FLOAT_OCTREE_SIZE << mip));
+			vec3 next_coord = TOFLOAT(TOUINT(coord) + (VOXEL_SIZE << mip));
 			
 			// upate coord by determining which child octant is entered first
 			// by comparing ray hit against middle plane hits
@@ -152,13 +135,15 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			
 		} else {
 			// air octree cell, continue stepping
-			vec3 next_coord = TOFLOAT(TOUINT(coord) + (FLOAT_OCTREE_SIZE << mip));
+			vec3 next_coord = TOFLOAT(TOUINT(coord) + (VOXEL_SIZE << mip));
 			
 			// calculate entry distances of next octree cell
 			vec3 t0v = inv_dir * next_coord + bias;
 			dist = min(min(t0v.x, t0v.y), t0v.z);
 			
+			#if 0
 			// step into next cell via relevant axis
+			bvec3 axismask;
 			axismask.x = t0v.x == dist;
 			axismask.y = t0v.y == dist && !axismask.x;
 			axismask.z = !axismask.x && !axismask.y;
@@ -168,9 +153,24 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 			uint stepcoord = axismask.x ? TOUINT(coord.x) : TOUINT(coord.z);
 			stepcoord = axismask.y ? TOUINT(coord.y) : stepcoord;
 			
-			mip = findLSB(stepcoord >> MANTISSA_SHIFT);
+			mip = findLSB(stepcoord) - MANTISSA_SHIFT;
 			
 			coord = TOFLOAT(TOUINT(coord) & (ROUND_MASK << mip));
+			#else
+			float stepcoord;
+			if (t0v.x == dist) {
+				coord.x = next_coord.x;
+				stepcoord = coord.x;
+			} else if (t0v.y == dist) {
+				coord.y = next_coord.y;
+				stepcoord = coord.y;
+			} else {
+				coord.z = next_coord.z;
+				stepcoord = coord.z;
+			}
+			mip = findLSB(TOUINT(stepcoord)) - MANTISSA_SHIFT;
+			coord = TOFLOAT(TOUINT(coord) & (ROUND_MASK << mip));
+			#endif
 			
 			if (mip >= uint(OCTREE_MIPS) || dist >= max_dist)
 				return false;
@@ -179,7 +179,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	
 	if (!sunray) {
 		int bits = OCTREE_MIPS - int(mip);
-		int offs = MANTISSA_BITS - bits;
+		int offs = (MANTISSA_BITS - OCTREE_MIPS) + int(mip);
 		uvec3 flipped = bitfieldExtract(TOUINT(coord) ^ flipmask, offs, bits);
 		
 		// arrived at solid leaf voxel, read block id from seperate data structure
@@ -189,12 +189,37 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		// calcualte surface hit info
 		hit.dist = dist;
 		hit.pos = pos + dir * dist;
-		hit.normal = mix(vec3(0.0), -sign(dir), axismask);
 		
-		uint entry_face = get_step_face(axismask, dir);
-		vec2 uv = calc_uv(fract(hit.pos), axismask, entry_face);
+		vec2 uv;
+		int face;
+		{ // calc hit face, uv and normal
+			vec3 hit_fract = fract(hit.pos);
+			vec3 hit_center = vec3(flipped) + 0.5;
+			
+			vec3 offs = (hit.pos - hit_center);
+			vec3 abs_offs = abs(offs);
+			
+			hit.normal = vec3(0.0);
+			
+			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
+				hit.normal.x = sign(offs.x);
+				face = offs.x < 0.0 ? 0 : 1;
+				uv = hit_fract.yz;
+				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+			} else if (abs_offs.y >= abs_offs.z) {
+				hit.normal.y = sign(offs.y);
+				face = offs.y < 0.0 ? 2 : 3;
+				uv = hit_fract.xz;
+				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+			} else {
+				hit.normal.z = sign(offs.z);
+				face = offs.z < 0.0 ? 4 : 5;
+				uv = hit_fract.xy;
+				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+			}
+		}
 		
-		float texid = float(block_tiles[hit.bid].sides[entry_face]);
+		float texid = float(block_tiles[hit.bid].sides[face]);
 		
 		hit.col = texture(tile_textures, vec3(uv, texid)).rgb;
 		hit.emiss = hit.col * get_emmisive(hit.bid);

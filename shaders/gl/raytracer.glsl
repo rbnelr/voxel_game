@@ -39,6 +39,9 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	// ray starts on the near plane
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
 	
+	// make relative to gpu world representation (could bake into matrix)
+	ray_pos += float(WORLD_SIZE/2);
+	
 	return true;
 
 #else // 360 Sphere Projections
