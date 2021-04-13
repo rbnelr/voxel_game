@@ -435,9 +435,6 @@
     <None Include="..\..\..\shaders\gl\postprocess.glsl">
       <Filter>shaders\gl</Filter>
     </None>
-    <None Include="..\..\..\shaders\gl\rt_lighting.glsl">
-      <Filter>shaders\gl</Filter>
-    </None>
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl">
       <Filter>shaders\gl</Filter>
     </None>

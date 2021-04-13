@@ -437,7 +437,6 @@
     <None Include="..\..\..\shaders\gl\postprocess.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_lighting.glsl" />
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
   </ItemGroup>
