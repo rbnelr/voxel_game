@@ -268,13 +268,15 @@ public:
 		VOXELS_TEX,
 		OCTREE_TEX,
 		GRADIENT,
-		WATER_NORMAL,
+		WATER_N_A,
+		WATER_N_B,
 	};
 
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		gradient		= {"gradient"};
-	Texture2D		water_normal	= {"water_normal"};
+	Texture2D		water_N_A		= {"water_N_A"};
+	Texture2D		water_N_B		= {"water_N_B"};
 
 	bool			wireframe = false;
 	bool			wireframe_backfaces = true;

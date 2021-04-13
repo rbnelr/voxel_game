@@ -180,7 +180,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		
 		float texid = float(block_tiles[hit.bid].sides[face]);
 		
-		hit.col = texture(tile_textures, vec3(uv, texid)).rgb;
+		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
 		hit.emiss = hit.col * get_emmisive(hit.bid);
 	}
 	return true;
@@ -279,12 +279,93 @@ uniform float water_F0 = 0.6;
 const float water_IOR = 1.333;
 const float air_IOR = 1.0;
 
-uniform sampler2D water_normal;
+uniform sampler2D water_N_A;
+uniform sampler2D water_N_B;
 
 uniform float water_normal_time = 0.0; // wrap on some integer to avoid losing precision over time
 uniform float water_normal_scale = 0.1;
 uniform float water_normal_strength = 0.05;
 
+//// From: https://godotshaders.com/shader/realistic-water/
+
+// Wave settings:
+uniform float	wave_speed		 = 0.3; // Speed scale for the waves
+const float	wave_steep		 	= 0.12; // Speed scale for the waves
+uniform vec4	wave_a			 = vec4(1.0, 1.0, 0.35*wave_steep, 3.0); 	// xy = Direction, z = Steepness, w = Length
+uniform	vec4	wave_b			 = vec4(1.0, 0.6, 0.30*wave_steep, 1.55);	// xy = Direction, z = Steepness, w = Length
+uniform	vec4	wave_c			 = vec4(1.0, 1.3, 0.25*wave_steep, 0.9); 	// xy = Direction, z = Steepness, w = Length
+
+// Surface settings:
+uniform vec2 	sampler_scale 	 = vec2(0.25, 0.25); 			// Scale for the sampler
+uniform vec2	sampler_direction= vec2(0.05, 0.04); 			// Direction and speed for the sampler offset
+
+// Wave function:
+vec3 wave(vec4 parameter, vec2 position, float time, inout vec3 tangent, inout vec3 binormal)
+{
+	float	wave_steepness	 = parameter.z;
+	float	wave_length		 = parameter.w;
+
+	float	k				 = 2.0 * 3.14159265359 / wave_length;
+	float 	c 				 = sqrt(9.8 / k);
+	vec2	d				 = normalize(parameter.xy);
+	float 	f 				 = k * (dot(d, position) - c * time);
+	float 	a				 = wave_steepness / k;
+	
+			tangent			+= normalize(vec3(1.0-d.x * d.x * (wave_steepness * sin(f)),    -d.x * d.y * (wave_steepness * sin(f)), d.x * (wave_steepness * cos(f))));
+			binormal		+= normalize(vec3(   -d.x * d.y * (wave_steepness * sin(f)), 1.0-d.y * d.y * (wave_steepness * sin(f)), d.y * (wave_steepness * cos(f))));
+
+	return vec3(d.x * (a * cos(f)), d.y * (a * cos(f)), a * sin(f) * 0.25);
+}
+
+
+// Vertex shader:
+void water_shader (vec2 uv, float time, out vec3 normal, out vec3 vertex_pos) {
+	float	t				 = time * wave_speed;
+	
+			vertex_pos		= vec3(0,0,0);
+	vec3	vertex_position  = vec3(uv, 0.0);
+	
+	vec3	vertex_tangent 	 = vec3(0.0, 0.0, 0.0);
+	vec3	vertex_binormal  = vec3(0.0, 0.0, 0.0);
+	
+			vertex_pos		+= wave(wave_a, vertex_position.xy, t, vertex_tangent, vertex_binormal);
+			vertex_pos		+= wave(wave_b, vertex_position.xy, t, vertex_tangent, vertex_binormal);
+			vertex_pos		+= wave(wave_c, vertex_position.xy, t, vertex_tangent, vertex_binormal);
+	//
+	//		vertex_position  = vertex.xyz;
+	//
+	//		vertex_height	 = (PROJECTION_MATRIX * MODELVIEW_MATRIX * vertex).z;
+	//
+	
+	vec3	vertex_normal	 = normalize(cross(vertex_tangent, vertex_binormal));
+	//	
+	//		UV				 = vertex.xz * sampler_scale;
+	//
+	//		VERTEX			 = vertex.xyz;
+	//		
+	//		inv_mvp = inverse(PROJECTION_MATRIX * MODELVIEW_MATRIX);
+	
+	
+	// Calculation of the UV with the UV motion sampler
+	vec2	uv_offset 					 = sampler_direction * time;
+	//vec2 	uv_sampler_uv 				 = uv * uv_sampler_scale + uv_offset;
+	//vec2	uv_sampler_uv_offset 		 = uv_sampler_strength * texture(uv_sampler, uv_sampler_uv).rg * 2.0 - 1.0;
+	//vec2 	uv 							 = uv + uv_sampler_uv_offset;
+	
+	// Normalmap:
+	vec3 	normalmap					 = texture(water_N_A, uv - uv_offset*2.0).rgb * 0.75;		// 75 % sampler A
+			normalmap 					+= texture(water_N_B, uv + uv_offset).rgb * 0.25;			// 25 % sampler B
+	
+	// Refraction UV:
+	vec3	ref_normalmap				 = normalmap * 2.0 - 1.0;
+	ref_normalmap.xy *= 0.03;
+	ref_normalmap = normalize(ref_normalmap);
+	
+			ref_normalmap				 = normalize(vertex_tangent*ref_normalmap.x + vertex_binormal*ref_normalmap.y + vertex_normal*ref_normalmap.z);
+	normal = ref_normalmap;
+}
+
+#if 0
 vec3 sample_water_normal (vec3 pos_world) {
 	vec2 uv1 = (pos_world.xy + water_normal_time * 0.2) * water_normal_scale;
 	vec2 uv2 = (pos_world.xy + -water_normal_time * 0.2) * water_normal_scale * 0.5;
@@ -295,6 +376,7 @@ vec3 sample_water_normal (vec3 pos_world) {
 	//
 	return normalize(vec3((a+b) * water_normal_strength, 1.0));
 }
+#endif
 
 bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected) {
 #if 0
@@ -312,7 +394,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 			return true;
 		
 		if (hit.normal.z > 0.0)
-			hit.normal = sample_water_normal(hit.pos);
+			hit.normal = water_shader(hit.pos);
 		
 		float reflect_fac = fresnel(-ray_dir, hit.normal, water_F0);
 		
@@ -346,16 +428,20 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 	if (did_hit && hit.bid == B_WATER) {
 		// reflect
 		
+		vec3 vertex;
 		vec3 normal_map = hit.normal;
 		
-		#ifndef RT_LIGHT
-		if (hit.normal.z > 0.0)
-			normal_map = sample_water_normal(hit.pos);
-		#endif
+		if (hit.normal.z > 0.0) {
+			//normal_map = sample_water_normal(hit.pos);
+			water_shader(vec2(1,-1) * hit.pos.yx * 0.3, water_normal_time, normal_map, vertex);
+		}
 		
 		ray_pos = hit.pos + normal_map * 0.001;
 		ray_dir = reflect(ray_dir, normal_map);
 		max_dist -= hit.dist;
+		
+		//hit.col = normal_map;
+		//return true;
 		
 		if (dot(ray_dir, hit.normal) < 0.0) {
 			hit.col = vec3(0,0,0); // can't reflect below water (normal_map vector was

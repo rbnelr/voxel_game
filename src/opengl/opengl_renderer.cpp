@@ -75,9 +75,13 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		glBindTexture(GL_TEXTURE_2D, gradient);
 		glBindSampler(GRADIENT, normal_sampler);
 
-		glActiveTexture(GL_TEXTURE0+WATER_NORMAL);
-		glBindTexture(GL_TEXTURE_2D, water_normal);
-		glBindSampler(WATER_NORMAL, normal_sampler_wrap);
+		glActiveTexture(GL_TEXTURE0+WATER_N_A);
+		glBindTexture(GL_TEXTURE_2D, water_N_A);
+		glBindSampler(WATER_N_A, normal_sampler_wrap);
+
+		glActiveTexture(GL_TEXTURE0+WATER_N_B);
+		glBindTexture(GL_TEXTURE_2D, water_N_B);
+		glBindSampler(WATER_N_B, normal_sampler_wrap);
 	}
 
 	{
@@ -602,7 +606,8 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 		}
 	}
 
-	upload_normal_map(water_normal, "textures/water_normal.jpg");
+	upload_normal_map(water_N_A, "textures/Water_N_A.png");
+	upload_normal_map(water_N_B, "textures/Water_N_B.png");
 
 	// heat_gradient.png   rainbow_gradient.png   blue_red_gradient.png
 	upload_texture(gradient, "textures/blue_red_gradient.png");
