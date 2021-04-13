@@ -69,6 +69,9 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
 	ray_dir = (view.cam_to_world * vec4(dir_cam, 0)).xyz;
 	ray_pos = (view.cam_to_world * vec4(0,0,0,1)).xyz;
+	
+	// make relative to gpu world representation (could bake into matrix)
+	ray_pos += float(WORLD_SIZE/2);
 
 	return true;
 #endif
@@ -158,6 +161,8 @@ void main () {
 	}
 	
 	if (did_hit && !was_reflected) {
+		first_hit_pos -= float(WORLD_SIZE/2);
+		
 		vec4 prev_clip = prev_world2clip * vec4(first_hit_pos, 1.0);
 		prev_clip.xyz /= prev_clip.w;
 		

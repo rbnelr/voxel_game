@@ -80,13 +80,9 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		uvec3 flipped = (coord ^ flipmask) >> mip;
 		
 		// read octree cell
-		uint childmask = texelFetch(octree, ivec3(flipped >> 1u), int(mip)).r;
+		uint voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
 		
-		uint i = flipped.x & 1u;
-		i = bitfieldInsert(i, flipped.y, 1, 1);
-		i = bitfieldInsert(i, flipped.z, 2, 1);
-		
-		if ((childmask & (1u << i)) != 0) {
+		if (voxel != 0) {
 			// non-air octree cell
 			if (mip == 0u)
 				break; // found solid leaf voxel
@@ -387,7 +383,10 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 			return sunlight_col * cos;
 		#else
 		// point sun
-		vec3 offs = (sun_pos + (rand3()-0.5) * sun_pos_size) - pos;
+		
+		vec3 spos = sun_pos + float(WORLD_SIZE/2);
+		
+		vec3 offs = (spos + (rand3()-0.5) * sun_pos_size) - pos;
 		float dist = length(offs);
 		vec3 dir = normalize(offs);
 		

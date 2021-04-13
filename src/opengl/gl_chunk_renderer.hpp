@@ -122,7 +122,7 @@ static constexpr int GPU_WORLD_SIZE_CHUNKS = 16;
 static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
 struct ChunkOctrees {
-	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE/2;
+	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE;
 
 	static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
 

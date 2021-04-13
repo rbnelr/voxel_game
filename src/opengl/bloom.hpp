@@ -8,7 +8,7 @@ namespace gl {
 class OpenglRenderer;
 
 struct BloomRenderer {
-	SERIALIZE(BloomRenderer, enable, radius, cutoff, strength)
+	SERIALIZE(BloomRenderer, enable, radius, cutoff, strength, renderscale)
 
 	bool enable = true;
 

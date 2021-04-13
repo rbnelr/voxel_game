@@ -241,7 +241,7 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 		glUseProgram(octree_filter_mip0->prog);
 		r.raytracer.bind_voxel_textures(r, octree_filter_mip0);
 
-		int size = CHUNK_SIZE/2;
+		int size = CHUNK_SIZE;
 		octree_filter_mip0->set_uniform("size", (GLuint)size);
 
 		glBindImageTexture(4, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI);
@@ -251,7 +251,7 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 
 			memset(offsets, 0, sizeof(offsets));
 			for (int j=0; j<remain_count; ++j)
-				offsets[j] = chunks[i+j] * (CHUNK_SIZE/2);
+				offsets[j] = chunks[i+j] * CHUNK_SIZE;
 			glUniform3uiv(octree_filter_mip0->get_uniform_location("offsets[0]"), ARRLEN(offsets), (GLuint*)offsets);
 
 			int dispatch_size = (size + COMPUTE_FILTER_LOCAL_SIZE-1) / COMPUTE_FILTER_LOCAL_SIZE;
@@ -269,7 +269,7 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 
 	// filter only octree texels for each chunk (up to 4x4x4 work groups)
 	for (int layer=1; layer<OCTREE_FILTER_CHUNK_MIPS; ++layer) {
-		int size = (CHUNK_SIZE/2) >> layer;
+		int size = CHUNK_SIZE >> layer;
 		octree_filter->set_uniform("read_mip", layer-1);
 		octree_filter->set_uniform("size", (GLuint)size);
 
@@ -280,7 +280,7 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 
 			memset(offsets, 0, sizeof(offsets));
 			for (int j=0; j<remain_count; ++j)
-				offsets[j] = (chunks[i+j] * (CHUNK_SIZE/2)) >> layer;
+				offsets[j] = (chunks[i+j] * CHUNK_SIZE) >> layer;
 			glUniform3uiv(octree_filter->get_uniform_location("offsets[0]"), ARRLEN(offsets), (GLuint*)offsets);
 
 			int dispatch_size = (size + COMPUTE_FILTER_LOCAL_SIZE-1) / COMPUTE_FILTER_LOCAL_SIZE;

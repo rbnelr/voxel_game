@@ -3,7 +3,7 @@
 		"seed_str": "test2"
 	},
 	"chunks": {
-		"load_radius": 300.0,
+		"load_radius": 600.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-62.89997863769531,
-				19.100547790527344,
-				60.805484771728516
+				70.55068969726563,
+				99.05199432373047,
+				44.08424758911133
 			],
 			"rot_aer": [
-				-1.0208027362823486,
-				-0.046747710555791855,
+				2.200021982192993,
+				-0.07996711134910583,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,16 +29,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 29.547496795654297,
+		"base_speed": 11.196417808532715,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			57.074745178222656,
-			76.4320068359375,
-			27.000099182128906
+			57.57500076293945,
+			76.78199768066406,
+			26.000099182128906
 		],
 		"vel": [
 			0.0,
@@ -46,8 +46,8 @@
 			0.0
 		],
 		"rot_ae": [
-			2.731752634048462,
-			0.24417173862457275
+			2.729309320449829,
+			0.2368413507938385
 		],
 		"third_person": false
 	},
@@ -65,26 +65,27 @@
 		},
 		"raytracer": {
 			"enable": true,
-			"max_iterations": 172,
+			"max_iterations": 478,
 			"rand_seed_time": true,
-			"sunlight_enable": true,
+			"sunlight_enable": false,
 			"sunlight_dist": 90.0,
 			"sunlight_col": [
 				1.2739999294281006,
 				1.1960008144378662,
 				0.8449998497962952
 			],
-			"bounces_enable": false,
+			"bounces_enable": true,
 			"bounces_max_dist": 128.0,
-			"bounces_max_count": 4,
-			"only_primary_rays": true,
-			"taa_alpha": 0.04753600060939789
+			"bounces_max_count": 2,
+			"only_primary_rays": false,
+			"taa_alpha": 0.05000000074505806
 		},
 		"bloom_renderer": {
-			"enable": false,
-			"radius": 86,
-			"cutoff": 1.850000023841858,
-			"strength": 0.44999998807907104
+			"enable": true,
+			"radius": 16,
+			"cutoff": 1.399999976158142,
+			"strength": 0.20000000298023224,
+			"renderscale": 0.25
 		},
 		"line_width": 4.135000228881836,
 		"debug_draw": {
