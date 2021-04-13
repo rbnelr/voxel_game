@@ -154,7 +154,7 @@ struct Raytracer {
 	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
 		sunlight_enable, sunlight_dist, sunlight_col,
 		bounces_enable, bounces_max_dist, bounces_max_count,
-		only_primary_rays, taa_alpha)
+		only_primary_rays, taa_alpha, taa_enable)
 
 	Shader* shad = nullptr;
 
@@ -277,7 +277,8 @@ struct Raytracer {
 	FramebufferTex framebuffers[2];
 	int cur_frambuffer = 0;
 
-	float taa_alpha = 0.05;\
+	bool taa_enable = true;
+	float taa_alpha = 0.05;
 
 	float4x4 prev_world2clip;
 	bool init = true;
@@ -330,6 +331,7 @@ struct Raytracer {
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
 			     {"ONLY_PRIMARY_RAYS", only_primary_rays ? "1":"0"},
 			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
+			     {"TAA_ENABLE", taa_enable ? "1":"0"},
 			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
 			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
@@ -345,25 +347,27 @@ struct Raytracer {
 		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
 		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
 
+		bool macro_change = false;
+
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SameLine();
+		macro_change |= ImGui::Checkbox("TAA", &taa_enable);
 
 		ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 		ImGui::Checkbox("rand_seed_time", &rand_seed_time);
 
-		bool macro_change = false;
-
-		macro_change = ImGui::Checkbox("visualize_cost", &visualize_cost) || macro_change;
+		macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 		ImGui::SameLine();
-		macro_change = ImGui::Checkbox("warp_iterations", &visualize_warp_iterations) || macro_change;
+		macro_change |= ImGui::Checkbox("warp_iterations", &visualize_warp_iterations);
 		ImGui::SameLine();
-		macro_change = ImGui::Checkbox("warp_reads", &visualize_warp_reads) || macro_change;
+		macro_change |= ImGui::Checkbox("warp_reads", &visualize_warp_reads);
 
 		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad) {
 			macro_change = true;
 			compute_local_size = _im_sizes[_im_selection];
 		}
 
-		macro_change = ImGui::Checkbox("only_primary_rays", &only_primary_rays) || macro_change;
+		macro_change |= ImGui::Checkbox("only_primary_rays", &only_primary_rays);
 
 		ImGui::Separator();
 
@@ -380,7 +384,7 @@ struct Raytracer {
 			ImGui::SliderAngle("sunlight_ang.y", &sunlight_ang.y, -90, +90);
 			ImGui::DragFloat("sun_dir_rand", &sun_dir_rand, 0.001f, 0, 0.5f, "%f", ImGuiSliderFlags_Logarithmic);
 
-			macro_change = ImGui::Checkbox("sunlight_mode", &sunlight_mode) || macro_change;
+			macro_change |= ImGui::Checkbox("sunlight_mode", &sunlight_mode);
 
 			ImGui::Spacing();
 

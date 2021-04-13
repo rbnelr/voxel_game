@@ -819,33 +819,64 @@ struct StateManager {
 
 	void set_default () {
 		state = PipelineState();
+		state = _override(state);
 
-		auto o = _override(state);
-
-		gl_enable(GL_DEPTH_TEST, o.depth_test);
+		gl_enable(GL_DEPTH_TEST, state.depth_test);
 		// use_reverse_depth
-		glDepthFunc(map_depth_func(o.depth_func));
+		glDepthFunc(map_depth_func(state.depth_func));
 		glClearDepth(0.0f);
 		glDepthRange(0.0f, 1.0f);
-		glDepthMask(o.depth_write ? GL_TRUE : GL_FALSE);
+		glDepthMask(state.depth_write ? GL_TRUE : GL_FALSE);
 
-		gl_enable(GL_SCISSOR_TEST, o.scissor_test);
+		gl_enable(GL_SCISSOR_TEST, state.scissor_test);
 
 		// culling
-		gl_enable(GL_CULL_FACE, o.culling);
-		glCullFace(o.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
+		gl_enable(GL_CULL_FACE, state.culling);
+		glCullFace(state.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
 		glFrontFace(GL_CCW);
 		// blending
-		gl_enable(GL_BLEND, o.blend_enable);
-		glBlendEquation(o.blend_func.equation);
-		glBlendFunc(o.blend_func.sfactor, state.blend_func.dfactor);
+		gl_enable(GL_BLEND, state.blend_enable);
+		glBlendEquation(state.blend_func.equation);
+		glBlendFunc(state.blend_func.sfactor, state.blend_func.dfactor);
 
-		glPolygonMode(GL_FRONT_AND_BACK, o.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
+		glPolygonMode(GL_FRONT_AND_BACK, state.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
 	}
 
 	// set opengl drawing state to a set of values, where only changes are applied
 	// no overrides to not break fullscreen quads etc.
 	void set_no_override (PipelineState const& s) {
+	#ifndef NBEBUG
+		{
+			assert(state.depth_test == !!glIsEnabled(GL_DEPTH_TEST));
+			GLint depth_func;		glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
+			assert(map_depth_func(state.depth_func) == depth_func);
+			GLint depth_write;		glGetIntegerv(GL_DEPTH_WRITEMASK, &depth_write);
+			assert(state.depth_write == !!depth_write);
+
+			assert(state.scissor_test == !!glIsEnabled(GL_SCISSOR_TEST));
+
+			bool culling = !!glIsEnabled(GL_CULL_FACE);
+			assert(state.culling == culling);
+			GLint cull_face;		glGetIntegerv(GL_CULL_FACE_MODE, &cull_face);
+			assert((state.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK) == cull_face);
+
+			assert(state.blend_enable == !!glIsEnabled(GL_BLEND));
+			GLint blend_eq;		glGetIntegerv(GL_BLEND_EQUATION, &blend_eq);
+			assert(state.blend_func.equation == blend_eq);
+			GLint blend_rgbs, blend_rgbd, blend_as, blend_ad;
+			glGetIntegerv(GL_BLEND_SRC_RGB, &blend_rgbs);
+			glGetIntegerv(GL_BLEND_DST_RGB, &blend_rgbd);
+			glGetIntegerv(GL_BLEND_SRC_ALPHA, &blend_as);
+			glGetIntegerv(GL_BLEND_DST_ALPHA, &blend_ad);
+			assert(state.blend_func.sfactor == blend_rgbs && state.blend_func.sfactor == blend_as);
+			assert(state.blend_func.dfactor == blend_rgbd && state.blend_func.dfactor == blend_ad);
+
+			GLint poly_mode;		glGetIntegerv(GL_POLYGON_MODE, &poly_mode);
+			assert((state.poly_mode == POLY_FILL ? GL_FILL : GL_LINE) == poly_mode);
+		}
+	#endif
+
+
 		if (state.depth_test != s.depth_test)
 			gl_enable(GL_DEPTH_TEST, s.depth_test);
 		if (state.depth_func != s.depth_func)
@@ -858,8 +889,8 @@ struct StateManager {
 
 		if (state.culling != s.culling)
 			gl_enable(GL_CULL_FACE, s.culling);
-		if (state.culling != s.culling)
-			glCullFace(s.culling == CULL_FRONT ? GL_FRONT : GL_BACK);
+		if (state.cull_face != s.cull_face)
+			glCullFace(s.cull_face == CULL_FRONT ? GL_FRONT : GL_BACK);
 
 		// blending
 		if (state.blend_enable != s.blend_enable)

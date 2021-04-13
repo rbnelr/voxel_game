@@ -13,10 +13,13 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 #include "rt_util.glsl"
 
 layout(rgba16f, binding = 4) writeonly restrict uniform image2D img;
-uniform sampler2D prev_framebuffer;
 
+#if TAA_ENABLE
+uniform sampler2D prev_framebuffer;
 uniform mat4 prev_world2clip;
 uniform float taa_alpha = 0.05;
+#endif
+
 uniform uint rand_frame_index = 0;
 
 // get pixel ray in world space based on pixel coord and matricies
@@ -160,6 +163,7 @@ void main () {
 		}
 	}
 	
+#if TAA_ENABLE
 	if (did_hit && !was_reflected) {
 		first_hit_pos -= float(WORLD_SIZE/2);
 		
@@ -179,6 +183,8 @@ void main () {
 		
 		hit_id = first_hit_bid;
 	}
+#endif
+	
 #endif
 
 #if VISUALIZE_COST
