@@ -258,20 +258,7 @@ public:
 
 	IndexedBuffer				mesh_data = indexed_buffer<GenericVertex>("mesh_data");
 	std::vector<GenericSubmesh>	item_meshes;
-
-	enum TextureUnit : GLint {
-		TILE_TEXTURES=0,
-		GUI_ATLAS=1,
-
-		PREV_FRAMEBUFFER=2,
-		SUBCHUNKS_TEX,
-		VOXELS_TEX,
-		OCTREE_TEX,
-		GRADIENT,
-		WATER_N_A,
-		WATER_N_B,
-	};
-
+	
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		gradient		= {"gradient"};

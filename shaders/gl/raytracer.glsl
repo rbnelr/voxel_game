@@ -117,17 +117,13 @@ void main () {
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	float max_dist = INF;
 	
-	vec3 first_hit_pos;
-	uint first_hit_bid;
-	bool was_reflected = false;
-	
 	vec3 col = vec3(0.0);
 	
 	Hit hit;
-	bool did_hit = bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected);
-	if (did_hit) {
-		first_hit_pos = hit.pos;
-		first_hit_bid = hit.bid;
+	bool was_reflected = false;
+	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected)) {
+		vec3 first_hit_pos = hit.pos;
+		uint first_hit_bid = hit.bid;
 		
 		ray_pos = hit.pos + hit.normal * 0.001;
 		
@@ -161,29 +157,29 @@ void main () {
 				contrib *= hit.col;
 			}
 		}
-	}
-	
-#if TAA_ENABLE
-	if (did_hit && !was_reflected) {
-		first_hit_pos -= float(WORLD_SIZE/2);
 		
-		vec4 prev_clip = prev_world2clip * vec4(first_hit_pos, 1.0);
-		prev_clip.xyz /= prev_clip.w;
-		
-		vec2 uv = prev_clip.xy * 0.5 + 0.5;
-		if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
-			vec4 prev_val = texture(prev_framebuffer, uv);
+	#if TAA_ENABLE
+		if (!was_reflected) {
+			first_hit_pos -= float(WORLD_SIZE/2);
 			
-			vec3 prev_col = prev_val.rgb;
-			uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
+			vec4 prev_clip = prev_world2clip * vec4(first_hit_pos, 1.0);
+			prev_clip.xyz /= prev_clip.w;
 			
-			if (prev_bid == first_hit_bid)
-				col = mix(prev_col, col, vec3(taa_alpha));
+			vec2 uv = prev_clip.xy * 0.5 + 0.5;
+			if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
+				vec4 prev_val = texture(prev_framebuffer, uv);
+				
+				vec3 prev_col = prev_val.rgb;
+				uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
+				
+				if (prev_bid == first_hit_bid)
+					col = mix(prev_col, col, vec3(taa_alpha));
+			}
+			
+			hit_id = first_hit_bid;
 		}
-		
-		hit_id = first_hit_bid;
+	#endif
 	}
-#endif
 	
 #endif
 

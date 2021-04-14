@@ -103,9 +103,11 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		if (!shader) return;
 
 		glUseProgram(shader->prog);
-		r.state.set(state);
 
-		glUniform1i(shader->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+		r.state.set(state);
+		r.state.bind_textures(shader, {
+			{"tile_textures", r.tile_textures, r.tile_sampler}
+		});
 
 		{
 			auto& block = game.player.selected_block;
@@ -239,7 +241,10 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 	{ // layer 0, generate binary octree from voxel data in voxel textures
 
 		glUseProgram(octree_filter_mip0->prog);
-		r.raytracer.bind_voxel_textures(r, octree_filter_mip0);
+		r.state.bind_textures(octree_filter_mip0, {
+			{"subchunks_tex", r.raytracer.subchunks_tex.tex},
+			{"voxels_tex", r.raytracer.voxels_tex.tex},
+		});
 
 		int size = CHUNK_SIZE;
 		octree_filter_mip0->set_uniform("size", (GLuint)size);
@@ -263,9 +268,9 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 
 	glUseProgram(octree_filter->prog);
 
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::OCTREE_TEX);
-	glBindTexture(GL_TEXTURE_3D, tex);
-	glUniform1i(octree_filter->get_uniform_location("octree"), OpenglRenderer::OCTREE_TEX);
+	r.state.bind_textures(octree_filter, {
+		{"octree", tex}
+	});
 
 	// filter only octree texels for each chunk (up to 4x4x4 work groups)
 	for (int layer=1; layer<OCTREE_FILTER_CHUNK_MIPS; ++layer) {
@@ -308,24 +313,12 @@ void ChunkOctrees::recompute_mips (OpenglRenderer& r, std::vector<int3> const& c
 	}
 }
 
-void Raytracer::bind_voxel_textures (OpenglRenderer& r, Shader* shad) {
-	// no samplers because these need to be texelFetch'ed anyway
+void Raytracer::draw (OpenglRenderer& r, Game& game) {
+	ZoneScoped;
+	OGL_TRACE("raytracer.draw");
 
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::SUBCHUNKS_TEX);
-	glBindTexture(GL_TEXTURE_3D, subchunks_tex.tex);
-
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::VOXELS_TEX);
-	glBindTexture(GL_TEXTURE_3D, voxels_tex.tex);
-
-	GLint tex_units[2] = { OpenglRenderer::SUBCHUNKS_TEX, OpenglRenderer::VOXELS_TEX };
-	glUniform1iv(shad->get_uniform_location("voxels[0]"), 2, tex_units);
-
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::OCTREE_TEX);
-	glBindTexture(GL_TEXTURE_3D, octree.tex);
-	glUniform1i(shad->get_uniform_location("octree"), OpenglRenderer::OCTREE_TEX);
-}
-// setup common state for rt_util.glsl
-void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
+	if (!shad->prog) return;
+	
 	glUseProgram(shad->prog);
 
 	shad->set_uniform("taa_alpha",          taa_alpha);
@@ -358,34 +351,23 @@ void Raytracer::setup_shader (OpenglRenderer& r, Shader* shad) {
 	shad->set_uniform("water_F0",           water_F0);
 	shad->set_uniform("water_normal_time",  time);
 
-	glUniform1i(shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
-	glUniform1i(shad->get_uniform_location("water_N_A"), OpenglRenderer::WATER_N_A);
-	glUniform1i(shad->get_uniform_location("water_N_B"), OpenglRenderer::WATER_N_B);
-	glUniform1i(shad->get_uniform_location("heat_gradient"), OpenglRenderer::GRADIENT);
-
-	bind_voxel_textures(r, shad);
-}
-
-void Raytracer::draw (OpenglRenderer& r, Game& game) {
-	ZoneScoped;
-	OGL_TRACE("raytracer.draw");
-
-	if (!shad->prog) return;
-
-	setup_shader(r, shad);
-
-	//
 	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
 	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
-
-	glActiveTexture(GL_TEXTURE0 +OpenglRenderer::PREV_FRAMEBUFFER);
-	curr_img.resize(r.framebuffer.size, cur_frambuffer);
-
 	cur_frambuffer ^= 1;
 
-	glBindTexture(GL_TEXTURE_2D, prev_img.tex);
-	glBindSampler(OpenglRenderer::PREV_FRAMEBUFFER, r.normal_sampler);
-	glUniform1i(shad->get_uniform_location("prev_framebuffer"), OpenglRenderer::PREV_FRAMEBUFFER);
+	curr_img.resize(r.framebuffer.size, cur_frambuffer);
+
+	r.state.bind_textures(shad, {
+		{"subchunks_tex", subchunks_tex.tex},
+		{"voxels_tex", voxels_tex.tex},
+		{"octree", octree.tex},
+
+		{"prev_framebuffer", {GL_TEXTURE_2D, prev_img.tex}, r.post_sampler},
+
+		{"tile_textures", r.tile_textures, r.tile_sampler},
+		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
+		{"water_N_B", r.water_N_B, r.normal_sampler_wrap},
+	});
 
 	glBindImageTexture(4, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	

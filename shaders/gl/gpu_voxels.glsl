@@ -53,7 +53,8 @@ float get_emmisive (uint bid) {
 
 #define OCTREE_MIPS			11
 
-uniform usampler3D	voxels[2];
+uniform usampler3D	subchunks_tex;
+uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
 
 uint read_bid (uvec3 coord) {
@@ -61,7 +62,7 @@ uint read_bid (uvec3 coord) {
 		return 0;
 	
 	uvec3 texcoord = bitfieldExtract(coord, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & ~SUBCHUNK_MASK) >> SUBCHUNK_SHIFT;
-	uint subchunk = texelFetch(voxels[0], ivec3(texcoord), 0).r;
+	uint subchunk = texelFetch(subchunks_tex, ivec3(texcoord), 0).r;
 	
 	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
 		return subchunk & ~SUBC_SPARSE_BIT;
@@ -76,6 +77,6 @@ uint read_bid (uvec3 coord) {
 		
 		texcoord = bitfieldInsert(coord, subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
 		
-		return texelFetch(voxels[1], ivec3(texcoord), 0).r;
+		return texelFetch(voxels_tex, ivec3(texcoord), 0).r;
 	}
 }

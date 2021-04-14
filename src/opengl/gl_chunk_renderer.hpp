@@ -245,6 +245,8 @@ struct Raytracer {
 
 		void resize (int2 new_size, int idx) {
 			if (tex == 0 || size != new_size) {
+				glActiveTexture(GL_TEXTURE0);
+
 				if (tex) { // delete old
 					glDeleteTextures(1, &tex);
 					glDeleteFramebuffers(1, &fbo);
@@ -482,7 +484,6 @@ struct Raytracer {
 
 	void upload_changes (OpenglRenderer& r, Game& game, Input& I);
 
-	void setup_shader (OpenglRenderer& r, Shader* shad);
 	void draw (OpenglRenderer& r, Game& game);
 };
 

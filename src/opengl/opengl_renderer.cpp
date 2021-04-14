@@ -66,22 +66,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, debug_draw.indirect_lines.vbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_meshes_ssbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, block_tiles_ssbo);
-
-		glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
-		glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
-		glBindSampler(TILE_TEXTURES, tile_sampler);
-
-		glActiveTexture(GL_TEXTURE0+GRADIENT);
-		glBindTexture(GL_TEXTURE_2D, gradient);
-		glBindSampler(GRADIENT, normal_sampler);
-
-		glActiveTexture(GL_TEXTURE0+WATER_N_A);
-		glBindTexture(GL_TEXTURE_2D, water_N_A);
-		glBindSampler(WATER_N_A, normal_sampler_wrap);
-
-		glActiveTexture(GL_TEXTURE0+WATER_N_B);
-		glBindTexture(GL_TEXTURE_2D, water_N_B);
-		glBindSampler(WATER_N_B, normal_sampler_wrap);
 	}
 
 	{
@@ -126,6 +110,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		
 		{
 			OGL_TRACE("generate framebuffer mips");
+			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, framebuffer.color);
 			glGenerateMipmap(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -156,14 +141,10 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			s.depth_write = false;
 			state.set_no_override(s);
 
-			GLuint textures[] = { framebuffer.color, bloom_renderer.passes[1].color };
-			const char* textures_uniforms[] = { "main_color", "bloom" };
-			for (int i=0; i<ARRLEN(textures); ++i) {
-				glActiveTexture(GL_TEXTURE0 + i);
-				glBindTexture(GL_TEXTURE_2D, textures[i]);
-				glBindSampler(i, post_sampler);
-				glUniform1i(post_shad->get_uniform_location(textures_uniforms[i]), i);
-			}
+			state.bind_textures(post_shad, {
+				{"main_color", {GL_TEXTURE_2D, framebuffer.color}, post_sampler},
+				{"bloom",      {GL_TEXTURE_2D, bloom_renderer.passes[1].color}, post_sampler},
+			});
 
 			post_shad->set_uniform("enable_bloom", bloom_renderer.enable);
 			post_shad->set_uniform("exposure", bloom_renderer.exposure);
@@ -174,16 +155,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	{
 		OGL_TRACE("ui draws");
-
-		{
-			glActiveTexture(GL_TEXTURE0+TILE_TEXTURES);
-			glBindTexture(GL_TEXTURE_2D_ARRAY, tile_textures);
-			glBindSampler(TILE_TEXTURES, tile_sampler);
-
-			glActiveTexture(GL_TEXTURE0+GUI_ATLAS);
-			glBindTexture(GL_TEXTURE_2D, gui_atlas);
-			glBindSampler(GUI_ATLAS, gui_renderer.gui_sampler);
-		}
 
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
 
@@ -234,6 +205,7 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	r.state.set(s);
 
 	glUseProgram(shad->prog);
+	r.state.bind_textures(shad, {});
 
 	shad->set_uniform("block_pos", (float3)block.hit.pos);
 	shad->set_uniform("model_to_clip", face_rotation[0]);
@@ -396,8 +368,10 @@ void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
 		r.state.set(s);
 		glUseProgram(gui_shad->prog);
 
-		glUniform1i(gui_shad->get_uniform_location("tex"), OpenglRenderer::GUI_ATLAS);
-		glUniform1i(gui_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+		r.state.bind_textures(gui_shad, {
+			{"tex", r.gui_atlas, gui_sampler},
+			{"tile_textures", r.tile_textures, r.tile_sampler},
+		});
 
 		glDrawElements(GL_TRIANGLES, (GLsizei)gui_index_data.size(), GL_UNSIGNED_SHORT, (void*)0);
 	}
@@ -426,7 +400,9 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 		if (item.is_block()) {
 			glUseProgram(held_block_shad->prog);
 
-			glUniform1i(held_block_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+			r.state.bind_textures(held_block_shad, {
+				{"tile_textures", r.tile_textures, r.tile_sampler}
+			});
 
 			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.block_mat));
 
@@ -465,8 +441,10 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			glDrawArrays(GL_TRIANGLES, 0, count*6);
 		} else {
 			glUseProgram(held_item_shad->prog);
-		
-			glUniform1i(held_item_shad->get_uniform_location("tile_textures"), OpenglRenderer::TILE_TEXTURES);
+			
+			r.state.bind_textures(held_item_shad, {
+				{"tile_textures", r.tile_textures, r.tile_sampler}
+			});
 
 			auto id = (item_id)item.id;
 
@@ -506,6 +484,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	
 				r.state.set(s);
 				glUseProgram(shad_lines->prog);
+				r.state.bind_textures(shad_lines, {});
 	
 				glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
 			}
@@ -514,6 +493,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	
 				r.state.set(s_occluded);
 				glUseProgram(shad_lines_occluded->prog);
+				r.state.bind_textures(shad_lines_occluded, {});
 	
 				shad_lines_occluded->set_uniform("occluded_alpha", occluded_alpha);
 	
@@ -530,6 +510,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 		r.state.set(s);
 		glUseProgram(shad_lines->prog);
+		r.state.bind_textures(shad_lines, {});
 
 		glDrawArraysIndirect(GL_LINES, (void*)0);
 
@@ -545,6 +526,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		if (g_debugdraw.tris.size() > 0) {
 			r.state.set(s);
 			glUseProgram(shad_tris->prog);
+			r.state.bind_textures(shad_tris, {});
 	
 			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)g_debugdraw.tris.size());
 		}
@@ -559,6 +541,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		if (g_debugdraw.wire_cubes.size() > 0) {
 			r.state.set(s);
 			glUseProgram(shad_wire_cube->prog);
+			r.state.bind_textures(shad_wire_cube, {});
 	
 			glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_indices), GL_UNSIGNED_SHORT,
 				(void*)0, (GLsizei)g_debugdraw.wire_cubes.size());

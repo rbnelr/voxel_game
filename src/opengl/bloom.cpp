@@ -23,6 +23,11 @@ namespace gl {
 
 			glUseProgram(p.shad->prog);
 
+			r.state.bind_textures(p.shad, {
+				{"input_tex", {GL_TEXTURE_2D, input_tex}, r.bloom_sampler},
+				{"gaussian_kernel", gaussian.kernel_tex},
+			});
+
 			p.shad->set_uniform("exposure", exposure);
 
 			p.shad->set_uniform("stepsz", 1.0f / (float2)size);
@@ -31,16 +36,6 @@ namespace gl {
 			p.shad->set_uniform("strength", strength);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, p.fbo);
-
-			glActiveTexture(GL_TEXTURE0);
-			glUniform1i(p.shad->get_uniform_location("input_tex"), 0);
-			glBindSampler(0, r.bloom_sampler);
-			glBindTexture(GL_TEXTURE_2D, input_tex);
-
-			glActiveTexture(GL_TEXTURE1);
-			//glBindSampler(1, r.post_sampler);
-			glBindTexture(GL_TEXTURE_1D, gaussian.kernel_tex);
-			glUniform1i(p.shad->get_uniform_location("gaussian_kernel"), 1);
 			
 			glDrawArrays(GL_TRIANGLES, 0, 3); // full screen triangle
 
