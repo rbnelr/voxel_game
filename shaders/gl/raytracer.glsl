@@ -111,7 +111,7 @@ void main () {
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	Hit hit;
-	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, false))
+	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, RAYT_PRIMARY))
 		col = hit.col;
 #else
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
@@ -130,14 +130,46 @@ void main () {
 	
 	Hit hit;
 	bool was_reflected = false;
-	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected)) {
+	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected, RAYT_PRIMARY)) {
 		ray_pos = hit.pos + hit.normal * 0.001;
 		
 		surf_light = collect_sunlight(ray_pos, hit.normal);
 		
+		#if 0 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
+			vec3 cur_pos = ray_pos;
+			vec3 cur_normal = hit.normal;
+			vec3 contrib = vec3(1.0);
+			
+			ray_dir = normalize(reflect(ray_dir, cur_normal) + random_in_sphere()*0.2);
+			
+			for (int j=0; j<bounces_max_count-1; ++j) {
+				bool was_reflected2;
+				Hit hit2;
+				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit2, was_reflected2, RAYT_SPECULAR))
+					break;
+				
+				cur_pos = hit2.pos + hit2.normal * 0.001;
+				max_dist -= hit2.dist;
+				
+				cur_normal = hit2.normal;
+				
+				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+				
+				vec3 light2 = collect_sunlight(cur_pos, cur_normal);
+				
+				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
+				contrib *= hit2.col;
+			}
+		}
+		#endif
+		
+		if (bounces_enable) {
+			max_dist = bounces_max_dist;
+			
+			vec3 cur_pos = ray_pos;
 			vec3 cur_normal = hit.normal;
 			vec3 contrib = vec3(1.0);
 			
@@ -146,15 +178,15 @@ void main () {
 				
 				bool was_reflected2;
 				Hit hit2;
-				if (!trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit2, was_reflected2))
+				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit2, was_reflected2, RAYT_DIFFUSE))
 					break;
 				
-				ray_pos = hit2.pos + hit2.normal * 0.001;
+				cur_pos = hit2.pos + hit2.normal * 0.001;
 				max_dist -= hit2.dist;
 				
 				cur_normal = hit2.normal;
 				
-				vec3 light2 = collect_sunlight(ray_pos, cur_normal);
+				vec3 light2 = collect_sunlight(cur_pos, cur_normal);
 				
 				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
 				contrib *= hit2.col;

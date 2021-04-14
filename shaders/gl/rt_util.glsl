@@ -18,10 +18,24 @@ uniform sampler2D		heat_gradient;
 	#endif
 #endif
 
-#define DEBUG_RAYS 0
+#define RAYT_PRIMARY		0
+#define RAYT_REFLECT		1
+#define RAYT_DIFFUSE		2
+#define RAYT_SPECULAR		3
+#define RAYT_SUN			4
+
+#define DEBUG_RAYS 1
 #if DEBUG_RAYS
 bool _dbg_ray = false;
 uniform bool update_debug_rays = false;
+
+vec4 _dbg_ray_cols[] = {
+	vec4(1,0,1,1),
+	vec4(0,0,1,1),
+	vec4(1,0,0,1),
+	vec4(0,1,0,1),
+	vec4(1,1,0,1),
+};
 #endif
 
 #define REFLECTIONS 1
@@ -40,7 +54,7 @@ const float WORLD_SIZEf = float(WORLD_SIZE);
 const uint ROUNDMASK = -1;
 const uint FLIPMASK = WORLD_SIZE-1;
 
-bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
+bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 	//coord = clamp(coord, 0.0, WORLD_SIZEf);
 	
 	// flip coordinate space such that ray is always positive (simplifies stepping logic)
@@ -138,10 +152,10 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 	}
 	
 	#if DEBUG_RAYS
-	if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, vec4(1,0,0,1));
+	if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
 	#endif
 	
-	if (!sunray) {
+	if (type < RAYT_SUN) {
 		coord ^= flipmask; // flip back to real coords
 		
 		// arrived at solid leaf voxel, read block id from seperate data structure
@@ -245,6 +259,16 @@ vec3 hemisphere_sample_stratified (int i, int n) {
 	// turning uniform distribution into cosine weighted distribution
 	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
 	return dir;
+}
+
+vec3 random_in_sphere () {
+	vec3 rnd = rand3();
+    float theta = rnd.x * 2.0 * PI;
+    float phi = acos(2.0 * rnd.y - 1.0);
+    float r = pow(rnd.z, 0.33333333);
+    float sp = sin(phi);
+    float cp = cos(phi);
+    return r * vec3(sp * sin(theta), sp * cos(theta), cp);
 }
 
 // TODO: could optimize this to be precalculated for all normals, since we currently only have 6
@@ -366,7 +390,7 @@ vec3 sample_water_normal (vec3 pos_world) {
 }
 #endif
 
-bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected) {
+bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected, int type) {
 #if 0
 	for (int j=0; j<2; ++j) {
 		if (!trace_ray(ray_pos, ray_dir, max_dist, hit))
@@ -410,7 +434,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 	
 	return false;
 #else
-	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, hit, false);
+	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, hit, type);
 
 #if REFLECTIONS
 	if (did_hit && hit.bid == B_WATER) {
@@ -437,7 +461,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hi
 		}
 		
 		was_reflected = true;
-		return trace_ray(ray_pos, ray_dir, max_dist, hit, false);
+		return trace_ray(ray_pos, ray_dir, max_dist, hit, RAYT_REFLECT);
 	}
 #endif
 	was_reflected = false;
@@ -453,7 +477,7 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 		float cos = dot(dir, normal);
 		
 		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, sunlight_dist, hit, true))
+		if (cos > 0.0 && !trace_ray(pos, dir, sunlight_dist, hit, RAYT_SUN))
 			return sunlight_col * cos;
 		#else
 		// point sun
@@ -470,7 +494,7 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 		float max_dist = dist - sun_pos_size*0.5;
 		
 		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, max_dist, hit, true))
+		if (cos > 0.0 && !trace_ray(pos, dir, max_dist, hit, RAYT_SUN))
 			return sunlight_col * (cos * atten);
 		#endif
 	}
