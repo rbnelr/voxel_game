@@ -238,47 +238,52 @@ struct Raytracer {
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
-	struct FramebufferTex {
-		GLuint tex = 0;
-		GLuint fbo;
+	struct TAAFramebuffer {
+		GLuint color = 0;
+		//GLuint fbo;
 		int2   size;
 
-		void resize (int2 new_size, int idx) {
-			if (tex == 0 || size != new_size) {
+		void resize (int2 new_size, int idx, bool clear=false) {
+			if (color == 0 || size != new_size) {
 				glActiveTexture(GL_TEXTURE0);
 
-				if (tex) { // delete old
-					glDeleteTextures(1, &tex);
-					glDeleteFramebuffers(1, &fbo);
+				if (color) { // delete old
+					glDeleteTextures(1, &color);
+					glDeleteFramebuffers(1, &color);
 				}
 
 				size = new_size;
 
 				// create new (textures created with glTexStorage2D cannot be resized)
-				glGenTextures(1, &tex);
+				glGenTextures(1, &color);
 
-				glBindTexture(GL_TEXTURE_2D, tex);
+				glBindTexture(GL_TEXTURE_2D, color);
 				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, size.x, size.y);
-				glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 				glBindTexture(GL_TEXTURE_2D, 0);
 
-				glGenFramebuffers(1, &fbo);
-				glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+				//glGenFramebuffers(1, &fbo);
+				//glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+				//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+				//
+				OGL_DBG_LABEL(GL_TEXTURE    , color, prints("RT.color%d", idx).c_str());
+				//OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, prints("RT.fbo%d", idx).c_str());
 
-				OGL_DBG_LABEL(GL_TEXTURE    , tex, prints("Raytracer.framebuffers[%d].tex", idx).c_str());
-				OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, prints("Raytracer.framebuffers[%d].fbo", idx).c_str());
+				//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				//if (status != GL_FRAMEBUFFER_COMPLETE) {
+				//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+				//}
+				//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-				GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-				if (status != GL_FRAMEBUFFER_COMPLETE) {
-					fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+				if (clear) {
+					lrgba col = lrgba(0,0,0,0);
+					glClearTexImage(color, 0, GL_RGBA, GL_FLOAT, &col.x); 
 				}
-				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			}
 		}
 	};
-	FramebufferTex framebuffers[2];
+	TAAFramebuffer framebuffers[2];
 	int cur_frambuffer = 0;
 
 	bool taa_enable = true;

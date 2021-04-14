@@ -32,7 +32,6 @@ struct Hit {
 	vec3	normal;
 	float	dist;
 	uint	bid;
-	uint	prev_bid;
 	vec3	col;
 	vec3	emiss;
 };
@@ -143,7 +142,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		
 		// arrived at solid leaf voxel, read block id from seperate data structure
 		hit.bid = read_bid(coord);
-		hit.prev_bid = 0; // don't know, could read
 		
 		// calcualte surface hit info
 		hit.dist = dist;

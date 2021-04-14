@@ -351,34 +351,31 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("water_F0",           water_F0);
 	shad->set_uniform("water_normal_time",  time);
 
-	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
-	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
+	TAAFramebuffer& prev_img = framebuffers[cur_frambuffer ^ 1];
+	TAAFramebuffer& curr_img = framebuffers[cur_frambuffer];
 
-	if (prev_img.tex == 0) {
-		// init prev_img for first frame, to avoid reading invalid texture
-		prev_img.resize(r.framebuffer.size, cur_frambuffer ^ 1);
-		
-		lrgba col = lrgba(0,0,0,0);
-		glClearTexImage(prev_img.tex, 0, GL_RGBA, GL_FLOAT, &col.x); 
+	if (taa_enable) {
+		if (prev_img.color == 0) // init prev_img for first frame, to avoid reading invalid texture
+			prev_img.resize(r.framebuffer.size, cur_frambuffer ^ 1, true);
+		curr_img.resize(r.framebuffer.size, cur_frambuffer);
+
+		cur_frambuffer ^= 1;
 	}
-	curr_img.resize(r.framebuffer.size, cur_frambuffer);
-
-	cur_frambuffer ^= 1;
-
 	r.state.bind_textures(shad, {
 		{"subchunks_tex", subchunks_tex.tex},
 		{"voxels_tex", voxels_tex.tex},
 		{"octree", octree.tex},
 
-		{"prev_framebuffer", {GL_TEXTURE_2D, prev_img.tex}, r.post_sampler},
+		(taa_enable ? StateManager::TextureBind{"taa_prev_color", {GL_TEXTURE_2D, prev_img.color}, r.post_sampler} : StateManager::TextureBind{}),
 
 		{"tile_textures", r.tile_textures, r.tile_sampler},
 		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
 		{"water_N_B", r.water_N_B, r.normal_sampler_wrap},
 	});
 
-	glBindImageTexture(4, curr_img.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-	
+	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	if (taa_enable)
+		glBindImageTexture(5, curr_img.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 	int2 dispatch_size;
 	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
@@ -395,9 +392,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	init = false;
 
 	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-
-	int2 sz = r.framebuffer.size;
-	glBlitNamedFramebuffer(curr_img.fbo, r.framebuffer.fbo, 0,0,sz.x,sz.y, 0,0,sz.x,sz.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
