@@ -1114,7 +1114,7 @@ struct StateManager {
 	// set opengl drawing state to a set of values, where only changes are applied
 	// no overrides to not break fullscreen quads etc.
 	void set_no_override (PipelineState const& s) {
-	#ifndef NBEBUG
+	#if DEBUGLEVEL >= 3
 		{
 			assert(state.depth_test == !!glIsEnabled(GL_DEPTH_TEST));
 			GLint depth_func;		glGetIntegerv(GL_DEPTH_FUNC, &depth_func);

@@ -81,9 +81,10 @@ namespace gl {
 		//OpenglRenderer* r = (OpenglRenderer*)userParam;
 
 		//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;
-		if (source == GL_DEBUG_SOURCE_APPLICATION_ARB)
+		if (source == GL_DEBUG_SOURCE_APPLICATION_ARB) {
+			//printf("%.*s\n", length, message); // message is not null terminated, pass explicit length
 			return; // OGL_TRACE is only for organizing drawcalls in nsight, not to spam the console
-
+		}
 					// hiding irrelevant infos/warnings
 		switch (id) {
 			case 131185: // Buffer detailed info
@@ -130,7 +131,7 @@ namespace gl {
 		}
 
 		clog(severity == GL_DEBUG_SEVERITY_HIGH_ARB ? ERROR : WARNING,
-			"[OpenGL] debug message: severity: %s src: %s type: %s id: %d  %s\n", severity_str, src_str, type_str, id, message);
+			"[OpenGL] debug message: severity: %s src: %s type: %s id: %d  %.*s\n", severity_str, src_str, type_str, id, length, message); // message is not null terminated, pass explicit length
 
 	#if RENDERER_DEBUG_OUTPUT_BREAKPOINT
 		if (severity == GL_DEBUG_SEVERITY_HIGH_ARB)

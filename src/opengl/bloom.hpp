@@ -54,8 +54,8 @@ struct BloomRenderer {
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_1D, kernel_tex);
 			glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, (GLsizei)weights.size(), 0, GL_RED, GL_FLOAT, weights.data());
-			glTextureParameteri(kernel_tex, GL_TEXTURE_BASE_LEVEL, 0);
-			glTextureParameteri(kernel_tex, GL_TEXTURE_MAX_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_BASE_LEVEL, 0);
+			glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
 			glBindTexture(GL_TEXTURE_1D, 0);
 		}
 	};

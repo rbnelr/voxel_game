@@ -353,9 +353,17 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	FramebufferTex& prev_img = framebuffers[cur_frambuffer ^ 1];
 	FramebufferTex& curr_img = framebuffers[cur_frambuffer];
-	cur_frambuffer ^= 1;
 
+	if (prev_img.tex == 0) {
+		// init prev_img for first frame, to avoid reading invalid texture
+		prev_img.resize(r.framebuffer.size, cur_frambuffer ^ 1);
+		
+		lrgba col = lrgba(0,0,0,0);
+		glClearTexImage(prev_img.tex, 0, GL_RGBA, GL_FLOAT, &col.x); 
+	}
 	curr_img.resize(r.framebuffer.size, cur_frambuffer);
+
+	cur_frambuffer ^= 1;
 
 	r.state.bind_textures(shad, {
 		{"subchunks_tex", subchunks_tex.tex},

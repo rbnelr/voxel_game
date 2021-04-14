@@ -259,6 +259,8 @@ struct Raytracer {
 
 				glBindTexture(GL_TEXTURE_2D, tex);
 				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, size.x, size.y);
+				glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
 				glBindTexture(GL_TEXTURE_2D, 0);
 
 				glGenFramebuffers(1, &fbo);
