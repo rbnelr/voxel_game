@@ -66,12 +66,12 @@
 		//	col = mix(col, vec3(1.0), vec3(f));
 		//}
 		
-		vec3 hsv = rgb2hsv(col);
+		//vec3 hsv = rgb2hsv(col);
 		//hsv.z = hsv.z / (hsv.z + 1.0);
 		
 		//hsv.z = haarm_peter_duiker(hsv.z);
 		
-		col = hsv2rgb(hsv);
+		//col = hsv2rgb(hsv);
 		
 		frag_col = col;
 	}

@@ -238,53 +238,81 @@ struct Raytracer {
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
-	struct TAAFramebuffer {
-		GLuint color = 0;
-		//GLuint fbo;
-		int2   size;
+	struct TAAHistory {
+		GLuint colors[2] = {};
+		GLuint posage[2] = {};
+		int2   size = 0;
+		int    cur = 0;
 
-		void resize (int2 new_size, int idx, bool clear=false) {
-			if (color == 0 || size != new_size) {
+		Sampler sampler = {"sampler"};
+		Sampler sampler_int = {"sampler_int"};
+
+		TAAHistory () {
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+
+		void resize (int2 new_size) {
+			if (colors[0] == 0 || size != new_size) {
 				glActiveTexture(GL_TEXTURE0);
 
-				if (color) { // delete old
-					glDeleteTextures(1, &color);
-					glDeleteFramebuffers(1, &color);
+				if (colors[0]) { // delete old
+					glDeleteTextures(2, colors);
+					glDeleteTextures(2, posage);
 				}
 
 				size = new_size;
 
 				// create new (textures created with glTexStorage2D cannot be resized)
-				glGenTextures(1, &color);
+				glGenTextures(2, colors);
+				glGenTextures(2, posage);
 
-				glBindTexture(GL_TEXTURE_2D, color);
+				glBindTexture(GL_TEXTURE_2D, colors[0]);
 				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, size.x, size.y);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glBindTexture(GL_TEXTURE_2D, colors[1]);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA16F, size.x, size.y);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glBindTexture(GL_TEXTURE_2D, posage[0]);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG16UI, size.x, size.y);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glBindTexture(GL_TEXTURE_2D, posage[1]);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RG16UI, size.x, size.y);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+				OGL_DBG_LABEL(GL_TEXTURE, colors[0],    "RT.taa_color0");
+				OGL_DBG_LABEL(GL_TEXTURE, colors[1],    "RT.taa_color1");
+				OGL_DBG_LABEL(GL_TEXTURE, posage[0], "RT.taa_posage0");
+				OGL_DBG_LABEL(GL_TEXTURE, posage[1], "RT.taa_posage1");
+
+				// clear textures to be read on first frame
+				float3 col = float3(0,0,0);
+				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
+
+				uint16_t pos[2] = { 0xffffu, 0 };
+				glClearTexImage(posage[0], 0, GL_RG, GL_UNSIGNED_SHORT, pos); // Invalid??
+
+				cur = 1;
+
 				glBindTexture(GL_TEXTURE_2D, 0);
-
-				//glGenFramebuffers(1, &fbo);
-				//glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-				//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
-				//
-				OGL_DBG_LABEL(GL_TEXTURE    , color, prints("RT.color%d", idx).c_str());
-				//OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, prints("RT.fbo%d", idx).c_str());
-
-				//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-				//if (status != GL_FRAMEBUFFER_COMPLETE) {
-				//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
-				//}
-				//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-				if (clear) {
-					lrgba col = lrgba(0,0,0,0);
-					glClearTexImage(color, 0, GL_RGBA, GL_FLOAT, &col.x); 
-				}
 			}
 		}
 	};
-	TAAFramebuffer framebuffers[2];
-	int cur_frambuffer = 0;
+	TAAHistory history;
 
 	bool taa_enable = true;
 	float taa_alpha = 0.05;

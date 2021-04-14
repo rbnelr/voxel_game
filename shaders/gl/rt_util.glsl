@@ -137,6 +137,10 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, bool sunray) {
 		}
 	}
 	
+	#if DEBUG_RAYS
+	if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, vec4(1,0,0,1));
+	#endif
+	
 	if (!sunray) {
 		coord ^= flipmask; // flip back to real coords
 		
@@ -329,33 +333,19 @@ void water_shader (vec2 uv, float time, out vec3 normal, out vec3 vertex_pos) {
 			vertex_pos		+= wave(wave_a, vertex_position.xy, t, vertex_tangent, vertex_binormal);
 			vertex_pos		+= wave(wave_b, vertex_position.xy, t, vertex_tangent, vertex_binormal);
 			vertex_pos		+= wave(wave_c, vertex_position.xy, t, vertex_tangent, vertex_binormal);
-	//
-	//		vertex_position  = vertex.xyz;
-	//
-	//		vertex_height	 = (PROJECTION_MATRIX * MODELVIEW_MATRIX * vertex).z;
-	//
 	
 	vec3	vertex_normal	 = normalize(cross(vertex_tangent, vertex_binormal));
-	//	
-	//		UV				 = vertex.xz * sampler_scale;
-	//
-	//		VERTEX			 = vertex.xyz;
-	//		
-	//		inv_mvp = inverse(PROJECTION_MATRIX * MODELVIEW_MATRIX);
 	
 	
-	// Calculation of the UV with the UV motion sampler
 	vec2	uv_offset 					 = sampler_direction * time;
-	//vec2 	uv_sampler_uv 				 = uv * uv_sampler_scale + uv_offset;
-	//vec2	uv_sampler_uv_offset 		 = uv_sampler_strength * texture(uv_sampler, uv_sampler_uv).rg * 2.0 - 1.0;
-	//vec2 	uv 							 = uv + uv_sampler_uv_offset;
 	
 	// Normalmap:
-	vec3 	normalmap					 = texture(water_N_A, uv - uv_offset*2.0).rgb * 0.75;		// 75 % sampler A
-			normalmap 					+= texture(water_N_B, uv + uv_offset).rgb * 0.25;			// 25 % sampler B
+	vec3 	normalmap					 = texture(water_N_A, uv * 0.7 - uv_offset*2.0).rgb * 0.75;		// 75 % sampler A
+			normalmap 					+= texture(water_N_B, uv * 0.5 + uv_offset).rgb * 0.25;			// 25 % sampler B
 	
 	// Refraction UV:
 	vec3	ref_normalmap				 = normalmap * 2.0 - 1.0;
+	//ref_normalmap.xy *= 0.03;
 	ref_normalmap.xy *= 0.03;
 	ref_normalmap = normalize(ref_normalmap);
 	

@@ -35,7 +35,7 @@
 
 float get_emmisive (uint bid) {
 	if (      bid == B_MAGMA   ) return 7.0;
-	else if ( bid == B_CRYSTAL ) return 10.0;
+	else if ( bid == B_CRYSTAL ) return 6.0;
 	else if ( bid == B_URANIUM ) return 3.2;
 	return 0.0;
 }

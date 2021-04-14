@@ -346,36 +346,42 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	static float time = 0;
 	time += g_window.input.dt;
-	time = fmodf(time, 100.0f);
+	//time = fmodf(time, 100.0f); // shader can't handle modded value, should be possible with correctly chosen values everywhere
 
 	shad->set_uniform("water_F0",           water_F0);
 	shad->set_uniform("water_normal_time",  time);
 
-	TAAFramebuffer& prev_img = framebuffers[cur_frambuffer ^ 1];
-	TAAFramebuffer& curr_img = framebuffers[cur_frambuffer];
+	if (taa_enable)
+		history.resize(r.framebuffer.size);
 
-	if (taa_enable) {
-		if (prev_img.color == 0) // init prev_img for first frame, to avoid reading invalid texture
-			prev_img.resize(r.framebuffer.size, cur_frambuffer ^ 1, true);
-		curr_img.resize(r.framebuffer.size, cur_frambuffer);
+	GLuint prev_color  = history.colors[history.cur ^ 1];
+	GLuint cur_color   = history.colors[history.cur];
+	GLuint prev_posage = history.posage[history.cur ^ 1];
+	GLuint cur_posage  = history.posage[history.cur];
 
-		cur_frambuffer ^= 1;
-	}
+	if (taa_enable)
+		history.cur ^= 1;
+	
 	r.state.bind_textures(shad, {
 		{"subchunks_tex", subchunks_tex.tex},
 		{"voxels_tex", voxels_tex.tex},
 		{"octree", octree.tex},
 
-		(taa_enable ? StateManager::TextureBind{"taa_prev_color", {GL_TEXTURE_2D, prev_img.color}, r.post_sampler} : StateManager::TextureBind{}),
-
 		{"tile_textures", r.tile_textures, r.tile_sampler},
 		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
 		{"water_N_B", r.water_N_B, r.normal_sampler_wrap},
+
+		(taa_enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, history.sampler} : StateManager::TextureBind{}),
+		(taa_enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, history.sampler_int} : StateManager::TextureBind{}),
+		
+		{"heat_gradient", r.gradient, r.normal_sampler},
 	});
 
 	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-	if (taa_enable)
-		glBindImageTexture(5, curr_img.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	if (taa_enable) {
+		glBindImageTexture(5, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(6, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
+	}
 
 	int2 dispatch_size;
 	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;

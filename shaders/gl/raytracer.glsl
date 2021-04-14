@@ -16,8 +16,11 @@ layout(rgba16f, binding = 4) writeonly restrict uniform image2D output_color;
 
 #if TAA_ENABLE
 layout(rgba16f, binding = 5) writeonly restrict uniform image2D taa_color;
+layout(r16ui  , binding = 6) writeonly restrict uniform uimage2D taa_posage;
 
-uniform sampler2D taa_prev_color;
+uniform  sampler2D taa_history_color;
+uniform usampler2D taa_history_posage;
+
 uniform mat4 prev_world2clip;
 uniform float taa_alpha = 0.05;
 #endif
@@ -93,22 +96,23 @@ void main () {
 	
 	uvec2 pxpos = gl_GlobalInvocationID.xy;
 	
-	// maybe try not to do rays that we do not see (happens due to local group size)
-	if (pxpos.x >= uint(view.viewport_size.x) || pxpos.y >= uint(view.viewport_size.y))
-		return;
+	//// maybe try not to do rays that we do not see (happens due to local group size)
+	//if (pxpos.x >= uint(view.viewport_size.x) || pxpos.y >= uint(view.viewport_size.y))
+	//	return;
 	
 #if DEBUG_RAYS
 	_dbg_ray = update_debug_rays && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 	if (_dbg_ray) line_drawer_init();
 #endif
 	
+	vec3 col = vec3(0.0);
 #if ONLY_PRIMARY_RAYS
 	vec3 ray_pos, ray_dir;
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	Hit hit;
-	bool did_hit = bray && trace_ray(ray_pos, ray_dir, INF, hit, false);
-	vec3 col = did_hit ? hit.col : vec3(0.0);
+	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, false))
+		col = hit.col;
 #else
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
 	
@@ -117,20 +121,18 @@ void main () {
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	float max_dist = INF;
 	
-	vec3 col = vec3(0.0);
 	vec3 surf_light = vec3(0.0); // light on surface for taa write
-	float surf_dist = 0.0;
+	
+	#if TAA_ENABLE
+	uint surf_position = 0xffffu;
+	uint age = 0;
+	#endif
 	
 	Hit hit;
 	bool was_reflected = false;
 	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected)) {
-		vec3 first_hit_pos = hit.pos;
-		
 		ray_pos = hit.pos + hit.normal * 0.001;
 		
-		vec3 surf_col = hit.col;
-		vec3 surf_emiss = hit.emiss;
-		surf_dist = hit.dist;
 		surf_light = collect_sunlight(ray_pos, hit.normal);
 		
 		if (bounces_enable) {
@@ -143,51 +145,64 @@ void main () {
 				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
 				
 				bool was_reflected2;
-				if (!trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected2))
+				Hit hit2;
+				if (!trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit2, was_reflected2))
 					break;
 				
-				ray_pos = hit.pos + hit.normal * 0.001;
-				max_dist -= hit.dist;
+				ray_pos = hit2.pos + hit2.normal * 0.001;
+				max_dist -= hit2.dist;
 				
-				cur_normal = hit.normal;
+				cur_normal = hit2.normal;
 				
 				vec3 light2 = collect_sunlight(ray_pos, cur_normal);
 				
-				surf_light += (hit.emiss + hit.col * light2) * contrib;
-				contrib *= hit.col;
+				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
+				contrib *= hit2.col;
 			}
 		}
 		
 		#if TAA_ENABLE
 		if (!was_reflected) {
-			first_hit_pos -= float(WORLD_SIZE/2);
+			hit.pos -= float(WORLD_SIZE/2);
 			
-			vec4 prev_clip = prev_world2clip * vec4(first_hit_pos, 1.0);
+			uvec3 rounded = uvec3(ivec3(round(hit.pos))) & 0x3fffu;
+			if      (abs(hit.normal.x) > 0.9) surf_position =           rounded.x;
+			else if (abs(hit.normal.y) > 0.9) surf_position = 0x4000u | rounded.y;
+			else                              surf_position = 0xc000u | rounded.z;
+			
+			vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
 			prev_clip.xyz /= prev_clip.w;
 			
 			vec2 uv = prev_clip.xy * 0.5 + 0.5;
 			if (all(greaterThan(uv, vec2(0.0))) && all(lessThan(uv, vec2(1.0)))) {
-				vec4 prev_val = texture(taa_prev_color, uv);
+				uvec2 sampl = texture(taa_history_posage, uv).rg;
 				
-				vec3 prev_light = prev_val.rgb;
-				//uint prev_bid = packHalf2x16(vec2(prev_val.a, 0.0));
-				float prev_dist = prev_val.a;
+				uint sampl_pos = sampl.r;
+				uint sampl_age = sampl.g;
 				
-				if (abs(surf_dist - prev_dist) <= 0.1)
-					surf_light = mix(prev_light, surf_light, vec3(taa_alpha));
+				if (surf_position == sampl_pos) {
+					uint max_age = (uint)round((1.0 / taa_alpha) - 1.0);
+					
+					age = min(sampl_age, max_age);
+					float alpha = 1.0 / (float(age) + 1.0);
+					
+					vec3 prev_light = texture(taa_history_color, uv).rgb;
+					surf_light = mix(prev_light, surf_light, vec3(alpha));
+				}
 			}
 		}
 		#endif
 		
 		if (visualize_light)
-			surf_col = vec3(1.0);
-		col = surf_emiss + surf_col * surf_light;
+			hit.col = vec3(1.0);
+		col = hit.emiss + hit.col * surf_light;
 	}
 	
-	
 	#if TAA_ENABLE
-	//imageStore(taa_color, ivec2(pxpos), vec4(surf_light, unpackHalf2x16(first_hit_bid).x));
-	imageStore(taa_color, ivec2(pxpos), vec4(surf_light, surf_dist));
+	//col = vec3(float(age) / 1000.0);
+	
+	imageStore(taa_color,  ivec2(pxpos), vec4(surf_light, 0.0));
+	imageStore(taa_posage, ivec2(pxpos), uvec4(surf_position, age + 1,0,0));
 	#endif
 	
 #endif
