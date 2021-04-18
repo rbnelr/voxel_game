@@ -46,6 +46,7 @@ struct Hit {
 	vec3	normal;
 	float	dist;
 	uint	bid;
+	uint	medium;
 	vec3	col;
 	vec3	emiss;
 };
@@ -54,9 +55,7 @@ const float WORLD_SIZEf = float(WORLD_SIZE);
 const uint ROUNDMASK = -1;
 const uint FLIPMASK = WORLD_SIZE-1;
 
-bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
-	//coord = clamp(coord, 0.0, WORLD_SIZEf);
-	
+bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit, int type) {
 	// flip coordinate space such that ray is always positive (simplifies stepping logic)
 	// keep track of flip via flipmask
 	bvec3 ray_neg = lessThan(dir, vec3(0.0));
@@ -70,6 +69,35 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 	vec3 inv_dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
 	vec3 bias = inv_dir * -flippedf;
 	
+	float dist = 0.0;
+	#if 0 // allow ray to start outside ray for nice debugging views
+	{
+		// calculate entry and exit coords into whole world cube
+		vec3 t0v = inv_dir * -flippedf;
+		vec3 t1v = inv_dir * (vec3(WORLD_SIZEf) - flippedf);
+		float t0 = max(max(t0v.x, t0v.y), t0v.z);
+		float t1 = min(min(t1v.x, t1v.y), t1v.z);
+		
+		// only if ray not inside cube
+		t0 = max(t0, 0.0);
+		t1 = max(t1, 0.0);
+		
+		// ray misses world texture
+		if (t1 <= t0)
+			return false;
+		
+		// adjust ray to start where it hits cube initally
+		dist = t0;
+		flippedf += abs(dir) * dist;
+		flippedf = max(flippedf, vec3(0.0));
+	}
+	#else
+	// cull any rays starting outside of cube
+	if ( any(lessThanEqual(flippedf, vec3(0.0))) ||
+		 any(greaterThanEqual(flippedf, vec3(WORLD_SIZEf))))
+		return false;
+	#endif
+	
 	// start at some level of octree
 	// -best to start at 0 if camera on surface
 	// -best at higher levels if camera were in a large empty region
@@ -79,8 +107,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 	// round down to start cell of octree
 	uvec3 coord = uvec3(floor(flippedf));
 	coord &= ROUNDMASK << mip;
-	
-	float dist = 0.0;
 	
 	for (;;) {
 		#if VISUALIZE_COST
@@ -95,7 +121,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 		// read octree cell
 		uint voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
 		
-		if (voxel != 0) {
+		if (voxel != medium_bid) {
 			// non-air octree cell
 			if (mip == 0u)
 				break; // found solid leaf voxel
@@ -138,6 +164,8 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 			#else
 			// step up one level
 			// (does not work if lower mips cannot be safely read without reading higher levels)
+			// also breaks  mip >= uint(OCTREE_MIPS-1)  as world exit condition
+			
 			//mip += min(findLSB(stepcoord >> mip) - mip, 1u);
 			mip += bitfieldExtract(stepcoord, int(mip), 1) ^ 1; // extract lowest bit of coord 
 			#endif
@@ -145,9 +173,14 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 			// round down coord to lower corner of (potential) parent cell
 			coord &= ROUNDMASK << mip;
 			
-			// exit when either stepped out of octree root cell or max ray dist reached
-			if (mip >= uint(OCTREE_MIPS) || dist >= max_dist)
+			//// exit when either stepped out of world or max ray dist reached
+			//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
+			if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
+				#if DEBUG_RAYS
+				if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+				#endif
 				return false;
+			}
 		}
 	}
 	
@@ -160,6 +193,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 		
 		// arrived at solid leaf voxel, read block id from seperate data structure
 		hit.bid = read_bid(coord);
+		hit.medium = medium_bid;
 		
 		// calcualte surface hit info
 		hit.dist = dist;
@@ -194,7 +228,11 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, out Hit hit, int type) {
 			}
 		}
 		
-		float texid = float(block_tiles[hit.bid].sides[face]);
+		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
+		if (tex_bid == B_TALLGRASS && face >= 4)
+			return false;
+		
+		float texid = float(block_tiles[tex_bid].sides[face]);
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
 		hit.emiss = hit.col * get_emmisive(hit.bid);
@@ -390,83 +428,61 @@ vec3 sample_water_normal (vec3 pos_world) {
 }
 #endif
 
-bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, out bool was_reflected, int type) {
-#if 0
-	for (int j=0; j<2; ++j) {
-		if (!trace_ray(ray_pos, ray_dir, max_dist, hit))
-			break;
+bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint medium_bid, out Hit hit, out bool was_reflected, int type) {
+	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, medium_bid, hit, type);
+
+#if REFLECTIONS
+	if (did_hit && ((medium_bid == B_AIR && hit.bid == B_WATER) || (medium_bid == B_WATER && hit.bid == B_AIR))) {
+		// reflect
 		
-		//bool water = hit.bid == B_WATER || hit.prev_bid == B_WATER;
-		//bool air = hit.bid == B_AIR || hit.prev_bid == B_AIR;
-		//bool water_surface = water && air;
+		vec3 vertex;
+		vec3 normal_map = hit.normal;
 		
-		bool water_surface = hit.bid == B_WATER;
-		
-		if (!water_surface)
-			return true;
-		
-		if (hit.normal.z > 0.0)
-			hit.normal = water_shader(hit.pos);
+		#if 1
+		if (hit.normal.z > 0.0) {
+			//normal_map = sample_water_normal(hit.pos);
+			water_shader(vec2(1,-1) * hit.pos.yx * 0.3, water_normal_time, normal_map, vertex);
+		}
+		#endif
 		
 		float reflect_fac = fresnel(-ray_dir, hit.normal, water_F0);
 		
 		float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;
 		
-		vec3 reflect_dir = reflect(ray_dir, hit.normal);
-		vec3 refract_dir = refract(ray_dir, hit.normal, eta);
+		vec3 reflect_dir = reflect(ray_dir, normal_map);
+		vec3 refract_dir = refract(ray_dir, normal_map, eta);
 		
 		if (dot(refract_dir, refract_dir) == 0.0) {
 			// total internal reflection, ie. outside of snells window
 			reflect_fac = 1.0;
 		}
 		
+		if (dot(reflect_dir, hit.normal) < 0.0) {
+			reflect_fac = 0.0; // can't reflect below water (normal_map vector was caused raflection below actual geometry normal)
+		}
+		
+		#if 1
+		uint new_medium;
 		if (rand() <= reflect_fac) {
 			// reflect
 			ray_pos = hit.pos + hit.normal * 0.001;
 			ray_dir = reflect_dir;
+			new_medium = medium_bid;
 		} else {
 			// refract
-			ray_pos = hit.pos + hit.normal * 0.001;
+			ray_pos = hit.pos + hit.normal * -0.001;
 			ray_dir = refract_dir;
+			new_medium = medium_bid == B_AIR ? B_WATER : B_AIR;
 		}
 		max_dist -= hit.dist;
-	}
-	
-	return false;
-#else
-	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, hit, type);
-
-#if REFLECTIONS
-	if (did_hit && hit.bid == B_WATER) {
-		// reflect
-		
-		vec3 vertex;
-		vec3 normal_map = hit.normal;
-		
-		if (hit.normal.z > 0.0) {
-			//normal_map = sample_water_normal(hit.pos);
-			water_shader(vec2(1,-1) * hit.pos.yx * 0.3, water_normal_time, normal_map, vertex);
-		}
-		
-		ray_pos = hit.pos + normal_map * 0.001;
-		ray_dir = reflect(ray_dir, normal_map);
-		max_dist -= hit.dist;
-		
-		//hit.col = normal_map;
-		//return true;
-		
-		if (dot(ray_dir, hit.normal) < 0.0) {
-			hit.col = vec3(0,0,0); // can't reflect below water (normal_map vector was
-			return true;
-		}
 		
 		was_reflected = true;
-		return trace_ray(ray_pos, ray_dir, max_dist, hit, RAYT_REFLECT);
+		return trace_ray(ray_pos, ray_dir, max_dist, new_medium, hit, RAYT_REFLECT);
+		#endif
 	}
 #endif
 	was_reflected = false;
 	return did_hit;
-#endif
 }
 
 vec3 collect_sunlight (vec3 pos, vec3 normal) {
@@ -477,7 +493,7 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 		float cos = dot(dir, normal);
 		
 		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, sunlight_dist, hit, RAYT_SUN))
+		if (cos > 0.0 && !trace_ray(pos, dir, sunlight_dist, B_AIR, hit, RAYT_SUN))
 			return sunlight_col * cos;
 		#else
 		// point sun
@@ -494,7 +510,7 @@ vec3 collect_sunlight (vec3 pos, vec3 normal) {
 		float max_dist = dist - sun_pos_size*0.5;
 		
 		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, max_dist, hit, RAYT_SUN))
+		if (cos > 0.0 && !trace_ray(pos, dir, max_dist, B_AIR, hit, RAYT_SUN))
 			return sunlight_col * (cos * atten);
 		#endif
 	}

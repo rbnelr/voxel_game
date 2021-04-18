@@ -142,7 +142,7 @@ struct ChunkOctrees {
 
 		glTextureStorage3D(tex, OCTREE_MIPS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 
-		uint8_t val = 0;
+		uint8_t val = (uint8_t)g_assets.block_types.map_id("air");
 		for (int layer=0; layer<OCTREE_MIPS; ++layer)
 			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
 	}
@@ -303,8 +303,8 @@ struct Raytracer {
 				float3 col = float3(0,0,0);
 				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
 
-				uint16_t pos[2] = { 0xffffu, 0 };
-				glClearTexImage(posage[0], 0, GL_RG, GL_UNSIGNED_SHORT, pos); // Invalid??
+				uint32_t pos[2] = { 0xffffu, 0 };
+				glClearTexImage(posage[0], 0, GL_RG_INTEGER, GL_UNSIGNED_INT, pos); // Invalid??
 
 				cur = 1;
 

@@ -18,8 +18,8 @@ uniform uint size;
 		uvec3 offset = offsets[chunk_idx];
 		pos += offset;
 		
-		uint value = uint(read_bid(pos) != B_AIR);
-		imageStore(write_mip, ivec3(pos), uvec4(value, 0u,0u,0u));
+		uint bid = read_bid(pos);
+		imageStore(write_mip, ivec3(pos), uvec4(bid, 0u,0u,0u));
 	}
 #else
 	uniform int read_mip;
@@ -45,10 +45,15 @@ uniform uint size;
 			uint g = texelFetchOffset(octree, ivec3(read_pos), read_mip, ivec3(0,1,1)).r;
 			uint h = texelFetchOffset(octree, ivec3(read_pos), read_mip, ivec3(1,1,1)).r;
 			
-			uint value = ((a+b)+(c+d)) + ((e+f)+(g+h));
-			value = uint(value != 0);
-
-			imageStore(write_mip, ivec3(pos), uvec4(value, 0u,0u,0u));
+			bool same = a == b;
+			same      = a == c && same;
+			same      = a == d && same;
+			same      = a == e && same;
+			same      = a == f && same;
+			same      = a == g && same;
+			same      = a == h && same;
+			
+			imageStore(write_mip, ivec3(pos), uvec4(same ? a : 0xffu, 0u,0u,0u));
 		}
 	}
 #endif

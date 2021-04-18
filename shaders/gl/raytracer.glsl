@@ -105,15 +105,6 @@ void main () {
 	if (_dbg_ray) line_drawer_init();
 #endif
 	
-	vec3 col = vec3(0.0);
-#if ONLY_PRIMARY_RAYS
-	vec3 ray_pos, ray_dir;
-	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
-	
-	Hit hit;
-	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, RAYT_PRIMARY))
-		col = hit.col;
-#else
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
 	
 	// primary ray
@@ -121,6 +112,14 @@ void main () {
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	float max_dist = INF;
 	
+	uint start_bid = read_bid(uvec3(floor(ray_pos)));
+	
+	vec3 col = vec3(0.0);
+#if ONLY_PRIMARY_RAYS
+	Hit hit;
+	if (bray && trace_ray(ray_pos, ray_dir, max_dist, start_bid, hit, RAYT_PRIMARY))
+		col = hit.col;
+#else
 	vec3 surf_light = vec3(0.0); // light on surface for taa write
 	
 	#if TAA_ENABLE
@@ -130,7 +129,7 @@ void main () {
 	
 	Hit hit;
 	bool was_reflected = false;
-	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, hit, was_reflected, RAYT_PRIMARY)) {
+	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, start_bid, hit, was_reflected, RAYT_PRIMARY)) {
 		ray_pos = hit.pos + hit.normal * 0.001;
 		
 		surf_light = collect_sunlight(ray_pos, hit.normal);
@@ -148,7 +147,7 @@ void main () {
 			for (int j=0; j<bounces_max_count-1; ++j) {
 				bool was_reflected2;
 				Hit hit2;
-				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit2, was_reflected2, RAYT_SPECULAR))
+				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_SPECULAR))
 					break;
 				
 				cur_pos = hit2.pos + hit2.normal * 0.001;
@@ -178,7 +177,7 @@ void main () {
 				
 				bool was_reflected2;
 				Hit hit2;
-				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit2, was_reflected2, RAYT_DIFFUSE))
+				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_DIFFUSE))
 					break;
 				
 				cur_pos = hit2.pos + hit2.normal * 0.001;
@@ -231,7 +230,7 @@ void main () {
 	}
 	
 	#if TAA_ENABLE
-	//col = vec3(float(age) / 1000.0);
+	//col = vec3(float(age) / 100.0);
 	
 	imageStore(taa_color,  ivec2(pxpos), vec4(surf_light, 0.0));
 	imageStore(taa_posage, ivec2(pxpos), uvec4(surf_position, age + 1,0,0));
