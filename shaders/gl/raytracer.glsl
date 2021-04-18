@@ -134,13 +134,13 @@ void main () {
 		
 		surf_light = collect_sunlight(ray_pos, hit.normal);
 		
-		#if 0 // specular test
+		#if 1 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
 			vec3 cur_pos = ray_pos;
 			vec3 cur_normal = hit.normal;
-			vec3 contrib = vec3(1.0);
+			vec3 contrib = vec3(hit.occl_spec.y);
 			
 			ray_dir = normalize(reflect(ray_dir, cur_normal) + random_in_sphere()*0.2);
 			
@@ -170,7 +170,7 @@ void main () {
 			
 			vec3 cur_pos = ray_pos;
 			vec3 cur_normal = hit.normal;
-			vec3 contrib = vec3(1.0);
+			vec3 contrib = vec3(hit.occl_spec.x);
 			
 			for (int j=0; j<bounces_max_count; ++j) {
 				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted

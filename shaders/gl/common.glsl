@@ -105,6 +105,8 @@ layout(std430, binding = 3) restrict readonly buffer BlockTiles {
 
 uniform sampler2DArray	tile_textures;
 
-	
-	
+uniform sampler2DArray	textures_A;
+uniform sampler2DArray	textures_N;
+uniform sampler2DArray	textures2_A;
+uniform sampler2DArray	textures2_N;
 

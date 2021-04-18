@@ -1,0 +1,25 @@
+{
+	"512": [
+		{
+			"color": "Tileable Brick Ground Textures - Set 1/Ground_01.png",
+			"norml": "Tileable Brick Ground Textures - Set 1/Ground_01_Nrm.png"
+		},
+		{
+			"color": "Tileable Grass Textures - Set 2/Grass_04.png",
+			"norml": "Tileable Grass Textures - Set 2/Grass_04_Nrm.png"
+		}
+	],
+
+	"1024": [
+		{
+			"color": "terrain/jungle_mntn_d.jpg",
+			"norml": "terrain/jungle_mntn_n.jpg",
+			"gloss": "terrain/jungle_mntn_s.jpg"
+		},
+		{
+			"color": "terrain/jungle_mntn2_d.jpg",
+			"norml": "terrain/jungle_mntn2_n.jpg",
+			"gloss": "terrain/jungle_mntn2_s.jpg"
+		}
+	]
+}

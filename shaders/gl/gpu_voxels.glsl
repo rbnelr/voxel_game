@@ -26,6 +26,12 @@
 
 #define B_AIR 1
 #define B_WATER 3
+#define B_EARTH 4
+#define B_GRASS 5
+#define B_STONE 6
+#define B_HARDSTONE 7
+#define B_SAND 8
+#define B_GRAVEL 9
 #define B_MAGMA 12
 #define B_CRYSTAL 15
 #define B_URANIUM 16

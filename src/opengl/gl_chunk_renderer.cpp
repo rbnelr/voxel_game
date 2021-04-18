@@ -371,6 +371,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
 		{"water_N_B", r.water_N_B, r.normal_sampler_wrap},
 
+		{"textures_A", r.textures_A, r.normal_sampler_wrap},
+		{"textures_N", r.textures_N, r.normal_sampler_wrap},
+		{"textures2_A", r.textures2_A, r.normal_sampler_wrap},
+		{"textures2_N", r.textures2_N, r.normal_sampler_wrap},
+
 		(taa_enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, history.sampler} : StateManager::TextureBind{}),
 		(taa_enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, history.sampler_int} : StateManager::TextureBind{}),
 		
