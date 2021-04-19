@@ -85,12 +85,59 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #endif
 }
 
+uniform float vct_size = 1.0;
+
+// sharpen texture samples by 
+vec4 read_vct_texture (vec3 texcoord, float size) {
+	float lod = log2(size);
+	
+	#if 1
+	// support negative lod (size < 1.0) by snapping texture coords to nearest texels
+	// when approaching size=0
+	// size = 0.5 would snap [0.25,0.75] to 0.5
+	//              and lerp [0.75,1.25] in [0.5,1.5]
+	size = min(size, 1.0);
+	texcoord = 0.5 * size + texcoord;
+	texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
+	#endif
+	
+	return textureLod(vct_tex, texcoord * INV_WORLD_SIZEf, lod);
+}
+vec3 voxel_cone_trace (uvec2 pxpos, bool did_hit, in Hit hit) {
+	// primary cone for debugging
+	vec3 cone_pos, cone_dir;
+	bool bray = get_ray(vec2(pxpos), cone_pos, cone_dir);
+	float max_dist = 800.0;
+	
+	float cone_slope = 1.0 / vct_size;
+	float start_dist = 0.2;
+	
+	vec4 color = vec4(0.0);
+
+	float dist = start_dist;
+	while (dist < max_dist) {
+		vec3 pos = cone_pos + cone_dir * dist;
+		float r = cone_slope * dist;
+		
+		vec4 sampl = read_vct_texture(pos, r);
+		
+		sampl.rgb = vec3(pow(dist / max_dist, 2.2));
+		color += (1.0 - color.a) * sampl;
+		
+		if (color.a >= 0.99 || dist >= max_dist)
+			break;
+
+		dist = (dist + r) / (1.0f - cone_slope);
+	}
+	
+	return color.rgb;
+}
+
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
 	if (subgroupElect()) {
 		warp_iter[gl_SubgroupID] = 0u;
 	}
-
 	barrier();
 #endif
 	
@@ -115,7 +162,22 @@ void main () {
 	uint start_bid = read_bid(ivec3(floor(ray_pos)));
 	
 	vec3 col = vec3(0.0);
-#if ONLY_PRIMARY_RAYS
+#if VCT
+	Hit hit;
+	bool did_hit = bray && trace_ray(ray_pos, ray_dir, max_dist, start_bid, hit, RAYT_PRIMARY);
+	
+#if VISUALIZE_COST && VISUALIZE_WARP_COST
+	if (subgroupElect()) {
+		warp_iter[gl_SubgroupID] = 0u;
+	}
+	barrier();
+#endif
+#if VISUALIZE_COST
+	iterations = 0;
+#endif
+	
+	col = voxel_cone_trace(pxpos, did_hit, hit);
+#elif ONLY_PRIMARY_RAYS
 	Hit hit;
 	if (bray && trace_ray(ray_pos, ray_dir, max_dist, start_bid, hit, RAYT_PRIMARY))
 		col = hit.col;

@@ -159,6 +159,9 @@ struct VCT_Data {
 
 	static constexpr int MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
 
+	Sampler sampler = {"sampler"};
+	Sampler filter_sampler = {"filter_sampler"};
+
 	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
@@ -170,6 +173,16 @@ struct VCT_Data {
 	VCT_Data (Shaders& shaders) {
 		filter      = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
 		filter_mip0 = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
+
+		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	
 		glTextureStorage3D(tex, MIPS, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
@@ -183,7 +196,7 @@ struct VCT_Data {
 };
 
 struct Raytracer {
-	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
+	SERIALIZE(Raytracer, enable, enable_vct, max_iterations, rand_seed_time,
 		sunlight_enable, sunlight_dist, sunlight_col,
 		bounces_enable, bounces_max_dist, bounces_max_count,
 		only_primary_rays, taa_alpha, taa_enable)
@@ -387,6 +400,9 @@ struct Raytracer {
 	bool sunlight_mode = 1;
 
 
+	float vct_size = 1.0;
+
+
 	bool  bounces_enable = false;
 	float bounces_max_dist = 64;
 	int   bounces_max_count = 4;
@@ -403,25 +419,27 @@ struct Raytracer {
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
-			     {"ONLY_PRIMARY_RAYS", only_primary_rays ? "1":"0"},
-			     {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
-			     {"TAA_ENABLE", taa_enable ? "1":"0"},
-			     {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			     {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
-			     {"VISUALIZE_WARP_READS", visualize_warp_reads ? "1":"0"}};
+		         {"ONLY_PRIMARY_RAYS", enable_vct || only_primary_rays ? "1":"0"},
+		         {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
+		         {"TAA_ENABLE", !(enable_vct || only_primary_rays) && taa_enable ? "1":"0"},
+		         {"VCT", enable_vct ? "1":"0"},
+		         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
+		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"}};
 	}
 
 	bool enable = true;
+	bool enable_vct = true;
 
 	void imgui () {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
+		bool macro_change = false;
+
 		ImGui::Checkbox("enable [R]", &enable);
+		macro_change |= ImGui::Checkbox("enable VCT [V]", &enable_vct);
 
 		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
 		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
-
-		bool macro_change = false;
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SameLine();
@@ -478,6 +496,8 @@ struct Raytracer {
 			ImGui::TreePop();
 		}
 
+		ImGui::SliderFloat("vct_size", &vct_size, 0, 256);
+
 		if (macro_change && shad) {
 			shad->macros = get_macros();
 			shad->recompile("macro_change", false);
@@ -521,7 +541,6 @@ struct Raytracer {
 			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
 			printf("max local work group invocations %d\n", number);
 		}
-
 		if (0) {
 			
 			int max_sparse_texture_size;

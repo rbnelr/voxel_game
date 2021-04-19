@@ -39,15 +39,33 @@ uniform uint size;
 
 		uint chunk_idx = pos.z / size;
 		pos.z          = pos.z % size;
-
+        
 		if (all(lessThan(pos, uvec3(size)))) {
 			pos += offsets[chunk_idx];
 			
-			vec3 read_pos = vec3(pos) * 2.0 + 1.0;
-			vec3 uv = read_pos / textureSize(vct_tex, read_mip);
+			#if 0
+			// actually slower than 8 texelFetchOffset ??
+			// also does not even work properly currently, not sure why it seems to filter wrong
+			vec3 uv = (vec3(pos) * 2.0 + 1.0) / textureSize(vct_tex, read_mip);
 
-			vec4 emiss = textureLod(vct_tex, uv, read_mip);
-			imageStore(write_mip, ivec3(pos), emiss);
+			vec4 val = textureLod(vct_tex, uv, read_mip);
+			#else
+			uvec3 read_pos = pos * 2u;
+			
+			vec4 sum;
+			sum  = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,0));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,0));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,0));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,0));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,1));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,1));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,1));
+			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,1));
+			
+			vec4 val = sum * 0.125;
+			#endif
+			
+			imageStore(write_mip, ivec3(pos), val);
 		}
 	}
 #endif
