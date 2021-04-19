@@ -118,7 +118,7 @@ struct ChunkRenderer {
 
 };
 
-static constexpr int GPU_WORLD_SIZE_CHUNKS = 16;
+static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
 static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
 struct ChunkOctrees {
@@ -141,10 +141,42 @@ struct ChunkOctrees {
 		octree_filter_mip0 = shaders.compile("rt_octree_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
 
 		glTextureStorage3D(tex, OCTREE_MIPS, GL_R8UI, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, OCTREE_MIPS-1);
 
 		uint8_t val = (uint8_t)g_assets.block_types.map_id("air");
 		for (int layer=0; layer<OCTREE_MIPS; ++layer)
 			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
+	}
+
+	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
+};
+struct VCT_Data {
+	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE;
+	static constexpr size_t _size = (4*2 * TEX_WIDTH*TEX_WIDTH*TEX_WIDTH) / MB;
+
+	static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
+
+	static constexpr int MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
+
+	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
+	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
+	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
+
+	Texture3D tex = {"VCT.tex"};
+	Shader* filter;
+	Shader* filter_mip0;
+
+	VCT_Data (Shaders& shaders) {
+		filter      = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
+		filter_mip0 = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
+	
+		glTextureStorage3D(tex, MIPS, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, MIPS-1);
+	
+		for (int layer=0; layer<MIPS; ++layer)
+			glClearTexImage(tex, layer, GL_RGBA, GL_FLOAT, nullptr);
 	}
 
 	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
@@ -165,6 +197,8 @@ struct Raytracer {
 			tex = {"RT.subchunks"};
 
 			glTextureStorage3D(tex, 1, GL_R32UI, GPU_WORLD_SIZE/SUBCHUNK_SIZE, GPU_WORLD_SIZE/SUBCHUNK_SIZE, GPU_WORLD_SIZE/SUBCHUNK_SIZE);
+			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
 
 			GLuint val = SUBC_SPARSE_BIT | (uint32_t)B_NULL;
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &val);
@@ -202,6 +236,8 @@ struct Raytracer {
 			clog(INFO, ">> Resized %s 3d texture to %dx%dx%d (%d MB)", label.c_str(), VOXTEX_SIZE, VOXTEX_SIZE, layers*SUBCHUNK_SIZE, (int)(sz / MB));
 
 			glTextureStorage3D(new_tex, 1, sizeof(T) == 2 ? GL_R16UI : GL_R32UI, VOXTEX_SIZE, VOXTEX_SIZE, layers*SUBCHUNK_SIZE);
+			glTextureParameteri(new_tex, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(new_tex, GL_TEXTURE_MAX_LEVEL, 0);
 
 			{ // copy old tex data to new bigger tex
 				if (alloc_layers)
@@ -235,6 +271,7 @@ struct Raytracer {
 	VoxTexture<block_id>		voxels_tex = {"RT.voxels" };
 
 	ChunkOctrees				octree;
+	VCT_Data					vct_data;
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
@@ -464,7 +501,7 @@ struct Raytracer {
 		ImGui::TreePop();
 	}
 
-	Raytracer (Shaders& shaders): octree(shaders) {
+	Raytracer (Shaders& shaders): octree(shaders), vct_data(shaders) {
 		if (0) {
 			int3 count, size;
 

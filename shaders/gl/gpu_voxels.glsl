@@ -47,7 +47,7 @@ float get_emmisive (uint bid) {
 }
 
 
-#define WORLD_SIZE_CHUNKS	16 // number of chunks for fixed subchunk texture (for now)
+#define WORLD_SIZE_CHUNKS	8 // number of chunks for fixed subchunk texture (for now)
 #define WORLD_SIZE			(WORLD_SIZE_CHUNKS * CHUNK_SIZE)
 
 #define VOXTEX_SIZE			2048 // max width, height, depth of sparse voxel texture (subchunk voxels)
@@ -57,17 +57,18 @@ float get_emmisive (uint bid) {
 
 #define SUBC_SPARSE_BIT		0x80000000u
 
-#define OCTREE_MIPS			11
+#define OCTREE_MIPS			10
 
 uniform usampler3D	subchunks_tex;
 uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
+uniform sampler3D	vct_tex;
 
-uint read_bid (uvec3 coord) {
-	if (!all(lessThan(coord, uvec3(WORLD_SIZE))))
-		return 0;
+uint read_bid (ivec3 coord) {
+	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))
+		return B_AIR;
 	
-	uvec3 texcoord = bitfieldExtract(coord, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & ~SUBCHUNK_MASK) >> SUBCHUNK_SHIFT;
+	uvec3 texcoord = bitfieldExtract(uvec3(coord), SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & ~SUBCHUNK_MASK) >> SUBCHUNK_SHIFT;
 	uint subchunk = texelFetch(subchunks_tex, ivec3(texcoord), 0).r;
 	
 	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
@@ -81,7 +82,7 @@ uint read_bid (uvec3 coord) {
 		subc_offs.y = bitfieldExtract(subchunk, VOXTEX_TEX_SHIFT*1, VOXTEX_TEX_SHIFT);
 		subc_offs.z = bitfieldExtract(subchunk, VOXTEX_TEX_SHIFT*2, VOXTEX_TEX_SHIFT);
 		
-		texcoord = bitfieldInsert(coord, subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
+		texcoord = bitfieldInsert(uvec3(coord), subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
 		
 		return texelFetch(voxels_tex, ivec3(texcoord), 0).r;
 	}

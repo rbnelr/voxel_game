@@ -438,6 +438,7 @@
     <None Include="..\..\..\shaders\gl\raytracer.glsl" />
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
+    <None Include="..\..\..\shaders\gl\vct_filter.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

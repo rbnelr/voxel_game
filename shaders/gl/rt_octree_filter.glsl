@@ -15,10 +15,9 @@ uniform uint size;
 		uint chunk_idx = pos.z / size;
 		pos.z          = pos.z % size;
 		
-		uvec3 offset = offsets[chunk_idx];
-		pos += offset;
+		pos += offsets[chunk_idx];
 		
-		uint bid = read_bid(pos);
+		uint bid = read_bid(ivec3(pos));
 		imageStore(write_mip, ivec3(pos), uvec4(bid, 0u,0u,0u));
 	}
 #else
@@ -31,11 +30,11 @@ uniform uint size;
 		pos.z          = pos.z % size;
 
 		if (all(lessThan(pos, uvec3(size)))) {
-			uvec3 offset = offsets[chunk_idx];
-			pos += offset;
+			pos += offsets[chunk_idx];
 
 			uvec3 read_pos = pos * 2u;
-	
+			
+			// use textureGather instead?
 			uint a = texelFetchOffset(octree, ivec3(read_pos), read_mip, ivec3(0,0,0)).r;
 			uint b = texelFetchOffset(octree, ivec3(read_pos), read_mip, ivec3(1,0,0)).r;
 			uint c = texelFetchOffset(octree, ivec3(read_pos), read_mip, ivec3(0,1,0)).r;

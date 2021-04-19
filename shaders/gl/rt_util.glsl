@@ -71,7 +71,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 	vec3 bias = inv_dir * -flippedf;
 	
 	float dist = 0.0;
-	#if 0 // allow ray to start outside ray for nice debugging views
+	#if 1 // allow ray to start outside ray for nice debugging views
 	{
 		// calculate entry and exit coords into whole world cube
 		vec3 t0v = inv_dir * -flippedf;
@@ -109,6 +109,8 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 	uvec3 coord = uvec3(floor(flippedf));
 	coord &= ROUNDMASK << mip;
 	
+	uint voxel;
+	
 	for (;;) {
 		#if VISUALIZE_COST
 		++iterations;
@@ -120,7 +122,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		uvec3 flipped = (coord ^ flipmask) >> mip;
 		
 		// read octree cell
-		uint voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
+		voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
 		
 		if (voxel != medium_bid) {
 			// non-air octree cell
@@ -193,7 +195,8 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		coord ^= flipmask; // flip back to real coords
 		
 		// arrived at solid leaf voxel, read block id from seperate data structure
-		hit.bid = read_bid(coord);
+		//hit.bid = read_bid(ivec3(coord));
+		hit.bid = voxel;
 		hit.medium = medium_bid;
 		
 		// calcualte surface hit info
@@ -243,57 +246,57 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 		float lod2 = log2(dist)*0.90 - 2.0;
 		
-		if (tex_bid == B_STONE) {
-			hit.col = textureLod(textures2_A, vec3(uv / 4.0, 1), lod2).rgb;
-			vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 7), lod2).r;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-			
-		} else if (tex_bid == B_HARDSTONE) {
-			hit.col = textureLod(textures2_A, vec3(uv / 4.0, 0), lod2).rgb;
-			vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 0), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 3), lod2).r;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else if (tex_bid == B_GRAVEL) {
-			hit.col = textureLod(textures_A, vec3(uv / 2.0, 0), lod2).rgb;
-			vec3 normalmap = textureLod(textures_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 0.5;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else if (tex_bid == B_GRASS) {
-			hit.col = textureLod(textures_A, vec3(uv / 4.0, 1), lod2).rgb;
-			vec3 normalmap = textureLod(textures_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 0.5;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else {
+		//if (tex_bid == B_STONE) {
+		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 1), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 7), lod2).r;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//	
+		//} else if (tex_bid == B_HARDSTONE) {
+		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 0), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 0), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 3), lod2).r;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else if (tex_bid == B_GRAVEL) {
+		//	hit.col = textureLod(textures_A, vec3(uv / 2.0, 0), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = 0.5;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else if (tex_bid == B_GRASS) {
+		//	hit.col = textureLod(textures_A, vec3(uv / 4.0, 1), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = 0.5;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else {
 			hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
 			
 			hit.occl_spec.x = 1.0;
 			hit.occl_spec.y = 1.0;
-		}
+		//}
 		hit.emiss = hit.col * get_emmisive(hit.bid);
 	}
 	return true;

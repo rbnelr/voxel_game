@@ -85,18 +85,19 @@ namespace gl {
 			//printf("%.*s\n", length, message); // message is not null terminated, pass explicit length
 			return; // OGL_TRACE is only for organizing drawcalls in nsight, not to spam the console
 		}
-					// hiding irrelevant infos/warnings
+		
+		// hiding irrelevant infos/warnings
 		switch (id) {
 			case 131185: // Buffer detailed info
-						 //case 1282: // using shader that was not compiled successfully
-						 //case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
-						 //case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
-
-						 ////case 131154: // Pixel transfer sync with rendering warning
-						 //
-						 //case 1282: // Wierd error on notebook when trying to do texture streaming
-						 //case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
-						 //case 131218: // performance warning, because of shader recompiling based on some 'key'
+			//case 1282: // using shader that was not compiled successfully
+			//case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
+			//case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
+			
+			////case 131154: // Pixel transfer sync with rendering warning
+			//
+			//case 1282: // Wierd error on notebook when trying to do texture streaming
+			//case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
+			//case 131218: // performance warning, because of shader recompiling based on some 'key'
 				return;
 
 			default:
@@ -105,33 +106,33 @@ namespace gl {
 
 		const char* src_str = "<unknown>";
 		switch (source) {
-			case GL_DEBUG_SOURCE_API_ARB:				src_str = "GL_DEBUG_SOURCE_API_ARB";				break;
-			case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:		src_str = "GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB";		break;
-			case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:	src_str = "GL_DEBUG_SOURCE_SHADER_COMPILER_ARB";	break;
-			case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:		src_str = "GL_DEBUG_SOURCE_THIRD_PARTY_ARB";		break;
-			case GL_DEBUG_SOURCE_APPLICATION_ARB:		src_str = "GL_DEBUG_SOURCE_APPLICATION_ARB";		break;
-			case GL_DEBUG_SOURCE_OTHER_ARB:				src_str = "GL_DEBUG_SOURCE_OTHER_ARB";				break;
+			case GL_DEBUG_SOURCE_API_ARB:				src_str = "API";				break;
+			case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:		src_str = "WINDOW_SYSTEM";		break;
+			case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:	src_str = "SHADER_COMPILER";	break;
+			case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:		src_str = "THIRD_PARTY";		break;
+			case GL_DEBUG_SOURCE_APPLICATION_ARB:		src_str = "APPLICATION";		break;
+			case GL_DEBUG_SOURCE_OTHER_ARB:				src_str = "OTHER";				break;
 		}
 
 		const char* type_str = "<unknown>";
 		switch (source) {
-			case GL_DEBUG_TYPE_ERROR_ARB:				type_str = "GL_DEBUG_TYPE_ERROR_ARB";				break;
-			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB";	break;
-			case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:	type_str = "GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB";	break;
-			case GL_DEBUG_TYPE_PORTABILITY_ARB:			type_str = "GL_DEBUG_TYPE_PORTABILITY_ARB";			break;
-			case GL_DEBUG_TYPE_PERFORMANCE_ARB:			type_str = "GL_DEBUG_TYPE_PERFORMANCE_ARB";			break;
-			case GL_DEBUG_TYPE_OTHER_ARB:				type_str = "GL_DEBUG_TYPE_OTHER_ARB";				break;
+			case GL_DEBUG_TYPE_ERROR_ARB:				type_str = "ERROR";					break;
+			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:	type_str = "DEPRECATED_BEHAVIOR";	break;
+			case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:	type_str = "UNDEFINED_BEHAVIOR";	break;
+			case GL_DEBUG_TYPE_PORTABILITY_ARB:			type_str = "PORTABILITY";			break;
+			case GL_DEBUG_TYPE_PERFORMANCE_ARB:			type_str = "PERFORMANCE";			break;
+			case GL_DEBUG_TYPE_OTHER_ARB:				type_str = "OTHER";					break;
 		}
 
 		const char* severity_str = "<unknown>";
 		switch (severity) {
-			case GL_DEBUG_SEVERITY_HIGH_ARB:			severity_str = "GL_DEBUG_SEVERITY_HIGH_ARB";		break;
-			case GL_DEBUG_SEVERITY_MEDIUM_ARB:			severity_str = "GL_DEBUG_SEVERITY_MEDIUM_ARB";		break;
-			case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "GL_DEBUG_SEVERITY_LOW_ARB";			break;
+			case GL_DEBUG_SEVERITY_HIGH_ARB:			severity_str = "HIGH";		break;
+			case GL_DEBUG_SEVERITY_MEDIUM_ARB:			severity_str = "MEDIUM";	break;
+			case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "LOW";		break;
 		}
 
 		clog(severity == GL_DEBUG_SEVERITY_HIGH_ARB ? ERROR : WARNING,
-			"[OpenGL] debug message: severity: %s src: %s type: %s id: %d  %.*s\n", severity_str, src_str, type_str, id, length, message); // message is not null terminated, pass explicit length
+			"[OpenGL] debug message: severity:%s  src:%s  type:%s  id:%d\n%.*s\n", severity_str, src_str, type_str, id, length, message); // message is not null terminated, pass explicit length
 
 	#if RENDERER_DEBUG_OUTPUT_BREAKPOINT
 		if (severity == GL_DEBUG_SEVERITY_HIGH_ARB)

@@ -112,7 +112,7 @@ void main () {
 	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 	float max_dist = INF;
 	
-	uint start_bid = read_bid(uvec3(floor(ray_pos)));
+	uint start_bid = read_bid(ivec3(floor(ray_pos)));
 	
 	vec3 col = vec3(0.0);
 #if ONLY_PRIMARY_RAYS
@@ -134,7 +134,7 @@ void main () {
 		
 		surf_light = collect_sunlight(ray_pos, hit.normal);
 		
-		#if 1 // specular test
+		#if 0 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			

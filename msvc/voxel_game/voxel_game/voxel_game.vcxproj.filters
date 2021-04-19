@@ -444,5 +444,8 @@
     <None Include="..\..\..\shaders\gl\rt_util.glsl">
       <Filter>shaders\gl</Filter>
     </None>
+    <None Include="..\..\..\shaders\gl\vct_filter.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
   </ItemGroup>
 </Project>
