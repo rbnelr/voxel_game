@@ -245,52 +245,52 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 		float lod2 = log2(dist)*0.90 - 2.0;
 		
-		if (tex_bid == B_STONE) {
-			hit.col = textureLod(textures2_A, vec3(uv / 4.0, 1), lod2).rgb;
-			vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 7), lod2).r;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-			
-		} else if (tex_bid == B_HARDSTONE) {
-			hit.col = textureLod(textures2_A, vec3(uv / 4.0, 0), lod2).rgb;
-			vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 0), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 3), lod2).r;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else if (tex_bid == B_GRAVEL) {
-			hit.col = textureLod(textures_A, vec3(uv / 2.0, 0), lod2).rgb;
-			vec3 normalmap = textureLod(textures_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 0.5;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else if (tex_bid == B_GRASS) {
-			hit.col = textureLod(textures_A, vec3(uv / 4.0, 1), lod2).rgb;
-			vec3 normalmap = textureLod(textures_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
-			
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 0.5;
-			
-			vec3 bitangent = cross(hit.normal, tangent);
-			mat3 TBN = mat3(tangent, bitangent, hit.normal);
-			
-			hit.normal = TBN * normalize(normalmap);
-		} else {
+		//if (tex_bid == B_STONE) {
+		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 1), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 7), lod2).r;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//	
+		//} else if (tex_bid == B_HARDSTONE) {
+		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 0), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 0), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 3), lod2).r;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else if (tex_bid == B_GRAVEL) {
+		//	hit.col = textureLod(textures_A, vec3(uv / 2.0, 0), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = 0.5;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else if (tex_bid == B_GRASS) {
+		//	hit.col = textureLod(textures_A, vec3(uv / 4.0, 1), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
+		//	
+		//	hit.occl_spec.x = 1.0;
+		//	hit.occl_spec.y = 0.5;
+		//	
+		//	vec3 bitangent = cross(hit.normal, tangent);
+		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
+		//	
+		//	hit.normal = TBN * normalize(normalmap);
+		//} else {
 			hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
 			
 			if (tex_bid == B_TALLGRASS && face >= 4)
@@ -298,11 +298,13 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 			hit.occl_spec.x = 1.0;
 			hit.occl_spec.y = 1.0;
-		}
+		//}
 		hit.emiss = hit.col * get_emmisive(hit.bid);
 	}
 	return true;
 }
+
+uniform bool  visualize_light = false;
 
 #if !ONLY_PRIMARY_RAYS
 float fresnel (vec3 view, vec3 norm, float F0) {
@@ -393,8 +395,6 @@ uniform vec3  ambient_light;
 uniform bool  bounces_enable = true;
 uniform float bounces_max_dist = 30.0;
 uniform int   bounces_max_count = 8;
-
-uniform bool  visualize_light = false;
 
 uniform vec3 sun_pos = vec3(-28, 67, 102);
 uniform float sun_pos_size = 4.0;

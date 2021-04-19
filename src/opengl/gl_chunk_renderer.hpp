@@ -419,7 +419,7 @@ struct Raytracer {
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
 		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
-		         {"ONLY_PRIMARY_RAYS", enable_vct || only_primary_rays ? "1":"0"},
+		         {"ONLY_PRIMARY_RAYS", !enable_vct && only_primary_rays ? "1":"0"},
 		         {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
 		         {"TAA_ENABLE", !(enable_vct || only_primary_rays) && taa_enable ? "1":"0"},
 		         {"VCT", enable_vct ? "1":"0"},

@@ -468,27 +468,39 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	if (!shad->prog) return;
 	
-	if (0) {
-		static float cone_slope = 0.3f;
-		static float start_dist = 0.3f;
+	if (1) {
+		static float cone_slope = 0.516f;
+		static float start_dist = 0.16f;
+		static float ang_offs = 5.0f;
 
 		ImGui::SliderFloat("cone_ang", &cone_slope, 0, 1);
 		ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
+		ImGui::DragFloat("ang_offs", &ang_offs, 0.02f);
 
-		float3 cone_pos = game.player.pos;
-		float3 cone_dir = float3(0,0,1);
+		float3 cone_dirs[1+5];
+		cone_dirs[0] = float3(0,0,1);
 
-		float dist = start_dist;
+		for (int i=0; i<5; ++i) {
+			cone_dirs[i+1] = rotate3_Z(deg(360/5) * ((float)i + 0.5f)) * rotate3_X(deg(360/5/2 - ang_offs)) * float3(0,1,0);
+		}
 
-		g_debugdraw.vector(cone_pos, float3(+cone_slope,0,1)*100, lrgba(0,0,1,1));
-		g_debugdraw.vector(cone_pos, float3(-cone_slope,0,1)*100, lrgba(0,0,1,1));
+		for (int i=0; i<ARRLEN(cone_dirs); ++i) {
+			float3 cone_pos = game.player.pos;
+			float3 cone_dir = cone_dirs[i];
 
-		while (dist < 100.0f) {
-			float3 pos = cone_pos + cone_dir * dist;
-			float r = cone_slope * dist;
-			g_debugdraw.wire_sphere(pos, r, lrgba(1,0,0,1), 16, 4);
+			float dist = start_dist;
 
-			dist = (dist + r) / (1.0f - cone_slope);
+			//g_debugdraw.vector(cone_pos, float3(+cone_slope,0,1)*100, lrgba(0,0,1,1));
+			//g_debugdraw.vector(cone_pos, float3(-cone_slope,0,1)*100, lrgba(0,0,1,1));
+
+			int j=0;
+			while (j++ < 100 && dist < 100.0f) {
+				float3 pos = cone_pos + cone_dir * dist;
+				float r = cone_slope * dist;
+				g_debugdraw.wire_sphere(pos, r, lrgba(1,0,0,1), 16, 4);
+
+				dist = (dist + r) / (1.0f - cone_slope);
+			}
 		}
 	}
 

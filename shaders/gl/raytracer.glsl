@@ -103,34 +103,65 @@ vec4 read_vct_texture (vec3 texcoord, float size) {
 	
 	return textureLod(vct_tex, texcoord * INV_WORLD_SIZEf, lod);
 }
-vec3 voxel_cone_trace (uvec2 pxpos, bool did_hit, in Hit hit) {
-	// primary cone for debugging
-	vec3 cone_pos, cone_dir;
-	bool bray = get_ray(vec2(pxpos), cone_pos, cone_dir);
-	float max_dist = 800.0;
+vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist) {
+	float start_dist = 0.1;
 	
-	float cone_slope = 1.0 / vct_size;
-	float start_dist = 0.2;
+	vec3 color = vec3(0.0);
+	float tranp = 1.0; // inverse alpha to support alpha stepsize fix
 	
-	vec4 color = vec4(0.0);
-
 	float dist = start_dist;
-	while (dist < max_dist) {
+	
+	for (int i=0; i<1000; ++i) {
+		#if VISUALIZE_COST
+		++iterations;
+		#if VISUALIZE_WARP_COST
+		if (subgroupElect()) atomicAdd(warp_iter[gl_SubgroupID], 1u);
+		#endif
+		#endif
+		
 		vec3 pos = cone_pos + cone_dir * dist;
 		float r = cone_slope * dist;
 		
 		vec4 sampl = read_vct_texture(pos, r);
 		
-		sampl.rgb = vec3(pow(dist / max_dist, 2.2));
-		color += (1.0 - color.a) * sampl;
+		color += tranp * sampl.rgb;
+		//tranp -= tranp * (1.0 - (1.0 - sampl.a));
+		tranp -= tranp * (1.0 - pow(1.0 - sampl.a, r*2));
 		
-		if (color.a >= 0.99 || dist >= max_dist)
+		if (tranp < 0.001 || dist >= max_dist)
 			break;
-
+		
 		dist = (dist + r) / (1.0f - cone_slope);
 	}
 	
-	return color.rgb;
+	return vec4(color, 1.0 - tranp);
+}
+
+vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
+	#if 0
+	// primary cone for debugging
+	vec3 cone_pos, cone_dir;
+	get_ray(vec2(pxpos), cone_pos, cone_dir);
+	
+	float max_dist = 400.0;
+	float cone_slope = 1.0 / vct_size;
+	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist).rgb;
+	#else
+	vec3 col = vec3(0.0);
+	if (did_hit) {
+		vec3 dir = hit.normal;
+		//vec3 dir = reflect(view_ray_dir, hit.normal);
+		
+		float max_dist = 400.0;
+		float cone_slope = 1.0 / (vct_size / 4.0);
+		vec3 light = trace_cone(hit.pos, dir, cone_slope, max_dist).rgb;
+		
+		if (visualize_light)
+			hit.col = vec3(1.0);
+		col = light * hit.col + hit.emiss;
+	}
+	return col;
+	#endif
 }
 
 void main () {
@@ -176,7 +207,7 @@ void main () {
 	iterations = 0;
 #endif
 	
-	col = voxel_cone_trace(pxpos, did_hit, hit);
+	col = voxel_cone_trace(pxpos, ray_dir, did_hit, hit);
 #elif ONLY_PRIMARY_RAYS
 	Hit hit;
 	if (bray && trace_ray(ray_pos, ray_dir, max_dist, start_bid, hit, RAYT_PRIMARY))
