@@ -55,7 +55,7 @@ void DebugDraw::wire_cube (float3 const& pos, float3 const& size, lrgba const& c
 }
 
 void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int angres, int wires) {
-	int wiresz = wires/2 -1; // one less wire, so we gett even vertical wires and odd number of horiz wires, so that there is a 'middle' horiz wire
+	int wiresz = wires/2 -1; // one less wire, so we get even vertical wires and odd number of horiz wires, so that there is a 'middle' horiz wire
 	int wiresxy = wires;
 
 	int count = (wiresz + wiresxy) * angres * 2; // every wire is <angres> lines, <wires> * 2 because horiz and vert wires
@@ -116,6 +116,49 @@ void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int a
 		}
 	}
 }
+
+void DebugDraw::wire_cone (float3 const& pos, float ang, float length, float3x3 const& rot, lrgba const& col, int circres, int wires) {
+	int count = (circres + wires) * 2;
+
+	size_t idx = lines.size();
+	lines.resize(idx + count);
+	auto* out = &lines[idx];
+
+	float r = tan(ang * 0.5f);
+
+	for (int i=0; i<count; ++i)
+		out[i].col = col;
+
+	auto set = [&] (float3 p) {
+		out->pos = pos + (rot * p) * length;
+		out++;
+	};
+
+	// circle of cone base
+	float s0 = 0;
+	float c0 = 1;
+	for (int i=0; i<circres; ++i) {
+		float ang = (float)(i + 1) * deg(360) / (float)circres;
+
+		float s1 = sin(ang);
+		float c1 = cos(ang);
+
+		set(float3(c0*r, s0*r, 1));
+		set(float3(c1*r, s1*r, 1));
+
+		s0 = s1;
+		c0 = c1;
+	}
+
+	// lines from tip to base
+	for (int i=0; i<wires; ++i) {
+		float ang = (float)(i + 1) * deg(360) / (float)wires;
+
+		set(float3(0, 0, 0));
+		set(float3(cos(ang)*r, sin(ang)*r, 1));
+	}
+}
+
 
 void DebugDraw::wire_frustrum (Camera_View const& view, lrgba const& col) {
 	static constexpr int _frustrum_corners[12 * 2] {

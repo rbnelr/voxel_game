@@ -38,12 +38,12 @@ vec4 _dbg_ray_cols[] = {
 };
 #endif
 
-#define REFLECTIONS 1
+#define REFLECTIONS 0
 
 //
 struct Hit {
 	vec3	pos;
-	vec3	normal;
+	mat3	TBN;
 	float	dist;
 	uint	bid;
 	uint	medium;
@@ -207,7 +207,6 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 		vec2 uv;
 		int face;
-		vec3 tangent;
 		{ // calc hit face, uv and normal
 			//vec3 hit_fract = fract(hit.pos);
 			vec3 hit_fract = hit.pos;
@@ -216,28 +215,31 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);
 			
-			hit.normal = vec3(0.0);
-			tangent = vec3(0.0);
+			vec3 normal = vec3(0.0);
+			vec3 tangent = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				hit.normal.x = sign(offs.x);
+				normal.x = sign(offs.x);
 				tangent.y = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit_fract.yz;
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
-				hit.normal.y = sign(offs.y);
+				normal.y = sign(offs.y);
 				tangent.x = -sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit_fract.xz;
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
-				hit.normal.z = sign(offs.z);
+				normal.z = sign(offs.z);
 				tangent.x = 1.0;
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit_fract.xy;
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
 			}
+			
+			vec3 bitangent = cross(normal, tangent);
+			hit.TBN = mat3(tangent, bitangent, normal);
 		}
 		
 		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
@@ -246,11 +248,11 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		float lod2 = log2(dist)*0.90 - 2.0;
 		
 		//if (tex_bid == B_STONE) {
-		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 1), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
+		//	hit.col = textureLod(textures2_A, vec3(uv / 2.0, 1), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 2.0, 4), lod2).rgb * 2.0 - 1.0;
 		//	
 		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 7), lod2).r;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 2.0, 7), lod2).r;
 		//	
 		//	vec3 bitangent = cross(hit.normal, tangent);
 		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
@@ -258,11 +260,11 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		//	hit.normal = TBN * normalize(normalmap);
 		//	
 		//} else if (tex_bid == B_HARDSTONE) {
-		//	hit.col = textureLod(textures2_A, vec3(uv / 4.0, 0), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 4.0, 0), lod2).rgb * 2.0 - 1.0;
+		//	hit.col = textureLod(textures2_A, vec3(uv / 2.0, 0), lod2).rgb;
+		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
 		//	
 		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 4.0, 3), lod2).r;
+		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 2.0, 3), lod2).r;
 		//	
 		//	vec3 bitangent = cross(hit.normal, tangent);
 		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
@@ -500,7 +502,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint mediu
 		// reflect
 		
 		vec3 vertex;
-		vec3 normal_map = hit.normal;
+		vec3 normal_map = hit.TBN;
 		
 		#if 1
 		if (hit.normal.z > 0.0) {

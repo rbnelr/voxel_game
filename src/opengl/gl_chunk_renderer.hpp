@@ -576,6 +576,23 @@ struct Raytracer {
 	void upload_changes (OpenglRenderer& r, Game& game, Input& I);
 
 	void draw (OpenglRenderer& r, Game& game);
+
+	struct Cone {
+		float3 dir;
+		float  slope;
+		float  weight;
+		float3 _pad;
+	};
+	struct ConeConfig {
+		int count;
+		int _pad[3];
+		Cone cones[32];
+	};
+	ConeConfig cone_data;
+
+	Ubo cones_ubo = {"RT.cones_ubo"};
+
+	void vct_conedev (OpenglRenderer& r, Game& game);
 };
 
 

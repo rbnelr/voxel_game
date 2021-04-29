@@ -18,7 +18,8 @@
 		},
 		{
 			"color": "terrain/jungle_mntn2_d.jpg",
-			"norml": "terrain/jungle_mntn2_n.jpg",
+			//"norml": "terrain/jungle_mntn2_n.jpg",
+			"norml": "morgan-pepper-stylized-crystals-graph-normal.png",
 			"gloss": "terrain/jungle_mntn2_s.jpg"
 		}
 	]

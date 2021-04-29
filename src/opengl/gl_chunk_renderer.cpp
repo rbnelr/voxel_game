@@ -163,9 +163,71 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 }
 
 //
+lrgba cols[] = {
+	{1,0,0,1},
+	{0,1,0,1},
+	{0,0,1,1},
+	{1,1,0,1},
+	{1,0,1,1},
+	{0,1,1,1},
+};
+void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
+	static bool draw_cones=false, draw_boxes=true;
+	static int count = 5;
+	static float cone_ang = 60.9f;
+	static float start_dist = 0.16f;
+
+	static float start_azim = 0;
+	static float elev_offs = 0;
+
+	ImGui::SameLine(); ImGui::Checkbox("draw cones", &draw_cones);
+	ImGui::SameLine(); ImGui::Checkbox("draw boxes", &draw_boxes);
+
+	ImGui::SliderInt("count", &count, 0, 16);
+	ImGui::DragFloat("cone_ang", &cone_ang, 0.1f, 0, 180);
+	ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
+
+	ImGui::DragFloat("start_azim", &start_azim, 0.1f);
+	ImGui::DragFloat("elev_offs", &elev_offs, 0.1f);
+
+	float ang = deg(cone_ang);
+
+	cone_data.count = count+1;
+
+	for (int i=0; i<count+1; ++i) {
+		float3 cone_pos = game.player.pos;
+
+		float3x3 rot = float3x3::identity();
+		if (i > 0)
+			rot = rotate3_Z((float)(i-1) / count * deg(360) + deg(start_azim)) *
+			      rotate3_Y(deg(90) - ang * 0.5f - deg(elev_offs));
+
+		auto& col = cols[i % ARRLEN(cols)];
+		if (draw_cones) g_debugdraw.wire_cone(cone_pos, ang, 30, rot, col, 32, 4);
+
+		float3 cone_dir = rot * float3(0,0,1);
+		float cone_slope = tan(ang * 0.5f);
+		float dist = start_dist;
+
+		cone_data.cones[i] = { cone_dir, cone_slope, 1.0f / (count+1), 0 };
+		
+		int j=0;
+		while (j++ < 100 && dist < 100.0f) {
+			float3 pos = cone_pos + cone_dir * dist;
+			float r = cone_slope * dist;
+			//g_debugdraw.wire_sphere(pos, r, col, 16, 4);
+			if (draw_boxes) g_debugdraw.wire_cube(pos, r*2, col);
+
+			dist = (dist + r) / (1.0f - cone_slope);
+		}
+	}
+}
+
 void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	ZoneScoped;
 	
+	vct_conedev(r, game);
+
 	bool macro_change = false;
 
 	if (I.buttons[KEY_R].went_down)
@@ -467,44 +529,6 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	OGL_TRACE("raytracer.draw");
 
 	if (!shad->prog) return;
-	
-	if (1) {
-		static float cone_slope = 0.516f;
-		static float start_dist = 0.16f;
-		static float ang_offs = 5.0f;
-
-		ImGui::SliderFloat("cone_ang", &cone_slope, 0, 1);
-		ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
-		ImGui::DragFloat("ang_offs", &ang_offs, 0.02f);
-
-		float3 cone_dirs[1+5];
-		cone_dirs[0] = float3(0,0,1);
-
-		for (int i=0; i<5; ++i) {
-			cone_dirs[i+1] = rotate3_Z(deg(360/5) * ((float)i + 0.5f)) * rotate3_X(deg(360/5/2 - ang_offs)) * float3(0,1,0);
-		}
-
-		for (int i=0; i<ARRLEN(cone_dirs); ++i) {
-			float3 cone_pos = game.player.pos;
-			float3 cone_dir = cone_dirs[i];
-
-			float dist = start_dist;
-
-			//g_debugdraw.vector(cone_pos, float3(+cone_slope,0,1)*100, lrgba(0,0,1,1));
-			//g_debugdraw.vector(cone_pos, float3(-cone_slope,0,1)*100, lrgba(0,0,1,1));
-
-			int j=0;
-			while (j++ < 100 && dist < 100.0f) {
-				float3 pos = cone_pos + cone_dir * dist;
-				float r = cone_slope * dist;
-				g_debugdraw.wire_sphere(pos, r, lrgba(1,0,0,1), 16, 4);
-
-				dist = (dist + r) / (1.0f - cone_slope);
-			}
-		}
-	}
-
-
 
 	glUseProgram(shad->prog);
 
@@ -572,11 +596,13 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		{"heat_gradient", r.gradient, r.normal_sampler},
 	});
 
-	glBindImageTexture(4, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
+
+	glBindImageTexture(5, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 	if (taa_enable) {
-		glBindImageTexture(5, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(6, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
+		glBindImageTexture(6, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(7, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
 	}
 
 	int2 dispatch_size;

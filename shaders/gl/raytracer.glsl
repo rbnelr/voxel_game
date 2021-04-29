@@ -12,11 +12,11 @@ layout(local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 #include "rt_util.glsl"
 
-layout(rgba16f, binding = 4) writeonly restrict uniform image2D output_color;
+layout(rgba16f, binding = 5) writeonly restrict uniform image2D output_color;
 
 #if TAA_ENABLE
-layout(rgba16f, binding = 5) writeonly restrict uniform image2D taa_color;
-layout(r16ui  , binding = 6) writeonly restrict uniform uimage2D taa_posage;
+layout(rgba16f, binding = 6) writeonly restrict uniform image2D taa_color;
+layout(r16ui  , binding = 7) writeonly restrict uniform uimage2D taa_posage;
 
 uniform  sampler2D taa_history_color;
 uniform usampler2D taa_history_posage;
@@ -85,6 +85,19 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #endif
 }
 
+struct Cone {
+	vec3   dir;
+	float  slope;
+	float  weight;
+	float _pad0, _pad1, _pad2;
+};
+
+layout(std140, binding = 4) uniform ConeConfig {
+	ivec4 count; // vector for padding
+	Cone cones[32];
+} cones;
+
+const float vct_start_dist = 0.1;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
@@ -104,12 +117,11 @@ vec4 read_vct_texture (vec3 texcoord, float size) {
 	return textureLod(vct_tex, texcoord * INV_WORLD_SIZEf, lod);
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist) {
-	float start_dist = 0.1;
-	
 	vec3 color = vec3(0.0);
 	float tranp = 1.0; // inverse alpha to support alpha stepsize fix
 	
-	float dist = start_dist;
+	float dist = vct_start_dist;
+	cone_slope *= 1.0;
 	
 	for (int i=0; i<1000; ++i) {
 		#if VISUALIZE_COST
@@ -120,7 +132,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist)
 		#endif
 		
 		vec3 pos = cone_pos + cone_dir * dist;
-		float r = cone_slope * dist;
+		float r = cone_slope * dist * 2.0;
 		
 		vec4 sampl = read_vct_texture(pos, r);
 		
@@ -143,18 +155,27 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
 	
+	//cone_pos = hit.pos;
+	//cone_dir = hit.TBN[2];
+	//cone_dir = reflect(view_ray_dir, hit.TBN[2]);
+	
 	float max_dist = 400.0;
 	float cone_slope = 1.0 / vct_size;
 	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist).rgb;
 	#else
 	vec3 col = vec3(0.0);
 	if (did_hit) {
-		vec3 dir = hit.normal;
+		//vec3 dir = hit.normal;
 		//vec3 dir = reflect(view_ray_dir, hit.normal);
 		
 		float max_dist = 400.0;
-		float cone_slope = 1.0 / (vct_size / 4.0);
-		vec3 light = trace_cone(hit.pos, dir, cone_slope, max_dist).rgb;
+		vec3 light = vec3(0.0);
+		
+		for (int i=0; i<cones.count.x; ++i) {
+			Cone c = cones.cones[i];
+			vec3 dir = hit.TBN * c.dir;
+			light += trace_cone(hit.pos, dir, c.slope, max_dist).rgb * c.weight;
+		}
 		
 		if (visualize_light)
 			hit.col = vec3(1.0);
@@ -223,19 +244,19 @@ void main () {
 	Hit hit;
 	bool was_reflected = false;
 	if (bray && trace_ray_refl_refr(ray_pos, ray_dir, max_dist, start_bid, hit, was_reflected, RAYT_PRIMARY)) {
-		ray_pos = hit.pos + hit.normal * 0.001;
+		ray_pos = hit.pos + hit.TBN[2] * 0.001;
 		
-		surf_light = collect_sunlight(ray_pos, hit.normal);
+		surf_light = collect_sunlight(ray_pos, hit.TBN[2]);
 		
 		#if 0 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
 			vec3 cur_pos = ray_pos;
-			vec3 cur_normal = hit.normal;
+			mat3 TBN = hit.TBN;
 			vec3 contrib = vec3(hit.occl_spec.y);
 			
-			ray_dir = normalize(reflect(ray_dir, cur_normal) + random_in_sphere()*0.2);
+			ray_dir = normalize(reflect(ray_dir, TBN[2]) + random_in_sphere()*0.2);
 			
 			for (int j=0; j<bounces_max_count-1; ++j) {
 				bool was_reflected2;
@@ -243,14 +264,14 @@ void main () {
 				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_SPECULAR))
 					break;
 				
-				cur_pos = hit2.pos + hit2.normal * 0.001;
+				cur_pos = hit2.pos + TBN[2] * 0.001;
 				max_dist -= hit2.dist;
 				
-				cur_normal = hit2.normal;
+				TBN = hit2.TBN;
 				
-				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+				ray_dir = TBN * hemisphere_sample(); // already cos weighted
 				
-				vec3 light2 = collect_sunlight(cur_pos, cur_normal);
+				vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
 				
 				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
 				contrib *= hit2.col;
@@ -262,23 +283,23 @@ void main () {
 			max_dist = bounces_max_dist;
 			
 			vec3 cur_pos = ray_pos;
-			vec3 cur_normal = hit.normal;
+			mat3 TBN = hit.TBN;
 			vec3 contrib = vec3(hit.occl_spec.x);
 			
 			for (int j=0; j<bounces_max_count; ++j) {
-				ray_dir = get_tangent_to_world(cur_normal) * hemisphere_sample(); // already cos weighted
+				ray_dir = TBN * hemisphere_sample(); // already cos weighted
 				
 				bool was_reflected2;
 				Hit hit2;
 				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_DIFFUSE))
 					break;
 				
-				cur_pos = hit2.pos + hit2.normal * 0.001;
+				TBN = hit2.TBN;
+				
+				cur_pos = hit2.pos + TBN[2] * 0.001;
 				max_dist -= hit2.dist;
 				
-				cur_normal = hit2.normal;
-				
-				vec3 light2 = collect_sunlight(cur_pos, cur_normal);
+				vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
 				
 				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
 				contrib *= hit2.col;
@@ -290,8 +311,8 @@ void main () {
 			hit.pos -= float(WORLD_SIZE/2);
 			
 			uvec3 rounded = uvec3(ivec3(round(hit.pos))) & 0x3fffu;
-			if      (abs(hit.normal.x) > 0.9) surf_position =           rounded.x;
-			else if (abs(hit.normal.y) > 0.9) surf_position = 0x4000u | rounded.y;
+			if      (abs(hit.TBN[2].x) > 0.9) surf_position =           rounded.x;
+			else if (abs(hit.TBN[2].y) > 0.9) surf_position = 0x4000u | rounded.y;
 			else                              surf_position = 0xc000u | rounded.z;
 			
 			vec4 prev_clip = prev_world2clip * vec4(hit.pos, 1.0);
