@@ -52,17 +52,16 @@ uniform uint size;
 			#else
 			uvec3 read_pos = pos * 2u;
 			
-			vec4 sum;
-			sum  = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,0));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,0));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,0));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,0));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,1));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,1));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,1));
-			sum += texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,1));
+			vec4 a = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,0));
+			vec4 b = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,0));
+			vec4 c = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,0));
+			vec4 d = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,0));
+			vec4 e = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,0,1));
+			vec4 f = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,0,1));
+			vec4 g = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(0,1,1));
+			vec4 h = texelFetchOffset(vct_tex, ivec3(read_pos), read_mip, ivec3(1,1,1));
 			
-			vec4 val = sum * 0.125;
+			vec4 val = (((a+b) + (c+d)) + ((e+f) + (g+h))) * 0.125;
 			#endif
 			
 			imageStore(write_mip, ivec3(pos), val);

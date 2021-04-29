@@ -97,14 +97,15 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-const float vct_start_dist = 0.1;
+const float vct_start_dist = 1.0 / 16;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
-vec4 read_vct_texture (vec3 texcoord, float size) {
+vec4 read_vct_texture (vec3 texcoord, float r) {
+	float size = r * 2.0;
 	float lod = log2(size);
 	
-	#if 1
+	#if 0
 	// support negative lod (size < 1.0) by snapping texture coords to nearest texels
 	// when approaching size=0
 	// size = 0.5 would snap [0.25,0.75] to 0.5
@@ -121,7 +122,6 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist)
 	float tranp = 1.0; // inverse alpha to support alpha stepsize fix
 	
 	float dist = vct_start_dist;
-	cone_slope *= 1.0;
 	
 	for (int i=0; i<1000; ++i) {
 		#if VISUALIZE_COST
@@ -132,13 +132,14 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist)
 		#endif
 		
 		vec3 pos = cone_pos + cone_dir * dist;
-		float r = cone_slope * dist * 2.0;
+		float r = cone_slope * dist;
 		
 		vec4 sampl = read_vct_texture(pos, r);
+		sampl *= r;
 		
 		color += tranp * sampl.rgb;
-		//tranp -= tranp * (1.0 - (1.0 - sampl.a));
-		tranp -= tranp * (1.0 - pow(1.0 - sampl.a, r*2));
+		tranp -= tranp * (1.0 - (1.0 - sampl.a));
+		//tranp -= tranp * (1.0 - pow(1.0 - sampl.a, r*2));
 		
 		if (tranp < 0.001 || dist >= max_dist)
 			break;
