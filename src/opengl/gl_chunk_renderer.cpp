@@ -180,8 +180,9 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 	static float start_azim = 0;
 	static float elev_offs = 0;
 
-	ImGui::SameLine(); ImGui::Checkbox("draw cones", &draw_cones);
-	ImGui::SameLine(); ImGui::Checkbox("draw boxes", &draw_boxes);
+	ImGui::Checkbox("draw cones", &draw_cones);
+	ImGui::SameLine();
+	ImGui::Checkbox("draw boxes", &draw_boxes);
 
 	ImGui::SliderInt("count", &count, 0, 16);
 	ImGui::DragFloat("cone_ang", &cone_ang, 0.1f, 0, 180);

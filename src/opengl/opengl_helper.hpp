@@ -1276,14 +1276,10 @@ struct Framebuffer {
 	bool nearest = false;
 
 	void imgui () {
-		if (imgui_push("Renderscale")) {
-			ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", size.x, size.y, (float)(size.x * size.y) / (1000*1000));
-			ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
+		ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", size.x, size.y, (float)(size.x * size.y) / (1000*1000));
+		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
 
-			ImGui::Checkbox("nearest", &nearest);
-
-			imgui_pop();
-		}
+		ImGui::Checkbox("nearest", &nearest);
 	}
 
 	static constexpr GLenum color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8

@@ -53,6 +53,13 @@ inline void imgui_pop () {
 	g_imgui.tree_depth--;
 }
 
+inline bool imgui_treenode (const char* label, bool* popen=nullptr) {
+	if (popen) ImGui::SetNextItemOpen(*popen);
+	bool open = ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_DefaultOpen);
+	if (popen) *popen = open;
+	return open;
+}
+
 inline bool imgui_header (const char* label, bool* popen=nullptr) {
 	if (popen) ImGui::SetNextItemOpen(*popen);
 	bool open = ImGui::CollapsingHeader(label, ImGuiTreeNodeFlags_DefaultOpen);

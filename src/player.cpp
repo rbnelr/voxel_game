@@ -99,13 +99,13 @@ void Player::update_movement (Input& I, Game& game) {
 		vel += jump_impulse;
 }
 
-void Player::update (Input& I, Game& game) {
+void Player::update (Input& I, int2 const& viewport_size, Game& game) {
 
-	game.player_view = calc_matricies(I, game.chunks);
+	game.player_view = calc_matricies(viewport_size, game.chunks);
 
 	game.view = game.player_view;
 	if (game.activate_flycam)
-		game.view = game.flycam.update(I);
+		game.view = game.flycam.update(I, viewport_size);
 
 	//
 	auto& block = selected_block;
@@ -127,7 +127,7 @@ void Player::update (Input& I, Game& game) {
 	}
 }
 
-Camera_View Player::calc_matricies (Input& I, Chunks& chunks) {
+Camera_View Player::calc_matricies (int2 const& viewport_size, Chunks& chunks) {
 	float3x3 body_rotation = rotate3_Z(rot_ae.x);
 	float3x3 body_rotation_inv = rotate3_Z(-rot_ae.x);
 
@@ -146,7 +146,7 @@ Camera_View Player::calc_matricies (Input& I, Chunks& chunks) {
 	Camera_View view;
 	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
 	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
-	view.cam_to_clip = cam.calc_cam_to_clip(I.window_size, &view.frustrum, &view.clip_to_cam);
+	view.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &view.frustrum, &view.clip_to_cam);
 	view.clip_near = cam.clip_near;
 	view.clip_far = cam.clip_far;
 	view.calc_frustrum();

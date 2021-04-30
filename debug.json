@@ -93,6 +93,11 @@
 		"debug_draw": {
 			"draw_occluded": false,
 			"occluded_alpha": 0.30000001192092896
+		},
+		"imopen": {
+			"framebuffer": false,
+			"debugdraw": false,
+			"gui": false
 		}
 	}
 }

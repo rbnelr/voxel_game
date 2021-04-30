@@ -161,7 +161,7 @@ void Game::update (Window& window, Input& I) {
 	player.update_movement(I, *this);
 	physics.update_player(I.dt, chunks, player);
 
-	player.update(I, *this);
+	player.update(I, I.window_size, *this);
 
 	auto& sel = player.selected_block;
 	if (sel)
@@ -178,6 +178,8 @@ void Game::update (Window& window, Input& I) {
 
 	if (activate_flycam || player.third_person)
 		g_debugdraw.cylinder(player.pos, player.radius, player.height, lrgba(1,0,1,0.5f));
+	if (activate_flycam)
+		g_debugdraw.axis_gizmo(view, I.window_size);
 
 	ImGui::End();
 }

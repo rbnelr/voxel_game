@@ -122,6 +122,8 @@ struct DebugDraw {
 	void wire_frustrum (Camera_View const& view, lrgba const& col);
 
 	void cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides=32);
+
+	void axis_gizmo (Camera_View const& view, int2 const& viewport_size);
 };
 
 inline DebugDraw g_debugdraw;

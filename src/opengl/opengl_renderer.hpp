@@ -212,7 +212,12 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, bloom_renderer, line_width, debug_draw)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, bloom_renderer, line_width, debug_draw, imopen)
+
+	struct ImguiOpen {
+		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
+		bool framebuffer=true, debugdraw=true, gui=true;
+	};
 
 	virtual void deserialize (nlohmann::ordered_json const& j) { j.get_to(*this); }
 	virtual void serialize (nlohmann::ordered_json& j) { j = *this; }
@@ -332,27 +337,39 @@ public:
 	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files);
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
 
+	ImguiOpen imopen;
+
 	virtual void screenshot_imgui (Input& I) {
 		trigger_screenshot = ImGui::Button("Screenshot [F8]") || I.buttons[KEY_F8].went_down;
 		ImGui::SameLine();
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
 	virtual void graphics_imgui (Input& I) {
-		framebuffer.imgui();
+		if (imgui_treenode("Framebuffer", &imopen.framebuffer)) {
+			framebuffer.imgui();
 
-		ImGui::Checkbox("wireframe", &wireframe);
-		ImGui::SameLine();
-		ImGui::Checkbox("backfaces", &wireframe_backfaces);
+			ImGui::TreePop();
+		}
 
-		debug_draw.imgui();
-		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
+		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
+			ImGui::Checkbox("wireframe", &wireframe);
+			ImGui::SameLine();
+			ImGui::Checkbox("backfaces", &wireframe_backfaces);
 
-		ImGui::Separator();
+			debug_draw.imgui();
+			ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
+
+			ImGui::TreePop();
+		}
 
 		ImGui::Checkbox("draw_chunks", &chunk_renderer._draw_chunks);
-		ImGui::Checkbox("crosshair", &gui_renderer.crosshair);
 
-		ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
+		if (imgui_treenode("GUI", &imopen.gui)) {
+			ImGui::Checkbox("crosshair", &gui_renderer.crosshair);
+			ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
+
+			ImGui::TreePop();
+		}
 
 		raytracer.imgui();
 		bloom_renderer.imgui();

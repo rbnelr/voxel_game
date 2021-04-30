@@ -185,7 +185,7 @@ float3x3 Flycam::calc_world_to_cam_rot (float3x3* cam_to_world_rot) {
 	return calc_aer_rotation(cam.rot_aer, cam_to_world_rot);
 }
 
-Camera_View Flycam::update (Input& I) {
+Camera_View Flycam::update (Input& I, int2 const& viewport_size) {
 
 	//// look
 	rotate_with_mouselook(I, &cam.rot_aer.x, &cam.rot_aer.y, cam.vfov);
@@ -235,7 +235,7 @@ Camera_View Flycam::update (Input& I) {
 	Camera_View v;
 	v.world_to_cam = world_to_cam_rot * translate(-cam.pos);
 	v.cam_to_world = translate(cam.pos) * cam_to_world_rot;
-	v.cam_to_clip = cam.calc_cam_to_clip(I.window_size, &v.frustrum, &v.clip_to_cam);
+	v.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &v.frustrum, &v.clip_to_cam);
 	v.clip_near = cam.clip_near;
 	v.clip_far = cam.clip_far;
 	v.calc_frustrum();

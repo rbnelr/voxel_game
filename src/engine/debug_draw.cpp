@@ -219,3 +219,20 @@ void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba 
 		cos0 = cos1;
 	}
 }
+
+void DebugDraw::axis_gizmo (Camera_View const& view, int2 const& viewport_size) {
+	//float2 pos_px = float2(viewport_size.x - 100.5f, 100.5f);
+	//float2 pos_clip = pos_px / (float2)viewport_size * 2.0f - 1.0f;
+	float2 pos_clip = float2(-0.9f, -0.9f);
+
+	float3 pos_cam = (float3)(view.clip_to_cam * float4(pos_clip, 0,1));
+	float3 pos_world = (float3)(view.cam_to_world * float4(pos_cam,1));
+
+	float size_clip = 0.05f;
+	float3 pos_cam2 = (float3)(view.clip_to_cam * float4(pos_clip.x, pos_clip.y + size_clip, 0,1)).y; // size in cam = size in world
+	float size_world = pos_cam2.y - pos_cam.y;
+
+	vector(pos_world, float3(size_world,0,0), lrgba(1,0,0,1));
+	vector(pos_world, float3(0,size_world,0), lrgba(0,1,0,1));
+	vector(pos_world, float3(0,0,size_world), lrgba(0,0,1,1));
+}

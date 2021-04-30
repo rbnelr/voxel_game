@@ -219,11 +219,11 @@ struct Player {
 
 
 	void update_controls (Input& I, Game& game);
-	void update (Input& I, Game& game);
+	void update (Input& I, int2 const& viewport_size, Game& game);
 
 	void update_movement (Input& I, Game& game);
 
-	Camera_View calc_matricies (Input& I, Chunks& chunks);
+	Camera_View calc_matricies (int2 const& viewport_size, Chunks& chunks);
 
 	bool calc_ground_contact (Chunks& chunks, bool* stuck);
 
