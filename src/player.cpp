@@ -175,7 +175,9 @@ void Player::calc_selected_block (SelectedBlock& block, Game& game, Camera_View&
 	ray.dir = (float3x3)view.cam_to_world * float3(0,0,-1);
 	ray.pos = view.cam_to_world * float3(0,0,0);
 
-	game.raycast_breakable_blocks(block, ray, reach, game.creative_mode);
+	VoxelHit hit;
+	block.is_selected = game.raycast_breakable_blocks(ray, reach, hit, game.creative_mode);
+	if (block.is_selected) block.hit = hit; // only overwrite hit when
 }
 
 void BreakBlock::update (Input& I, Game& game, Player& player) {
@@ -192,7 +194,7 @@ void BreakBlock::update (Input& I, Game& game, Player& player) {
 	if (!anim_triggered && anim_t > anim_hit_t && inp) {
 		//clog(INFO, "[BreakBlock] anim hit");
 		if (player.selected_block) {
-			game.apply_damage(player.selected_block, player.inventory.toolbar.get_selected(), game.creative_mode);
+			player.apply_block_damage(game.chunks, player.selected_block, player.inventory.toolbar.get_selected(), game.creative_mode);
 			hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 		}
 		anim_triggered = true;
@@ -224,7 +226,7 @@ void BlockPlace::update (Input& I, Game& game, Player& player) {
 		bool block_place_is_inside_player = cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
 
 		if (!block_place_is_inside_player || g_assets.block_types[(block_id)item.id].collision != CM_SOLID) {
-			game.try_place_block(block_place_pos, (block_id)item.id);
+			player.try_place_block(game.chunks, block_place_pos, (block_id)item.id);
 		} else {
 			trigger = false;
 		}
@@ -306,3 +308,46 @@ bool Player::calc_ground_contact (Chunks& chunks, bool* stuck) {
 	return grounded;
 }
 
+
+void Player::apply_block_damage (Chunks& chunks, SelectedBlock& block, Item& item, bool creative_mode) {
+	assert(block);
+	auto& tool_props = item.get_props();
+
+	auto hardness = g_assets.block_types[block.hit.bid].hardness;
+
+	if (!g_assets.block_types.block_breakable(block.hit.bid))
+		return;
+
+	float dmg = 0;
+	if (hardness == 0) {
+		dmg = 1.0f;
+	} else if (hardness == 255) {
+		dmg = 0.0f;
+	} else {
+		float damage_multiplier = (float)tool_props.hardness / (float)hardness;
+		if (tool_props.tool == g_assets.block_types[block.hit.bid].tool)
+			damage_multiplier *= TOOL_MATCH_BONUS_DAMAGE;
+
+		dmg = ((float)tool_props.damage / 255.0f) * damage_multiplier;
+
+		if (creative_mode)
+			dmg = 1.0f;
+	}
+	block.damage += dmg;
+
+	if (block.damage >= 1) {
+		g_assets.break_sound.play();
+
+		chunks.write_block(block.hit.pos.x, block.hit.pos.y, block.hit.pos.z, g_assets.block_types.air_id);
+	}
+}
+
+bool Player::try_place_block (Chunks& chunks, int3 pos, block_id id) {
+	auto oldb = chunks.read_block(pos.x, pos.y, pos.z);
+
+	if (!g_assets.block_types.block_breakable(oldb)) { // non-breakable blocks are solids and gasses
+		chunks.write_block(pos.x, pos.y, pos.z, id);
+		return true;
+	}
+	return false;
+}

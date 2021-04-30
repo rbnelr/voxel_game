@@ -174,6 +174,8 @@ struct Assets {
 
 	PlayerAssets			player;
 
+	Sound break_sound = { "dig1", 1.2f, 0.8f };
+
 	void load_block_types (json const& blocks_json);
 	void load_block_tiles (json const& blocks_json);
 

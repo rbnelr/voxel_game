@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-79.31416320800781,
-				-108.86328887939453,
-				36.55040740966797
+				26.086612701416016,
+				-18.396413803100586,
+				14.656248092651367
 			],
 			"rot_aer": [
-				3.0887043476104736,
-				-0.27928856015205383,
+				0.5158629417419434,
+				-0.5062944889068604,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -64,8 +64,8 @@
 			"_draw_chunks": true
 		},
 		"raytracer": {
-			"enable": true,
-			"enable_vct": true,
+			"enable": false,
+			"enable_vct": false,
 			"max_iterations": 478,
 			"rand_seed_time": true,
 			"sunlight_enable": true,
@@ -78,7 +78,7 @@
 			"bounces_enable": true,
 			"bounces_max_dist": 128.0,
 			"bounces_max_count": 2,
-			"only_primary_rays": true,
+			"only_primary_rays": false,
 			"taa_alpha": 0.05000000074505806,
 			"taa_enable": true
 		},

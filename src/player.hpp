@@ -230,4 +230,6 @@ struct Player {
 	void calc_selected_block (SelectedBlock& block, Game& game, Camera_View& view, float reach);
 	float3 calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation);
 
+	void apply_block_damage (Chunks& chunks, SelectedBlock& block, Item& item, bool creative_mode);
+	bool try_place_block (Chunks& chunks, int3 pos, block_id id);
 };

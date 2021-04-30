@@ -31,8 +31,6 @@ struct Game {
 
 	BlockUpdate block_update;
 
-	Sound break_sound = { "dig1", 1.2f, 0.8f };
-
 	bool activate_flycam = false;
 	bool creative_mode = false;
 	bool trigger_place_block = false;
@@ -48,9 +46,6 @@ struct Game {
 	void update (Window& window, Input& I);
 
 	//
-	void raycast_breakable_blocks (SelectedBlock& block, Ray const& ray, float max_dist, bool hit_at_max_dist=false);
-
-	void apply_damage (SelectedBlock& block, Item& item, bool creative_mode);
-	bool try_place_block (int3 pos, block_id id);
+	bool raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist=false);
 
 };

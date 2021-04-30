@@ -208,7 +208,7 @@ void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
 	r.state.bind_textures(shad, {});
 
 	shad->set_uniform("block_pos", (float3)block.hit.pos);
-	shad->set_uniform("model_to_clip", face_rotation[0]);
+	shad->set_uniform("face_rotation", face_rotation[0]);
 	shad->set_uniform("tint", srgba(40,40,40,240));
 
 	glBindVertexArray(r.mesh_data.vao);
