@@ -172,7 +172,7 @@ lrgba cols[] = {
 	{0,1,1,1},
 };
 void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
-	static bool draw_cones=false, draw_boxes=true;
+	static bool draw_cones=false, draw_boxes=false;
 	static int count = 5;
 	static float cone_ang = 60.9f;
 	static float start_dist = 0.16f;
@@ -239,11 +239,11 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 	}
 
 	if (I.buttons[KEY_T].went_down) {
-		update_debug_rays = !update_debug_rays;
+		update_debugdraw = !update_debugdraw;
 	}
-	if (clear_debug_rays) { //  || update_debug_rays
-		r.debug_draw.indirect_lines.clear();
-		clear_debug_rays = false;
+	if (clear_debugdraw || update_debugdraw) {
+		r.debug_draw.clear_indirect();
+		clear_debugdraw = false;
 	}
 
 	if (macro_change && shad) {
@@ -612,7 +612,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
 
-	shad->set_uniform("update_debug_rays",  update_debug_rays);
+	shad->set_uniform("update_debugdraw",  update_debugdraw);
 
 	shad->set_uniform("dispatch_size", dispatch_size);
 	shad->set_uniform("prev_world2clip", init ? world2clip : prev_world2clip);
@@ -621,6 +621,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	init = false;
 
 	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+
+
+	glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(6, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(7, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
 
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }

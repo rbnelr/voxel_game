@@ -413,8 +413,8 @@ struct Raytracer {
 
 	bool  only_primary_rays = true;
 
-	bool  update_debug_rays = false;
-	bool  clear_debug_rays = false;
+	bool  update_debugdraw = false;
+	bool  clear_debugdraw = false;
 
 	std::vector<gl::MacroDefinition> get_macros () {
 		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
@@ -438,8 +438,8 @@ struct Raytracer {
 		ImGui::Checkbox("enable [R]", &enable);
 		macro_change |= ImGui::Checkbox("enable VCT [V]", &enable_vct);
 
-		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
-		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
+		ImGui::Checkbox("update debugdraw [T]", &update_debugdraw);
+		clear_debugdraw = ImGui::Button("clear debugdraw") || clear_debugdraw;
 
 		ImGui::SliderFloat("taa_alpha", &taa_alpha, 0,1, "%f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SameLine();

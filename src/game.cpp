@@ -115,7 +115,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		}
 
 		{
-			bool open = imgui_header("Entities", &imopen.entities);
+			bool open = imgui_header("Misc", &imopen.entities);
 
 			if (open) ImGui::Checkbox("Toggle Flycam [P]", &activate_flycam);
 			if (window.input.buttons[KEY_P].went_down) {

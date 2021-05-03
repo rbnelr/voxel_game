@@ -76,9 +76,8 @@ struct DebugDraw {
 
 		template <typename ATTRIBS>
 		static void attributes (ATTRIBS& a) {
-			int loc = 0;
 			a.init(sizeof(PosVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos) >(loc++, "pos",  offsetof(PosVertex, pos));
+			a.template add<AttribMode::FLOAT, decltype(pos) >(0, "pos",  offsetof(PosVertex, pos));
 		}
 	};
 	struct Instance {
@@ -90,11 +89,10 @@ struct DebugDraw {
 
 		template <typename ATTRIBS>
 		static void attributes (ATTRIBS& a) {
-			int loc = 1;
 			a.init(sizeof(Instance), true);
-			a.template add<AttribMode::FLOAT, decltype(pos) >(loc++, "instance_pos",  offsetof(Instance, pos));
-			a.template add<AttribMode::FLOAT, decltype(size)>(loc++, "instance_size", offsetof(Instance, size));
-			a.template add<AttribMode::FLOAT, decltype(col) >(loc++, "instance_col",  offsetof(Instance, col));
+			a.template add<AttribMode::FLOAT, decltype(pos)>(1, "instance_pos",  offsetof(Instance, pos));
+			a.template add<AttribMode::FLOAT, decltype(size)>(2, "instance_size",  offsetof(Instance, size));
+			a.template add<AttribMode::FLOAT, decltype(col)>(3, "instance_col",  offsetof(Instance, col));
 		}
 	};
 

@@ -55,15 +55,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("binds");
 
-		//{ // init debug_draw.indirect_lines
-		//	glDrawArraysIndirectCommand cmd = {};
-		//	cmd.instanceCount = 1;
-		//	glBindBuffer(GL_ARRAY_BUFFER, debug_draw.indirect_lines.vbo);
-		//	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cmd), &cmd);
-		//	glBindBuffer(GL_ARRAY_BUFFER, 0);
-		//}
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, debug_draw.indirect_lines.vbo);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, debug_draw.indirect_vbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_meshes_ssbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, block_tiles_ssbo);
 	}
@@ -473,6 +465,21 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	s_occluded.blend_enable = true;
 
 	{
+		OGL_TRACE("draw tris");
+
+		glBindVertexArray(vbo_tris.vao);
+		stream_buffer(vbo_tris, g_debugdraw.tris);
+
+		if (g_debugdraw.tris.size() > 0) {
+			r.state.set(s);
+			glUseProgram(shad_tris->prog);
+			r.state.bind_textures(shad_tris, {});
+
+			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)g_debugdraw.tris.size());
+		}
+	}
+
+	{
 		OGL_TRACE("draw lines");
 	
 		glBindVertexArray(vbo_lines.vao);
@@ -505,46 +512,42 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 	{
 		OGL_TRACE("draw lines indirect");
 
-		glBindVertexArray(indirect_lines.vao);
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_lines.vbo);
+		glBindVertexArray(indirect_lines_vao);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
 
 		r.state.set(s);
 		glUseProgram(shad_lines->prog);
 		r.state.bind_textures(shad_lines, {});
 
-		glDrawArraysIndirect(GL_LINES, (void*)0);
+		glDrawArraysIndirect(GL_LINES, (void*)offsetof(IndirectBuffer, lines.cmd));
 
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	}
 
 	{
-		OGL_TRACE("draw tris");
-	
-		glBindVertexArray(vbo_tris.vao);
-		stream_buffer(vbo_tris, g_debugdraw.tris);
-	
-		if (g_debugdraw.tris.size() > 0) {
-			r.state.set(s);
-			glUseProgram(shad_tris->prog);
-			r.state.bind_textures(shad_tris, {});
-	
-			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)g_debugdraw.tris.size());
-		}
-	}
-
-	{
 		OGL_TRACE("draw wire cubes");
-	
-		glBindVertexArray(vbo_wire_cube.vao);
-		reupload_vbo(vbo_wire_cube.instance_vbo, g_debugdraw.wire_cubes.data(), g_debugdraw.wire_cubes.size(), GL_STREAM_DRAW);
+
+		r.state.set(s);
+		glUseProgram(shad_wire_cube->prog);
+		r.state.bind_textures(shad_wire_cube, {});
+
+		{
+			glBindVertexArray(vbo_wire_cube.vao);
+			reupload_vbo(vbo_wire_cube.instance_vbo, g_debugdraw.wire_cubes.data(), g_debugdraw.wire_cubes.size(), GL_STREAM_DRAW);
 		
-		if (g_debugdraw.wire_cubes.size() > 0) {
-			r.state.set(s);
-			glUseProgram(shad_wire_cube->prog);
-			r.state.bind_textures(shad_wire_cube, {});
-	
-			glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_indices), GL_UNSIGNED_SHORT,
-				(void*)0, (GLsizei)g_debugdraw.wire_cubes.size());
+			if (g_debugdraw.wire_cubes.size() > 0) {
+				glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_indices), GL_UNSIGNED_SHORT,
+					(void*)0, (GLsizei)g_debugdraw.wire_cubes.size());
+			}
+		}
+
+		{
+			glBindVertexArray(indirect_wire_cube_vao);
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
+
+			glDrawElementsIndirect(GL_LINES, GL_UNSIGNED_SHORT, (void*)offsetof(IndirectBuffer, wire_cubes.cmd));
+
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 		}
 	}
 }

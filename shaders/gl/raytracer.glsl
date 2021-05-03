@@ -119,7 +119,7 @@ vec4 read_vct_texture (vec3 texcoord, float r) {
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist) {
 	vec3 color = vec3(0.0);
-	float tranp = 1.0; // inverse alpha to support alpha stepsize fix
+	float transp = 1.0; // inverse alpha to support alpha stepsize fix
 	
 	float dist = vct_start_dist;
 	
@@ -135,19 +135,26 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist)
 		float r = cone_slope * dist;
 		
 		vec4 sampl = read_vct_texture(pos, r);
-		sampl *= r;
+		//sampl *= r;
 		
-		color += tranp * sampl.rgb;
-		tranp -= tranp * (1.0 - (1.0 - sampl.a));
-		//tranp -= tranp * (1.0 - pow(1.0 - sampl.a, r*2));
+		color += transp * sampl.rgb;
+		transp -= transp * (1.0 - (1.0 - sampl.a));
+		//transp -= transp * (1.0 - pow(1.0 - sampl.a, r*2.0));
 		
-		if (tranp < 0.001 || dist >= max_dist)
+		#if DEBUGDRAW
+		if (_debugdraw) {
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(1,0,0,1));
+			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(vec3(transp), 1.0));
+		}
+		#endif
+		
+		if (transp < 0.001 || dist >= max_dist)
 			break;
 		
 		dist = (dist + r) / (1.0f - cone_slope);
 	}
 	
-	return vec4(color, 1.0 - tranp);
+	return vec4(color, 1.0 - transp);
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
@@ -200,9 +207,8 @@ void main () {
 	//if (pxpos.x >= uint(view.viewport_size.x) || pxpos.y >= uint(view.viewport_size.y))
 	//	return;
 	
-#if DEBUG_RAYS
-	_dbg_ray = update_debug_rays && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	if (_dbg_ray) line_drawer_init();
+#if DEBUGDRAW
+	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 #endif
 	
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);

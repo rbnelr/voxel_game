@@ -471,24 +471,53 @@ struct VertexAttributes {
 	}
 };
 
+struct BufferLocation {
+	GLuint buf, offset;
+	BufferLocation (GLuint buf, GLuint offset=0): buf{buf}, offset{offset} {}
+	BufferLocation (Vbo const& buf, GLuint offset=0): buf{buf}, offset{offset} {}
+};
+
 // setup one VAO with a single associated VBO (and optionally EBO)
-template <typename T> Vao setup_vao (std::string_view label, GLuint vertex_buf, GLuint indices_buf=0, GLuint vbo_offset=0) {
+template <typename MESH_VERTEX> Vao setup_vao (std::string_view label, BufferLocation vbo, GLuint ebo=0) {
 	Vao vao = { label };
 	glBindVertexArray(vao);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buf);
-	if (indices_buf)
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indices_buf);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo.buf);
+	if (ebo) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 
 	VertexAttributes a;
-	a.buffer_offset = vbo_offset;
-	T::attributes(a);
+	a.buffer_offset = vbo.offset;
+	MESH_VERTEX::attributes(a);
 
 	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
 
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	if (indices_buf)
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	if (ebo) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	return vao;
+}
+
+template <typename MESH_VERTEX, typename INSTANCE_VERTEX> Vao setup_instanced_vao (std::string_view label,
+		BufferLocation instance_vbo, BufferLocation mesh_vbo, GLuint mesh_ebo=0) {
+	Vao vao = { label };
+	glBindVertexArray(vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, mesh_vbo.buf);
+	if (mesh_ebo) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh_ebo);
+	{
+		VertexAttributes a;
+		a.buffer_offset = mesh_vbo.offset;
+		MESH_VERTEX::attributes(a);
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, instance_vbo.buf);
+	{
+		VertexAttributes a;
+		a.buffer_offset = instance_vbo.offset;
+		INSTANCE_VERTEX::attributes(a);
+	}
+	glBindVertexArray(0); // unbind vao before unbinding EBO else GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	if (mesh_ebo) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	return vao;
 }
 
@@ -531,25 +560,7 @@ inline InstancedBuffer instanced_buffer (std::string_view label) {
 	InstancedBuffer v;
 	v.mesh_vbo = Vbo(label);
 	v.instance_vbo = Vbo(label);
-	
-	v.vao = { label };
-
-	glBindVertexArray(v.vao);
-
-	glBindBuffer(GL_ARRAY_BUFFER, v.mesh_vbo);
-	{
-		VertexAttributes a;
-		MeshVertex::attributes(a);
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, v.instance_vbo);
-	{
-		VertexAttributes a;
-		InstanceVertVertex::attributes(a);
-	}
-	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-
+	v.vao = setup_instanced_vao<MeshVertex, InstanceVertVertex>(label, v.instance_vbo, v.mesh_vbo);
 	return v;
 }
 
@@ -566,27 +577,7 @@ inline IndexedInstancedBuffer indexed_instanced_buffer (std::string_view label) 
 	v.mesh_vbo = Vbo(label);
 	v.mesh_ebo = Ebo(label);
 	v.instance_vbo = Vbo(label);
-
-	v.vao = { label };
-
-	glBindVertexArray(v.vao);
-
-	glBindBuffer(GL_ARRAY_BUFFER, v.mesh_vbo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, v.mesh_ebo);
-	{
-		VertexAttributes a;
-		MeshVertex::attributes(a);
-	}
-	glBindBuffer(GL_ARRAY_BUFFER, v.instance_vbo);
-	{
-		VertexAttributes a;
-		InstanceVertVertex::attributes(a);
-	}
-	glBindVertexArray(0); // unbind vao before unbinding EBO or GL_ELEMENT_ARRAY_BUFFER will be unbound from VAO
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
+	v.vao = setup_instanced_vao<MeshVertex, InstanceVertVertex>(label, v.instance_vbo, v.mesh_vbo, v.mesh_ebo);
 	return v;
 }
 
@@ -634,32 +625,13 @@ typedef struct {
 	uint32_t  baseInstance;
 } glDrawArraysIndirectCommand;
 
-template <typename T>
-struct IndirectVertexDrawer {
-	Vao vao;
-	Vbo vbo;
-	int max_count = 0;
-
-	IndirectVertexDrawer (std::string_view label) {
-		vbo = Vbo(label);
-		vao = setup_vao<T>(label, vbo, 0, sizeof(glDrawArraysIndirectCommand));
-	}
-	
-	void resize (int new_max_count) {
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(glDrawArraysIndirectCommand) + new_max_count * sizeof(T), nullptr, GL_STREAM_DRAW);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		max_count = new_max_count;
-	}
-
-	void clear () {
-		glDrawArraysIndirectCommand cmd = {};
-		cmd.instanceCount = 1;
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
-		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(cmd), &cmd);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-	}
-};
+typedef struct {
+	uint32_t count;
+	uint32_t primCount;
+	uint32_t firstIndex;
+	uint32_t baseVertex;
+	uint32_t baseInstance;
+} glDrawElementsIndirectCommand;
 
 // 
 struct Mesh {

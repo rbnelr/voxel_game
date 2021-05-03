@@ -39,38 +39,56 @@ struct glDrawArraysIndirectCommand {
 	uint first;
 	uint baseInstance;
 };
-struct IndirectLineDrawerVertex {
+
+struct glDrawElementsIndirectCommand {
+	uint count;
+	uint primCount;
+	uint firstIndex;
+	uint baseVertex;
+	uint baseInstance;
+};
+
+struct IndirectLineVertex {
 	vec4 pos;
 	vec4 col;
 };
+struct IndirectWireCubeInstace {
+	vec4 pos;
+	vec4 size;
+	vec4 col;
+};
 
-layout(std430, binding = 1) restrict buffer IndirectLineDrawer {
-	glDrawArraysIndirectCommand  cmd;
-	IndirectLineDrawerVertex     vertices[];
-} _line_drawer;
-uniform uint _line_drawer_max_vertices = 1024;
+struct IndirectLines {
+	glDrawArraysIndirectCommand cmd;
+	IndirectLineVertex vertices[4096];
+};
+struct IndirectWireCubes {
+	glDrawElementsIndirectCommand cmd;
+	uint _pad[3]; // padding for std430 alignment
+	IndirectWireCubeInstace vertices[4096];
+};
 
-void line_drawer_init () {
-	_line_drawer.cmd.count         = 0;
-	_line_drawer.cmd.instanceCount = 1;
-	_line_drawer.cmd.first         = 0;
-	_line_drawer.cmd.baseInstance  = 0;
+layout(std430, binding = 1) restrict buffer IndirectBuffer {
+	IndirectLines     lines;
+	IndirectWireCubes wire_cubes;
+} _dbgdraw;
+
+//void dbgdraw_clear () {
+//	_dbgdraw.lines     .cmd.count = 0;
+//	_dbgdraw.wire_cubes.cmd.primCount = 0;
+//}
+void dbgdraw_vector (vec3 pos, vec3 dir, vec4 col) {
+	if (_dbgdraw.lines.cmd.count < 4096) {
+		_dbgdraw.lines.vertices[_dbgdraw.lines.cmd.count++] = IndirectLineVertex( vec4(pos      , 0), col );
+		_dbgdraw.lines.vertices[_dbgdraw.lines.cmd.count++] = IndirectLineVertex( vec4(pos + dir, 0), col );
+		_dbgdraw.lines.cmd.count %= 4096;
+	}
 }
-void dbg_draw_vector (vec3 pos, vec3 dir, vec4 col) {
-	if (_line_drawer.cmd.count < _line_drawer_max_vertices) {
-		uint idx = _line_drawer.cmd.count;
-		
-		_line_drawer.vertices[idx].pos = vec4(pos, 0);
-		//_line_drawer.vertices[idx].pos = vec4(pos + dir * 0.97, 0);
-		_line_drawer.vertices[idx].col = col;
-		idx++;
-		
-		_line_drawer.vertices[idx].pos = vec4(pos + dir, 0);
-		_line_drawer.vertices[idx].col = col;
-		idx++;
-		
-		_line_drawer.cmd.count = idx;
-		//_line_drawer.cmd.count = idx % _line_drawer_max_vertices;
+void dbgdraw_wire_cube (vec3 pos, vec3 size, vec4 col) {
+	if (_dbgdraw.wire_cubes.cmd.primCount < 4096) {
+		_dbgdraw.wire_cubes.vertices[_dbgdraw.wire_cubes.cmd.primCount++] =
+			IndirectWireCubeInstace( vec4(pos, 0), vec4(size, 0), col);
+		_dbgdraw.wire_cubes.cmd.primCount %= 4096;
 	}
 }
 

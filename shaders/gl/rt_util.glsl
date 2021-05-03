@@ -24,10 +24,10 @@ uniform sampler2D		heat_gradient;
 #define RAYT_SPECULAR		3
 #define RAYT_SUN			4
 
-#define DEBUG_RAYS 1
-#if DEBUG_RAYS
-bool _dbg_ray = false;
-uniform bool update_debug_rays = false;
+#define DEBUGDRAW 1
+#if DEBUGDRAW
+bool _debugdraw = false;
+uniform bool update_debugdraw = false;
 
 vec4 _dbg_ray_cols[] = {
 	vec4(1,0,1,1),
@@ -181,16 +181,16 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			//// exit when either stepped out of world or max ray dist reached
 			//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
 			if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
-				#if DEBUG_RAYS
-				if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+				#if DEBUGDRAW
+				if (_debugdraw) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
 				#endif
 				return false;
 			}
 		}
 	}
 	
-	#if DEBUG_RAYS
-	if (_dbg_ray) dbg_draw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+	#if DEBUGDRAW
+	if (_debugdraw) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
 	#endif
 	
 	if (type < RAYT_SUN) {

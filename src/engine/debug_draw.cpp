@@ -48,8 +48,8 @@ void DebugDraw::wire_cube (float3 const& pos, float3 const& size, lrgba const& c
 	wire_cubes.emplace_back();
 	auto& v = wire_cubes.back();
 
-	v.pos = pos;
-	v.size = size;
+	v.pos = float4(pos, 0);
+	v.size = float4(size, 0);
 	v.col = col;
 #endif
 }
