@@ -173,54 +173,71 @@ lrgba cols[] = {
 };
 void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 	static bool draw_cones=false, draw_boxes=false;
-	static int count = 5;
-	static float cone_ang = 60.9f;
 	static float start_dist = 0.16f;
-
-	static float start_azim = 0;
-	static float elev_offs = 0;
-
+	
 	ImGui::Checkbox("draw cones", &draw_cones);
 	ImGui::SameLine();
 	ImGui::Checkbox("draw boxes", &draw_boxes);
-
-	ImGui::SliderInt("count", &count, 0, 16);
-	ImGui::DragFloat("cone_ang", &cone_ang, 0.1f, 0, 180);
 	ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
 
-	ImGui::DragFloat("start_azim", &start_azim, 0.1f);
-	ImGui::DragFloat("elev_offs", &elev_offs, 0.1f);
+	struct Set {
+		int count = 8;
+		float cone_ang = 40.1f;
 
-	float ang = deg(cone_ang);
+		float start_azim = 22.5f;
+		float elev_offs = 2.1f;
+	};
+	static std::vector<Set> sets = {
+		{ 8, 40.1f, 22.5f, 2.1f },
+		{ 4, 38.9f, 45.0f, 40.2f },
+	};
 
-	cone_data.count = count+1;
+	int set_count = (int)sets.size();
+	ImGui::DragInt("sets", &set_count, 0.01f);
+	sets.resize(set_count);
 
-	for (int i=0; i<count+1; ++i) {
-		float3 cone_pos = game.player.pos;
+	cone_data.count = 0;
 
-		float3x3 rot = float3x3::identity();
-		if (i > 0)
-			rot = rotate3_Z((float)(i-1) / count * deg(360) + deg(start_azim)) *
-			      rotate3_Y(deg(90) - ang * 0.5f - deg(elev_offs));
+	for (auto& s : sets) {
+		ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set");
 
-		auto& col = cols[i % ARRLEN(cols)];
-		if (draw_cones) g_debugdraw.wire_cone(cone_pos, ang, 30, rot, col, 32, 4);
+		ImGui::SliderInt("count", &s.count, 0, 16);
+		ImGui::DragFloat("cone_ang", &s.cone_ang, 0.1f, 0, 180);
 
-		float3 cone_dir = rot * float3(0,0,1);
-		float cone_slope = tan(ang * 0.5f);
-		float dist = start_dist;
+		ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
+		ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
 
-		cone_data.cones[i] = { cone_dir, cone_slope, 1.0f / (count+1), 0 };
+		float ang = deg(s.cone_ang);
+
+		for (int i=0; i<s.count; ++i) {
+			float3 cone_pos = game.player.pos;
+
+			float3x3 rot = rotate3_Z((float)(i-1) / s.count * deg(360) + deg(s.start_azim)) *
+					rotate3_Y(deg(90) - ang * 0.5f - deg(s.elev_offs));
+
+			auto& col = cols[i % ARRLEN(cols)];
+			if (draw_cones) g_debugdraw.wire_cone(cone_pos, ang, 30, rot, col, 32, 4);
+
+			float3 cone_dir = rot * float3(0,0,1);
+			float cone_slope = tan(ang * 0.5f);
+			float dist = start_dist;
+
+			cone_data.cones[cone_data.count+i] = { cone_dir, cone_slope, 1.0f / (s.count+1), 0 };
 		
-		int j=0;
-		while (j++ < 100 && dist < 100.0f) {
-			float3 pos = cone_pos + cone_dir * dist;
-			float r = cone_slope * dist;
-			//g_debugdraw.wire_sphere(pos, r, col, 16, 4);
-			if (draw_boxes) g_debugdraw.wire_cube(pos, r*2, col);
+			int j=0;
+			while (j++ < 100 && dist < 100.0f) {
+				float3 pos = cone_pos + cone_dir * dist;
+				float r = cone_slope * dist;
+				//g_debugdraw.wire_sphere(pos, r, col, 16, 4);
+				if (draw_boxes) g_debugdraw.wire_cube(pos, r*2, col);
 
-			dist = (dist + r) / (1.0f - cone_slope);
+				dist = (dist + r) / (1.0f - cone_slope);
+			}
 		}
+
+		cone_data.count += s.count;
+
+		ImGui::TreePop();
 	}
 }
 
@@ -414,7 +431,9 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		int size = CHUNK_SIZE;
 		filter_mip0->set_uniform("size", (GLuint)size);
 
-		glBindImageTexture(4, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(0, tex_col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		for (int dir=0; dir<6; ++dir)
+			glBindImageTexture(1+dir, tex_alph[dir], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -434,7 +453,13 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 	glUseProgram(filter->prog);
 
 	r.state.bind_textures(filter, {
-		{"vct_tex", tex, filter_sampler}
+		{"vct_col", tex_col, filter_sampler},
+		{"vct_alphNX", tex_alph[0], filter_sampler},
+		{"vct_alphPX", tex_alph[1], filter_sampler},
+		{"vct_alphNY", tex_alph[2], filter_sampler},
+		{"vct_alphPY", tex_alph[3], filter_sampler},
+		{"vct_alphNZ", tex_alph[4], filter_sampler},
+		{"vct_alphPZ", tex_alph[5], filter_sampler},
 	});
 
 	// filter only texels for each chunk (up to 4x4x4 work groups)
@@ -443,7 +468,9 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		filter->set_uniform("read_mip", layer-1);
 		filter->set_uniform("size", (GLuint)size);
 
-		glBindImageTexture(4, tex, layer  , GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(0, tex_col, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		for (int dir=0; dir<6; ++dir)
+			glBindImageTexture(1+dir, tex_alph[dir], layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -469,7 +496,9 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		filter->set_uniform("read_mip", layer-1);
 		filter->set_uniform("size", (GLuint)size);
 
-		glBindImageTexture(4, tex, layer  , GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(0, tex_col, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		for (int dir=0; dir<6; ++dir)
+			glBindImageTexture(1+dir, tex_alph[dir], layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8);
 
 		int dispatch_size = (size + COMPUTE_FILTER_LOCAL_SIZE-1) / COMPUTE_FILTER_LOCAL_SIZE;
 		glDispatchCompute(dispatch_size, dispatch_size, dispatch_size);
@@ -523,6 +552,11 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 	}
 #endif
+
+	// unbind
+	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	for (int dir=0; dir<6; ++dir)
+		glBindImageTexture(1+dir, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8);
 }
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
@@ -580,7 +614,14 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		{"subchunks_tex", subchunks_tex.tex},
 		{"voxels_tex", voxels_tex.tex},
 		{"octree", octree.tex},
-		{"vct_tex", vct_data.tex, vct_data.sampler},
+
+		{"vct_col", vct_data.tex_col, vct_data.filter_sampler},
+		{"vct_alphNX", vct_data.tex_alph[0], vct_data.filter_sampler},
+		{"vct_alphPX", vct_data.tex_alph[1], vct_data.filter_sampler},
+		{"vct_alphNY", vct_data.tex_alph[2], vct_data.filter_sampler},
+		{"vct_alphPY", vct_data.tex_alph[3], vct_data.filter_sampler},
+		{"vct_alphNZ", vct_data.tex_alph[4], vct_data.filter_sampler},
+		{"vct_alphPZ", vct_data.tex_alph[5], vct_data.filter_sampler},
 
 		{"tile_textures", r.tile_textures, r.tile_sampler},
 		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
@@ -622,12 +663,12 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+	// unbind
 	glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	glBindImageTexture(6, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	glBindImageTexture(7, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
-
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 } // namespace gl

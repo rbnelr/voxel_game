@@ -166,13 +166,19 @@ struct VCT_Data {
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
 
-	Texture3D tex = {"VCT.tex"};
+	Texture3D tex_col = {"VCT.col"};
+	Texture3D tex_alph[6] = {
+		{"VCT.alphNX"}, {"VCT.alphPX"},
+		{"VCT.alphNY"}, {"VCT.alphPY"},
+		{"VCT.alphNZ"}, {"VCT.alphPZ"},
+	};
+
 	Shader* filter;
 	Shader* filter_mip0;
 
 	VCT_Data (Shaders& shaders) {
-		filter      = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
-		filter_mip0 = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
+		filter       = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
+		filter_mip0  = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
 
 		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -184,12 +190,20 @@ struct VCT_Data {
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	
-		glTextureStorage3D(tex, MIPS, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
-		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
-		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, MIPS-1);
-	
+		glTextureStorage3D(tex_col, MIPS, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH); // GL_RGB16F fails silently?
+		glTextureParameteri(tex_col, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex_col, GL_TEXTURE_MAX_LEVEL, MIPS-1);
 		for (int layer=0; layer<MIPS; ++layer)
-			glClearTexImage(tex, layer, GL_RGBA, GL_FLOAT, nullptr);
+			glClearTexImage(tex_col, layer, GL_RGBA, GL_FLOAT, nullptr);
+
+		for (int dir=0; dir<6; ++dir) {
+			glTextureStorage3D(tex_alph[dir], MIPS, GL_R8, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+			glTextureParameteri(tex_alph[dir], GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(tex_alph[dir], GL_TEXTURE_MAX_LEVEL, MIPS-1);
+			
+			for (int layer=0; layer<MIPS; ++layer)
+				glClearTexImage(tex_alph[dir], layer, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+		}
 	}
 
 	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);

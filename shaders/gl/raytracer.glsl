@@ -101,11 +101,11 @@ const float vct_start_dist = 1.0 / 16;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
-vec4 read_vct_texture (vec3 texcoord, float r) {
+vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float size = r * 2.0;
 	float lod = log2(size);
 	
-	#if 0
+	#if 1
 	// support negative lod (size < 1.0) by snapping texture coords to nearest texels
 	// when approaching size=0
 	// size = 0.5 would snap [0.25,0.75] to 0.5
@@ -114,10 +114,19 @@ vec4 read_vct_texture (vec3 texcoord, float r) {
 	texcoord = 0.5 * size + texcoord;
 	texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
 	#endif
+	texcoord *= INV_WORLD_SIZEf;
 	
-	return textureLod(vct_tex, texcoord * INV_WORLD_SIZEf, lod);
+	vec3 col = textureLod(vct_col, texcoord, lod).rgb;
+	
+	float alphX = textureLod(dir.x < 0.0 ? vct_alphNX : vct_alphPX, texcoord, lod).r * abs(dir.x);
+	float alphY = textureLod(dir.y < 0.0 ? vct_alphNY : vct_alphPY, texcoord, lod).r * abs(dir.y);
+	float alphZ = textureLod(dir.z < 0.0 ? vct_alphNZ : vct_alphPZ, texcoord, lod).r * abs(dir.z);
+	float alpha = alphX + alphY + alphZ;
+	
+	return vec4(col, alpha);
+	
 }
-vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist) {
+vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist, bool dbg) {
 	vec3 color = vec3(0.0);
 	float transp = 1.0; // inverse alpha to support alpha stepsize fix
 	
@@ -134,31 +143,33 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist)
 		vec3 pos = cone_pos + cone_dir * dist;
 		float r = cone_slope * dist;
 		
-		vec4 sampl = read_vct_texture(pos, r);
-		//sampl *= r;
+		vec4 sampl = read_vct_texture(pos, cone_dir, r);
+		//sampl.rgb *= r;
 		
 		color += transp * sampl.rgb;
 		transp -= transp * (1.0 - (1.0 - sampl.a));
 		//transp -= transp * (1.0 - pow(1.0 - sampl.a, r*2.0));
 		
 		#if DEBUGDRAW
-		if (_debugdraw) {
-			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(1,0,0,1));
-			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(vec3(transp), 1.0));
+		if (_debugdraw && dbg) {
+			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(1,0,0,1));
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(transp * sampl.rgb, 1.0-transp));
 		}
 		#endif
 		
-		if (transp < 0.001 || dist >= max_dist)
+		if (transp < 0.01 || dist >= max_dist)
 			break;
 		
 		dist = (dist + r) / (1.0f - cone_slope);
 	}
 	
+	//return vec4(vec3(dist / 300.0), 1.0);
+	//return vec4(vec3(transp), 1.0);
 	return vec4(color, 1.0 - transp);
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
-	#if 0
+	#if 1
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
@@ -169,7 +180,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	
 	float max_dist = 400.0;
 	float cone_slope = 1.0 / vct_size;
-	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist).rgb;
+	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist, true).rgb;
 	#else
 	vec3 col = vec3(0.0);
 	if (did_hit) {
@@ -182,7 +193,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 		for (int i=0; i<cones.count.x; ++i) {
 			Cone c = cones.cones[i];
 			vec3 dir = hit.TBN * c.dir;
-			light += trace_cone(hit.pos, dir, c.slope, max_dist).rgb * c.weight;
+			light += trace_cone(hit.pos, dir, c.slope, max_dist, true).rgb * c.weight;
 		}
 		
 		if (visualize_light)

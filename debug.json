@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-78.62567138671875,
-				-87.9894790649414,
-				47.896610260009766
+				5.904854774475098,
+				162.24990844726563,
+				40.97032928466797
 			],
 			"rot_aer": [
-				2.882838487625122,
-				-0.30143508315086365,
+				2.3772318363189697,
+				0.3235858976840973,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -36,9 +36,9 @@
 	},
 	"player": {
 		"pos": [
-			-85.33728790283203,
-			-113.856201171875,
-			23.000099182128906
+			5.904854774475098,
+			162.24990844726563,
+			-48.999900817871094
 		],
 		"vel": [
 			0.0,
@@ -65,10 +65,10 @@
 		},
 		"raytracer": {
 			"enable": true,
-			"enable_vct": false,
+			"enable_vct": true,
 			"max_iterations": 478,
 			"rand_seed_time": true,
-			"sunlight_enable": true,
+			"sunlight_enable": false,
 			"sunlight_dist": 90.0,
 			"sunlight_col": [
 				1.2739999294281006,
@@ -83,7 +83,7 @@
 			"taa_enable": true
 		},
 		"bloom_renderer": {
-			"enable": true,
+			"enable": false,
 			"radius": 16,
 			"cutoff": 1.399999976158142,
 			"strength": 0.20000000298023224,
