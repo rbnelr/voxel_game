@@ -97,7 +97,7 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-const float vct_start_dist = 1.0 / 16;
+const float vct_start_dist = 1.0 / 4;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
@@ -123,6 +123,8 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float alphZ = textureLod(dir.z < 0.0 ? vct_alphNZ : vct_alphPZ, texcoord, lod).r * abs(dir.z);
 	float alpha = alphX + alphY + alphZ;
 	
+	alpha = max(max(alphX, alphY), alphZ);
+	
 	return vec4(col, alpha);
 	
 }
@@ -145,15 +147,17 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 		
 		vec4 sampl = read_vct_texture(pos, cone_dir, r);
 		//sampl.rgb *= r;
+		//sampl.a *= r;
 		
 		color += transp * sampl.rgb;
-		transp -= transp * (1.0 - (1.0 - sampl.a));
-		//transp -= transp * (1.0 - pow(1.0 - sampl.a, r*2.0));
+		transp -= transp * sampl.a;
+		//transp -= transp * (1.0 - pow(sampl.a, r*2.0));
 		
 		#if DEBUGDRAW
 		if (_debugdraw && dbg) {
 			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(1,0,0,1));
-			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(transp * sampl.rgb, 1.0-transp));
+			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(transp * sampl.rgb, 1.0-transp));
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(vec3(sampl.a), 1.0));
 		}
 		#endif
 		
@@ -164,7 +168,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 	}
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
-	//return vec4(vec3(transp), 1.0);
+	return vec4(vec3(transp), 1.0);
 	return vec4(color, 1.0 - transp);
 }
 
@@ -178,7 +182,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	//cone_dir = hit.TBN[2];
 	//cone_dir = reflect(view_ray_dir, hit.TBN[2]);
 	
-	float max_dist = 400.0;
+	float max_dist = 20.0;
 	float cone_slope = 1.0 / vct_size;
 	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist, true).rgb;
 	#else
@@ -190,10 +194,19 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 		float max_dist = 400.0;
 		vec3 light = vec3(0.0);
 		
-		for (int i=0; i<cones.count.x; ++i) {
-			Cone c = cones.cones[i];
-			vec3 dir = hit.TBN * c.dir;
-			light += trace_cone(hit.pos, dir, c.slope, max_dist, true).rgb * c.weight;
+		{ // diffuse
+			for (int i=0; i<cones.count.x; ++i) {
+				Cone c = cones.cones[i];
+				vec3 cone_dir = hit.TBN * c.dir;
+				light += trace_cone(hit.pos, cone_dir, c.slope, max_dist, true).rgb * c.weight;
+			}
+		}
+		
+		{ // specular
+			float specular_strength = 0.1;
+			float cone_slope = 1.0 / vct_size;
+			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
+			light += trace_cone(hit.pos, cone_dir, cone_slope, max_dist, true).rgb * specular_strength;
 		}
 		
 		if (visualize_light)
@@ -223,6 +236,7 @@ void main () {
 #endif
 	
 	srand(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y, rand_frame_index);
+	//srand(0, 0, rand_frame_index);
 	
 	// primary ray
 	vec3 ray_pos, ray_dir;
@@ -298,30 +312,34 @@ void main () {
 		#endif
 		
 		if (bounces_enable) {
-			max_dist = bounces_max_dist;
-			
-			vec3 cur_pos = ray_pos;
-			mat3 TBN = hit.TBN;
-			vec3 contrib = vec3(hit.occl_spec.x);
-			
-			for (int j=0; j<bounces_max_count; ++j) {
-				ray_dir = TBN * hemisphere_sample(); // already cos weighted
+			//int count = 128;
+			//for (int i=0; i<count; ++i) {
+				max_dist = bounces_max_dist;
 				
-				bool was_reflected2;
-				Hit hit2;
-				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_DIFFUSE))
-					break;
+				vec3 cur_pos = ray_pos;
+				mat3 TBN = hit.TBN;
+				vec3 contrib = vec3(hit.occl_spec.x);
 				
-				TBN = hit2.TBN;
-				
-				cur_pos = hit2.pos + TBN[2] * 0.001;
-				max_dist -= hit2.dist;
-				
-				vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
-				
-				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
-				contrib *= hit2.col;
-			}
+				for (int j=0; j<bounces_max_count; ++j) {
+					ray_dir = TBN * hemisphere_sample(); // already cos weighted
+					
+					bool was_reflected2;
+					Hit hit2;
+					if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_DIFFUSE))
+						break;
+					
+					TBN = hit2.TBN;
+					
+					cur_pos = hit2.pos + TBN[2] * 0.001;
+					max_dist -= hit2.dist;
+					
+					vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
+					
+					surf_light += (hit2.emiss + hit2.col * light2) * contrib;
+					contrib *= hit2.col;
+				}
+			//}
+			//surf_light /= float(count);
 		}
 		
 		#if TAA_ENABLE
