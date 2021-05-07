@@ -63,13 +63,13 @@ uniform usampler3D	subchunks_tex;
 uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
 
-uniform sampler3D	vct_col;
-uniform sampler3D	vct_alphNX;
-uniform sampler3D	vct_alphPX;
-uniform sampler3D	vct_alphNY;
-uniform sampler3D	vct_alphPY;
-uniform sampler3D	vct_alphNZ;
-uniform sampler3D	vct_alphPZ;
+uniform sampler3D	vct_basedata;
+uniform sampler3D	vct_preintNX;
+uniform sampler3D	vct_preintPX;
+uniform sampler3D	vct_preintNY;
+uniform sampler3D	vct_preintPY;
+uniform sampler3D	vct_preintNZ;
+uniform sampler3D	vct_preintPZ;
 
 uint read_bid (ivec3 coord) {
 	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))

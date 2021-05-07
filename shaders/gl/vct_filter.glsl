@@ -1,21 +1,15 @@
 #version 460 core
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(rgba16f, binding = 0) writeonly restrict uniform image3D write_mip_col;
-layout(r8, binding = 1) writeonly restrict uniform image3D write_mip_alphNX;
-layout(r8, binding = 2) writeonly restrict uniform image3D write_mip_alphPX;
-layout(r8, binding = 3) writeonly restrict uniform image3D write_mip_alphNY;
-layout(r8, binding = 4) writeonly restrict uniform image3D write_mip_alphPY;
-layout(r8, binding = 5) writeonly restrict uniform image3D write_mip_alphNZ;
-layout(r8, binding = 6) writeonly restrict uniform image3D write_mip_alphPZ;
-
 #include "common.glsl"
 #include "gpu_voxels.glsl"
 
 uniform uvec3 offsets[16];
 uniform uint size;
 
-#if MIP0
+#if STEP == 0
+	layout(rgba16f, binding = 0) writeonly restrict uniform image3D basedata;
+	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
 		
@@ -31,108 +25,59 @@ uniform uint size;
 		
 		//if (bid == B_MAGMA) col = vec4(0.0);
 		
-		imageStore(write_mip_col, dst_pos, vec4(col.rgb * get_emmisive(bid), 0.0));
+		vec4 val;
+		val.rgb = col.rgb * get_emmisive(bid);
+		val.a = bid == B_AIR ? 0.0 : 1.0;
 		
-		//float transp = col.a == 0.0 ? 0.0 : 1.0; // pretend leaves etc. are fully opaque for now
-		//
-		//uint bidNX = read_bid(dst_pos + ivec3(+1,0,0));
-		//uint bidPX = read_bid(dst_pos + ivec3(-1,0,0));
-		//uint bidNY = read_bid(dst_pos + ivec3(0,+1,0));
-		//uint bidPY = read_bid(dst_pos + ivec3(0,-1,0));
-		//uint bidNZ = read_bid(dst_pos + ivec3(0,0,+1));
-		//uint bidPZ = read_bid(dst_pos + ivec3(0,0,-1));
-		//
-		//float transpNX = bid != B_AIR && bidNX == B_AIR ? transp : 0.0;
-		//float transpPX = bid != B_AIR && bidPX == B_AIR ? transp : 0.0;
-		//float transpNY = bid != B_AIR && bidNY == B_AIR ? transp : 0.0;
-		//float transpPY = bid != B_AIR && bidPY == B_AIR ? transp : 0.0;
-		//float transpNZ = bid != B_AIR && bidNZ == B_AIR ? transp : 0.0;
-		//float transpPZ = bid != B_AIR && bidPZ == B_AIR ? transp : 0.0;
-		//
-		//imageStore(write_mip_alphNX, dst_pos, vec4(transpNX, 0.0, 0.0, 0.0));
-		//imageStore(write_mip_alphPX, dst_pos, vec4(transpPX, 0.0, 0.0, 0.0));
-		//imageStore(write_mip_alphNY, dst_pos, vec4(transpNY, 0.0, 0.0, 0.0));
-		//imageStore(write_mip_alphPY, dst_pos, vec4(transpPY, 0.0, 0.0, 0.0));
-		//imageStore(write_mip_alphNZ, dst_pos, vec4(transpNZ, 0.0, 0.0, 0.0));
-		//imageStore(write_mip_alphPZ, dst_pos, vec4(transpPZ, 0.0, 0.0, 0.0));
-		
-		float transp = bid == B_AIR ? 0.0 : 1.0;
-		
-		imageStore(write_mip_alphNX, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPX, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphNY, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPY, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphNZ, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPZ, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(basedata, dst_pos, val);
 	}
 #else
+	layout(rgba16f, binding = 0) writeonly restrict uniform image3D preintNX;
+	layout(rgba16f, binding = 1) writeonly restrict uniform image3D preintPX;
+	layout(rgba16f, binding = 2) writeonly restrict uniform image3D preintNY;
+	layout(rgba16f, binding = 3) writeonly restrict uniform image3D preintPY;
+	layout(rgba16f, binding = 4) writeonly restrict uniform image3D preintNZ;
+	layout(rgba16f, binding = 5) writeonly restrict uniform image3D preintPZ;
+	
 	uniform int read_mip;
 	
-	vec3 filter_rgb (sampler3D src, ivec3 src_pos) {
-		vec3 a = texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,0)).rgb;
-		vec3 b = texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,0)).rgb;
-		vec3 c = texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,0)).rgb;
-		vec3 d = texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,0)).rgb;
-		vec3 e = texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,1)).rgb;
-		vec3 f = texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).rgb;
-		vec3 g = texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).rgb;
-		vec3 h = texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).rgb;
+	// Preintegration - filter down 3d texture for 6 view directions
+	
+	// Rather than simply averaging the 6 textures of the previous mip do the following:
+	// sample the 4 close and the corresponding 4 far texels
+	// (write_mipNX is the one that gets sampled later if cones go in the negative x direction)
+	// blend each pair of texels as viewed from the direction then average the 4 resulting values
+	// this makes a 1x2x2 wall have the 'correct' values of 1/2 opacity or 1 opacity depending on view direction
+	// it also makes it so that light should not leak though thin walls in a lot of cases (I think)
+	
+	vec4 preintegrate ( vec4 a0, vec4 a1,  vec4 b0, vec4 b1,
+	                    vec4 c0, vec4 c1,  vec4 d0, vec4 d1 ) {
+		vec4 a,b,c,d;
 		
-		return (((a+b) + (c+d)) + ((e+f) + (g+h))) * 0.125;
+		a.a = 1.0 - ((1.0 - a0.a) * (1.0 - a1.a)); // alpha actually getting through
+		a.rgb  = a0.rgb + (a1.rgb * (1.0 - a0.a)); // color is front + back getting through front alpha
+		
+		b.a = 1.0 - ((1.0 - b0.a) * (1.0 - b1.a));
+		b.rgb  = b0.rgb + (b1.rgb * (1.0 - b0.a));
+		
+		c.a = 1.0 - ((1.0 - c0.a) * (1.0 - c1.a));
+		c.rgb  = c0.rgb + (c1.rgb * (1.0 - c0.a));
+		
+		d.a = 1.0 - ((1.0 - d0.a) * (1.0 - d1.a));
+		d.rgb  = d0.rgb + (d1.rgb * (1.0 - d0.a));
+		
+		return ((a+b) + (c+d)) * 0.25;
 	}
 	
-	// Filter far and close texels multiplicative
-	// (0.3 transparency with 0.6 transparency behind it has combined 0.3*0.6 transparency)
-	// then average the 4 computed values
-	
-	float filter_transpX (sampler3D src, ivec3 src_pos) {
-		float t000 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,0)).r;
-		float t100 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,0)).r;
-		float t010 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,0)).r;
-		float t110 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,0)).r;
-		float t001 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,1)).r;
-		float t101 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).r;
-		float t011 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).r;
-		float t111 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).r;
-		
-		//0 1  2 3  4 5  6 7
-		return 1.0 - ( t000*t100 +
-		               t010*t110 +
-		               t001*t101 +
-		               t011*t111 ) * 0.25;
-	}
-	float filter_transpY (sampler3D src, ivec3 src_pos) {
-		float t000 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,0)).r;
-		float t100 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,0)).r;
-		float t010 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,0)).r;
-		float t110 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,0)).r;
-		float t001 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,1)).r;
-		float t101 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).r;
-		float t011 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).r;
-		float t111 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).r;
-		
-		//0 2  1 3  4 6  5 7
-		return 1.0 - ( t000*t010 +
-		               t100*t110 +
-		               t001*t011 +
-		               t101*t111 ) * 0.25;
-	}
-	float filter_transpZ (sampler3D src, ivec3 src_pos) {
-		float t000 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,0)).r;
-		float t100 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,0)).r;
-		float t010 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,0)).r;
-		float t110 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,0)).r;
-		float t001 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,1)).r;
-		float t101 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).r;
-		float t011 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).r;
-		float t111 = 1.0 - texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).r;
-		
-		//0 4  1 5  2 6  3 7
-		return 1.0 - ( t000*t001 +
-		               t100*t101 +
-		               t010*t011 +
-		               t110*t111 ) * 0.25;
-	}
+	#define READ(src, mip) \
+		vec4 a = texelFetchOffset(src, src_pos, mip, ivec3(0,0,0)); \
+		vec4 b = texelFetchOffset(src, src_pos, mip, ivec3(1,0,0)); \
+		vec4 c = texelFetchOffset(src, src_pos, mip, ivec3(0,1,0)); \
+		vec4 d = texelFetchOffset(src, src_pos, mip, ivec3(1,1,0)); \
+		vec4 e = texelFetchOffset(src, src_pos, mip, ivec3(0,0,1)); \
+		vec4 f = texelFetchOffset(src, src_pos, mip, ivec3(1,0,1)); \
+		vec4 g = texelFetchOffset(src, src_pos, mip, ivec3(0,1,1)); \
+		vec4 h = texelFetchOffset(src, src_pos, mip, ivec3(1,1,1));
 	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
@@ -144,16 +89,42 @@ uniform uint size;
 			ivec3 dst_pos = ivec3(pos + offsets[chunk_idx]);
 			ivec3 src_pos = dst_pos * 2;
 			
-			imageStore(write_mip_col, dst_pos, vec4(filter_rgb(vct_col, src_pos), 0.0));
-			
-			imageStore(write_mip_alphNX, dst_pos, vec4(filter_transpX(vct_alphNX, src_pos), 0.0, 0.0, 0.0));
-			imageStore(write_mip_alphPX, dst_pos, vec4(filter_transpX(vct_alphPX, src_pos), 0.0, 0.0, 0.0));
-			
-			imageStore(write_mip_alphNY, dst_pos, vec4(filter_transpY(vct_alphNY, src_pos), 0.0, 0.0, 0.0));
-			imageStore(write_mip_alphPY, dst_pos, vec4(filter_transpY(vct_alphPY, src_pos), 0.0, 0.0, 0.0));
-			
-			imageStore(write_mip_alphNZ, dst_pos, vec4(filter_transpZ(vct_alphNZ, src_pos), 0.0, 0.0, 0.0));
-			imageStore(write_mip_alphPZ, dst_pos, vec4(filter_transpZ(vct_alphPZ, src_pos), 0.0, 0.0, 0.0));
+	#if STEP == 1
+		READ(vct_basedata, 0)
+		imageStore(preintNX, dst_pos, preintegrate(b,a, d,c, f,e, h,g));
+		imageStore(preintPX, dst_pos, preintegrate(a,b, c,d, e,f, g,h));
+		imageStore(preintNY, dst_pos, preintegrate(c,a, d,b, g,e, h,f));
+		imageStore(preintPY, dst_pos, preintegrate(a,c, b,d, e,g, f,h));
+		imageStore(preintNZ, dst_pos, preintegrate(e,a, f,b, g,c, h,d));
+		imageStore(preintPZ, dst_pos, preintegrate(a,e, b,f, c,g, d,h));
+	#else
+		{
+			READ(vct_preintNX, read_mip)
+			imageStore(preintNX, dst_pos, preintegrate(b,a, d,c, f,e, h,g));
+		}
+		{
+			READ(vct_preintPX, read_mip)
+			imageStore(preintPX, dst_pos, preintegrate(a,b, c,d, e,f, g,h));
+		}
+		
+		{
+			READ(vct_preintNY, read_mip)
+			imageStore(preintNY, dst_pos, preintegrate(c,a, d,b, g,e, h,f));
+		}
+		{
+			READ(vct_preintPY, read_mip)
+			imageStore(preintPY, dst_pos, preintegrate(a,c, b,d, e,g, f,h));
+		}
+		
+		{
+			READ(vct_preintNZ, read_mip)
+			imageStore(preintNZ, dst_pos, preintegrate(e,a, f,b, g,c, h,d));
+		}
+		{
+			READ(vct_preintPZ, read_mip)
+			imageStore(preintPZ, dst_pos, preintegrate(a,e, b,f, c,g, d,h));
+		}
+	#endif
 		}
 	}
 #endif

@@ -100,6 +100,21 @@ layout(std140, binding = 4) uniform ConeConfig {
 const float vct_start_dist = 1.0 / 32.0;
 uniform float vct_size = 1.0;
 
+
+vec4 _read_vct_mip (vec3 texcoord, vec3 dir, float lod) {
+	if (lod <= 0.0) {
+		return textureLod(vct_basedata, texcoord, lod);
+	} else {
+		lod -= 1.0;
+		
+		vec4 valX = textureLod(dir.x < 0.0 ? vct_preintNX : vct_preintPX, texcoord, lod) * abs(dir.x);
+		vec4 valY = textureLod(dir.y < 0.0 ? vct_preintNY : vct_preintPY, texcoord, lod) * abs(dir.y);
+		vec4 valZ = textureLod(dir.z < 0.0 ? vct_preintNZ : vct_preintPZ, texcoord, lod) * abs(dir.z);
+		
+		return valX + valY + valZ;
+	}
+}
+
 // sharpen texture samples by 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float size = r * 2.0;
@@ -116,14 +131,13 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
 	
-	vec3 col = textureLod(vct_col, texcoord, lod).rgb;
+	// manual interpolation between mipmaps to allow lod = 0 to come from vct_basedata and lod > 0 from vct_preintXX
+	float flod = floor(lod);
+	vec4 val0 = _read_vct_mip(texcoord, dir, flod);
+	vec4 val1 = _read_vct_mip(texcoord, dir, flod+1.0);
 	
-	float alphX = textureLod(dir.x < 0.0 ? vct_alphNX : vct_alphPX, texcoord, lod).r * abs(dir.x);
-	float alphY = textureLod(dir.y < 0.0 ? vct_alphNY : vct_alphPY, texcoord, lod).r * abs(dir.y);
-	float alphZ = textureLod(dir.z < 0.0 ? vct_alphNZ : vct_alphPZ, texcoord, lod).r * abs(dir.z);
-	float alpha = alphX + alphY + alphZ;
-	
-	return vec4(col, alpha);
+	vec4 val = mix(val0, val1, lod - flod);
+	return val;
 	
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist, bool dbg) {
@@ -171,7 +185,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
-	#if 0
+	#if 1
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
