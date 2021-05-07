@@ -33,29 +33,37 @@ uniform uint size;
 		
 		imageStore(write_mip_col, dst_pos, vec4(col.rgb * get_emmisive(bid), 0.0));
 		
+		//float transp = col.a == 0.0 ? 0.0 : 1.0; // pretend leaves etc. are fully opaque for now
+		//
+		//uint bidNX = read_bid(dst_pos + ivec3(+1,0,0));
+		//uint bidPX = read_bid(dst_pos + ivec3(-1,0,0));
+		//uint bidNY = read_bid(dst_pos + ivec3(0,+1,0));
+		//uint bidPY = read_bid(dst_pos + ivec3(0,-1,0));
+		//uint bidNZ = read_bid(dst_pos + ivec3(0,0,+1));
+		//uint bidPZ = read_bid(dst_pos + ivec3(0,0,-1));
+		//
+		//float transpNX = bid != B_AIR && bidNX == B_AIR ? transp : 0.0;
+		//float transpPX = bid != B_AIR && bidPX == B_AIR ? transp : 0.0;
+		//float transpNY = bid != B_AIR && bidNY == B_AIR ? transp : 0.0;
+		//float transpPY = bid != B_AIR && bidPY == B_AIR ? transp : 0.0;
+		//float transpNZ = bid != B_AIR && bidNZ == B_AIR ? transp : 0.0;
+		//float transpPZ = bid != B_AIR && bidPZ == B_AIR ? transp : 0.0;
+		//
+		//imageStore(write_mip_alphNX, dst_pos, vec4(transpNX, 0.0, 0.0, 0.0));
+		//imageStore(write_mip_alphPX, dst_pos, vec4(transpPX, 0.0, 0.0, 0.0));
+		//imageStore(write_mip_alphNY, dst_pos, vec4(transpNY, 0.0, 0.0, 0.0));
+		//imageStore(write_mip_alphPY, dst_pos, vec4(transpPY, 0.0, 0.0, 0.0));
+		//imageStore(write_mip_alphNZ, dst_pos, vec4(transpNZ, 0.0, 0.0, 0.0));
+		//imageStore(write_mip_alphPZ, dst_pos, vec4(transpPZ, 0.0, 0.0, 0.0));
 		
-		float transp = col.a == 0.0 ? 0.0 : 1.0; // pretend leaves etc. are fully opaque for now
+		float transp = bid == B_AIR ? 0.0 : 1.0;
 		
-		uint bidNX = read_bid(dst_pos + ivec3(+1,0,0));
-		uint bidPX = read_bid(dst_pos + ivec3(-1,0,0));
-		uint bidNY = read_bid(dst_pos + ivec3(0,+1,0));
-		uint bidPY = read_bid(dst_pos + ivec3(0,-1,0));
-		uint bidNZ = read_bid(dst_pos + ivec3(0,0,+1));
-		uint bidPZ = read_bid(dst_pos + ivec3(0,0,-1));
-		
-		float transpNX = bid != B_AIR && bidNX == B_AIR ? transp : 0.0;
-		float transpPX = bid != B_AIR && bidPX == B_AIR ? transp : 0.0;
-		float transpNY = bid != B_AIR && bidNY == B_AIR ? transp : 0.0;
-		float transpPY = bid != B_AIR && bidPY == B_AIR ? transp : 0.0;
-		float transpNZ = bid != B_AIR && bidNZ == B_AIR ? transp : 0.0;
-		float transpPZ = bid != B_AIR && bidPZ == B_AIR ? transp : 0.0;
-		
-		imageStore(write_mip_alphNX, dst_pos, vec4(transpNX, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPX, dst_pos, vec4(transpPX, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphNY, dst_pos, vec4(transpNY, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPY, dst_pos, vec4(transpPY, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphNZ, dst_pos, vec4(transpNZ, 0.0, 0.0, 0.0));
-		imageStore(write_mip_alphPZ, dst_pos, vec4(transpPZ, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphNX, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphPX, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphNY, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphPY, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphNZ, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
+		imageStore(write_mip_alphPZ, dst_pos, vec4(transp, 0.0, 0.0, 0.0));
 	}
 #else
 	uniform int read_mip;
@@ -69,19 +77,6 @@ uniform uint size;
 		vec3 f = texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).rgb;
 		vec3 g = texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).rgb;
 		vec3 h = texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).rgb;
-		
-		return (((a+b) + (c+d)) + ((e+f) + (g+h))) * 0.125;
-	}
-	
-	float filter_transp (sampler3D src, ivec3 src_pos) {
-		float a = texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,0)).r;
-		float b = texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,0)).r;
-		float c = texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,0)).r;
-		float d = texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,0)).r;
-		float e = texelFetchOffset(src, src_pos, read_mip, ivec3(0,0,1)).r;
-		float f = texelFetchOffset(src, src_pos, read_mip, ivec3(1,0,1)).r;
-		float g = texelFetchOffset(src, src_pos, read_mip, ivec3(0,1,1)).r;
-		float h = texelFetchOffset(src, src_pos, read_mip, ivec3(1,1,1)).r;
 		
 		return (((a+b) + (c+d)) + ((e+f) + (g+h))) * 0.125;
 	}

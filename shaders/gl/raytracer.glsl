@@ -97,7 +97,7 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-const float vct_start_dist = 1.0 / 4;
+const float vct_start_dist = 1.0 / 32.0;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
@@ -122,8 +122,6 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float alphY = textureLod(dir.y < 0.0 ? vct_alphNY : vct_alphPY, texcoord, lod).r * abs(dir.y);
 	float alphZ = textureLod(dir.z < 0.0 ? vct_alphNZ : vct_alphPZ, texcoord, lod).r * abs(dir.z);
 	float alpha = alphX + alphY + alphZ;
-	
-	alpha = max(max(alphX, alphY), alphZ);
 	
 	return vec4(col, alpha);
 	
@@ -168,12 +166,12 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 	}
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
-	return vec4(vec3(transp), 1.0);
+	//return vec4(vec3(transp), 1.0);
 	return vec4(color, 1.0 - transp);
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
-	#if 1
+	#if 0
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
@@ -182,7 +180,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	//cone_dir = hit.TBN[2];
 	//cone_dir = reflect(view_ray_dir, hit.TBN[2]);
 	
-	float max_dist = 20.0;
+	float max_dist = 400.0;
 	float cone_slope = 1.0 / vct_size;
 	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist, true).rgb;
 	#else
@@ -202,7 +200,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			}
 		}
 		
-		{ // specular
+		if (false) { // specular
 			float specular_strength = 0.1;
 			float cone_slope = 1.0 / vct_size;
 			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
