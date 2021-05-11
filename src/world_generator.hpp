@@ -74,6 +74,13 @@ namespace worldgen {
 		B_LEAVES		,
 		B_TALLGRASS		,
 		B_TORCH			,
+
+		B_CRYSTAL2		,
+		B_CRYSTAL3		,
+		B_CRYSTAL4		,
+		B_CRYSTAL5		,
+		B_CRYSTAL6		,
+
 		B_COUNT			,
 	};
 	struct BlockIDs {
@@ -105,6 +112,12 @@ namespace worldgen {
 			/*B_LEAVES		*/ "leaves",
 			/*B_TALLGRASS	*/ "tallgrass",
 			/*B_TORCH		*/ "torch",
+
+			/*B_CRYSTAL2	*/ "crystal2",
+			/*B_CRYSTAL3	*/ "crystal3",
+			/*B_CRYSTAL4	*/ "crystal4",
+			/*B_CRYSTAL5	*/ "crystal5",
+			/*B_CRYSTAL6	*/ "crystal6",
 		};
 
 		void load () {
@@ -162,6 +175,8 @@ struct WorldGenerator {
 
 	bool stalac = true;
 	float stalac_dens = 0.001f;
+	
+	bool disable_grass = true;
 
 	float ground_ang = 0.55f;
 	float earth_overhang_stren = 0.55f;
@@ -232,6 +247,8 @@ struct WorldGenerator {
 		ImGui::Spacing();
 		ImGui::DragFloat("ground_ang", &ground_ang, 0.01f);
 		ImGui::DragFloat("earth_overhang_stren", &earth_overhang_stren, 0.1f);
+
+		ImGui::Checkbox("disable_grass", &disable_grass);
 
 		ImGui::PopItemWidth();
 		imgui_pop();

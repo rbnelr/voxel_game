@@ -449,21 +449,25 @@ namespace worldgen {
 				auto place_stalac = [&] (int x, int y, int z, float rand1, float rand2) {
 					float scale = lerp(0.4f, 2.5f, rand1);
 
+					int variation = clamp(floori(rand2 * 6), 0,5);
+					static constexpr BlockID BIDS[] = { B_CRYSTAL, B_CRYSTAL2, B_CRYSTAL3, B_CRYSTAL4, B_CRYSTAL5, B_CRYSTAL6 };
+					auto bid = BIDS[variation];
+
 					float base_r = 3 * scale;
 					int h = roundi(20 * scale);
 					for (int oz=-5; oz<h; ++oz) {
 
 						int w = ceili(base_r)+1;
 						for (int ox=-w; ox<=w; ++ox)
-							for (int oy=-w; oy<=w; ++oy) {
-								float r = 1.0f - (float)oz/(float)h;
-								r = lerp(0.5f, base_r, powf(r, 1.4f) + 0.0001f);
-								r *= map(noise3.eval((float)(wx+ox) * 20, (float)(wy+oy) * 20, (float)(wz+oz) * 4), -1.0f, +1.0f, 0.6f, 1.4f);
+						for (int oy=-w; oy<=w; ++oy) {
+							float r = 1.0f - (float)oz/(float)h;
+							r = lerp(0.5f, base_r, powf(r, 1.4f) + 0.0001f);
+							r *= map(noise3.eval((float)(wx+ox) * 20, (float)(wy+oy) * 20, (float)(wz+oz) * 4), -1.0f, +1.0f, 0.6f, 1.4f);
 
-								if (length_sqr((float2)int2(ox,oy) / r) <= 1) {
-									replace_block(x+ox, y+oy, z-oz, B_CRYSTAL);
-								}
+							if (length_sqr((float2)int2(ox,oy) / r) <= 1) {
+								replace_block(x+ox, y+oy, z-oz, bid);
 							}
+						}
 					}
 				};
 
@@ -484,10 +488,10 @@ namespace worldgen {
 					if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
 						place_tree(x,y,z, rand1, rand2);
 					}
-					else if (chance(rand, (double)grass_density)) {
+					else if (!wg->disable_grass && chance(rand, (double)grass_density)) {
 						write_block(x,y,z, B_TALLGRASS);
 					}
-					else if (chance(rand, 0.003)) {
+					else if (!wg->disable_grass && chance(rand, 0.003)) {
 						write_block(x,y,z, B_TORCH);
 					}
 				}

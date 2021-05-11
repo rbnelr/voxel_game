@@ -24,30 +24,37 @@
 #define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 
 
-#define B_AIR 1
-#define B_WATER 3
-#define B_EARTH 4
-#define B_GRASS 5
-#define B_STONE 6
-#define B_HARDSTONE 7
-#define B_SAND 8
-#define B_GRAVEL 9
-#define B_MAGMA 12
-#define B_CRYSTAL 15
-#define B_URANIUM 16
-#define B_LEAVES 18
-#define B_TORCH 19
-#define B_TALLGRASS 20
+#define B_AIR		1
+#define B_WATER		3
+#define B_EARTH		4
+#define B_GRASS		5
+#define B_STONE		6
+#define B_HARDSTONE	7
+#define B_SAND		8
+#define B_GRAVEL	9
+#define B_MAGMA		12
+#define B_CRYSTAL	15
+#define B_URANIUM	16
+#define B_LEAVES	18
+#define B_TORCH		19
+#define B_TALLGRASS	20
+#define B_GLASS		21
+#define B_CRYSTAL2	22
+#define B_CRYSTAL3	23
+#define B_CRYSTAL4	24
+#define B_CRYSTAL5	25
+#define B_CRYSTAL6	26
 
 float get_emmisive (uint bid) {
 	if (      bid == B_MAGMA   ) return 7.0;
 	else if ( bid == B_CRYSTAL ) return 6.0;
 	else if ( bid == B_URANIUM ) return 3.2;
+	else if ( bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6 ) return 6.0;
 	return 0.0;
 }
 
 
-#define WORLD_SIZE_CHUNKS	8 // number of chunks for fixed subchunk texture (for now)
+#define WORLD_SIZE_CHUNKS	4 // number of chunks for fixed subchunk texture (for now)
 #define WORLD_SIZE			(WORLD_SIZE_CHUNKS * CHUNK_SIZE)
 
 #define VOXTEX_SIZE			2048 // max width, height, depth of sparse voxel texture (subchunk voxels)
@@ -63,13 +70,12 @@ uniform usampler3D	subchunks_tex;
 uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
 
-uniform sampler3D	vct_basedata;
-uniform sampler3D	vct_preintNX;
-uniform sampler3D	vct_preintPX;
-uniform sampler3D	vct_preintNY;
-uniform sampler3D	vct_preintPY;
-uniform sampler3D	vct_preintNZ;
-uniform sampler3D	vct_preintPZ;
+uniform sampler3D	vct_texNX;
+uniform sampler3D	vct_texPX;
+uniform sampler3D	vct_texNY;
+uniform sampler3D	vct_texPY;
+uniform sampler3D	vct_texNZ;
+uniform sampler3D	vct_texPZ;
 
 uint read_bid (ivec3 coord) {
 	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))

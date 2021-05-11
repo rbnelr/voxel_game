@@ -119,6 +119,32 @@
 			"class": "solid",
 			"transparency": "transparent",
 			"tex": [2,4]
+		},
+		
+		"crystal2": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [8,3]
+		},
+		"crystal3": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [9,3]
+		},
+		"crystal4": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [10,3]
+		},
+		"crystal5": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [11,3]
+		},
+		"crystal6": {
+			"tool": "pickaxe",
+			"hardness": 8,
+			"tex": [12,3]
 		}
 	}
 }

@@ -7,9 +7,14 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 uniform uvec3 offsets[16];
 uniform uint size;
 
-#if STEP == 0
-	layout(rgba16f, binding = 0) writeonly restrict uniform image3D basedata;
-	
+layout(rgba16f, binding = 0) writeonly restrict uniform image3D write_mipNX;
+layout(rgba16f, binding = 1) writeonly restrict uniform image3D write_mipPX;
+layout(rgba16f, binding = 2) writeonly restrict uniform image3D write_mipNY;
+layout(rgba16f, binding = 3) writeonly restrict uniform image3D write_mipPY;
+layout(rgba16f, binding = 4) writeonly restrict uniform image3D write_mipNZ;
+layout(rgba16f, binding = 5) writeonly restrict uniform image3D write_mipPZ;
+
+#if MIP0
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
 		
@@ -25,19 +30,30 @@ uniform uint size;
 		
 		//if (bid == B_MAGMA) col = vec4(0.0);
 		
-		vec4 val;
-		val.rgb = col.rgb * get_emmisive(bid);
-		val.a = bid == B_AIR ? 0.0 : 1.0;
+		uint bidNX = read_bid(dst_pos + ivec3(-1,0,0));
+		uint bidPX = read_bid(dst_pos + ivec3(+1,0,0));
+		uint bidNY = read_bid(dst_pos + ivec3(0,-1,0));
+		uint bidPY = read_bid(dst_pos + ivec3(0,+1,0));
+		uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
+		uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
 		
-		imageStore(basedata, dst_pos, val);
+		bool blocked =
+			(bidNX != B_AIR) && (bidPX != B_AIR) &&
+			(bidNY != B_AIR) && (bidPY != B_AIR) &&
+			(bidNZ != B_AIR) && (bidPZ != B_AIR);
+		
+		vec4 val;
+		val.rgb = blocked ? vec3(0.0) : col.rgb * get_emmisive(bid);
+		val.a = bid != B_AIR ? 1.0 : 0.0;
+		
+		imageStore(write_mipNX, dst_pos, val);
+		imageStore(write_mipPX, dst_pos, val);
+		imageStore(write_mipNY, dst_pos, val);
+		imageStore(write_mipPY, dst_pos, val);
+		imageStore(write_mipNZ, dst_pos, val);
+		imageStore(write_mipPZ, dst_pos, val);
 	}
 #else
-	layout(rgba16f, binding = 0) writeonly restrict uniform image3D preintNX;
-	layout(rgba16f, binding = 1) writeonly restrict uniform image3D preintPX;
-	layout(rgba16f, binding = 2) writeonly restrict uniform image3D preintNY;
-	layout(rgba16f, binding = 3) writeonly restrict uniform image3D preintPY;
-	layout(rgba16f, binding = 4) writeonly restrict uniform image3D preintNZ;
-	layout(rgba16f, binding = 5) writeonly restrict uniform image3D preintPZ;
 	
 	uniform int read_mip;
 	
@@ -88,43 +104,33 @@ uniform uint size;
 		if (all(lessThan(pos, uvec3(size)))) {
 			ivec3 dst_pos = ivec3(pos + offsets[chunk_idx]);
 			ivec3 src_pos = dst_pos * 2;
-			
-	#if STEP == 1
-		READ(vct_basedata, 0)
-		imageStore(preintNX, dst_pos, preintegrate(b,a, d,c, f,e, h,g));
-		imageStore(preintPX, dst_pos, preintegrate(a,b, c,d, e,f, g,h));
-		imageStore(preintNY, dst_pos, preintegrate(c,a, d,b, g,e, h,f));
-		imageStore(preintPY, dst_pos, preintegrate(a,c, b,d, e,g, f,h));
-		imageStore(preintNZ, dst_pos, preintegrate(e,a, f,b, g,c, h,d));
-		imageStore(preintPZ, dst_pos, preintegrate(a,e, b,f, c,g, d,h));
-	#else
+		
 		{
-			READ(vct_preintNX, read_mip)
-			imageStore(preintNX, dst_pos, preintegrate(b,a, d,c, f,e, h,g));
+			READ(vct_texNX, read_mip)
+			imageStore(write_mipNX, dst_pos, preintegrate(b,a, d,c, f,e, h,g));
 		}
 		{
-			READ(vct_preintPX, read_mip)
-			imageStore(preintPX, dst_pos, preintegrate(a,b, c,d, e,f, g,h));
+			READ(vct_texPX, read_mip)
+			imageStore(write_mipPX, dst_pos, preintegrate(a,b, c,d, e,f, g,h));
 		}
 		
 		{
-			READ(vct_preintNY, read_mip)
-			imageStore(preintNY, dst_pos, preintegrate(c,a, d,b, g,e, h,f));
+			READ(vct_texNY, read_mip)
+			imageStore(write_mipNY, dst_pos, preintegrate(c,a, d,b, g,e, h,f));
 		}
 		{
-			READ(vct_preintPY, read_mip)
-			imageStore(preintPY, dst_pos, preintegrate(a,c, b,d, e,g, f,h));
+			READ(vct_texPY, read_mip)
+			imageStore(write_mipPY, dst_pos, preintegrate(a,c, b,d, e,g, f,h));
 		}
 		
 		{
-			READ(vct_preintNZ, read_mip)
-			imageStore(preintNZ, dst_pos, preintegrate(e,a, f,b, g,c, h,d));
+			READ(vct_texNZ, read_mip)
+			imageStore(write_mipNZ, dst_pos, preintegrate(e,a, f,b, g,c, h,d));
 		}
 		{
-			READ(vct_preintPZ, read_mip)
-			imageStore(preintPZ, dst_pos, preintegrate(a,e, b,f, c,g, d,h));
+			READ(vct_texPZ, read_mip)
+			imageStore(write_mipPZ, dst_pos, preintegrate(a,e, b,f, c,g, d,h));
 		}
-	#endif
 		}
 	}
 #endif

@@ -100,21 +100,6 @@ layout(std140, binding = 4) uniform ConeConfig {
 const float vct_start_dist = 1.0 / 32.0;
 uniform float vct_size = 1.0;
 
-
-vec4 _read_vct_mip (vec3 texcoord, vec3 dir, float lod) {
-	if (lod <= 0.0) {
-		return textureLod(vct_basedata, texcoord, lod);
-	} else {
-		lod -= 1.0;
-		
-		vec4 valX = textureLod(dir.x < 0.0 ? vct_preintNX : vct_preintPX, texcoord, lod) * abs(dir.x);
-		vec4 valY = textureLod(dir.y < 0.0 ? vct_preintNY : vct_preintPY, texcoord, lod) * abs(dir.y);
-		vec4 valZ = textureLod(dir.z < 0.0 ? vct_preintNZ : vct_preintPZ, texcoord, lod) * abs(dir.z);
-		
-		return valX + valY + valZ;
-	}
-}
-
 // sharpen texture samples by 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float size = r * 2.0;
@@ -131,14 +116,11 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
 	
-	// manual interpolation between mipmaps to allow lod = 0 to come from vct_basedata and lod > 0 from vct_preintXX
-	float flod = floor(lod);
-	vec4 val0 = _read_vct_mip(texcoord, dir, flod);
-	vec4 val1 = _read_vct_mip(texcoord, dir, flod+1.0);
+	vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod) * abs(dir.x);
+	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod) * abs(dir.y);
+	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod) * abs(dir.z);
 	
-	vec4 val = mix(val0, val1, lod - flod);
-	return val;
-	
+	return valX + valY + valZ;
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist, bool dbg) {
 	vec3 color = vec3(0.0);
@@ -185,7 +167,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
-	#if 1
+	#if 0
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
@@ -214,8 +196,13 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			}
 		}
 		
-		if (false) { // specular
-			float specular_strength = 0.1;
+		float specular_strength = 0.0;
+		if (hit.bid == B_WATER) {
+			hit.col *= 0.02;
+			specular_strength = 0.2;
+		}
+		
+		if (specular_strength > 0.0) { // specular
 			float cone_slope = 1.0 / vct_size;
 			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
 			light += trace_cone(hit.pos, cone_dir, cone_slope, max_dist, true).rgb * specular_strength;
@@ -292,7 +279,7 @@ void main () {
 		
 		surf_light = collect_sunlight(ray_pos, hit.TBN[2]);
 		
-		#if 0 // specular test
+		#if 1 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
@@ -300,7 +287,7 @@ void main () {
 			mat3 TBN = hit.TBN;
 			vec3 contrib = vec3(hit.occl_spec.y);
 			
-			ray_dir = normalize(reflect(ray_dir, TBN[2]) + random_in_sphere()*0.2);
+			ray_dir = normalize(reflect(ray_dir, TBN[2]) + random_in_sphere()*0.04);
 			
 			for (int j=0; j<bounces_max_count-1; ++j) {
 				bool was_reflected2;
