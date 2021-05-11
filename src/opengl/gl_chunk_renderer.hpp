@@ -118,7 +118,7 @@ struct ChunkRenderer {
 
 };
 
-static constexpr int GPU_WORLD_SIZE_CHUNKS = 4;
+static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
 static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
 struct ChunkOctrees {
@@ -166,10 +166,11 @@ struct VCT_Data {
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
 
-	Texture3D textures[6] = {
-		{"VCT.texNX"}, {"VCT.texPX"},
-		{"VCT.texNY"}, {"VCT.texPY"},
-		{"VCT.texNZ"}, {"VCT.texPZ"},
+	Texture3D basetex = {"VCT.basetex"};
+	Texture3D preints[6] = {
+		{"VCT.preintX"}, {"VCT.preintPX"},
+		{"VCT.preintY"}, {"VCT.preintPY"},
+		{"VCT.preintZ"}, {"VCT.preintPZ"},
 	};
 
 	Shader* filter;
@@ -181,21 +182,27 @@ struct VCT_Data {
 
 		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	
+		lrgba color = lrgba(0,0,0,0);
+		glSamplerParameterfv(filter_sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
+
+		glTextureStorage3D(basetex, 1, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureParameteri(basetex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(basetex, GL_TEXTURE_MAX_LEVEL, 0);
+		glClearTexImage(basetex, 0, GL_RGBA, GL_FLOAT, nullptr);
+
 		for (int dir=0; dir<6; ++dir) {
-			glTextureStorage3D(textures[dir], MIPS, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
-			glTextureParameteri(textures[dir], GL_TEXTURE_BASE_LEVEL, 0);
-			glTextureParameteri(textures[dir], GL_TEXTURE_MAX_LEVEL, MIPS-1);
-			
-			for (int layer=0; layer<MIPS; ++layer)
-				glClearTexImage(textures[dir], layer, GL_RGBA, GL_FLOAT, nullptr);
+			glTextureStorage3D(preints[dir], MIPS-1, GL_RGBA16F, TEX_WIDTH/2,TEX_WIDTH/2,TEX_WIDTH/2);
+			glTextureParameteri(preints[dir], GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(preints[dir], GL_TEXTURE_MAX_LEVEL, MIPS-2);
+			for (int layer=0; layer<MIPS-1; ++layer)
+				glClearTexImage(preints[dir], layer, GL_RGBA, GL_FLOAT, nullptr);
 		}
 	}
 

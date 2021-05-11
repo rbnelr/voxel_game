@@ -431,8 +431,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		int size = CHUNK_SIZE;
 		filter_mip0->set_uniform("size", (GLuint)size);
 
-		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, textures[dir], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(0, basetex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -452,23 +451,23 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 	glUseProgram(filter->prog);
 
 	r.state.bind_textures(filter, {
-		{"vct_texNX", textures[0], filter_sampler},
-		{"vct_texNX", textures[0], filter_sampler},
-		{"vct_texPX", textures[1], filter_sampler},
-		{"vct_texNY", textures[2], filter_sampler},
-		{"vct_texPY", textures[3], filter_sampler},
-		{"vct_texNZ", textures[4], filter_sampler},
-		{"vct_texPZ", textures[5], filter_sampler},
+		{"vct_basetex", basetex, filter_sampler},
+		{"vct_texNX", preints[0], filter_sampler},
+		{"vct_texPX", preints[1], filter_sampler},
+		{"vct_texNY", preints[2], filter_sampler},
+		{"vct_texPY", preints[3], filter_sampler},
+		{"vct_texNZ", preints[4], filter_sampler},
+		{"vct_texPZ", preints[5], filter_sampler},
 	});
 
 	// filter only texels for each chunk (up to 4x4x4 work groups)
 	for (int layer=1; layer<FILTER_CHUNK_MIPS; ++layer) {
 		int size = CHUNK_SIZE >> layer;
-		filter->set_uniform("read_mip", layer-1);
+		filter->set_uniform("read_mip", layer-2);
 		filter->set_uniform("size", (GLuint)size);
 
 		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, textures[dir], layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -491,11 +490,11 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 
 	for (int layer=FILTER_CHUNK_MIPS; layer<MIPS; ++layer) {
 		int size = TEX_WIDTH >> layer;
-		filter->set_uniform("read_mip", layer-1);
+		filter->set_uniform("read_mip", layer-2);
 		filter->set_uniform("size", (GLuint)size);
 
 		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, textures[dir], layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 		int dispatch_size = (size + COMPUTE_FILTER_LOCAL_SIZE-1) / COMPUTE_FILTER_LOCAL_SIZE;
 		glDispatchCompute(dispatch_size, dispatch_size, dispatch_size);
@@ -612,12 +611,13 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		{"voxels_tex", voxels_tex.tex},
 		{"octree", octree.tex},
 
-		{"vct_texNX", vct_data.textures[0], vct_data.sampler},
-		{"vct_texPX", vct_data.textures[1], vct_data.sampler},
-		{"vct_texNY", vct_data.textures[2], vct_data.sampler},
-		{"vct_texPY", vct_data.textures[3], vct_data.sampler},
-		{"vct_texNZ", vct_data.textures[4], vct_data.sampler},
-		{"vct_texPZ", vct_data.textures[5], vct_data.sampler},
+		{"vct_basetex", vct_data.basetex, vct_data.sampler},
+		{"vct_texNX", vct_data.preints[0], vct_data.sampler},
+		{"vct_texPX", vct_data.preints[1], vct_data.sampler},
+		{"vct_texNY", vct_data.preints[2], vct_data.sampler},
+		{"vct_texPY", vct_data.preints[3], vct_data.sampler},
+		{"vct_texNZ", vct_data.preints[4], vct_data.sampler},
+		{"vct_texPZ", vct_data.preints[5], vct_data.sampler},
 
 		{"tile_textures", r.tile_textures, r.tile_sampler},
 		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},

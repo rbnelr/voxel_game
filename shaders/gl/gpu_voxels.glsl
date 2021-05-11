@@ -56,7 +56,7 @@ float get_emmisive (uint bid) {
 }
 
 
-#define WORLD_SIZE_CHUNKS	4 // number of chunks for fixed subchunk texture (for now)
+#define WORLD_SIZE_CHUNKS	8 // number of chunks for fixed subchunk texture (for now)
 #define WORLD_SIZE			(WORLD_SIZE_CHUNKS * CHUNK_SIZE)
 
 #define VOXTEX_SIZE			2048 // max width, height, depth of sparse voxel texture (subchunk voxels)
@@ -71,7 +71,8 @@ float get_emmisive (uint bid) {
 uniform usampler3D	subchunks_tex;
 uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
-
+		
+uniform sampler3D	vct_basetex;
 uniform sampler3D	vct_texNX;
 uniform sampler3D	vct_texPX;
 uniform sampler3D	vct_texNY;

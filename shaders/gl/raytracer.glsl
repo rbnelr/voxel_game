@@ -100,7 +100,6 @@ layout(std140, binding = 4) uniform ConeConfig {
 const float vct_start_dist = 1.0 / 16.0;
 uniform float vct_size = 1.0;
 
-// sharpen texture samples by 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	float size = r * 2.0;
 	float lod = log2(size);
@@ -116,11 +115,31 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
 	
-	vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod) * abs(dir.x);
-	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod) * abs(dir.y);
-	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod) * abs(dir.z);
+	// TODO: is there a way to share mip0 for 6 texture somehow?
+	// one possibility might be sparse textures where you manually assign the same pages to all the first mips
+	// according to only possible with glTexturePageCommitmentMemNV which actually requires using a vulkan instance to allocate the memory for the pages?
 	
-	return valX + valY + valZ;
+	if (lod <= 0.0) {
+		return textureLod(vct_basetex, texcoord, 0.0);
+	} else if (lod < 1.0) {
+		vec4 val0 = textureLod(vct_basetex, texcoord, 0.0);
+		vec4 val1;
+		{
+			vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) * abs(dir.x);
+			vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) * abs(dir.y);
+			vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) * abs(dir.z);
+			
+			val1 = valX + valY + valZ;
+		}
+		
+		return mix(val0, val1, lod);
+	} else {
+		vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod-1.0) * abs(dir.x);
+		vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod-1.0) * abs(dir.y);
+		vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod-1.0) * abs(dir.z);
+		
+		return valX + valY + valZ;
+	}
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist, bool dbg) {
 	vec3 color = vec3(0.0);
