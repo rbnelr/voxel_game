@@ -52,6 +52,13 @@ layout(rgba16f, binding = 5) writeonly restrict uniform image3D write_mipPZ;
 		imageStore(write_mipPY, dst_pos, val);
 		imageStore(write_mipNZ, dst_pos, val);
 		imageStore(write_mipPZ, dst_pos, val);
+		
+		//imageStore(write_mipNX, dst_pos, vec4(val.rgb, bid != B_AIR && bidPX == B_AIR ? 1.0 : 0.0));
+		//imageStore(write_mipPX, dst_pos, vec4(val.rgb, bid != B_AIR && bidNX == B_AIR ? 1.0 : 0.0));
+		//imageStore(write_mipNY, dst_pos, vec4(val.rgb, bid != B_AIR && bidPY == B_AIR ? 1.0 : 0.0));
+		//imageStore(write_mipPY, dst_pos, vec4(val.rgb, bid != B_AIR && bidNY == B_AIR ? 1.0 : 0.0));
+		//imageStore(write_mipNZ, dst_pos, vec4(val.rgb, bid != B_AIR && bidPZ == B_AIR ? 1.0 : 0.0));
+		//imageStore(write_mipPZ, dst_pos, vec4(val.rgb, bid != B_AIR && bidNZ == B_AIR ? 1.0 : 0.0));
 	}
 #else
 	

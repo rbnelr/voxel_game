@@ -38,7 +38,7 @@ vec4 _dbg_ray_cols[] = {
 };
 #endif
 
-#define REFLECTIONS 0
+#define REFLECTIONS 1
 
 //
 struct Hit {
@@ -501,17 +501,19 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint mediu
 	if (did_hit && ((medium_bid == B_AIR && hit.bid == B_WATER) || (medium_bid == B_WATER && hit.bid == B_AIR))) {
 		// reflect
 		
+		vec3 hit_normal = hit.TBN[2];
+		
 		vec3 vertex;
-		vec3 normal_map = hit.TBN;
+		vec3 normal_map = hit_normal;
 		
 		#if 1
-		if (hit.normal.z > 0.0) {
+		if (hit_normal.z > 0.0) {
 			//normal_map = sample_water_normal(hit.pos);
 			water_shader(vec2(1,-1) * hit.pos.yx * 0.3, water_normal_time, normal_map, vertex);
 		}
 		#endif
 		
-		float reflect_fac = fresnel(-ray_dir, hit.normal, water_F0);
+		float reflect_fac = fresnel(-ray_dir, hit_normal, water_F0);
 		
 		float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;
 		
@@ -523,7 +525,7 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint mediu
 			reflect_fac = 1.0;
 		}
 		
-		if (dot(reflect_dir, hit.normal) < 0.0) {
+		if (dot(reflect_dir, hit_normal) < 0.0) {
 			reflect_fac = 0.0; // can't reflect below water (normal_map vector was caused raflection below actual geometry normal)
 		}
 		
@@ -531,12 +533,12 @@ bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint mediu
 		uint new_medium;
 		if (rand() <= reflect_fac) {
 			// reflect
-			ray_pos = hit.pos + hit.normal * 0.001;
+			ray_pos = hit.pos + hit_normal * 0.001;
 			ray_dir = reflect_dir;
 			new_medium = medium_bid;
 		} else {
 			// refract
-			ray_pos = hit.pos + hit.normal * -0.001;
+			ray_pos = hit.pos + hit_normal * -0.001;
 			ray_dir = refract_dir;
 			new_medium = medium_bid == B_AIR ? B_WATER : B_AIR;
 		}

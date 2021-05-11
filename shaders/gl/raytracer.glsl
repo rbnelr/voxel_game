@@ -196,6 +196,10 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			}
 		}
 		
+		if (visualize_light)
+			hit.col = vec3(1.0);
+		col = light * hit.col + hit.emiss ;
+		
 		float specular_strength = 0.0;
 		if (hit.bid == B_WATER) {
 			hit.col *= 0.02;
@@ -205,12 +209,8 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 		if (specular_strength > 0.0) { // specular
 			float cone_slope = 1.0 / vct_size;
 			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
-			light += trace_cone(hit.pos, cone_dir, cone_slope, max_dist, true).rgb * specular_strength;
+			col += trace_cone(hit.pos, cone_dir, cone_slope, max_dist, true).rgb * specular_strength;
 		}
-		
-		if (visualize_light)
-			hit.col = vec3(1.0);
-		col = light * hit.col + hit.emiss;
 	}
 	return col;
 	#endif
