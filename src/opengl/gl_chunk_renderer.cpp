@@ -431,7 +431,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		int size = CHUNK_SIZE;
 		filter_mip0->set_uniform("size", (GLuint)size);
 
-		glBindImageTexture(0, basetex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(0, basetex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -467,7 +467,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		filter->set_uniform("size", (GLuint)size);
 
 		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -494,7 +494,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 		filter->set_uniform("size", (GLuint)size);
 
 		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(dir, preints[dir], layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
 		int dispatch_size = (size + COMPUTE_FILTER_LOCAL_SIZE-1) / COMPUTE_FILTER_LOCAL_SIZE;
 		glDispatchCompute(dispatch_size, dispatch_size, dispatch_size);
@@ -550,9 +550,8 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunk
 #endif
 
 	// unbind
-	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	for (int dir=0; dir<6; ++dir)
-		glBindImageTexture(1+dir, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8);
+		glBindImageTexture(dir, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 }
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {

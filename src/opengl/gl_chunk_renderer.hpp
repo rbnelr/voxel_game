@@ -153,7 +153,7 @@ struct ChunkOctrees {
 };
 struct VCT_Data {
 	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE;
-	static constexpr size_t _size = (4*2 * TEX_WIDTH*TEX_WIDTH*TEX_WIDTH) / MB;
+	static constexpr size_t _size = (sizeof(uint8_t)*4 * TEX_WIDTH*TEX_WIDTH*TEX_WIDTH) / MB;
 
 	static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
 
@@ -167,6 +167,7 @@ struct VCT_Data {
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
 
 	Texture3D basetex = {"VCT.basetex"};
+
 	Texture3D preints[6] = {
 		{"VCT.preintX"}, {"VCT.preintPX"},
 		{"VCT.preintY"}, {"VCT.preintPY"},
@@ -192,13 +193,13 @@ struct VCT_Data {
 		lrgba color = lrgba(0,0,0,0);
 		glSamplerParameterfv(filter_sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
 
-		glTextureStorage3D(basetex, 1, GL_RGBA16F, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
+		glTextureStorage3D(basetex, 1, GL_RGBA8, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
 		glTextureParameteri(basetex, GL_TEXTURE_BASE_LEVEL, 0);
 		glTextureParameteri(basetex, GL_TEXTURE_MAX_LEVEL, 0);
 		glClearTexImage(basetex, 0, GL_RGBA, GL_FLOAT, nullptr);
 
 		for (int dir=0; dir<6; ++dir) {
-			glTextureStorage3D(preints[dir], MIPS-1, GL_RGBA16F, TEX_WIDTH/2,TEX_WIDTH/2,TEX_WIDTH/2);
+			glTextureStorage3D(preints[dir], MIPS-1, GL_RGBA8, TEX_WIDTH/2,TEX_WIDTH/2,TEX_WIDTH/2);
 			glTextureParameteri(preints[dir], GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(preints[dir], GL_TEXTURE_MAX_LEVEL, MIPS-2);
 			for (int layer=0; layer<MIPS-1; ++layer)

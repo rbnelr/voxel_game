@@ -38,7 +38,7 @@ uniform uint size;
 			(bidNZ != B_AIR) && (bidPZ != B_AIR);
 		
 		float alpha = bid != B_AIR ? 1.0 : 0.0;
-		vec3 emissive = blocked ? vec3(0.0) : (col.rgb * get_emmisive(bid)) * alpha;
+		vec3 emissive = blocked ? vec3(0.0) : col.rgb * get_emmisive(bid);
 		
 		imageStore(write_mip, dst_pos, vct_pack(vec4(emissive, alpha)));
 	}

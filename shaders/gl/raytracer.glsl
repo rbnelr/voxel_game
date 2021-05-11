@@ -120,32 +120,33 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	// according to only possible with glTexturePageCommitmentMemNV which actually requires using a vulkan instance to allocate the memory for the pages?
 	
 	if (lod <= 0.0) {
-		return textureLod(vct_basetex, texcoord, 0.0);
+		return vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
 	} else if (lod < 1.0) {
 		vec4 val0 = textureLod(vct_basetex, texcoord, 0.0);
 		vec4 val1;
 		{
-			vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) * abs(dir.x);
-			vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) * abs(dir.y);
-			vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) * abs(dir.z);
+			vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) );
+			vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) );
+			vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) );
 			
-			val1 = valX + valY + valZ;
+			val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 		}
 		
 		return mix(val0, val1, lod);
 	} else {
-		vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod-1.0) * abs(dir.x);
-		vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod-1.0) * abs(dir.y);
-		vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod-1.0) * abs(dir.z);
+		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod-1.0) );
+		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod-1.0) );
+		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod-1.0) );
 		
-		return valX + valY + valZ;
+		return valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 	}
 }
-vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist, bool dbg) {
+vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	vec3 color = vec3(0.0);
 	float transp = 1.0; // inverse alpha to support alpha stepsize fix
 	
-	float dist = vct_start_dist;
+	
+	float dist = start_dist;
 	
 	for (int i=0; i<4000; ++i) {
 		#if VISUALIZE_COST
@@ -186,6 +187,8 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
+	float start_dist = vct_start_dist;
+	
 	#if 0
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
@@ -197,7 +200,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	
 	float max_dist = 400.0;
 	float cone_slope = 1.0 / vct_size;
-	return trace_cone(cone_pos, cone_dir, cone_slope, max_dist, true).rgb;
+	return trace_cone(cone_pos, cone_dir, cone_slope, start_dist, max_dist, true).rgb;
 	#else
 	vec3 col = vec3(0.0);
 	if (did_hit) {
@@ -211,7 +214,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			for (int i=0; i<cones.count.x; ++i) {
 				Cone c = cones.cones[i];
 				vec3 cone_dir = hit.TBN * c.dir;
-				light += trace_cone(hit.pos, cone_dir, c.slope, max_dist, true).rgb * c.weight;
+				light += trace_cone(hit.pos, cone_dir, c.slope, start_dist, max_dist, true).rgb * c.weight;
 			}
 		}
 		
@@ -219,16 +222,17 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			hit.col = vec3(1.0);
 		col = light * hit.col + hit.emiss ;
 		
-		float specular_strength = 0.0;
+		float specular_strength = fresnel(-view_ray_dir, hit.TBN[2], 0.02);
+		float cone_slope = 1.0 / vct_size;
 		if (hit.bid == B_WATER) {
 			hit.col *= 0.02;
-			specular_strength = 0.2;
+		} else /*if (hit.bid == B_STONE)*/ {
+			cone_slope = 1.0 / 3.0;
 		}
 		
 		if (specular_strength > 0.0) { // specular
-			float cone_slope = 1.0 / vct_size;
 			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
-			col += trace_cone(hit.pos, cone_dir, cone_slope, max_dist, true).rgb * specular_strength;
+			col += trace_cone(hit.pos, cone_dir, cone_slope, start_dist, max_dist, true).rgb * specular_strength;
 		}
 	}
 	return col;

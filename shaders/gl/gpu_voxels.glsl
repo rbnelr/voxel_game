@@ -80,6 +80,17 @@ uniform sampler3D	vct_texPY;
 uniform sampler3D	vct_texNZ;
 uniform sampler3D	vct_texPZ;
 
+#define VCT_COL_MAX 5.0
+
+vec4 vct_pack (vec4 col) {
+	col.rgb = col.rgb / VCT_COL_MAX;
+	return col;
+}
+vec4 vct_unpack (vec4 col) {
+	col.rgb = col.rgb * VCT_COL_MAX;
+	return col;
+}
+
 uint read_bid (ivec3 coord) {
 	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))
 		return B_AIR;
