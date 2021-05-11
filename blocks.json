@@ -145,6 +145,12 @@
 			"tool": "pickaxe",
 			"hardness": 8,
 			"tex": [12,3]
+		},
+
+		"glowshroom": {
+			"class": "deco",
+			"mesh": "X-plant",
+			"tex": [2,3]
 		}
 	}
 }

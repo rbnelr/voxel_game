@@ -97,7 +97,7 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-const float vct_start_dist = 1.0 / 32.0;
+const float vct_start_dist = 1.0 / 16.0;
 uniform float vct_size = 1.0;
 
 // sharpen texture samples by 
@@ -128,7 +128,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float max_dist,
 	
 	float dist = vct_start_dist;
 	
-	for (int i=0; i<1000; ++i) {
+	for (int i=0; i<4000; ++i) {
 		#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
@@ -279,7 +279,7 @@ void main () {
 		
 		surf_light = collect_sunlight(ray_pos, hit.TBN[2]);
 		
-		#if 1 // specular test
+		#if 0 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
@@ -311,7 +311,7 @@ void main () {
 		#endif
 		
 		if (bounces_enable) {
-			//int count = 128;
+			//int count = 8;
 			//for (int i=0; i<count; ++i) {
 				max_dist = bounces_max_dist;
 				

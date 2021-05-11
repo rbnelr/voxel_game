@@ -81,6 +81,8 @@ namespace worldgen {
 		B_CRYSTAL5		,
 		B_CRYSTAL6		,
 
+		B_GLOWSHROOM	,
+
 		B_COUNT			,
 	};
 	struct BlockIDs {
@@ -118,6 +120,8 @@ namespace worldgen {
 			/*B_CRYSTAL4	*/ "crystal4",
 			/*B_CRYSTAL5	*/ "crystal5",
 			/*B_CRYSTAL6	*/ "crystal6",
+
+			/*B_GLOWSHROOM	*/ "glowshroom",
 		};
 
 		void load () {
