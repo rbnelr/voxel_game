@@ -166,12 +166,27 @@ struct VCT_Data {
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
 
-	Texture3D basetex = {"VCT.basetex"};
+	// Require glTextureView to allow compute shader to write into srgb texture via imageStore
+	struct VctTexture {
+		Texture3D tex;
+		GLuint texview;
 
-	Texture3D preints[6] = {
-		{"VCT.preintX"}, {"VCT.preintPX"},
-		{"VCT.preintY"}, {"VCT.preintPY"},
-		{"VCT.preintZ"}, {"VCT.preintPZ"},
+		VctTexture (std::string_view label, int mipmaps, int width): tex{label} {
+			glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, width,width,width);
+			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
+			glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+			glGenTextures(1, &texview);
+			glTextureView(texview, GL_TEXTURE_3D, tex, GL_RGBA8UI, 0,mipmaps, 0,1);
+		}
+	}; 
+
+	VctTexture basetex = {"VCT.basetex", 1, TEX_WIDTH};
+	VctTexture preints[6] = {
+		{"VCT.preintX", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPX", MIPS-1, TEX_WIDTH/2},
+		{"VCT.preintY", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPY", MIPS-1, TEX_WIDTH/2},
+		{"VCT.preintZ", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPZ", MIPS-1, TEX_WIDTH/2},
 	};
 
 	Shader* filter;
@@ -185,26 +200,13 @@ struct VCT_Data {
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		lrgba color = lrgba(0,0,0,0);
+		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		lrgba color = lrgba(0,0,0,0);
-		glSamplerParameterfv(filter_sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
-
-		glTextureStorage3D(basetex, 1, GL_RGBA8, TEX_WIDTH,TEX_WIDTH,TEX_WIDTH);
-		glTextureParameteri(basetex, GL_TEXTURE_BASE_LEVEL, 0);
-		glTextureParameteri(basetex, GL_TEXTURE_MAX_LEVEL, 0);
-		glClearTexImage(basetex, 0, GL_RGBA, GL_FLOAT, nullptr);
-
-		for (int dir=0; dir<6; ++dir) {
-			glTextureStorage3D(preints[dir], MIPS-1, GL_RGBA8, TEX_WIDTH/2,TEX_WIDTH/2,TEX_WIDTH/2);
-			glTextureParameteri(preints[dir], GL_TEXTURE_BASE_LEVEL, 0);
-			glTextureParameteri(preints[dir], GL_TEXTURE_MAX_LEVEL, MIPS-2);
-			for (int layer=0; layer<MIPS-1; ++layer)
-				glClearTexImage(preints[dir], layer, GL_RGBA, GL_FLOAT, nullptr);
-		}
 	}
 
 	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);

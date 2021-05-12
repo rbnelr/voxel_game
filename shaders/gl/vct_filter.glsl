@@ -7,8 +7,30 @@ layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 uniform uvec3 offsets[16];
 uniform uint size;
 
+//https://gamedev.stackexchange.com/questions/92015/optimized-linear-to-srgb-glsl
+vec3 to_srgb (vec3 lrgb) {
+	bvec3 cutoff = lessThan(lrgb, vec3(0.0031308));
+	vec3 higher = vec3(1.055) * pow(lrgb, vec3(1.0/2.4)) - vec3(0.055);
+	vec3 lower = lrgb * vec3(12.92);
+	return mix(higher, lower, cutoff);
+}
+
+// pack my raw lighting values into SRGB8_ALPHA8 texels manually
+// since imageStore do not support srgb for some reason
+uvec4 pack_texel (vec4 lrgba) {
+	lrgba.rgb /= VCT_COL_MAX; // compress out light range into [0,1]
+	
+	lrgba = clamp(lrgba, vec4(0.0), vec4(1.0)); // clamp for good measure
+	
+	lrgba.rgb = to_srgb(lrgba.rgb); // linear -> srgb
+	
+	// TODO: is [0,1] -> floored [0,256) more correct?
+	uvec4 rgba8 = uvec4(round(lrgba * vec4(255.0))); // [0,1] -> rounded [0,255]
+	return rgba8;
+}
+
 #if MIP0
-	layout(rgba32f, binding = 0) writeonly restrict uniform image3D write_mip;
+	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mip;
 	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
@@ -40,17 +62,17 @@ uniform uint size;
 		float alpha = bid != B_AIR ? 1.0 : 0.0;
 		vec3 emissive = blocked ? vec3(0.0) : (col.rgb * get_emmisive(bid)) * alpha;
 		
-		imageStore(write_mip, dst_pos, vct_pack(vec4(emissive, alpha)));
+		imageStore(write_mip, dst_pos, pack_texel(vec4(emissive, alpha)));
 	}
 #else
 	uniform int read_mip;
 	
-	layout(rgba32f, binding = 0) writeonly restrict uniform image3D write_mipNX;
-	layout(rgba32f, binding = 1) writeonly restrict uniform image3D write_mipPX;
-	layout(rgba32f, binding = 2) writeonly restrict uniform image3D write_mipNY;
-	layout(rgba32f, binding = 3) writeonly restrict uniform image3D write_mipPY;
-	layout(rgba32f, binding = 4) writeonly restrict uniform image3D write_mipNZ;
-	layout(rgba32f, binding = 5) writeonly restrict uniform image3D write_mipPZ;
+	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mipNX;
+	layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mipPX;
+	layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mipNY;
+	layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mipPY;
+	layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mipNZ;
+	layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 	
 	// Preintegration - filter down 3d texture for 6 view directions
 	
@@ -61,27 +83,24 @@ uniform uint size;
 	// this makes a 1x2x2 wall have the 'correct' values of 1/2 opacity or 1 opacity depending on view direction
 	// it also makes it so that light should not leak though thin walls in a lot of cases (I think)
 	
-	
-	
 	vec4 preintegrate ( vec4 a0, vec4 a1,  vec4 b0, vec4 b1,
 	                    vec4 c0, vec4 c1,  vec4 d0, vec4 d1 ) {
 		// alpha is 1-alpha
 		vec4 a,b,c,d;
 		
-		a.a = a0.a * a1.a; // alpha actually getting through
-		a.rgb  = a0.rgb + (a1.rgb * a0.a); // color is front + back getting through front alpha
-		
+		// alpha actually getting through
+		a.a = a0.a * a1.a;
 		b.a = b0.a * b1.a;
-		b.rgb  = b0.rgb + (b1.rgb * b0.a);
-		
 		c.a = c0.a * c1.a;
-		c.rgb  = c0.rgb + (c1.rgb * c0.a);
-		
 		d.a = d0.a * d1.a;
-		d.rgb  = d0.rgb + (d1.rgb * d0.a);
 		
-		vec4 res = (a+b+c+d) * 0.25;
-		return res;
+		// color is front + back getting through front alpha
+		a.rgb = a0.rgb + (a1.rgb * a0.a);
+		b.rgb = b0.rgb + (b1.rgb * b0.a);
+		c.rgb = c0.rgb + (c1.rgb * c0.a);
+		d.rgb = d0.rgb + (d1.rgb * d0.a);
+		
+		return (a+b+c+d) * 0.25;
 	}
 	
 	vec4 _load (vec4 col) {
@@ -89,10 +108,9 @@ uniform uint size;
 		col.a = 1.0 - col.a;
 		return col;
 	}
-	vec4 _store (vec4 col) {
-		col = vct_pack(col);
+	uvec4 _store (vec4 col) {
 		col.a = 1.0 - col.a;
-		return col;
+		return pack_texel(col);
 	}
 	
 	#define LOAD(src, mip) \

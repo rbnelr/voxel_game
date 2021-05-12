@@ -119,18 +119,16 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	// one possibility might be sparse textures where you manually assign the same pages to all the first mips
 	// according to only possible with glTexturePageCommitmentMemNV which actually requires using a vulkan instance to allocate the memory for the pages?
 	
-	if (lod <= 0.0) {
-		return vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
-	} else if (lod < 1.0) {
-		vec4 val0 = textureLod(vct_basetex, texcoord, 0.0);
-		vec4 val1;
-		{
-			vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) );
-			vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) );
-			vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) );
-			
-			val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
-		}
+	if (lod < 1.0) {
+		vec4 val0 = vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
+		
+		if (lod < 1.0) return val0;
+		
+		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) );
+		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) );
+		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) );
+		
+		vec4 val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 		
 		return mix(val0, val1, lod);
 	} else {
