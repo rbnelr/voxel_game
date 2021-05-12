@@ -592,7 +592,9 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	shad->set_uniform("water_F0",           water_F0);
 	shad->set_uniform("water_normal_time",  time);
 
-	shad->set_uniform("vct_size",  vct_size);
+	shad->set_uniform("vct_start_dist",     vct_start_dist);
+	shad->set_uniform("vct_stepsize",       vct_stepsize);
+	shad->set_uniform("vct_test",           vct_test);
 
 	if (taa_enable)
 		history.resize(r.framebuffer.size);

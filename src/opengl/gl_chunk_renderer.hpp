@@ -417,7 +417,10 @@ struct Raytracer {
 	bool sunlight_mode = 1;
 
 
-	float vct_size = 1.0;
+	float vct_start_dist = 1.0f / 16.0f;
+	float vct_stepsize = 1.0f;
+	float vct_test = 100;
+	bool vct_dbg_primary = false;
 
 
 	bool  bounces_enable = false;
@@ -440,6 +443,7 @@ struct Raytracer {
 		         {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
 		         {"TAA_ENABLE", !(enable_vct || only_primary_rays) && taa_enable ? "1":"0"},
 		         {"VCT", enable_vct ? "1":"0"},
+		         {"VCT_DBG_PRIMARY", vct_dbg_primary ? "1":"0"},
 		         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"}};
 	}
@@ -513,7 +517,10 @@ struct Raytracer {
 			ImGui::TreePop();
 		}
 
-		ImGui::SliderFloat("vct_size", &vct_size, 0, 256);
+		ImGui::SliderFloat("vct_start_dist", &vct_start_dist, 0, 4, "%.4f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("vct_stepsize", &vct_stepsize, 0, 1);
+		ImGui::SliderFloat("vct_test", &vct_test, 0, 256);
+		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 
 		if (macro_change && shad) {
 			shad->macros = get_macros();
@@ -539,25 +546,6 @@ struct Raytracer {
 	}
 
 	Raytracer (Shaders& shaders): octree(shaders), vct_data(shaders) {
-		if (0) {
-			int3 count, size;
-
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &count.x);
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &count.y);
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &count.z);
-
-			printf("max global (total) work group count (%d, %d, %d)\n", count.x, count.y, count.z);
-
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &size.x);
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &size.y);
-			glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &size.z);
-
-			printf("max local (in one shader) work group size (%d, %d, %d)\n", size.x, size.y, size.z);
-
-			int number;
-			glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &number);
-			printf("max local work group invocations %d\n", number);
-		}
 		if (0) {
 			
 			int max_sparse_texture_size;

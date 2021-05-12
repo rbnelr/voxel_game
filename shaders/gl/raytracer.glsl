@@ -97,11 +97,12 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-const float vct_start_dist = 1.0 / 16.0;
-uniform float vct_size = 1.0;
+uniform float vct_start_dist = 1.0 / 16.0;
+uniform float vct_stepsize = 1.0;
 
-vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
-	float size = r * 2.0;
+uniform float vct_test = 1.0;
+
+vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	float lod = log2(size);
 	
 	#if 1
@@ -120,18 +121,22 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	// according to only possible with glTexturePageCommitmentMemNV which actually requires using a vulkan instance to allocate the memory for the pages?
 	
 	if (lod < 1.0) {
+		// sample mip 0
 		vec4 val0 = vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
 		
-		if (lod < 1.0) return val0;
+		if (lod <= 0.0) return val0; // no need to also sample larger mip
 		
+		// sample mip 1
 		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) );
 		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) );
 		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) );
 		
 		vec4 val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 		
+		// interpolate mip0 and mip1
 		return mix(val0, val1, lod);
 	} else {
+		// rely on hardware mip interpolation
 		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod-1.0) );
 		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod-1.0) );
 		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod-1.0) );
@@ -140,13 +145,13 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float r) {
 	}
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
-	vec3 color = vec3(0.0);
-	float transp = 1.0; // inverse alpha to support alpha stepsize fix
-	
 	
 	float dist = start_dist;
 	
-	for (int i=0; i<4000; ++i) {
+	vec3 color = vec3(0.0);
+	float transp = 1.0; // inverse alpha to support alpha stepsize fix
+	
+	for (int i=0; i<2000; ++i) {
 		#if VISUALIZE_COST
 		++iterations;
 		#if VISUALIZE_WARP_COST
@@ -155,28 +160,25 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		#endif
 		
 		vec3 pos = cone_pos + cone_dir * dist;
-		float r = cone_slope * dist;
+		float size = cone_slope * 2.0 * dist;
 		
-		vec4 sampl = read_vct_texture(pos, cone_dir, r);
-		//sampl.rgb *= r;
-		//sampl.a *= r;
+		vec4 sampl = read_vct_texture(pos, cone_dir, size);
 		
 		color += transp * sampl.rgb;
 		transp -= transp * sampl.a;
-		//transp -= transp * (1.0 - pow(sampl.a, r*2.0));
 		
 		#if DEBUGDRAW
 		if (_debugdraw && dbg) {
-			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(1,0,0,1));
-			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(transp * sampl.rgb, 1.0-transp));
-			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(r*2.0), vec4(vec3(sampl.a), 1.0));
+			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(1,0,0,1));
+			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(transp * sampl.rgb, 1.0-transp));
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(vec3(sampl.a), 1.0));
 		}
 		#endif
 		
+		dist += size * vct_stepsize;
+		
 		if (transp < 0.01 || dist >= max_dist)
 			break;
-		
-		dist = (dist + r) / (1.0f - cone_slope);
 	}
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
@@ -187,7 +189,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
 	float start_dist = vct_start_dist;
 	
-	#if 0
+	#if VCT_DBG_PRIMARY
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
@@ -197,7 +199,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	//cone_dir = reflect(view_ray_dir, hit.TBN[2]);
 	
 	float max_dist = 400.0;
-	float cone_slope = 1.0 / vct_size;
+	float cone_slope = 1.0 / vct_test;
 	return trace_cone(cone_pos, cone_dir, cone_slope, start_dist, max_dist, true).rgb;
 	#else
 	vec3 col = vec3(0.0);
@@ -221,7 +223,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 		col = light * hit.col + hit.emiss ;
 		
 		float specular_strength = fresnel(-view_ray_dir, hit.TBN[2], 0.02);
-		float cone_slope = 1.0 / vct_size;
+		float cone_slope = 1.0 / vct_test;
 		if (hit.bid == B_WATER) {
 			hit.col *= 0.02;
 		} else /*if (hit.bid == B_STONE)*/ {
