@@ -211,6 +211,7 @@
     <ClInclude Include="..\..\..\src\kisslib\circular_buffer.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\clean_windows_h.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\collision.hpp" />
+    <ClInclude Include="..\..\..\src\kisslib\containers.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\file_io.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\image.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />

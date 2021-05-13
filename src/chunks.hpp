@@ -33,7 +33,8 @@ static_assert(SUBCHUNK_COUNT == (CHUNK_SIZE / SUBCHUNK_SIZE), "");
 static_assert((1 << SUBCHUNK_SHIFT) == SUBCHUNK_SIZE, "");
 static_assert(SUBCHUNK_MASK == SUBCHUNK_SIZE-1, "");
 
-#define IDX3D(x,y,z, sz) (size_t)(z) * (sz)*(sz) + (size_t)(y) * (sz) + (size_t)(x)
+#define IDX3D(X,Y,Z, SZ) (size_t)(Z) * (SZ)*(SZ) + (size_t)(Y) * (SZ) + (size_t)(X)
+#define IDX3DV(X,Y,Z, SZ) (size_t)(Z) * (SZ).y*(SZ).x + (size_t)(Y) * (SZ).x + (size_t)(X)
 
 // Get array index of subchunk in chunk data from chunk-relative xyz
 #define SUBCHUNK_IDX(x,y,z) ( (uint32_t)((z) >> SUBCHUNK_SHIFT) * SUBCHUNK_COUNT * SUBCHUNK_COUNT \

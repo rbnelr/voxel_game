@@ -214,6 +214,9 @@
     <ClInclude Include="..\..\..\src\opengl\bloom.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\kisslib\containers.hpp">
+      <Filter>kisslib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">

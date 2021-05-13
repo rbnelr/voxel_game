@@ -51,6 +51,7 @@ static constexpr const char* APPNAME = "Voxel Game";
 #include "kisslib/threadsafe_queue.hpp"
 #include "kisslib/timer.hpp"
 #include "kisslib/allocator.hpp"
+#include "kisslib/containers.hpp"
 
 #define SERIALIZE_LOG(type, ...) clog(type, __VA_ARGS__)
 #include "kisslib/serialization.hpp"

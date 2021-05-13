@@ -76,7 +76,7 @@
 				0.8449998497962952
 			],
 			"bounces_enable": true,
-			"bounces_max_dist": 128.0,
+			"bounces_max_dist": 300.0,
 			"bounces_max_count": 2,
 			"only_primary_rays": false,
 			"taa_alpha": 0.05000000074505806,

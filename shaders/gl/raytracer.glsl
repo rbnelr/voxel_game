@@ -151,6 +151,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	vec3 color = vec3(0.0);
 	float transp = 1.0; // inverse alpha to support alpha stepsize fix
 	
+	#if 1
 	for (int i=0; i<2000; ++i) {
 		#if VISUALIZE_COST
 		++iterations;
@@ -180,6 +181,33 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		if (transp < 0.01 || dist >= max_dist)
 			break;
 	}
+	#else
+	float slope2 = cone_slope * 2.0;
+	float stepmul = slope2 * vct_stepsize;
+	
+	for (int i=0; i<2000; i+=4) {
+		float dists[4];
+		dists[0] = dist;
+		dists[1] = dists[0] + dists[0] * stepmul;
+		dists[2] = dists[1] + dists[1] * stepmul;
+		dists[3] = dists[2] + dists[2] * stepmul;
+		dist     = dists[3] + dists[3] * stepmul;
+		
+		vec4 sampls[4];
+		sampls[0] = read_vct_texture(cone_pos + cone_dir * dists[0], cone_dir, slope2 * dists[0]);
+		sampls[1] = read_vct_texture(cone_pos + cone_dir * dists[1], cone_dir, slope2 * dists[1]);
+		sampls[2] = read_vct_texture(cone_pos + cone_dir * dists[2], cone_dir, slope2 * dists[2]);
+		sampls[3] = read_vct_texture(cone_pos + cone_dir * dists[3], cone_dir, slope2 * dists[3]);
+		
+		for (int j=0; j<4; ++j) {
+			color += transp * sampls[j].rgb;
+			transp -= transp * sampls[j].a;
+		}
+		
+		if (transp < 0.01 || dist >= max_dist)
+			break;
+	}
+	#endif
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
 	//return vec4(vec3(transp), 1.0);
@@ -187,13 +215,12 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 }
 
 vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit) {
-	float start_dist = vct_start_dist;
-	
 	#if VCT_DBG_PRIMARY
 	// primary cone for debugging
 	vec3 cone_pos, cone_dir;
 	get_ray(vec2(pxpos), cone_pos, cone_dir);
 	
+	float start_dist = 1.0;
 	//cone_pos = hit.pos;
 	//cone_dir = hit.TBN[2];
 	//cone_dir = reflect(view_ray_dir, hit.TBN[2]);
@@ -204,6 +231,7 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 	#else
 	vec3 col = vec3(0.0);
 	if (did_hit) {
+		float start_dist = vct_start_dist;
 		//vec3 dir = hit.normal;
 		//vec3 dir = reflect(view_ray_dir, hit.normal);
 		
@@ -218,17 +246,17 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 			}
 		}
 		
-		if (visualize_light)
-			hit.col = vec3(1.0);
-		col = light * hit.col + hit.emiss ;
-		
 		float specular_strength = fresnel(-view_ray_dir, hit.TBN[2], 0.02);
 		float cone_slope = 1.0 / vct_test;
 		if (hit.bid == B_WATER) {
-			hit.col *= 0.02;
+			hit.col *= 0.05;
 		} else /*if (hit.bid == B_STONE)*/ {
 			cone_slope = 1.0 / 3.0;
 		}
+		
+		if (visualize_light)
+			hit.col = vec3(1.0);
+		col = light * hit.col + hit.emiss ;
 		
 		if (specular_strength > 0.0) { // specular
 			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);

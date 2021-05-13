@@ -149,7 +149,7 @@ struct ChunkOctrees {
 			glClearTexImage(tex, layer, GL_RED_INTEGER, GL_UNSIGNED_BYTE, &val);
 	}
 
-	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
+	void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
 };
 struct VCT_Data {
 	static constexpr int TEX_WIDTH = GPU_WORLD_SIZE;
@@ -171,7 +171,11 @@ struct VCT_Data {
 		Texture3D tex;
 		GLuint texview;
 
-		VctTexture (std::string_view label, int mipmaps, int width): tex{label} {
+		VctTexture (std::string_view label, int mipmaps, int width, bool sparse=false): tex{label} {
+			if (sparse) {
+				glTextureParameteri(tex, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
+				glTextureParameteri(tex, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
+			}
 			glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, width,width,width);
 			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
@@ -180,9 +184,12 @@ struct VCT_Data {
 			glGenTextures(1, &texview);
 			glTextureView(texview, GL_TEXTURE_3D, tex, GL_RGBA8UI, 0,mipmaps, 0,1);
 		}
+		~VctTexture () {
+			glDeleteTextures(1, &texview);
+		}
 	}; 
 
-	VctTexture basetex = {"VCT.basetex", 1, TEX_WIDTH};
+	VctTexture basetex = {"VCT.basetex", 1, TEX_WIDTH, true};
 	VctTexture preints[6] = {
 		{"VCT.preintX", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPX", MIPS-1, TEX_WIDTH/2},
 		{"VCT.preintY", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPY", MIPS-1, TEX_WIDTH/2},
@@ -191,6 +198,17 @@ struct VCT_Data {
 
 	Shader* filter;
 	Shader* filter_mip0;
+
+	int3 sparse_size;
+	array3D<bool> sparse_page_state;
+
+	int3 get_sparse_texture3d_config (GLenum texel_format) {
+		int3 res;
+		glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_X_ARB, 1, &res.x);
+		glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_Y_ARB, 1, &res.y);
+		glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_Z_ARB, 1, &res.z);
+		return res;
+	}
 
 	VCT_Data (Shaders& shaders) {
 		filter       = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
@@ -206,10 +224,20 @@ struct VCT_Data {
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		
+		sparse_size = get_sparse_texture3d_config(GL_SRGB8_ALPHA8);
+
+		sparse_page_state.resize(int3(GPU_WORLD_SIZE) / sparse_size);
+		sparse_page_state.clear(true);
+
+		assert(GLAD_GL_ARB_sparse_texture && // for sparse texture support
+		       GLAD_GL_ARB_sparse_texture2); // for relying on decommitted texture regions reading as zero
 	}
 
-	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
+	void visualize_sparse (OpenglRenderer& r);
+	void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
 };
 
 struct Raytracer {
@@ -417,10 +445,11 @@ struct Raytracer {
 	bool sunlight_mode = 1;
 
 
-	float vct_start_dist = 1.0f / 16.0f;
+	float vct_start_dist = 1.0f / 64.0f;
 	float vct_stepsize = 1.0f;
-	float vct_test = 100;
+	float vct_test = 60;
 	bool vct_dbg_primary = false;
+	bool vct_visualize_sparse = false;
 
 
 	bool  bounces_enable = false;
@@ -505,7 +534,7 @@ struct Raytracer {
 			float sun_dir_rand = 4.0;
 
 			ImGui::Checkbox("bounces_enable", &bounces_enable);
-			ImGui::SliderFloat("bounces_max_dist", &bounces_max_dist, 1, 128);
+			ImGui::SliderFloat("bounces_max_dist", &bounces_max_dist, 1, 512);
 			ImGui::SliderInt("bounces_max_count", &bounces_max_count, 1, 16);
 			ImGui::Spacing();
 
@@ -521,6 +550,7 @@ struct Raytracer {
 		ImGui::SliderFloat("vct_stepsize", &vct_stepsize, 0, 1);
 		ImGui::SliderFloat("vct_test", &vct_test, 0, 256);
 		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
+		ImGui::Checkbox("vct_visualize_sparse", &vct_visualize_sparse);
 
 		if (macro_change && shad) {
 			shad->macros = get_macros();
@@ -559,12 +589,12 @@ struct Raytracer {
 			glGetIntegerv(GL_SPARSE_TEXTURE_FULL_ARRAY_CUBE_MIPMAPS_ARB  , &sparse_texture_full_array_cube_mipmaps);
 
 			GLint page_sizes;
-			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_NUM_VIRTUAL_PAGE_SIZES_ARB, 1, &page_sizes);
+			glGetInternalformativ(GL_TEXTURE_3D, GL_SRGB8_ALPHA8, GL_NUM_VIRTUAL_PAGE_SIZES_ARB, 1, &page_sizes);
 
 			std::vector<GLint> sizes_x(page_sizes), sizes_y(page_sizes), sizes_z(page_sizes);
-			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_X_ARB, page_sizes, sizes_x.data());
-			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_Y_ARB, page_sizes, sizes_y.data());
-			glGetInternalformativ(GL_TEXTURE_3D, GL_R32UI, GL_VIRTUAL_PAGE_SIZE_Z_ARB, page_sizes, sizes_z.data());
+			glGetInternalformativ(GL_TEXTURE_3D, GL_SRGB8_ALPHA8, GL_VIRTUAL_PAGE_SIZE_X_ARB, page_sizes, sizes_x.data());
+			glGetInternalformativ(GL_TEXTURE_3D, GL_SRGB8_ALPHA8, GL_VIRTUAL_PAGE_SIZE_Y_ARB, page_sizes, sizes_y.data());
+			glGetInternalformativ(GL_TEXTURE_3D, GL_SRGB8_ALPHA8, GL_VIRTUAL_PAGE_SIZE_Z_ARB, page_sizes, sizes_z.data());
 
 			Texture3D tex = {"test"};
 
@@ -572,7 +602,7 @@ struct Raytracer {
 			glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
 			glTexParameteri(GL_TEXTURE_3D, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
 
-			glTextureStorage3D(tex, 1, GL_R32UI, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
+			glTextureStorage3D(tex, 1, GL_SRGB8_ALPHA8, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
 			
 			printf("...\n");
 		}
