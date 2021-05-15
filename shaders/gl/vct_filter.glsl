@@ -47,17 +47,18 @@ uvec4 pack_texel (vec4 lrgba) {
 		
 		//if (bid == B_MAGMA) col = vec4(0.0);
 		
-		uint bidNX = read_bid(dst_pos + ivec3(-1,0,0));
-		uint bidPX = read_bid(dst_pos + ivec3(+1,0,0));
-		uint bidNY = read_bid(dst_pos + ivec3(0,-1,0));
-		uint bidPY = read_bid(dst_pos + ivec3(0,+1,0));
-		uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
-		uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
-		
-		bool blocked =
-			(bidNX != B_AIR) && (bidPX != B_AIR) &&
-			(bidNY != B_AIR) && (bidPY != B_AIR) &&
-			(bidNZ != B_AIR) && (bidPZ != B_AIR);
+		//uint bidNX = read_bid(dst_pos + ivec3(-1,0,0));
+		//uint bidPX = read_bid(dst_pos + ivec3(+1,0,0));
+		//uint bidNY = read_bid(dst_pos + ivec3(0,-1,0));
+		//uint bidPY = read_bid(dst_pos + ivec3(0,+1,0));
+		//uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
+		//uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
+		//
+		//bool blocked =
+		//	(bidNX != B_AIR) && (bidPX != B_AIR) &&
+		//	(bidNY != B_AIR) && (bidPY != B_AIR) &&
+		//	(bidNZ != B_AIR) && (bidPZ != B_AIR);
+		bool blocked = false;
 		
 		float alpha = bid != B_AIR ? 1.0 : 0.0;
 		vec3 emissive = blocked ? vec3(0.0) : (col.rgb * get_emmisive(bid)) * alpha;

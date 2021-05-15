@@ -102,9 +102,68 @@ uniform float vct_stepsize = 1.0;
 
 uniform float vct_test = 1.0;
 
+vec4 _compute_mip0 (ivec3 vox_pos) {
+	//uint bid = read_bid(vox_pos);
+	uint bid = texelFetch(octree, vox_pos, 0).r;
+	
+	//float texid = float(block_tiles[bid].sides[0]);
+	//vec4 col = textureLod(tile_textures, vec3(vec2(0.5), texid), 100.0);
+	int texid = block_tiles[bid].sides[0];
+	vec4 col = texelFetch(tile_textures, ivec3(0,0,texid), 4);
+	
+	//if (bid == B_MAGMA) col = vec4(0.0);
+	
+	//uint bidNX = read_bid(dst_pos + ivec3(-1,0,0));
+	//uint bidPX = read_bid(dst_pos + ivec3(+1,0,0));
+	//uint bidNY = read_bid(dst_pos + ivec3(0,-1,0));
+	//uint bidPY = read_bid(dst_pos + ivec3(0,+1,0));
+	//uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
+	//uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
+	//
+	//bool blocked =
+	//	(bidNX != B_AIR) && (bidPX != B_AIR) &&
+	//	(bidNY != B_AIR) && (bidPY != B_AIR) &&
+	//	(bidNZ != B_AIR) && (bidPZ != B_AIR);
+	//bool blocked = false;
+	
+	if (bid == B_AIR) return vec4(0.0);
+	return vec4(col.rgb * get_emmisive(bid), 1.0);
+}
+vec4 compute_mip0 (vec3 texcoord) {
+	texcoord *= WORLD_SIZEf;
+	texcoord -= 0.4999;
+	
+	vec3 t = fract(texcoord);
+	ivec3 pos = ivec3(floor(texcoord));
+	
+	vec4 v000 = _compute_mip0(ivec3(pos + ivec3(0,0,0)));
+	//return v000;
+	//if (t.x < 0.001 && t.y < 0.001 && t.z < 0.001) return v000;
+	
+	vec4 v100 = _compute_mip0(ivec3(pos + ivec3(1,0,0)));
+	vec4 v010 = _compute_mip0(ivec3(pos + ivec3(0,1,0)));
+	vec4 v110 = _compute_mip0(ivec3(pos + ivec3(1,1,0)));
+	vec4 v001 = _compute_mip0(ivec3(pos + ivec3(0,0,1)));
+	vec4 v101 = _compute_mip0(ivec3(pos + ivec3(1,0,1)));
+	vec4 v011 = _compute_mip0(ivec3(pos + ivec3(0,1,1)));
+	vec4 v111 = _compute_mip0(ivec3(pos + ivec3(1,1,1)));
+	
+	vec4 v00 = mix(v000, v100, vec4(t.x));
+	vec4 v10 = mix(v010, v110, vec4(t.x));
+	vec4 v01 = mix(v001, v101, vec4(t.x));
+	vec4 v11 = mix(v011, v111, vec4(t.x));
+	
+	vec4 v0 = mix(v00, v10, vec4(t.y));
+	vec4 v1 = mix(v01, v11, vec4(t.y));
+	
+	vec4 val = mix(v0, v1, vec4(t.z));
+	return val;
+}
+
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	float lod = log2(size);
 	
+	ivec3 vox_pos = ivec3(floor(texcoord));
 	#if 1
 	// support negative lod (size < 1.0) by snapping texture coords to nearest texels
 	// when approaching size=0
@@ -123,6 +182,7 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	if (lod < 1.0) {
 		// sample mip 0
 		vec4 val0 = vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
+		//vec4 val0 = compute_mip0(texcoord);
 		
 		if (lod <= 0.0) return val0; // no need to also sample larger mip
 		

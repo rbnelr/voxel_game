@@ -186,10 +186,12 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 
 		float start_azim = 22.5f;
 		float elev_offs = 2.1f;
+
+		float weight = 1.0f;
 	};
 	static std::vector<Set> sets = {
-		{ 8, 40.1f, 22.5f, 2.1f },
-		{ 4, 38.9f, 45.0f, 40.2f },
+		{ 8, 40.1f, 22.5f, 2.1f, 0.25f },
+		{ 4, 38.9f, 45.0f, 40.2f, 1.0f },
 	};
 
 	int set_count = (int)sets.size();
@@ -198,6 +200,9 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 
 	cone_data.count = 0;
 
+	float total_weight = 0;
+
+	int j=0;
 	for (auto& s : sets) {
 		ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set");
 
@@ -206,6 +211,8 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 
 		ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
 		ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
+
+		ImGui::DragFloat("weight", &s.weight, 0.01f);
 
 		float ang = deg(s.cone_ang);
 
@@ -222,7 +229,7 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 			float cone_slope = tan(ang * 0.5f);
 			float dist = start_dist;
 
-			cone_data.cones[cone_data.count+i] = { cone_dir, cone_slope, 1.0f / (s.count+1), 0 };
+			cone_data.cones[j++] = { cone_dir, cone_slope, s.weight, 0 };
 		
 			int j=0;
 			while (j++ < 100 && dist < 100.0f) {
@@ -233,11 +240,21 @@ void Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
 
 				dist = (dist + r) / (1.0f - cone_slope);
 			}
+
+			total_weight += s.weight;
 		}
 
 		cone_data.count += s.count;
 
 		ImGui::TreePop();
+	}
+
+	// normalize weights
+	j=0;
+	for (auto& s : sets) {
+		for (int i=0; i<s.count; ++i) {
+			cone_data.cones[j++].weight /= total_weight;
+		}
 	}
 }
 
