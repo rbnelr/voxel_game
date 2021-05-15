@@ -234,6 +234,7 @@ struct VCT_Data {
 
 		assert(GLAD_GL_ARB_sparse_texture && // for sparse texture support
 		       GLAD_GL_ARB_sparse_texture2); // for relying on decommitted texture regions reading as zero
+	//	assert(GLAD_GL_NV_memory_object_sparse);
 	}
 
 	void visualize_sparse (OpenglRenderer& r);

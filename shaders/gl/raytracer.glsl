@@ -244,24 +244,27 @@ vec3 voxel_cone_trace (uvec2 pxpos, vec3 view_ray_dir, bool did_hit, in Hit hit)
 				vec3 cone_dir = hit.TBN * c.dir;
 				light += trace_cone(hit.pos, cone_dir, c.slope, start_dist, max_dist, true).rgb * c.weight;
 			}
+			
+			if (visualize_light)
+				hit.col = vec3(1.0);
+			col = light * hit.col + hit.emiss;
 		}
 		
-		float specular_strength = fresnel(-view_ray_dir, hit.TBN[2], 0.02);
-		float cone_slope = 1.0 / vct_test;
-		if (hit.bid == B_WATER) {
-			hit.col *= 0.05;
-		} else /*if (hit.bid == B_STONE)*/ {
-			cone_slope = 1.0 / 3.0;
-		}
-		
-		if (visualize_light)
-			hit.col = vec3(1.0);
-		col = light * hit.col + hit.emiss ;
-		
-		if (specular_strength > 0.0) { // specular
-			vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
-			col += trace_cone(hit.pos, cone_dir, cone_slope, start_dist, max_dist, true).rgb * specular_strength;
-		}
+		//{ // specular
+		//	vec3 cone_dir = reflect(view_ray_dir, hit.TBN[2]);
+		//	
+		//	float specular_strength = fresnel(-view_ray_dir, hit.TBN[2], 0.02) * 0.3;
+		//	float cone_slope = 1.0 / vct_test;
+		//	if (hit.bid == B_WATER) {
+		//		hit.col *= 0.05;
+		//	} else /*if (hit.bid == B_STONE)*/ {
+		//		cone_slope = 1.0 / 8.0;
+		//	}
+		//	
+		//	if (specular_strength > 0.0) { // specular
+		//		col += trace_cone(hit.pos, cone_dir, cone_slope, start_dist, max_dist, true).rgb * specular_strength;
+		//	}
+		//}
 	}
 	return col;
 	#endif
@@ -330,7 +333,7 @@ void main () {
 		
 		surf_light = collect_sunlight(ray_pos, hit.TBN[2]);
 		
-		#if 0 // specular test
+		#if 1 // specular test
 		if (bounces_enable) {
 			max_dist = bounces_max_dist;
 			
@@ -338,25 +341,37 @@ void main () {
 			mat3 TBN = hit.TBN;
 			vec3 contrib = vec3(hit.occl_spec.y);
 			
-			ray_dir = normalize(reflect(ray_dir, TBN[2]) + random_in_sphere()*0.04);
+			float roughness = 0.8;
 			
-			for (int j=0; j<bounces_max_count-1; ++j) {
-				bool was_reflected2;
-				Hit hit2;
-				if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_SPECULAR))
-					break;
-				
-				cur_pos = hit2.pos + TBN[2] * 0.001;
-				max_dist -= hit2.dist;
-				
-				TBN = hit2.TBN;
-				
-				ray_dir = TBN * hemisphere_sample(); // already cos weighted
-				
-				vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
-				
-				surf_light += (hit2.emiss + hit2.col * light2) * contrib;
-				contrib *= hit2.col;
+			vec2 rand = rand2();
+			
+			float theta = atan(roughness * sqrt(rand.x) / sqrt(1.0 - rand.x));
+			float phi = 2.0 * PI * rand.y;
+			
+			vec3 normal = from_spherical(theta, phi, 1.0);
+			normal = TBN * normal;
+			
+			ray_dir = reflect(ray_dir, normal);
+			
+			if (dot(ray_dir, TBN[2]) >= 0.0) {
+				for (int j=0; j<bounces_max_count-1; ++j) {
+					bool was_reflected2;
+					Hit hit2;
+					if (!trace_ray_refl_refr(cur_pos, ray_dir, max_dist, hit.medium, hit2, was_reflected2, RAYT_SPECULAR))
+						break;
+					
+					cur_pos = hit2.pos + TBN[2] * 0.001;
+					max_dist -= hit2.dist;
+					
+					TBN = hit2.TBN;
+					
+					ray_dir = TBN * hemisphere_sample(); // already cos weighted
+					
+					vec3 light2 = collect_sunlight(cur_pos, TBN[2]);
+					
+					surf_light += (hit2.emiss + hit2.col * light2) * contrib;
+					contrib *= hit2.col;
+				}
 			}
 		}
 		#endif

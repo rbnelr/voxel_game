@@ -11,6 +11,14 @@ float map (float x, float a, float b) {
 	return (x - a) / (b - a);
 }
 
+// theta is angle from 0,0,1
+// phi is horizontal angle starting at 0,1,0
+vec3 from_spherical (float theta, float phi, float r) {
+	float st = sin(theta);
+    float ct = cos(theta);
+    return r * vec3(st * sin(phi), st * cos(phi), ct);
+}
+
 //// View
 
 struct View {
