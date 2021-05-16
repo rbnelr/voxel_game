@@ -7,15 +7,47 @@
 #define INF (1. / 0.)
 
 #if VISUALIZE_COST
-int iterations = 0;
-
-uniform int max_iterations = 200;
-
-uniform sampler2D		heat_gradient;
+	int iterations = 0;
+	
+	uniform int max_iterations = 200;
+	
+	uniform sampler2D		heat_gradient;
+	
 	#if VISUALIZE_WARP_COST
-		#define WARP_COUNT_IN_WG ((LOCAL_SIZE_X*LOCAL_SIZE_Y) / 32) 
+		#define WARP_COUNT_IN_WG ((WG_PIXELS_X*WG_PIXELS_Y) / 32) 
 		shared uint warp_iter[WARP_COUNT_IN_WG];
+		
+		#define INIT_VISUALIZE_COST \
+			if (subgroupElect()) { \
+				warp_iter[gl_SubgroupID] = 0u; \
+			} \
+			iterations = 0; \
+			barrier();
+			
+		#define GET_VISUALIZE_COST(VAL) \
+			const uint warp_cost = warp_iter[gl_SubgroupID]; \
+			const uint local_cost = iterations; \
+			 \
+			float wasted_work = float(warp_cost - local_cost) / float(warp_cost); \
+			VAL = texture(heat_gradient, vec2(wasted_work, 0.5)).rgb;
+			
+		#define VISUALIZE_COST_COUNT \
+			++iterations; \
+			if (subgroupElect()) atomicAdd(warp_iter[gl_SubgroupID], 1u);
+	#else
+		#define INIT_VISUALIZE_COST \
+			iterations = 0;
+			
+		#define GET_VISUALIZE_COST(VAL) \
+			VAL = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5)).rgb;
+			
+		#define VISUALIZE_COST_COUNT \
+			++iterations;
 	#endif
+#else
+	#define INIT_VISUALIZE_COST
+	#define GET_VISUALIZE_COST(VAL)
+	#define VISUALIZE_COST_COUNT
 #endif
 
 #define RAYT_PRIMARY		0
@@ -24,7 +56,7 @@ uniform sampler2D		heat_gradient;
 #define RAYT_SPECULAR		3
 #define RAYT_SUN			4
 
-#define DEBUGDRAW 1
+#define DEBUGDRAW 0
 #if DEBUGDRAW
 bool _debugdraw = false;
 uniform bool update_debugdraw = false;
@@ -114,12 +146,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 	uint voxel;
 	
 	for (;;) {
-		#if VISUALIZE_COST
-		++iterations;
-		#if VISUALIZE_WARP_COST
-		if (subgroupElect()) atomicAdd(warp_iter[gl_SubgroupID], 1u);
-		#endif
-		#endif
+		VISUALIZE_COST_COUNT
 	
 		uvec3 flipped = (coord ^ flipmask) >> mip;
 		

@@ -3,7 +3,7 @@
 		"seed_str": "test5"
 	},
 	"chunks": {
-		"load_radius": 600.0,
+		"load_radius": 500.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,

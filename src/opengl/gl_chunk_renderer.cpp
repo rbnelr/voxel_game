@@ -707,8 +707,8 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	}
 
 	int2 dispatch_size;
-	dispatch_size.x = (r.framebuffer.size.x + (compute_local_size.x -1)) / compute_local_size.x;
-	dispatch_size.y = (r.framebuffer.size.y + (compute_local_size.y -1)) / compute_local_size.y;
+	dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
+	dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
 
 	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
 

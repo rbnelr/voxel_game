@@ -427,11 +427,10 @@ struct Raytracer {
 	bool visualize_warp_reads = false;
 
 	//
-	int _im_selection = 2;
-	static constexpr const char* _im_options = "4x4\0" "8x4\0" "8x8\0" "16x8\0" "16x16\0" "32x16\0";
-	static constexpr int2 _im_sizes[] = { int2(4,4), int2(8,4), int2(8,8), int2(16,8), int2(16,16), int2(32,16), };
+	int2 group_size = int2(8,8);
+	bool update_group_size = false; // alow editing without instanly updating, as to avoid invalid sizes
 
-	int2 compute_local_size = int2(8,8);
+	int2 _group_size = int2(8,8);
 
 	//
 	bool  sunlight_enable = true;
@@ -453,6 +452,8 @@ struct Raytracer {
 	bool vct_dbg_primary = false;
 	bool vct_visualize_sparse = false;
 
+	bool vct_opt_test = false;
+
 
 	bool  bounces_enable = false;
 	float bounces_max_dist = 64;
@@ -468,8 +469,9 @@ struct Raytracer {
 	bool  clear_debugdraw = false;
 
 	std::vector<gl::MacroDefinition> get_macros () {
-		return { {"LOCAL_SIZE_X", prints("%d", compute_local_size.x)},
-		         {"LOCAL_SIZE_Y", prints("%d", compute_local_size.y)},
+		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
+		         {"WG_PIXELS_Y", prints("%d", _group_size.y)},
+		         {"WG_CONES", prints("%d", enable_vct ? (vct_opt_test ? 12 : 1) : 1)},
 		         {"ONLY_PRIMARY_RAYS", !enable_vct && only_primary_rays ? "1":"0"},
 		         {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
 		         {"TAA_ENABLE", !(enable_vct || only_primary_rays) && taa_enable ? "1":"0"},
@@ -503,12 +505,11 @@ struct Raytracer {
 		macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 		ImGui::SameLine();
 		macro_change |= ImGui::Checkbox("warp_iterations", &visualize_warp_iterations);
-		ImGui::SameLine();
-		macro_change |= ImGui::Checkbox("warp_reads", &visualize_warp_reads);
 
-		if (ImGui::Combo("compute_local_size", &_im_selection, _im_options) && shad) {
+		ImGui::InputInt2("group_size", &group_size.x); ImGui::SameLine(); 
+		if (ImGui::Button("Update")) {
 			macro_change = true;
-			compute_local_size = _im_sizes[_im_selection];
+			_group_size = group_size;
 		}
 
 		macro_change |= ImGui::Checkbox("only_primary_rays", &only_primary_rays);
@@ -553,6 +554,8 @@ struct Raytracer {
 		ImGui::SliderFloat("vct_test", &vct_test, 0, 256);
 		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 		ImGui::Checkbox("vct_visualize_sparse", &vct_visualize_sparse);
+
+		macro_change |= ImGui::Checkbox("vct_opt_test", &vct_opt_test);
 
 		if (macro_change && shad) {
 			shad->macros = get_macros();
