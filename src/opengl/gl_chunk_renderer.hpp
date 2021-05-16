@@ -218,14 +218,15 @@ struct VCT_Data {
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 		lrgba color = lrgba(0,0,0,0);
 		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 		
 		sparse_size = get_sparse_texture3d_config(GL_SRGB8_ALPHA8);
 

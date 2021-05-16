@@ -61,7 +61,9 @@ uvec4 pack_texel (vec4 lrgba) {
 		bool blocked = false;
 		
 		float alpha = bid != B_AIR ? 1.0 : 0.0;
-		vec3 emissive = blocked ? vec3(0.0) : (col.rgb * get_emmisive(bid)) * alpha;
+		vec3 emissive = blocked ? vec3(0.0) :
+		//(col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
+		(col.rgb * get_emmisive(bid)) * alpha;
 		
 		imageStore(write_mip, dst_pos, pack_texel(vec4(emissive, alpha)));
 	}
