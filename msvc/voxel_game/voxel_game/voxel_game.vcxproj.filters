@@ -426,9 +426,6 @@
     <None Include="..\..\..\shaders\gl\rand.glsl">
       <Filter>shaders\gl</Filter>
     </None>
-    <None Include="..\..\..\shaders\gl\raytracer.glsl">
-      <Filter>shaders\gl</Filter>
-    </None>
     <None Include="..\..\..\shaders\gl\bloom.glsl">
       <Filter>shaders\gl</Filter>
     </None>
@@ -448,6 +445,15 @@
       <Filter>shaders\gl</Filter>
     </None>
     <None Include="..\..\..\shaders\gl\vct_filter.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\chunk_.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\rt_gbufgen.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\vct_shade.glsl">
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>

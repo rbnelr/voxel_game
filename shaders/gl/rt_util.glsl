@@ -50,6 +50,64 @@
 	#define VISUALIZE_COST_COUNT
 #endif
 
+// get pixel ray in world space based on pixel coord and matricies
+bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
+	
+#if 1 // Normal camera projection
+	//vec2 px_center = px_pos + rand2();
+	vec2 px_center = px_pos + vec2(0.5);
+	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
+	
+	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
+
+	// TODO: can't get optimization to one single clip_to_world mat mul to work, why?
+	// -> clip_to_cam needs translation  cam_to_world needs to _not_ have translation
+	vec3 cam = (view.clip_to_cam * clip).xyz;
+
+	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
+	ray_dir = normalize(ray_dir);
+	
+	// ray starts on the near plane
+	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
+	
+	// make relative to gpu world representation (could bake into matrix)
+	ray_pos += float(WORLD_SIZE/2);
+	
+	return true;
+
+#else // 360 Sphere Projections
+	
+	vec2 px_center = (px_pos + vec2(0.5)) / view.viewport_size; // [0,1]
+	
+	#if 0 // Equirectangular projection
+		float lon = (px_center.x - 0.5) * PI*2;
+		float lat = (px_center.y - 0.5) * PI;
+	#else // Mollweide projection
+		float x = px_center.x * 2.0 - 1.0;
+		float y = px_center.y * 2.0 - 1.0;
+		
+		if ((x*x + y*y) > 1.0)
+			return false;
+		
+		float theta = asin(y);
+		
+		float lon = (PI * x) / cos(theta);
+		float lat = asin((2.0 * theta + sin(2.0 * theta)) / PI);
+	#endif
+	
+	float c = cos(lat);
+	vec3 dir_cam = vec3(c * sin(lon), sin(lat), -c * cos(lon));
+	
+	ray_dir = (view.cam_to_world * vec4(dir_cam, 0)).xyz;
+	ray_pos = (view.cam_to_world * vec4(0,0,0,1)).xyz;
+	
+	// make relative to gpu world representation (could bake into matrix)
+	ray_pos += float(WORLD_SIZE/2);
+
+	return true;
+#endif
+}
+
 #define RAYT_PRIMARY		0
 #define RAYT_REFLECT		1
 #define RAYT_DIFFUSE		2
@@ -81,7 +139,7 @@ struct Hit {
 	uint	medium;
 	vec3	col;
 	vec2	occl_spec;
-	vec3	emiss;
+	float	emiss;
 };
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
@@ -328,7 +386,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			hit.occl_spec.x = 1.0;
 			hit.occl_spec.y = 1.0;
 		//}
-		hit.emiss = hit.col * get_emmisive(hit.bid);
+		hit.emiss = get_emmisive(hit.bid);
 	}
 	return true;
 }

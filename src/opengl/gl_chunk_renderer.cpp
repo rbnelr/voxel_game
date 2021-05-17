@@ -280,16 +280,21 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 		clear_debugdraw = false;
 	}
 
-	if (macro_change && shad) {
-		shad->macros = get_macros();
-		shad->recompile("macro_change", false);
+	if (macro_change && rt_shad) {
+		rt_shad->macros = get_rt_macros();
+		rt_shad->recompile("macro_change", false);
+	}
+	if (macro_change && vct_shad) {
+		vct_shad->macros = get_vct_macros();
+		vct_shad->recompile("macro_change", false);
 	}
 
 	if (vct_visualize_sparse)
 		vct_data.visualize_sparse(r);
 
 	// lazy init these to allow json changes to affect the macros
-	if (!shad)			shad = r.shaders.compile("raytracer", get_macros(), {{ COMPUTE_SHADER }});
+	if (!rt_shad)	rt_shad  = r.shaders.compile("rt_gbufgen", get_rt_macros(), {{ COMPUTE_SHADER }});
+	if (!vct_shad)	vct_shad = r.shaders.compile("vct_shade", get_vct_macros(), {{ COMPUTE_SHADER }});
 	
 	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
 
@@ -618,116 +623,92 @@ void VCT_Data::visualize_sparse (OpenglRenderer& r) {
 
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
-	OGL_TRACE("raytracer.draw");
 
-	if (!shad->prog) return;
+	if (!rt_shad->prog || !vct_shad->prog) return;
 
-	glUseProgram(shad->prog);
+	resize_gbuf(r.framebuffer.size);
+	{
+		ZoneScopedN("rt_gbufgen");
+		OGL_TRACE("rt_gbufgen");
 
-	shad->set_uniform("taa_alpha",          taa_alpha);
+		glUseProgram(rt_shad->prog);
 
-	shad->set_uniform("max_iterations",     max_iterations);
-	shad->set_uniform("rand_frame_index",   rand_seed_time ? (uint32_t)g_window.frame_counter : 0);
+		r.state.bind_textures(rt_shad, {
+			{"subchunks_tex", subchunks_tex.tex},
+			{"voxels_tex", voxels_tex.tex},
+			{"octree", octree.tex},
 
-	shad->set_uniform("sunlight_enable",    sunlight_enable);
-	shad->set_uniform("sunlight_dist",      sunlight_dist);
-	shad->set_uniform("sunlight_col",       sunlight_col);
+			{"tile_textures", r.tile_textures, r.tile_sampler},
+		});
 
-	float3 sun_dir = rotate3_Z(sunlight_ang.x) * rotate3_X(sunlight_ang.y) * float3(0,+1,0);
+		glBindImageTexture(0, gbuf_pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		glBindImageTexture(1, gbuf_col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(2, gbuf_norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(3, gbuf_tang , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
-	shad->set_uniform("sun_pos",            sunlight_pos);
-	shad->set_uniform("sun_pos_size",       sun_pos_size);
-	shad->set_uniform("sun_dir",            sun_dir);
-	shad->set_uniform("sun_dir_rand",       sun_dir_rand);
-
-	shad->set_uniform("bounces_enable",     bounces_enable);
-	shad->set_uniform("bounces_max_dist",   bounces_max_dist);
-	shad->set_uniform("bounces_max_count",  bounces_max_count);
-
-	//shad->set_uniform("rays",               rays);
-	shad->set_uniform("visualize_light",    visualize_light);
-
-	static float time = 0;
-	time += g_window.input.dt;
-	//time = fmodf(time, 100.0f); // shader can't handle modded value, should be possible with correctly chosen values everywhere
-
-	shad->set_uniform("water_F0",           water_F0);
-	shad->set_uniform("water_normal_time",  time);
-
-	shad->set_uniform("vct_start_dist",     vct_start_dist);
-	shad->set_uniform("vct_stepsize",       vct_stepsize);
-	shad->set_uniform("vct_test",           vct_test);
-
-	if (taa_enable)
-		history.resize(r.framebuffer.size);
-
-	GLuint prev_color  = history.colors[history.cur ^ 1];
-	GLuint cur_color   = history.colors[history.cur];
-	GLuint prev_posage = history.posage[history.cur ^ 1];
-	GLuint cur_posage  = history.posage[history.cur];
-
-	if (taa_enable)
-		history.cur ^= 1;
-	
-	r.state.bind_textures(shad, {
-		{"subchunks_tex", subchunks_tex.tex},
-		{"voxels_tex", voxels_tex.tex},
-		{"octree", octree.tex},
-
-		{"vct_basetex", vct_data.basetex.tex, vct_data.sampler},
-		{"vct_texNX", vct_data.preints[0].tex, vct_data.sampler},
-		{"vct_texPX", vct_data.preints[1].tex, vct_data.sampler},
-		{"vct_texNY", vct_data.preints[2].tex, vct_data.sampler},
-		{"vct_texPY", vct_data.preints[3].tex, vct_data.sampler},
-		{"vct_texNZ", vct_data.preints[4].tex, vct_data.sampler},
-		{"vct_texPZ", vct_data.preints[5].tex, vct_data.sampler},
-
-		{"tile_textures", r.tile_textures, r.tile_sampler},
-		{"water_N_A", r.water_N_A, r.normal_sampler_wrap},
-		{"water_N_B", r.water_N_B, r.normal_sampler_wrap},
-
-		{"textures_A", r.textures_A, r.normal_sampler_wrap},
-		{"textures_N", r.textures_N, r.normal_sampler_wrap},
-		{"textures2_A", r.textures2_A, r.normal_sampler_wrap},
-		{"textures2_N", r.textures2_N, r.normal_sampler_wrap},
-
-		(taa_enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, history.sampler} : StateManager::TextureBind{}),
-		(taa_enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, history.sampler_int} : StateManager::TextureBind{}),
+		int2 dispatch_size;
+		dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
+		dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
 		
-		{"heat_gradient", r.gradient, r.normal_sampler},
-	});
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 
-	upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
-
-	glBindImageTexture(5, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-
-	if (taa_enable) {
-		glBindImageTexture(6, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(7, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
 	}
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	int2 dispatch_size;
-	dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
-	dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
+	{
+		ZoneScopedN("vct_shade");
+		OGL_TRACE("vct_shade");
 
-	float4x4 world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+		glUseProgram(vct_shad->prog);
 
-	shad->set_uniform("update_debugdraw",  update_debugdraw);
+		vct_shad->set_uniform("visualize_light",    visualize_light);
 
-	shad->set_uniform("dispatch_size", dispatch_size);
-	shad->set_uniform("prev_world2clip", init ? world2clip : prev_world2clip);
+		vct_shad->set_uniform("vct_start_dist",     vct_start_dist);
+		vct_shad->set_uniform("vct_stepsize",       vct_stepsize);
+		vct_shad->set_uniform("vct_test",           vct_test);
 
-	prev_world2clip = world2clip;
-	init = false;
+		vct_shad->set_uniform("update_debugdraw",  update_debugdraw);
 
-	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+		r.state.bind_textures(vct_shad, {
+			{"subchunks_tex", subchunks_tex.tex},
+			{"voxels_tex", voxels_tex.tex},
+			{"octree", octree.tex},
 
+			{"gbuf_pos" , gbuf_pos },
+			{"gbuf_col" , gbuf_col },
+			{"gbuf_norm", gbuf_norm},
+			{"gbuf_tang", gbuf_tang},
+
+			{"vct_basetex", vct_data.basetex.tex, vct_data.sampler},
+			{"vct_texNX", vct_data.preints[0].tex, vct_data.sampler},
+			{"vct_texPX", vct_data.preints[1].tex, vct_data.sampler},
+			{"vct_texNY", vct_data.preints[2].tex, vct_data.sampler},
+			{"vct_texPY", vct_data.preints[3].tex, vct_data.sampler},
+			{"vct_texNZ", vct_data.preints[4].tex, vct_data.sampler},
+			{"vct_texPZ", vct_data.preints[5].tex, vct_data.sampler},
+
+			{"tile_textures", r.tile_textures, r.tile_sampler},
+			
+			{"heat_gradient", r.gradient, r.normal_sampler},
+		});
+
+		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
+
+		glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+
+		int2 dispatch_size;
+		dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
+		dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
+
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	}
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 	// unbind
-	glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-	glBindImageTexture(6, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-	glBindImageTexture(7, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI );
+	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	glBindImageTexture(1, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	glBindImageTexture(2, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+	glBindImageTexture(3, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 }
 
 } // namespace gl

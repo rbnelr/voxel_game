@@ -1234,6 +1234,19 @@ struct StateManager {
 
 ////
 
+inline int calc_mipmaps (int w, int h) {
+	int count = 0;
+	for (;;) {
+		count++;
+		if (w == 1 && h == 1)
+			break;
+
+		w = max(w / 2, 1);
+		h = max(h / 2, 1);
+	}
+	return count;
+}
+
 // framebuffer for rendering at different resolution and to make sure we get float buffers
 struct Framebuffer {
 	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
@@ -1257,19 +1270,6 @@ struct Framebuffer {
 	static constexpr GLenum color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8
 	static constexpr GLenum depth_format = GL_DEPTH_COMPONENT32F;
 	static constexpr bool color_mips = true;
-
-	int calc_mipmaps (int w, int h) {
-		int count = 0;
-		for (;;) {
-			count++;
-			if (w == 1 && h == 1)
-				break;
-
-			w = max(w / 2, 1);
-			h = max(h / 2, 1);
-		}
-		return count;
-	}
 
 	void update (int2 window_size) {
 		auto old_size = size;

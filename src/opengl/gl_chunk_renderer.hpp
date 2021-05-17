@@ -248,7 +248,8 @@ struct Raytracer {
 		bounces_enable, bounces_max_dist, bounces_max_count,
 		only_primary_rays, taa_alpha, taa_enable)
 
-	Shader* shad = nullptr;
+	Shader* rt_shad = nullptr;
+	Shader* vct_shad = nullptr;
 
 	struct SubchunksTexture {
 		Texture3D	tex;
@@ -333,6 +334,29 @@ struct Raytracer {
 	ChunkOctrees				octree;
 	VCT_Data					vct_data;
 
+	int2						gbuf_size = 0;
+	Texture2D					gbuf_pos ;
+	Texture2D					gbuf_col ;
+	Texture2D					gbuf_norm;
+	Texture2D					gbuf_tang;
+	
+	void resize_gbuf (int2 const& size) {
+		if (gbuf_size == size) return;
+		gbuf_size = size;
+
+		gbuf_pos   = {"gbuf.pos"  }; // could be computed from depth
+		gbuf_col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
+		gbuf_norm  = {"gbuf.norm" }; // rgb normal
+		gbuf_tang  = {"gbuf.tang" }; // rgb tangent
+
+		//int mips = calc_mipmaps(size.x, size.y);
+
+		glTextureStorage2D(gbuf_pos , 1, GL_RGBA32F, size.x, size.y);
+		glTextureStorage2D(gbuf_col , 1, GL_RGBA16F, size.x, size.y);
+		glTextureStorage2D(gbuf_norm, 1, GL_RGBA16F, size.x, size.y);
+		glTextureStorage2D(gbuf_tang, 1, GL_RGBA16F, size.x, size.y);
+	}
+
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
 	struct TAAHistory {
@@ -409,13 +433,13 @@ struct Raytracer {
 			}
 		}
 	};
-	TAAHistory history;
-
+	//TAAHistory history;
+	//
 	bool taa_enable = true;
 	float taa_alpha = 0.05;
-
-	float4x4 prev_world2clip;
-	bool init = true;
+	//
+	//float4x4 prev_world2clip;
+	//bool init = true;
 
 	//
 	int max_iterations = 512;
@@ -452,8 +476,6 @@ struct Raytracer {
 	bool vct_dbg_primary = false;
 	bool vct_visualize_sparse = false;
 
-	bool vct_opt_test = false;
-
 
 	bool  bounces_enable = false;
 	float bounces_max_dist = 64;
@@ -468,14 +490,14 @@ struct Raytracer {
 	bool  update_debugdraw = false;
 	bool  clear_debugdraw = false;
 
-	std::vector<gl::MacroDefinition> get_macros () {
+	std::vector<gl::MacroDefinition> get_rt_macros () {
+		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
+		         {"WG_PIXELS_Y", prints("%d", _group_size.y)} };
+	}
+	std::vector<gl::MacroDefinition> get_vct_macros () {
 		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
 		         {"WG_PIXELS_Y", prints("%d", _group_size.y)},
-		         {"WG_CONES", prints("%d", enable_vct ? (vct_opt_test ? 12 : 1) : 1)},
-		         {"ONLY_PRIMARY_RAYS", !enable_vct && only_primary_rays ? "1":"0"},
-		         {"SUNLIGHT_MODE", sunlight_mode ? "1":"0"},
-		         {"TAA_ENABLE", !(enable_vct || only_primary_rays) && taa_enable ? "1":"0"},
-		         {"VCT", enable_vct ? "1":"0"},
+		         {"WG_CONES", prints("%d", 12)},
 		         {"VCT_DBG_PRIMARY", vct_dbg_primary ? "1":"0"},
 		         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"}};
@@ -555,25 +577,13 @@ struct Raytracer {
 		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 		ImGui::Checkbox("vct_visualize_sparse", &vct_visualize_sparse);
 
-		macro_change |= ImGui::Checkbox("vct_opt_test", &vct_opt_test);
-
-		if (macro_change && shad) {
-			shad->macros = get_macros();
-			shad->recompile("macro_change", false);
+		if (macro_change && rt_shad) {
+			rt_shad->macros = get_rt_macros();
+			rt_shad->recompile("macro_change", false);
 		}
-
-		if (ImGui::Button("Dump asm")) {
-			GLsizei length;
-			glGetProgramiv(shad->prog, GL_PROGRAM_BINARY_LENGTH, &length);
-
-			char* buf = (char*)malloc(length);
-
-			GLenum format;
-			glGetProgramBinary(shad->prog, length, &length, &format, buf);
-
-			save_binary_file("../raytracer.glsl.asm", buf, length);
-
-			free(buf);
+		if (macro_change && vct_shad) {
+			vct_shad->macros = get_vct_macros();
+			vct_shad->recompile("macro_change", false);
 		}
 		
 		//
