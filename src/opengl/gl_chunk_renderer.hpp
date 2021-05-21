@@ -250,6 +250,7 @@ struct Raytracer {
 
 	Shader* rt_shad = nullptr;
 	Shader* vct_shad = nullptr;
+	Vao dummy_vao = {"dummy_vao"};
 
 	struct SubchunksTexture {
 		Texture3D	tex;
@@ -334,28 +335,62 @@ struct Raytracer {
 	ChunkOctrees				octree;
 	VCT_Data					vct_data;
 
-	int2						gbuf_size = 0;
-	Texture2D					gbuf_pos ;
-	Texture2D					gbuf_col ;
-	Texture2D					gbuf_norm;
-	Texture2D					gbuf_tang;
-	
-	void resize_gbuf (int2 const& size) {
-		if (gbuf_size == size) return;
-		gbuf_size = size;
+	struct Gbuffer {
+		int2						size = 0;
+		Texture2D					pos ;
+		Texture2D					col ;
+		Texture2D					norm;
+		Texture2D					tang;
 
-		gbuf_pos   = {"gbuf.pos"  }; // could be computed from depth
-		gbuf_col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
-		gbuf_norm  = {"gbuf.norm" }; // rgb normal
-		gbuf_tang  = {"gbuf.tang" }; // rgb tangent
+		GLuint						fbo;
 
-		//int mips = calc_mipmaps(size.x, size.y);
+		void resize (int2 const& new_size) {
+			if (size == new_size) return;
+			size = new_size;
 
-		glTextureStorage2D(gbuf_pos , 1, GL_RGBA32F, size.x, size.y);
-		glTextureStorage2D(gbuf_col , 1, GL_RGBA16F, size.x, size.y);
-		glTextureStorage2D(gbuf_norm, 1, GL_RGBA16F, size.x, size.y);
-		glTextureStorage2D(gbuf_tang, 1, GL_RGBA16F, size.x, size.y);
-	}
+			pos   = {"gbuf.pos"  }; // could be computed from depth
+			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
+			norm  = {"gbuf.norm" }; // rgb normal
+			tang  = {"gbuf.norm" }; // rgb tang
+
+			//int mips = calc_mipmaps(size.x, size.y);
+
+			glTextureStorage2D(pos , 1, GL_RGBA32F, size.x, size.y);
+			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
+			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
+			glTextureStorage2D(tang, 1, GL_RGBA16F, size.x, size.y);
+
+			glDeleteFramebuffers(1, &fbo);
+			glGenFramebuffers(1, &fbo);
+			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+			OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, "gbuf.fbo");
+
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pos, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, col, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, norm, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, tang, 0);
+			//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+
+			GLenum draw_buffers[] = {
+				GL_COLOR_ATTACHMENT0,
+				GL_COLOR_ATTACHMENT1,
+				GL_COLOR_ATTACHMENT2,
+				GL_COLOR_ATTACHMENT3,
+			};
+			glDrawBuffers(ARRLEN(draw_buffers), draw_buffers);
+
+			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			//if (status != GL_FRAMEBUFFER_COMPLETE) {
+			//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+			//}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+		~Gbuffer () {
+			glDeleteFramebuffers(1, &fbo);
+		}
+	};
+	Gbuffer gbuf;
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 

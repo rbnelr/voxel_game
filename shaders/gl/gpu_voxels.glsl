@@ -110,3 +110,9 @@ uint read_bid (ivec3 coord) {
 		return texelFetch(voxels_tex, ivec3(texcoord), 0).r;
 	}
 }
+uint read_bid_octree (ivec3 coord) {
+	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))
+		return B_AIR;
+	
+	return texelFetch(octree, coord, 0).r;
+}
