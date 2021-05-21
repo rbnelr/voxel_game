@@ -6,7 +6,11 @@
 	#extension GL_ARB_shader_group_vote : enable
 #endif
 
+#if TEST
+layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
+#else
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y, local_size_z = WG_CONES) in;
+#endif
 
 #define RAND_SEED_TIME 1
 
@@ -172,11 +176,6 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	return vec4(color, 1.0 - transp);
 }
 
-uniform sampler2D gbuf_pos ;
-uniform sampler2D gbuf_col ;
-uniform sampler2D gbuf_norm;
-uniform sampler2D gbuf_tang;
-
 struct Geometry {
 	bool did_hit;
 	vec3 col;
@@ -185,41 +184,18 @@ struct Geometry {
 	vec3 norm;
 	vec3 tang;
 };
-Geometry read_geom (ivec2 pxpos) {
-	Geometry g;
-	g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
-	g.did_hit = g.pos.x >= -100.0;
-	
-	vec4 col  = texelFetch(gbuf_col , pxpos, 0).rgba;
-	g.col = col.rgb;
-	g.emiss = col.a;
-	
-	g.norm    = texelFetch(gbuf_norm, pxpos, 0).rgb;
-	g.tang    = texelFetch(gbuf_tang, pxpos, 0).rgb;
-	return g;
-}
 
 #if TEST
-shared Geometry geom[WG_PIXELS_X*WG_PIXELS_Y];
-#endif
-shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
 
 void main () {
-	uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
-	uint coneid   = gl_LocalInvocationID.z;
-	
 	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
 	
 	//#if DEBUGDRAW
 	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 	//#endif
 	
-	
-#if TEST
-	
-	if (coneid == 0u) {
-		Geometry g;
-		
+	Geometry g;
+	{
 		vec3 ray_pos, ray_dir;
 		bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
 		
@@ -235,15 +211,70 @@ void main () {
 			g.norm  = hit.TBN[2];
 			g.tang  = hit.TBN[0];
 		}
-		
-		geom[threadid] = g;
 	}
-	barrier();
 	
-	Geometry g = geom[threadid];
+	INIT_VISUALIZE_COST
+	
+	vec3 col = vec3(0.0);
+	
+	if (g.did_hit) {
+		
+		vec3 light = vec3(0.0);
+		
+		for (int coneid=0; coneid<12; ++coneid) {
+			vec3 bitang = cross(g.norm, g.tang);
+			mat3 TBN = mat3(g.tang, bitang, g.norm);
+			
+			Cone c = cones.cones[coneid];
+			vec3 cone_dir = TBN * c.dir;
+			
+			vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+			
+			light += res;
+		}
+		
+		if (visualize_light)
+			g.col = vec3(1.0);
+		col = (light + g.emiss) * g.col;
+	}
+	
+	GET_VISUALIZE_COST(col)
+	imageStore(output_color, pxpos, vec4(col, 1.0));
+}
+
 #else
-	Geometry g = read_geom(pxpos);
-#endif
+uniform sampler2D gbuf_pos ;
+uniform sampler2D gbuf_col ;
+uniform sampler2D gbuf_norm;
+uniform sampler2D gbuf_tang;
+
+Geometry read_gbuf (ivec2 pxpos) {
+	Geometry g;
+	g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
+	g.did_hit = g.pos.x >= -100.0;
+	
+	vec4 col  = texelFetch(gbuf_col , pxpos, 0).rgba;
+	g.col = col.rgb;
+	g.emiss = col.a;
+	
+	g.norm    = texelFetch(gbuf_norm, pxpos, 0).rgb;
+	g.tang    = texelFetch(gbuf_tang, pxpos, 0).rgb;
+	return g;
+}
+
+shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
+
+void main () {
+	uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
+	uint coneid   = gl_LocalInvocationID.z;
+	
+	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+	
+	//#if DEBUGDRAW
+	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
+	//#endif
+	
+	Geometry g = read_gbuf(pxpos);
 	
 	INIT_VISUALIZE_COST
 	
@@ -279,4 +310,4 @@ void main () {
 		imageStore(output_color, pxpos, vec4(col, 1.0));
 	}
 }
-
+#endif
