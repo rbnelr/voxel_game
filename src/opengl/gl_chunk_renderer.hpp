@@ -342,6 +342,8 @@ struct Raytracer {
 		Texture2D					norm;
 		Texture2D					tang;
 
+		// keep FBO so we can rasterize into gbuffer
+		// compute raytracer gbuf generation has same or slightly better perf
 		GLuint						fbo;
 
 		void resize (int2 const& new_size) {
@@ -510,6 +512,7 @@ struct Raytracer {
 	float vct_test = 60;
 	bool vct_dbg_primary = false;
 	bool vct_visualize_sparse = false;
+	bool test = false;
 
 
 	bool  bounces_enable = false;
@@ -527,7 +530,9 @@ struct Raytracer {
 
 	std::vector<gl::MacroDefinition> get_rt_macros () {
 		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
-		         {"WG_PIXELS_Y", prints("%d", _group_size.y)} };
+		         {"WG_PIXELS_Y", prints("%d", _group_size.y)},
+		         {"TEST", test ? "1":"0"},
+		};
 	}
 	std::vector<gl::MacroDefinition> get_vct_macros () {
 		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
@@ -535,7 +540,9 @@ struct Raytracer {
 		         {"WG_CONES", prints("%d", 12)},
 		         {"VCT_DBG_PRIMARY", vct_dbg_primary ? "1":"0"},
 		         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"}};
+		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
+		         {"TEST", test ? "1":"0"},
+		};
 	}
 
 	bool enable = true;
@@ -611,6 +618,8 @@ struct Raytracer {
 		ImGui::SliderFloat("vct_test", &vct_test, 0, 256);
 		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 		ImGui::Checkbox("vct_visualize_sparse", &vct_visualize_sparse);
+
+		macro_change |= ImGui::Checkbox("test", &test);
 
 		if (macro_change && rt_shad) {
 			rt_shad->macros = get_rt_macros();

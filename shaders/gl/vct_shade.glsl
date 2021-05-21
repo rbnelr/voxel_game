@@ -199,6 +199,9 @@ Geometry read_geom (ivec2 pxpos) {
 	return g;
 }
 
+#if TEST
+shared Geometry geom[WG_PIXELS_X*WG_PIXELS_Y];
+#endif
 shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
 
 void main () {
@@ -211,7 +214,36 @@ void main () {
 	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 	//#endif
 	
+	
+#if TEST
+	
+	if (coneid == 0u) {
+		Geometry g;
+		
+		vec3 ray_pos, ray_dir;
+		bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
+		
+		uint start_bid = read_bid_octree(ivec3(floor(ray_pos)));
+		
+		Hit hit;
+		g.did_hit = bray && trace_ray(ray_pos, ray_dir, INF, start_bid, hit, RAYT_PRIMARY);
+		
+		if (g.did_hit) {
+			g.pos   = hit.pos;
+			g.col   = hit.col;
+			g.emiss = hit.emiss;
+			g.norm  = hit.TBN[2];
+			g.tang  = hit.TBN[0];
+		}
+		
+		geom[threadid] = g;
+	}
+	barrier();
+	
+	Geometry g = geom[threadid];
+#else
 	Geometry g = read_geom(pxpos);
+#endif
 	
 	INIT_VISUALIZE_COST
 	

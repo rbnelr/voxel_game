@@ -294,7 +294,6 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 
 	// lazy init these to allow json changes to affect the macros
 	if (!rt_shad)	rt_shad  = r.shaders.compile("rt_gbufgen", get_rt_macros(), {{ COMPUTE_SHADER }});
-	//if (!rt_shad)	rt_shad  = r.shaders.compile("rt_gbufgen", get_rt_macros());
 	if (!vct_shad)	vct_shad = r.shaders.compile("vct_shade", get_vct_macros(), {{ COMPUTE_SHADER }});
 	
 	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
@@ -627,47 +626,35 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 
 	if (!rt_shad->prog || !vct_shad->prog) return;
 
-	gbuf.resize(r.framebuffer.size);
-	{
-		ZoneScopedN("rt_gbufgen");
-		OGL_TRACE("rt_gbufgen");
+	if (!test) {
+		gbuf.resize(r.framebuffer.size);
+		{
+			ZoneScopedN("rt_gbufgen");
+			OGL_TRACE("rt_gbufgen");
 
-		glUseProgram(rt_shad->prog);
+			glUseProgram(rt_shad->prog);
 
-		r.state.bind_textures(rt_shad, {
-			{"subchunks_tex", subchunks_tex.tex},
-			{"voxels_tex", voxels_tex.tex},
-			{"octree", octree.tex},
+			r.state.bind_textures(rt_shad, {
+				{"subchunks_tex", subchunks_tex.tex},
+				{"voxels_tex", voxels_tex.tex},
+				{"octree", octree.tex},
 
-			{"tile_textures", r.tile_textures, r.tile_sampler},
-		});
+				{"tile_textures", r.tile_textures, r.tile_sampler},
+			});
 
-	#if 1
-		glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-		glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		glBindImageTexture(3, gbuf.tang , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+			glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(3, gbuf.tang , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		
-		int2 dispatch_size;
-		dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
-		dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
+			int2 dispatch_size;
+			dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
+			dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
 		
-		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-	#else
-		PipelineState s;
-		s.depth_test = false;
-		s.depth_write = false;
-		s.blend_enable = false;
-		r.state.set_no_override(s);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
-
-		glBindVertexArray(dummy_vao);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	#endif
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		}
 	}
 
 	{
