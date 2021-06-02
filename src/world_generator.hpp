@@ -163,11 +163,11 @@ struct WorldGenerator {
 		float cutoff_val = 0.0f;
 	};
 
-	float max_depth = 40;
-	float base_depth = 25;
+	float max_depth = 20;
+	float base_depth = 40;
 
 	std::vector<NoiseParam> large_noise = {
-		{ 300, -1 },
+		{ 500, -1 },
 		{ 180, -1 },
 		{  70, -1.5f },
 	};
