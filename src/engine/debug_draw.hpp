@@ -1,8 +1,6 @@
 #pragma once
-#include "common.hpp"
 #include "renderer.hpp"
-
-struct Camera_View;
+#include "camera.hpp"
 
 struct DebugDraw {
 	struct LineVertex {
@@ -121,6 +119,41 @@ struct DebugDraw {
 	void wire_frustrum (Camera_View const& view, lrgba const& col);
 
 	void cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides=32);
+
+	////
+	// Imgui-style interface to create selectable 'objects' in the 3d world
+	// object is really just a point that you can move (rotate?)
+	bool enable_selectables = true;
+	char const* selected_id = nullptr;
+
+	Camera_View view;
+	float2 window_size;
+	float2 cursor_pos = 0;
+	bool lmb_went_down = false;
+	bool lmb_is_down = false;
+
+	bool grabbed = false;
+	int gizmo_axis = -1;
+	float3 grabbed_pos;
+	float3 grabbed_offset;
+
+	void prepare_selectables (Camera_View const& view, Input& I, bool enable);
+	void finish_selectables ();
+
+	// call with some string ptr and a position in the world to display a sphere at that point in the 3d world
+	// that is selectable, keeps track of selected state internally returns if this object (id) is selected
+	bool selectable (char const* id, float3 const& pos, float size, lrgba const& col);
+
+	bool gizmo (float3* pos);
+
+	bool movable (char const* id, float3* pos, float size, lrgba const& col, float3* vel=nullptr) {
+		bool selected = selectable(id, *pos, size, col);
+		if (selected) {
+			if (gizmo(pos))
+				if (vel) *vel = 0;
+		}
+		return selected;
+	}
 };
 
 inline DebugDraw g_debugdraw;

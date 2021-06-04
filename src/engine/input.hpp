@@ -27,6 +27,7 @@ struct Input {
 
 	int2 window_size;
 	float2 cursor_pos; // in pixels, float because glfw retuns doubles
+	float2 cursor_pos_bottom_up; // in pixels, float because glfw retuns doubles
 
 	float2 mouse_delta;
 	int mouse_wheel_delta; // in "clicks"
