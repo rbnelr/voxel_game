@@ -159,10 +159,6 @@ struct VCT_Data {
 
 	static constexpr int MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
 
-	Sampler sampler = {"sampler"};
-	Sampler sampler_no_mip = {"sampler_no_mip"};
-	Sampler filter_sampler = {"filter_sampler"};
-
 	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
 	// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
 	static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
@@ -170,6 +166,9 @@ struct VCT_Data {
 	// Require glTextureView to allow compute shader to write into srgb texture via imageStore
 	struct VctTexture {
 		Texture3D tex;
+
+		// texview to allow binding GL_SRGB8_ALPHA8 as GL_RGBA8UI in compute shader (imageStore does not support srgb)
+		// this way at least I can manually do the srgb conversion before writing
 		GLuint texview;
 
 		VctTexture (std::string_view label, int mipmaps, int3 const& size, bool sparse=false): tex{label} {
@@ -180,7 +179,9 @@ struct VCT_Data {
 			glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, size.x,size.y,size.z);
 			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
-			glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, nullptr);
+
+			lrgba col = srgba(0,0,0,0);
+			glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
 
 			glGenTextures(1, &texview);
 			glTextureView(texview, GL_TEXTURE_3D, tex, GL_RGBA8UI, 0,mipmaps, 0,1);
@@ -192,10 +193,17 @@ struct VCT_Data {
 		}
 	}; 
 
-	VctTexture basetex = {"VCT.basetex", 1, TEX_WIDTH, true};
-	// store 6 textures in one (packed side by side on X axis) to avoid 8 texture store limit in compute shader
-	// this will cause issues with GL_CLAMP_TO_EDGE on the X axis, but whatever (will be irrelevant once I add sparse representation anyway)
-	VctTexture preint = {"VCT.preint", MIPS-1, int3(TEX_WIDTH/2 * 6,TEX_WIDTH/2,TEX_WIDTH/2)};
+	VctTexture textures[6] = {
+		{"VCT.texNX", MIPS, TEX_WIDTH},
+		{"VCT.texPX", MIPS, TEX_WIDTH},
+		{"VCT.texNY", MIPS, TEX_WIDTH},
+		{"VCT.texPY", MIPS, TEX_WIDTH},
+		{"VCT.texNZ", MIPS, TEX_WIDTH},
+		{"VCT.texPZ", MIPS, TEX_WIDTH},
+	};
+
+	Sampler sampler = {"sampler"};
+	Sampler filter_sampler = {"filter_sampler"};
 
 	Shader* filter;
 	Shader* filter_mip0;
@@ -223,13 +231,6 @@ struct VCT_Data {
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
-
-		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-		glSamplerParameterfv(sampler_no_mip, GL_TEXTURE_BORDER_COLOR, &color.x);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

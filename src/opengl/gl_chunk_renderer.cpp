@@ -438,7 +438,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 
 	OGL_TRACE("vct.recompute_mips");
 
-	{ // commit sparse pages
+	if (0) { // commit sparse pages
 		ZoneScopedN("commit sparse pages");
 
 		assert(all(sparse_size > SUBCHUNK_SIZE));
@@ -461,7 +461,8 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 
 				if (page_sparse) {
 					int3 offs = idx * sparse_size;
-					glTexturePageCommitmentEXT(basetex.tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, true);
+					for (int dir=0; dir<6; ++dir)
+						glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, true);
 				}
 			}
 		}
@@ -478,16 +479,11 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		int size = CHUNK_SIZE >> layer;
 		shad->set_uniform("size", (GLuint)size);
 
-		if (layer == 0) {
-			glBindImageTexture(0, basetex.texview, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
-		} else {
-			shad->set_uniform("read_mip", layer-2);
+		for (int dir=0; dir<6; ++dir)
+			glBindImageTexture(dir, textures[dir].texview, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 
-			shad->set_uniform("src_width", (GLint)(TEX_WIDTH >> (layer-1)));
-			shad->set_uniform("dst_width", (GLint)(TEX_WIDTH >>  layer));
-
-			glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
-		}
+		if (layer >= 0)
+			shad->set_uniform("read_mip", layer-1);
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
 			int remain_count = min(BATCHSIZE, (int)chunks.size() - i);
@@ -506,12 +502,10 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 	auto dispatch_whole = [&] (int layer, Shader* shad) {
 		int size = TEX_WIDTH >> layer;
 		shad->set_uniform("size", (GLuint)size);
-		shad->set_uniform("read_mip", layer-2);
+		shad->set_uniform("read_mip", layer-1);
 
-		shad->set_uniform("src_width", (GLint)(TEX_WIDTH >> (layer-1)));
-		shad->set_uniform("dst_width", (GLint)(TEX_WIDTH >>  layer));
-
-		glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+		for (int dir=0; dir<6; ++dir)
+			glBindImageTexture(dir, textures[dir].texview, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 
 		memset(offsets, 0, sizeof(offsets));
 		glUniform3uiv(shad->get_uniform_location("offsets[0]"), ARRLEN(offsets), (GLuint*)offsets);
@@ -537,8 +531,12 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		glUseProgram(filter->prog);
 
 		r.state.bind_textures(filter, {
-			{"vct_basetex", basetex.tex, filter_sampler},
-			{"vct_preint", preint.tex, filter_sampler},
+			{"vct_texNX", textures[0].tex, filter_sampler},
+			{"vct_texPX", textures[1].tex, filter_sampler},
+			{"vct_texNY", textures[2].tex, filter_sampler},
+			{"vct_texPY", textures[3].tex, filter_sampler},
+			{"vct_texNZ", textures[4].tex, filter_sampler},
+			{"vct_texPZ", textures[5].tex, filter_sampler},
 		});
 
 		// filter only texels for each chunk (up to 4x4x4 work groups)
@@ -552,9 +550,10 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 	}
 
 	// unbind
-	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+	for (int dir=0; dir<6; ++dir)
+		glBindImageTexture(dir, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
-	{ // decommit sparse pages
+	if (0) { // decommit sparse pages
 		ZoneScopedN("decommit sparse pages");
 
 		assert(all(sparse_size > SUBCHUNK_SIZE));
@@ -594,7 +593,8 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 				
 				if (sparse) {
 					int3 offs = idx * sparse_size;
-					glTexturePageCommitmentEXT(basetex.tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, false);
+					for (int dir=0; dir<6; ++dir)
+						glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, false);
 				}
 			}
 		}
@@ -674,8 +674,12 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			{"gbuf_norm", gbuf.norm},
 			{"gbuf_tang", gbuf.tang},
 
-			{"vct_basetex", vct_data.basetex.tex, vct_data.sampler_no_mip},
-			{"vct_preint", vct_data.preint.tex, vct_data.sampler},
+			{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler},
+			{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler},
+			{"vct_texNY", vct_data.textures[2].tex, vct_data.sampler},
+			{"vct_texPY", vct_data.textures[3].tex, vct_data.sampler},
+			{"vct_texNZ", vct_data.textures[4].tex, vct_data.sampler},
+			{"vct_texPZ", vct_data.textures[5].tex, vct_data.sampler},
 
 			{"tile_textures", r.tile_textures, r.tile_sampler},
 			

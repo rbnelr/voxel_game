@@ -72,8 +72,12 @@ uniform usampler3D	subchunks_tex;
 uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
 		
-uniform sampler3D	vct_basetex;
-uniform sampler3D	vct_preint;
+uniform sampler3D	vct_texNX;
+uniform sampler3D	vct_texPX;
+uniform sampler3D	vct_texNY;
+uniform sampler3D	vct_texPY;
+uniform sampler3D	vct_texNZ;
+uniform sampler3D	vct_texPZ;
 
 #define VCT_COL_MAX 5.0
 #define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
