@@ -163,6 +163,8 @@ void Game::update (Window& window, Input& I) {
 
 	player.update(I, I.window_size, *this);
 
+	g_debugdraw.prepare_selectables(view, I, I.cursor_enabled);
+
 	auto& sel = player.selected_block;
 	if (sel)
 		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.hit.pos.x, sel.hit.pos.y, sel.hit.pos.z, g_assets.block_types[sel.hit.bid].name.c_str());
@@ -176,11 +178,15 @@ void Game::update (Window& window, Input& I) {
 	chunks.update_chunk_loading(*this);
 	chunks.update_chunk_meshing(*this);
 
-	if (activate_flycam || player.third_person)
+	if (activate_flycam || player.third_person) {
 		g_debugdraw.cylinder(player.pos, player.radius, player.height, lrgba(1,0,1,0.5f));
-	if (activate_flycam)
+	}
+	if (activate_flycam) {
 		g_debugdraw.axis_gizmo(view, I.window_size);
+		g_debugdraw.movable("player", &player.pos, 0.4f, lrgba(0.7f,0,0.7f,1), &player.vel);
+	}
 
+	g_debugdraw.finish_selectables();
 	ImGui::End();
 }
 

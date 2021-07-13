@@ -32,7 +32,9 @@ void glfw_sample_non_callback_input (Window& window) {
 	glfwGetCursorPos(window.window, &x, &y);
 
 	window.input.cursor_pos = float2((float)x, (float)y);
-	window.input.cursor_pos.y = window.input.window_size.y - 1 - window.input.cursor_pos.y;
+
+	window.input.cursor_pos_bottom_up = window.input.cursor_pos;
+	window.input.cursor_pos_bottom_up.y = window.input.window_size.y - 1 - window.input.cursor_pos_bottom_up.y;
 
 	//logf("cursor_pos: %f %f\n", input.cursor_pos.x, input.cursor_pos.y);
 }

@@ -1,6 +1,6 @@
 #pragma once
-#include "common.hpp"
 #include "input.hpp"
+#include "kisslib/kissmath.hpp"
 #include "kisslib/collision.hpp"
 
 enum perspective_mode {
@@ -31,6 +31,46 @@ struct Camera_View {
 
 	void calc_frustrum();
 };
+
+inline bool project_world2screen (float3 const& pos_world, float4x4 const& world2clip, float2 const& screen_size, float2* pos_screen) {
+
+	float4 c = world2clip * float4(pos_world, 1);
+
+	if (  c.x < -c.w || c.x > c.w || 
+		  c.y < -c.w || c.y > c.w ||
+		  c.z < -c.w || c.z > c.w)
+		return false; // clipped by frustrum
+
+	float2 ndc = (float2)c / c.w; // perspective divide usually done by opengl
+
+	float2 normalized = ndc * float2(0.5f,-0.5f) + 0.5f; // [-1,+1] to [0,1] also flip y to be top-down
+	*pos_screen = normalized * screen_size;
+
+	return true;
+}
+inline bool project_world2screen (float3 const& pos_world, Camera_View const& view, float2 const& screen_size, float2* pos_screen) {
+	return project_world2screen(pos_world, view.cam_to_clip * (float4x4)view.world_to_cam, screen_size, pos_screen);
+}
+
+inline Ray screen_ray (float2 const& pos_px, Camera_View const& view, float2 const& screen_size) {
+	
+	float2 px_center = pos_px + 0.5f;
+	float2 ndc = (px_center / screen_size * 2.0f - 1.0f) * float2(1,-1);
+
+	float4 clip = float4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
+
+	float3 cam = (float3)(view.clip_to_cam * clip);
+
+	Ray ray;
+
+	ray.dir = (float3)(view.cam_to_world * float4(cam, 0));
+	ray.dir = normalize(ray.dir);
+
+	// ray starts on the near plane
+	ray.pos = (float3)(view.cam_to_world * float4(cam, 1));
+
+	return ray;
+}
 
 struct Camera {
 	SERIALIZE(Camera, pos, rot_aer, mode, clip_near, clip_far, vfov, ortho_vsize)

@@ -294,7 +294,7 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 
 		float2 start = anchor -(float2)int2(w-1,h-1)/2 * frame_sz;
 
-		int2 hovered_idx = roundi((I.cursor_pos - start) / frame_sz);
+		int2 hovered_idx = roundi((I.cursor_pos_bottom_up - start) / frame_sz);
 
 		for (int i=0; i<count; ++i) {
 			int2 idx2 = int2(i%w, h-1 -i/w);
@@ -341,7 +341,7 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
 
 		if (I.cursor_enabled && game.player.inventory.hand.id != I_NULL)
-			draw_item_quad(I.cursor_pos +(item_sz/2), item_sz, game.player.inventory.hand.id);
+			draw_item_quad(I.cursor_pos_bottom_up +(item_sz/2), item_sz, game.player.inventory.hand.id);
 	}
 }
 void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
@@ -481,47 +481,60 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 	{
 		OGL_TRACE("draw lines");
-	
-		glBindVertexArray(vbo_lines.vao);
+		
 		stream_buffer(vbo_lines, g_debugdraw.lines);
 	
 		if (g_debugdraw.lines.size() > 0) {
 			{
-				OGL_TRACE("normal");
-	
 				r.state.set(s);
 				glUseProgram(shad_lines->prog);
 				r.state.bind_textures(shad_lines, {});
-	
-				glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+
+				{
+					OGL_TRACE("normal");
+
+					glBindVertexArray(vbo_lines.vao);
+					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+				}
+				{
+					OGL_TRACE("normal indirect");
+
+					glBindVertexArray(indirect_lines_vao);
+					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
+				
+					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+
+					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+				}
 			}
 			if (draw_occluded) { // lines occluded by geometry
-				OGL_TRACE("occluded");
 	
 				r.state.set(s_occluded);
 				glUseProgram(shad_lines_occluded->prog);
 				r.state.bind_textures(shad_lines_occluded, {});
-	
+
 				shad_lines_occluded->set_uniform("occluded_alpha", occluded_alpha);
-	
-				glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+
+				{
+					OGL_TRACE("occluded");
+
+					glBindVertexArray(vbo_lines.vao);
+					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+				}
+				{
+					OGL_TRACE("occluded indirect");
+
+					glBindVertexArray(indirect_lines_vao);
+					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
+
+					glDrawArraysIndirect(GL_LINES, (void*)offsetof(IndirectBuffer, lines.cmd));
+
+					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+
+					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+				}
 			}
 		}
-	}
-
-	{
-		OGL_TRACE("draw lines indirect");
-
-		glBindVertexArray(indirect_lines_vao);
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
-
-		r.state.set(s);
-		glUseProgram(shad_lines->prog);
-		r.state.bind_textures(shad_lines, {});
-
-		glDrawArraysIndirect(GL_LINES, (void*)offsetof(IndirectBuffer, lines.cmd));
-
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	}
 
 	{
