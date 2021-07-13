@@ -92,6 +92,10 @@ vec4 compute_mip0 (vec3 texcoord) {
 	return val;
 }
 
+vec4 read_preint (vec3 texcoord, float lod, int dir) {
+	return textureLodOffset(vct_preint, texcoord, lod, ivec3(WORLD_SIZE/2 * dir, 0,0));
+}
+
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	float lod = log2(size);
 	
@@ -108,6 +112,9 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
 	
+	vec3 packed_texcoord = texcoord;
+	packed_texcoord.x *= 1.0/6.0; // actually 6 packed textures
+	
 	if (lod < 1.0) {
 		// sample mip 0
 		vec4 val0 = vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
@@ -116,9 +123,9 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 		if (lod <= 0.0) return val0; // no need to also sample larger mip
 		
 		// sample mip 1
-		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, 0.0) );
-		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, 0.0) );
-		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, 0.0) );
+		vec4 valX = vct_unpack( read_preint(packed_texcoord, 0.0, dir.x < 0.0 ? 0 : 1) );
+		vec4 valY = vct_unpack( read_preint(packed_texcoord, 0.0, dir.y < 0.0 ? 2 : 3) );
+		vec4 valZ = vct_unpack( read_preint(packed_texcoord, 0.0, dir.z < 0.0 ? 4 : 5) );
 		
 		vec4 val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 		
@@ -126,9 +133,9 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 		return mix(val0, val1, lod);
 	} else {
 		// rely on hardware mip interpolation
-		vec4 valX = vct_unpack( textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod-1.0) );
-		vec4 valY = vct_unpack( textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod-1.0) );
-		vec4 valZ = vct_unpack( textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod-1.0) );
+		vec4 valX = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.x < 0.0 ? 0 : 1) );
+		vec4 valY = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.y < 0.0 ? 2 : 3) );
+		vec4 valZ = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.z < 0.0 ? 4 : 5) );
 		
 		return valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
 	}

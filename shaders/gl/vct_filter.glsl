@@ -73,12 +73,7 @@ uvec4 pack_texel (vec4 lrgba) {
 #else
 	uniform int read_mip;
 	
-	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mipNX;
-	layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mipPX;
-	layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mipNY;
-	layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mipPY;
-	layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mipNZ;
-	layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
+	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mip;
 	
 	// Preintegration - filter down 3d texture for 6 view directions
 	
@@ -119,17 +114,17 @@ uvec4 pack_texel (vec4 lrgba) {
 		return pack_texel(col);
 	}
 	
-	#define LOAD(src, mip) \
-		vec4 a = _load(texelFetchOffset(src, src_pos, mip, ivec3(0,0,0))); \
-		vec4 b = _load(texelFetchOffset(src, src_pos, mip, ivec3(1,0,0))); \
-		vec4 c = _load(texelFetchOffset(src, src_pos, mip, ivec3(0,1,0))); \
-		vec4 d = _load(texelFetchOffset(src, src_pos, mip, ivec3(1,1,0))); \
-		vec4 e = _load(texelFetchOffset(src, src_pos, mip, ivec3(0,0,1))); \
-		vec4 f = _load(texelFetchOffset(src, src_pos, mip, ivec3(1,0,1))); \
-		vec4 g = _load(texelFetchOffset(src, src_pos, mip, ivec3(0,1,1))); \
-		vec4 h = _load(texelFetchOffset(src, src_pos, mip, ivec3(1,1,1)));
+	#define LOAD(src, mip, dir) \
+		vec4 a = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,0,0))); \
+		vec4 b = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,0,0))); \
+		vec4 c = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,1,0))); \
+		vec4 d = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,1,0))); \
+		vec4 e = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,0,1))); \
+		vec4 f = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,0,1))); \
+		vec4 g = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,1,1))); \
+		vec4 h = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,1,1)));
 		
-	#define STORE(dst, val) imageStore(dst, dst_pos, _store(val))
+	#define STORE(dst, val, dir) imageStore(dst, dst_pos + ivec3(WORLD_SIZE/2 * dir, 0,0), _store(val))
 	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
@@ -142,40 +137,40 @@ uvec4 pack_texel (vec4 lrgba) {
 			ivec3 src_pos = dst_pos * 2;
 			
 			if (read_mip < 0) {
-				LOAD(vct_basetex, 0)
+				LOAD(vct_basetex, 0, 0)
 				
-				STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
-				STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
-				STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
-				STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
-				STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
-				STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
+				STORE(write_mip, preintegrate(b,a, d,c, f,e, h,g), 0);
+				STORE(write_mip, preintegrate(a,b, c,d, e,f, g,h), 1);
+				STORE(write_mip, preintegrate(c,a, d,b, g,e, h,f), 2);
+				STORE(write_mip, preintegrate(a,c, b,d, e,g, f,h), 3);
+				STORE(write_mip, preintegrate(e,a, f,b, g,c, h,d), 4);
+				STORE(write_mip, preintegrate(a,e, b,f, c,g, d,h), 5);
 			} else {
 				{
-					LOAD(vct_texNX, read_mip)
-					STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
+					LOAD(vct_preint, read_mip, 0)
+					STORE(write_mip, preintegrate(b,a, d,c, f,e, h,g), 0);
 				}
 				{
-					LOAD(vct_texPX, read_mip)
-					STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
-				}
-				
-				{
-					LOAD(vct_texNY, read_mip)
-					STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
-				}
-				{
-					LOAD(vct_texPY, read_mip)
-					STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
+					LOAD(vct_preint, read_mip, 1)
+					STORE(write_mip, preintegrate(a,b, c,d, e,f, g,h), 1);
 				}
 				
 				{
-					LOAD(vct_texNZ, read_mip)
-					STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
+					LOAD(vct_preint, read_mip, 2)
+					STORE(write_mip, preintegrate(c,a, d,b, g,e, h,f), 2);
 				}
 				{
-					LOAD(vct_texPZ, read_mip)
-					STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
+					LOAD(vct_preint, read_mip, 3)
+					STORE(write_mip, preintegrate(a,c, b,d, e,g, f,h), 3);
+				}
+				
+				{
+					LOAD(vct_preint, read_mip, 4)
+					STORE(write_mip, preintegrate(e,a, f,b, g,c, h,d), 4);
+				}
+				{
+					LOAD(vct_preint, read_mip, 5)
+					STORE(write_mip, preintegrate(a,e, b,f, c,g, d,h), 5);
 				}
 			}
 		}

@@ -133,9 +133,12 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			s.depth_write = false;
 			state.set_no_override(s);
 
+			StateManager::TextureBind bloom_tex;
+			if (bloom_renderer.enable) bloom_tex = {"bloom", {GL_TEXTURE_2D, bloom_renderer.passes[1].color}, post_sampler};
+
 			state.bind_textures(post_shad, {
 				{"main_color", {GL_TEXTURE_2D, framebuffer.color}, post_sampler},
-				{"bloom",      {GL_TEXTURE_2D, bloom_renderer.passes[1].color}, post_sampler},
+				bloom_tex,
 			});
 
 			post_shad->set_uniform("enable_bloom", bloom_renderer.enable);

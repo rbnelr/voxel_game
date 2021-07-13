@@ -73,12 +73,7 @@ uniform usampler3D	voxels_tex;
 uniform usampler3D	octree;
 		
 uniform sampler3D	vct_basetex;
-uniform sampler3D	vct_texNX;
-uniform sampler3D	vct_texPX;
-uniform sampler3D	vct_texNY;
-uniform sampler3D	vct_texPY;
-uniform sampler3D	vct_texNZ;
-uniform sampler3D	vct_texPZ;
+uniform sampler3D	vct_preint;
 
 #define VCT_COL_MAX 5.0
 

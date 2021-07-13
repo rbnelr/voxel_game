@@ -483,8 +483,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		} else {
 			shad->set_uniform("read_mip", layer-2);
 
-			for (int dir=0; dir<6; ++dir)
-				glBindImageTexture(dir, preints[dir].texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+			glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 		}
 
 		for (int i=0; i<(int)chunks.size(); i+=BATCHSIZE) {
@@ -506,8 +505,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		shad->set_uniform("size", (GLuint)size);
 		shad->set_uniform("read_mip", layer-2);
 
-		for (int dir=0; dir<6; ++dir)
-			glBindImageTexture(dir, preints[dir].texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+		glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 
 		memset(offsets, 0, sizeof(offsets));
 		glUniform3uiv(shad->get_uniform_location("offsets[0]"), ARRLEN(offsets), (GLuint*)offsets);
@@ -534,12 +532,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 
 		r.state.bind_textures(filter, {
 			{"vct_basetex", basetex.tex, filter_sampler},
-			{"vct_texNX", preints[0].tex, filter_sampler},
-			{"vct_texPX", preints[1].tex, filter_sampler},
-			{"vct_texNY", preints[2].tex, filter_sampler},
-			{"vct_texPY", preints[3].tex, filter_sampler},
-			{"vct_texNZ", preints[4].tex, filter_sampler},
-			{"vct_texPZ", preints[5].tex, filter_sampler},
+			{"vct_preint", preint.tex, filter_sampler},
 		});
 
 		// filter only texels for each chunk (up to 4x4x4 work groups)
@@ -553,8 +546,7 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 	}
 
 	// unbind
-	for (int dir=0; dir<6; ++dir)
-		glBindImageTexture(dir, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+	glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
 	{ // decommit sparse pages
 		ZoneScopedN("decommit sparse pages");
@@ -677,12 +669,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			{"gbuf_tang", gbuf.tang},
 
 			{"vct_basetex", vct_data.basetex.tex, vct_data.sampler},
-			{"vct_texNX", vct_data.preints[0].tex, vct_data.sampler},
-			{"vct_texPX", vct_data.preints[1].tex, vct_data.sampler},
-			{"vct_texNY", vct_data.preints[2].tex, vct_data.sampler},
-			{"vct_texPY", vct_data.preints[3].tex, vct_data.sampler},
-			{"vct_texNZ", vct_data.preints[4].tex, vct_data.sampler},
-			{"vct_texPZ", vct_data.preints[5].tex, vct_data.sampler},
+			{"vct_preint", vct_data.preint.tex, vct_data.sampler},
 
 			{"tile_textures", r.tile_textures, r.tile_sampler},
 			

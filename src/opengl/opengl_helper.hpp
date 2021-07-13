@@ -1195,12 +1195,15 @@ struct StateManager {
 			auto& bound_type = bound_texture_types[i];
 			
 			glActiveTexture((GLenum)(GL_TEXTURE0 + i));
-			glBindSampler((GLuint)i, to_bind.sampler);
 
-			if (to_bind.tex.type != bound_type && bound_type != 0)
+			if (to_bind.tex.type != bound_type && bound_type != 0) {
 				glBindTexture(bound_type, 0); // unbind previous
+				glBindSampler((GLuint)i, 0);
+			}
 
 			if (to_bind.tex.type != 0) {
+				glBindSampler((GLuint)i, to_bind.sampler);
+
 				glBindTexture(to_bind.tex.type, to_bind.tex.tex); // bind new
 
 				auto loc = shad->get_uniform_location(to_bind.uniform_name);

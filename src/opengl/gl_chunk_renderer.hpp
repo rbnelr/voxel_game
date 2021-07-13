@@ -171,18 +171,20 @@ struct VCT_Data {
 		Texture3D tex;
 		GLuint texview;
 
-		VctTexture (std::string_view label, int mipmaps, int width, bool sparse=false): tex{label} {
+		VctTexture (std::string_view label, int mipmaps, int3 const& size, bool sparse=false): tex{label} {
 			if (sparse) {
 				glTextureParameteri(tex, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
 				glTextureParameteri(tex, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
 			}
-			glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, width,width,width);
+			glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, size.x,size.y,size.z);
 			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
 			glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, nullptr);
 
 			glGenTextures(1, &texview);
 			glTextureView(texview, GL_TEXTURE_3D, tex, GL_RGBA8UI, 0,mipmaps, 0,1);
+
+			OGL_DBG_LABEL(GL_TEXTURE, texview, label + ".texview");
 		}
 		~VctTexture () {
 			glDeleteTextures(1, &texview);
@@ -190,11 +192,9 @@ struct VCT_Data {
 	}; 
 
 	VctTexture basetex = {"VCT.basetex", 1, TEX_WIDTH, true};
-	VctTexture preints[6] = {
-		{"VCT.preintX", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPX", MIPS-1, TEX_WIDTH/2},
-		{"VCT.preintY", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPY", MIPS-1, TEX_WIDTH/2},
-		{"VCT.preintZ", MIPS-1, TEX_WIDTH/2}, {"VCT.preintPZ", MIPS-1, TEX_WIDTH/2},
-	};
+	// store 6 textures in one (packed side by side on X axis) to avoid 8 texture store limit in compute shader
+	// this will cause issues with GL_CLAMP_TO_EDGE on the X axis, but whatever (will be irrelevant once I add sparse representation anyway)
+	VctTexture preint = {"VCT.preint", MIPS-1, int3(TEX_WIDTH/2 * 6,TEX_WIDTH/2,TEX_WIDTH/2)};
 
 	Shader* filter;
 	Shader* filter_mip0;
@@ -353,7 +353,7 @@ struct Raytracer {
 			pos   = {"gbuf.pos"  }; // could be computed from depth
 			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
 			norm  = {"gbuf.norm" }; // rgb normal
-			tang  = {"gbuf.norm" }; // rgb tang
+			tang  = {"gbuf.tang" }; // rgb tang
 
 			//int mips = calc_mipmaps(size.x, size.y);
 
@@ -452,8 +452,8 @@ struct Raytracer {
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 
-				OGL_DBG_LABEL(GL_TEXTURE, colors[0],    "RT.taa_color0");
-				OGL_DBG_LABEL(GL_TEXTURE, colors[1],    "RT.taa_color1");
+				OGL_DBG_LABEL(GL_TEXTURE, colors[0], "RT.taa_color0");
+				OGL_DBG_LABEL(GL_TEXTURE, colors[1], "RT.taa_color1");
 				OGL_DBG_LABEL(GL_TEXTURE, posage[0], "RT.taa_posage0");
 				OGL_DBG_LABEL(GL_TEXTURE, posage[1], "RT.taa_posage1");
 
