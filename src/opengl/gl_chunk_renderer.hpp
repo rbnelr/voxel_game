@@ -160,6 +160,7 @@ struct VCT_Data {
 	static constexpr int MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
 
 	Sampler sampler = {"sampler"};
+	Sampler sampler_no_mip = {"sampler_no_mip"};
 	Sampler filter_sampler = {"filter_sampler"};
 
 	// how many octree layers to filter per uploaded chunk (rest are done for whole world)
@@ -214,13 +215,21 @@ struct VCT_Data {
 		filter       = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
 		filter_mip0  = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
 
+		lrgba color = lrgba(0,0,0,0);
+		
 		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-		lrgba color = lrgba(0,0,0,0);
 		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
+
+		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(sampler_no_mip, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+		glSamplerParameterfv(sampler_no_mip, GL_TEXTURE_BORDER_COLOR, &color.x);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

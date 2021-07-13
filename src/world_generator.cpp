@@ -107,6 +107,9 @@ namespace worldgen {
 		//}
 		
 		// air & water
+
+		water_level += (int)pos.x / 20;
+
 		if (pos.z >= water_level) {
 			return B_AIR;
 		} else {

@@ -483,6 +483,9 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		} else {
 			shad->set_uniform("read_mip", layer-2);
 
+			shad->set_uniform("src_width", (GLint)(TEX_WIDTH >> (layer-1)));
+			shad->set_uniform("dst_width", (GLint)(TEX_WIDTH >>  layer));
+
 			glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 		}
 
@@ -504,6 +507,9 @@ void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> 
 		int size = TEX_WIDTH >> layer;
 		shad->set_uniform("size", (GLuint)size);
 		shad->set_uniform("read_mip", layer-2);
+
+		shad->set_uniform("src_width", (GLint)(TEX_WIDTH >> (layer-1)));
+		shad->set_uniform("dst_width", (GLint)(TEX_WIDTH >>  layer));
 
 		glBindImageTexture(0, preint.texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 
@@ -668,7 +674,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			{"gbuf_norm", gbuf.norm},
 			{"gbuf_tang", gbuf.tang},
 
-			{"vct_basetex", vct_data.basetex.tex, vct_data.sampler},
+			{"vct_basetex", vct_data.basetex.tex, vct_data.sampler_no_mip},
 			{"vct_preint", vct_data.preint.tex, vct_data.sampler},
 
 			{"tile_textures", r.tile_textures, r.tile_sampler},

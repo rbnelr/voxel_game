@@ -92,10 +92,6 @@ vec4 compute_mip0 (vec3 texcoord) {
 	return val;
 }
 
-vec4 read_preint (vec3 texcoord, float lod, int dir) {
-	return textureLodOffset(vct_preint, texcoord, lod, ivec3(WORLD_SIZE/2 * dir, 0,0));
-}
-
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	float lod = log2(size);
 	
@@ -111,33 +107,39 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
+	texcoord.x = clamp(texcoord.x, 0.0, 1.0);
 	
-	vec3 packed_texcoord = texcoord;
-	packed_texcoord.x *= 1.0/6.0; // actually 6 packed textures
+	const float PACK = 1.0/6.0; // actually 6 packed textures
+	
+	vec3 coordX = vec3(((dir.x < 0.0 ? 0 : 1) + texcoord.x) * PACK, texcoord.yz);
+	vec3 coordY = vec3(((dir.y < 0.0 ? 2 : 3) + texcoord.x) * PACK, texcoord.yz);
+	vec3 coordZ = vec3(((dir.z < 0.0 ? 4 : 5) + texcoord.x) * PACK, texcoord.yz);
 	
 	if (lod < 1.0) {
 		// sample mip 0
-		vec4 val0 = vct_unpack( textureLod(vct_basetex, texcoord, 0.0) );
+		vec4 val0 = textureLod(vct_basetex, texcoord, 0.0) * VCT_UNPACK;
 		//vec4 val0 = compute_mip0(texcoord);
 		
 		if (lod <= 0.0) return val0; // no need to also sample larger mip
 		
 		// sample mip 1
-		vec4 valX = vct_unpack( read_preint(packed_texcoord, 0.0, dir.x < 0.0 ? 0 : 1) );
-		vec4 valY = vct_unpack( read_preint(packed_texcoord, 0.0, dir.y < 0.0 ? 2 : 3) );
-		vec4 valZ = vct_unpack( read_preint(packed_texcoord, 0.0, dir.z < 0.0 ? 4 : 5) );
+		vec4 valX = textureLod(vct_preint, coordX, 0.0);
+		vec4 valY = textureLod(vct_preint, coordY, 0.0);
+		vec4 valZ = textureLod(vct_preint, coordZ, 0.0);
 		
-		vec4 val1 = valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
+		vec4 val1 = (valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z)) * VCT_UNPACK;
 		
 		// interpolate mip0 and mip1
 		return mix(val0, val1, lod);
 	} else {
-		// rely on hardware mip interpolation
-		vec4 valX = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.x < 0.0 ? 0 : 1) );
-		vec4 valY = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.y < 0.0 ? 2 : 3) );
-		vec4 valZ = vct_unpack( read_preint(packed_texcoord, lod-1.0, dir.z < 0.0 ? 4 : 5) );
+		float preint_lod = lod - 1.0;
 		
-		return valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z);
+		// rely on hardware mip interpolation
+		vec4 valX = textureLod(vct_preint, coordX, preint_lod);
+		vec4 valY = textureLod(vct_preint, coordY, preint_lod);
+		vec4 valZ = textureLod(vct_preint, coordZ, preint_lod);
+		
+		return (valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z)) * VCT_UNPACK;
 	}
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
@@ -178,8 +180,8 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	}
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
-	//return vec4(vec3(transp), 1.0);
-	return vec4(color, 1.0 - transp);
+	return vec4(vec3(transp), 1.0);
+	//return vec4(color, 1.0 - transp);
 }
 
 struct Geometry {
@@ -357,7 +359,8 @@ void main () {
 		Cone c = cones.cones[coneid];
 		vec3 cone_dir = TBN * c.dir;
 		
-		vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+		//vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+		vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 20.0, true).rgb * c.weight;
 		
 		cone_results[threadid][coneid] = res;
 	}

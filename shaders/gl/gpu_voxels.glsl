@@ -76,11 +76,7 @@ uniform sampler3D	vct_basetex;
 uniform sampler3D	vct_preint;
 
 #define VCT_COL_MAX 5.0
-
-vec4 vct_unpack (vec4 col) {
-	col.rgb = col.rgb * VCT_COL_MAX;
-	return col;
-}
+#define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
 
 uint read_bid (ivec3 coord) {
 	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))

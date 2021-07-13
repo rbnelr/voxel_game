@@ -60,18 +60,21 @@ uvec4 pack_texel (vec4 lrgba) {
 			(bidNZ != B_AIR) && (bidPZ != B_AIR);
 		//bool blocked = false;
 		
-		float alpha = 1.0;
+		float alpha = blocked ? 1.0 : 1.0;
 		if      (bid == B_AIR   ) alpha = 0.0;
 		//else if (bid == B_LEAVES) alpha = 0.3;
 		
 		vec3 emissive = blocked ? vec3(0.0) :
-		//(col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
-		(col.rgb * get_emmisive(bid)) * alpha;
+		(col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
+		//(col.rgb * get_emmisive(bid)) * alpha;
 		
 		imageStore(write_mip, dst_pos, pack_texel(vec4(emissive, alpha)));
 	}
 #else
 	uniform int read_mip;
+	
+	uniform int src_width;
+	uniform int dst_width;
 	
 	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mip;
 	
@@ -105,7 +108,7 @@ uvec4 pack_texel (vec4 lrgba) {
 	}
 	
 	vec4 _load (vec4 col) {
-		col = vct_unpack(col);
+		col = col * VCT_UNPACK;
 		col.a = 1.0 - col.a;
 		return col;
 	}
@@ -115,16 +118,17 @@ uvec4 pack_texel (vec4 lrgba) {
 	}
 	
 	#define LOAD(src, mip, dir) \
-		vec4 a = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,0,0))); \
-		vec4 b = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,0,0))); \
-		vec4 c = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,1,0))); \
-		vec4 d = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,1,0))); \
-		vec4 e = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,0,1))); \
-		vec4 f = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,0,1))); \
-		vec4 g = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 0,1,1))); \
-		vec4 h = _load(texelFetchOffset(src, src_pos, mip, ivec3(WORLD_SIZE/2 * dir + 1,1,1)));
+		ivec3 _pos = src_pos + ivec3(src_width * dir, 0,0); \
+		vec4 a = _load(texelFetchOffset(src, _pos, mip, ivec3(0,0,0))); \
+		vec4 b = _load(texelFetchOffset(src, _pos, mip, ivec3(1,0,0))); \
+		vec4 c = _load(texelFetchOffset(src, _pos, mip, ivec3(0,1,0))); \
+		vec4 d = _load(texelFetchOffset(src, _pos, mip, ivec3(1,1,0))); \
+		vec4 e = _load(texelFetchOffset(src, _pos, mip, ivec3(0,0,1))); \
+		vec4 f = _load(texelFetchOffset(src, _pos, mip, ivec3(1,0,1))); \
+		vec4 g = _load(texelFetchOffset(src, _pos, mip, ivec3(0,1,1))); \
+		vec4 h = _load(texelFetchOffset(src, _pos, mip, ivec3(1,1,1)));
 		
-	#define STORE(dst, val, dir) imageStore(dst, dst_pos + ivec3(WORLD_SIZE/2 * dir, 0,0), _store(val))
+	#define STORE(dst, val, dir) imageStore(dst, dst_pos + ivec3(dst_width * dir, 0,0), _store(val))
 	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
