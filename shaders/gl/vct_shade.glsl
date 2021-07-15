@@ -112,7 +112,8 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
 	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
 	
-	return (valX*abs(dir.x) + valY*abs(dir.y) + valZ*abs(dir.z)) * VCT_UNPACK;
+	vec3 sqr = dir * dir;
+	return (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	
@@ -152,7 +153,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	}
 	
 	//return vec4(vec3(dist / 300.0), 1.0);
-	return vec4(vec3(transp), 1.0);
+	//return vec4(vec3(transp), 1.0);
 	return vec4(color, 1.0 - transp);
 }
 
@@ -331,8 +332,7 @@ void main () {
 		Cone c = cones.cones[coneid];
 		vec3 cone_dir = TBN * c.dir;
 		
-		//vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
-		vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 40.0, true).rgb * c.weight;
+		vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
 		
 		cone_results[threadid][coneid] = res;
 	}

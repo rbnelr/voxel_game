@@ -59,26 +59,36 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
 		uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
 		
+		
+		float alpha = 1.0;
+		if      (bid == B_AIR   ) alpha = 0.0;
+		//else if (bid == B_LEAVES) alpha = 0.3;
+		
+		//vec3 emissive = (col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
+		vec3 emissive = (col.rgb * get_emmisive(bid)) * alpha;
+		
+	#if 1
 		bool blocked =
 			(bidNX != B_AIR) && (bidPX != B_AIR) &&
 			(bidNY != B_AIR) && (bidPY != B_AIR) &&
 			(bidNZ != B_AIR) && (bidPZ != B_AIR);
-		//bool blocked = false;
 		
-		float alpha = blocked ? 1.0 : 1.0;
-		if      (bid == B_AIR   ) alpha = 0.0;
-		//else if (bid == B_LEAVES) alpha = 0.3;
+		if (blocked) emissive = vec3(0.0);
+		//if (blocked) alpha = 0.0;
 		
-		vec3 emissive = blocked ? vec3(0.0) :
-		//(col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
-		(col.rgb * get_emmisive(bid)) * alpha;
-		
-		float alphaNX = bid != B_AIR && bidPX == B_AIR ? 1.0 : 0.0;
-		float alphaPX = bid != B_AIR && bidNX == B_AIR ? 1.0 : 0.0;
-		float alphaNY = bid != B_AIR && bidPY == B_AIR ? 1.0 : 0.0;
-		float alphaPY = bid != B_AIR && bidNY == B_AIR ? 1.0 : 0.0;
-		float alphaNZ = bid != B_AIR && bidPZ == B_AIR ? 1.0 : 0.0;
-		float alphaPZ = bid != B_AIR && bidNZ == B_AIR ? 1.0 : 0.0;
+		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissive, alpha)));
+	#else
+		float alphaNX = bidPX == B_AIR ? alpha : 0.0;
+		float alphaPX = bidNX == B_AIR ? alpha : 0.0;
+		float alphaNY = bidPY == B_AIR ? alpha : 0.0;
+		float alphaPY = bidNY == B_AIR ? alpha : 0.0;
+		float alphaNZ = bidPZ == B_AIR ? alpha : 0.0;
+		float alphaPZ = bidNZ == B_AIR ? alpha : 0.0;
 		
 		vec3 emissiveNX = bidPX == B_AIR ? emissive : vec3(0.0);
 		vec3 emissivePX = bidNX == B_AIR ? emissive : vec3(0.0);
@@ -93,6 +103,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissivePY, alphaPY)));
 		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissiveNZ, alphaNZ)));
 		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissivePZ, alphaPZ)));
+	#endif
 	}
 #else
 	uniform int read_mip;
