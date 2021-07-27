@@ -52,13 +52,11 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		
 		//if (bid == B_MAGMA) col = vec4(0.0);
 		
-		uint bidNX = read_bid(dst_pos + ivec3(-1,0,0));
-		uint bidPX = read_bid(dst_pos + ivec3(+1,0,0));
-		uint bidNY = read_bid(dst_pos + ivec3(0,-1,0));
-		uint bidPY = read_bid(dst_pos + ivec3(0,+1,0));
-		uint bidNZ = read_bid(dst_pos + ivec3(0,0,-1));
-		uint bidPZ = read_bid(dst_pos + ivec3(0,0,+1));
-		
+		uint bids[3][3][3];
+		for (int z=0; z<3; ++z)
+		for (int y=0; y<3; ++y)
+		for (int x=0; x<3; ++x)
+			bids[z][y][x] = read_bid(dst_pos + ivec3(x-1,y-1,z-1));
 		
 		float alpha = 1.0;
 		if      (bid == B_AIR   ) alpha = 0.0;
@@ -68,13 +66,20 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		vec3 emissive = (col.rgb * get_emmisive(bid)) * alpha;
 		
 	#if 1
-		bool blocked =
-			(bidNX != B_AIR) && (bidPX != B_AIR) &&
-			(bidNY != B_AIR) && (bidPY != B_AIR) &&
-			(bidNZ != B_AIR) && (bidPZ != B_AIR);
+		bool visible = false;
+		for (int z=0; z<3; ++z)
+		for (int y=0; y<3; ++y)
+		for (int x=0; x<3; ++x)
+			if (x!=1 || y!=1 || z!=1)
+				visible = visible || bids[z][y][x] == B_AIR;
 		
-		if (blocked) emissive = vec3(0.0);
-		//if (blocked) alpha = 0.0;
+		//bool visible =
+		//	(bids[1][1][0] == B_AIR) || (bids[1][1][2] == B_AIR) ||
+		//	(bids[1][0][1] == B_AIR) || (bids[1][2][1] == B_AIR) ||
+		//	(bids[0][1][1] == B_AIR) || (bids[2][1][1] == B_AIR);
+		
+		if (!visible) emissive = vec3(0.0);
+		//if (!visible) alpha = 0.0;
 		
 		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
@@ -83,6 +88,13 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissive, alpha)));
 	#else
+		uint bidNX = bids[1][1][0];
+		uint bidPX = bids[1][1][2];
+		uint bidNY = bids[1][0][1];
+		uint bidPY = bids[1][2][1];
+		uint bidNZ = bids[0][1][1];
+		uint bidPZ = bids[2][1][1];
+		
 		float alphaNX = bidPX == B_AIR ? alpha : 0.0;
 		float alphaPX = bidNX == B_AIR ? alpha : 0.0;
 		float alphaNY = bidPY == B_AIR ? alpha : 0.0;

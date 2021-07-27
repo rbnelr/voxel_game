@@ -114,7 +114,7 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #define RAYT_SPECULAR		3
 #define RAYT_SUN			4
 
-#define DEBUGDRAW 0
+#define DEBUGDRAW 1
 #if DEBUGDRAW
 bool _debugdraw = false;
 uniform bool update_debugdraw = false;
@@ -323,6 +323,29 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
 			}
 			
+			//{
+			//	vec3 sphere_pos = hit_center;
+			//	float sphere_r = 0.5;
+			//	
+			//	vec3 pos_rel = sphere_pos - pos;
+			//	
+			//	float t = dot(pos_rel, dir);
+			//	vec3 closest = pos + dir * t;
+			//	
+			//	
+			//	
+			//	float hit_r = length(closest - sphere_pos);
+			//	if (hit_r <= sphere_r) {
+			//		float depth = sqrt(sphere_r*sphere_r - hit_r*hit_r);
+			//		
+			//		t -= depth;
+			//		
+			//		hit.pos = pos + dir * t;
+			//		normal = normalize(hit.pos - sphere_pos);
+			//	}
+			//	
+			//}
+			
 			vec3 bitangent = cross(normal, tangent);
 			hit.TBN = mat3(tangent, bitangent, normal);
 		}
@@ -387,6 +410,8 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			hit.occl_spec.y = 1.0;
 		//}
 		hit.emiss = get_emmisive(hit.bid);
+		
+		//hit.col = hit.TBN[2];
 	}
 	return true;
 }

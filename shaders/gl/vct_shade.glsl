@@ -113,7 +113,9 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
 	
 	vec3 sqr = dir * dir;
-	return (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+	vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+	//val.a = max(max(valX.a, valY.a), valZ.a);
+	return val;
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	
@@ -134,17 +136,22 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		
 		vec4 sampl = read_vct_texture(pos, cone_dir, size);
 		
-		color += transp * sampl.rgb;
-		transp -= transp * sampl.a;
+		vec3 new_col = color + transp * sampl.rgb;
+		float new_transp = transp - transp * sampl.a;
 		//transp -= transp * pow(sampl.a, 1.0 / min(stepsize, 1.0));
 		
 		#if DEBUGDRAW
 		if (_debugdraw && dbg) {
-			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(1,0,0,1));
-			//dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(transp * sampl.rgb, 1.0-transp));
-			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), vec4(vec3(sampl.a), 1.0));
+			//vec4 col = vec4(1,0,0,1);
+			//vec4 col = vec4(sampl.rgb, 1.0-transp);
+			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
+			vec4 col = vec4(vec3(sampl.a), 1.0);
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
 		}
 		#endif
+		
+		color = new_col;
+		transp = new_transp;
 		
 		dist += stepsize;
 		
@@ -171,9 +178,9 @@ void main () {
 	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
 	INIT_VISUALIZE_COST
 	
-	//#if DEBUGDRAW
-	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	//#endif
+	#if DEBUGDRAW
+	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
+	#endif
 	
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
@@ -186,25 +193,24 @@ void main () {
 }
 #elif TEST
 
-	
-	// All components are in the range [0…1], including hue.
-	vec3 rgb2hsv (vec3 c) {
-		vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-		vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-		vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+// All components are in the range [0…1], including hue.
+vec3 rgb2hsv (vec3 c) {
+	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
 
-		float d = q.x - min(q.w, q.y);
-		float e = 1.0e-10;
-		return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-	}
-	
-	// All components are in the range [0…1], including hue.
-	vec3 hsv2rgb (vec3 c) {
-		vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-		vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-		return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-	}
-	
+	float d = q.x - min(q.w, q.y);
+	float e = 1.0e-10;
+	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+// All components are in the range [0…1], including hue.
+vec3 hsv2rgb (vec3 c) {
+	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
 void main () {
 	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
 	
@@ -324,6 +330,10 @@ void main () {
 	Geometry g = read_gbuf(pxpos);
 	
 	INIT_VISUALIZE_COST
+	
+	#if DEBUGDRAW
+	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2 && coneid == 0;
+	#endif
 	
 	if (g.did_hit) {
 		vec3 bitang = cross(g.norm, g.tang);

@@ -86,17 +86,19 @@ layout(std430, binding = 1) restrict buffer IndirectBuffer {
 //	_dbgdraw.wire_cubes.cmd.primCount = 0;
 //}
 void dbgdraw_vector (vec3 pos, vec3 dir, vec4 col) {
-	if (_dbgdraw.lines.cmd.count < 4096) {
-		_dbgdraw.lines.vertices[_dbgdraw.lines.cmd.count++] = IndirectLineVertex( vec4(pos      , 0), col );
-		_dbgdraw.lines.vertices[_dbgdraw.lines.cmd.count++] = IndirectLineVertex( vec4(pos + dir, 0), col );
-		_dbgdraw.lines.cmd.count %= 4096;
+	uint idx = atomicAdd(_dbgdraw.lines.cmd.count, 2u);
+	if (idx < 4096) {
+		_dbgdraw.lines.vertices[idx++] = IndirectLineVertex( vec4(pos      , 0), col );
+		_dbgdraw.lines.vertices[idx  ] = IndirectLineVertex( vec4(pos + dir, 0), col );
+		//_dbgdraw.lines.cmd.count %= 4096;
 	}
 }
 void dbgdraw_wire_cube (vec3 pos, vec3 size, vec4 col) {
-	if (_dbgdraw.wire_cubes.cmd.primCount < 4096) {
-		_dbgdraw.wire_cubes.vertices[_dbgdraw.wire_cubes.cmd.primCount++] =
+	uint idx = atomicAdd(_dbgdraw.wire_cubes.cmd.primCount, 1u);
+	if (idx < 4096) {
+		_dbgdraw.wire_cubes.vertices[idx] =
 			IndirectWireCubeInstace( vec4(pos, 0), vec4(size, 0), col);
-		_dbgdraw.wire_cubes.cmd.primCount %= 4096;
+		//_dbgdraw.wire_cubes.cmd.primCount %= 4096;
 	}
 }
 
