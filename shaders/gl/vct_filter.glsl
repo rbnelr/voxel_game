@@ -62,8 +62,9 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		if      (bid == B_AIR   ) alpha = 0.0;
 		//else if (bid == B_LEAVES) alpha = 0.3;
 		
-		//vec3 emissive = (col.rgb * max(get_emmisive(bid), 0.1)) * alpha;
-		vec3 emissive = (col.rgb * get_emmisive(bid)) * alpha;
+		vec3 emissive = (col.rgb * get_emmisive(bid));
+		//emissive += col.rgb * 0.1; // makes everything glow, for testing
+		emissive *= alpha;
 		
 	#if 1
 		bool visible = false;

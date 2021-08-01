@@ -93,11 +93,13 @@ vec4 compute_mip0 (vec3 texcoord) {
 }
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
+	//size = max(size, 1.0);
+	
 	float lod = log2(size);
 	
 	#if 1
 	// prevent small samples from being way too blurry
-	// by simulating negative lods (size < 1.0) by snapping texture coords to nearest texels
+	// -> simulate negative lods (size < 1.0) by snapping texture coords to nearest texels
 	// when approaching size=0
 	// size = 0.5 would snap [0.25,0.75] to 0.5
 	//              and lerp [0.75,1.25] in [0.5,1.5]
@@ -107,7 +109,6 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	#endif
 	texcoord *= INV_WORLD_SIZEf;
 	
-	// rely on hardware mip interpolation
 	vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
 	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
 	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
@@ -143,9 +144,9 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		#if DEBUGDRAW
 		if (_debugdraw && dbg) {
 			//vec4 col = vec4(1,0,0,1);
-			//vec4 col = vec4(sampl.rgb, 1.0-transp);
+			vec4 col = vec4(sampl.rgb, 1.0-transp);
 			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
-			vec4 col = vec4(vec3(sampl.a), 1.0);
+			//vec4 col = vec4(vec3(sampl.a), 1.0);
 			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
 		}
 		#endif
@@ -332,7 +333,7 @@ void main () {
 	INIT_VISUALIZE_COST
 	
 	#if DEBUGDRAW
-	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2 && coneid == 0;
+	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
 	#endif
 	
 	if (g.did_hit) {
