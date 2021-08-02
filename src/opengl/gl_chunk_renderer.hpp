@@ -232,6 +232,10 @@ struct VCT_Data {
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 		glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
 
+		// takes max of the 8 samples for trilinear interpolation instead of lerping,
+		// this avoids cones from passing through walls, but destroys the actual VCT, but shows that cone leaking can be avoided
+		glSamplerParameteri(sampler, GL_TEXTURE_REDUCTION_MODE_EXT, GL_MAX);
+
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);

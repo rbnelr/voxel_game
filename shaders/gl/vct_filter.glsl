@@ -63,7 +63,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//else if (bid == B_LEAVES) alpha = 0.3;
 		
 		vec3 emissive = (col.rgb * get_emmisive(bid));
-		//emissive += col.rgb * 0.1; // makes everything glow, for testing
+		emissive += col.rgb * 0.1; // makes everything glow, for testing
 		emissive *= alpha;
 		
 	#if 1
@@ -80,7 +80,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//	(bids[0][1][1] == B_AIR) || (bids[2][1][1] == B_AIR);
 		
 		if (!visible) emissive = vec3(0.0);
-		//if (!visible) alpha = 0.0;
+		if (!visible) alpha = 0.0;
 		
 		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
