@@ -14,17 +14,20 @@ __m128 lerp (__m128 a, __m128 b, float t) {
 
 namespace worldgen {
 	float NoisePass::calc_large_noise (float3 const& pos) {
+		float depth = wg->base_depth;
+		
+		float sphere = (length(pos) - 180) * 1.0f; // for VCT dev
+		depth = max(sphere, 0.0f);
+
 		float3 p = pos;
 		// make noise 'flatter' 0.7 to flatten world
 		p.z /= 0.7;
-
-		float depth = wg->base_depth;
 
 		float seed = 0;
 		for (auto& n : wg->large_noise) {
 			float val = noise(p, n.period, seed++) * n.strength;
 			if (n.cutoff) val = max(val, n.cutoff_val);
-
+		
 			depth += val;
 		}
 		
@@ -108,7 +111,13 @@ namespace worldgen {
 		
 		// air & water
 
-		water_level += (int)pos.x / 20;
+		water_level += (int)pos.x / 20; // for vct dev
+
+		//float wall_thickness = max(-pos.y, 0.0f) * 0.05f; // for vct dev
+		float wall_thickness = 1.0f; // for vct dev
+		if (abs(pos.x) <= wall_thickness/2) {
+			return B_STONE;
+		}
 
 		if (pos.z >= water_level) {
 			return B_AIR;
@@ -450,6 +459,8 @@ namespace worldgen {
 				int wz = z + chunkpos.z;
 
 				auto place_stalac = [&] (int x, int y, int z, float rand1, float rand2) {
+					if (wx > -5) return; // for vct dev
+
 					float scale = lerp(0.4f, 2.5f, rand1);
 
 					int variation = clamp(floori(rand2 * 6), 0,5);
@@ -511,7 +522,7 @@ namespace worldgen {
 					float rand1 = (float)(h & 0xffffffff) * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
 					float rand2 = (float)(h >> 32)        * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
 
-					if (chunks.blue_noise_tex.sample(wx,wy,wz) < wg->stalac_dens) {
+					if (chunks.blue_noise_tex.sample(wx,wy,wz) < wg->stalac_dens * 0.001f) {
 						place_stalac(x,y,z, rand1, rand2);
 					}
 				}

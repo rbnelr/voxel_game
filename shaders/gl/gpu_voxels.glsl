@@ -47,11 +47,11 @@
 #define B_GLOWSHROOM	27
 
 float get_emmisive (uint bid) {
-	if (      bid == B_MAGMA   ) return 7.0;
-	else if ( bid == B_CRYSTAL ) return 6.0;
+	if (      bid == B_MAGMA   ) return 4.0; // 7
+	else if ( bid == B_CRYSTAL ) return 80.0;
 	else if ( bid == B_URANIUM ) return 3.2;
-	else if ( bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6 ) return 6.0;
-	else if ( bid == B_GLOWSHROOM ) return 12.0;
+	else if ( bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6 ) return 80.0;
+	else if ( bid == B_GLOWSHROOM ) return 2.0; // 12
 	return 0.0;
 }
 
@@ -79,7 +79,7 @@ uniform sampler3D	vct_texPY;
 uniform sampler3D	vct_texNZ;
 uniform sampler3D	vct_texPZ;
 
-#define VCT_COL_MAX 5.0
+#define VCT_COL_MAX 80.0
 #define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
 
 uint read_bid (ivec3 coord) {

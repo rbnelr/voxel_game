@@ -51,6 +51,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		vec4 col = textureLod(tile_textures, vec3(vec2(0.5), texid), 100.0);
 		
 		//if (bid == B_MAGMA) col = vec4(0.0);
+		//if (bid == B_GLOWSHROOM) col = vec4(0.0);
 		
 		uint bids[3][3][3];
 		for (int z=0; z<3; ++z)
@@ -63,8 +64,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//else if (bid == B_LEAVES) alpha = 0.3;
 		
 		vec3 emissive = (col.rgb * get_emmisive(bid));
-		emissive += col.rgb * 0.1; // makes everything glow, for testing
-		emissive *= alpha;
+		//emissive += col.rgb * 0.03; // makes everything glow, for testing
 		
 	#if 1
 		bool visible = false;
@@ -81,6 +81,8 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		
 		if (!visible) emissive = vec3(0.0);
 		if (!visible) alpha = 0.0;
+		
+		emissive *= alpha;
 		
 		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
@@ -103,12 +105,12 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		float alphaNZ = bidPZ == B_AIR ? alpha : 0.0;
 		float alphaPZ = bidNZ == B_AIR ? alpha : 0.0;
 		
-		vec3 emissiveNX = bidPX == B_AIR ? emissive : vec3(0.0);
-		vec3 emissivePX = bidNX == B_AIR ? emissive : vec3(0.0);
-		vec3 emissiveNY = bidPY == B_AIR ? emissive : vec3(0.0);
-		vec3 emissivePY = bidNY == B_AIR ? emissive : vec3(0.0);
-		vec3 emissiveNZ = bidPZ == B_AIR ? emissive : vec3(0.0);
-		vec3 emissivePZ = bidNZ == B_AIR ? emissive : vec3(0.0);
+		vec3 emissiveNX = emissive * alphaNX;
+		vec3 emissivePX = emissive * alphaPX;
+		vec3 emissiveNY = emissive * alphaNY;
+		vec3 emissivePY = emissive * alphaPY;
+		vec3 emissiveNZ = emissive * alphaNZ;
+		vec3 emissivePZ = emissive * alphaPZ;
 		
 		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissiveNX, alphaNX)));
 		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissivePX, alphaPX)));

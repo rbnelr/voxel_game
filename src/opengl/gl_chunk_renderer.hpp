@@ -225,7 +225,7 @@ struct VCT_Data {
 
 		lrgba color = lrgba(0,0,0,0);
 		
-		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // GL_LINEAR_MIPMAP_NEAREST
 		glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 		glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
@@ -234,7 +234,7 @@ struct VCT_Data {
 
 		// takes max of the 8 samples for trilinear interpolation instead of lerping,
 		// this avoids cones from passing through walls, but destroys the actual VCT, but shows that cone leaking can be avoided
-		glSamplerParameteri(sampler, GL_TEXTURE_REDUCTION_MODE_EXT, GL_MAX);
+		//glSamplerParameteri(sampler, GL_TEXTURE_REDUCTION_MODE_EXT, GL_MAX);
 
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

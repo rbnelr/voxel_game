@@ -35,8 +35,6 @@ uniform float vct_stepsize = 1.0;
 uniform float vct_test = 1.0;
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
-	//size = max(size, 1.0);
-	
 	float lod = log2(size);
 	
 	#if 1
@@ -57,7 +55,14 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	
 	vec3 sqr = dir * dir;
 	vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
-	//val.a = max(max(valX.a, valY.a), valZ.a);
+	
+	//vec3 weight = min(abs(dir) * 15.0, 1.0);
+	//valX.a *= weight.x;
+	//valY.a *= weight.y;
+	//valZ.a *= weight.z;
+	
+	val.a = max(max(valX.a, valY.a), valZ.a);
+	
 	return val;
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
@@ -75,6 +80,29 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		vec3 pos = cone_pos + cone_dir * dist;
 		float size = cone_slope * 2.0 * dist;
 		
+		//if (true) {
+		//	float lod = log2(size);
+		//	lod = round(lod);
+		//	//lod = max(lod, 0.0);
+		//	
+		//	float size_nearest = pow(2.0, lod);
+		//	size = size_nearest;
+		//	
+		//	vec3 pos_nearest = pos;
+		//	
+		//	pos_nearest /= size_nearest;
+		//	pos_nearest = floor(pos_nearest);
+		//	pos_nearest += 0.5;
+		//	pos_nearest *= size_nearest;
+		//	
+		//	vec3 dir = abs(cone_dir);
+		//	float max_dir = max(max(dir.x, dir.y), dir.z);
+		//	
+		//	if      (max_dir == dir.x) pos.x = pos_nearest.x;
+		//	else if (max_dir == dir.y) pos.y = pos_nearest.y;
+		//	else                       pos.z = pos_nearest.z;
+		//}
+		
 		float stepsize = size * vct_stepsize;
 		
 		vec4 sampl = read_vct_texture(pos, cone_dir, size);
@@ -86,9 +114,9 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		#if DEBUGDRAW
 		if (_debugdraw && dbg) {
 			//vec4 col = vec4(1,0,0,1);
-			//vec4 col = vec4(sampl.rgb, 1.0-transp);
+			vec4 col = vec4(sampl.rgb, 1.0-transp);
 			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
-			vec4 col = vec4(vec3(sampl.a), 1.0);
+			//vec4 col = vec4(vec3(sampl.a), 1.0);
 			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
 		}
 		#endif
@@ -98,7 +126,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		
 		dist += stepsize;
 		
-		if (transp < 0.01 || dist >= max_dist)
+		if (transp < 0.005 || dist >= max_dist)
 			break;
 	}
 	
