@@ -14,8 +14,8 @@ namespace gl {
 inline void draw_submesh (GenericSubmesh submesh) {
 	glDrawElementsBaseVertex(GL_TRIANGLES,
 		submesh.index_count, // vertex draw count is how many indicies there are
-		GL_UNSIGNED_SHORT,
-		(void*)(submesh.index_offs * sizeof(uint16_t)), // index offset
+		GL_UNSIGNED_INT,
+		(void*)(submesh.index_offs * sizeof(uint32_t)), // index offset
 		(GLint)submesh.base_vertex);
 }
 

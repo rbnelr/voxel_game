@@ -355,6 +355,7 @@ struct Raytracer {
 		Texture2D					col ;
 		Texture2D					norm;
 		//Texture2D					tang;
+		Texture2D					depth;
 
 		// keep FBO so we can rasterize into gbuffer
 		// compute raytracer gbuf generation has same or slightly better perf
@@ -368,6 +369,9 @@ struct Raytracer {
 			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
 			norm  = {"gbuf.norm" }; // rgb normal
 			//tang  = {"gbuf.tang" }; // rgb tang
+			depth  = {"gbuf.depth" };
+
+			//tang  = {"gbuf.tang" }; // rgb tang
 
 			//int mips = calc_mipmaps(size.x, size.y);
 
@@ -375,6 +379,7 @@ struct Raytracer {
 			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
 			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
 			//glTextureStorage2D(tang, 1, GL_RGBA16F, size.x, size.y);
+			glTextureStorage2D(depth, 1, GL_DEPTH_COMPONENT32F, size.x, size.y);
 
 			glDeleteFramebuffers(1, &fbo);
 			glGenFramebuffers(1, &fbo);
@@ -385,7 +390,7 @@ struct Raytracer {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, col, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, norm, 0);
 			//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, tang, 0);
-			//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
 
 			GLenum draw_buffers[] = {
 				GL_COLOR_ATTACHMENT0,
@@ -426,6 +431,31 @@ struct Raytracer {
 		}
 	};
 	Framebuffer vct_diff_framebuf;
+
+	struct TestRenderer {
+		Shader*		shad;
+		IndexedMesh	mesh;
+
+		float3 pos = float3(-18.3f,0,40);
+		float2 rot = float3(deg(-90),0,0);
+		float size = 5;
+
+		TestRenderer (Shaders& shaders) {
+			shad = shaders.compile("test");
+
+			auto& m = g_assets.stock_models;
+			mesh = upload_mesh("stock_mesh", m.vertices.data(), m.vertices.size(), m.indices.data(), m.indices.size());
+		}
+		void imgui () {
+			g_debugdraw.movable("Stock_mesh", &pos, 0.4f, lrgba(0.7f,0,0.7f,1));
+
+			ImGui::DragFloat3("Stock_mesh pos", &pos.x, 0.1f);
+			ImGui::DragFloat2("Stock_mesh rot", &rot.x, 0.1f);
+			ImGui::DragFloat("Stock_mesh size", &size, 0.1f);
+		}
+		void draw (OpenglRenderer& r);
+	};
+	TestRenderer test_renderer;
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
@@ -633,11 +663,13 @@ struct Raytracer {
 
 		ImGui::SliderFloat("vct_diff_renderscale", &vct_diff_framebuf.renderscale, .5f, 1, "%.2f");
 		
+		test_renderer.imgui();
+
 		//
 		ImGui::TreePop();
 	}
 
-	Raytracer (Shaders& shaders): octree(shaders), vct_data(shaders) {
+	Raytracer (Shaders& shaders): octree(shaders), vct_data(shaders), test_renderer(shaders) {
 		if (0) {
 			
 			int max_sparse_texture_size;

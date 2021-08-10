@@ -112,9 +112,9 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		#if DEBUGDRAW
 		if (_dbgdraw_rays && dbg) {
 			//vec4 col = vec4(1,0,0,1);
-			vec4 col = vec4(sampl.rgb, 1.0-transp);
+			//vec4 col = vec4(sampl.rgb, 1.0-transp);
 			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
-			//vec4 col = vec4(vec3(sampl.a), 1.0);
+			vec4 col = vec4(vec3(sampl.a), 1.0);
 			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
 		}
 		#endif
@@ -174,9 +174,9 @@ uniform vec2 dispatch_size;
 		
 		INIT_VISUALIZE_COST
 		
-		#if DEBUGDRAW
-		_dbgdraw_rays = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
-		#endif
+		//#if DEBUGDRAW
+		//_dbgdraw_rays = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
+		//#endif
 		
 		if (g.did_hit) {
 			Cone c = cones.cones[coneid];
@@ -203,17 +203,17 @@ uniform vec2 dispatch_size;
 			imageStore(output_color, pxpos, vec4(light, 1.0));
 		}
 		
-		//#if DEBUGDRAW
-		//bool update_dbg_vecs = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
-		//
-		//if (update_dbg_vecs) {
-		//	vec3 pos = g.pos - WORLD_SIZEf/2.0;
-		//	
-		//	// why does only the first vector appear???
-		//	dbgdraw_vector(pos, g.TBN[2], vec4(0,1,1,1));
-		//	dbgdraw_vector(pos, g.TBN[0], vec4(0,1,0,1));
-		//}
-		//#endif
+		#if DEBUGDRAW
+		bool update_dbg_vecs = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
+		
+		if (update_dbg_vecs) {
+			vec3 pos = g.pos - WORLD_SIZEf/2.0;
+			
+			// why does only the first vector appear???
+			dbgdraw_vector(pos, g.TBN[2], vec4(0,1,1,1));
+			dbgdraw_vector(pos, g.TBN[0], vec4(0,1,0,1));
+		}
+		#endif
 	}
 	
 #else

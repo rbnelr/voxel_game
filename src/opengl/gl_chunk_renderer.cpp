@@ -619,6 +619,24 @@ void VCT_Data::visualize_sparse (OpenglRenderer& r) {
 	}
 }
 
+void Raytracer::TestRenderer::draw (OpenglRenderer& r) {
+	ZoneScoped;
+	OGL_TRACE("TestRenderer draw");
+
+	PipelineState s;
+	s.depth_test = true;
+	s.blend_enable = false;
+	r.state.set(s);
+
+	glUseProgram(shad->prog);
+	r.state.bind_textures(shad, {});
+
+	float4x4 mat = (float4x4)translate(pos) * (float4x4)(rotate3_Z(rot.x) * rotate3_X(rot.y)) * (float4x4)scale((float3)size);
+	shad->set_uniform("model2world", mat);
+
+	glBindVertexArray(mesh.ib.vao);
+	glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
+}
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 
@@ -653,6 +671,13 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 	}
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		test_renderer.draw(r);
+	}
 
 	upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 

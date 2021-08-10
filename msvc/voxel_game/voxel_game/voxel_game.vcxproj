@@ -425,7 +425,6 @@
     <None Include="..\..\..\shaders\gl\block_highlight.glsl" />
     <None Include="..\..\..\shaders\gl\bloom.glsl" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
-    <None Include="..\..\..\shaders\gl\chunk_.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
     <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
@@ -440,6 +439,7 @@
     <None Include="..\..\..\shaders\gl\rt_gbufgen.glsl" />
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
+    <None Include="..\..\..\shaders\gl\test.glsl" />
     <None Include="..\..\..\shaders\gl\vct_filter.glsl" />
     <None Include="..\..\..\shaders\gl\vct_shade.glsl" />
   </ItemGroup>

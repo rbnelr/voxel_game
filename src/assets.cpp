@@ -282,7 +282,7 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 					assert(f.mNumIndices == 3);
 
 					for (unsigned k=0; k<3; ++k) {
-						data->indices.push_back( (uint16_t)f.mIndices[k] );
+						data->indices.push_back( (uint32_t)f.mIndices[k] );
 					}
 				}
 
@@ -307,4 +307,14 @@ BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data) {
 
 	aiReleaseImport(block_highlight_fbx);
 	return bh;
+}
+
+GenericVertexData load_fbx (char const* filename, char const* submesh_name) {
+	auto* fbx = aiImportFile(filename, aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
+	
+	GenericVertexData data;
+	auto m = load_subobject(&data, fbx, submesh_name);
+
+	aiReleaseImport(fbx);
+	return data;
 }

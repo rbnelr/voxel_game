@@ -165,37 +165,6 @@ struct PlayerAssets {
 	float3 arm_size = float3(0.2f, 0.70f, 0.2f);
 };
 
-struct Assets {
-	
-	BlockMeshes				block_meshes;
-	std::vector<BlockTile>	block_tiles;
-
-	BlockTypes				block_types;
-
-	PlayerAssets			player;
-
-	Sound break_sound = { "dig1", 1.2f, 0.8f };
-
-	void load_block_types (json const& blocks_json);
-	void load_block_tiles (json const& blocks_json);
-
-	static Assets load () {
-		ZoneScoped;
-		Assets a;
-
-		json blocks_json = load_json("blocks.json");
-
-		a.load_block_types(blocks_json);
-		a.block_meshes.load(blocks_json);
-		a.load_block_tiles(blocks_json);
-
-		return a;
-	}
-};
-
-// global assets because these are needed in a lot of places
-inline Assets g_assets;
-
 struct GenericVertex {
 	float3	pos;
 	float3	norm;
@@ -212,15 +181,53 @@ struct GenericVertex {
 		a.template add<AttribMode::FLOAT, decltype(col)>(loc++, "col",  offsetof(GenericVertex, col ));
 	}
 };
+
 struct GenericVertexData {
 	std::vector<GenericVertex>	vertices;
-	std::vector<uint16_t>		indices;
+	std::vector<uint32_t>		indices;
 };
 struct GenericSubmesh {
 	uint32_t	base_vertex; // start index of verticies in GenericVertexData::vertices
 	uint32_t	index_offs;  // start index of indices in GenericVertexData::indices
 	uint32_t	index_count; // number of indices
 };
+
+GenericVertexData load_fbx (char const* filename, char const* submesh_name);
+
+struct Assets {
+	
+	BlockMeshes				block_meshes;
+	std::vector<BlockTile>	block_tiles;
+
+	BlockTypes				block_types;
+
+	PlayerAssets			player;
+
+	Sound break_sound = { "dig1", 1.2f, 0.8f };
+
+	GenericVertexData		stock_models;
+
+	void load_block_types (json const& blocks_json);
+	void load_block_tiles (json const& blocks_json);
+
+	static Assets load () {
+		ZoneScoped;
+		Assets a;
+
+		json blocks_json = load_json("blocks.json");
+
+		a.load_block_types(blocks_json);
+		a.block_meshes.load(blocks_json);
+		a.load_block_tiles(blocks_json);
+
+		a.stock_models = load_fbx("meshes/stock_models.fbx", "stock_models");
+
+		return a;
+	}
+};
+
+// global assets because these are needed in a lot of places
+inline Assets g_assets;
 
 struct BlockHighlightSubmeshes {
 	GenericSubmesh block_highlight, face_highlight;

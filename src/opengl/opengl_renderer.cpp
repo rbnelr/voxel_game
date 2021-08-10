@@ -79,6 +79,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		if (raytracer.enable)
 			raytracer.draw(*this, game);
 
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+
 		// draw before chunks so it shows through transparent blocks
 		if (game.player.selected_block)
 			block_highl.draw(*this, game.player.selected_block);
