@@ -6,7 +6,7 @@ layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 layout(rgba32f, binding = 0) writeonly restrict uniform image2D gbuf_pos ;
 layout(rgba16f, binding = 1) writeonly restrict uniform image2D gbuf_col ;
 layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
-layout(rgba16f, binding = 3) writeonly restrict uniform image2D gbuf_tang;
+//layout(rgba16f, binding = 3) writeonly restrict uniform image2D gbuf_tang;
 
 void main () {
 	ivec2 pxpos = ivec2(gl_GlobalInvocationID.xy);
@@ -27,13 +27,13 @@ void main () {
 		col.rgb = hit.col;
 		col.a   = hit.emiss;
 		norm    = hit.TBN[2];
-		tang    = hit.TBN[0];
+		//tang    = hit.TBN[0];
 	}
 	
 	imageStore(gbuf_pos , pxpos, vec4(pos, 0.0));
 	imageStore(gbuf_col , pxpos, col);
 	imageStore(gbuf_norm, pxpos, vec4(norm, 0.0));
-	imageStore(gbuf_tang, pxpos, vec4(tang, 0.0));
+	//imageStore(gbuf_tang, pxpos, vec4(tang, 0.0));
 }
 	
 /*

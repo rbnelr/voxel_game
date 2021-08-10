@@ -258,12 +258,12 @@ struct VCT_Data {
 
 struct Raytracer {
 	SERIALIZE(Raytracer, enable, enable_vct, max_iterations, rand_seed_time,
-		sunlight_enable, sunlight_dist, sunlight_col,
-		bounces_enable, bounces_max_dist, bounces_max_count,
 		only_primary_rays, taa_alpha, taa_enable)
 
 	Shader* rt_shad = nullptr;
-	Shader* vct_shad = nullptr;
+	Shader* vct_diffuse = nullptr;
+	Shader* vct_combine = nullptr;
+
 	Vao dummy_vao = {"dummy_vao"};
 
 	struct SubchunksTexture {
@@ -354,7 +354,7 @@ struct Raytracer {
 		Texture2D					pos ;
 		Texture2D					col ;
 		Texture2D					norm;
-		Texture2D					tang;
+		//Texture2D					tang;
 
 		// keep FBO so we can rasterize into gbuffer
 		// compute raytracer gbuf generation has same or slightly better perf
@@ -367,14 +367,14 @@ struct Raytracer {
 			pos   = {"gbuf.pos"  }; // could be computed from depth
 			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
 			norm  = {"gbuf.norm" }; // rgb normal
-			tang  = {"gbuf.tang" }; // rgb tang
+			//tang  = {"gbuf.tang" }; // rgb tang
 
 			//int mips = calc_mipmaps(size.x, size.y);
 
 			glTextureStorage2D(pos , 1, GL_RGBA32F, size.x, size.y);
 			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
 			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
-			glTextureStorage2D(tang, 1, GL_RGBA16F, size.x, size.y);
+			//glTextureStorage2D(tang, 1, GL_RGBA16F, size.x, size.y);
 
 			glDeleteFramebuffers(1, &fbo);
 			glGenFramebuffers(1, &fbo);
@@ -384,16 +384,16 @@ struct Raytracer {
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pos, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, col, 0);
 			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, norm, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, tang, 0);
+			//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, tang, 0);
 			//glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
 
 			GLenum draw_buffers[] = {
 				GL_COLOR_ATTACHMENT0,
 				GL_COLOR_ATTACHMENT1,
 				GL_COLOR_ATTACHMENT2,
-				GL_COLOR_ATTACHMENT3,
+				//GL_COLOR_ATTACHMENT3,
 			};
-			glDrawBuffers(ARRLEN(draw_buffers), draw_buffers);
+			glDrawBuffers(3, draw_buffers);
 
 			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 			//if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -407,6 +407,25 @@ struct Raytracer {
 		}
 	};
 	Gbuffer gbuf;
+
+	struct Framebuffer {
+		int2						size = 0;
+		Texture2D					col;
+
+		float renderscale = 0.5f;
+
+		void resize (int2 const& framebuffer_size) {
+			int2 new_size = (int2)round((float2)framebuffer_size * renderscale);
+
+			if (size == new_size) return;
+			size = new_size;
+
+			col = {"gbuf.col"};
+
+			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
+		}
+	};
+	Framebuffer vct_diff_framebuf;
 
 	void bind_voxel_textures (OpenglRenderer& r, Shader* shad);
 
@@ -502,38 +521,36 @@ struct Raytracer {
 	bool visualize_warp_reads = false;
 
 	//
-	int2 group_size = int2(8,8);
-	bool update_group_size = false; // alow editing without instanly updating, as to avoid invalid sizes
+	struct ComputeGroupSize {
+		int2 _size;
+		int2 size;
 
-	int2 _group_size = int2(8,8);
+		ComputeGroupSize (int2 const& s): _size{s}, size{s} {}
 
-	//
-	bool  sunlight_enable = true;
-	float sunlight_dist = 90;
-	lrgb  sunlight_col = lrgb(0.98, 0.92, 0.65) * 1.3;
+		bool imgui (char const* lbl) {
+			ImGui::PushID(lbl);
 
-	float3 sunlight_pos = float3(-28, 67, 102);
-	float sun_pos_size = 4.0;
+			ImGui::InputInt2(lbl, &_size.x);
+			ImGui::SameLine(); 
 
-	float2 sunlight_ang = float2(deg(60), deg(35));
-	float sun_dir_rand = 0.05;
+			bool changed = ImGui::Button("Update");
+			if (changed)
+				size = _size;
 
-	bool sunlight_mode = 1;
+			ImGui::PopID();
+			return changed;
+		}
+	};
 
+	ComputeGroupSize rt_groupsz = int2(8,8);
+	ComputeGroupSize vct_diff_groupsz = int2(8,8);
+	ComputeGroupSize vct_comp_groupsz = int2(8,8);
 
 	float vct_start_dist = 1.0f / 64.0f;
 	float vct_stepsize = 1.0f;
 	float vct_test = 60;
 	bool vct_dbg_primary = false;
 	bool vct_visualize_sparse = false;
-	bool test = false;
-
-
-	bool  bounces_enable = false;
-	float bounces_max_dist = 64;
-	int   bounces_max_count = 4;
-
-	float water_F0 = 0.05f;
 
 	bool  visualize_light = false;
 
@@ -543,19 +560,19 @@ struct Raytracer {
 	bool  clear_debugdraw = false;
 
 	std::vector<gl::MacroDefinition> get_rt_macros () {
-		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
-		         {"WG_PIXELS_Y", prints("%d", _group_size.y)},
-		         {"TEST", test ? "1":"0"},
+		return { {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
+		         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)}
 		};
 	}
-	std::vector<gl::MacroDefinition> get_vct_macros () {
-		return { {"WG_PIXELS_X", prints("%d", _group_size.x)},
-		         {"WG_PIXELS_Y", prints("%d", _group_size.y)},
+	std::vector<gl::MacroDefinition> get_vct_macros (bool diffuse) {
+		auto& groupsz = diffuse ? vct_diff_groupsz : vct_comp_groupsz;
+		return { {"WG_PIXELS_X", prints("%d", groupsz.size.x)},
+		         {"WG_PIXELS_Y", prints("%d", groupsz.size.y)},
+		         {"VCT_DIFFUSE", diffuse ? "1":"0"},
 		         {"WG_CONES", prints("%d", 12)},
 		         {"VCT_DBG_PRIMARY", vct_dbg_primary ? "1":"0"},
 		         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"},
-		         {"TEST", test ? "1":"0"},
+		         {"VISUALIZE_WARP_COST", visualize_warp_iterations ? "1":"0"}
 		};
 	}
 
@@ -584,65 +601,37 @@ struct Raytracer {
 		ImGui::SameLine();
 		macro_change |= ImGui::Checkbox("warp_iterations", &visualize_warp_iterations);
 
-		ImGui::InputInt2("group_size", &group_size.x); ImGui::SameLine(); 
-		if (ImGui::Button("Update")) {
-			macro_change = true;
-			_group_size = group_size;
-		}
+		macro_change |= rt_groupsz.imgui("rt_groupsz");
+		macro_change |= vct_diff_groupsz.imgui("vct_diff_groupsz");
+		macro_change |= vct_comp_groupsz.imgui("vct_comp_groupsz");
 
 		macro_change |= ImGui::Checkbox("only_primary_rays", &only_primary_rays);
 
 		ImGui::Separator();
 
 		//
-		if (ImGui::TreeNodeEx("real_time_lighting")) {
-			ImGui::Checkbox("sunlight_enable", &sunlight_enable);
-			ImGui::SliderFloat("sunlight_dist", &sunlight_dist, 1, 128);
-			imgui_ColorEdit("sunlight_col", &sunlight_col);
+		ImGui::Checkbox("visualize_light", &visualize_light);
 
-			ImGui::DragFloat3("sunlight_pos", &sunlight_pos.x, 0.25f);
-			ImGui::DragFloat("sun_pos_size", &sun_pos_size, 0.1f, 0, 100, "%f", ImGuiSliderFlags_Logarithmic);
-
-			ImGui::SliderAngle("sunlight_ang.x", &sunlight_ang.x, -180, +180);
-			ImGui::SliderAngle("sunlight_ang.y", &sunlight_ang.y, -90, +90);
-			ImGui::DragFloat("sun_dir_rand", &sun_dir_rand, 0.001f, 0, 0.5f, "%f", ImGuiSliderFlags_Logarithmic);
-
-			macro_change |= ImGui::Checkbox("sunlight_mode", &sunlight_mode);
-
-			ImGui::Spacing();
-
-			float2 sunlight_ang = float2(deg(0), deg(40));
-			float sun_dir_rand = 4.0;
-
-			ImGui::Checkbox("bounces_enable", &bounces_enable);
-			ImGui::SliderFloat("bounces_max_dist", &bounces_max_dist, 1, 512);
-			ImGui::SliderInt("bounces_max_count", &bounces_max_count, 1, 16);
-			ImGui::Spacing();
-
-			//ImGui::SliderInt("rays", &rays, 1, 16, "%d", ImGuiSliderFlags_Logarithmic);
-			ImGui::Checkbox("visualize_light", &visualize_light);
-
-			ImGui::SliderFloat("water_F0", &water_F0, 0, 1);
-			
-			ImGui::TreePop();
-		}
-
-		ImGui::SliderFloat("vct_start_dist", &vct_start_dist, 0, 4, "%.4f", ImGuiSliderFlags_Logarithmic);
+		ImGui::SliderFloat("vct_start_dist", &vct_start_dist, 1.0f / 512, 4, "%.4f", ImGuiSliderFlags_Logarithmic);
 		ImGui::SliderFloat("vct_stepsize", &vct_stepsize, 0, 1);
 		ImGui::SliderFloat("vct_test", &vct_test, 0, 256);
 		macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 		ImGui::Checkbox("vct_visualize_sparse", &vct_visualize_sparse);
 
-		macro_change |= ImGui::Checkbox("test", &test);
-
 		if (macro_change && rt_shad) {
 			rt_shad->macros = get_rt_macros();
 			rt_shad->recompile("macro_change", false);
 		}
-		if (macro_change && vct_shad) {
-			vct_shad->macros = get_vct_macros();
-			vct_shad->recompile("macro_change", false);
+		if (macro_change && vct_diffuse) {
+			vct_diffuse->macros = get_vct_macros(true);
+			vct_diffuse->recompile("macro_change", false);
 		}
+		if (macro_change && vct_combine) {
+			vct_combine->macros = get_vct_macros(false);
+			vct_combine->recompile("macro_change", false);
+		}
+
+		ImGui::SliderFloat("vct_diff_renderscale", &vct_diff_framebuf.renderscale, .5f, 1, "%.2f");
 		
 		//
 		ImGui::TreePop();

@@ -284,17 +284,22 @@ void Raytracer::upload_changes (OpenglRenderer& r, Game& game, Input& I) {
 		rt_shad->macros = get_rt_macros();
 		rt_shad->recompile("macro_change", false);
 	}
-	if (macro_change && vct_shad) {
-		vct_shad->macros = get_vct_macros();
-		vct_shad->recompile("macro_change", false);
+	if (macro_change && vct_diffuse) {
+		vct_diffuse->macros = get_vct_macros(true);
+		vct_diffuse->recompile("macro_change", false);
+	}
+	if (macro_change && vct_combine) {
+		vct_combine->macros = get_vct_macros(false);
+		vct_combine->recompile("macro_change", false);
 	}
 
 	if (vct_visualize_sparse)
 		vct_data.visualize_sparse(r);
 
 	// lazy init these to allow json changes to affect the macros
-	if (!rt_shad)	rt_shad  = r.shaders.compile("rt_gbufgen", get_rt_macros(), {{ COMPUTE_SHADER }});
-	if (!vct_shad)	vct_shad = r.shaders.compile("vct_shade", get_vct_macros(), {{ COMPUTE_SHADER }});
+	if (!rt_shad)     rt_shad     = r.shaders.compile("rt_gbufgen", get_rt_macros(), {{ COMPUTE_SHADER }});
+	if (!vct_diffuse) vct_diffuse = r.shaders.compile("vct_shade", get_vct_macros(true), {{ COMPUTE_SHADER }});
+	if (!vct_combine) vct_combine = r.shaders.compile("vct_shade", get_vct_macros(false), {{ COMPUTE_SHADER }});
 	
 	voxels_tex.resize(game.chunks.subchunks.slots.alloc_end);
 
@@ -617,54 +622,57 @@ void VCT_Data::visualize_sparse (OpenglRenderer& r) {
 void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	ZoneScoped;
 
-	if (!rt_shad->prog || !vct_shad->prog) return;
+	if (!rt_shad->prog || !vct_diffuse->prog || !vct_combine->prog) return;
 
-	if (!test) {
-		gbuf.resize(r.framebuffer.size);
-		{
-			ZoneScopedN("rt_gbufgen");
-			OGL_TRACE("rt_gbufgen");
-
-			glUseProgram(rt_shad->prog);
-
-			r.state.bind_textures(rt_shad, {
-				{"subchunks_tex", subchunks_tex.tex},
-				{"voxels_tex", voxels_tex.tex},
-				{"octree", octree.tex},
-
-				{"tile_textures", r.tile_textures, r.tile_sampler},
-			});
-
-			glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-			glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-			glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-			glBindImageTexture(3, gbuf.tang , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		
-			int2 dispatch_size;
-			dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
-			dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
-		
-			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		}
-	}
+	gbuf.resize(r.framebuffer.size);
+	vct_diff_framebuf.resize(r.framebuffer.size);
 
 	{
-		ZoneScopedN("vct_shade");
-		OGL_TRACE("vct_shade");
+		ZoneScopedN("rt_gbufgen");
+		OGL_TRACE("rt_gbufgen");
 
-		glUseProgram(vct_shad->prog);
+		glUseProgram(rt_shad->prog);
 
-		vct_shad->set_uniform("visualize_light",    visualize_light);
+		r.state.bind_textures(rt_shad, {
+			{"subchunks_tex", subchunks_tex.tex},
+			{"voxels_tex", voxels_tex.tex},
+			{"octree", octree.tex},
 
-		vct_shad->set_uniform("vct_start_dist",     vct_start_dist);
-		vct_shad->set_uniform("vct_stepsize",       vct_stepsize);
-		vct_shad->set_uniform("vct_test",           vct_test);
+			{"tile_textures", r.tile_textures, r.tile_sampler},
+		});
 
-		vct_shad->set_uniform("update_debugdraw",  update_debugdraw);
+		glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		//glBindImageTexture(3, gbuf.tang , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		
+		int2 dispatch_size;
+		dispatch_size.x = (r.framebuffer.size.x + (rt_groupsz.size.x -1)) / rt_groupsz.size.x;
+		dispatch_size.y = (r.framebuffer.size.y + (rt_groupsz.size.y -1)) / rt_groupsz.size.y;
+		
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	}
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		r.state.bind_textures(vct_shad, {
+	upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
+
+	{
+		ZoneScopedN("vct_diffuse");
+		OGL_TRACE("vct_diffuse");
+
+		glUseProgram(vct_diffuse->prog);
+
+		vct_diffuse->set_uniform("dispatch_size",      (float2)vct_diff_framebuf.size);
+
+		vct_diffuse->set_uniform("visualize_light",    visualize_light);
+
+		vct_diffuse->set_uniform("vct_start_dist",     vct_start_dist);
+		vct_diffuse->set_uniform("vct_stepsize",       vct_stepsize);
+		vct_diffuse->set_uniform("vct_test",           vct_test);
+
+		vct_diffuse->set_uniform("update_debugdraw",   update_debugdraw);
+
+		r.state.bind_textures(vct_diffuse, {
 			{"subchunks_tex", subchunks_tex.tex},
 			{"voxels_tex", voxels_tex.tex},
 			{"octree", octree.tex},
@@ -672,7 +680,57 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			{"gbuf_pos" , gbuf.pos },
 			{"gbuf_col" , gbuf.col },
 			{"gbuf_norm", gbuf.norm},
-			{"gbuf_tang", gbuf.tang},
+			//{"gbuf_tang", gbuf.tang},
+
+			{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler},
+			{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler},
+			{"vct_texNY", vct_data.textures[2].tex, vct_data.sampler},
+			{"vct_texPY", vct_data.textures[3].tex, vct_data.sampler},
+			{"vct_texNZ", vct_data.textures[4].tex, vct_data.sampler},
+			{"vct_texPZ", vct_data.textures[5].tex, vct_data.sampler},
+
+			{"tile_textures", r.tile_textures, r.tile_sampler},
+
+			{"heat_gradient", r.gradient, r.normal_sampler},
+		});
+
+		glBindImageTexture(0, vct_diff_framebuf.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+
+		int2 dispatch_size;
+		dispatch_size.x = (vct_diff_framebuf.size.x + (vct_diff_groupsz.size.x -1)) / vct_diff_groupsz.size.x;
+		dispatch_size.y = (vct_diff_framebuf.size.y + (vct_diff_groupsz.size.y -1)) / vct_diff_groupsz.size.y;
+
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	}
+	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+	{
+		ZoneScopedN("vct_combine");
+		OGL_TRACE("vct_combine");
+
+		glUseProgram(vct_combine->prog);
+
+		vct_combine->set_uniform("dispatch_size",      (float2)r.framebuffer.size);
+
+		vct_combine->set_uniform("visualize_light",    visualize_light);
+
+		vct_combine->set_uniform("vct_start_dist",     vct_start_dist);
+		vct_combine->set_uniform("vct_stepsize",       vct_stepsize);
+		vct_combine->set_uniform("vct_test",           vct_test);
+
+		vct_combine->set_uniform("update_debugdraw",   update_debugdraw);
+
+		r.state.bind_textures(vct_combine, {
+			{"subchunks_tex", subchunks_tex.tex},
+			{"voxels_tex", voxels_tex.tex},
+			{"octree", octree.tex},
+
+			{"gbuf_pos" , gbuf.pos },
+			{"gbuf_col" , gbuf.col },
+			{"gbuf_norm", gbuf.norm},
+			//{"gbuf_tang", gbuf.tang},
+
+			{"vct_diffuse", vct_diff_framebuf.col, vct_data.filter_sampler},
 
 			{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler},
 			{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler},
@@ -686,13 +744,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 			{"heat_gradient", r.gradient, r.normal_sampler},
 		});
 
-		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
-
 		glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 		int2 dispatch_size;
-		dispatch_size.x = (r.framebuffer.size.x + (_group_size.x -1)) / _group_size.x;
-		dispatch_size.y = (r.framebuffer.size.y + (_group_size.y -1)) / _group_size.y;
+		dispatch_size.x = (r.framebuffer.size.x + (vct_comp_groupsz.size.x -1)) / vct_comp_groupsz.size.x;
+		dispatch_size.y = (r.framebuffer.size.y + (vct_comp_groupsz.size.y -1)) / vct_comp_groupsz.size.y;
 
 		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 	}

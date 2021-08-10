@@ -50,6 +50,18 @@
 	#define VISUALIZE_COST_COUNT
 #endif
 
+vec3 generate_tangent (vec3 normal) { // NOTE: tangents currently do not correspond with texture uvs, normal mapping will be wrong
+	vec3 tangent = vec3(0,0,+1);
+	if (abs(normal.z) > 0.99) return vec3(0,+1,0);
+	return tangent;
+}
+mat3 calc_TBN (vec3 normal, vec3 tangent) {
+	vec3 bitangent = cross(normal, tangent); // generate bitangent vector orthogonal to both normal and tangent
+	tangent = cross(bitangent, normal); // regenerate tangent vector in case it was not orthogonal to normal
+	
+	return mat3(tangent, bitangent, normal);
+}
+
 // get pixel ray in world space based on pixel coord and matricies
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
@@ -116,7 +128,7 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 
 #define DEBUGDRAW 1
 #if DEBUGDRAW
-bool _debugdraw = false;
+bool _dbgdraw_rays = false;
 uniform bool update_debugdraw = false;
 
 vec4 _dbg_ray_cols[] = {
@@ -127,8 +139,6 @@ vec4 _dbg_ray_cols[] = {
 	vec4(1,1,0,1),
 };
 #endif
-
-#define REFLECTIONS 1
 
 //
 struct Hit {
@@ -267,7 +277,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
 			if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
 				#if DEBUGDRAW
-				if (_debugdraw) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+				if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
 				#endif
 				return false;
 			}
@@ -275,7 +285,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 	}
 	
 	#if DEBUGDRAW
-	if (_debugdraw) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+	if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
 	#endif
 	
 	if (type < RAYT_SUN) {
@@ -301,23 +311,19 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			vec3 abs_offs = abs(offs);
 			
 			vec3 normal = vec3(0.0);
-			vec3 tangent = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				normal.x = sign(offs.x);
-				tangent.y = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit_fract.yz;
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
 				normal.y = sign(offs.y);
-				tangent.x = -sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit_fract.xz;
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
 				normal.z = sign(offs.z);
-				tangent.x = 1.0;
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit_fract.xy;
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
@@ -346,8 +352,7 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 			//	
 			//}
 			
-			vec3 bitangent = cross(normal, tangent);
-			hit.TBN = mat3(tangent, bitangent, normal);
+			hit.TBN = calc_TBN(normal, generate_tangent(normal));
 		}
 		
 		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
@@ -355,63 +360,15 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 		float lod2 = log2(dist)*0.90 - 2.0;
 		
-		//if (tex_bid == B_STONE) {
-		//	hit.col = textureLod(textures2_A, vec3(uv / 2.0, 1), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 2.0, 4), lod2).rgb * 2.0 - 1.0;
-		//	
-		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 2.0, 7), lod2).r;
-		//	
-		//	vec3 bitangent = cross(hit.normal, tangent);
-		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
-		//	
-		//	hit.normal = TBN * normalize(normalmap);
-		//	
-		//} else if (tex_bid == B_HARDSTONE) {
-		//	hit.col = textureLod(textures2_A, vec3(uv / 2.0, 0), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures2_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
-		//	
-		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = textureLod(textures2_N, vec3(uv / 2.0, 3), lod2).r;
-		//	
-		//	vec3 bitangent = cross(hit.normal, tangent);
-		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
-		//	
-		//	hit.normal = TBN * normalize(normalmap);
-		//} else if (tex_bid == B_GRAVEL) {
-		//	hit.col = textureLod(textures_A, vec3(uv / 2.0, 0), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 2.0, 0), lod2).rgb * 2.0 - 1.0;
-		//	
-		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = 0.5;
-		//	
-		//	vec3 bitangent = cross(hit.normal, tangent);
-		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
-		//	
-		//	hit.normal = TBN * normalize(normalmap);
-		//} else if (tex_bid == B_GRASS) {
-		//	hit.col = textureLod(textures_A, vec3(uv / 4.0, 1), lod2).rgb;
-		//	vec3 normalmap = textureLod(textures_N, vec3(uv / 4.0, 4), lod2).rgb * 2.0 - 1.0;
-		//	
-		//	hit.occl_spec.x = 1.0;
-		//	hit.occl_spec.y = 0.5;
-		//	
-		//	vec3 bitangent = cross(hit.normal, tangent);
-		//	mat3 TBN = mat3(tangent, bitangent, hit.normal);
-		//	
-		//	hit.normal = TBN * normalize(normalmap);
-		//} else {
-			hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
-			
-			if (tex_bid == B_TALLGRASS && face >= 4)
-				hit.col = vec3(0.0);
+		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
 		
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 1.0;
-		//}
+		if (tex_bid == B_TALLGRASS && face >= 4)
+			hit.col = vec3(0.0);
+	
+		hit.occl_spec.x = 1.0;
+		hit.occl_spec.y = 1.0;
+		
 		hit.emiss = get_emmisive(hit.bid);
-		
-		//hit.col = hit.TBN[2];
 	}
 	return true;
 }
@@ -496,202 +453,5 @@ mat3 get_tangent_to_world (vec3 normal) {
 	tangent = cross(bitangent, normal);
 	
 	return mat3(tangent, bitangent, normal);
-}
-
-uniform bool  sunlight_enable = true;
-uniform float sunlight_dist = 90.0;
-uniform vec3  sunlight_col = vec3(0.98, 0.92, 0.65) * 1.3;
-
-uniform vec3  ambient_light;
-
-uniform bool  bounces_enable = true;
-uniform float bounces_max_dist = 30.0;
-uniform int   bounces_max_count = 8;
-
-uniform vec3 sun_pos = vec3(-28, 67, 102);
-uniform float sun_pos_size = 4.0;
-
-uniform vec3 sun_dir = normalize(vec3(-1,2,3));
-uniform float sun_dir_rand = 0.05;
-
-uniform float water_F0 = 0.6;
-
-const float water_IOR = 1.333;
-const float air_IOR = 1.0;
-
-uniform sampler2D water_N_A;
-uniform sampler2D water_N_B;
-
-uniform float water_normal_time = 0.0; // wrap on some integer to avoid losing precision over time
-uniform float water_normal_scale = 0.1;
-uniform float water_normal_strength = 0.05;
-
-//// From: https://godotshaders.com/shader/realistic-water/
-
-// Wave settings:
-uniform float	wave_speed		 = 0.3; // Speed scale for the waves
-const float	wave_steep		 	= 0.12; // Speed scale for the waves
-uniform vec4	wave_a			 = vec4(1.0, 1.0, 0.35*wave_steep, 3.0); 	// xy = Direction, z = Steepness, w = Length
-uniform	vec4	wave_b			 = vec4(1.0, 0.6, 0.30*wave_steep, 1.55);	// xy = Direction, z = Steepness, w = Length
-uniform	vec4	wave_c			 = vec4(1.0, 1.3, 0.25*wave_steep, 0.9); 	// xy = Direction, z = Steepness, w = Length
-
-// Surface settings:
-uniform vec2 	sampler_scale 	 = vec2(0.25, 0.25); 			// Scale for the sampler
-uniform vec2	sampler_direction= vec2(0.05, 0.04); 			// Direction and speed for the sampler offset
-
-// Wave function:
-vec3 wave(vec4 parameter, vec2 position, float time, inout vec3 tangent, inout vec3 binormal)
-{
-	float	wave_steepness	 = parameter.z;
-	float	wave_length		 = parameter.w;
-
-	float	k				 = 2.0 * 3.14159265359 / wave_length;
-	float 	c 				 = sqrt(9.8 / k);
-	vec2	d				 = normalize(parameter.xy);
-	float 	f 				 = k * (dot(d, position) - c * time);
-	float 	a				 = wave_steepness / k;
-	
-			tangent			+= normalize(vec3(1.0-d.x * d.x * (wave_steepness * sin(f)),    -d.x * d.y * (wave_steepness * sin(f)), d.x * (wave_steepness * cos(f))));
-			binormal		+= normalize(vec3(   -d.x * d.y * (wave_steepness * sin(f)), 1.0-d.y * d.y * (wave_steepness * sin(f)), d.y * (wave_steepness * cos(f))));
-
-	return vec3(d.x * (a * cos(f)), d.y * (a * cos(f)), a * sin(f) * 0.25);
-}
-
-
-// Vertex shader:
-void water_shader (vec2 uv, float time, out vec3 normal, out vec3 vertex_pos) {
-	float	t				 = time * wave_speed;
-	
-			vertex_pos		= vec3(0,0,0);
-	vec3	vertex_position  = vec3(uv, 0.0);
-	
-	vec3	vertex_tangent 	 = vec3(0.0, 0.0, 0.0);
-	vec3	vertex_binormal  = vec3(0.0, 0.0, 0.0);
-	
-			vertex_pos		+= wave(wave_a, vertex_position.xy, t, vertex_tangent, vertex_binormal);
-			vertex_pos		+= wave(wave_b, vertex_position.xy, t, vertex_tangent, vertex_binormal);
-			vertex_pos		+= wave(wave_c, vertex_position.xy, t, vertex_tangent, vertex_binormal);
-	
-	vec3	vertex_normal	 = normalize(cross(vertex_tangent, vertex_binormal));
-	
-	
-	vec2	uv_offset 					 = sampler_direction * time;
-	
-	// Normalmap:
-	vec3 	normalmap					 = texture(water_N_A, uv * 0.7 - uv_offset*2.0).rgb * 0.75;		// 75 % sampler A
-			normalmap 					+= texture(water_N_B, uv * 0.5 + uv_offset).rgb * 0.25;			// 25 % sampler B
-	
-	// Refraction UV:
-	vec3	ref_normalmap				 = normalmap * 2.0 - 1.0;
-	//ref_normalmap.xy *= 0.03;
-	ref_normalmap.xy *= 0.03;
-	ref_normalmap = normalize(ref_normalmap);
-	
-			ref_normalmap				 = normalize(vertex_tangent*ref_normalmap.x + vertex_binormal*ref_normalmap.y + vertex_normal*ref_normalmap.z);
-	normal = ref_normalmap;
-}
-
-#if 0
-vec3 sample_water_normal (vec3 pos_world) {
-	vec2 uv1 = (pos_world.xy + water_normal_time * 0.2) * water_normal_scale;
-	vec2 uv2 = (pos_world.xy + -water_normal_time * 0.2) * water_normal_scale * 0.5;
-	uv2.xy = uv2.yx;
-	
-	vec2 a = texture(water_normal, uv1).rg * 2.0 - 1.0;
-	vec2 b = texture(water_normal, uv2).rg * 2.0 - 1.0;
-	//
-	return normalize(vec3((a+b) * water_normal_strength, 1.0));
-}
-#endif
-
-bool trace_ray_refl_refr (vec3 ray_pos, vec3 ray_dir, float max_dist, uint medium_bid, out Hit hit, out bool was_reflected, int type) {
-	bool did_hit = trace_ray(ray_pos, ray_dir, max_dist, medium_bid, hit, type);
-
-#if REFLECTIONS
-	if (did_hit && ((medium_bid == B_AIR && hit.bid == B_WATER) || (medium_bid == B_WATER && hit.bid == B_AIR))) {
-		// reflect
-		
-		vec3 hit_normal = hit.TBN[2];
-		
-		vec3 vertex;
-		vec3 normal_map = hit_normal;
-		
-		#if 1
-		if (hit_normal.z > 0.0) {
-			//normal_map = sample_water_normal(hit.pos);
-			water_shader(vec2(1,-1) * hit.pos.yx * 0.3, water_normal_time, normal_map, vertex);
-		}
-		#endif
-		
-		float reflect_fac = fresnel(-ray_dir, hit_normal, water_F0);
-		
-		float eta = hit.bid == B_WATER ? air_IOR / water_IOR : water_IOR / air_IOR;
-		
-		vec3 reflect_dir = reflect(ray_dir, normal_map);
-		vec3 refract_dir = refract(ray_dir, normal_map, eta);
-		
-		if (dot(refract_dir, refract_dir) == 0.0) {
-			// total internal reflection, ie. outside of snells window
-			reflect_fac = 1.0;
-		}
-		
-		if (dot(reflect_dir, hit_normal) < 0.0) {
-			reflect_fac = 0.0; // can't reflect below water (normal_map vector was caused raflection below actual geometry normal)
-		}
-		
-		#if 1
-		uint new_medium;
-		if (rand() <= reflect_fac) {
-			// reflect
-			ray_pos = hit.pos + hit_normal * 0.001;
-			ray_dir = reflect_dir;
-			new_medium = medium_bid;
-		} else {
-			// refract
-			ray_pos = hit.pos + hit_normal * -0.001;
-			ray_dir = refract_dir;
-			new_medium = medium_bid == B_AIR ? B_WATER : B_AIR;
-		}
-		max_dist -= hit.dist;
-		
-		was_reflected = true;
-		return trace_ray(ray_pos, ray_dir, max_dist, new_medium, hit, RAYT_REFLECT);
-		#endif
-	}
-#endif
-	was_reflected = false;
-	return did_hit;
-}
-
-vec3 collect_sunlight (vec3 pos, vec3 normal) {
-	if (sunlight_enable) {
-		#if SUNLIGHT_MODE == 0
-		// directional sun
-		vec3 dir = sun_dir + rand3()*sun_dir_rand;
-		float cos = dot(dir, normal);
-		
-		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, sunlight_dist, B_AIR, hit, RAYT_SUN))
-			return sunlight_col * cos;
-		#else
-		// point sun
-		
-		vec3 spos = sun_pos + float(WORLD_SIZE/2);
-		
-		vec3 offs = (spos + (rand3()-0.5) * sun_pos_size) - pos;
-		float dist = length(offs);
-		vec3 dir = normalize(offs);
-		
-		float cos = dot(dir, normal);
-		float atten = 16000.0 / (dist*dist);
-		
-		float max_dist = dist - sun_pos_size*0.5;
-		
-		Hit hit;
-		if (cos > 0.0 && !trace_ray(pos, dir, max_dist, B_AIR, hit, RAYT_SUN))
-			return sunlight_col * (cos * atten);
-		#endif
-	}
-	return vec3(0.0);
 }
 #endif

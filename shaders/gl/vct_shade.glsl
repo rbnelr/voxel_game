@@ -6,17 +6,15 @@
 	#extension GL_ARB_shader_group_vote : enable
 #endif
 
-#if TEST || VCT_DBG_PRIMARY
-layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
-#else
+#if VCT_DIFFUSE && !VCT_DBG_PRIMARY
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y, local_size_z = WG_CONES) in;
+#else
+layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 #endif
 
 #define RAND_SEED_TIME 1
 
 #include "rt_util.glsl"
-
-layout(rgba16f, binding = 0) writeonly restrict uniform image2D output_color;
 
 struct Cone {
 	vec3   dir;
@@ -112,7 +110,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		//transp -= transp * pow(sampl.a, 1.0 / min(stepsize, 1.0));
 		
 		#if DEBUGDRAW
-		if (_debugdraw && dbg) {
+		if (_dbgdraw_rays && dbg) {
 			//vec4 col = vec4(1,0,0,1);
 			vec4 col = vec4(sampl.rgb, 1.0-transp);
 			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
@@ -135,208 +133,185 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	return vec4(color, 1.0 - transp);
 }
 
-struct Geometry {
-	bool did_hit;
-	vec3 col;
-	float emiss;
-	vec3 pos;
-	vec3 norm;
-	vec3 tang;
-};
+layout(rgba16f, binding = 0) writeonly restrict uniform image2D output_color;
+uniform vec2 dispatch_size;
 
-#if VCT_DBG_PRIMARY
-void main () {
-	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
-	INIT_VISUALIZE_COST
-	
-	#if DEBUGDRAW
-	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	#endif
-	
-	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
-	
-	float cone_slope = 1.0 / vct_test;
-	vec3 col = trace_cone(ray_pos, ray_dir, cone_slope, 0.5, 400.0, true).rgb;
-	
-	GET_VISUALIZE_COST(col)
-	imageStore(output_color, pxpos, vec4(col, 1.0));
-}
-#elif TEST
+#if VCT_DIFFUSE
+	struct Geometry {
+		bool did_hit;
+		vec3 pos;
+		mat3 TBN;
+	};
 
-// All components are in the range [0…1], including hue.
-vec3 rgb2hsv (vec3 c) {
-	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-	vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+	uniform sampler2D gbuf_pos ;
+	//uniform sampler2D gbuf_col ;
+	uniform sampler2D gbuf_norm;
+	//uniform sampler2D gbuf_tang;
 
-	float d = q.x - min(q.w, q.y);
-	float e = 1.0e-10;
-	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
-}
-
-// All components are in the range [0…1], including hue.
-vec3 hsv2rgb (vec3 c) {
-	vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-	vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-void main () {
-	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
-	
-	//srand(pxpos.x, pxpos.y, 0);
-	
-	//#if DEBUGDRAW
-	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	//#endif
-	
-	Geometry g;
-	
-	vec3 ray_pos, ray_dir;
-	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
-	
-	uint start_bid = read_bid_octree(ivec3(floor(ray_pos)));
-	
-	Hit hit;
-	g.did_hit = bray && trace_ray(ray_pos, ray_dir, INF, start_bid, hit, RAYT_PRIMARY);
-	
-	if (g.did_hit) {
-		g.pos   = hit.pos;
-		g.col   = hit.col;
-		g.emiss = hit.emiss;
-		g.norm  = hit.TBN[2];
-		g.tang  = hit.TBN[0];
+	Geometry read_gbuf (ivec2 pxpos) {
+		vec2 uv = (vec2(pxpos) + 0.5) / dispatch_size;
+		
+		Geometry g;
+		g.pos     = texture(gbuf_pos , uv).rgb;
+		g.did_hit = g.pos.x >= -100.0;
+		
+		vec3 norm  = texture(gbuf_norm, uv).rgb;
+		
+		norm = normalize(norm);
+		g.TBN = calc_TBN(norm, generate_tangent(norm));
+		return g;
 	}
 	
-	INIT_VISUALIZE_COST
+	shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
 	
-	vec3 col = vec3(0.0);
-	
-	if (g.did_hit) {
+	void main () {
+		uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
+		uint coneid   = gl_LocalInvocationID.z;
 		
-		//float r = 1.0 / 4.0;
-		//g.pos = round(g.pos / r) * r;
+		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
 		
-		g.pos = g.pos + hit.TBN[2] * 0.01;
+		Geometry g = read_gbuf(pxpos);
 		
-		vec3 light = vec3(0.0);
+		INIT_VISUALIZE_COST
 		
-		for (int coneid=0; coneid<12; ++coneid) {
-			vec3 bitang = cross(g.norm, g.tang);
-			mat3 TBN = mat3(g.tang, bitang, g.norm);
-			
+		#if DEBUGDRAW
+		_dbgdraw_rays = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
+		#endif
+		
+		if (g.did_hit) {
 			Cone c = cones.cones[coneid];
-			vec3 cone_dir = TBN * c.dir;
+			vec3 cone_dir = g.TBN * c.dir;
 			
-			light += trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+			vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+			
+			cone_results[threadid][coneid] = res;
 		}
+		barrier();
 		
-		if (true) { // specular
-			vec3 cone_dir = reflect(ray_dir, g.norm);
+		// Write out results for pixel
+		if (coneid == 0u) {
 			
-			float specular_strength = fresnel(-ray_dir, g.norm, 0.02) * 0.3;
-			float cone_slope = 1.0 / vct_test;
-			if (hit.bid == B_WATER) {
-				hit.col *= 0.05;
-			} else /*if (hit.bid == B_STONE)*/ {
-				cone_slope = 1.0 / 8.0;
+			vec3 light = vec3(0.0);
+			if (g.did_hit) {
+				for (uint i=0u; i<WG_CONES; ++i)
+					light += cone_results[threadid][i];
 			}
 			
-			if (specular_strength > 0.0) { // specular
-				light += trace_cone(g.pos, cone_dir, cone_slope, vct_start_dist, 400.0, true).rgb * specular_strength;
-			}
+			//light = g.TBN[0];
+			
+			GET_VISUALIZE_COST(light)
+			imageStore(output_color, pxpos, vec4(light, 1.0));
 		}
 		
-		//{
-		//	float s = 16.0;
-		//	vec3 hsv = rgb2hsv(light);
+		//#if DEBUGDRAW
+		//bool update_dbg_vecs = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
+		//
+		//if (update_dbg_vecs) {
+		//	vec3 pos = g.pos - WORLD_SIZEf/2.0;
 		//	
-		//	hsv.z = floor(hsv.z * s) / s;
-		//	
-		//	light = hsv2rgb(hsv);
+		//	// why does only the first vector appear???
+		//	dbgdraw_vector(pos, g.TBN[2], vec4(0,1,1,1));
+		//	dbgdraw_vector(pos, g.TBN[0], vec4(0,1,0,1));
 		//}
-		
-		if (visualize_light)
-			g.col = vec3(1.0);
-		col = (light + g.emiss) * g.col;
+		//#endif
 	}
 	
-	GET_VISUALIZE_COST(col)
-	imageStore(output_color, pxpos, vec4(col, 1.0));
-}
-
 #else
-uniform sampler2D gbuf_pos ;
-uniform sampler2D gbuf_col ;
-uniform sampler2D gbuf_norm;
-uniform sampler2D gbuf_tang;
-
-Geometry read_gbuf (ivec2 pxpos) {
-	Geometry g;
-	g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
-	g.did_hit = g.pos.x >= -100.0;
-	
-	vec4 col  = texelFetch(gbuf_col , pxpos, 0).rgba;
-	g.col = col.rgb;
-	g.emiss = col.a;
-	
-	g.norm    = texelFetch(gbuf_norm, pxpos, 0).rgb;
-	g.tang    = texelFetch(gbuf_tang, pxpos, 0).rgb;
-	return g;
-}
-
-shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
-
-void main () {
-	uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
-	uint coneid   = gl_LocalInvocationID.z;
-	
-	ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
-	
-	//#if DEBUGDRAW
-	//	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	//#endif
-	
-	Geometry g = read_gbuf(pxpos);
-	
-	INIT_VISUALIZE_COST
-	
-	#if DEBUGDRAW
-	_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
-	#endif
-	
-	if (g.did_hit) {
-		vec3 bitang = cross(g.norm, g.tang);
-		mat3 TBN = mat3(g.tang, bitang, g.norm);
+	#if VCT_DBG_PRIMARY
+	void main () {
+		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+		INIT_VISUALIZE_COST
 		
-		Cone c = cones.cones[coneid];
-		vec3 cone_dir = TBN * c.dir;
+		#if DEBUGDRAW
+		_debugdraw = update_debugdraw && pxpos.x == uint(view.viewport_size.x)/2 && pxpos.y == uint(view.viewport_size.y)/2;
+		#endif
 		
-		vec3 res = trace_cone(g.pos, cone_dir, c.slope, vct_start_dist, 400.0, true).rgb * c.weight;
+		vec3 ray_pos, ray_dir;
+		get_ray(vec2(pxpos), ray_pos, ray_dir);
 		
-		cone_results[threadid][coneid] = res;
+		float cone_slope = 1.0 / vct_test;
+		vec3 col = trace_cone(ray_pos, ray_dir, cone_slope, 0.5, 400.0, true).rgb;
+		
+		GET_VISUALIZE_COST(col)
+		imageStore(output_color, pxpos, vec4(col, 1.0));
 	}
-	barrier();
+
+	//if (true) { // specular
+	//	vec3 cone_dir = reflect(ray_dir, g.norm);
+	//	
+	//	float specular_strength = fresnel(-ray_dir, g.norm, 0.02) * 0.3;
+	//	float cone_slope = 1.0 / vct_test;
+	//	if (hit.bid == B_WATER) {
+	//		hit.col *= 0.05;
+	//	} else /*if (hit.bid == B_STONE)*/ {
+	//		cone_slope = 1.0 / 8.0;
+	//	}
+	//	
+	//	if (specular_strength > 0.0) { // specular
+	//		light += trace_cone(g.pos, cone_dir, cone_slope, vct_start_dist, 400.0, true).rgb * specular_strength;
+	//	}
+	//}
+
+	#else
 	
-	// Write out results for pixel
-	if (coneid == 0u) {
+	
+	struct Geometry {
+		bool did_hit;
+		vec3 col;
+		float emiss;
+		vec3 pos;
+		vec3 norm;
+		//vec3 tang;
+	};
+
+	uniform sampler2D gbuf_pos ;
+	uniform sampler2D gbuf_col ;
+	uniform sampler2D gbuf_norm;
+	//uniform sampler2D gbuf_tang;
+
+	uniform sampler2D vct_diffuse;
+
+	Geometry read_gbuf (ivec2 pxpos) {
+		Geometry g;
+		g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
+		g.did_hit = g.pos.x >= -100.0;
+		
+		vec4 col  = texelFetch(gbuf_col , pxpos, 0).rgba;
+		g.col = col.rgb;
+		g.emiss = col.a;
+		
+		g.norm    = texelFetch(gbuf_norm, pxpos, 0).rgb;
+		//g.tang    = texelFetch(gbuf_tang, pxpos, 0).rgb;
+		return g;
+	}
+	
+	void main () {
+		uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
+		
+		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+		vec2 pxuv = (vec2(pxpos) + 0.5) / dispatch_size;
+		
+		Geometry g = read_gbuf(pxpos);
+		
+		INIT_VISUALIZE_COST
+		
+		#if DEBUGDRAW
+		_dbgdraw_rays = update_debugdraw && pxpos.x == uint(dispatch_size.x)/2 && pxpos.y == uint(dispatch_size.y)/2;
+		#endif
 		
 		vec3 col = vec3(0.0);
 		if (g.did_hit) {
 			
-			vec3 light = vec3(0.0);
-			for (uint i=0u; i<WG_CONES; ++i)
-				light += cone_results[threadid][i];
+			if (visualize_light) g.col = vec3(1.0);
 			
-			if (visualize_light)
-				g.col = vec3(1.0);
-			//col = g.col;
+			vec3 light = texture(vct_diffuse, pxuv).rgb;
+			
 			col = (light + g.emiss) * g.col;
 		}
 		
 		GET_VISUALIZE_COST(col)
 		imageStore(output_color, pxpos, vec4(col, 1.0));
 	}
-}
+	#endif
+
 #endif

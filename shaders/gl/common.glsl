@@ -37,6 +37,8 @@ struct View {
 	float clip_far;
 	// viewport size in pixels
 	vec2 viewport_size;
+	
+	vec2 cursor_pos; // mostly for debugging
 };
 
 //// Debug Line Rendering
@@ -89,7 +91,7 @@ void dbgdraw_vector (vec3 pos, vec3 dir, vec4 col) {
 	uint idx = atomicAdd(_dbgdraw.lines.cmd.count, 2u);
 	if (idx < 4096) {
 		_dbgdraw.lines.vertices[idx++] = IndirectLineVertex( vec4(pos      , 0), col );
-		_dbgdraw.lines.vertices[idx  ] = IndirectLineVertex( vec4(pos + dir, 0), col );
+		_dbgdraw.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + dir, 0), col );
 		//_dbgdraw.lines.cmd.count %= 4096;
 	}
 }
