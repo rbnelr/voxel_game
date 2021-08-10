@@ -62,6 +62,93 @@ mat3 calc_TBN (vec3 normal, vec3 tangent) {
 	return mat3(tangent, bitangent, normal);
 }
 
+// The MIT License
+// Copyright © 2016 Inigo Quilez
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+float ray_capsule (in vec3 ro, in vec3 rd, in vec3 pa, in vec3 pb, in float r) {
+    vec3  ba = pb - pa;
+    vec3  oa = ro - pa;
+
+    float baba = dot(ba,ba);
+    float bard = dot(ba,rd);
+    float baoa = dot(ba,oa);
+    float rdoa = dot(rd,oa);
+    float oaoa = dot(oa,oa);
+
+    float a = baba      - bard*bard;
+    float b = baba*rdoa - baoa*bard;
+    float c = baba*oaoa - baoa*baoa - r*r*baba;
+    float h = b*b - a*c;
+    if (h >= 0.0) {
+        float t = (-b-sqrt(h))/a;
+        float y = baoa + t*bard;
+        // body
+        if(y > 0.0 && y < baba) return t;
+        // caps
+        vec3 oc = (y<=0.0) ? oa : ro - pb;
+        b = dot(rd,oc);
+        c = dot(oc,oc) - r*r;
+        h = b*b - c;
+        if (h > 0.0) return -b - sqrt(h);
+    }
+    return -1.0;
+}
+vec3 capsule_normal (in vec3 pos, in vec3 a, in vec3 b, in float r) {
+    vec3  ba = b - a;
+    vec3  pa = pos - a;
+    float h = clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);
+    return (pa - h*ba)/r;
+}
+
+float ray_sphere (in vec3 ro, in vec3 rd, in vec3 sph, in float r) {
+	vec3 oc = ro - sph;
+	float b = dot( oc, rd );
+	float c = dot( oc, oc ) - r*r;
+	float h = b*b - c;
+	if( h<0.0 ) return INF;
+	return -b - sqrt( h );
+}
+vec3 sphere_normal (in vec3 pos, in vec3 sph) {
+    return normalize(pos-sph.xyz);
+}
+
+void sphere (vec3 ray_pos, vec3 ray_dir, vec3 sph_pos, float sph_r, inout float cur_t, inout vec3 cur_pos) {
+	float t = ray_sphere(ray_pos, ray_dir, sph_pos, sph_r);
+	if (t >= cur_t) return;
+	
+	cur_t = t;
+	cur_pos = sph_pos;
+}
+
+float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
+vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
+vec4 perm(vec4 x){return mod289(((x * 34.0) + 1.0) * x);}
+
+float noise(vec3 p){
+    vec3 a = floor(p);
+    vec3 d = p - a;
+    d = d * d * (3.0 - 2.0 * d);
+
+    vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
+    vec4 k1 = perm(b.xyxy);
+    vec4 k2 = perm(k1.xyxy + b.zzww);
+
+    vec4 c = k2 + a.zzzz;
+    vec4 k3 = perm(c);
+    vec4 k4 = perm(c + 1.0);
+
+    vec4 o1 = fract(k3 * (1.0 / 41.0));
+    vec4 o2 = fract(k4 * (1.0 / 41.0));
+
+    vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
+    vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
+
+    float val = o4.y * d.y + o4.x * (1.0 - d.y);
+	
+	return val * 2.0 - 1.0;
+}
+
 // get pixel ray in world space based on pixel coord and matricies
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
@@ -158,6 +245,8 @@ const uint ROUNDMASK = -1;
 const uint FLIPMASK = WORLD_SIZE-1;
 
 bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit, int type) {
+	vec3 p = vec3(200, 200, 200);
+	
 	// flip coordinate space such that ray is always positive (simplifies stepping logic)
 	// keep track of flip via flipmask
 	bvec3 ray_neg = lessThan(dir, vec3(0.0));
@@ -213,164 +302,223 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 	
 	uint voxel;
 	
-	for (;;) {
-		VISUALIZE_COST_COUNT
-	
-		uvec3 flipped = (coord ^ flipmask) >> mip;
+	for (int j=0; j<80; j++) {
+		mip = 0;
 		
-		// read octree cell
-		voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
+		for (;;) {
+			VISUALIZE_COST_COUNT
 		
-		if (voxel != medium_bid) {
-			// non-air octree cell
-			if (mip == 0u)
-				break; // found solid leaf voxel
+			uvec3 flipped = (coord ^ flipmask) >> mip;
 			
-			// decend octree
-			mip--;
-			uvec3 next_coord = coord + (1u << mip);
+			// read octree cell
+			voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
 			
-			// upate coord by determining which child octant is entered first
-			// by comparing ray hit against middle plane hits
-			vec3 tmidv = inv_dir * vec3(next_coord) + bias;
-			
-			coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
-			
-		} else {
-			// air octree cell, continue stepping
-			uvec3 next_coord = coord + (1u << mip);
-			
-			// calculate exit distances of next octree cell
-			vec3 t0v = inv_dir * vec3(next_coord) + bias;
-			dist = min(min(t0v.x, t0v.y), t0v.z);
-			
-			// step on axis where exit distance is lowest
-			uint stepcoord;
-			if (t0v.x == dist) {
-				coord.x = next_coord.x;
-				stepcoord = coord.x;
-			} else if (t0v.y == dist) {
-				coord.y = next_coord.y;
-				stepcoord = coord.y;
+			if (voxel != medium_bid) {
+				// non-air octree cell
+				if (mip == 0u)
+					break; // found solid leaf voxel
+				
+				// decend octree
+				mip--;
+				uvec3 next_coord = coord + (1u << mip);
+				
+				// upate coord by determining which child octant is entered first
+				// by comparing ray hit against middle plane hits
+				vec3 tmidv = inv_dir * vec3(next_coord) + bias;
+				
+				coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
+				
 			} else {
-				coord.z = next_coord.z;
-				stepcoord = coord.z;
-			}
-			
-			
-			#if 0
-			// step up to highest changed octree parent cell
-			mip = findLSB(stepcoord);
-			#else
-			// step up one level
-			// (does not work if lower mips cannot be safely read without reading higher levels)
-			// also breaks  mip >= uint(OCTREE_MIPS-1)  as world exit condition
-			
-			//mip += min(findLSB(stepcoord >> mip) - mip, 1u);
-			mip += bitfieldExtract(stepcoord, int(mip), 1) ^ 1; // extract lowest bit of coord 
-			#endif
-			
-			// round down coord to lower corner of (potential) parent cell
-			coord &= ROUNDMASK << mip;
-			
-			//// exit when either stepped out of world or max ray dist reached
-			//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
-			if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
-				#if DEBUGDRAW
-				if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+				// air octree cell, continue stepping
+				uvec3 next_coord = coord + (1u << mip);
+				
+				// calculate exit distances of next octree cell
+				vec3 t0v = inv_dir * vec3(next_coord) + bias;
+				dist = min(min(t0v.x, t0v.y), t0v.z);
+				
+				// step on axis where exit distance is lowest
+				uint stepcoord;
+				if (t0v.x == dist) {
+					coord.x = next_coord.x;
+					stepcoord = coord.x;
+				} else if (t0v.y == dist) {
+					coord.y = next_coord.y;
+					stepcoord = coord.y;
+				} else {
+					coord.z = next_coord.z;
+					stepcoord = coord.z;
+				}
+				
+				
+				#if 0
+				// step up to highest changed octree parent cell
+				mip = findLSB(stepcoord);
+				#else
+				// step up one level
+				// (does not work if lower mips cannot be safely read without reading higher levels)
+				// also breaks  mip >= uint(OCTREE_MIPS-1)  as world exit condition
+				
+				//mip += min(findLSB(stepcoord >> mip) - mip, 1u);
+				mip += bitfieldExtract(stepcoord, int(mip), 1) ^ 1; // extract lowest bit of coord 
 				#endif
-				return false;
+				
+				// round down coord to lower corner of (potential) parent cell
+				coord &= ROUNDMASK << mip;
+				
+				//// exit when either stepped out of world or max ray dist reached
+				//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
+				if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
+					#if DEBUGDRAW
+					if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+					#endif
+					return false;
+				}
 			}
 		}
-	}
-	
-	#if DEBUGDRAW
-	if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
-	#endif
-	
-	if (type < RAYT_SUN) {
-		coord ^= flipmask; // flip back to real coords
 		
-		// arrived at solid leaf voxel, read block id from seperate data structure
-		//hit.bid = read_bid(ivec3(coord));
-		hit.bid = voxel;
-		hit.medium = medium_bid;
+		#if DEBUGDRAW
+		if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
+		#endif
 		
-		// calcualte surface hit info
-		hit.dist = dist;
-		hit.pos = pos + dir * dist;
-		
-		vec2 uv;
-		int face;
-		{ // calc hit face, uv and normal
-			//vec3 hit_fract = fract(hit.pos);
-			vec3 hit_fract = hit.pos;
-			vec3 hit_center = vec3(coord) + 0.5;
+		if (type < RAYT_SUN) {
+			uvec3 flipped = coord ^ flipmask; // flip back to real coords
 			
-			vec3 offs = (hit.pos - hit_center);
-			vec3 abs_offs = abs(offs);
+			// arrived at solid leaf voxel, read block id from seperate data structure
+			//hit.bid = read_bid(ivec3(flipped));
+			hit.bid = voxel;
+			hit.medium = medium_bid;
 			
-			vec3 normal = vec3(0.0);
+			// calcualte surface hit info
+			hit.dist = dist;
+			hit.pos = pos + dir * dist;
 			
-			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				normal.x = sign(offs.x);
-				face = offs.x < 0.0 ? 0 : 1;
-				uv = hit_fract.yz;
-				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
-			} else if (abs_offs.y >= abs_offs.z) {
-				normal.y = sign(offs.y);
-				face = offs.y < 0.0 ? 2 : 3;
-				uv = hit_fract.xz;
-				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
-			} else {
-				normal.z = sign(offs.z);
-				face = offs.z < 0.0 ? 4 : 5;
-				uv = hit_fract.xy;
-				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+			vec2 uv;
+			int face;
+			{ // calc hit face, uv and normal
+			
+				#if 1
+				//vec3 hit_fract = fract(hit.pos);
+				vec3 hit_fract = hit.pos;
+				vec3 hit_center = vec3(flipped) + 0.5;
+				
+				vec3 normal = vec3(0.0);
+				
+				vec3 offs = (hit.pos - hit_center);
+				vec3 abs_offs = abs(offs);
+				
+				if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
+					normal.x = sign(offs.x);
+					face = offs.x < 0.0 ? 0 : 1;
+					uv = hit_fract.yz;
+					if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+				} else if (abs_offs.y >= abs_offs.z) {
+					normal.y = sign(offs.y);
+					face = offs.y < 0.0 ? 2 : 3;
+					uv = hit_fract.xz;
+					if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+				} else {
+					normal.z = sign(offs.z);
+					face = offs.z < 0.0 ? 4 : 5;
+					uv = hit_fract.xy;
+					if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+				}
+				
+				hit.TBN = calc_TBN(normal, generate_tangent(normal));
+				
+				float amp = 0.25;
+				float freq = 2.0;
+				
+				if (face/2 != 0) offs.x += amp * noise(freq * hit.pos);
+				if (face/2 != 1) offs.y += amp * noise(freq * hit.pos + vec3(73.138332));
+				if (face/2 != 2) offs.z += amp * noise(freq * hit.pos - vec3(97.3138332));
+				
+				ivec3 cell = ivec3(flipped) + ivec3(round(offs * 0.99));
+				
+				uint blend_vox = read_bid(cell);
+				if (blend_vox != B_AIR) hit.bid = blend_vox;
+				
+				#else
+				vec3 hit_center = vec3(flipped) + 0.5;
+				
+				vec3 normal = vec3(0.0);
+				
+				{
+					float t = INF;
+					vec3 sph_pos;
+					
+					sphere(pos, dir, hit_center              , 0.5, t, sph_pos);
+					
+					if (t >= 0.0 && t < INF) { 
+						hit.pos = pos + dir * t;
+						normal = sphere_normal(hit.pos, sph_pos);
+					} else {
+						
+						// Damn you glsl, why no goto?
+						// I need to continue stepping by jumping into else part of octree raytracing loop
+						
+						// air octree cell, continue stepping
+						uvec3 next_coord = coord + (1u << mip);
+						
+						// calculate exit distances of next octree cell
+						vec3 t0v = inv_dir * vec3(next_coord) + bias;
+						dist = min(min(t0v.x, t0v.y), t0v.z);
+						
+						// step on axis where exit distance is lowest
+						uint stepcoord;
+						if (t0v.x == dist) {
+							coord.x = next_coord.x;
+							stepcoord = coord.x;
+						} else if (t0v.y == dist) {
+							coord.y = next_coord.y;
+							stepcoord = coord.y;
+						} else {
+							coord.z = next_coord.z;
+							stepcoord = coord.z;
+						}
+						
+						continue;
+					}
+					
+				}
+				
+				vec3 absnorm = abs(normal);
+				float n = max(max(absnorm.x, absnorm.y), absnorm.z);
+				
+				if (n == absnorm.x) {
+					face = normal.x < 0.0 ? 0 : 1;
+					uv = hit.pos.yz;
+					if (normal.x < 0.0) uv.x = 1.0 - uv.x;
+				} else if (n == absnorm.y) {
+					face = normal.y < 0.0 ? 2 : 3;
+					uv = hit.pos.xz;
+					if (normal.y >= 0.0) uv.x = 1.0 - uv.x;
+				} else {
+					face = normal.z < 0.0 ? 4 : 5;
+					uv = hit.pos.xy;
+					if (normal.z < 0.0) uv.y = 1.0 - uv.y;
+				}
+				
+				hit.TBN = calc_TBN(normal, generate_tangent(normal));
+				#endif
 			}
 			
-			//{
-			//	vec3 sphere_pos = hit_center;
-			//	float sphere_r = 0.5;
-			//	
-			//	vec3 pos_rel = sphere_pos - pos;
-			//	
-			//	float t = dot(pos_rel, dir);
-			//	vec3 closest = pos + dir * t;
-			//	
-			//	
-			//	
-			//	float hit_r = length(closest - sphere_pos);
-			//	if (hit_r <= sphere_r) {
-			//		float depth = sqrt(sphere_r*sphere_r - hit_r*hit_r);
-			//		
-			//		t -= depth;
-			//		
-			//		hit.pos = pos + dir * t;
-			//		normal = normalize(hit.pos - sphere_pos);
-			//	}
-			//	
-			//}
+			uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
+			float texid = float(block_tiles[tex_bid].sides[face]);
 			
-			hit.TBN = calc_TBN(normal, generate_tangent(normal));
+			float lod2 = log2(dist)*0.90 - 2.0;
+			
+			hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
+			
+			if (tex_bid == B_TALLGRASS && face >= 4)
+				hit.col = vec3(0.0);
+		
+			hit.occl_spec.x = 1.0;
+			hit.occl_spec.y = 1.0;
+			
+			hit.emiss = get_emmisive(hit.bid);
 		}
-		
-		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
-		float texid = float(block_tiles[tex_bid].sides[face]);
-		
-		float lod2 = log2(dist)*0.90 - 2.0;
-		
-		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
-		
-		if (tex_bid == B_TALLGRASS && face >= 4)
-			hit.col = vec3(0.0);
-	
-		hit.occl_spec.x = 1.0;
-		hit.occl_spec.y = 1.0;
-		
-		hit.emiss = get_emmisive(hit.bid);
+		return true;
 	}
-	return true;
 }
 
 uniform bool  visualize_light = false;
