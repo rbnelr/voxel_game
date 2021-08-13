@@ -217,6 +217,12 @@
     <ClInclude Include="..\..\..\src\kisslib\containers.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\gl_raytracer.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\gl_dbg_draw.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -352,6 +358,12 @@
       <Filter>kisslib</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\bloom.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
   </ItemGroup>

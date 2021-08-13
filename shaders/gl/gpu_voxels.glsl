@@ -56,7 +56,8 @@ float get_emmisive (uint bid) {
 }
 
 
-#define WORLD_SIZE_CHUNKS	8 // number of chunks for fixed subchunk texture (for now)
+// set by shader macro from engine code: WORLD_SIZE_CHUNKS  // number of chunks for fixed subchunk texture (for now)
+
 #define WORLD_SIZE			(WORLD_SIZE_CHUNKS * CHUNK_SIZE)
 
 #define VOXTEX_SIZE			2048 // max width, height, depth of sparse voxel texture (subchunk voxels)
@@ -68,46 +69,4 @@ float get_emmisive (uint bid) {
 
 #define OCTREE_MIPS			10
 
-uniform usampler3D	subchunks_tex;
-uniform usampler3D	voxels_tex;
-uniform usampler3D	octree;
-		
-uniform sampler3D	vct_texNX;
-uniform sampler3D	vct_texPX;
-uniform sampler3D	vct_texNY;
-uniform sampler3D	vct_texPY;
-uniform sampler3D	vct_texNZ;
-uniform sampler3D	vct_texPZ;
-
-#define VCT_COL_MAX 80.0
-#define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
-
-uint read_bid (ivec3 coord) {
-	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))
-		return B_AIR;
-	
-	uvec3 texcoord = bitfieldExtract(uvec3(coord), SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & ~SUBCHUNK_MASK) >> SUBCHUNK_SHIFT;
-	uint subchunk = texelFetch(subchunks_tex, ivec3(texcoord), 0).r;
-	
-	if ((subchunk & SUBC_SPARSE_BIT) != 0) {
-		return subchunk & ~SUBC_SPARSE_BIT;
-	} else {
-		
-		// subchunk id to 3d tex offset (including subchunk_size multiplication)
-		// ie. split subchunk id into 3 sets of VOXTEX_TEX_SHIFT bits
-		uvec3 subc_offs;
-		subc_offs.x = bitfieldExtract(subchunk, VOXTEX_TEX_SHIFT*0, VOXTEX_TEX_SHIFT);
-		subc_offs.y = bitfieldExtract(subchunk, VOXTEX_TEX_SHIFT*1, VOXTEX_TEX_SHIFT);
-		subc_offs.z = bitfieldExtract(subchunk, VOXTEX_TEX_SHIFT*2, VOXTEX_TEX_SHIFT);
-		
-		texcoord = bitfieldInsert(uvec3(coord), subc_offs, SUBCHUNK_SHIFT, 32 - SUBCHUNK_SHIFT); // (coord & SUBCHUNK_MASK) | (subc_offs << SUBCHUNK_SHIFT)
-		
-		return texelFetch(voxels_tex, ivec3(texcoord), 0).r;
-	}
-}
-uint read_bid_octree (ivec3 coord) {
-	if (!all(lessThan(uvec3(coord), uvec3(WORLD_SIZE))))
-		return B_AIR;
-	
-	return texelFetch(octree, coord, 0).r;
-}
+uniform usampler3D voxel_tex;

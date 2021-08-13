@@ -1,5 +1,10 @@
 
 #include "common.glsl"
+
+#if DEBUGDRAW
+	#include "dbg_indirect_draw.glsl"
+#endif
+
 #include "gpu_voxels.glsl"
 #include "rand.glsl"
 
@@ -9,9 +14,7 @@
 #if VISUALIZE_COST
 	int iterations = 0;
 	
-	uniform int max_iterations = 200;
-	
-	uniform sampler2D		heat_gradient;
+	uniform sampler2D heat_gradient;
 	
 	#if VISUALIZE_WARP_COST
 		#define WARP_COUNT_IN_WG ((WG_PIXELS_X*WG_PIXELS_Y) / 32) 
@@ -61,6 +64,8 @@ mat3 calc_TBN (vec3 normal, vec3 tangent) {
 	
 	return mat3(tangent, bitangent, normal);
 }
+
+//// Some raytracing primitives
 
 // The MIT License
 // Copyright © 2016 Inigo Quilez
@@ -120,6 +125,10 @@ void sphere (vec3 ray_pos, vec3 ray_dir, vec3 sph_pos, float sph_r, inout float 
 	cur_t = t;
 	cur_pos = sph_pos;
 }
+
+//// Noise function for testing, replace with set of better noise functions later
+// > don't use mod289 for example, use better int based hashing instead, seems to be superior on modern gpus
+// > float-based noise usually shows patterns on closer inspection
 
 float mod289(float x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
 vec4 mod289(vec4 x){return x - floor(x * (1.0 / 289.0)) * 289.0;}
@@ -207,70 +216,45 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #endif
 }
 
-#define RAYT_PRIMARY		0
-#define RAYT_REFLECT		1
-#define RAYT_DIFFUSE		2
-#define RAYT_SPECULAR		3
-#define RAYT_SUN			4
-
-#define DEBUGDRAW 1
-#if DEBUGDRAW
-bool _dbgdraw_rays = false;
-uniform bool update_debugdraw = false;
-
-vec4 _dbg_ray_cols[] = {
-	vec4(1,0,1,1),
-	vec4(0,0,1,1),
-	vec4(1,0,0,1),
-	vec4(0,1,0,1),
-	vec4(1,1,0,1),
-};
-#endif
-
 //
 struct Hit {
 	vec3	pos;
 	mat3	TBN;
 	float	dist;
 	uint	bid;
-	uint	medium;
-	vec3	col;
-	vec2	occl_spec;
-	float	emiss;
+	vec4	col;
 };
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
 const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
-const uint ROUNDMASK = -1;
-const uint FLIPMASK = WORLD_SIZE-1;
 
-bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit, int type) {
-	vec3 p = vec3(200, 200, 200);
+bool _dbgdraw = false;
+
+uniform int max_iterations = 200;
+
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+	float dist;
 	
-	// flip coordinate space such that ray is always positive (simplifies stepping logic)
-	// keep track of flip via flipmask
-	bvec3 ray_neg = lessThan(dir, vec3(0.0));
-	vec3 flippedf = mix(pos, WORLD_SIZEf - pos, ray_neg);
-	
-	uvec3 flipmask = mix(uvec3(0u), uvec3(FLIPMASK), ray_neg);
-	
-	// precompute part of plane projection equation
-	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
-	// due to mad instruction
-	//vec3 inv_dir = mix(1.0 / abs(dir), vec3(INF), equal(dir, vec3(0.0)));
-	vec3 inv_dir = 1.0 / abs(dir);
-	vec3 bias = inv_dir * -flippedf;
-	
-	float dist = 0.0;
-	#if 1 // allow ray to start outside ray for nice debugging views
-	{
+	{ // allow ray to start outside ray for nice debugging views
+		// flip coordinate space such that ray is always positive (simplifies stepping logic)
+		// keep track of flip via flipmask
+		bvec3 ray_neg = lessThan(ray_dir, vec3(0.0));
+		vec3 flippedf = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
+		
+		//uvec3 flipmask = mix(uvec3(0u), uvec3(FLIPMASK), ray_neg);
+		
+		// precompute part of plane projection equation
+		// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
+		// due to mad instruction
+		vec3 inv_dir = 1.0 / abs(ray_dir);
+		vec3 bias = inv_dir * -flippedf;
+		
 		// calculate entry and exit coords into whole world cube
-		vec3 t0v = inv_dir * -flippedf;
-		vec3 t1v = inv_dir * (vec3(WORLD_SIZEf) - flippedf);
+		vec3 t0v =     vec3(0) * inv_dir + bias;
+		vec3 t1v = WORLD_SIZEf * inv_dir + bias;
 		float t0 = max(max(t0v.x, t0v.y), t0v.z);
 		float t1 = min(min(t1v.x, t1v.y), t1v.z);
 		
-		// only if ray not inside cube
 		t0 = max(t0, 0.0);
 		t1 = max(t1, 0.0);
 		
@@ -280,250 +264,34 @@ bool trace_ray (vec3 pos, vec3 dir, float max_dist, uint medium_bid, out Hit hit
 		
 		// adjust ray to start where it hits cube initally
 		dist = t0;
-		flippedf += abs(dir) * dist;
-		flippedf = max(flippedf, vec3(0.0));
+		max_dist = t1;
+		
+		//flippedf += abs(dir) * t;
+		//flippedf = max(flippedf, vec3(0.0));
 	}
-	#else
-	// cull any rays starting outside of cube
-	if ( any(lessThanEqual(flippedf, vec3(0.0))) ||
-		 any(greaterThanEqual(flippedf, vec3(WORLD_SIZEf))))
-		return false;
+	
+	#if DEBUGDRAW
+	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
 	#endif
 	
-	// start at some level of octree
-	// -best to start at 0 if camera on surface
-	// -best at higher levels if camera were in a large empty region
-	uint mip = 0;
-	//uint mip = uint(OCTREE_MIPS-1);
-	
-	// round down to start cell of octree
-	uvec3 coord = uvec3(floor(flippedf));
-	coord &= ROUNDMASK << mip;
-	
-	uint voxel;
-	
-	for (int j=0; j<80; j++) {
-		mip = 0;
+	for (int iter=0; iter<max_iterations; ++iter) {
+		if (iter >= max_iterations || dist >= max_dist)
+			return false; // miss
+		VISUALIZE_COST_COUNT
 		
-		for (;;) {
-			VISUALIZE_COST_COUNT
+		vec3 pos = dist * ray_dir + ray_pos;
 		
-			uvec3 flipped = (coord ^ flipmask) >> mip;
-			
-			// read octree cell
-			voxel = texelFetch(octree, ivec3(flipped), int(mip)).r;
-			
-			if (voxel != medium_bid) {
-				// non-air octree cell
-				if (mip == 0u)
-					break; // found solid leaf voxel
-				
-				// decend octree
-				mip--;
-				uvec3 next_coord = coord + (1u << mip);
-				
-				// upate coord by determining which child octant is entered first
-				// by comparing ray hit against middle plane hits
-				vec3 tmidv = inv_dir * vec3(next_coord) + bias;
-				
-				coord = mix(coord, next_coord, lessThan(tmidv, vec3(dist)));
-				
-			} else {
-				// air octree cell, continue stepping
-				uvec3 next_coord = coord + (1u << mip);
-				
-				// calculate exit distances of next octree cell
-				vec3 t0v = inv_dir * vec3(next_coord) + bias;
-				dist = min(min(t0v.x, t0v.y), t0v.z);
-				
-				// step on axis where exit distance is lowest
-				uint stepcoord;
-				if (t0v.x == dist) {
-					coord.x = next_coord.x;
-					stepcoord = coord.x;
-				} else if (t0v.y == dist) {
-					coord.y = next_coord.y;
-					stepcoord = coord.y;
-				} else {
-					coord.z = next_coord.z;
-					stepcoord = coord.z;
-				}
-				
-				
-				#if 0
-				// step up to highest changed octree parent cell
-				mip = findLSB(stepcoord);
-				#else
-				// step up one level
-				// (does not work if lower mips cannot be safely read without reading higher levels)
-				// also breaks  mip >= uint(OCTREE_MIPS-1)  as world exit condition
-				
-				//mip += min(findLSB(stepcoord >> mip) - mip, 1u);
-				mip += bitfieldExtract(stepcoord, int(mip), 1) ^ 1; // extract lowest bit of coord 
-				#endif
-				
-				// round down coord to lower corner of (potential) parent cell
-				coord &= ROUNDMASK << mip;
-				
-				//// exit when either stepped out of world or max ray dist reached
-				//if (mip >= uint(OCTREE_MIPS-1) || dist >= max_dist)
-				if (stepcoord >= WORLD_SIZE || dist >= max_dist) {
-					#if DEBUGDRAW
-					if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
-					#endif
-					return false;
-				}
-			}
-		}
+		uint bid = textureLod(voxel_tex, pos * INV_WORLD_SIZEf, 0.0).r;
+		if (bid > B_AIR) break;
 		
-		#if DEBUGDRAW
-		if (_dbgdraw_rays) dbgdraw_vector(pos - WORLD_SIZEf/2.0, dir * dist, _dbg_ray_cols[type]);
-		#endif
-		
-		if (type < RAYT_SUN) {
-			uvec3 flipped = coord ^ flipmask; // flip back to real coords
-			
-			// arrived at solid leaf voxel, read block id from seperate data structure
-			//hit.bid = read_bid(ivec3(flipped));
-			hit.bid = voxel;
-			hit.medium = medium_bid;
-			
-			// calcualte surface hit info
-			hit.dist = dist;
-			hit.pos = pos + dir * dist;
-			
-			vec2 uv;
-			int face;
-			{ // calc hit face, uv and normal
-			
-				#if 1
-				//vec3 hit_fract = fract(hit.pos);
-				vec3 hit_fract = hit.pos;
-				vec3 hit_center = vec3(flipped) + 0.5;
-				
-				vec3 normal = vec3(0.0);
-				
-				vec3 offs = (hit.pos - hit_center);
-				vec3 abs_offs = abs(offs);
-				
-				if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-					normal.x = sign(offs.x);
-					face = offs.x < 0.0 ? 0 : 1;
-					uv = hit_fract.yz;
-					if (offs.x < 0.0) uv.x = 1.0 - uv.x;
-				} else if (abs_offs.y >= abs_offs.z) {
-					normal.y = sign(offs.y);
-					face = offs.y < 0.0 ? 2 : 3;
-					uv = hit_fract.xz;
-					if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
-				} else {
-					normal.z = sign(offs.z);
-					face = offs.z < 0.0 ? 4 : 5;
-					uv = hit_fract.xy;
-					if (offs.z < 0.0) uv.y = 1.0 - uv.y;
-				}
-				
-				hit.TBN = calc_TBN(normal, generate_tangent(normal));
-				
-				float amp = 0.25;
-				float freq = 2.0;
-				
-				if (face/2 != 0) offs.x += amp * noise(freq * hit.pos);
-				if (face/2 != 1) offs.y += amp * noise(freq * hit.pos + vec3(73.138332));
-				if (face/2 != 2) offs.z += amp * noise(freq * hit.pos - vec3(97.3138332));
-				
-				ivec3 cell = ivec3(flipped) + ivec3(round(offs * 0.99));
-				
-				uint blend_vox = read_bid(cell);
-				if (blend_vox != B_AIR) hit.bid = blend_vox;
-				
-				#else
-				vec3 hit_center = vec3(flipped) + 0.5;
-				
-				vec3 normal = vec3(0.0);
-				
-				{
-					float t = INF;
-					vec3 sph_pos;
-					
-					sphere(pos, dir, hit_center              , 0.5, t, sph_pos);
-					
-					if (t >= 0.0 && t < INF) { 
-						hit.pos = pos + dir * t;
-						normal = sphere_normal(hit.pos, sph_pos);
-					} else {
-						
-						// Damn you glsl, why no goto?
-						// I need to continue stepping by jumping into else part of octree raytracing loop
-						
-						// air octree cell, continue stepping
-						uvec3 next_coord = coord + (1u << mip);
-						
-						// calculate exit distances of next octree cell
-						vec3 t0v = inv_dir * vec3(next_coord) + bias;
-						dist = min(min(t0v.x, t0v.y), t0v.z);
-						
-						// step on axis where exit distance is lowest
-						uint stepcoord;
-						if (t0v.x == dist) {
-							coord.x = next_coord.x;
-							stepcoord = coord.x;
-						} else if (t0v.y == dist) {
-							coord.y = next_coord.y;
-							stepcoord = coord.y;
-						} else {
-							coord.z = next_coord.z;
-							stepcoord = coord.z;
-						}
-						
-						continue;
-					}
-					
-				}
-				
-				vec3 absnorm = abs(normal);
-				float n = max(max(absnorm.x, absnorm.y), absnorm.z);
-				
-				if (n == absnorm.x) {
-					face = normal.x < 0.0 ? 0 : 1;
-					uv = hit.pos.yz;
-					if (normal.x < 0.0) uv.x = 1.0 - uv.x;
-				} else if (n == absnorm.y) {
-					face = normal.y < 0.0 ? 2 : 3;
-					uv = hit.pos.xz;
-					if (normal.y >= 0.0) uv.x = 1.0 - uv.x;
-				} else {
-					face = normal.z < 0.0 ? 4 : 5;
-					uv = hit.pos.xy;
-					if (normal.z < 0.0) uv.y = 1.0 - uv.y;
-				}
-				
-				hit.TBN = calc_TBN(normal, generate_tangent(normal));
-				#endif
-			}
-			
-			uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
-			float texid = float(block_tiles[tex_bid].sides[face]);
-			
-			float lod2 = log2(dist)*0.90 - 2.0;
-			
-			hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 0.7).rgb;
-			
-			if (tex_bid == B_TALLGRASS && face >= 4)
-				hit.col = vec3(0.0);
-		
-			hit.occl_spec.x = 1.0;
-			hit.occl_spec.y = 1.0;
-			
-			hit.emiss = get_emmisive(hit.bid);
-		}
-		return true;
+		dist += 0.5;
 	}
+	
+	hit.col = vec4(vec3(dist / 200.0), 1);
+	return true; // hit
 }
 
-uniform bool  visualize_light = false;
-
-#if !ONLY_PRIMARY_RAYS
+#if 0
 float fresnel (vec3 view, vec3 norm, float F0) {
 	float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
 	float x2 = x*x;

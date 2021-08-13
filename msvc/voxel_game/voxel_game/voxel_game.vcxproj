@@ -242,6 +242,8 @@
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />
+    <ClInclude Include="..\..\..\src\opengl\gl_dbg_draw.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\gl_raytracer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
@@ -379,6 +381,14 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
+    <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>

@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-61.17151641845703,
-				-81.42947387695313,
-				49.68349838256836
+				-162.4095458984375,
+				-90.06237030029297,
+				160.11871337890625
 			],
 			"rot_aer": [
-				3.110212564468384,
-				0.10274434834718704,
+				-1.0035912990570068,
+				-0.32635244727134705,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,16 +29,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 3.9585390090942383,
+		"base_speed": 12.86131763458252,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			0.0,
-			0.0,
-			9.999999747378752e-05
+			-106.92960357666016,
+			-46.27054977416992,
+			77.0000991821289
 		],
 		"vel": [
 			0.0,
@@ -65,12 +65,7 @@
 		},
 		"raytracer": {
 			"enable": true,
-			"enable_vct": true,
-			"max_iterations": 478,
-			"rand_seed_time": true,
-			"only_primary_rays": false,
-			"taa_alpha": 0.05000000074505806,
-			"taa_enable": true
+			"max_iterations": 1024
 		},
 		"bloom_renderer": {
 			"enable": false,
@@ -79,10 +74,10 @@
 			"strength": 0.20000000298023224,
 			"renderscale": 0.25
 		},
-		"line_width": 4.135000228881836,
 		"debug_draw": {
 			"draw_occluded": false,
-			"occluded_alpha": 0.30000001192092896
+			"occluded_alpha": 0.30000001192092896,
+			"line_width": 1.0
 		},
 		"imopen": {
 			"framebuffer": true,

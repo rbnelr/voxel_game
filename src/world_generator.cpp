@@ -16,8 +16,8 @@ namespace worldgen {
 	float NoisePass::calc_large_noise (float3 const& pos) {
 		float depth = wg->base_depth;
 		
-		float sphere = (length(pos) - 180) * 1.0f; // for VCT dev
-		depth = max(sphere, 0.0f);
+		//float sphere = (length(pos) - 180) * 1.0f; // for VCT dev
+		//depth = max(sphere, 0.0f);
 
 		float3 p = pos;
 		// make noise 'flatter' 0.7 to flatten world
@@ -97,27 +97,16 @@ namespace worldgen {
 				}
 			}
 		}
-
-		//// stalactites
-		//if (wg->stalac) {
-		//	float stalac = noise01(pos / float3(1,1,64), 6, 3) * clamp(map(normal.z, -0.2f, -0.9f));
-		//	stalac = clamp(map(stalac, 0.4f, 1.0f));
-		//	stalac = stalac*stalac*stalac * wg->stalac_stren;
-		//
-		//	if ((depth + stalac) > 0)
-		//		//return B_STONE;
-		//		return B_CRYSTAL;
-		//}
 		
 		// air & water
 
-		water_level += (int)pos.x / 20; // for vct dev
+		//water_level += (int)pos.x / 20; // for vct dev
 
-		//float wall_thickness = max(-pos.y, 0.0f) * 0.05f; // for vct dev
-		float wall_thickness = 1.0f; // for vct dev
-		if (abs(pos.x) <= wall_thickness/2) {
-			return B_STONE;
-		}
+		////float wall_thickness = max(-pos.y, 0.0f) * 0.05f; // for vct dev
+		//float wall_thickness = 1.0f; // for vct dev
+		//if (abs(pos.x) <= wall_thickness/2) {
+		//	return B_STONE;
+		//}
 
 		if (pos.z >= water_level) {
 			return B_AIR;

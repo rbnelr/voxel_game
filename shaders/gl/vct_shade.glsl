@@ -1,4 +1,4 @@
-﻿ #version 460 core
+﻿#version 460 core
 #extension GL_NV_gpu_shader5 : enable // for uint16_t, uint8_t
 
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
