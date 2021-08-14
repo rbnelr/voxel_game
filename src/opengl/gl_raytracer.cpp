@@ -52,6 +52,128 @@ namespace gl {
 	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 
+		{
+			ImGui::Begin("DFTest");
+
+			static int3 coord = int3(-28,-83,219);
+			static int radius = 3;
+			ImGui::DragInt3("coord", &coord.x, 0.1f);
+			ImGui::DragInt("radius", &radius, 0.1f);
+
+			array3D<int> grid0 (int3(16,16,1));
+			array3D<int2> grid1 (int3(16,16,1));
+
+			g_debugdraw.wire_cube((float3)coord + (float3)grid0.size/2, (float3)grid0.size, lrgba(1,0,0,1));
+
+			int iNULL = 99;
+
+			//for (int z=0; z<grid0.size.z; ++z)
+			for (int y=0; y<grid0.size.y; ++y)
+			for (int x=0; x<grid0.size.x; ++x) {
+				int offs = iNULL;
+				
+				auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
+				if (bid > 1) {
+					offs = 0;
+				} else {
+					for (int offsx=1; offsx<=radius; ++offsx) {
+						auto bid0 = game.chunks.read_block(coord.x + x - offsx, coord.y + y, coord.z);
+						auto bid1 = game.chunks.read_block(coord.x + x + offsx, coord.y + y, coord.z);
+
+						if (bid0 > 1) {
+							offs = -offsx;
+							break;
+						} else if (bid1 > 1) {
+							offs = +offsx;
+							break;
+						}
+					}
+				}
+
+				grid0.get(x,y,0) = offs;
+			}
+
+			for (int y=0; y<grid0.size.y; ++y)
+			for (int x=0; x<grid0.size.x; ++x) {
+				int2 offs = iNULL;
+				float min_distsqr = INF;
+
+				for (int offsy=-radius; offsy<=radius; ++offsy) {
+					int offsx = grid0.get_or_default(x, y + offsy, 0, iNULL);
+
+					float distsqr = offsx*offsx + offsy*offsy;
+					if (distsqr < min_distsqr) {
+						offs = int2(offsx, offsy);
+						min_distsqr = distsqr;
+					}
+				}
+
+				grid1.get(x,y,0) = offs;
+			}
+
+			if (ImGui::BeginTable("grid0", grid0.size.x, ImGuiTableFlags_Borders)) {
+				for (int y=grid0.size.y-1; y>=0; --y) {
+					ImGui::TableNextRow();
+					for (int x=0; x<grid0.size.x; ++x) {
+						int offs = grid0.get(x,y,0);
+
+						ImGui::TableNextColumn();
+						ImGui::Text(offs == iNULL ? "":"%d", offs);
+
+						float dist = length((float)offs);
+						if (offs != iNULL) {
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
+						}
+					}
+				}
+				ImGui::EndTable();
+			}
+
+			if (ImGui::BeginTable("grid1", grid1.size.x, ImGuiTableFlags_Borders)) {
+				for (int y=grid1.size.y-1; y>=0; --y) {
+					ImGui::TableNextRow();
+					for (int x=0; x<grid1.size.x; ++x) {
+						int2 offs = grid1.get(x,y,0);
+
+						ImGui::TableNextColumn();
+						ImGui::Text(offs.x == iNULL ? "":"%d,%d", offs.x,offs.y);
+
+						float dist = length((float2)offs);
+						if (offs.x != iNULL) {
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
+						}
+					}
+				}
+				ImGui::EndTable();
+			}
+
+			if (ImGui::BeginTable("grid2", grid1.size.x, ImGuiTableFlags_Borders)) {
+				for (int y=grid1.size.y-1; y>=0; --y) {
+					ImGui::TableNextRow();
+					for (int x=0; x<grid1.size.x; ++x) {
+						int2 offs = grid1.get(x,y,0);
+						float dist = length((float2)offs);
+
+						ImGui::TableNextColumn();
+						ImGui::Text(offs.x == iNULL ? "":"%.2f", dist);
+
+						if (offs.x != iNULL) {
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
+						}
+					}
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::End();
+		}
+
 		std::vector<int3> chunks;
 
 		if (!game.chunks.upload_voxels.empty()) {

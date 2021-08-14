@@ -230,42 +230,6 @@ bool _dbgdraw = false;
 
 uniform int max_iterations = 200;
 
-float dbg_get_df (ivec3 pos) {
-	float min_dist = DF_RADIUSf;
-	
-	#if DEBUGDRAW
-	dbgdraw_wire_cube(vec3(pos)+0.5 - WORLD_SIZEf/2.0, vec3(DF_RADIUS*2+1), vec4(0,0,1,1));
-	#endif
-	
-	for (int z=-DF_RADIUS; z<=+DF_RADIUS; ++z)
-	for (int y=-DF_RADIUS; y<=+DF_RADIUS; ++y)
-	for (int x=-DF_RADIUS; x<=+DF_RADIUS; ++x) {
-		ivec3 offs = ivec3(x,y,z);
-		
-		float dist = length(vec3(max(abs(offs) - 1, 0)));
-		
-		if (dist < DF_RADIUSf) {
-			uint val = texelFetchOffset(voxel_tex, pos, 0, offs).r;
-			if (val > B_AIR) {
-				#if DEBUGDRAW
-				dbgdraw_wire_cube(vec3(pos+offs)+0.5 - WORLD_SIZEf/2.0, vec3(1), vec4(1,0,1,1));
-				#endif
-				
-				min_dist = min(min_dist, dist); 
-			}
-		}
-	}
-	
-	#if DEBUGDRAW
-	for (int i=0; i<8; ++i) {
-		vec3 corner = vec3(ivec3(i&1, (i>>1)&1, i>>2));
-		dbgdraw_wire_sphere(vec3(pos)+corner - WORLD_SIZEf/2.0, vec3(max(min_dist, 0.1)*2.0), vec4(0,1,0,1));
-	}
-	#endif
-	
-	return min_dist;
-}
-
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	float dist;
 	
@@ -314,7 +278,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	bool dda = false;
 	
 	int dbgcol = 0;
-	vec3 last_pos;
 	
 	for (int iter=0; iter<max_iterations; ++iter) {
 		if (iter >= max_iterations || dist >= max_dist)
@@ -333,13 +296,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			dda = false;
 			
 			#if DEBUGDRAW
-			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), vec4(dbgcol==0 ? 1 : 0.2,0,0,1));
-			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , vec4(dbgcol==0 ? 1 : 0.2,0,0,1));
+			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
 			#endif
 			
 			dist += df;
-			
-			last_pos = pos;
 		} else {
 			// DF is 0, we need to check individual voxels now
 			
@@ -356,8 +318,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			
 			// Switch between DDA and raymarching
 			if (!dda) {
-				if (_dbgdraw) dbg_get_df(ivec3(floor(last_pos)));
-				
 				coord = ivec3(floor(pos)) ^ flipmask;
 				dda = true;
 			}
@@ -392,7 +352,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		dbgcol ^= 1;
 	}
 	
-	//if (_dbgdraw) dbg_get_df(ivec3(floor(ray_pos + ray_dir * 10.0)));
 	#if DEBUGDRAW
 	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
 	#endif

@@ -208,9 +208,6 @@
     <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h">
       <Filter>kisslib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\noise.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\bloom.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
@@ -466,6 +463,18 @@
       <Filter>shaders\gl</Filter>
     </None>
     <None Include="..\..\..\shaders\gl\test.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\dbg_indirect_draw.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\debug_wire_instance.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\rt_df_gen.glsl">
+      <Filter>shaders\gl</Filter>
+    </None>
+    <None Include="..\..\..\shaders\gl\rt_forward.glsl">
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>

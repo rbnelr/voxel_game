@@ -251,7 +251,6 @@
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
     <ClInclude Include="..\..\..\src\player.hpp" />
-    <ClInclude Include="..\..\..\src\noise.hpp" />
     <ClInclude Include="..\..\..\src\world_generator.hpp" />
   </ItemGroup>
   <ItemGroup>
@@ -436,9 +435,11 @@
     <None Include="..\..\..\shaders\gl\bloom.glsl" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
+    <None Include="..\..\..\shaders\gl\dbg_indirect_draw.glsl" />
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
     <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
     <None Include="..\..\..\shaders\gl\debug_wire_cube.glsl" />
+    <None Include="..\..\..\shaders\gl\debug_wire_instance.glsl" />
     <None Include="..\..\..\shaders\gl\fullscreen_triangle.glsl" />
     <None Include="..\..\..\shaders\gl\gpu_voxels.glsl" />
     <None Include="..\..\..\shaders\gl\gui.glsl" />
@@ -446,6 +447,8 @@
     <None Include="..\..\..\shaders\gl\held_item.glsl" />
     <None Include="..\..\..\shaders\gl\postprocess.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_df_gen.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_forward.glsl" />
     <None Include="..\..\..\shaders\gl\rt_gbufgen.glsl" />
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
