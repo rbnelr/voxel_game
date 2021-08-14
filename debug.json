@@ -3,7 +3,7 @@
 		"seed_str": "test4"
 	},
 	"chunks": {
-		"load_radius": 400.0,
+		"load_radius": 500.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-162.4095458984375,
-				-90.06237030029297,
-				160.11871337890625
+				-113.76428985595703,
+				-112.81560516357422,
+				214.42568969726563
 			],
 			"rot_aer": [
-				-1.0035912990570068,
-				-0.32635244727134705,
+				-0.5543279647827148,
+				-0.4038529098033905,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,7 +29,7 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 12.86131763458252,
+		"base_speed": 5.223323345184326,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -65,7 +65,7 @@
 		},
 		"raytracer": {
 			"enable": true,
-			"max_iterations": 1024
+			"max_iterations": 512
 		},
 		"bloom_renderer": {
 			"enable": false,
@@ -77,11 +77,11 @@
 		"debug_draw": {
 			"draw_occluded": false,
 			"occluded_alpha": 0.30000001192092896,
-			"line_width": 1.0
+			"line_width": 2.0
 		},
 		"imopen": {
 			"framebuffer": true,
-			"debugdraw": false,
+			"debugdraw": true,
 			"gui": false
 		}
 	}

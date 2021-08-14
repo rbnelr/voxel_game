@@ -98,6 +98,10 @@ namespace gl {
 			//case 1282: // Wierd error on notebook when trying to do texture streaming
 			//case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
 			//case 131218: // performance warning, because of shader recompiling based on some 'key'
+
+			// Pixel-path detailed info: The current pixel-path operation converts data from 2-bit integer to 1-bit integer, and may exhibit data loss
+			// when intentionally uploading uint16_t to GL_R8UI
+			case 131153:
 				return;
 
 			default:

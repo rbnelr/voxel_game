@@ -54,8 +54,8 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 					glBindVertexArray(indirect_lines_vao);
 					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
-
-					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
+					
+					glDrawArraysIndirect(GL_LINES, (void*)offsetof(IndirectBuffer, lines.cmd));
 
 					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 				}
@@ -82,8 +82,6 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 					glDrawArraysIndirect(GL_LINES, (void*)offsetof(IndirectBuffer, lines.cmd));
 
-					glDrawArrays(GL_LINES, 0, (GLsizei)g_debugdraw.lines.size());
-
 					glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 				}
 			}
@@ -94,15 +92,15 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 		OGL_TRACE("draw wire cubes");
 
 		r.state.set(s);
-		glUseProgram(shad_wire_cube->prog);
-		r.state.bind_textures(shad_wire_cube, {});
+		glUseProgram(shad_wire_instance->prog);
+		r.state.bind_textures(shad_wire_instance, {});
 
 		{
 			glBindVertexArray(vbo_wire_cube.vao);
 			reupload_vbo(vbo_wire_cube.instance_vbo, g_debugdraw.wire_cubes.data(), g_debugdraw.wire_cubes.size(), GL_STREAM_DRAW);
 
 			if (g_debugdraw.wire_cubes.size() > 0) {
-				glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_indices), GL_UNSIGNED_SHORT,
+				glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_cube_indices), GL_UNSIGNED_SHORT,
 					(void*)0, (GLsizei)g_debugdraw.wire_cubes.size());
 			}
 		}
@@ -115,6 +113,15 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 
 			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 		}
+
+		{
+			glBindVertexArray(indirect_wire_sphere_vao);
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirect_vbo);
+
+			glDrawElementsIndirect(GL_LINES, GL_UNSIGNED_SHORT, (void*)offsetof(IndirectBuffer, wire_spheres.cmd));
+		}
+
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	}
 }
 

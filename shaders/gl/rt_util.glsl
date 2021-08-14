@@ -8,9 +8,6 @@
 #include "gpu_voxels.glsl"
 #include "rand.glsl"
 
-#define PI	3.1415926535897932384626433832795
-#define INF (1. / 0.)
-
 #if VISUALIZE_COST
 	int iterations = 0;
 	
@@ -219,39 +216,80 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 //
 struct Hit {
 	vec3	pos;
-	mat3	TBN;
 	float	dist;
+	vec3	normal;
 	uint	bid;
 	vec4	col;
 };
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
 const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
+const int FLIPMASK = WORLD_SIZE-1;
 
 bool _dbgdraw = false;
 
 uniform int max_iterations = 200;
 
+float dbg_get_df (ivec3 pos) {
+	float min_dist = DF_RADIUSf;
+	
+	#if DEBUGDRAW
+	dbgdraw_wire_cube(vec3(pos)+0.5 - WORLD_SIZEf/2.0, vec3(DF_RADIUS*2+1), vec4(0,0,1,1));
+	#endif
+	
+	for (int z=-DF_RADIUS; z<=+DF_RADIUS; ++z)
+	for (int y=-DF_RADIUS; y<=+DF_RADIUS; ++y)
+	for (int x=-DF_RADIUS; x<=+DF_RADIUS; ++x) {
+		ivec3 offs = ivec3(x,y,z);
+		
+		float dist = length(vec3(max(abs(offs) - 1, 0)));
+		
+		if (dist < DF_RADIUSf) {
+			uint val = texelFetchOffset(voxel_tex, pos, 0, offs).r;
+			if (val > B_AIR) {
+				#if DEBUGDRAW
+				dbgdraw_wire_cube(vec3(pos+offs)+0.5 - WORLD_SIZEf/2.0, vec3(1), vec4(1,0,1,1));
+				#endif
+				
+				min_dist = min(min_dist, dist); 
+			}
+		}
+	}
+	
+	#if DEBUGDRAW
+	for (int i=0; i<8; ++i) {
+		vec3 corner = vec3(ivec3(i&1, (i>>1)&1, i>>2));
+		dbgdraw_wire_sphere(vec3(pos)+corner - WORLD_SIZEf/2.0, vec3(max(min_dist, 0.1)*2.0), vec4(0,1,0,1));
+	}
+	#endif
+	
+	return min_dist;
+}
+
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	float dist;
 	
+	// flip coordinate space such that ray is always positive (simplifies stepping logic)
+	// keep track of flip via flipmask
+	bvec3 ray_neg = lessThan(ray_dir, vec3(0.0));
+	vec3 flippedf = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
+	
+	ivec3 flipmask = mix(ivec3(0), ivec3(FLIPMASK), ray_neg);
+	
+	// precompute part of plane projection equation
+	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
+	// due to mad instruction
+	vec3 inv_dir = 1.0 / abs(ray_dir);
+	vec3 bias = inv_dir * -flippedf;
+	
 	{ // allow ray to start outside ray for nice debugging views
-		// flip coordinate space such that ray is always positive (simplifies stepping logic)
-		// keep track of flip via flipmask
-		bvec3 ray_neg = lessThan(ray_dir, vec3(0.0));
-		vec3 flippedf = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
-		
-		//uvec3 flipmask = mix(uvec3(0u), uvec3(FLIPMASK), ray_neg);
-		
-		// precompute part of plane projection equation
-		// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
-		// due to mad instruction
-		vec3 inv_dir = 1.0 / abs(ray_dir);
-		vec3 bias = inv_dir * -flippedf;
+		float epsilon = 0.0001; // stop the raymarching from sometimes sampling outside the world textures
+		vec3 world_min = vec3(0) + epsilon;
+		vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
 		
 		// calculate entry and exit coords into whole world cube
-		vec3 t0v =     vec3(0) * inv_dir + bias;
-		vec3 t1v = WORLD_SIZEf * inv_dir + bias;
+		vec3 t0v = world_min * inv_dir + bias;
+		vec3 t1v = world_max * inv_dir + bias;
 		float t0 = max(max(t0v.x, t0v.y), t0v.z);
 		float t1 = min(min(t1v.x, t1v.y), t1v.z);
 		
@@ -270,9 +308,13 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		//flippedf = max(flippedf, vec3(0.0));
 	}
 	
-	#if DEBUGDRAW
-	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
-	#endif
+	uint bid;
+	
+	ivec3 coord;
+	bool dda = false;
+	
+	int dbgcol = 0;
+	vec3 last_pos;
 	
 	for (int iter=0; iter<max_iterations; ++iter) {
 		if (iter >= max_iterations || dist >= max_dist)
@@ -281,13 +323,127 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		vec3 pos = dist * ray_dir + ray_pos;
 		
-		uint bid = textureLod(voxel_tex, pos * INV_WORLD_SIZEf, 0.0).r;
-		if (bid > B_AIR) break;
+		float df = texelFetch(df_tex, ivec3(floor(pos)), 0).r * DF_RADIUSf;
+		//float df = textureLod(df_tex, pos * INV_WORLD_SIZEf, 0.0).r * DF_RADIUSf;
 		
-		dist += 0.5;
+		if (df > 0.0) {
+			// DF tells us that we can still step by df before we can possibly hit a voxel
+			// step via DF raymarching
+			
+			dda = false;
+			
+			#if DEBUGDRAW
+			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), vec4(dbgcol==0 ? 1 : 0.2,0,0,1));
+			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , vec4(dbgcol==0 ? 1 : 0.2,0,0,1));
+			#endif
+			
+			dist += df;
+			
+			last_pos = pos;
+		} else {
+			// DF is 0, we need to check individual voxels now
+			
+			//// Naiive raymarching
+			//#if DEBUGDRAW
+			//if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(0.1*2.0), vec4(1,1,0,1));
+			//#endif
+			//
+			//bid = textureLod(voxel_tex, pos * INV_WORLD_SIZEf, 0.0).r;
+			//if (bid > B_AIR)
+			//	break;
+			//
+			//dist += 0.1;
+			
+			// Switch between DDA and raymarching
+			if (!dda) {
+				if (_dbgdraw) dbg_get_df(ivec3(floor(last_pos)));
+				
+				coord = ivec3(floor(pos)) ^ flipmask;
+				dda = true;
+			}
+			
+			#if DEBUGDRAW
+			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord ^ flipmask) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+			#endif
+			
+			bid = texelFetch(voxel_tex, coord ^ flipmask, 0).r;
+			if (bid > B_AIR)
+				break;
+			
+			ivec3 next_coord = coord + 1;
+			
+			vec3 t0v = inv_dir * vec3(next_coord) + bias;
+			dist = min(min(t0v.x, t0v.y), t0v.z);
+			
+			// step on axis where exit distance is lowest
+			int stepcoord;
+			if (t0v.x == dist) {
+				coord.x = next_coord.x;
+				stepcoord = coord.x;
+			} else if (t0v.y == dist) {
+				coord.y = next_coord.y;
+				stepcoord = coord.y;
+			} else {
+				coord.z = next_coord.z;
+				stepcoord = coord.z;
+			}
+		}
+		
+		dbgcol ^= 1;
 	}
 	
-	hit.col = vec4(vec3(dist / 200.0), 1);
+	//if (_dbgdraw) dbg_get_df(ivec3(floor(ray_pos + ray_dir * 10.0)));
+	#if DEBUGDRAW
+	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
+	#endif
+	
+	{ // calc hit info
+		hit.bid = bid;
+		hit.dist = dist;
+		hit.pos = dist * ray_dir + ray_pos;
+		
+		vec2 uv;
+		int face;
+		{ // calc hit face, uv and normal
+			vec3 hit_fract = hit.pos;
+			vec3 hit_center = vec3(coord ^ flipmask) + 0.5;
+			
+			vec3 offs = (hit.pos - hit_center);
+			vec3 abs_offs = abs(offs);
+			
+			hit.normal = vec3(0.0);
+			
+			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
+				hit.normal.x = sign(offs.x);
+				face = offs.x < 0.0 ? 0 : 1;
+				uv = hit_fract.yz;
+				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+			} else if (abs_offs.y >= abs_offs.z) {
+				hit.normal.y = sign(offs.y);
+				face = offs.y < 0.0 ? 2 : 3;
+				uv = hit_fract.xz;
+				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+			} else {
+				hit.normal.z = sign(offs.z);
+				face = offs.z < 0.0 ? 4 : 5;
+				uv = hit_fract.xy;
+				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+			}
+		}
+		
+		uint medium_bid = B_AIR;
+		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
+		float texid = float(block_tiles[tex_bid].sides[face]);
+		
+		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 1.0).rgba;
+		
+		//if (tex_bid == B_TALLGRASS && face >= 4)
+		//	hit.col = vec4(0.0);
+		
+		//hit.emiss = get_emmisive(hit.bid);
+	}
+	
+	//hit.col = vec4(vec3(dist / 200.0), 1);
 	return true; // hit
 }
 

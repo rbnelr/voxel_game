@@ -3,18 +3,14 @@
 #include "camera.hpp"
 
 void DebugDraw::vector (float3 const& pos, float3 const& dir, lrgba const& col) {
-	size_t idx = lines.size();
-	lines.resize(idx + 2);
-	auto* out = &lines[idx];
+	auto* out = push_back(lines, 2);
 
 	*out++ = { pos, col };
 	*out++ = { pos + dir, col };
 }
 
 void DebugDraw::point (float3 const& pos, float3 const& size, lrgba const& col) {
-	size_t idx = lines.size();
-	lines.resize(idx + 8);
-	auto* out = &lines[idx];
+	auto* out = push_back(lines, 8);
 
 	*out++ = { pos + size * float3(-1,-1,-1), col };
 	*out++ = { pos + size * float3(+1,+1,+1), col };
@@ -32,13 +28,15 @@ void DebugDraw::point (float3 const& pos, float3 const& size, lrgba const& col) 
 void DebugDraw::wire_cube (float3 const& pos, float3 const& size, lrgba const& col) {
 #if 0
 	size_t idx = lines.size();
-	lines.resize(idx + ARRLEN(_wire_cube));
+	lines.resize(idx + ARRLEN(_wire_cube_indices));
 	auto* out = &lines[idx];
 
-	for (auto& p : _wire_cube) {
-		out->pos.x = p.x * size.x + pos.x;
-		out->pos.y = p.y * size.y + pos.y;
-		out->pos.z = p.z * size.z + pos.z;
+	for (auto& idx : _wire_cube_indices) {
+		auto& v = _wire_cube_vertices[idx];
+
+		out->pos.x = v.x * size.x + pos.x;
+		out->pos.y = v.y * size.y + pos.y;
+		out->pos.z = v.z * size.z + pos.z;
 
 		out->col = col;
 
@@ -60,9 +58,7 @@ void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int a
 
 	int count = (wiresz + wiresxy) * angres * 2; // every wire is <angres> lines, <wires> * 2 because horiz and vert wires
 
-	size_t idx = lines.size();
-	lines.resize(idx + count);
-	auto* out = &lines[idx];
+	auto* out = push_back(lines, count);
 
 	float ang_step = deg(360) / (float)angres;
 
@@ -120,9 +116,7 @@ void DebugDraw::wire_sphere (float3 const& pos, float r, lrgba const& col, int a
 void DebugDraw::wire_cone (float3 const& pos, float ang, float length, float3x3 const& rot, lrgba const& col, int circres, int wires) {
 	int count = (circres + wires) * 2;
 
-	size_t idx = lines.size();
-	lines.resize(idx + count);
-	auto* out = &lines[idx];
+	auto* out = push_back(lines, count);
 
 	float r = tan(ang * 0.5f);
 
@@ -167,9 +161,7 @@ void DebugDraw::wire_frustrum (Camera_View const& view, lrgba const& col) {
 		4,5,  5,6,  6,7,  7,4, // top lines
 	};
 
-	size_t idx = lines.size();
-	lines.resize(idx + ARRLEN(_frustrum_corners));
-	auto* out = &lines[idx];
+	auto* out = push_back(lines, ARRLEN(_frustrum_corners));
 
 	for (int corner : _frustrum_corners) {
 		out->pos = view.frustrum.corners[corner];
@@ -179,9 +171,7 @@ void DebugDraw::wire_frustrum (Camera_View const& view, lrgba const& col) {
 }
 
 void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides) {
-	size_t idx = tris.size();
-	tris.resize(idx + sides * 4 * 3); // tri for bottom + top cap + 2 tris for side
-	auto* out = &tris[idx];
+	auto* out = push_back(tris, sides * 4 * 3); // tri for bottom + top cap + 2 tris for side
 
 	float ang_step = 2*PI / (float)sides;
 

@@ -57,6 +57,8 @@ namespace gl {
 		if (!game.chunks.upload_voxels.empty()) {
 			OGL_TRACE("raytracer upload changes");
 
+			block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // temp buffer to 'decompress' the data and enable uploading it in a single glTextureSubImage3D
+
 			for (auto cid : game.chunks.upload_voxels) {
 				auto& chunk = game.chunks.chunks[cid];
 				auto& vox = game.chunks.chunk_voxels[cid];
@@ -65,35 +67,83 @@ namespace gl {
 				if ( (unsigned)(pos.x) < GPU_WORLD_SIZE_CHUNKS &&
 					 (unsigned)(pos.y) < GPU_WORLD_SIZE_CHUNKS &&
 					 (unsigned)(pos.z) < GPU_WORLD_SIZE_CHUNKS ) {
-					OGL_TRACE("upload chunk data");
+					//OGL_TRACE("upload chunk data");
 
-					for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
-					for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
-					for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
-						int coordx = pos.x * CHUNK_SIZE + sx*SUBCHUNK_SIZE;
-						int coordy = pos.y * CHUNK_SIZE + sy*SUBCHUNK_SIZE;
-						int coordz = pos.z * CHUNK_SIZE + sz*SUBCHUNK_SIZE;
+					{
+						ZoneScopedN("decompress");
 
-						auto subc = vox.subchunks[IDX3D(sx,sy,sz, SUBCHUNK_SIZE)];
-						if (subc & SUBC_SPARSE_BIT) {
-							block_id val = (block_id)(subc & ~SUBC_SPARSE_BIT);
+						for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
+						for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
+						for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
 
-							glClearTexSubImage(voxel_tex.tex, 0,
-								coordx, coordy, coordz, SUBCHUNK_SIZE, SUBCHUNK_SIZE, SUBCHUNK_SIZE,
-								GL_RED_INTEGER, GL_UNSIGNED_SHORT, &val);
+							auto subc = vox.subchunks[IDX3D(sx,sy,sz, SUBCHUNK_SIZE)];
+							if (subc & SUBC_SPARSE_BIT) {
+								block_id val = (block_id)(subc & ~SUBC_SPARSE_BIT);
 
-						} else {
-							auto* data = &game.chunks.subchunks[subc].voxels;
+								block_id val_packed[SUBCHUNK_SIZE];
+								for (int i=0; i<SUBCHUNK_SIZE; ++i)
+									val_packed[i] = val;
 
-							glTextureSubImage3D(voxel_tex.tex, 0,
-								coordx, coordy, coordz, SUBCHUNK_SIZE, SUBCHUNK_SIZE, SUBCHUNK_SIZE,
-								GL_RED_INTEGER, GL_UNSIGNED_SHORT, data);
+								for (int z=0; z<SUBCHUNK_SIZE; ++z)
+								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
+									memcpy(dst, val_packed, sizeof(block_id)*SUBCHUNK_SIZE);
+								}
+
+							} else {
+								auto* data = game.chunks.subchunks[subc].voxels;
+
+								for (int z=0; z<SUBCHUNK_SIZE; ++z)
+								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
+									auto* src = &data[IDX3D(0,y,z, SUBCHUNK_SIZE)];
+									memcpy(dst, src, sizeof(block_id)*SUBCHUNK_SIZE);
+								}
+							}
 						}
+					}
+
+					{
+						ZoneScopedN("glTextureSubImage3D");
+
+						glTextureSubImage3D(voxel_tex.tex, 0,
+							pos.x*CHUNK_SIZE, pos.y*CHUNK_SIZE, pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
+							GL_RED_INTEGER, GL_UNSIGNED_SHORT, buffer);
 					}
 
 					chunks.push_back(pos);
 				}
 			}
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+
+			{
+				ZoneScopedN("rt_df_gen");
+				OGL_TRACE("rt_df_gen");
+
+				glUseProgram(df_tex.gen_shad->prog);
+				r.state.bind_textures(df_tex.gen_shad, {
+					{"voxel_tex", voxel_tex.tex},
+				});
+
+				bind_ubo(df_tex.check_cells_ubo, 5);
+
+				glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+				for (auto& chunkpos : chunks) {
+					// update all voxels which could have changed if any voxel in chunk did change
+					// this is chunk + border in practice
+					int3 offs = chunkpos * CHUNK_SIZE - DFTexture::DF_RADIUS;
+					int  size = CHUNK_SIZE + DFTexture::DF_RADIUS*2;
+
+					df_tex.gen_shad->set_uniform("offset", offs);
+
+					int dispatch_size = (CHUNK_SIZE + size -1) / DFTexture::COMPUTE_GROUPSZ;
+					glDispatchCompute(dispatch_size, dispatch_size, dispatch_size);
+				}
+			}
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+
+			glBindImageTexture(4, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); // unbind
 		}
 	}
 
@@ -107,12 +157,14 @@ namespace gl {
 
 			glUseProgram(rt_forward->prog);
 
-			//rt_forward->set_uniform("dispatch_size", (float2)r.framebuffer.size);
+			rt_forward->set_uniform("dispatch_size", r.framebuffer.size);
+			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
+
 			rt_forward->set_uniform("max_iterations", max_iterations);
 
 			r.state.bind_textures(rt_forward, {
 				{"voxel_tex", voxel_tex.tex},
-				//{"voxels_tex", voxels_tex.tex},
+				{"df_tex", df_tex.tex},
 
 				//{"gbuf_pos" , gbuf.pos },
 				//{"gbuf_col" , gbuf.col },
@@ -126,12 +178,12 @@ namespace gl {
 			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 			int2 dispatch_size;
-			dispatch_size.x = (r.framebuffer.size.x + (rt_groupsz.size.x -1)) / rt_groupsz.size.x;
-			dispatch_size.y = (r.framebuffer.size.y + (rt_groupsz.size.y -1)) / rt_groupsz.size.y;
+			dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+			dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
 
 			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 		}
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
 		//{
 		//	glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);

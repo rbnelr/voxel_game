@@ -33,24 +33,7 @@ struct DebugDraw {
 	std::vector<LineVertex> lines;
 	std::vector<TriVertex> tris;
 
-	static constexpr float3 _wire_cube[12 * 2] {
-		// bottom lines
-		float3(-.5f,-.5f,-.5f), float3(+.5f,-.5f,-.5f),
-		float3(+.5f,-.5f,-.5f), float3(+.5f,+.5f,-.5f),
-		float3(+.5f,+.5f,-.5f), float3(-.5f,+.5f,-.5f),
-		float3(-.5f,+.5f,-.5f), float3(-.5f,-.5f,-.5f),
-		// vertical lines
-		float3(-.5f,-.5f,-.5f), float3(-.5f,-.5f,+.5f),
-		float3(+.5f,-.5f,-.5f), float3(+.5f,-.5f,+.5f),
-		float3(+.5f,+.5f,-.5f), float3(+.5f,+.5f,+.5f),
-		float3(-.5f,+.5f,-.5f), float3(-.5f,+.5f,+.5f),
-		// top lines
-		float3(-.5f,-.5f,+.5f), float3(+.5f,-.5f,+.5f),
-		float3(+.5f,-.5f,+.5f), float3(+.5f,+.5f,+.5f),
-		float3(+.5f,+.5f,+.5f), float3(-.5f,+.5f,+.5f),
-		float3(-.5f,+.5f,+.5f), float3(-.5f,-.5f,+.5f),
-	};
-	static constexpr float3 _wire_vertices[8] {
+	static constexpr float3 _wire_cube_vertices[8] {
 		float3(-.5f,-.5f,-.5f),
 		float3(+.5f,-.5f,-.5f),
 		float3(+.5f,+.5f,-.5f),
@@ -60,7 +43,7 @@ struct DebugDraw {
 		float3(+.5f,+.5f,+.5f),
 		float3(-.5f,+.5f,+.5f),
 	};
-	static constexpr uint16_t _wire_indices[12 * 2] {
+	static constexpr uint16_t _wire_cube_indices[12 * 2] {
 		// bottom lines
 		0,1,  1,2,  2,3,  3,0,
 		// vertical lines
@@ -68,6 +51,40 @@ struct DebugDraw {
 		// top lines
 		4,5,  5,6,  6,7,  7,4,
 	};
+	
+	static void gen_simple_wire_sphere (std::vector<float3>* vertices, std::vector<uint16_t>* indices, float r, int segments) {
+		int count = 3 * segments;
+
+		auto* vert = push_back(*vertices, 3 * segments);
+		auto* ind = push_back(*indices, 3 * segments*2);
+		
+		float ang_step = deg(360) / (float)segments;
+
+		for (int i=0; i<segments; ++i) {
+			float s = sin((float)i * ang_step);
+			float c = cos((float)i * ang_step);
+
+			vert[i           ] = float3(c,s,0) * r;
+			vert[i+segments  ] = float3(c,0,s) * r;
+			vert[i+segments*2] = float3(0,c,s) * r;
+		}
+
+		uint16_t base = 0;
+		for (int i=0; i<segments; ++i) {
+			*ind++ = base + (uint16_t)( i );
+			*ind++ = base + (uint16_t)((i+1) == segments ? 0 : i+1);
+		}
+		base += segments;
+		for (int i=0; i<segments; ++i) {
+			*ind++ = base + (uint16_t)( i );
+			*ind++ = base + (uint16_t)((i+1) == segments ? 0 : i+1);
+		}
+		base += segments;
+		for (int i=0; i<segments; ++i) {
+			*ind++ = base + (uint16_t)( i );
+			*ind++ = base + (uint16_t)((i+1) == segments ? 0 : i+1);
+		}
+	}
 	
 	struct PosVertex {
 		float3 pos;

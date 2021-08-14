@@ -69,4 +69,9 @@ float get_emmisive (uint bid) {
 
 #define OCTREE_MIPS			10
 
+
+#define DF_RADIUS 4
+#define DF_RADIUSf float(DF_RADIUS)
+
 uniform usampler3D voxel_tex;
+uniform sampler3D df_tex;

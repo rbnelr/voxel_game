@@ -80,16 +80,86 @@ namespace gl {
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr); // clear texture to B_NULL
 		}
 	};
+	struct DFTexture {
+		Texture3D	tex;
+
+		static constexpr int COMPUTE_GROUPSZ = 4;
+		static constexpr int DF_RADIUS = 4;
+
+		Shader* gen_shad = nullptr;
+
+		DFTexture (Shaders& shaders) {
+			gen_shad = shaders.compile("rt_df_gen", {
+					{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
+				}, {{ COMPUTE_SHADER }});
+			generate_check_cells();
+
+			tex = {"RT.df_tex"};
+
+			glTextureStorage3D(tex, 1, GL_R32F, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
+			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+
+			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); // just avoid reading outside?
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			//
+			//lrgba color = lrgba(0,0,0,0);
+			//glTextureParameterfv(tex, GL_TEXTURE_BORDER_COLOR, &color.x);
+
+			float dist = 1.0f; // max dist
+			glClearTexImage(tex, 0, GL_RED, GL_FLOAT, &dist);
+		}
+
+		struct CheckCell {
+			int offs_x, offs_y, offs_z;
+			float dist;
+		};
+		struct CheckCells {
+			static constexpr int CELL_COUNT = DF_RADIUS*2+1;
+
+			CheckCell cells[CELL_COUNT*CELL_COUNT*CELL_COUNT];
+		};
+
+		Ubo check_cells_ubo = {"check_cells"};
+
+		void generate_check_cells () {
+			CheckCells check_cells; // xyz: offs, w: dist
+
+			int count = 0;
+			for (int z=-DF_RADIUS; z<=+DF_RADIUS; ++z)
+			for (int y=-DF_RADIUS; y<=+DF_RADIUS; ++y)
+			for (int x=-DF_RADIUS; x<=+DF_RADIUS; ++x) {
+				int3 offs = int3(x,y,z);
+
+				float dist = length(float3(max(abs(offs) - 1, 0)));
+
+				if (dist < (float)DF_RADIUS) {
+					check_cells.cells[count++] = { offs.x, offs.y, offs.z, dist };
+				}
+			}
+
+			std::stable_sort(&check_cells.cells[0], &check_cells.cells[count], [] (CheckCell const& l, CheckCell const& r) {
+				return std::less<float>()(l.dist, r.dist);
+			});
+
+			glUseProgram(gen_shad->prog);
+			gen_shad->set_uniform("check_count", count);
+			upload_ubo(check_cells_ubo, &check_cells, sizeof(CheckCells));
+		}
+	};
 
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations)
 		
 		Shader* rt_forward = nullptr;
-		//Shader* rt_shade = nullptr;
-
-		TestRenderer test_renderer;
 		
 		VoxelTexture voxel_tex;
+		DFTexture df_tex;
+
+		TestRenderer test_renderer;
 
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
@@ -102,7 +172,7 @@ namespace gl {
 			};
 		}
 
-		Raytracer (Shaders& shaders): test_renderer(shaders) {
+		Raytracer (Shaders& shaders): df_tex(shaders), test_renderer(shaders) {
 			#if 0
 				int max_sparse_texture_size;
 				int max_sparse_3d_texture_size;
