@@ -60,65 +60,156 @@ namespace gl {
 			ImGui::DragInt3("coord", &coord.x, 0.1f);
 			ImGui::DragInt("radius", &radius, 0.1f);
 
-			array3D<int> grid0 (int3(16,16,1));
+			array3D<int2> grid0 (int3(16,16,1));
 			array3D<int2> grid1 (int3(16,16,1));
 
 			g_debugdraw.wire_cube((float3)coord + (float3)grid0.size/2, (float3)grid0.size, lrgba(1,0,0,1));
 
 			int iNULL = 99;
 
-			//for (int z=0; z<grid0.size.z; ++z)
-			for (int y=0; y<grid0.size.y; ++y) {
+			for (int y=0; y<grid0.size.y; ++y)
+			for (int x=0; x<grid0.size.x; ++x) {
 
-				int prev = iNULL;
-				for (int x=0; x<grid0.size.x; ++x) {
-					
-					auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
-					
-					int val = bid > 1 ? 0 : prev+1;
+				auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
+
+				grid0.get(x,y,0) = bid > 1 ? 0 : iNULL;
+			}
+
+
+			for (int x=0; x<grid0.size.x; ++x) {
+				for (int y=0; y<grid0.size.y; ++y) {
+					int2 a = grid0.get_or_default(x-1, y-1, 0, iNULL);
+					int2 b = grid0.get_or_default(x-1, y  , 0, iNULL);
+					int2 c = grid0.get_or_default(x-1, y+1, 0, iNULL);
+
+					int2 d = grid0.get_or_default(x, y, 0, iNULL);
+
+					if (a.x > 0) a = iNULL;
+					if (b.x > 0) b = iNULL;
+					if (c.x > 0) c = iNULL;
+
+					if (a.x != iNULL) a += int2(-1, -1);
+					if (b.x != iNULL) b += int2(-1,  0);
+					if (c.x != iNULL) c += int2(-1, +1);
+
+					int ad = a.x*a.x + a.y*a.y;
+					int bd = b.x*b.x + b.y*b.y;
+					int cd = c.x*c.x + c.y*c.y;
+					int dd = d.x*d.x + d.y*d.y;
+
+					int dist = min(min(ad, bd), min(cd, dd));
+
+					int2 val;
+					if      (ad == dist) val = a;
+					else if (bd == dist) val = b;
+					else if (cd == dist) val = c;
+					else                 val = d;
 
 					grid0.get(x,y,0) = val;
-					prev = val;
-				}
-
-				prev = iNULL;
-				for (int x=grid0.size.x-1; x>=0; --x) {
-					int cur = grid0.get(x,y,0);
-
-					int val = cur <= prev+1 ? cur : prev+1;
-
-					grid0.get(x,y,0) = val;
-					prev = val;
 				}
 			}
 
-			//for (int z=0; z<grid0.size.z; ++z)
-			for (int x=0; x<grid1.size.x; ++x) {
-				
-				int2 prev = iNULL;
-				for (int y=0; y<grid1.size.y; ++y) {
-					int2 cur_val = int2(grid0.get(x,y,0), 0);
-					int2 prev_val = prev + int2(0,1);
+			for (int x=grid0.size.x-1; x>=0; --x) {
+				for (int y=0; y<grid0.size.y; ++y) {
+					int2 a = grid0.get_or_default(x+1, y-1, 0, iNULL);
+					int2 b = grid0.get_or_default(x+1, y  , 0, iNULL);
+					int2 c = grid0.get_or_default(x+1, y+1, 0, iNULL);
 
-					int eucl0 = cur_val.x*cur_val.x;
-					int eucl1 = prev_val.x*prev_val.x + prev_val.y*prev_val.y;
-					int2 val = eucl0 <= eucl1 ? cur_val : prev_val;
+					int2 d = grid0.get_or_default(x, y, 0, iNULL);
+					
+					if (a.x < 0) a = iNULL;
+					if (b.x < 0) b = iNULL;
+					if (c.x < 0) c = iNULL;
 
-					grid1.get(x,y,0) = val;
-					prev = val;
+					if (a.x != iNULL) a += int2(+1, -1);
+					if (b.x != iNULL) b += int2(+1,  0);
+					if (c.x != iNULL) c += int2(+1, +1);
+
+					int ad = a.x*a.x + a.y*a.y;
+					int bd = b.x*b.x + b.y*b.y;
+					int cd = c.x*c.x + c.y*c.y;
+					int dd = d.x*d.x + d.y*d.y;
+			
+					int dist = min(min(ad, bd), min(cd, dd));
+			
+					int2 val;
+					if      (ad == dist) val = a;
+					else if (bd == dist) val = b;
+					else if (cd == dist) val = c;
+					else                 val = d;
+			
+					grid0.get(x,y,0) = val;
 				}
+			}
 
-				prev = iNULL;
-				for (int y=grid1.size.y-1; y>=0; --y) {
-					int2 cur_val = grid1.get(x,y,0);
-					int2 prev_val = prev + int2(0,1);
+			for (int y=0; y<grid0.size.y; ++y)
+			for (int x=0; x<grid0.size.x; ++x) {
+				grid1.get(x,y,0) = grid0.get(x,y,0);
+			}
 
-					int eucl0 = cur_val.x*cur_val.x + cur_val.y*cur_val.y;
-					int eucl1 = prev_val.x*prev_val.x + prev_val.y*prev_val.y;
-					int2 val = eucl0 <= eucl1 ? cur_val : prev_val;
+			for (int y=0; y<grid1.size.y; ++y) {
+				for (int x=0; x<grid1.size.x; ++x) {
+					int2 a = grid1.get_or_default(x-1, y-1, 0, iNULL);
+					int2 b = grid1.get_or_default(x  , y-1, 0, iNULL);
+					int2 c = grid1.get_or_default(x+1, y-1, 0, iNULL);
+
+					int2 d = grid1.get_or_default(x, y, 0, iNULL);
+
+					if (a.y > 0) a = iNULL;
+					if (b.y > 0) b = iNULL;
+					if (c.y > 0) c = iNULL;
+
+					if (a.x != iNULL) a += int2(-1, -1);
+					if (b.x != iNULL) b += int2( 0, -1);
+					if (c.x != iNULL) c += int2(+1, -1);
+
+					int ad = a.x*a.x + a.y*a.y;
+					int bd = b.x*b.x + b.y*b.y;
+					int cd = c.x*c.x + c.y*c.y;
+					int dd = d.x*d.x + d.y*d.y;
+
+					int dist = min(min(ad, bd), min(cd, dd));
+
+					int2 val;
+					if      (ad == dist) val = a;
+					else if (bd == dist) val = b;
+					else if (cd == dist) val = c;
+					else                 val = d;
 
 					grid1.get(x,y,0) = val;
-					prev = val;
+				}
+			}
+
+			for (int y=grid1.size.y-1; y>=0; --y) {
+				for (int x=0; x<grid0.size.x; ++x) {
+					int2 a = grid1.get_or_default(x-1, y+1, 0, iNULL);
+					int2 b = grid1.get_or_default(x  , y+1, 0, iNULL);
+					int2 c = grid1.get_or_default(x+1, y+1, 0, iNULL);
+			
+					int2 d = grid1.get_or_default(x, y, 0, iNULL);
+					
+					if (a.y < 0) a = iNULL;
+					if (b.y < 0) b = iNULL;
+					if (c.y < 0) c = iNULL;
+
+					if (a.x != iNULL) a += int2(-1, +1);
+					if (b.x != iNULL) b += int2( 0, +1);
+					if (c.x != iNULL) c += int2(+1, +1);
+
+					int ad = a.x*a.x + a.y*a.y;
+					int bd = b.x*b.x + b.y*b.y;
+					int cd = c.x*c.x + c.y*c.y;
+					int dd = d.x*d.x + d.y*d.y;
+
+					int dist = min(min(ad, bd), min(cd, dd));
+
+					int2 val;
+					if      (ad == dist) val = a;
+					else if (bd == dist) val = b;
+					else if (cd == dist) val = c;
+					else                 val = d;
+			
+					grid1.get(x,y,0) = val;
 				}
 			}
 
@@ -126,13 +217,14 @@ namespace gl {
 				for (int y=grid0.size.y-1; y>=0; --y) {
 					ImGui::TableNextRow();
 					for (int x=0; x<grid0.size.x; ++x) {
-						int offs = grid0.get(x,y,0);
+						int2 offs = grid0.get(x,y,0);
 
 						ImGui::TableNextColumn();
-						ImGui::Text(offs >= iNULL ? "":"%d,%d", offs, 0);
+						ImGui::Text(offs.x >= iNULL ? "":"%d,%d", offs.x,offs.y);
 
+						float dist = length((float2)offs);
 						if (offs != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - (float)offs / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
 							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
 						}
