@@ -62,10 +62,11 @@ namespace gl {
 
 			array3D<int2> grid0 (int3(16,16,1));
 			array3D<int2> grid1 (int3(16,16,1));
+			array3D<int2> grid_test (int3(16,16,1));
 
 			g_debugdraw.wire_cube((float3)coord + (float3)grid0.size/2, (float3)grid0.size, lrgba(1,0,0,1));
 
-			int iNULL = 99;
+			int iNULL = 999;
 
 			for (int y=0; y<grid0.size.y; ++y)
 			for (int x=0; x<grid0.size.x; ++x) {
@@ -213,7 +214,33 @@ namespace gl {
 				}
 			}
 
-			if (ImGui::BeginTable("grid0", grid0.size.x, ImGuiTableFlags_Borders)) {
+
+			// Brute force version
+			for (int y=0; y<grid_test.size.y; ++y)
+			for (int x=0; x<grid_test.size.x; ++x) {
+
+				int2 min_offs = iNULL;
+				int min_dist_sqr = iNULL;
+				
+				for (int cy=0; cy<grid_test.size.y; ++cy)
+				for (int cx=0; cx<grid_test.size.x; ++cx) {
+					auto bid = game.chunks.read_block(coord.x + cx, coord.y + cy, coord.z);
+				
+					if (bid > 1) {
+						int2 offs = int2(cx-x, cy-y);
+						int dist_sqr = offs.x*offs.x + offs.y*offs.y;
+						if (dist_sqr <= min_dist_sqr) {
+							min_dist_sqr = dist_sqr;
+							min_offs = offs;
+						}
+					}
+				}
+
+				grid_test.get(x,y,0) = min_offs;
+			}
+
+			ImGui::Text("X-Pass");
+			if (ImGui::BeginTable("X-Pass", grid0.size.x, ImGuiTableFlags_Borders)) {
 				for (int y=grid0.size.y-1; y>=0; --y) {
 					ImGui::TableNextRow();
 					for (int x=0; x<grid0.size.x; ++x) {
@@ -233,7 +260,8 @@ namespace gl {
 				ImGui::EndTable();
 			}
 
-			if (ImGui::BeginTable("grid1", grid1.size.x, ImGuiTableFlags_Borders)) {
+			ImGui::Text("Y-Pass");
+			if (ImGui::BeginTable("Y-Pass", grid1.size.x, ImGuiTableFlags_Borders)) {
 				for (int y=grid1.size.y-1; y>=0; --y) {
 					ImGui::TableNextRow();
 					for (int x=0; x<grid1.size.x; ++x) {
@@ -253,7 +281,8 @@ namespace gl {
 				ImGui::EndTable();
 			}
 
-			if (ImGui::BeginTable("grid1", grid1.size.x, ImGuiTableFlags_Borders)) {
+			ImGui::Text("Result");
+			if (ImGui::BeginTable("Result", grid1.size.x, ImGuiTableFlags_Borders)) {
 				for (int y=grid1.size.y-1; y>=0; --y) {
 					ImGui::TableNextRow();
 					for (int x=0; x<grid1.size.x; ++x) {
@@ -267,6 +296,33 @@ namespace gl {
 							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
 							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
+						}
+					}
+				}
+				ImGui::EndTable();
+			}
+
+			ImGui::Text("Brute Force Version");
+			if (ImGui::BeginTable("Brute Force Version", grid_test.size.x, ImGuiTableFlags_Borders)) {
+				for (int y=grid_test.size.y-1; y>=0; --y) {
+					ImGui::TableNextRow();
+					for (int x=0; x<grid_test.size.x; ++x) {
+						int2 offs = grid_test.get(x,y,0);
+						int2 offs2 = grid1.get(x,y,0);
+
+						float dist = length((float2)offs);
+						float dist2 = length((float2)offs2);
+
+						bool error = abs(dist - dist2) > 0.001f;
+
+						ImGui::TableNextColumn();
+						ImGui::Text(offs.x >= iNULL ? "":"%.2f", dist);
+
+						if (offs != iNULL) {
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+							ImU32 error32 = ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, error ? error32 : (offs != 0 ? red32 : solid32));
 						}
 					}
 				}
