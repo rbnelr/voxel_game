@@ -55,8 +55,8 @@ namespace gl {
 		{
 			ImGui::Begin("DFTest");
 
-			static int3 coord = int3(-28,-83,219);
-			static int radius = 3;
+			static int3 coord = int3(-21,-85,219);
+			static int radius = 5;
 			ImGui::DragInt3("coord", &coord.x, 0.1f);
 			ImGui::DragInt("radius", &radius, 0.1f);
 
@@ -68,47 +68,58 @@ namespace gl {
 			int iNULL = 99;
 
 			//for (int z=0; z<grid0.size.z; ++z)
-			for (int y=0; y<grid0.size.y; ++y)
-			for (int x=0; x<grid0.size.x; ++x) {
-				int offs = iNULL;
-				
-				auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
-				if (bid > 1) {
-					offs = 0;
-				} else {
-					for (int offsx=1; offsx<=radius; ++offsx) {
-						auto bid0 = game.chunks.read_block(coord.x + x - offsx, coord.y + y, coord.z);
-						auto bid1 = game.chunks.read_block(coord.x + x + offsx, coord.y + y, coord.z);
+			for (int y=0; y<grid0.size.y; ++y) {
 
-						if (bid0 > 1) {
-							offs = -offsx;
-							break;
-						} else if (bid1 > 1) {
-							offs = +offsx;
-							break;
-						}
-					}
+				int prev = iNULL;
+				for (int x=0; x<grid0.size.x; ++x) {
+					
+					auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
+					
+					int val = bid > 1 ? 0 : prev+1;
+
+					grid0.get(x,y,0) = val;
+					prev = val;
 				}
 
-				grid0.get(x,y,0) = offs;
+				prev = iNULL;
+				for (int x=grid0.size.x-1; x>=0; --x) {
+					int cur = grid0.get(x,y,0);
+
+					int val = cur <= prev+1 ? cur : prev+1;
+
+					grid0.get(x,y,0) = val;
+					prev = val;
+				}
 			}
 
-			for (int y=0; y<grid0.size.y; ++y)
-			for (int x=0; x<grid0.size.x; ++x) {
-				int2 offs = iNULL;
-				float min_distsqr = INF;
+			//for (int z=0; z<grid0.size.z; ++z)
+			for (int x=0; x<grid1.size.x; ++x) {
+				
+				int2 prev = iNULL;
+				for (int y=0; y<grid1.size.y; ++y) {
+					int2 cur_val = int2(grid0.get(x,y,0), 0);
+					int2 prev_val = prev + int2(0,1);
 
-				for (int offsy=-radius; offsy<=radius; ++offsy) {
-					int offsx = grid0.get_or_default(x, y + offsy, 0, iNULL);
+					int eucl0 = cur_val.x*cur_val.x;
+					int eucl1 = prev_val.x*prev_val.x + prev_val.y*prev_val.y;
+					int2 val = eucl0 <= eucl1 ? cur_val : prev_val;
 
-					float distsqr = offsx*offsx + offsy*offsy;
-					if (distsqr < min_distsqr) {
-						offs = int2(offsx, offsy);
-						min_distsqr = distsqr;
-					}
+					grid1.get(x,y,0) = val;
+					prev = val;
 				}
 
-				grid1.get(x,y,0) = offs;
+				prev = iNULL;
+				for (int y=grid1.size.y-1; y>=0; --y) {
+					int2 cur_val = grid1.get(x,y,0);
+					int2 prev_val = prev + int2(0,1);
+
+					int eucl0 = cur_val.x*cur_val.x + cur_val.y*cur_val.y;
+					int eucl1 = prev_val.x*prev_val.x + prev_val.y*prev_val.y;
+					int2 val = eucl0 <= eucl1 ? cur_val : prev_val;
+
+					grid1.get(x,y,0) = val;
+					prev = val;
+				}
 			}
 
 			if (ImGui::BeginTable("grid0", grid0.size.x, ImGuiTableFlags_Borders)) {
@@ -118,9 +129,28 @@ namespace gl {
 						int offs = grid0.get(x,y,0);
 
 						ImGui::TableNextColumn();
-						ImGui::Text(offs == iNULL ? "":"%d", offs);
+						ImGui::Text(offs >= iNULL ? "":"%d,%d", offs, 0);
 
-						float dist = length((float)offs);
+						if (offs != iNULL) {
+							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - (float)offs / ((float)radius*1.44f), 0, 0, 1));
+							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
+						}
+					}
+				}
+				ImGui::EndTable();
+			}
+
+			if (ImGui::BeginTable("grid1", grid1.size.x, ImGuiTableFlags_Borders)) {
+				for (int y=grid1.size.y-1; y>=0; --y) {
+					ImGui::TableNextRow();
+					for (int x=0; x<grid1.size.x; ++x) {
+						int2 offs = grid1.get(x,y,0);
+			
+						ImGui::TableNextColumn();
+						ImGui::Text(offs.x >= iNULL ? "":"%d,%d", offs.x,offs.y);
+						
+						float dist = length((float2)offs);
 						if (offs != iNULL) {
 							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
 							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
@@ -136,32 +166,12 @@ namespace gl {
 					ImGui::TableNextRow();
 					for (int x=0; x<grid1.size.x; ++x) {
 						int2 offs = grid1.get(x,y,0);
-
-						ImGui::TableNextColumn();
-						ImGui::Text(offs.x == iNULL ? "":"%d,%d", offs.x,offs.y);
-
-						float dist = length((float2)offs);
-						if (offs.x != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
-							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
-						}
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			if (ImGui::BeginTable("grid2", grid1.size.x, ImGuiTableFlags_Borders)) {
-				for (int y=grid1.size.y-1; y>=0; --y) {
-					ImGui::TableNextRow();
-					for (int x=0; x<grid1.size.x; ++x) {
-						int2 offs = grid1.get(x,y,0);
 						float dist = length((float2)offs);
 
 						ImGui::TableNextColumn();
-						ImGui::Text(offs.x == iNULL ? "":"%.2f", dist);
+						ImGui::Text(offs.x >= iNULL ? "":"%.2f", dist);
 
-						if (offs.x != iNULL) {
+						if (offs != iNULL) {
 							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
 							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
 							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
