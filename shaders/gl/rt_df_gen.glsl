@@ -1,75 +1,86 @@
 #version 460 core
-layout(local_size_x = GROUPSZ, local_size_y = GROUPSZ, local_size_z = GROUPSZ) in;
+layout(local_size_x = GROUPSZ, local_size_y = GROUPSZ) in;
 
 #include "gpu_voxels.glsl"
 
-#if   PASS == 0
-	layout(r8i , binding = 5) writeonly restrict uniform iimage3D result;
-#elif PASS == 1
-	layout(r8i , binding = 4) readonly  restrict uniform iimage3D input_offs;
-	layout(rg8i, binding = 5) writeonly restrict uniform iimage3D result;
-#else
-	layout(rg8i, binding = 4) readonly  restrict uniform iimage3D input_offs;
-	layout(r8ui, binding = 5) writeonly restrict uniform uimage3D result;
-#endif
+layout(r8ui, binding = 4) restrict uniform uimage3D df_img;
 
-#define INF (1. / 0.)
-#define iINF 0x7fffffff
+#define SIZE CHUNK_SIZE
 
 uniform ivec3 offset;
 uniform int dispatch_id;
 
 void main () {
-	ivec3 pos = ivec3(gl_GlobalInvocationID.xyz);
-	ivec3 temp_pos = pos + ivec3(0,0, dispatch_id*CHUNK_SIZE);
-	ivec3 world_pos = pos + offset;
-	
 #if PASS == 0
+	ivec3 pos = ivec3(0, gl_GlobalInvocationID.xy);
+	pos += offset;
 	
-	int min_dist = iINF;
-	int min_offs = iINF;
-	
-	int start = max(pos.x - DF_RADIUS, 0);
-	int end   = max(pos.x + DF_RADIUS, 0);
-	for (int loc=start; loc<=end; ++loc) {
-		int offs = loc - pos.x;
-		int dist = abs(offs);
-		uint bid = texelFetchOffset(voxel_tex, world_pos, 0, ivec3(offs,0,0)).r;
-		if (dist < min_dist && bid > B_AIR) {
-			min_dist = dist;
-			min_offs = offs;
-		}
+	int prev = 255;
+	for (int x=0; x<SIZE; ++x) {
+		uint bid = texelFetch(voxel_tex, pos + ivec3(x,0,0), 0).r;
+		
+		int val = bid > B_AIR ? 0 : prev+1;
+		
+		imageStore(df_img, pos + ivec3(x,0,0), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
 	}
 	
-	imageStore(result, temp_pos, ivec4(min_offs, 0,0,0));
+	prev = 255;
+	for (int x=SIZE-1; x>=0; --x) {
+		int cur = int(imageLoad(df_img, pos + ivec3(x,0,0)).r);
+		
+		int val = min(cur, prev+1);
+		//if (val != cur) // TODO: avoiding writes better for performance??
+		imageStore(df_img, pos + ivec3(x,0,0), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
+	}
 	
 #elif PASS == 1
+	ivec3 pos = ivec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.y);
+	pos += offset;
 	
-	int min_dist = iINF;
-	ivec2 min_offs = ivec2(iINF);
-	
-	int start = max(pos.y - DF_RADIUS, 0);
-	int end   = max(pos.y + DF_RADIUS, 0);
-	for (int loc=start; loc<=end; ++loc) {
-		int offsY = loc - pos.y;
-		int offsX = imageLoad(input_offs, temp_pos + ivec3(0,offsY,0)).r;
-		int dist = offsX*offsX + offsY*offsY;
-		if (dist < min_dist) {
-			min_dist = dist;
-			min_offs = ivec2(offsX, offsY);
-		}
+	int prev = 255;
+	for (int y=0; y<SIZE; ++y) {
+		int cur = int(imageLoad(df_img, pos + ivec3(0,y,0)).r);
+		
+		int val = min(cur, prev+1);
+		//if (val != cur) // TODO: avoiding writes better for performance??
+		imageStore(df_img, pos + ivec3(0,y,0), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
 	}
 	
-	imageStore(result, temp_pos, ivec4(min_offs, 0,0));
+	prev = 255;
+	for (int y=SIZE-1; y>=0; --y) {
+		int cur = int(imageLoad(df_img, pos + ivec3(0,y,0)).r);
+		
+		int val = min(cur, prev+1);
+		//if (val != cur) // TODO: avoiding writes better for performance??
+		imageStore(df_img, pos + ivec3(0,y,0), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
+	}
+	
 #else
-	ivec2 offsXY = imageLoad(input_offs, temp_pos).rg;
+	ivec3 pos = ivec3(gl_GlobalInvocationID.xy, 0);
+	pos += offset;
 	
-	float min_dist = length(vec2(offsXY));
+	int prev = 255;
+	for (int z=0; z<SIZE; ++z) {
+		int cur = int(imageLoad(df_img, pos + ivec3(0,0,z)).r);
+		
+		int val = min(cur, prev+1);
+		//if (val != cur) // TODO: avoiding writes better for performance??
+		imageStore(df_img, pos + ivec3(0,0,z), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
+	}
 	
-	min_dist /= DF_RADIUSf; // [0,DF_RADIUS] -> [0,1]
-	
-	uint val = uint(clamp(min_dist, 0.0, 1.0) * 255);
-	
-	imageStore(result, world_pos, uvec4(val, 0u,0u,0u));
+	prev = 255;
+	for (int z=SIZE-1; z>=0; --z) {
+		int cur = int(imageLoad(df_img, pos + ivec3(0,0,z)).r);
+		
+		int val = min(cur, prev+1);
+		//if (val != cur) // TODO: avoiding writes better for performance??
+		imageStore(df_img, pos + ivec3(0,0,z), uvec4(uint(val), 0u,0u,0u));
+		prev = val;
+	}
 #endif
 }

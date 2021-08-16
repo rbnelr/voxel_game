@@ -402,46 +402,28 @@ namespace gl {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
 
-				//assert(chunks.size() <= DFTexture::MAX_CHUNKS_PER_FRAME);
-
 				for (int pass=0; pass<3; ++pass) {
 					Shader* shad = df_tex.shad_pass[pass];
 
 					glUseProgram(shad->prog);
 
-					if (pass == 0) {
-						r.state.bind_textures(shad, {
-							{"voxel_tex", voxel_tex.tex},
-						});
-						glBindImageTexture(5, df_tex.temp_tex0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8I);
-					} else if (pass == 1) {
-						r.state.bind_textures(shad, {});
-						glBindImageTexture(4, df_tex.temp_tex0, 0, GL_FALSE, 0, GL_READ_ONLY , GL_R8I);
-						glBindImageTexture(5, df_tex.temp_tex1, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG8I);
-					} else {
-						r.state.bind_textures(shad, {});
-						glBindImageTexture(4, df_tex.temp_tex1, 0, GL_FALSE, 0, GL_READ_ONLY , GL_RG8I);
-						glBindImageTexture(5, df_tex.tex      , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8UI);
-					}
+					r.state.bind_textures(shad, {
+						{"voxel_tex", voxel_tex.tex},
+					});
+					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
 
-					for (int i=0; i<min(DFTexture::MAX_CHUNKS_PER_FRAME, (int)chunks.size()); ++i) {
-						auto& chunkpos = chunks[i];
-						
+					for (auto& chunkpos : chunks) {
 						shad->set_uniform("offset", chunkpos * CHUNK_SIZE);
-						shad->set_uniform("dispatch_id", i);
 
-						int dispatch_size = (CHUNK_SIZE + CHUNK_SIZE -1) / DFTexture::COMPUTE_GROUPSZ;
-
-						glDispatchCompute(dispatch_size, dispatch_size, dispatch_size);
+						int dispatch_size = (CHUNK_SIZE + DFTexture::COMPUTE_GROUPSZ -1) / DFTexture::COMPUTE_GROUPSZ;
+						glDispatchCompute(dispatch_size, dispatch_size, 1);
 					}
 
 					glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 				}
 			}
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
 			glBindImageTexture(4, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); // unbind
-			glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); // unbind
 		}
 	}
 

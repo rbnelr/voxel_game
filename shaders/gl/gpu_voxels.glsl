@@ -70,8 +70,5 @@ float get_emmisive (uint bid) {
 #define OCTREE_MIPS			10
 
 
-//#define DF_RADIUS 4 // set from engine
-#define DF_RADIUSf float(DF_RADIUS)
-
 uniform usampler3D voxel_tex;
 uniform usampler3D df_tex;

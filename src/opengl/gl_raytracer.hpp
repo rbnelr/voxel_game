@@ -82,13 +82,8 @@ namespace gl {
 	};
 	struct DFTexture {
 		Texture3D	tex = {"RT.DF.tex"};
-		Texture3D	temp_tex0 = {"RT.DF.temp0"};
-		Texture3D	temp_tex1 = {"RT.DF.temp1"};
 
 		static constexpr int COMPUTE_GROUPSZ = 4;
-		static constexpr int DF_RADIUS = 8;
-
-		static constexpr int MAX_CHUNKS_PER_FRAME = 64;
 
 		Shader* shad_pass[3] = {};
 
@@ -97,12 +92,9 @@ namespace gl {
 				shad_pass[pass] = shaders.compile("rt_df_gen", {
 						{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
 						{"PASS", prints("%d", pass)},
-						{"DF_RADIUS", prints("%d", DF_RADIUS)},
 					}, {{ COMPUTE_SHADER }});
 
 			glTextureStorage3D(tex, 1, GL_R8UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
-			glTextureStorage3D(temp_tex0, 1, GL_R8I, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE*MAX_CHUNKS_PER_FRAME);
-			glTextureStorage3D(temp_tex1, 1, GL_RG8I, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE*MAX_CHUNKS_PER_FRAME);
 
 			int dist = 255; // max dist
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &dist);
@@ -125,7 +117,6 @@ namespace gl {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
-			         {"DF_RADIUS", prints("%d", DFTexture::DF_RADIUS)},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_WARP_COST", visualize_warp_cost ? "1":"0"}
 			};
