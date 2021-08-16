@@ -286,7 +286,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		vec3 pos = dist * ray_dir + ray_pos;
 		
-		float df = texelFetch(df_tex, ivec3(floor(pos)), 0).r * DF_RADIUSf;
+		float df = float(texelFetch(df_tex, ivec3(floor(pos)), 0).r) * (DF_RADIUSf / 255.0);
+		
 		//float df = textureLod(df_tex, pos * INV_WORLD_SIZEf, 0.0).r * DF_RADIUSf;
 		
 		if (df > 0.0) {

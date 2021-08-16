@@ -81,73 +81,31 @@ namespace gl {
 		}
 	};
 	struct DFTexture {
-		Texture3D	tex;
+		Texture3D	tex = {"RT.DF.tex"};
+		Texture3D	temp_tex0 = {"RT.DF.temp0"};
+		Texture3D	temp_tex1 = {"RT.DF.temp1"};
 
 		static constexpr int COMPUTE_GROUPSZ = 4;
-		static constexpr int DF_RADIUS = 4;
+		static constexpr int DF_RADIUS = 8;
 
-		Shader* gen_shad = nullptr;
+		static constexpr int MAX_CHUNKS_PER_FRAME = 64;
+
+		Shader* shad_pass[3] = {};
 
 		DFTexture (Shaders& shaders) {
-			gen_shad = shaders.compile("rt_df_gen", {
-					{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
-				}, {{ COMPUTE_SHADER }});
-			generate_check_cells();
+			for (int pass=0; pass<3; ++pass)
+				shad_pass[pass] = shaders.compile("rt_df_gen", {
+						{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
+						{"PASS", prints("%d", pass)},
+						{"DF_RADIUS", prints("%d", DF_RADIUS)},
+					}, {{ COMPUTE_SHADER }});
 
-			tex = {"RT.df_tex"};
+			glTextureStorage3D(tex, 1, GL_R8UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
+			glTextureStorage3D(temp_tex0, 1, GL_R8I, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE*MAX_CHUNKS_PER_FRAME);
+			glTextureStorage3D(temp_tex1, 1, GL_RG8I, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE*MAX_CHUNKS_PER_FRAME);
 
-			glTextureStorage3D(tex, 1, GL_R32F, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
-			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
-			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
-
-			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			//glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER); // just avoid reading outside?
-			//glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			//glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-			//
-			//lrgba color = lrgba(0,0,0,0);
-			//glTextureParameterfv(tex, GL_TEXTURE_BORDER_COLOR, &color.x);
-
-			float dist = 1.0f; // max dist
-			glClearTexImage(tex, 0, GL_RED, GL_FLOAT, &dist);
-		}
-
-		struct CheckCell {
-			int offs_x, offs_y, offs_z;
-			float dist;
-		};
-		struct CheckCells {
-			static constexpr int CELL_COUNT = DF_RADIUS*2+1;
-
-			CheckCell cells[CELL_COUNT*CELL_COUNT*CELL_COUNT];
-		};
-
-		Ubo check_cells_ubo = {"check_cells"};
-
-		void generate_check_cells () {
-			CheckCells check_cells; // xyz: offs, w: dist
-
-			int count = 0;
-			for (int z=-DF_RADIUS; z<=+DF_RADIUS; ++z)
-			for (int y=-DF_RADIUS; y<=+DF_RADIUS; ++y)
-			for (int x=-DF_RADIUS; x<=+DF_RADIUS; ++x) {
-				int3 offs = int3(x,y,z);
-
-				float dist = length(float3(max(abs(offs) - 1, 0)));
-
-				if (dist < (float)DF_RADIUS) {
-					check_cells.cells[count++] = { offs.x, offs.y, offs.z, dist };
-				}
-			}
-
-			std::stable_sort(&check_cells.cells[0], &check_cells.cells[count], [] (CheckCell const& l, CheckCell const& r) {
-				return std::less<float>()(l.dist, r.dist);
-			});
-
-			glUseProgram(gen_shad->prog);
-			gen_shad->set_uniform("check_count", count);
-			upload_ubo(check_cells_ubo, &check_cells, sizeof(CheckCells));
+			int dist = 255; // max dist
+			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &dist);
 		}
 	};
 
@@ -167,6 +125,7 @@ namespace gl {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
+			         {"DF_RADIUS", prints("%d", DFTexture::DF_RADIUS)},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_WARP_COST", visualize_warp_cost ? "1":"0"}
 			};

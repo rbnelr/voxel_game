@@ -1196,11 +1196,17 @@ struct StateManager {
 			
 			glActiveTexture((GLenum)(GL_TEXTURE0 + i));
 
+			// can have multiple textures of differing types bound in the same texture unit
+			// this is super confusing in the graphics debugger, unbind if previous texture is a different type
+			// (otherwise we overwrite it anyway, this just saves one gl call)
 			if (to_bind.tex.type != bound_type && bound_type != 0) {
 				glBindTexture(bound_type, 0); // unbind previous
 				glBindSampler((GLuint)i, 0);
 			}
 
+			// overwrite previous texture binding
+			// could try to optimize this by detecting when rebinding same texture,
+			// but if at that point should just avoid calling this and do it manually instead
 			if (to_bind.tex.type != 0) {
 				glBindSampler((GLuint)i, to_bind.sampler);
 
@@ -1214,7 +1220,7 @@ struct StateManager {
 			bound_type = to_bind.tex.type;
 		}
 
-		// unbind rest
+		// unbind rest of texture units
 		for (int i=(int)count; i<(int)bound_texture_types.size(); ++i) {
 			auto& bound_type = bound_texture_types[i];
 
