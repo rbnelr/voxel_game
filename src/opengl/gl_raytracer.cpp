@@ -398,9 +398,11 @@ namespace gl {
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
-			{
+			if (!chunks.empty()) {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
+
+				int count = (int)chunks.size();
 
 				for (int pass=0; pass<3; ++pass) {
 					Shader* shad = df_tex.shad_pass[pass];
@@ -412,11 +414,19 @@ namespace gl {
 					});
 					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
 
-					for (auto& chunkpos : chunks) {
-						shad->set_uniform("offset", chunkpos * CHUNK_SIZE);
+					static constexpr int BATCHSIZE = 32;
+					for (int i=0; i<count; i+=BATCHSIZE) {
+						
+						int subcount = min(count - i, BATCHSIZE);
+
+						int3 offsets[BATCHSIZE] = {};
+						for (int j=0; j<subcount; ++j)
+							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+
+						shad->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
 
 						int dispatch_size = (CHUNK_SIZE + DFTexture::COMPUTE_GROUPSZ -1) / DFTexture::COMPUTE_GROUPSZ;
-						glDispatchCompute(dispatch_size, dispatch_size, 1);
+						glDispatchCompute(dispatch_size, dispatch_size, subcount);
 					}
 
 					glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);

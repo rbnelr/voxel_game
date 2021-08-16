@@ -7,13 +7,12 @@ layout(r8ui, binding = 4) restrict uniform uimage3D df_img;
 
 #define SIZE CHUNK_SIZE
 
-uniform ivec3 offset;
-uniform int dispatch_id;
+uniform ivec3 offsets[64];
 
 void main () {
 #if PASS == 0
 	ivec3 pos = ivec3(0, gl_GlobalInvocationID.xy);
-	pos += offset;
+	pos += offsets[gl_WorkGroupID.z];
 	
 	int prev = 255;
 	for (int x=0; x<SIZE; ++x) {
@@ -37,7 +36,7 @@ void main () {
 	
 #elif PASS == 1
 	ivec3 pos = ivec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.y);
-	pos += offset;
+	pos += offsets[gl_WorkGroupID.z];
 	
 	int prev = 255;
 	for (int y=0; y<SIZE; ++y) {
@@ -61,7 +60,7 @@ void main () {
 	
 #else
 	ivec3 pos = ivec3(gl_GlobalInvocationID.xy, 0);
-	pos += offset;
+	pos += offsets[gl_WorkGroupID.z];
 	
 	int prev = 255;
 	for (int z=0; z<SIZE; ++z) {

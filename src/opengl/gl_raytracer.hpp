@@ -83,7 +83,7 @@ namespace gl {
 	struct DFTexture {
 		Texture3D	tex = {"RT.DF.tex"};
 
-		static constexpr int COMPUTE_GROUPSZ = 4;
+		static constexpr int COMPUTE_GROUPSZ = 8;
 
 		Shader* shad_pass[3] = {};
 
