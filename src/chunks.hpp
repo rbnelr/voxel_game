@@ -148,6 +148,10 @@ struct Chunk {
 
 		LOADED_PHASE2	= 1u<<3, // not set: phase 1
 
+		DIRTY_FACE		= 1u<<3,
+		DIRTY_EDGE		= 1u<<4,
+		DIRTY_CORNER	= 1u<<5,
+
 		// Flags for if neighbours[i] contains null to skip neighbour loop in iterate chunk loading for performance
 		NEIGHBOUR0_NULL = 1u<<26,
 		NEIGHBOUR1_NULL = 1u<<27,
@@ -160,6 +164,14 @@ struct Chunk {
 
 	Flags flags;
 	int3 pos;
+
+	int3 dirty_rect_min;
+	int3 dirty_rect_max;
+
+	void clear_dirty_rect () {
+		dirty_rect_min = 0;
+		dirty_rect_max = 0;
+	}
 
 	chunk_id neighbours[6];
 	// make sure there are still at 4 bytes following this so that 16-byte sse loads of neighbours can never segfault
@@ -320,6 +332,8 @@ struct Chunks {
 
 	void sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels);
 
+	void flag_touching_neighbours (Chunk* c);
+
 	Chunk& operator[] (chunk_id id) {
 		return chunks[id];
 	}
@@ -400,7 +414,7 @@ struct Chunks {
 	};
 	std_vector<UploadSlice> upload_slices;
 
-	std_vector<chunk_id> upload_voxels; // VOXELS_DIRTY of this frame
+	std_vector<chunk_id> upload_voxels; // REMESH of this frame
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);

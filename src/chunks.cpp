@@ -121,22 +121,12 @@ void Chunks::write_block (int x, int y, int z, chunk_id cid, block_id data) {
 void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	c->flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
-	auto flag_neighbour = [&] (int x, int y, int z) {
-		//auto nid = chunks_arr.checked_get(x,y,z);
-		auto nid = query_chunk(int3(x,y,z));
-		if (nid != U16_NULL) {
-			assert(chunks[nid].flags != 0);
-			chunks[nid].flags |= Chunk::REMESH;
-		}
-	};
-
-	// Set remesh flags for neighbours where needed
-	if (x == 0           ) flag_neighbour(c->pos.x-1, c->pos.y,   c->pos.z  );
-	if (x == CHUNK_SIZE-1) flag_neighbour(c->pos.x+1, c->pos.y,   c->pos.z  );
-	if (y == 0           ) flag_neighbour(c->pos.x,   c->pos.y-1, c->pos.z  );
-	if (y == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y+1, c->pos.z  );
-	if (z == 0           ) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z-1);
-	if (z == CHUNK_SIZE-1) flag_neighbour(c->pos.x,   c->pos.y,   c->pos.z+1);
+	c->dirty_rect_min.x = min(c->dirty_rect_min.x, x);
+	c->dirty_rect_min.y = min(c->dirty_rect_min.x, y);
+	c->dirty_rect_min.z = min(c->dirty_rect_min.x, z);
+	c->dirty_rect_max.x = max(c->dirty_rect_max.x, x+1);
+	c->dirty_rect_max.y = max(c->dirty_rect_max.x, y+1);
+	c->dirty_rect_max.z = max(c->dirty_rect_max.x, z+1);
 }
 
 void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t& subc) {
@@ -283,6 +273,7 @@ chunk_id Chunks::alloc_chunk (int3 pos) {
 		chunk.flags = Chunk::ALLOCATED;
 		chunk.pos = pos;
 		//chunk.refcount = 0;
+		chunk.clear_dirty_rect();
 		chunk.init_meshes();
 	}
 
@@ -568,6 +559,78 @@ void Chunks::update_chunk_loading (Game& game) {
 	}
 }
 
+void Chunks::flag_touching_neighbours (Chunk* c) {
+	// Set remesh flags for neighbours where needed
+	auto flag_neighbour = [&] (int x, int y, int z, Chunk::Flags flag) {
+		//auto nid = chunks_arr.checked_get(x,y,z);
+		auto nid = query_chunk(int3(x,y,z));
+		if (nid != U16_NULL) {
+			assert(chunks[nid].flags != 0);
+			chunks[nid].flags |= flag;
+		}
+	};
+
+	int3 const& x0 = c->dirty_rect_min;
+	int3 const& x1 = c->dirty_rect_max;
+	int sz = CHUNK_SIZE-1;
+
+	Chunk::Flags face = Chunk::DIRTY_FACE | Chunk::REMESH;
+	Chunk::Flags edge = Chunk::DIRTY_FACE;
+	Chunk::Flags corner = Chunk::DIRTY_FACE;
+
+	if (x0.x == 0) {
+		if (x0.y == 0) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x -1, c->pos.y -1, c->pos.z -1, corner);
+			                flag_neighbour(c->pos.x -1, c->pos.y -1, c->pos.z   , edge);
+			if (x1.z == sz) flag_neighbour(c->pos.x -1, c->pos.y -1, c->pos.z +1, corner);
+		}
+		{
+			if (x0.z ==  0) flag_neighbour(c->pos.x -1, c->pos.y   , c->pos.z -1, edge);
+			                flag_neighbour(c->pos.x -1, c->pos.y   , c->pos.z   , face); // -X face
+			if (x1.z == sz) flag_neighbour(c->pos.x -1, c->pos.y   , c->pos.z +1, edge);
+		}
+		if (x1.y == sz) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x -1, c->pos.y +1, c->pos.z -1, corner);
+			                flag_neighbour(c->pos.x -1, c->pos.y +1, c->pos.z   , edge);
+			if (x1.z == sz) flag_neighbour(c->pos.x -1, c->pos.y +1, c->pos.z +1, corner);
+		}
+	}
+	{
+		if (x0.y == 0) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x   , c->pos.y -1, c->pos.z -1, edge);
+			                flag_neighbour(c->pos.x   , c->pos.y -1, c->pos.z   , face); // -Y face
+			if (x1.z == sz) flag_neighbour(c->pos.x   , c->pos.y -1, c->pos.z +1, edge);
+		}
+		{
+			if (x0.z ==  0) flag_neighbour(c->pos.x   , c->pos.y   , c->pos.z -1, face); // -Z face
+			// -------------/\/\/\/\/\/\/\---------------------------------------
+			if (x1.z == sz) flag_neighbour(c->pos.x   , c->pos.y   , c->pos.z +1, face); // +Z face
+		}
+		if (x1.y == sz) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x   , c->pos.y +1, c->pos.z -1, edge);
+			                flag_neighbour(c->pos.x   , c->pos.y +1, c->pos.z   , face); // +Y face
+			if (x1.z == sz) flag_neighbour(c->pos.x   , c->pos.y +1, c->pos.z +1, edge);
+		}
+	}
+	if (x1.x == sz) {
+		if (x0.y == 0) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x +1, c->pos.y -1, c->pos.z -1, corner);
+			                flag_neighbour(c->pos.x +1, c->pos.y -1, c->pos.z   , edge);
+			if (x1.z == sz) flag_neighbour(c->pos.x +1, c->pos.y -1, c->pos.z +1, corner);
+		}
+		{
+			if (x0.z ==  0) flag_neighbour(c->pos.x +1, c->pos.y   , c->pos.z -1, edge);
+			                flag_neighbour(c->pos.x +1, c->pos.y   , c->pos.z   , face); // +X face
+			if (x1.z == sz) flag_neighbour(c->pos.x +1, c->pos.y   , c->pos.z +1, edge);
+		}
+		if (x1.y == sz) {
+			if (x0.z ==  0) flag_neighbour(c->pos.x +1, c->pos.y +1, c->pos.z -1, corner);
+			                flag_neighbour(c->pos.x +1, c->pos.y +1, c->pos.z   , edge);
+			if (x1.z == sz) flag_neighbour(c->pos.x +1, c->pos.y +1, c->pos.z +1, corner);
+		}
+	}
+}
+
 void Chunks::update_chunk_meshing (Game& game) {
 	ZoneScoped;
 
@@ -587,16 +650,24 @@ void Chunks::update_chunk_meshing (Game& game) {
 			chunk._validate_flags();
 			
 			if (chunk.flags & Chunk::VOXELS_DIRTY) {
-				upload_voxels.push_back(cid);
+				flag_touching_neighbours(&chunk);
 
 				checked_sparsify_chunk(cid);
-				chunk.flags &= ~Chunk::VOXELS_DIRTY;
 			}
-
+		}
+		for (chunk_id cid = 0; cid<end(); ++cid) {
+			auto& chunk = chunks[cid];
+			
 			if (chunk.flags & Chunk::REMESH) {
 				auto job = std::make_unique<RemeshChunkJob>(*this, cid, game.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
+
+			if (chunk.flags & (Chunk::VOXELS_DIRTY | Chunk::DIRTY_FACE | Chunk::DIRTY_EDGE | Chunk::DIRTY_CORNER)) {
+				upload_voxels.push_back(cid);
+			}
+
+			chunk.flags &= ~(Chunk::VOXELS_DIRTY | Chunk::DIRTY_FACE | Chunk::DIRTY_EDGE | Chunk::DIRTY_CORNER);
 		}
 	}
 

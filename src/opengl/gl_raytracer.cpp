@@ -52,288 +52,6 @@ namespace gl {
 	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 
-	#if 0
-		{
-			ImGui::Begin("DFTest");
-
-			static int3 coord = int3(-21,-85,219);
-			static int radius = 5;
-			ImGui::DragInt3("coord", &coord.x, 0.1f);
-			ImGui::DragInt("radius", &radius, 0.1f);
-
-			array3D<int2> grid0 (int3(16,16,1));
-			array3D<int2> grid1 (int3(16,16,1));
-			array3D<int2> grid_test (int3(16,16,1));
-
-			g_debugdraw.wire_cube((float3)coord + (float3)grid0.size/2, (float3)grid0.size, lrgba(1,0,0,1));
-
-			int iNULL = 999;
-
-			for (int y=0; y<grid0.size.y; ++y)
-			for (int x=0; x<grid0.size.x; ++x) {
-
-				auto bid = game.chunks.read_block(coord.x + x, coord.y + y, coord.z);
-
-				grid0.get(x,y,0) = bid > 1 ? 0 : iNULL;
-			}
-
-
-			for (int x=0; x<grid0.size.x; ++x) {
-				for (int y=0; y<grid0.size.y; ++y) {
-					int2 a = grid0.get_or_default(x-1, y-1, 0, iNULL);
-					int2 b = grid0.get_or_default(x-1, y  , 0, iNULL);
-					int2 c = grid0.get_or_default(x-1, y+1, 0, iNULL);
-
-					int2 d = grid0.get_or_default(x, y, 0, iNULL);
-
-					if (a.x > 0) a = iNULL;
-					if (b.x > 0) b = iNULL;
-					if (c.x > 0) c = iNULL;
-
-					if (a.x != iNULL) a += int2(-1, -1);
-					if (b.x != iNULL) b += int2(-1,  0);
-					if (c.x != iNULL) c += int2(-1, +1);
-
-					int ad = a.x*a.x + a.y*a.y;
-					int bd = b.x*b.x + b.y*b.y;
-					int cd = c.x*c.x + c.y*c.y;
-					int dd = d.x*d.x + d.y*d.y;
-
-					int dist = min(min(ad, bd), min(cd, dd));
-
-					int2 val;
-					if      (ad == dist) val = a;
-					else if (bd == dist) val = b;
-					else if (cd == dist) val = c;
-					else                 val = d;
-
-					grid0.get(x,y,0) = val;
-				}
-			}
-
-			for (int x=grid0.size.x-1; x>=0; --x) {
-				for (int y=0; y<grid0.size.y; ++y) {
-					int2 a = grid0.get_or_default(x+1, y-1, 0, iNULL);
-					int2 b = grid0.get_or_default(x+1, y  , 0, iNULL);
-					int2 c = grid0.get_or_default(x+1, y+1, 0, iNULL);
-
-					int2 d = grid0.get_or_default(x, y, 0, iNULL);
-					
-					if (a.x < 0) a = iNULL;
-					if (b.x < 0) b = iNULL;
-					if (c.x < 0) c = iNULL;
-
-					if (a.x != iNULL) a += int2(+1, -1);
-					if (b.x != iNULL) b += int2(+1,  0);
-					if (c.x != iNULL) c += int2(+1, +1);
-
-					int ad = a.x*a.x + a.y*a.y;
-					int bd = b.x*b.x + b.y*b.y;
-					int cd = c.x*c.x + c.y*c.y;
-					int dd = d.x*d.x + d.y*d.y;
-			
-					int dist = min(min(ad, bd), min(cd, dd));
-			
-					int2 val;
-					if      (ad == dist) val = a;
-					else if (bd == dist) val = b;
-					else if (cd == dist) val = c;
-					else                 val = d;
-			
-					grid0.get(x,y,0) = val;
-				}
-			}
-
-			for (int y=0; y<grid0.size.y; ++y)
-			for (int x=0; x<grid0.size.x; ++x) {
-				grid1.get(x,y,0) = grid0.get(x,y,0);
-			}
-
-			for (int y=0; y<grid1.size.y; ++y) {
-				for (int x=0; x<grid1.size.x; ++x) {
-					int2 a = grid1.get_or_default(x-1, y-1, 0, iNULL);
-					int2 b = grid1.get_or_default(x  , y-1, 0, iNULL);
-					int2 c = grid1.get_or_default(x+1, y-1, 0, iNULL);
-
-					int2 d = grid1.get_or_default(x, y, 0, iNULL);
-
-					if (a.y > 0) a = iNULL;
-					if (b.y > 0) b = iNULL;
-					if (c.y > 0) c = iNULL;
-
-					if (a.x != iNULL) a += int2(-1, -1);
-					if (b.x != iNULL) b += int2( 0, -1);
-					if (c.x != iNULL) c += int2(+1, -1);
-
-					int ad = a.x*a.x + a.y*a.y;
-					int bd = b.x*b.x + b.y*b.y;
-					int cd = c.x*c.x + c.y*c.y;
-					int dd = d.x*d.x + d.y*d.y;
-
-					int dist = min(min(ad, bd), min(cd, dd));
-
-					int2 val;
-					if      (ad == dist) val = a;
-					else if (bd == dist) val = b;
-					else if (cd == dist) val = c;
-					else                 val = d;
-
-					grid1.get(x,y,0) = val;
-				}
-			}
-
-			for (int y=grid1.size.y-1; y>=0; --y) {
-				for (int x=0; x<grid0.size.x; ++x) {
-					int2 a = grid1.get_or_default(x-1, y+1, 0, iNULL);
-					int2 b = grid1.get_or_default(x  , y+1, 0, iNULL);
-					int2 c = grid1.get_or_default(x+1, y+1, 0, iNULL);
-			
-					int2 d = grid1.get_or_default(x, y, 0, iNULL);
-					
-					if (a.y < 0) a = iNULL;
-					if (b.y < 0) b = iNULL;
-					if (c.y < 0) c = iNULL;
-
-					if (a.x != iNULL) a += int2(-1, +1);
-					if (b.x != iNULL) b += int2( 0, +1);
-					if (c.x != iNULL) c += int2(+1, +1);
-
-					int ad = a.x*a.x + a.y*a.y;
-					int bd = b.x*b.x + b.y*b.y;
-					int cd = c.x*c.x + c.y*c.y;
-					int dd = d.x*d.x + d.y*d.y;
-
-					int dist = min(min(ad, bd), min(cd, dd));
-
-					int2 val;
-					if      (ad == dist) val = a;
-					else if (bd == dist) val = b;
-					else if (cd == dist) val = c;
-					else                 val = d;
-			
-					grid1.get(x,y,0) = val;
-				}
-			}
-
-
-			// Brute force version
-			for (int y=0; y<grid_test.size.y; ++y)
-			for (int x=0; x<grid_test.size.x; ++x) {
-
-				int2 min_offs = iNULL;
-				int min_dist_sqr = iNULL;
-				
-				for (int cy=0; cy<grid_test.size.y; ++cy)
-				for (int cx=0; cx<grid_test.size.x; ++cx) {
-					auto bid = game.chunks.read_block(coord.x + cx, coord.y + cy, coord.z);
-				
-					if (bid > 1) {
-						int2 offs = int2(cx-x, cy-y);
-						int dist_sqr = offs.x*offs.x + offs.y*offs.y;
-						if (dist_sqr <= min_dist_sqr) {
-							min_dist_sqr = dist_sqr;
-							min_offs = offs;
-						}
-					}
-				}
-
-				grid_test.get(x,y,0) = min_offs;
-			}
-
-			ImGui::Text("X-Pass");
-			if (ImGui::BeginTable("X-Pass", grid0.size.x, ImGuiTableFlags_Borders)) {
-				for (int y=grid0.size.y-1; y>=0; --y) {
-					ImGui::TableNextRow();
-					for (int x=0; x<grid0.size.x; ++x) {
-						int2 offs = grid0.get(x,y,0);
-
-						ImGui::TableNextColumn();
-						ImGui::Text(offs.x >= iNULL ? "":"%d,%d", offs.x,offs.y);
-
-						float dist = length((float2)offs);
-						if (offs != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
-							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
-						}
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			ImGui::Text("Y-Pass");
-			if (ImGui::BeginTable("Y-Pass", grid1.size.x, ImGuiTableFlags_Borders)) {
-				for (int y=grid1.size.y-1; y>=0; --y) {
-					ImGui::TableNextRow();
-					for (int x=0; x<grid1.size.x; ++x) {
-						int2 offs = grid1.get(x,y,0);
-			
-						ImGui::TableNextColumn();
-						ImGui::Text(offs.x >= iNULL ? "":"%d,%d", offs.x,offs.y);
-						
-						float dist = length((float2)offs);
-						if (offs != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
-							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
-						}
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			ImGui::Text("Result");
-			if (ImGui::BeginTable("Result", grid1.size.x, ImGuiTableFlags_Borders)) {
-				for (int y=grid1.size.y-1; y>=0; --y) {
-					ImGui::TableNextRow();
-					for (int x=0; x<grid1.size.x; ++x) {
-						int2 offs = grid1.get(x,y,0);
-						float dist = length((float2)offs);
-
-						ImGui::TableNextColumn();
-						ImGui::Text(offs.x >= iNULL ? "":"%.2f", dist);
-
-						if (offs != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
-							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, offs != 0 ? red32 : solid32);
-						}
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			ImGui::Text("Brute Force Version");
-			if (ImGui::BeginTable("Brute Force Version", grid_test.size.x, ImGuiTableFlags_Borders)) {
-				for (int y=grid_test.size.y-1; y>=0; --y) {
-					ImGui::TableNextRow();
-					for (int x=0; x<grid_test.size.x; ++x) {
-						int2 offs = grid_test.get(x,y,0);
-						int2 offs2 = grid1.get(x,y,0);
-
-						float dist = length((float2)offs);
-						float dist2 = length((float2)offs2);
-
-						bool error = abs(dist - dist2) > 0.001f;
-
-						ImGui::TableNextColumn();
-						ImGui::Text(offs.x >= iNULL ? "":"%.2f", dist);
-
-						if (offs != iNULL) {
-							ImU32 red32   = ImGui::GetColorU32(ImVec4(1.0f - dist / ((float)radius*1.44f), 0, 0, 1));
-							ImU32 solid32 = ImGui::GetColorU32(ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
-							ImU32 error32 = ImGui::GetColorU32(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
-							ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, error ? error32 : (offs != 0 ? red32 : solid32));
-						}
-					}
-				}
-				ImGui::EndTable();
-			}
-
-			ImGui::End();
-		}
-	#endif
-
 		std::vector<int3> chunks;
 
 		if (!game.chunks.upload_voxels.empty()) {
@@ -404,31 +122,56 @@ namespace gl {
 
 				int count = (int)chunks.size();
 
-				for (int pass=0; pass<3; ++pass) {
-					Shader* shad = df_tex.shad_pass[pass];
+				{
+					glUseProgram(df_tex.shad_init->prog);
 
-					glUseProgram(shad->prog);
-
-					r.state.bind_textures(shad, {
+					r.state.bind_textures(df_tex.shad_init, {
 						{"voxel_tex", voxel_tex.tex},
 					});
 					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
 
 					static constexpr int BATCHSIZE = 32;
 					for (int i=0; i<count; i+=BATCHSIZE) {
-						
+					
 						int subcount = min(count - i, BATCHSIZE);
-
+					
 						int3 offsets[BATCHSIZE] = {};
 						for (int j=0; j<subcount; ++j)
 							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+					
+						df_tex.shad_init->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
+					
+						int SIZE = 16-2;
+						int dispatch_size = (CHUNK_SIZE + SIZE-1) / SIZE;
+						glDispatchCompute(dispatch_size, dispatch_size, dispatch_size * subcount);
+					}
 
+					glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+				}
+
+				for (int pass=0; pass<3; ++pass) {
+					Shader* shad = df_tex.shad_pass[pass];
+				
+					glUseProgram(shad->prog);
+				
+					r.state.bind_textures(shad, {});
+					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
+				
+					static constexpr int BATCHSIZE = 32;
+					for (int i=0; i<count; i+=BATCHSIZE) {
+						
+						int subcount = min(count - i, BATCHSIZE);
+				
+						int3 offsets[BATCHSIZE] = {};
+						for (int j=0; j<subcount; ++j)
+							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+				
 						shad->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
-
+				
 						int dispatch_size = (CHUNK_SIZE + DFTexture::COMPUTE_GROUPSZ -1) / DFTexture::COMPUTE_GROUPSZ;
 						glDispatchCompute(dispatch_size, dispatch_size, subcount);
 					}
-
+				
 					glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 				}
 			}

@@ -85,9 +85,12 @@ namespace gl {
 
 		static constexpr int COMPUTE_GROUPSZ = 8;
 
+		Shader* shad_init = nullptr;
 		Shader* shad_pass[3] = {};
 
 		DFTexture (Shaders& shaders) {
+			shad_init = shaders.compile("rt_df_init", {}, {{ COMPUTE_SHADER }});
+
 			for (int pass=0; pass<3; ++pass)
 				shad_pass[pass] = shaders.compile("rt_df_gen", {
 						{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
