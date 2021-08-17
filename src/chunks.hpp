@@ -169,8 +169,8 @@ struct Chunk {
 	int3 dirty_rect_max;
 
 	void clear_dirty_rect () {
-		dirty_rect_min = 0;
-		dirty_rect_max = 0;
+		dirty_rect_min = INT_MAX;
+		dirty_rect_max = INT_MIN;
 	}
 
 	chunk_id neighbours[6];

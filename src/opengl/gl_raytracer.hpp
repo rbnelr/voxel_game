@@ -64,7 +64,7 @@ namespace gl {
 		VoxelTexture () {
 			tex = {"RT.voxels"};
 
-			glTextureStorage3D(tex, 1, GL_R8UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
+			glTextureStorage3D(tex, 1, GL_R16UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
 			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
 

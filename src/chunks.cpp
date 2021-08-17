@@ -122,11 +122,11 @@ void Chunks::write_block_update_chunk_flags (int x, int y, int z, Chunk* c) {
 	c->flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
 	c->dirty_rect_min.x = min(c->dirty_rect_min.x, x);
-	c->dirty_rect_min.y = min(c->dirty_rect_min.x, y);
-	c->dirty_rect_min.z = min(c->dirty_rect_min.x, z);
+	c->dirty_rect_min.y = min(c->dirty_rect_min.y, y);
+	c->dirty_rect_min.z = min(c->dirty_rect_min.z, z);
 	c->dirty_rect_max.x = max(c->dirty_rect_max.x, x+1);
-	c->dirty_rect_max.y = max(c->dirty_rect_max.x, y+1);
-	c->dirty_rect_max.z = max(c->dirty_rect_max.x, z+1);
+	c->dirty_rect_max.y = max(c->dirty_rect_max.y, y+1);
+	c->dirty_rect_max.z = max(c->dirty_rect_max.z, z+1);
 }
 
 void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t& subc) {
@@ -489,6 +489,8 @@ void Chunks::update_chunk_loading (Game& game) {
 
 				sparse_chunk_from_worldgen(cid, chunk, &job->noise_pass.voxels[0][0][0]);
 
+				chunk.dirty_rect_min = 0;
+				chunk.dirty_rect_max = CHUNK_SIZE;
 				chunk.flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
 				// link neighbour ptrs and flag neighbours to be remeshed
@@ -572,7 +574,7 @@ void Chunks::flag_touching_neighbours (Chunk* c) {
 
 	int3 const& x0 = c->dirty_rect_min;
 	int3 const& x1 = c->dirty_rect_max;
-	int sz = CHUNK_SIZE-1;
+	int sz = CHUNK_SIZE;
 
 	Chunk::Flags face = Chunk::DIRTY_FACE | Chunk::REMESH;
 	Chunk::Flags edge = Chunk::DIRTY_FACE;
@@ -629,6 +631,8 @@ void Chunks::flag_touching_neighbours (Chunk* c) {
 			if (x1.z == sz) flag_neighbour(c->pos.x +1, c->pos.y +1, c->pos.z +1, corner);
 		}
 	}
+
+	c->clear_dirty_rect();
 }
 
 void Chunks::update_chunk_meshing (Game& game) {
@@ -653,6 +657,8 @@ void Chunks::update_chunk_meshing (Game& game) {
 				flag_touching_neighbours(&chunk);
 
 				checked_sparsify_chunk(cid);
+
+				upload_voxels.push_back(cid);
 			}
 		}
 		for (chunk_id cid = 0; cid<end(); ++cid) {
@@ -661,10 +667,6 @@ void Chunks::update_chunk_meshing (Game& game) {
 			if (chunk.flags & Chunk::REMESH) {
 				auto job = std::make_unique<RemeshChunkJob>(*this, cid, game.world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
-			}
-
-			if (chunk.flags & (Chunk::VOXELS_DIRTY | Chunk::DIRTY_FACE | Chunk::DIRTY_EDGE | Chunk::DIRTY_CORNER)) {
-				upload_voxels.push_back(cid);
 			}
 
 			chunk.flags &= ~(Chunk::VOXELS_DIRTY | Chunk::DIRTY_FACE | Chunk::DIRTY_EDGE | Chunk::DIRTY_CORNER);
