@@ -85,12 +85,9 @@ namespace gl {
 
 		static constexpr int COMPUTE_GROUPSZ = 8;
 
-		Shader* shad_init = nullptr;
 		Shader* shad_pass[3] = {};
 
 		DFTexture (Shaders& shaders) {
-			shad_init = shaders.compile("rt_df_init", {}, {{ COMPUTE_SHADER }});
-
 			for (int pass=0; pass<3; ++pass)
 				shad_pass[pass] = shaders.compile("rt_df_gen", {
 						{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
@@ -152,6 +149,20 @@ namespace gl {
 				glTexParameteri(GL_TEXTURE_3D, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
 
 				glTextureStorage3D(tex, 1, GL_SRGB8_ALPHA8, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT, 32*SUBCHUNK_COUNT);
+			#endif
+			#if 0
+
+				int max_compute_work_group_invocations;
+				int3 max_compute_work_group_count;
+				int3 max_compute_work_group_size;
+				glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &max_compute_work_group_invocations);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &max_compute_work_group_count.x);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &max_compute_work_group_count.y);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &max_compute_work_group_count.z);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &max_compute_work_group_size.x);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &max_compute_work_group_size.y);
+				glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &max_compute_work_group_size.z);
+
 			#endif
 		}
 

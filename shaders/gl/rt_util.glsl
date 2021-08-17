@@ -231,29 +231,27 @@ bool _dbgdraw = false;
 uniform int max_iterations = 200;
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
-	float dist;
+	bvec3 dir_pos = greaterThanEqual(ray_dir, vec3(0.0));
 	
-	// flip coordinate space such that ray is always positive (simplifies stepping logic)
-	// keep track of flip via flipmask
-	bvec3 ray_neg = lessThan(ray_dir, vec3(0.0));
-	vec3 flippedf = mix(ray_pos, WORLD_SIZEf - ray_pos, ray_neg);
+	ivec3 vox_exit = mix(ivec3(0), ivec3(1), dir_pos);
 	
-	ivec3 flipmask = mix(ivec3(0), ivec3(FLIPMASK), ray_neg);
+	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_pos);
 	
 	// precompute part of plane projection equation
 	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
 	// due to mad instruction
-	vec3 inv_dir = 1.0 / abs(ray_dir);
-	vec3 bias = inv_dir * -flippedf;
+	vec3 inv_dir = 1.0 / ray_dir;
+	vec3 bias = inv_dir * -ray_pos;
 	
+	float dist;
 	{ // allow ray to start outside ray for nice debugging views
 		float epsilon = 0.0001; // stop the raymarching from sometimes sampling outside the world textures
-		vec3 world_min = vec3(0) + epsilon;
+		vec3 world_min = vec3(        0.0) + epsilon;
 		vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
 		
 		// calculate entry and exit coords into whole world cube
-		vec3 t0v = world_min * inv_dir + bias;
-		vec3 t1v = world_max * inv_dir + bias;
+		vec3 t0v = mix(world_max, world_min, dir_pos) * inv_dir + bias;
+		vec3 t1v = mix(world_min, world_max, dir_pos) * inv_dir + bias;
 		float t0 = max(max(t0v.x, t0v.y), t0v.z);
 		float t1 = min(min(t1v.x, t1v.y), t1v.z);
 		
@@ -272,87 +270,85 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		//flippedf = max(flippedf, vec3(0.0));
 	}
 	
+	float manhattan_fac = 1.0 / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
+	
 	uint bid;
 	
-	ivec3 coord;
-	bool dda = false;
+	vec3 pos = dist * ray_dir + ray_pos;
+	ivec3 coord = ivec3(pos);
 	
 	int dbgcol = 0;
+	int iter = 0;
 	
-	for (int iter=0; iter<max_iterations; ++iter) {
-		if (iter >= max_iterations || dist >= max_dist)
-			return false; // miss
+	for (;;) {
 		VISUALIZE_COST_COUNT
 		
-		vec3 pos = dist * ray_dir + ray_pos;
+		float df = float(texelFetch(df_tex, coord, 0).r) - 1.0;
+		df *= manhattan_fac;
 		
-		float df = float(texelFetch(df_tex, ivec3(floor(pos)), 0).r);
-		
-		df = min(df / sqrt(3.0), 8.0);
-		
-		//float df = textureLod(df_tex, pos * INV_WORLD_SIZEf, 0.0).r * DF_RADIUSf;
-		
-		if (df > 0.0) {
+		if (df > 1.0) {
 			// DF tells us that we can still step by df before we can possibly hit a voxel
 			// step via DF raymarching
 			
-			dda = false;
+			// step up to exit of current cell, since DF is safe up until its bounds
+			// seems to give a little bit of perf, as this reduces iteration count
+			// of course iteration now has more instructions, so could hurt as well
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+			dist = min(min(t1v.x, t1v.y), t1v.z);
 			
 			#if DEBUGDRAW
+			pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
 			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
 			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
 			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
 			#endif
 			
+			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+			vec3 chunk_exit = vec3((coord & ~63) + vox_exit*64);
+			
+			vec3 chunk_t1v = inv_dir * chunk_exit + bias;
+			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z);
+			
 			dist += df;
+			// limit step to exactly on the exit face of the chunk
+			dist = min(dist, chunk_t1);
+			
+			// update pos for next iteration
+			pos = dist * ray_dir + ray_pos;
+			
+			// fix precision issues with coord calculation when limiting step to on chunk face
+			// note: prefer this to adding epsilon to chunk_t1, since that can miss voxels through the diagonals
+			if      (chunk_t1v.x == dist) pos.x += float(step_dir.x) * 0.5;
+			else if (chunk_t1v.y == dist) pos.y += float(step_dir.y) * 0.5;
+			else if (chunk_t1v.z == dist) pos.z += float(step_dir.z) * 0.5;
+			
+			// update coord for next iteration
+			coord = ivec3(pos);
+			
 		} else {
-			// DF is 0, we need to check individual voxels now
-			
-			//// Naiive raymarching
-			//#if DEBUGDRAW
-			//if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(0.1*2.0), vec4(1,1,0,1));
-			//#endif
-			//
-			//bid = textureLod(voxel_tex, pos * INV_WORLD_SIZEf, 0.0).r;
-			//if (bid > B_AIR)
-			//	break;
-			//
-			//dist += 0.1;
-			
-			// Switch between DDA and raymarching
-			if (!dda) {
-				coord = ivec3(floor(pos)) ^ flipmask;
-				dda = true;
-			}
+			// DF is 0, we need to check individual voxels by DDA now
 			
 			#if DEBUGDRAW
-			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord ^ flipmask) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
 			#endif
 			
-			bid = texelFetch(voxel_tex, coord ^ flipmask, 0).r;
+			bid = texelFetch(voxel_tex, coord, 0).r;
 			if (bid > B_AIR)
 				break;
 			
-			ivec3 next_coord = coord + 1;
-			
-			vec3 t0v = inv_dir * vec3(next_coord) + bias;
-			dist = min(min(t0v.x, t0v.y), t0v.z);
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+			dist = min(min(t1v.x, t1v.y), t1v.z);
 			
 			// step on axis where exit distance is lowest
-			int stepcoord;
-			if (t0v.x == dist) {
-				coord.x = next_coord.x;
-				stepcoord = coord.x;
-			} else if (t0v.y == dist) {
-				coord.y = next_coord.y;
-				stepcoord = coord.y;
-			} else {
-				coord.z = next_coord.z;
-				stepcoord = coord.z;
-			}
+			if      (t1v.x == dist) coord.x += step_dir.x;
+			else if (t1v.y == dist) coord.y += step_dir.y;
+			else                    coord.z += step_dir.z;
 		}
 		
 		dbgcol ^= 1;
+		iter++;
+		if (iter >= max_iterations || dist >= max_dist)
+			return false; // miss
 	}
 	
 	#if DEBUGDRAW
@@ -360,6 +356,13 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	#endif
 	
 	{ // calc hit info
+		
+		// snap ray to voxel entry in case we landed inside a voxel when raymarching
+		vec3 vox_entry = vec3(coord) + mix(vec3(1.0), vec3(0.0), dir_pos);
+		
+		vec3 t0v = inv_dir * vox_entry + bias;
+		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to not count faces behind ray
+		
 		hit.bid = bid;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
@@ -368,7 +371,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		int face;
 		{ // calc hit face, uv and normal
 			vec3 hit_fract = hit.pos;
-			vec3 hit_center = vec3(coord ^ flipmask) + 0.5;
+			vec3 hit_center = vec3(coord) + 0.5;
 			
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);

@@ -9,10 +9,10 @@ layout(r8ui, binding = 4) restrict uniform uimage3D df_img;
 uniform ivec3 offsets[32];
 
 void main () {
-#if PASS == 1
+#if PASS == 0
 	ivec3 pos = ivec3(0, gl_GlobalInvocationID.xy);
 	#define GETPOS(I) ivec3(pos.x + (I), pos.y, pos.z)
-#elif PASS == 2
+#elif PASS == 1
 	ivec3 pos = ivec3(gl_GlobalInvocationID.x, 0, gl_GlobalInvocationID.y);
 	#define GETPOS(I) ivec3(pos.x, pos.y + (I), pos.z)
 #else
@@ -23,6 +23,18 @@ void main () {
 	pos += offsets[gl_WorkGroupID.z];
 	
 	uint prev = 255u;
+	
+#if PASS == 0
+	for (int i=0; i<SIZE; ++i) {
+		ivec3 p = GETPOS(i);
+		
+		uint bid = texelFetch(voxel_tex, p, 0).r;
+		uint cur = bid > B_AIR ? 0u : prev+1u;
+		
+		imageStore(df_img, p, uvec4(cur, 0u,0u,0u));
+		prev = cur;
+	}
+#else
 	for (int i=0; i<SIZE; ++i) {
 		ivec3 p = GETPOS(i);
 		uint cur = imageLoad(df_img, p).r;
@@ -31,6 +43,7 @@ void main () {
 		if (prev < cur) imageStore(df_img, p, uvec4(prev, 0u,0u,0u));
 		else            prev = cur;
 	}
+#endif
 	
 	prev = 255u;
 	for (int i=SIZE-1; i>=0; --i) {

@@ -11,8 +11,9 @@ float map (float x, float a, float b) {
 	return (x - a) / (b - a);
 }
 
-#define PI	3.1415926535897932384626433832795
-#define INF (1. / 0.)
+const float PI			= 3.1415926535897932384626433832795;
+const float INV_SQRT_3	= 0.5773502691896257645091487805019;
+const float INF			= 1. / 0.;
 
 // theta is angle from 0,0,1
 // phi is horizontal angle starting at 0,1,0
