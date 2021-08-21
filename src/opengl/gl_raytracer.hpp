@@ -89,7 +89,7 @@ namespace gl {
 
 		DFTexture (Shaders& shaders) {
 			for (int pass=0; pass<3; ++pass)
-				shad_pass[pass] = shaders.compile("rt_df_gen", {
+				shad_pass[pass] = shaders.compile("rt_df_gen", prints("rt_df_gen%d", pass).c_str(), {
 						{"GROUPSZ", prints("%d", COMPUTE_GROUPSZ)},
 						{"PASS", prints("%d", pass)},
 					}, {{ COMPUTE_SHADER }});

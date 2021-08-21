@@ -734,6 +734,7 @@ struct MacroDefinition {
 
 struct Shader {
 	std::string						name;
+	std::string						dbgname;
 
 	std::vector<ShaderStage>		stages;
 	std::vector<MacroDefinition>	macros;
@@ -762,7 +763,7 @@ struct Shader {
 		// Compile shader stages
 
 		prog = glCreateProgram();
-		OGL_DBG_LABEL(GL_PROGRAM, prog, name);
+		OGL_DBG_LABEL(GL_PROGRAM, prog, dbgname);
 
 		std::vector<GLuint> compiled_stages;
 
@@ -959,13 +960,14 @@ struct Shaders {
 	}
 
 	Shader* compile (
-		char const* name,
+		char const* name, char const* dbgname,
 		std::vector<MacroDefinition>&& macros,
 		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
 		ZoneScoped;
 
 		auto s = std::make_unique<Shader>();
 		s->name = name;
+		s->dbgname = dbgname;
 		s->stages = stages;
 		s->macros = std::move(macros);
 
@@ -978,9 +980,24 @@ struct Shaders {
 
 	Shader* compile (
 		char const* name,
+		std::vector<MacroDefinition>&& macros,
+		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
+		return compile(name, name, std::move(macros), stages);
+	}
+
+	Shader* compile (
+		char const* name,
 		std::initializer_list<MacroDefinition> macros = {},
 		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
-		return compile(name, std::vector<MacroDefinition>(macros), stages);
+		return compile(name, name, std::move(macros), stages);
+	}
+
+	// optional dbgname version to differentiate same-filename-different-macro shaders in debugger
+	Shader* compile (
+		char const* filename, char const* dbgname,
+		std::initializer_list<MacroDefinition> macros = {},
+		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
+		return compile(filename, dbgname, std::vector<MacroDefinition>(macros), stages);
 	}
 };
 

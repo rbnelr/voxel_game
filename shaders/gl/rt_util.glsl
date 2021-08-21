@@ -283,7 +283,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	for (;;) {
 		VISUALIZE_COST_COUNT
 		
-		float df = float(texelFetch(df_tex, coord, 0).r) - 1.0;
+		float df = float(texelFetch(df_tex, coord, 0).r) - 2.0;
 		df *= manhattan_fac;
 		
 		if (df > 1.0) {

@@ -58,7 +58,7 @@ namespace gl {
 			OGL_TRACE("raytracer upload changes");
 
 			block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // temp buffer to 'decompress' the data and enable uploading it in a single glTextureSubImage3D
-
+			
 			for (auto cid : game.chunks.upload_voxels) {
 				auto& chunk = game.chunks.chunks[cid];
 				auto& vox = game.chunks.chunk_voxels[cid];
@@ -79,20 +79,20 @@ namespace gl {
 							auto subc = vox.subchunks[IDX3D(sx,sy,sz, SUBCHUNK_SIZE)];
 							if (subc & SUBC_SPARSE_BIT) {
 								block_id val = (block_id)(subc & ~SUBC_SPARSE_BIT);
-
+							
 								block_id val_packed[SUBCHUNK_SIZE];
 								for (int i=0; i<SUBCHUNK_SIZE; ++i)
 									val_packed[i] = val;
-
+							
 								for (int z=0; z<SUBCHUNK_SIZE; ++z)
 								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
 									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
 									memcpy(dst, val_packed, sizeof(block_id)*SUBCHUNK_SIZE);
 								}
-
+							
 							} else {
 								auto* data = game.chunks.subchunks[subc].voxels;
-
+							
 								for (int z=0; z<SUBCHUNK_SIZE; ++z)
 								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
 									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
@@ -165,7 +165,7 @@ namespace gl {
 
 			glUseProgram(rt_forward->prog);
 
-			rt_forward->set_uniform("dispatch_size", r.framebuffer.size);
+			rt_forward->set_uniform("framebuf_size", r.framebuffer.size);
 			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
 			rt_forward->set_uniform("max_iterations", max_iterations);
