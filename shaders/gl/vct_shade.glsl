@@ -136,6 +136,42 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 layout(rgba16f, binding = 0) writeonly restrict uniform image2D output_color;
 uniform vec2 dispatch_size;
 
+// Instead of executing work groups in a simple row major order
+// reorder them into columns of width N (by returning a different 2d index)
+// in each column the work groups are still row major order
+// replicates this: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
+uvec2 work_group_tiling (uint N) {
+	#if 0
+	return gl_WorkGroupID.xy;
+	#else
+	uint idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+	
+	uint column_size       = gl_NumWorkGroups.y * N;
+	uint full_column_count = gl_NumWorkGroups.x / N;
+	uint last_column_width = gl_NumWorkGroups.x % N;
+	
+	uint column_idx = idx / column_size;
+	uint idx_in_column = idx % column_size;
+	
+	uint column_width = N;
+	if (column_idx == full_column_count)
+		column_width = last_column_width;
+	
+	uvec2 wg_swizzled;
+	wg_swizzled.y = idx_in_column / column_width;
+	wg_swizzled.x = idx_in_column % column_width + column_idx * N;
+	return wg_swizzled;
+	#endif
+}
+
+uvec2 get_pxpos () {
+	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
+	ivec2 wgroupid = ivec2(work_group_tiling(8u));
+	
+	ivec2 pxpos = wgroupid * ivec2(gl_WorkGroupSize.xy) + threadid;
+	return pxpos;
+}
+
 #if VCT_DIFFUSE
 	struct Geometry {
 		bool did_hit;
@@ -168,7 +204,7 @@ uniform vec2 dispatch_size;
 		uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
 		uint coneid   = gl_LocalInvocationID.z;
 		
-		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+		ivec2 pxpos   = ivec2(get_pxpos());
 		
 		Geometry g = read_gbuf(pxpos);
 		
@@ -219,7 +255,7 @@ uniform vec2 dispatch_size;
 #else
 	#if VCT_DBG_PRIMARY
 	void main () {
-		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+		ivec2 pxpos   = ivec2(get_pxpos());
 		INIT_VISUALIZE_COST
 		
 		#if DEBUGDRAW
@@ -286,9 +322,7 @@ uniform vec2 dispatch_size;
 	}
 	
 	void main () {
-		uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
-		
-		ivec2 pxpos   = ivec2(gl_GlobalInvocationID.xy);
+		ivec2 pxpos = ivec2(get_pxpos());
 		vec2 pxuv = (vec2(pxpos) + 0.5) / dispatch_size;
 		
 		Geometry g = read_gbuf(pxpos);
