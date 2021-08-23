@@ -240,6 +240,57 @@ public:
 	operator GLuint () const { return tex; }
 };
 
+//// Profiling
+
+#if DEBUGLEVEL > 0
+	struct TimerZone {
+		GLuint query;
+		uint64_t elapsed;
+
+		TimerZone () {
+			glGenQueries(1, &query);
+
+			//GLint bits;
+			//glGetQueryiv(GL_TIME_ELAPSED,  GL_QUERY_COUNTER_BITS, &bits);
+		}
+		~TimerZone () {
+			glDeleteQueries(1, &query);
+		}
+
+		void start () {
+			glBeginQuery(GL_TIME_ELAPSED, query);
+		}
+		void end () {
+			glEndQuery(GL_TIME_ELAPSED);
+
+			glGetQueryObjectui64v(query, GL_QUERY_RESULT, &elapsed);
+		}
+
+		uint64_t get_nanoseconds () {
+			return elapsed;
+		}
+		float get_seconds () {
+			return (float)elapsed * (1.0f / NSEC);
+		}
+	};
+
+	struct TimerZoneScoped {
+		TimerZone& zone;
+		TimerZoneScoped (TimerZone& zone): zone{zone} {
+			zone.start();
+		}
+		~TimerZoneScoped () {
+			zone.end();
+		}
+	};
+
+	#define OGL_TIMER_ZONE(name) TimerZone name;
+	#define OGL_TIMER(zone) TimerZoneScoped __scoped_glzone_##__COUNTER__(zone);
+#else
+	#define OGL_TIMER_ZONE(name)
+	#define OGL_TIMER(zone)
+#endif
+
 //// Shader & Shader uniform stuff
 
 struct ShaderUniform {

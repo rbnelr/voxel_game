@@ -420,7 +420,7 @@ public:
 			ImGui::TreePop();
 		}
 
-		raytracer.imgui();
+		raytracer.imgui(I);
 		bloom_renderer.imgui();
 	}
 

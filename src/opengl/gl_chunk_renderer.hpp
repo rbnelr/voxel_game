@@ -264,6 +264,15 @@ struct Raytracer {
 	Shader* vct_diffuse = nullptr;
 	Shader* vct_combine = nullptr;
 
+#if DEBUGLEVEL > 0
+	OGL_TIMER_ZONE(timer_vct_rt)
+	OGL_TIMER_ZONE(timer_vct_diffuse)
+	OGL_TIMER_ZONE(timer_vct_combine)
+	Timing_Histogram vct_rt_histo;
+	Timing_Histogram vct_diffuse_histo;
+	Timing_Histogram vct_combine_histo;
+#endif
+
 	Vao dummy_vao = {"dummy_vao"};
 
 	struct SubchunksTexture {
@@ -609,10 +618,16 @@ struct Raytracer {
 	bool enable = true;
 	bool enable_vct = true;
 
-	void imgui () {
+	void imgui (Input& I) {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		bool macro_change = false;
+
+	#if DEBUGLEVEL > 0
+		vct_rt_histo     .imgui("vct_rt"     , timer_vct_rt     .get_seconds(), I.dt);
+		vct_diffuse_histo.imgui("vct_diffuse", timer_vct_diffuse.get_seconds(), I.dt);
+		vct_combine_histo.imgui("vct_combine", timer_vct_combine.get_seconds(), I.dt);
+	#endif
 
 		ImGui::Checkbox("enable [R]", &enable);
 		macro_change |= ImGui::Checkbox("enable VCT [V]", &enable_vct);

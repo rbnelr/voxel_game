@@ -648,6 +648,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	{
 		ZoneScopedN("rt_gbufgen");
 		OGL_TRACE("rt_gbufgen");
+		OGL_TIMER(timer_vct_rt)
 
 		glUseProgram(rt_shad->prog);
 
@@ -684,6 +685,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	{
 		ZoneScopedN("vct_diffuse");
 		OGL_TRACE("vct_diffuse");
+		OGL_TIMER(timer_vct_diffuse)
 
 		glUseProgram(vct_diffuse->prog);
 
@@ -732,6 +734,7 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	{
 		ZoneScopedN("vct_combine");
 		OGL_TRACE("vct_combine");
+		OGL_TIMER(timer_vct_combine)
 
 		glUseProgram(vct_combine->prog);
 

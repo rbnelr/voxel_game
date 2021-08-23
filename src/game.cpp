@@ -84,7 +84,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		ImGui::Spacing();
 
 		if (imgui_header("Performance", &imopen.performance)) {
-			fps_display.display_fps(window.input.real_dt, window.input.dt);
+			fps_display.imgui("framerate", I.real_dt, I.dt, true);
 
 			//ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
 		}

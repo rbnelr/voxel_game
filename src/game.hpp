@@ -19,7 +19,7 @@ struct Game {
 	ImguiOpen imopen;
 
 	bool dbg_pause = false;
-	FPS_Display fps_display;
+	Timing_Histogram fps_display;
 
 	WorldGenerator world_gen; // modified by imgui etc.
 	WorldGenerator _threads_world_gen; // used in threads, do not modify
