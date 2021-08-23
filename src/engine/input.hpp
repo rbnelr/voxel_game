@@ -61,6 +61,8 @@ struct Input {
 		ImGui::DragFloat("time_scale", &time_scale, 0.01f);
 		ImGui::Checkbox("pause_time [,]", &pause_time);
 
+		ImGui::Text("timestep (dt): %6.3f ms", dt * 1000);
+
 		ImGui::DragFloat("mouselook_sensitiviy_divider", &mouselook_sensitiviy_divider, 0.1f);
 
 		ImGui::SliderAngle("view_elevation_down_limit", &view_elevation_down_limit, 0, 45);

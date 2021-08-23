@@ -162,6 +162,7 @@ namespace gl {
 		{
 			ZoneScopedN("rt_gbufgen");
 			OGL_TRACE("rt_gbufgen");
+			OGL_TIMER_ZONE(timer_rt);
 
 			glUseProgram(rt_forward->prog);
 

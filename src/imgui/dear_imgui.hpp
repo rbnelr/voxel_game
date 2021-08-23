@@ -168,44 +168,53 @@ public:
 	void add_line (Line const& line);
 };
 
-struct FPS_Display {
-	RunningAverage<float> dt_avg = RunningAverage<float>(64);
-	float latest_avg_dt;
-	float latest_min_dt, latest_max_dt, latest_std_dev_dt;
+struct Timing_Histogram {
+	RunningAverage<float> avg = RunningAverage<float>(64);
+	float latest_avg;
+	float latest_min, latest_max, latest_std_dev;
 
 	float update_period = .5f; // sec
 	float update_timer = 0;
 
-	int histogram_height = 60;
+	int imgui_histo_height = 60;
+	float y_axis_height = 20;
 
-	void display_fps (float real_dt, float timestep) {
-		dt_avg.push(real_dt);
+	// add new timing into circular buffer
+	void push_timing (float seconds) {
+		avg.push(seconds);
+	}
 
+	// compute averages from circular buffer every update_period seconds (only includes pushed timings, not initial 0s)
+	// and display them via imgui
+	void imgui_display (char const* name, float dt, bool default_open=false) { // dt for updating imgui every update_period (not for actual value being averaged)
 		if (update_timer <= 0) {
-			latest_avg_dt = dt_avg.calc_avg(&latest_min_dt, &latest_max_dt, &latest_std_dev_dt);
+			latest_avg = avg.calc_avg(&latest_min, &latest_max, &latest_std_dev);
 			update_timer += update_period;
 		}
-		update_timer -= real_dt;
+		update_timer -= dt;
 
-		{
-			float avg_fps = 1.0f / latest_avg_dt;
-			ImGui::Text("avg fps: %5.1f (%6.3fms  min: %6.3f  max: %6.3f  stddev: %6.3f)",
-				avg_fps, latest_avg_dt * 1000, latest_min_dt * 1000, latest_max_dt * 1000, latest_std_dev_dt * 1000);
-			ImGui::Text("timestep: %6.3fms", timestep * 1000);
+		if (ImGui::TreeNodeEx(name, default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0,
+				"%12s - %6.3fms", name, latest_avg * 1000)) {
+			float avg_hz = 1.0f / latest_avg;
+			ImGui::Text("avg: %5.1f hz (%6.3f ms  min: %6.3f  max: %6.3f  stddev: %6.3f)",
+				avg_hz, latest_avg * 1000, latest_min * 1000, latest_max * 1000, latest_std_dev * 1000);
 
 			ImGui::SetNextItemWidth(-1);
-			ImGui::PlotHistogram("##frametimes_histogram", dt_avg.data(), (int)dt_avg.count(), 0, "frametimes:", 0, 1.0f/20, ImVec2(0, (float)histogram_height));
+			ImGui::PlotHistogram("##frametimes_histogram", avg.data(), (int)avg.count(), 0, nullptr, 0, y_axis_height / 1000, ImVec2(0, (float)imgui_histo_height));
 
 			if (ImGui::BeginPopupContextItem("##frametimes_histogram popup")) {
-				ImGui::SliderInt("histogram_height", &histogram_height, 20, 120);
+				ImGui::SliderInt("imgui_histo_height", &imgui_histo_height, 20, 120);
+				ImGui::DragFloat("y_axis_height [ms]", &y_axis_height, 0.1f);
 
-				int cap = (int)dt_avg.capacity();
+				int cap = (int)avg.capacity();
 				if (ImGui::SliderInt("avg_count", &cap, 16, 1024)) {
-					dt_avg.resize(cap);
+					avg.resize(cap);
 				}
 
 				ImGui::EndPopup();
 			}
+
+			ImGui::TreePop();
 		}
 	}
 };

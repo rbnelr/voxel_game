@@ -1,5 +1,33 @@
 #pragma once
 
+#if   BUILD_DEBUG
+
+	#define RENDERER_PROFILING					1
+	#define RENDERER_DEBUG_OUTPUT				1
+	#define RENDERER_DEBUG_OUTPUT_BREAKPOINT	1
+	#define OGL_STATE_ASSERT					1
+
+#elif BUILD_VALIDATE
+
+	#define RENDERER_PROFILING					1
+	#define RENDERER_DEBUG_OUTPUT				1
+	#define RENDERER_DEBUG_OUTPUT_BREAKPOINT	0
+	#define OGL_STATE_ASSERT					0
+	
+#elif BUILD_TRACY
+	
+	#define NDEBUG // no asserts
+	
+	#define RENDERER_PROFILING					1 // Could impact perf? Maybe disable this?
+	
+#elif BUILD_RELEASE
+	
+	#define NDEBUG // no asserts
+	
+#endif
+
+#define RENDERER_DEBUG_LABELS					1
+
 static constexpr const char* APPNAME = "Voxel Game";
 
 #include "kisslib/clean_windows_h.hpp"

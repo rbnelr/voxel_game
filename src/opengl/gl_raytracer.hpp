@@ -113,6 +113,11 @@ namespace gl {
 
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
+	#if RENDERER_PROFILING
+		OGL_TIMER(timer_rt);
+		Timing_Histogram histo_rt;
+	#endif
+
 		std::vector<gl::MacroDefinition> get_forward_macros () {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
@@ -174,8 +179,17 @@ namespace gl {
 		bool visualize_warp_cost = false;
 
 		bool macro_change = false; // shader macro change
-		void imgui () {
+		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
+
+		#if RENDERER_PROFILING
+			{
+				float seconds;
+				while (timer_rt.read_seconds(&seconds))
+					histo_rt.push_timing(seconds);
+				histo_rt.imgui_display("rt", I.dt);
+			}
+		#endif
 
 			ImGui::Checkbox("enable [R]", &enable);
 

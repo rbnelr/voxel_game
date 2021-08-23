@@ -240,6 +240,85 @@ public:
 	operator GLuint () const { return tex; }
 };
 
+//// Profiling
+#if RENDERER_PROFILING
+	template <int N=4>
+	struct TimerZone {
+		int next = 0; // next timer to be used for measurement
+		int count = 0; // number of timers 'buffered', ie measurement was started by result not read yet
+		GLuint queries[N];
+		
+		TimerZone () {
+			glGenQueries(N, queries);
+
+			// could check the timer res here, but not sure what to do if it ever overflowed, just ignore since it's only for profiling anyway
+			//GLint bits;
+			//glGetQueryiv(GL_TIME_ELAPSED,  GL_QUERY_COUNTER_BITS, &bits);
+		}
+		~TimerZone () {
+			glDeleteQueries(N, queries);
+		}
+
+		// always call end() after start() and never call read_seconds inbetween
+		void start () {
+			glBeginQuery(GL_TIME_ELAPSED, queries[next]);
+		}
+		void end () {
+			glEndQuery(GL_TIME_ELAPSED);
+
+			next = (next + 1) % N;
+			count++;
+		}
+
+		// try to read oldest timing
+		// returns false if it is still not ready to be read
+		// returns true if result was ready, result in out_seconds
+		// in case that a result takes so long to be readable (or you don't read them)
+		//  timers will start to be reused, thus overwriting results
+		//  in the case that this happend count will become larger than N and this function will return 'fake' 0 results
+		bool read_seconds (float* out_seconds) {
+			if (count == 0) return false;
+			if (count > N) {
+				// we overflowed our buffer, so this sample is overwritten, return 0 dummy value
+				count--; // pop timing
+				*out_seconds = 0;
+				return true;
+			}
+
+			int idx = (next + N - count) % N;
+			
+			ZoneScoped;
+			GLint avail;
+			glGetQueryObjectiv(queries[idx], GL_QUERY_RESULT_AVAILABLE, &avail);
+			if (avail == 0) return false;
+
+			count--; // pop timing
+			
+			uint64_t elapsed_ns = 99;
+			glGetQueryObjectui64v(queries[idx], GL_QUERY_RESULT, &elapsed_ns);
+
+			*out_seconds = (float)elapsed_ns * (1.0f / NSEC);
+			return true;
+		}
+	};
+
+	struct TimerZoneScoped {
+		TimerZone<>& zone;
+		TimerZoneScoped (TimerZone<>& zone): zone{zone} {
+			zone.start();
+		}
+		~TimerZoneScoped () {
+			zone.end();
+		}
+	};
+
+	#define OGL_TIMER(name) TimerZone<> name
+	#define OGL_TIMER_ZONE(zone) TimerZoneScoped __scoped_glzone_##__COUNTER__(zone)
+#else
+	#define OGL_TIMER(name)
+	#define OGL_TIMER_ZONE(zone)
+#endif
+
 //// Shader & Shader uniform stuff
 
 struct ShaderUniform {
@@ -1103,7 +1182,7 @@ struct StateManager {
 	// set opengl drawing state to a set of values, where only changes are applied
 	// no overrides to not break fullscreen quads etc.
 	void set_no_override (PipelineState const& s) {
-	#if DEBUGLEVEL >= 3
+	#if OGL_STATE_ASSERT
 		{
 			assert(state.depth_test == !!glIsEnabled(GL_DEPTH_TEST));
 			GLint depth_func;		glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
@@ -1133,7 +1212,6 @@ struct StateManager {
 			assert((state.poly_mode == POLY_FILL ? GL_FILL : GL_LINE) == poly_mode);
 		}
 	#endif
-
 
 		if (state.depth_test != s.depth_test)
 			gl_enable(GL_DEPTH_TEST, s.depth_test);

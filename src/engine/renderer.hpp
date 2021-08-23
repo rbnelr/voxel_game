@@ -19,10 +19,6 @@ enum class RenderBackend : int {
 
 // Controls for in what builds to output debug info, set in this file to allow window.cpp to use these too
 
-#define RENDERER_DEBUG_OUTPUT				(DEBUGLEVEL >= 2)
-#define RENDERER_DEBUG_OUTPUT_BREAKPOINT	(DEBUGLEVEL >= 4)
-#define RENDERER_DEBUG_LABELS				1
-
 struct GLFWwindow;
 struct Game;
 struct Chunks;

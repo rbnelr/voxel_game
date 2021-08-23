@@ -126,7 +126,7 @@ void glfw_error (int err, const char* msg) {
 }
 
 bool app_init () {
-#if DEBUGLEVEL >= 2
+#if RENDERER_DEBUG_OUTPUT
 	glfwSetErrorCallback(glfw_error);
 #endif
 
