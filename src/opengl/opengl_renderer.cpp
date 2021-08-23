@@ -500,7 +500,7 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 	upload_normal_map(water_N_B, "textures/Water_N_B.png");
 
 	// heat_gradient.png   rainbow_gradient.png   blue_red_gradient.png
-	upload_texture(gradient, "textures/blue_red_gradient.png");
+	upload_texture(gradient, "textures/heat_gradient.png");
 	upload_texture(gui_atlas, "textures/gui.png");
 
 	{ // test textures

@@ -122,19 +122,42 @@ namespace gl {
 
 				int count = (int)chunks.size();
 
+				{
+					glUseProgram(df_tex.shad_init->prog);
+
+					r.state.bind_textures(df_tex.shad_init, {
+						{"voxel_tex", voxel_tex.tex},
+					});
+					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
+
+					static constexpr int BATCHSIZE = 32;
+					for (int i=0; i<count; i+=BATCHSIZE) {
+						int subcount = min(count - i, BATCHSIZE);
+
+						int3 offsets[BATCHSIZE] = {};
+						for (int j=0; j<subcount; ++j)
+							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+
+						df_tex.shad_init->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
+
+						constexpr int REGION = 8;
+						constexpr int CORE = REGION -2;
+						constexpr int CHUNK_WGROUPS = (CHUNK_SIZE + CORE-1) / CORE; // round up
+
+						glDispatchCompute(CHUNK_WGROUPS, CHUNK_WGROUPS, CHUNK_WGROUPS * subcount);
+					}
+
+					glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+				}
 				for (int pass=0; pass<3; ++pass) {
 					Shader* shad = df_tex.shad_pass[pass];
 				
 					glUseProgram(shad->prog);
 					
-					r.state.bind_textures(shad, {
-						{"voxel_tex", voxel_tex.tex},
-					});
 					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
 				
 					static constexpr int BATCHSIZE = 32;
 					for (int i=0; i<count; i+=BATCHSIZE) {
-						
 						int subcount = min(count - i, BATCHSIZE);
 				
 						int3 offsets[BATCHSIZE] = {};
@@ -162,7 +185,7 @@ namespace gl {
 		{
 			ZoneScopedN("rt_gbufgen");
 			OGL_TRACE("rt_gbufgen");
-			OGL_TIMER_ZONE(timer_rt);
+			OGL_TIMER_ZONE(timer_rt.timer);
 
 			glUseProgram(rt_forward->prog);
 

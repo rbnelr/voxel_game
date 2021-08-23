@@ -270,7 +270,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		//flippedf = max(flippedf, vec3(0.0));
 	}
 	
-	float manhattan_fac = 1.0 / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
+	float manhattan_fac = 0.999 / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
 	
 	uint bid;
 	
@@ -283,7 +283,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	for (;;) {
 		VISUALIZE_COST_COUNT
 		
-		float df = float(texelFetch(df_tex, coord, 0).r) - 2.0;
+		float df = float(texelFetch(df_tex, coord, 0).r);
 		df *= manhattan_fac;
 		
 		if (df > 1.0) {

@@ -314,9 +314,27 @@ public:
 
 	#define OGL_TIMER(name) TimerZone<> name
 	#define OGL_TIMER_ZONE(zone) TimerZoneScoped __scoped_glzone_##__COUNTER__(zone)
+
+	struct TimerHistogram {
+		TimerZone<> timer;
+		Timing_Histogram histo;
+
+		void update (float dt) {
+			float seconds;
+			while (timer.read_seconds(&seconds))
+				histo.push_timing(seconds);
+			histo.imgui_display("rt", dt);
+		}
+	};
+
+	#define OGL_TIMER_HISTOGRAM(name) TimerHistogram timer_##name
+	#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt) timer_##name.update(dt);
 #else
 	#define OGL_TIMER(name)
 	#define OGL_TIMER_ZONE(zone)
+	
+	#define OGL_TIMER_HISTOGRAM(name)
+	#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt)
 #endif
 
 //// Shader & Shader uniform stuff

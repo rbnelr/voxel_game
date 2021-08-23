@@ -23,7 +23,7 @@ uniform ivec2 framebuf_size;
 // in each column the work groups are still row major order
 // replicates this: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
 uvec2 work_group_tiling (uint N) {
-	#if 1
+	#if 0
 	return gl_WorkGroupID.xy;
 	#else
 	uint idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
@@ -50,7 +50,7 @@ void main () {
 	//ivec2 pxpos = ivec2(gl_GlobalInvocationID.xy);
 	
 	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
-	ivec2 wgroupid = ivec2(work_group_tiling(16u));
+	ivec2 wgroupid = ivec2(work_group_tiling(8u));
 	
 	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
 	
