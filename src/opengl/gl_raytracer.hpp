@@ -96,7 +96,7 @@ namespace gl {
 						{"PASS", prints("%d", pass)},
 					}, {{ COMPUTE_SHADER }});
 
-			glTextureStorage3D(tex, 1, GL_R8UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
+			glTextureStorage3D(tex, 1, GL_R8I, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
 
 			int dist = 255; // max dist
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &dist);

@@ -272,8 +272,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	float manhattan_fac = 0.999 / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
 	
-	uint bid;
-	
 	vec3 pos = dist * ray_dir + ray_pos;
 	ivec3 coord = ivec3(pos);
 	
@@ -332,8 +330,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
 			#endif
 			
-			bid = texelFetch(voxel_tex, coord, 0).r;
-			if (bid > B_AIR)
+			//bid = texelFetch(voxel_tex, coord, 0).r;
+			//if (bid > B_AIR)
+			//	break;
+			
+			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
+			// this avoids one memory read
+			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
+			if (df < 0.0)
 				break;
 			
 			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
@@ -363,7 +367,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		vec3 t0v = inv_dir * vox_entry + bias;
 		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to not count faces behind ray
 		
-		hit.bid = bid;
+		hit.bid = texelFetch(voxel_tex, coord, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		

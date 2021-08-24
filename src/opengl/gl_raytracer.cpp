@@ -118,17 +118,19 @@ namespace gl {
 
 		}
 		{
-			chunks.clear();
-			for (int y=0; y<4; ++y)
-			for (int x=0; x<4; ++x) {
-				chunks.push_back({x,y,7});
-			}
+			//chunks.clear(); // for profiling df gen
+			//for (int y=0; y<4; ++y)
+			//for (int x=0; x<4; ++x) {
+			//	chunks.push_back({x,y,7});
+			//}
 
 			if (!chunks.empty()) {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
 
 				int count = (int)chunks.size();
+
+				glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8I);
 
 				{
 					OGL_TIMER_ZONE(timer_df_init.timer);
@@ -138,7 +140,6 @@ namespace gl {
 					r.state.bind_textures(df_tex.shad_init, {
 						{"voxel_tex", voxel_tex.tex},
 					});
-					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
 
 					static constexpr int BATCHSIZE = 32;
 					for (int i=0; i<count; i+=BATCHSIZE) {
@@ -163,8 +164,7 @@ namespace gl {
 					Shader* shad = df_tex.shad_pass[pass];
 				
 					glUseProgram(shad->prog);
-					
-					glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8UI);
+					r.state.bind_textures(shad, {});
 				
 					static constexpr int BATCHSIZE = 32;
 					for (int i=0; i<count; i+=BATCHSIZE) {

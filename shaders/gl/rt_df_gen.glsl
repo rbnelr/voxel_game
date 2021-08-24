@@ -1,7 +1,7 @@
 #version 460 core
 layout(local_size_x = GROUPSZ, local_size_y = GROUPSZ) in;
 
-layout(r8ui, binding = 4) restrict uniform uimage3D df_img;
+layout(r8i, binding = 4) restrict uniform iimage3D df_img;
 
 #include "gpu_voxels.glsl"
 #define SIZE CHUNK_SIZE
@@ -22,23 +22,23 @@ void main () {
 	
 	pos += offsets[gl_WorkGroupID.z];
 	
-	uint prev = 255u;
+	int prev = 127;
 	for (int i=0; i<SIZE; ++i) {
 		ivec3 p = GETPOS(i);
-		uint cur = imageLoad(df_img, p).r;
+		int cur = imageLoad(df_img, p).r;
 		
-		prev += 1u;
-		if (prev < cur) imageStore(df_img, p, uvec4(prev, 0u,0u,0u));
+		prev += 1;
+		if (prev < cur) imageStore(df_img, p, ivec4(prev, 0,0,0));
 		else            prev = cur;
 	}
 	
-	prev = 255u;
+	prev = 127;
 	for (int i=SIZE-1; i>=0; --i) {
 		ivec3 p = GETPOS(i);
-		uint cur = imageLoad(df_img, p).r;
+		int cur = imageLoad(df_img, p).r;
 		
-		prev += 1u;
-		if (prev < cur) imageStore(df_img, p, uvec4(prev, 0u,0u,0u));
+		prev += 1;
+		if (prev < cur) imageStore(df_img, p, ivec4(prev, 0,0,0));
 		else            prev = cur;
 	}
 }
