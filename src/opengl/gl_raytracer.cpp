@@ -116,6 +116,14 @@ namespace gl {
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
+		}
+		{
+			chunks.clear();
+			for (int y=0; y<4; ++y)
+			for (int x=0; x<4; ++x) {
+				chunks.push_back({x,y,7});
+			}
+
 			if (!chunks.empty()) {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
@@ -123,6 +131,8 @@ namespace gl {
 				int count = (int)chunks.size();
 
 				{
+					OGL_TIMER_ZONE(timer_df_init.timer);
+
 					glUseProgram(df_tex.shad_init->prog);
 
 					r.state.bind_textures(df_tex.shad_init, {

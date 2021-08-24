@@ -319,16 +319,16 @@ public:
 		TimerZone<> timer;
 		Timing_Histogram histo;
 
-		void update (float dt) {
+		void update (float dt, char const* name) {
 			float seconds;
 			while (timer.read_seconds(&seconds))
 				histo.push_timing(seconds);
-			histo.imgui_display("rt", dt);
+			histo.imgui_display(name, dt);
 		}
 	};
 
 	#define OGL_TIMER_HISTOGRAM(name) TimerHistogram timer_##name
-	#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt) timer_##name.update(dt);
+	#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt) timer_##name.update(dt, TO_STRING(name));
 #else
 	#define OGL_TIMER(name)
 	#define OGL_TIMER_ZONE(zone)

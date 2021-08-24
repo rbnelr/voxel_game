@@ -116,6 +116,7 @@ namespace gl {
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
 		OGL_TIMER_HISTOGRAM(rt);
+		OGL_TIMER_HISTOGRAM(df_init);
 
 		std::vector<gl::MacroDefinition> get_forward_macros () {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
@@ -182,6 +183,7 @@ namespace gl {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 			OGL_TIMER_HISTOGRAM_UPDATE(rt, I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
 
 			ImGui::Checkbox("enable [R]", &enable);
 
