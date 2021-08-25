@@ -40,7 +40,7 @@ inline constexpr uint16_t MAX_HARDNESS = (uint16_t)-1;
 
 struct BlockTypes {
 	struct Block {
-		std_string			name = "null";
+		std::string			name = "null";
 
 		uint8v3				size = 16;
 
@@ -53,7 +53,7 @@ struct BlockTypes {
 		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
 	};
 
-	std_vector<Block> blocks;
+	std::vector<Block> blocks;
 
 	int count () {
 		return (int)blocks.size();
@@ -62,7 +62,7 @@ struct BlockTypes {
 		return blocks[id];
 	}
 
-	//std_unordered_map<std_string, block_id> name_map;
+	//std_unordered_map<std::string, block_id> name_map;
 
 	block_id air_id;
 
@@ -74,7 +74,7 @@ struct BlockTypes {
 		if (id == -1) return B_NULL;
 		return (block_id)id;
 	#else
-		// unordered_map with std_string is bad because you can't lookup without constructing a std_string (fixed in C++20)
+		// unordered_map with std::string is bad because you can't lookup without constructing a std::string (fixed in C++20)
 		auto it = name_map.find(name);
 		if (it == name_map.end()) return B_NULL;
 		return it->second;

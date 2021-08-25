@@ -24,6 +24,7 @@ Game::Game () {
 	set_thread_description(">> gameloop");
 
 	_threads_world_gen = world_gen; // apply changes loaded by load("debug.json")
+	_threads_world_gen.seed = get_seed(_threads_world_gen.seed_str);
 }
 Game::~Game () {
 	ZoneScoped;
@@ -103,8 +104,16 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 			if (ImGui::Button("Recreate")) {
 				chunks.destroy();
-				_threads_world_gen = world_gen;
+				_threads_world_gen = world_gen; // make copy that can safely be used in threads while main version is edited by imgui
+				_threads_world_gen.seed = get_seed(_threads_world_gen.seed_str);
 			}
+
+			ImGui::InputText("savefile", &world_gen.savefile);
+			ImGui::SameLine();
+			ImGui::Checkbox("Load", &chunks.load_from_disk);
+			ImGui::SameLine();
+			if (ImGui::Button("Save"))
+				chunks.save_chunks_to_disk(world_gen.savefile.c_str());
 
 			world_gen.imgui();
 		}

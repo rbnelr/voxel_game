@@ -45,7 +45,7 @@ struct ChunkRenderer {
 		DrawList		draw_lists[2];
 	};
 
-	std_vector<AllocBlock>	allocs;
+	std::vector<AllocBlock>	allocs;
 
 	Shader* shad_opaque;
 	Shader* shad_transparent;

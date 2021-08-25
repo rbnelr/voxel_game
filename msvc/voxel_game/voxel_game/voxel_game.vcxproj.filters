@@ -445,4 +445,7 @@
       <Filter>shaders\gl</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="test.natvis" />
+  </ItemGroup>
 </Project>

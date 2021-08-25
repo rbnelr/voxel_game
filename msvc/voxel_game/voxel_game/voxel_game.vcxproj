@@ -439,6 +439,9 @@
     <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="test.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

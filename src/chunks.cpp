@@ -227,9 +227,10 @@ bool process_subchunk_region (block_id* ptr, SubchunkVoxels& subc) {
 #endif
 }
 
-void Chunks::sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels) {
+void Chunks::sparse_chunk_from_worldgen (chunk_id cid, block_id* raw_voxels) {
 	ZoneScoped;
 
+	auto& chunk = chunks[cid];
 	auto& vox = chunk_voxels[cid];
 	
 	// allocate one temp subchunk to copy data into while scanning (instead of a scanning loop + copy loop)
@@ -332,11 +333,16 @@ void Chunks::update_chunk_loading (Game& game) {
 		chunks_to_generate.shrink_to_fit(); // delete all inner vectors to avoid constant memory alloc when loading idle
 		chunks_to_generate.resize((int)(radius*radius * BUCKET_FAC) + 1);
 	}
-	auto add_chunk_to_generate = [&] (int3 chunk_pos, float dist_sqr, int phase) {
+	auto add_chunk_to_generate = [&] (int3 const& chunk_pos, float dist_sqr, int phase) {
+		assert(query_chunk(chunk_pos) == U16_NULL);
+
 		int bucketi = (int)(dist_sqr * BUCKET_FAC);
 		//assert(bucketi >= 0 && bucketi < chunks_to_generate.size());
 		bucketi = clamp(bucketi, 0, (int)chunks_to_generate.size() -1);
-		chunks_to_generate[bucketi].push_back({ chunk_pos });
+
+		auto& bucket = chunks_to_generate[bucketi];
+		if (std::find(bucket.begin(), bucket.end(), chunk_pos) == bucket.end()) // remove duplicates generated through neighbour ptr checking
+			bucket.push_back(chunk_pos);
 	};
 
 	{
@@ -393,15 +399,21 @@ void Chunks::update_chunk_loading (Game& game) {
 			return offsx*offsx + offsy*offsy + offsz*offsz;
 		};
 	#else
-		auto player_pos = _mm_load_ps(&game.player.pos.x);
-
 		auto sz = _mm_set1_ps((float)CHUNK_SIZE);
 		auto szh = _mm_set1_ps((float)CHUNK_SIZE/2);
 
-		auto dist_base = _mm_sub_ps(szh, player_pos);
+		// NOTE: supposed to be safe to use _mm_loadu_ps to load unaligned data, except that the compiler optimized it into
+		// subps       xmm7,xmmword ptr [r15+548h]
+		// which it is not supposed to (https://stackoverflow.com/questions/38443452/alignment-and-sse-strange-behaviour)
+		// this is likely a compiler bug
+		
+		//auto dist_base = _mm_sub_ps(szh, _mm_loadu_ps(&game.player.pos.x));
+		auto dist_base = _mm_sub_ps(szh, _mm_set_ps(0, game.player.pos.z, game.player.pos.y, game.player.pos.x)); // workaround for the bug
 
 		auto chunk_dist_sqr = [&] (int3 const& pos) {
 
+			// this might run into the same bug, but currently does not get fused into another instruction, so is safe
+			// Note that it reads 'garbage' for the 4th component
 			auto ipos = _mm_loadu_si128((__m128i*)&pos.x);
 			auto fpos = _mm_cvtepi32_ps(ipos);
 
@@ -426,6 +438,7 @@ void Chunks::update_chunk_loading (Game& game) {
 			auto& chunk = chunks[cid];
 			if (chunk.flags == 0) continue;
 			chunk._validate_flags();
+			assert(chunks_map.find(chunk.pos)->second == cid);
 
 			float dist_sqr = chunk_dist_sqr(chunk.pos);
 
@@ -439,7 +452,8 @@ void Chunks::update_chunk_loading (Game& game) {
 							auto npos = chunk.pos + NEIGHBOURS[i];
 							float ndist_sqr = chunk_dist_sqr(npos);
 							
-							if (ndist_sqr <= load_dist_sqr && queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
+							if (	ndist_sqr <= load_dist_sqr &&
+									queued_chunks.find(npos) == queued_chunks.end()) // chunk not yet queued for worldgen
 								add_chunk_to_generate(npos, ndist_sqr, 1); // note: this creates duplicates because we arrive at the same chunk through two ways
 						}
 					}
@@ -478,6 +492,25 @@ void Chunks::update_chunk_loading (Game& game) {
 			chunk.flags |= Chunk::LOADED_PHASE2 | Chunk::REMESH;
 		};
 
+		auto link_neighbours_and_flag_remesh = [&] (int3 const& chunk_pos, chunk_id cid) {
+			auto& chunk = chunks[cid];
+			
+			// link neighbour ptrs and flag neighbours to be remeshed
+			for (int ni=0; ni<6; ++ni) {
+				auto nid = query_chunk(chunk_pos + NEIGHBOURS[ni]);
+
+				chunk.neighbours[ni] = nid;
+				if (nid == U16_NULL) {
+					chunk.flags |= (Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << ni);
+				} else {
+					assert(chunks[nid].flags != 0);
+					chunks[nid].flags |= Chunk::REMESH;
+					chunks[nid].flags &= ~(Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << (ni^1));
+					chunks[nid].neighbours[ni^1] = cid;
+				}
+			}
+		};
+
 		{
 			ZoneScopedN("pop jobs");
 
@@ -493,33 +526,19 @@ void Chunks::update_chunk_loading (Game& game) {
 				queued_chunks.erase(job->noise_pass.chunk_pos);
 
 				auto cid = alloc_chunk(chunk_pos);
-				auto& chunk = chunks[cid];
-				chunks_map.emplace(chunk.pos, cid);
+				chunks_map.emplace(chunk_pos, cid);
 
-				sparse_chunk_from_worldgen(cid, chunk, &job->noise_pass.voxels[0][0][0]);
+				sparse_chunk_from_worldgen(cid, &job->noise_pass.voxels[0][0][0]);
 
-				chunk.flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
+				chunks[cid].flags |= Chunk::REMESH | Chunk::VOXELS_DIRTY;
 
-				// link neighbour ptrs and flag neighbours to be remeshed
-				for (int ni=0; ni<6; ++ni) {
-					auto nid = query_chunk(chunk_pos + NEIGHBOURS[ni]);
-
-					chunk.neighbours[ni] = nid;
-					if (nid == U16_NULL) {
-						chunk.flags |= (Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << ni);
-					} else {
-						assert(chunks[nid].flags != 0);
-						chunks[nid].flags |= Chunk::REMESH;
-						chunks[nid].flags &= ~(Chunk::Flags)(Chunk::NEIGHBOUR0_NULL << (ni^1));
-						chunks[nid].neighbours[ni^1] = cid;
-					}
-				}
+				link_neighbours_and_flag_remesh(chunk_pos, cid);
 
 				// run phase2 generation where required
 				// TODO: this could possibly be accelerated by keeping a counter of how many neighbours have are ready,
 				// but don't bother because this should be fast enough and will be less bugprone (and not require storing a counter)
 				for (auto& offs : FULL_NEIGHBOURS) {
-					chunk_id nid = query_chunk(chunk.pos + offs);
+					chunk_id nid = query_chunk(chunk_pos + offs);
 					if (nid != U16_NULL)
 						update_chunk_phase2_generation(nid);
 				}
@@ -536,31 +555,49 @@ void Chunks::update_chunk_loading (Game& game) {
 			//  and push jobs until threadpool has at max background_queued_count jobs (ignore the remaining chunks, which will get pushed as soon as jobs are completed)
 			int bucket=0, j=0; // sort bucket indices
 
-			int max_count = (int)ARRLEN(jobs) - (int)queued_chunks.size();
-			int count = 0;
-			for (int bucket=0; count < max_count && bucket < (int)chunks_to_generate.size(); ++bucket) {
-				for (int i=0; count < max_count && i < (int)chunks_to_generate[bucket].size(); ++i) {
+			int queued_count = 0;
+			int queue_limit = (int)ARRLEN(jobs) - (int)queued_chunks.size();
+
+			int file_loaded_count = 0;
+			int file_load_limit = 16;
+
+			for (int bucket=0; bucket < (int)chunks_to_generate.size(); ++bucket) {
+				for (int i=0; i < (int)chunks_to_generate[bucket].size(); ++i) {
+					if (queued_count >= queue_limit || file_loaded_count >= file_load_limit)
+						goto end;
+
 					auto genchunk = chunks_to_generate[bucket][i];
 
-					if (queued_chunks.find(genchunk.pos) != queued_chunks.end()) continue; // remove duplicates generated by code above
+					//if (queued_chunks.find(genchunk.pos) != queued_chunks.end()) continue; // remove duplicates generated by code above
 
-					ZoneScopedN("phase 1 job");
+					chunk_id cid = U16_NULL;
+					if (load_from_disk)
+						cid = try_load_chunk_from_disk(*this, genchunk, game.world_gen.savefile.c_str());
+					
+					if (cid != U16_NULL) {
+						// finished chunk was loaded from disk
+						link_neighbours_and_flag_remesh(genchunk, cid);
+						file_loaded_count++;
+					} else {
+						// chunk could not be loaded from disk, generate chunk
+						ZoneScopedN("phase 1 job");
 
-					auto job = std::make_unique<WorldgenJob>(genchunk.pos, &game._threads_world_gen);
+						auto job = std::make_unique<WorldgenJob>(genchunk, &game._threads_world_gen);
 						
-					jobs[count++] = std::move(job);
+						jobs[queued_count++] = std::move(job);
 
-					queued_chunks.emplace(genchunk.pos);
+						queued_chunks.emplace(genchunk);
+					}
 				}
-			}
+			} end:;
 
-			background_threadpool.jobs.push_n(jobs, count);
+			background_threadpool.jobs.push_n(jobs, queued_count);
 
 			{ // for imgui
 				pending_chunks = 0; // chunks waiting to be queued
 				for (auto& b : chunks_to_generate)
 					pending_chunks += (uint32_t)b.size();
-				pending_chunks -= count; // exclude chunks we have already queued
+				pending_chunks -= queued_count; // exclude chunks we have already queued
 			}
 
 			//TracyPlot("background_queued_count", (int64_t)background_queued_count);
@@ -669,7 +706,7 @@ void Chunks::imgui (Renderer* renderer) {
 	ImGui::Checkbox("subchunks", &visualize_subchunks);
 	ImGui::SameLine();
 	ImGui::Checkbox("radius", &visualize_radius);
-
+	
 	//if (ImGui::BeginPopupContextWindow("Colors")) {
 	//	imgui_ColorEdit("DBG_CHUNK_COL",			&DBG_CHUNK_COL);
 	//	imgui_ColorEdit("DBG_STAGE1_COL",			&DBG_STAGE1_COL);
@@ -839,6 +876,75 @@ void Chunks::visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culle
 				}
 			}
 		}
+	}
+}
+
+chunk_id try_load_chunk_from_disk (Chunks& chunks, int3 const& pos, char const* dirname) {
+	ZoneScoped;
+
+	uint64_t size;
+	auto data = load_binary_file(get_chunk_filename(pos, dirname).c_str(), &size);
+	if (!data)
+		return U16_NULL;
+
+	ChunkFileData* file = (ChunkFileData*)data.get();
+	
+	auto cid = chunks.alloc_chunk(pos);
+	auto& chunk = chunks[cid];
+	chunks.chunks_map.emplace(pos, cid);
+
+	auto& chunkdata = chunks.chunk_voxels[cid];
+
+	for (int i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
+		auto subc = file->voxels.subchunks[i];
+		if (subc & SUBC_SPARSE_BIT) {
+			chunkdata.subchunks[i] = subc;
+		} else {
+			auto alloc_subc = chunks.subchunks.alloc();
+			chunkdata.subchunks[i] = alloc_subc;
+
+			memcpy(chunks.subchunks[alloc_subc].voxels, file->subchunks[subc].voxels, sizeof(SubchunkVoxels));
+		}
+	}
+
+	chunk.flags |= Chunk::LOADED_PHASE2 | Chunk::REMESH | Chunk::VOXELS_DIRTY;
+	return cid;
+}
+void save_chunk_to_disk (Chunks& chunks, chunk_id cid, char const* dirname) {
+	auto& chunk = chunks.chunks[cid];
+	if ((chunk.flags & (Chunk::ALLOCATED|Chunk::LOADED_PHASE2)) == 0)
+		return; // only save completely loaded chunks
+
+	ZoneScoped;
+
+	ChunkFileData file;
+
+	auto& chunkdata = chunks.chunk_voxels[cid];
+
+	uint32_t counter = 0;
+	for (int i=0; i<CHUNK_SUBCHUNK_COUNT; ++i) {
+		auto subc = chunkdata.subchunks[i];
+		if (subc & SUBC_SPARSE_BIT) {
+			file.voxels.subchunks[i] = subc;
+		} else {
+			file.voxels.subchunks[i] = counter;
+
+			memcpy(file.subchunks[counter].voxels, chunks.subchunks[subc].voxels, sizeof(SubchunkVoxels));
+
+			counter++;
+		}
+	}
+
+	auto filename = prints("%s/%+3d,%+3d,%+3d.bin", dirname, chunk.pos.x, chunk.pos.y, chunk.pos.z);
+	auto size = (char*)&file.subchunks[counter] - (char*)&file;
+	kiss::save_binary_file(filename.c_str(), &file, (uint64_t)size);
+}
+void Chunks::save_chunks_to_disk (const char* save_dirname) {
+	
+	CreateDirectoryA(save_dirname, NULL); // C has no way of creating directories, are you kidding me?
+
+	for (chunk_id cid=0; cid < end(); ++cid) {
+		save_chunk_to_disk(*this, cid, save_dirname);
 	}
 }
 

@@ -3,10 +3,10 @@
 		"seed_str": "test2"
 	},
 	"chunks": {
-		"load_radius": 600.0,
+		"load_radius": 532.0,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
-		"visualize_chunks": false,
+		"visualize_chunks": true,
 		"visualize_subchunks": false,
 		"visualize_radius": false,
 		"debug_frustrum_culling": false
@@ -14,13 +14,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				67.72151184082031,
-				59.0627555847168,
-				27.988576889038086
+				81.50240325927734,
+				68.04158020019531,
+				49.1198844909668
 			],
 			"rot_aer": [
-				0.9874789714813232,
-				-0.6585553288459778,
+				1.9058291912078857,
+				-0.10765402019023895,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -29,15 +29,15 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 11.196417808532715,
+		"base_speed": 135.7644500732422,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			57.57500076293945,
-			76.78199768066406,
+			59.84370040893555,
+			68.83949279785156,
 			26.000099182128906
 		],
 		"vel": [
@@ -64,7 +64,7 @@
 			"_draw_chunks": true
 		},
 		"raytracer": {
-			"enable": true,
+			"enable": false,
 			"max_iterations": 478,
 			"rand_seed_time": true,
 			"sunlight_enable": true,
@@ -78,7 +78,8 @@
 			"bounces_max_dist": 128.0,
 			"bounces_max_count": 2,
 			"only_primary_rays": false,
-			"taa_alpha": 0.05000000074505806
+			"taa_alpha": 0.05000000074505806,
+			"taa_enable": true
 		},
 		"bloom_renderer": {
 			"enable": true,
