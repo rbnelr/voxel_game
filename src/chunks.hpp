@@ -135,8 +135,8 @@ struct ChunkVoxels {
 inline constexpr uint32_t MAX_SUBCHUNKS = (uint32_t)( (32ull *GB) / sizeof(SubchunkVoxels) );
 
 // Use comma operator to assert and return value in expression
-#define CHECK_BLOCK(b) (assert((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
-//#define CHECK_BLOCK(b) ( ((b) > B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
+#define CHECK_BLOCK(b) (assert((b) >= B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
+//#define CHECK_BLOCK(b) ( ((b) >= B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
 
 struct Chunk {
 	enum Flags : uint32_t {
