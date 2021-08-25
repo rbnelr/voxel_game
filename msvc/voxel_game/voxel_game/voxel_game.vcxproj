@@ -456,6 +456,9 @@
     <None Include="..\..\..\shaders\gl\vct_filter.glsl" />
     <None Include="..\..\..\shaders\gl\vct_shade.glsl" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="test.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

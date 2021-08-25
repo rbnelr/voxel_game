@@ -67,9 +67,9 @@ inline bool imgui_header (const char* label, bool* popen=nullptr) {
 	return open;
 }
 
-namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tracked std_string
+namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tracked std::string
 	struct _InputTextCallback_UserData {
-		std_string*             Str;
+		std::string*             Str;
 		ImGuiInputTextCallback  ChainCallback;
 		void*                   ChainCallbackUserData;
 	};
@@ -80,7 +80,7 @@ namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tr
 		{
 			// Resize string callback
 			// If for some reason we refuse the new length (BufTextLen) and/or capacity (BufSize) we need to set them back to what we want.
-			std_string* str = user_data->Str;
+			std::string* str = user_data->Str;
 			IM_ASSERT(data->Buf == str->c_str());
 			str->resize(data->BufTextLen);
 			data->Buf = (char*)str->c_str();
@@ -94,7 +94,7 @@ namespace ImGui { // copy paste from imgui_stdlib.h to make it work for tracy-tr
 		return 0;
 	}
 
-	inline bool InputText(const char* label, std_string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
+	inline bool InputText(const char* label, std::string* str, ImGuiInputTextFlags flags, ImGuiInputTextCallback callback, void* user_data) {
 		IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
 		flags |= ImGuiInputTextFlags_CallbackResize;
 
@@ -154,7 +154,7 @@ public:
 		int frame;
 	};
 
-	std_vector<Line> lines;
+	std::vector<Line> lines;
 	bool shown = true;
 
 	bool show_levels[4] = { 0,1,1,1 };

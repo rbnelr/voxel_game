@@ -137,21 +137,16 @@ namespace worldgen {
 }
 
 struct WorldGenerator {
-	friend void to_json(nlohmann::ordered_json& j, const WorldGenerator& t) {
-		j["seed_str"] = t.seed_str;
-	}
-	friend void from_json(const nlohmann::ordered_json& j, WorldGenerator& t) {
-		if (j.contains("seed_str")) j.at("seed_str").get_to(t.seed_str);
-
-		t.seed = get_seed(t.seed_str); // recalc seed from loaded seed_str
-	}
+	SERIALIZE(WorldGenerator, seed_str, savefile)
 	
 	//	max_depth, base_depth,
 	//	large_noise, small_noise,
 	//	ground_ang
 
-	std_string seed_str = "test2";
-	uint64_t seed = get_seed(seed_str);
+	std::string seed_str = "test2";
+	uint64_t seed; // only calculated on WorldGenerator copy into _threads_world_gen
+
+	std::string savefile = "../saves/test";
 
 	struct NoiseParam {
 		SERIALIZE(NoiseParam, period, strength, cutoff, cutoff_val)
@@ -200,7 +195,6 @@ struct WorldGenerator {
 		bids.load();
 	}
 
-
 	static void imgui_noise_layers (char const* name, std::vector<NoiseParam>& layers) {
 		if (!imgui_push(name)) return;
 
@@ -226,9 +220,8 @@ struct WorldGenerator {
 	void imgui () {
 		if (!imgui_push("WorldGenerator")) return;
 
-		if (ImGui::InputText("seed str", &seed_str, 0, NULL, NULL))
-			seed = get_seed(seed_str); // recalc seed from modified seed_str
-		ImGui::Text("seed code: 0x%016p", seed);
+		ImGui::InputText("seed str", &seed_str, 0, NULL, NULL);
+		ImGui::Text("seed code: 0x%016p", get_seed(seed_str));
 
 		ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.2f);
 
@@ -338,7 +331,6 @@ namespace worldgen {
 			return chunks.read_block(bx,by,bz, chunk);
 		}
 	};
-
 
 	void object_pass (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg);
 }

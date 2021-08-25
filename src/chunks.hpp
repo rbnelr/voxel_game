@@ -227,9 +227,9 @@ struct ChunkKey_Comparer {
 };
 
 template <typename T>
-using chunk_pos_map = std_unordered_map<int3, T, ChunkKey_Hasher, ChunkKey_Comparer>;
+using chunk_pos_map = std::unordered_map<int3, T, ChunkKey_Hasher, ChunkKey_Comparer>;
 
-typedef std_unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
+typedef std::unordered_set<int3, ChunkKey_Hasher, ChunkKey_Comparer> chunk_pos_set;
 
 // TODO: Maybe a 128x128x16 Texture might have less artefacting than a 64^3 texture because trees are mainly horizontally placed
 struct BlueNoiseTexture {
@@ -290,7 +290,19 @@ struct BlueNoiseTexture {
 	}
 };
 
+struct ChunkFileData {
+	ChunkVoxels voxels;
+	SubchunkVoxels subchunks[CHUNK_SUBCHUNK_COUNT];
+};
+inline std::string get_chunk_filename (int3 const& pos, char const* dirname) {
+	return prints("%s/%+3d,%+3d,%+3d.bin", dirname, pos.x, pos.y, pos.z);
+}
+chunk_id try_load_chunk_from_disk (Chunks& chunks, int3 const& pos, char const* dirname);
+void save_chunk_to_disk (Chunks& chunks, chunk_id cid, char const* dirname);
+
 struct Chunks {
+	SERIALIZE(Chunks, load_radius, load_from_disk, unload_hyster, mesh_world_border,
+		visualize_chunks, visualize_subchunks, visualize_radius, debug_frustrum_culling)
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
 	BlockAllocator<ChunkVoxels>		chunk_voxels	= { MAX_CHUNKS }; // TODO: get rid of alloc bitset here;  always same id as chunk, ie. this is just a SOA array together with chunks
@@ -330,7 +342,7 @@ struct Chunks {
 	void checked_sparsify_chunk (chunk_id cid);
 	bool checked_sparsify_subchunk (ChunkVoxels& vox, uint32_t& subc);
 
-	void sparse_chunk_from_worldgen (chunk_id cid, Chunk& chunk, block_id* raw_voxels);
+	void sparse_chunk_from_worldgen (chunk_id cid, block_id* raw_voxels);
 
 	void flag_touching_neighbours (Chunk* c);
 
@@ -356,11 +368,10 @@ struct Chunks {
 		}
 	}
 
-	SERIALIZE(Chunks, load_radius, unload_hyster, mesh_world_border, visualize_chunks, visualize_subchunks, visualize_radius, debug_frustrum_culling)
-
 	// load chunks in this radius in order of distance to the player 
 	float load_radius = 700.0f;
-	
+	bool load_from_disk = false;
+
 	// prevent rapid loading and unloading chunks
 	// This way walking back and forth small distances does not cause load on the system
 	float unload_hyster = 40;
@@ -393,16 +404,15 @@ struct Chunks {
 
 	void write_block_update_chunk_flags (int x, int y, int z, Chunk* c);
 
+	void save_chunks_to_disk (const char* save_dirname);
+
 	// instead of sorting the chunks using a exact sorting of a vector ( O(N logN) )
 	// simply insert the chunks into a set of buckets ( O(N) )
 	// that each span a fixed interval in squared distance to player space
 	// using squared distances is easier and has the advantage of having more buckets close to the player
 	// this means we still load the chunks in a routhly sorted order but chunks with closeish distances might be out of order
 	// by changing the BUCKET_FAC you increase the amount of vectors needed but increase the accuracy of the sort
-	struct GenChunk {
-		int3 pos;
-	};
-	std_vector< std_vector<GenChunk> > chunks_to_generate;
+	std::vector< std::vector<int3> > chunks_to_generate;
 	uint32_t pending_chunks = 0; // chunks waiting to be queued
 
 	// queue and finialize chunks that should be generated
@@ -412,9 +422,9 @@ struct Chunks {
 		slice_id		sliceid;
 		ChunkSliceData*	data;
 	};
-	std_vector<UploadSlice> upload_slices;
+	std::vector<UploadSlice> upload_slices;
 
-	std_vector<chunk_id> upload_voxels; // REMESH of this frame
+	std::vector<chunk_id> upload_voxels; // VOXELS_DIRTY of this frame
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);

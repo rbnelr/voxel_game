@@ -29,7 +29,7 @@ void Assets::load_block_types (json const& blocks_json) {
 		auto val = kv.value();
 
 		// get block 'class' which eases the block config by setting block parameter defaults depending on class
-		std_string cls = "solid";
+		std::string cls = "solid";
 
 	#define GET(val, member) if ((val).contains(member)) (val).at(member)
 

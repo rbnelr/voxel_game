@@ -24,7 +24,7 @@ void Logger::imgui () {
 	ImGui::Text("%6.2f KB", (float)lines.size() * sizeof(Line) / 1024);
 	ImGui::SameLine();
 	if (ImGui::Button("Clear"))
-		lines = std_vector<Line>();
+		lines = std::vector<Line>();
 	ImGui::SameLine();
 
 	ImGui::SameLine();

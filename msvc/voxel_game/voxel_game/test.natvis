@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010"> 
+	<Type Name="kissmath::int2">
+		<DisplayString>{{ {x}, {y} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::int3">
+		<DisplayString>{{ {x}, {y}, {z} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::int4">
+		<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+	</Type>
+	
+	<Type Name="kissmath::float2">
+		<DisplayString>{{ {x}, {y} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::float3">
+		<DisplayString>{{ {x}, {y}, {z} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::float4">
+		<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+	</Type>
+	
+	<Type Name="kissmath::bool2">
+		<DisplayString>{{ {x}, {y} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::bool3">
+		<DisplayString>{{ {x}, {y}, {z} }}</DisplayString>
+	</Type>
+	<Type Name="kissmath::bool4">
+		<DisplayString>{{ {x}, {y}, {z}, {w} }}</DisplayString>
+	</Type>
+</AutoVisualizer>
