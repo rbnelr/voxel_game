@@ -242,29 +242,35 @@ public:
 
 //// Profiling
 #if RENDERER_PROFILING
+	// Timestamps are reportedly sometimes prone to rollover if internal bit withds are too small (see tracy dev)
+	// timestamps seem to be nanoseconds since unix epoch in 64 bit on my machine
+	// glBegin/EndQuery(GL_TIME_ELAPSED, queries[next]); can be used as well, but does unexpectedly not support nesting
 	template <int N=4>
 	struct TimerZone {
 		int next = 0; // next timer to be used for measurement
 		int count = 0; // number of timers 'buffered', ie measurement was started by result not read yet
-		GLuint queries[N];
+		GLuint queries_begin[N];
+		GLuint queries_end[N];
 		
 		TimerZone () {
-			glGenQueries(N, queries);
+			glGenQueries(N, queries_begin);
+			glGenQueries(N, queries_end);
 
 			// could check the timer res here, but not sure what to do if it ever overflowed, just ignore since it's only for profiling anyway
 			//GLint bits;
 			//glGetQueryiv(GL_TIME_ELAPSED,  GL_QUERY_COUNTER_BITS, &bits);
 		}
 		~TimerZone () {
-			glDeleteQueries(N, queries);
+			glDeleteQueries(N, queries_begin);
+			glDeleteQueries(N, queries_end);
 		}
 
 		// always call end() after start() and never call read_seconds inbetween
 		void start () {
-			glBeginQuery(GL_TIME_ELAPSED, queries[next]);
+			glQueryCounter(queries_begin[next], GL_TIMESTAMP);
 		}
 		void end () {
-			glEndQuery(GL_TIME_ELAPSED);
+			glQueryCounter(queries_end[next], GL_TIMESTAMP);
 
 			next = (next + 1) % N;
 			count++;
@@ -289,14 +295,16 @@ public:
 			
 			ZoneScoped;
 			GLint avail;
-			glGetQueryObjectiv(queries[idx], GL_QUERY_RESULT_AVAILABLE, &avail);
+			glGetQueryObjectiv(queries_end[idx], GL_QUERY_RESULT_AVAILABLE, &avail); // if end is ready, begin should be too
 			if (avail == 0) return false;
 
 			count--; // pop timing
 			
-			uint64_t elapsed_ns = 99;
-			glGetQueryObjectui64v(queries[idx], GL_QUERY_RESULT, &elapsed_ns);
+			uint64_t begin_ts, end_ts;
+			glGetQueryObjectui64v(queries_begin[idx], GL_QUERY_RESULT, &begin_ts);
+			glGetQueryObjectui64v(queries_end[idx], GL_QUERY_RESULT, &end_ts);
 
+			uint64_t elapsed_ns = end_ts - begin_ts;
 			*out_seconds = (float)elapsed_ns * (1.0f / NSEC);
 			return true;
 		}
