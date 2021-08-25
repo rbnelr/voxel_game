@@ -481,4 +481,7 @@
   <ItemGroup>
     <Natvis Include="test.natvis" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="test.natvis" />
+  </ItemGroup>
 </Project>
