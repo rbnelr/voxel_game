@@ -397,8 +397,11 @@ void Raytracer::draw (OpenglRenderer& r, Game& game) {
 	prev_world2clip = world2clip;
 	init = false;
 
-	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-
+	{
+		OGL_TIMER_ZONE(timer_rt.timer);
+		
+		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+	}
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 

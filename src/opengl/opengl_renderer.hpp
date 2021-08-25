@@ -348,7 +348,7 @@ public:
 
 		ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
 
-		raytracer.imgui();
+		raytracer.imgui(I);
 		bloom_renderer.imgui();
 	}
 

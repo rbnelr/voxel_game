@@ -85,6 +85,36 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #endif
 }
 
+
+
+// Instead of executing work groups in a simple row major order
+// reorder them into columns of width N (by returning a different 2d index)
+// in each column the work groups are still row major order
+// replicates this: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
+uvec2 work_group_tiling (uint N) {
+	#if 0
+	return gl_WorkGroupID.xy;
+	#else
+	uint idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+	
+	uint column_size       = gl_NumWorkGroups.y * N;
+	uint full_column_count = gl_NumWorkGroups.x / N;
+	uint last_column_width = gl_NumWorkGroups.x % N;
+	
+	uint column_idx = idx / column_size;
+	uint idx_in_column = idx % column_size;
+	
+	uint column_width = N;
+	if (column_idx == full_column_count)
+		column_width = last_column_width;
+	
+	uvec2 wg_swizzled;
+	wg_swizzled.y = idx_in_column / column_width;
+	wg_swizzled.x = idx_in_column % column_width + column_idx * N;
+	return wg_swizzled;
+	#endif
+}
+
 void main () {
 #if VISUALIZE_COST && VISUALIZE_WARP_COST
 	if (subgroupElect()) {
@@ -94,7 +124,10 @@ void main () {
 	barrier();
 #endif
 	
-	uvec2 pxpos = gl_GlobalInvocationID.xy;
+	uvec2 wgroupid = work_group_tiling(16u);
+	uvec2 pxpos = wgroupid * gl_WorkGroupSize.xy + gl_LocalInvocationID.xy;
+	
+	//uvec2 pxpos = gl_GlobalInvocationID.xy;
 	
 	//// maybe try not to do rays that we do not see (happens due to local group size)
 	//if (pxpos.x >= uint(view.viewport_size.x) || pxpos.y >= uint(view.viewport_size.y))

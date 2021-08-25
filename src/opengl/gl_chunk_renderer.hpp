@@ -150,6 +150,159 @@ struct ChunkOctrees {
 	void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
 };
 
+
+struct Timing_Histogram {
+	RunningAverage<float> avg = RunningAverage<float>(64);
+	float latest_avg;
+	float latest_min, latest_max, latest_std_dev;
+
+	float update_period = .5f; // sec
+	float update_timer = 0;
+
+	int imgui_histo_height = 60;
+	float y_axis_height = 20;
+
+	// add new timing into circular buffer
+	void push_timing (float seconds) {
+		avg.push(seconds);
+	}
+
+	// compute averages from circular buffer every update_period seconds (only includes pushed timings, not initial 0s)
+	// and display them via imgui
+	void imgui_display (char const* name, float dt, bool default_open=false) { // dt for updating imgui every update_period (not for actual value being averaged)
+		if (update_timer <= 0) {
+			latest_avg = avg.calc_avg(&latest_min, &latest_max, &latest_std_dev);
+			update_timer += update_period;
+		}
+		update_timer -= dt;
+
+		if (ImGui::TreeNodeEx(name, default_open ? ImGuiTreeNodeFlags_DefaultOpen : 0,
+			"%12s - %6.3fms", name, latest_avg * 1000)) {
+			float avg_hz = 1.0f / latest_avg;
+			ImGui::Text("avg: %5.1f hz (%6.3f ms  min: %6.3f  max: %6.3f  stddev: %6.3f)",
+				avg_hz, latest_avg * 1000, latest_min * 1000, latest_max * 1000, latest_std_dev * 1000);
+
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotHistogram("##frametimes_histogram", avg.data(), (int)avg.count(), 0, nullptr, 0, y_axis_height / 1000, ImVec2(0, (float)imgui_histo_height));
+
+			if (ImGui::BeginPopupContextItem("##frametimes_histogram popup")) {
+				ImGui::SliderInt("imgui_histo_height", &imgui_histo_height, 20, 120);
+				ImGui::DragFloat("y_axis_height [ms]", &y_axis_height, 0.1f);
+
+				int cap = (int)avg.capacity();
+				if (ImGui::SliderInt("avg_count", &cap, 16, 1024)) {
+					avg.resize(cap);
+				}
+
+				ImGui::EndPopup();
+			}
+
+			ImGui::TreePop();
+		}
+	}
+};
+//// Profiling
+#if 1
+template <int N=4>
+struct TimerZone {
+	int next = 0; // next timer to be used for measurement
+	int count = 0; // number of timers 'buffered', ie measurement was started by result not read yet
+	GLuint queries[N];
+
+	TimerZone () {
+		glGenQueries(N, queries);
+
+		// could check the timer res here, but not sure what to do if it ever overflowed, just ignore since it's only for profiling anyway
+		//GLint bits;
+		//glGetQueryiv(GL_TIME_ELAPSED,  GL_QUERY_COUNTER_BITS, &bits);
+	}
+	~TimerZone () {
+		glDeleteQueries(N, queries);
+	}
+
+	// always call end() after start() and never call read_seconds inbetween
+	void start () {
+		glBeginQuery(GL_TIME_ELAPSED, queries[next]);
+	}
+	void end () {
+		glEndQuery(GL_TIME_ELAPSED);
+
+		next = (next + 1) % N;
+		count++;
+	}
+
+	// try to read oldest timing
+	// returns false if it is still not ready to be read
+	// returns true if result was ready, result in out_seconds
+	// in case that a result takes so long to be readable (or you don't read them)
+	//  timers will start to be reused, thus overwriting results
+	//  in the case that this happend count will become larger than N and this function will return 'fake' 0 results
+	bool read_seconds (float* out_seconds) {
+		if (count == 0) return false;
+		if (count > N) {
+			// we overflowed our buffer, so this sample is overwritten, return 0 dummy value
+			count--; // pop timing
+			*out_seconds = 0;
+			return true;
+		}
+
+		int idx = (next + N - count) % N;
+
+		ZoneScoped;
+		GLint avail;
+		glGetQueryObjectiv(queries[idx], GL_QUERY_RESULT_AVAILABLE, &avail);
+		if (avail == 0) return false;
+
+		count--; // pop timing
+
+		uint64_t elapsed_ns = 99;
+		glGetQueryObjectui64v(queries[idx], GL_QUERY_RESULT, &elapsed_ns);
+
+		const uint64_t NSEC = 1000ull * 1000ull * 1000ull;
+
+		*out_seconds = (float)elapsed_ns * (1.0f / NSEC);
+		return true;
+	}
+};
+
+struct TimerZoneScoped {
+	TimerZone<>& zone;
+	TimerZoneScoped (TimerZone<>& zone): zone{zone} {
+		zone.start();
+	}
+	~TimerZoneScoped () {
+		zone.end();
+	}
+};
+
+#define OGL_TIMER(name) TimerZone<> name
+#define OGL_TIMER_ZONE(zone) TimerZoneScoped __scoped_glzone_##__COUNTER__(zone)
+
+struct TimerHistogram {
+	TimerZone<> timer;
+	Timing_Histogram histo;
+
+	void update (float dt, char const* name) {
+		float seconds;
+		while (timer.read_seconds(&seconds))
+			histo.push_timing(seconds);
+		histo.imgui_display(name, dt);
+	}
+};
+
+#define OGL_TIMER_HISTOGRAM(name) TimerHistogram timer_##name
+#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt) timer_##name.update(dt, TO_STRING(name));
+#else
+#define OGL_TIMER(name)
+#define OGL_TIMER_ZONE(zone)
+
+#define OGL_TIMER_HISTOGRAM(name)
+#define OGL_TIMER_HISTOGRAM_UPDATE(name, dt)
+#endif
+
+
+
+
 struct Raytracer {
 	SERIALIZE(Raytracer, enable, max_iterations, rand_seed_time,
 		sunlight_enable, sunlight_dist, sunlight_col,
@@ -157,6 +310,8 @@ struct Raytracer {
 		only_primary_rays, taa_alpha, taa_enable)
 
 	Shader* shad = nullptr;
+
+	OGL_TIMER_HISTOGRAM(rt);
 
 	struct SubchunksTexture {
 		Texture3D	tex;
@@ -376,10 +531,12 @@ struct Raytracer {
 
 	bool enable = true;
 
-	void imgui () {
+	void imgui (Input& I) {
 		if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 		ImGui::Checkbox("enable [R]", &enable);
+
+		OGL_TIMER_HISTOGRAM_UPDATE(rt, I.dt);
 
 		ImGui::Checkbox("update_debug_rays [T]", &update_debug_rays);
 		clear_debug_rays = ImGui::Button("clear_debug_rays") || clear_debug_rays;
