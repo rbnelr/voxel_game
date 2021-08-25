@@ -978,6 +978,16 @@ chunk_id try_load_chunk_from_disk (Chunks& chunks, int3 const& pos, char const* 
 			chunkdata.subchunks[i] = alloc_subc;
 
 			memcpy(chunks.subchunks[alloc_subc].voxels, file->subchunks[subc].voxels, sizeof(SubchunkVoxels));
+			
+		#if 1
+			// turn unknown block ids into safe nulls
+			// (happens when loading save that was saves with more block types)
+			auto& v = chunks.subchunks[alloc_subc].voxels;
+			auto count = g_assets.block_types.count();
+			for (int i=0; i<SUBCHUNK_VOXEL_COUNT; ++i) {
+				if (v[i] >= count) v[i] = B_NULL;
+			}
+		#endif
 		}
 	}
 
