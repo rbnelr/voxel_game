@@ -35,6 +35,7 @@
 #define B_MAGMA			12
 #define B_CRYSTAL		15
 #define B_URANIUM		16
+#define B_TREE_LOG		17
 #define B_LEAVES		18
 #define B_TORCH			19
 #define B_TALLGRASS		20
