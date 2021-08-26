@@ -1,6 +1,8 @@
 ﻿#version 460 core
 #extension GL_NV_gpu_shader5 : enable // for uint16_t, uint8_t
 
+#extension GL_ARB_shader_group_vote : enable
+
 #if VISUALIZE_COST && VISUALIZE_TIME
 	#extension GL_ARB_shader_clock : enable
 #endif
