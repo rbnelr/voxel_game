@@ -8,13 +8,22 @@ layout(r8i, binding = 4) restrict uniform iimage3D df_img;
 
 #include "gpu_voxels.glsl"
 
+uniform ivec3 offsets[32];
+
+// Initialized my DF such that a cell gets the value:
+//   0 if a neighbouring voxel is solid (3x3 region)
+//  -1 if the voxel itself is solid (so that I avoid checking voxel block ids in the tracing)
+// 128 (max DF dist) otherwise
+
+// This code is using a few compute/gpu shader tricks like shared mem, barriers and lane intrinsics
+// but in essence it's just computing this logic on the 3x3 region centered on the voxel
+// but without requiring 27 texture reads per result voxel
+
 const int REGION = 8;
 const int CORE = REGION -2;
 const int CHUNK_WGROUPS = (CHUNK_SIZE + CORE-1) / CORE; // round up
 
 shared int8_t buf[REGION][REGION][REGION];
-
-uniform ivec3 offsets[32];
 
 void main () {
 	ivec3 wgroupid = ivec3(gl_WorkGroupID);
@@ -32,8 +41,9 @@ void main () {
 	int z = int(gl_LocalInvocationID.z);
 	
 	uint bid = in_chunk ? texelFetch(voxel_tex, pos, 0).r : 0;
-	int8_t val = bid > B_AIR ? int8_t(1u) : int8_t(0u);
+	int8_t val = bid > B_AIR ? int8_t(1u) : int8_t(0u); // solid voxels get a 1, air gets a 0
 	
+	// Propagate 1s to X-neighbours
 #if 0
 	buf[z][y][x] = val;
 	barrier(); // make write visible to X pass reads

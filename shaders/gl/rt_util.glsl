@@ -8,48 +8,6 @@
 #include "gpu_voxels.glsl"
 #include "rand.glsl"
 
-#if VISUALIZE_COST
-	int iterations = 0;
-	
-	uniform sampler2D heat_gradient;
-	
-	#if VISUALIZE_WARP_COST
-		#define WARP_COUNT_IN_WG ((WG_PIXELS_X*WG_PIXELS_Y) / 32) 
-		shared uint warp_iter[WARP_COUNT_IN_WG];
-		
-		#define INIT_VISUALIZE_COST \
-			if (subgroupElect()) { \
-				warp_iter[gl_SubgroupID] = 0u; \
-			} \
-			iterations = 0; \
-			barrier();
-			
-		#define GET_VISUALIZE_COST(VAL) \
-			const uint warp_cost = warp_iter[gl_SubgroupID]; \
-			const uint local_cost = iterations; \
-			 \
-			float wasted_work = float(warp_cost - local_cost) / float(warp_cost); \
-			VAL = texture(heat_gradient, vec2(wasted_work, 0.5)).rgb;
-			
-		#define VISUALIZE_COST_COUNT \
-			++iterations; \
-			if (subgroupElect()) atomicAdd(warp_iter[gl_SubgroupID], 1u);
-	#else
-		#define INIT_VISUALIZE_COST \
-			iterations = 0;
-			
-		#define GET_VISUALIZE_COST(VAL) \
-			VAL = texture(heat_gradient, vec2(float(iterations) / float(max_iterations), 0.5)).rgb;
-			
-		#define VISUALIZE_COST_COUNT \
-			++iterations;
-	#endif
-#else
-	#define INIT_VISUALIZE_COST
-	#define GET_VISUALIZE_COST(VAL)
-	#define VISUALIZE_COST_COUNT
-#endif
-
 vec3 generate_tangent (vec3 normal) { // NOTE: tangents currently do not correspond with texture uvs, normal mapping will be wrong
 	vec3 tangent = vec3(0,0,+1);
 	if (abs(normal.z) > 0.99) return vec3(0,+1,0);
@@ -214,6 +172,47 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 }
 
 //
+uniform int max_iterations = 200;
+
+#if VISUALIZE_COST
+	int _iterations = 0;
+	uint64_t _ts_start;
+	
+	uniform sampler2D heat_gradient;
+	
+	void INIT_VISUALIZE_COST () {
+		_iterations = 0;
+		
+		#if VISUALIZE_TIME
+		_ts_start = clockARB();
+		#endif
+	}
+		
+	void GET_VISUALIZE_COST (inout vec3 col) {
+		#if VISUALIZE_TIME
+		uint64_t dur = clockARB() - _ts_start;
+		float val = float(dur) / float(60000);
+		//float val = float(dur) / float(_iterations) / 2000.0;
+		
+		#else
+		float val = float(_iterations) / float(max_iterations);
+		#endif
+		
+		col = texture(heat_gradient, vec2(val, 0.5)).rgb;
+	}
+	
+	#define VISUALIZE_ITERATION ++_iterations;
+	
+	//uint64_t ts_dur = clockARB() - ts_start;
+	//float iter = float(iterations) / float(max_iterations);
+	//float time = float(ts_dur) / float(60000);
+	//float time_per_iter = float(ts_dur) / float(iterations) / 3000.0;
+#else
+	#define INIT_VISUALIZE_COST()
+	#define GET_VISUALIZE_COST(col)
+	#define VISUALIZE_ITERATION
+#endif
+
 struct Hit {
 	vec3	pos;
 	float	dist;
@@ -228,8 +227,6 @@ const int FLIPMASK = WORLD_SIZE-1;
 
 bool _dbgdraw = false;
 
-uniform int max_iterations = 200;
-
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	bvec3 dir_pos = greaterThanEqual(ray_dir, vec3(0.0));
 	
@@ -239,12 +236,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	// precompute part of plane projection equation
 	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
-	// due to mad instruction
+	// due to madd instruction
 	vec3 inv_dir = 1.0 / ray_dir;
 	vec3 bias = inv_dir * -ray_pos;
 	
 	float dist;
-	{ // allow ray to start outside ray for nice debugging views
+	{ // allow ray to start outside of world texture cube for nice debugging views
 		float epsilon = 0.0001; // stop the raymarching from sometimes sampling outside the world textures
 		vec3 world_min = vec3(        0.0) + epsilon;
 		vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
@@ -265,9 +262,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		// adjust ray to start where it hits cube initally
 		dist = t0;
 		max_dist = t1;
-		
-		//flippedf += abs(dir) * t;
-		//flippedf = max(flippedf, vec3(0.0));
 	}
 	
 	float manhattan_fac = 0.999 / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
@@ -279,13 +273,13 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	int iter = 0;
 	
 	for (;;) {
-		VISUALIZE_COST_COUNT
+		VISUALIZE_ITERATION
 		
 		float df = float(texelFetch(df_tex, coord, 0).r);
 		df *= manhattan_fac;
 		
 		if (df > 1.0) {
-			// DF tells us that we can still step by df before we can possibly hit a voxel
+			// DF tells us that we can still step by <df> before we could possibly hit a voxel
 			// step via DF raymarching
 			
 			// step up to exit of current cell, since DF is safe up until its bounds
@@ -307,9 +301,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			vec3 chunk_t1v = inv_dir * chunk_exit + bias;
 			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z);
 			
-			dist += df;
 			// limit step to exactly on the exit face of the chunk
-			dist = min(dist, chunk_t1);
+			dist = min(dist + df, chunk_t1);
 			
 			// update pos for next iteration
 			pos = dist * ray_dir + ray_pos;
@@ -324,7 +317,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			coord = ivec3(pos);
 			
 		} else {
-			// DF is 0, we need to check individual voxels by DDA now
+			// we need to check individual voxels by DDA now
 			
 			#if DEBUGDRAW
 			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
@@ -374,7 +367,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		vec2 uv;
 		int face;
 		{ // calc hit face, uv and normal
-			vec3 hit_fract = hit.pos;
 			vec3 hit_center = vec3(coord) + 0.5;
 			
 			vec3 offs = (hit.pos - hit_center);
@@ -385,17 +377,17 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				hit.normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
-				uv = hit_fract.yz;
+				uv = hit.pos.yz;
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
 				hit.normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
-				uv = hit_fract.xz;
+				uv = hit.pos.xz;
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
 				hit.normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
-				uv = hit_fract.xy;
+				uv = hit.pos.xy;
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
 			}
 		}
@@ -408,8 +400,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		//if (tex_bid == B_TALLGRASS && face >= 4)
 		//	hit.col = vec4(0.0);
-		
-		//hit.emiss = get_emmisive(hit.bid);
 	}
 	
 	//hit.col = vec4(vec3(dist / 200.0), 1);

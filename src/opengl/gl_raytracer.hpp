@@ -123,7 +123,7 @@ namespace gl {
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			         {"VISUALIZE_WARP_COST", visualize_warp_cost ? "1":"0"}
+			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
 		}
 
@@ -176,7 +176,7 @@ namespace gl {
 		int max_iterations = 512;
 
 		bool visualize_cost = false;
-		bool visualize_warp_cost = false;
+		bool visualize_time = false;
 
 		bool macro_change = false; // shader macro change
 		void imgui (Input& I) {
@@ -191,7 +191,7 @@ namespace gl {
 
 			macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 			ImGui::SameLine();
-			macro_change |= ImGui::Checkbox("warp_cost", &visualize_warp_cost);
+			macro_change |= ImGui::Checkbox("visualize_time", &visualize_time);
 
 			macro_change |= rt_groupsz.imgui("rt_groupsz");
 

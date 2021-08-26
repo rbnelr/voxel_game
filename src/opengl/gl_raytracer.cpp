@@ -57,14 +57,15 @@ namespace gl {
 		if (!game.chunks.upload_voxels.empty()) {
 			OGL_TRACE("raytracer upload changes");
 
-			block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // temp buffer to 'decompress' the data and enable uploading it in a single glTextureSubImage3D
+			// temp buffer to 'decompress' my sparse subchunks and enable uploading them in a single glTextureSubImage3D per chunk
+			block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 			
 			for (auto cid : game.chunks.upload_voxels) {
 				auto& chunk = game.chunks.chunks[cid];
 				auto& vox = game.chunks.chunk_voxels[cid];
 
 				int3 pos = chunk.pos + GPU_WORLD_SIZE_CHUNKS/2;
-				if ( (unsigned)(pos.x) < GPU_WORLD_SIZE_CHUNKS &&
+				if ( (unsigned)(pos.x) < GPU_WORLD_SIZE_CHUNKS && // use 3 unsigned comparisons instead of 6 signed ones
 					 (unsigned)(pos.y) < GPU_WORLD_SIZE_CHUNKS &&
 					 (unsigned)(pos.z) < GPU_WORLD_SIZE_CHUNKS ) {
 					//OGL_TRACE("upload chunk data");
@@ -193,8 +194,8 @@ namespace gl {
 		if (!rt_forward->prog) return;
 
 		{
-			ZoneScopedN("rt_gbufgen");
-			OGL_TRACE("rt_gbufgen");
+			ZoneScopedN("rt_forward");
+			OGL_TRACE("rt_forward");
 			OGL_TIMER_ZONE(timer_rt.timer);
 
 			glUseProgram(rt_forward->prog);
