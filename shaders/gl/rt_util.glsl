@@ -272,11 +272,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	int dbgcol = 0;
 	int iter = 0;
 	
+	#if 0
 	for (;;) {
 		VISUALIZE_ITERATION
 		
-		float df = float(texelFetch(df_tex, coord, 0).r); // tex read + conv
-		df *= manhattan_fac; // 1 mul
+		int dfi = texelFetch(df_tex, coord, 0).r; // tex read
 		
 		// step up to exit of current cell, since DF is safe up until its bounds
 		// seems to give a little bit of perf, as this reduces iteration count
@@ -285,7 +285,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		//vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
 		//dist = min(min(t1v.x, t1v.y), t1v.z);
 		
-		if (df > 1.0) { // 1 comp + branch
+		if (dfi > 1) { // 1 comp + branch
+			float df = float(dfi) * manhattan_fac; // 1 conv + 1 mul
+			
 			// DF tells us that we can still step by <df> before we could possibly hit a voxel
 			// step via DF raymarching
 			
@@ -312,7 +314,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			// update coord for next iteration
 			coord = ivec3(pos); // 3 conv
 			
-			// 19 instr (11 for chunk handling)
+			// 21 instr (11 for chunk handling)
 		} else {
 			// we need to check individual voxels by DDA now
 			
@@ -323,16 +325,19 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
 			// this avoids one memory read
 			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
-			if (df < 0.0)
+			if (dfi < 0) // 1 comp + branch
 				break;
 			
-			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
-			dist = min(min(t1v.x, t1v.y), t1v.z);
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias; // 3 add + 3 conv + 3 madd
+			dist = min(min(t1v.x, t1v.y), t1v.z); // 2 min
 			
 			// step on axis where exit distance is lowest
+			// 2 comp + 3 add ??
 			if      (t1v.x == dist) coord.x += step_dir.x;
 			else if (t1v.y == dist) coord.y += step_dir.y;
 			else                    coord.z += step_dir.z;
+			
+			// ~16 instr
 		}
 		
 		dbgcol ^= 1;
@@ -340,6 +345,91 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		if (iter >= max_iterations || dist >= max_dist)
 			return false; // miss
 	}
+	#else
+	
+	int dfi;
+	for (;;) {
+		
+		for (;;) {
+			VISUALIZE_ITERATION
+			
+			dfi = texelFetch(df_tex, coord, 0).r;
+			if (dfi <= 1)
+				break;
+		
+			float df = float(dfi) * manhattan_fac; // 1 conv + 1 mul
+			
+			// DF tells us that we can still step by <df> before we could possibly hit a voxel
+			// step via DF raymarching
+			
+		#if DEBUGDRAW
+			{
+				vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+				vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+				if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+				if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+			}
+		#endif
+			
+			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+			vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes; // 3 and + 3 add
+			
+			vec3 chunk_t1v = inv_dir * chunk_exit + bias; // 3 madd
+			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z); // 2 min
+			
+			dist += df; // 1 add
+			dist = min(dist, chunk_t1); // 1 min  limit step to exactly on the exit face of the chunk
+			
+			// update pos for next iteration
+			vec3 pos = dist * ray_dir + ray_pos; // 3 madd
+			// update coord for next iteration
+			coord = ivec3(pos); // 3 conv
+			
+			// 21 instr (11 for chunk handling)
+			
+			dbgcol ^= 1;
+			iter++;
+			if (iter >= max_iterations || dist >= max_dist)
+				return false; // miss
+		}
+		
+		for (;;) {
+			VISUALIZE_ITERATION
+			// we need to check individual voxels by DDA now
+			
+			dfi = texelFetch(df_tex, coord, 0).r;
+			
+		#if DEBUGDRAW
+			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+		#endif
+		
+			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
+			// this avoids one memory read
+			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
+			if (dfi < 0 || dfi > 1)
+				break;
+			
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias; // 3 add + 3 conv + 3 madd
+			dist = min(min(t1v.x, t1v.y), t1v.z); // 2 min
+			
+			// step on axis where exit distance is lowest
+			// 2 comp + 3 add ??
+			if      (t1v.x == dist) coord.x += step_dir.x;
+			else if (t1v.y == dist) coord.y += step_dir.y;
+			else                    coord.z += step_dir.z;
+			
+			// ~16 instr
+			
+			dbgcol ^= 1;
+			iter++;
+			if (iter >= max_iterations || dist >= max_dist)
+				return false; // miss
+		}
+		
+		if (dfi < 0)
+			break; // hit
+	}
+	#endif
 	
 	#if DEBUGDRAW
 	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
@@ -358,6 +448,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		hit.pos = dist * ray_dir + ray_pos;
 		
 		vec2 uv;
+		//vec2 uv_dx; // uv gradients to get mip mapping
+		//vec2 uv_dy;
+		
 		int face;
 		{ // calc hit face, uv and normal
 			vec3 hit_center = vec3(coord) + 0.5;
