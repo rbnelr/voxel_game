@@ -1,9 +1,11 @@
 {
 	"world_gen": {
-		"seed_str": "test4"
+		"seed_str": "test4",
+		"savefile": "../saves/test"
 	},
 	"chunks": {
 		"load_radius": 500.0,
+		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -14,13 +16,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-109.2895278930664,
-				-104.60159301757813,
-				225.0740966796875
+				-106.94998168945313,
+				-85.3009262084961,
+				229.9498291015625
 			],
 			"rot_aer": [
-				-0.6198902130126953,
-				-0.4647766649723053,
+				-1.7604583501815796,
+				-0.3069780468940735,
 				0.0
 			],
 			"mode": "PERSPECTIVE",

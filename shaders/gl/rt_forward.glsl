@@ -7,7 +7,7 @@
 
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
-#define DEBUGDRAW 0
+#define DEBUGDRAW 1
 #include "rt_util.glsl"
 
 layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;

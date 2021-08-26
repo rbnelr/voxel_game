@@ -191,8 +191,8 @@ uniform int max_iterations = 200;
 	void GET_VISUALIZE_COST (inout vec3 col) {
 		#if VISUALIZE_TIME
 		uint64_t dur = clockARB() - _ts_start;
-		float val = float(dur) / float(60000);
-		//float val = float(dur) / float(_iterations) / 2000.0;
+		//float val = float(dur) / float(60000);
+		float val = float(dur) / float(_iterations) / 2000.0;
 		
 		#else
 		float val = float(_iterations) / float(max_iterations);
@@ -203,10 +203,6 @@ uniform int max_iterations = 200;
 	
 	#define VISUALIZE_ITERATION ++_iterations;
 	
-	//uint64_t ts_dur = clockARB() - ts_start;
-	//float iter = float(iterations) / float(max_iterations);
-	//float time = float(ts_dur) / float(60000);
-	//float time_per_iter = float(ts_dur) / float(iterations) / 3000.0;
 #else
 	#define INIT_VISUALIZE_COST()
 	#define GET_VISUALIZE_COST(col)
@@ -231,6 +227,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	bvec3 dir_pos = greaterThanEqual(ray_dir, vec3(0.0));
 	
 	ivec3 vox_exit = mix(ivec3(0), ivec3(1), dir_pos);
+	ivec3 chunk_exit_offs = mix(ivec3(0), ivec3(63), dir_pos);
 	
 	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_pos);
 	
@@ -278,16 +275,22 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		float df = float(texelFetch(df_tex, coord, 0).r);
 		df *= manhattan_fac;
 		
-		if (df > 1.0) {
+		// step up to exit of current cell, since DF is safe up until its bounds
+		// seems to give a little bit of perf, as this reduces iteration count
+		// of course iteration now has more instructions, so could hurt as well
+		vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+		dist = min(min(t1v.x, t1v.y), t1v.z);
+		
+		// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+		ivec3 chunk_exit = (coord & ~63) + chunk_exit_offs;
+		
+		bool on_chunk_bound = coord.x == chunk_exit.x || coord.y == chunk_exit.y || coord.z == chunk_exit.z;
+		
+		if (df > 1.0 && !on_chunk_bound) {
 			// DF tells us that we can still step by <df> before we could possibly hit a voxel
 			// step via DF raymarching
 			
-			// step up to exit of current cell, since DF is safe up until its bounds
-			// seems to give a little bit of perf, as this reduces iteration count
-			// of course iteration now has more instructions, so could hurt as well
-			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
-			dist = min(min(t1v.x, t1v.y), t1v.z);
-			
+		
 			#if DEBUGDRAW
 			pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
 			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
@@ -295,24 +298,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
 			#endif
 			
-			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
-			vec3 chunk_exit = vec3((coord & ~63) + vox_exit*64);
-			
-			vec3 chunk_t1v = inv_dir * chunk_exit + bias;
+			vec3 chunk_t1v = inv_dir * vec3(chunk_exit) + 0.5 + bias; // project against 
 			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z);
 			
-			// limit step to exactly on the exit face of the chunk
-			dist = min(dist + df, chunk_t1);
+			dist += df;
+			dist = min(dist, chunk_t1); // limit step to exactly on the exit face of the chunk
 			
 			// update pos for next iteration
 			pos = dist * ray_dir + ray_pos;
-			
-			// fix precision issues with coord calculation when limiting step to on chunk face
-			// note: prefer this to adding epsilon to chunk_t1, since that can miss voxels through the diagonals
-			if      (chunk_t1v.x == dist) pos.x += float(step_dir.x) * 0.5;
-			else if (chunk_t1v.y == dist) pos.y += float(step_dir.y) * 0.5;
-			else if (chunk_t1v.z == dist) pos.z += float(step_dir.z) * 0.5;
-			
 			// update coord for next iteration
 			coord = ivec3(pos);
 			
@@ -323,23 +316,25 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
 			#endif
 			
-			//bid = texelFetch(voxel_tex, coord, 0).r;
-			//if (bid > B_AIR)
-			//	break;
-			
 			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
 			// this avoids one memory read
 			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
 			if (df < 0.0)
 				break;
 			
-			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
-			dist = min(min(t1v.x, t1v.y), t1v.z);
-			
+			#if 0 // faster, masked execution?
 			// step on axis where exit distance is lowest
 			if      (t1v.x == dist) coord.x += step_dir.x;
 			else if (t1v.y == dist) coord.y += step_dir.y;
 			else                    coord.z += step_dir.z;
+			#else
+			bvec3 stepmask;
+			stepmask.x = t1v.x == dist;
+			stepmask.y = t1v.y == dist && !stepmask.x;
+			stepmask.z = !stepmask.x && !stepmask.y;
+			
+			coord += mix(ivec3(0), step_dir, stepmask);
+			#endif
 		}
 		
 		dbgcol ^= 1;
