@@ -191,7 +191,7 @@ uniform int max_iterations = 200;
 	void GET_VISUALIZE_COST (inout vec3 col) {
 		#if VISUALIZE_TIME
 		uint64_t dur = clockARB() - _ts_start;
-		float val = float(dur) / float(60000);
+		float val = float(dur) / float(200000);
 		//float val = float(dur) / float(_iterations) / 2000.0;
 		
 		#else
@@ -239,22 +239,61 @@ float cylinderZ_df (vec3 p, vec3 loc, float r, float h0, float h1) {
 	return length(p - vec3(centerxy, closestz)) - r;
 }
 
-void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord) {
+void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord, float noiseval) {
 	float df;
 	
 	if (bid == B_GLOWSHROOM || bid == B_LEAVES)
 		df = sphere_df(pos, vec3(vox_coord), 0.7);
 	else if (bid == B_TREE_LOG)
-		df = cylinderZ_df(pos, vec3(vox_coord), 0.4, 0.0,1.0);
+		df = cylinderZ_df(pos, vec3(vox_coord), 0.4, 0.0, 1.0);
+	else if (bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6))
+		df = cylinderZ_df(pos, vec3(vox_coord), 0.55, 0.0, 1.0);
 	else
-		df = rounded_cube_df(pos, vec3(vox_coord), 0.2, 0.3);
+		df = rounded_cube_df(pos, vec3(vox_coord), 0.1, 0.2);
 	
-	df += noise(pos * 3.0) * 0.1;
+	df += noiseval;
 	
 	if (df < hit_df) {
 		hit_df = df;
 		hit_vox = vox_coord;
 	}
+}
+
+float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
+	ivec3 texcoord = ivec3(round(pos));
+	
+	uint tex000 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1,-1)).r;
+	uint tex100 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1,-1)).r;
+	uint tex010 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0,-1)).r;
+	uint tex110 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0,-1)).r;
+	uint tex001 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1, 0)).r;
+	uint tex101 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1, 0)).r;
+	uint tex011 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0, 0)).r;
+	uint tex111 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0, 0)).r;
+	
+	float df = 0.40;
+	
+	float N = noise(pos * 3.0) * 0.1;
+	//float N = 0.0;
+	
+	if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(-1,-1,-1), N);
+	if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3( 0,-1,-1), N);
+	if (tex010 > B_AIR) voxel_df(df, vox_hit, pos, tex010, texcoord + ivec3(-1, 0,-1), N);
+	if (tex110 > B_AIR) voxel_df(df, vox_hit, pos, tex110, texcoord + ivec3( 0, 0,-1), N);
+	if (tex001 > B_AIR) voxel_df(df, vox_hit, pos, tex001, texcoord + ivec3(-1,-1, 0), N);
+	if (tex101 > B_AIR) voxel_df(df, vox_hit, pos, tex101, texcoord + ivec3( 0,-1, 0), N);
+	if (tex011 > B_AIR) voxel_df(df, vox_hit, pos, tex011, texcoord + ivec3(-1, 0, 0), N);
+	if (tex111 > B_AIR) voxel_df(df, vox_hit, pos, tex111, texcoord + ivec3( 0, 0, 0), N);
+	
+	return df;
+}
+vec3 eval_vox_df_normal (float df, vec3 pos) {
+	ivec3 _ignore;
+	float dfX = eval_vox_df(pos + vec3(epsilon,0,0), _ignore);
+	float dfY = eval_vox_df(pos + vec3(0,epsilon,0), _ignore);
+	float dfZ = eval_vox_df(pos + vec3(0,0,epsilon), _ignore);
+	
+	return normalize(vec3(dfX, dfY, dfZ) - df);
 }
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
@@ -299,48 +338,29 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
 	float manhattan_fac = (1.0 - epsilon) / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
 	
-	vec3 pos = dist * ray_dir + ray_pos;
-	ivec3 coord = ivec3(pos);
+	vec3 pos;
+	ivec3 coord;
 	
 	int dbgcol = 0;
 	int iter = 0;
 	
 	ivec3 vox_hit;
+	float df;
 	
 	for (;;) {
 		VISUALIZE_ITERATION
 		
+		pos = dist * ray_dir + ray_pos;
 		coord = ivec3(pos);
 		
-		float df = float(texelFetch(df_tex, coord, 0).r);
+		df = float(texelFetch(df_tex, coord, 0).r);
 		df *= manhattan_fac;
 		
 		if (df <= 0) {
 			
-			ivec3 texcoord = ivec3(round(pos));
+			df = eval_vox_df(pos, vox_hit);
 			
-			uint tex000 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1,-1)).r;
-			uint tex100 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1,-1)).r;
-			uint tex010 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0,-1)).r;
-			uint tex110 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0,-1)).r;
-			uint tex001 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1, 0)).r;
-			uint tex101 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1, 0)).r;
-			uint tex011 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0, 0)).r;
-			uint tex111 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0, 0)).r;
-			
-			
-			df = 0.40;
-			
-			if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(-1,-1,-1));
-			if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3( 0,-1,-1));
-			if (tex010 > B_AIR) voxel_df(df, vox_hit, pos, tex010, texcoord + ivec3(-1, 0,-1));
-			if (tex110 > B_AIR) voxel_df(df, vox_hit, pos, tex110, texcoord + ivec3( 0, 0,-1));
-			if (tex001 > B_AIR) voxel_df(df, vox_hit, pos, tex001, texcoord + ivec3(-1,-1, 0));
-			if (tex101 > B_AIR) voxel_df(df, vox_hit, pos, tex101, texcoord + ivec3( 0,-1, 0));
-			if (tex011 > B_AIR) voxel_df(df, vox_hit, pos, tex011, texcoord + ivec3(-1, 0, 0));
-			if (tex111 > B_AIR) voxel_df(df, vox_hit, pos, tex111, texcoord + ivec3( 0, 0, 0));
-			
-			if (df < 0.01)
+			if (df < 0.005)
 				break; // hit
 		}
 		
@@ -361,9 +381,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		dist += df; // 1 add
 		dist = min(dist, chunk_t1); // 1 min  limit step to exactly on the exit face of the chunk
-		
-		// update pos for next iteration
-		pos = dist * ray_dir + ray_pos; // 3 madd
 		
 		dbgcol ^= 1;
 		iter++;
@@ -387,6 +404,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		
+		hit.normal = eval_vox_df_normal(df, pos);
+		
 		vec2 uv;
 		//vec2 uv_dx; // uv gradients to get mip mapping
 		//vec2 uv_dy;
@@ -398,20 +417,20 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);
 			
-			hit.normal = vec3(0.0);
+			//hit.normal = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				hit.normal.x = sign(offs.x);
+				//hit.normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit.pos.yz;
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
-				hit.normal.y = sign(offs.y);
+				//hit.normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit.pos.xz;
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
-				hit.normal.z = sign(offs.z);
+				//hit.normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit.pos.xy;
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
@@ -423,6 +442,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 1.0).rgba;
+		
+		//hit.col.rgb = hit.normal;
 		
 		//if (tex_bid == B_TALLGRASS && face >= 4)
 		//	hit.col = vec4(0.0);

@@ -9,7 +9,7 @@
 
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
-#define DEBUGDRAW 1
+#define DEBUGDRAW 0
 #include "rt_util.glsl"
 
 layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
@@ -67,6 +67,7 @@ void main () {
 	Hit hit;
 	if (bray && trace_ray(ray_pos, ray_dir, INF, hit)) {
 		col = hit.col;
+		col *= max(dot(hit.normal, normalize(vec3(1,2,3))), 0.0) + 0.02;
 	}
 	
 	GET_VISUALIZE_COST(col.rgb);
