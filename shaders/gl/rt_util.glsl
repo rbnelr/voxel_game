@@ -248,18 +248,20 @@ float cylinderZ_df (vec3 p, vec3 loc, float r, float h0, float h1) {
 void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord, float noiseval) {
 	float df;
 	
-	pos -= 0.5; // make center of block the origin in sdf funcs
+	vec3 cent = vec3(vox_coord) + 0.5;
 	
-	if (bid == B_GLOWSHROOM || bid == B_LEAVES)
-		df = sphere_sdf(pos, vec3(vox_coord), 0.7);
+	if (bid == B_LEAVES)
+		df = sphere_sdf(pos, cent, 0.7);
+	else if (bid == B_GLOWSHROOM)
+		df = max( sphere_sdf(pos, cent, 0.5), min(-(pos.z - cent.z), cylinderZ_df(pos, cent, 0.15, -0.5, +0.5)) );
 	else if (bid == B_TREE_LOG)
-		df = cylinderZ_df(pos, vec3(vox_coord), 0.4, -0.5, +0.5);
+		df = cylinderZ_df(pos, cent, 0.4, -0.5, +0.5);
 	else if (bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6))
-		df = cylinderZ_df(pos, vec3(vox_coord), 0.55, -0.5, +0.5);
+		df = cylinderZ_df(pos, cent, 0.55, -0.5, +0.5);
 	else
-		df = rounded_cube_sdf(pos, vec3(vox_coord), 0.55, 0.2);
+		df = rounded_cube_sdf(pos, cent, 0.43, 0.1);
 	
-	//df += noiseval;
+	df += noiseval;
 	
 	if (df < hit_df) {
 		hit_df = df;
@@ -357,7 +359,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	ivec3 vox_hit;
 	float df;
 	
-	float prev_df = 0.0;
 	float prev_dist = 0.0;
 	
 	for (;;) {
@@ -373,29 +374,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			
 			df = eval_vox_df(pos, vox_hit);
 			
-			if (df <= 0.0) {
-				// map 0 in [prev_df, df] use to interp between [prev_dist, dist] to get more accurate surface hit
-				//dist = mix(dist, prev_dist, -df / (prev_df - df));
-				
-				// binary search for isosurface
-				float at = prev_dist, bt = dist; // at: df>0   bt: df<0   search for dist at which df=0
-				for (int i=0; i<8; ++i) {
-					float midt = (at + bt) * 0.5;
-					
-					pos = midt * ray_dir + ray_pos;
-					
-					df = eval_vox_df(pos, vox_hit);
-					
-					if (df < 0.0) bt = midt;
-					else          at = midt;
-				}
-				dist = (at + bt) * 0.5;
-				
+			if (df <= 0.0)
 				break; // hit
-			}
 		}
-		prev_df = df;
-		prev_dist = dist;
 		
 		float min_step = 0.05; // limit min step for perf reasons, TODO: scale this to be larger the further along the ray is, parameterize relative to pixel size?
 		df = max(df, min_step);
@@ -415,6 +396,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		vec3 chunk_t1v = inv_dir * chunk_exit + bias; // 3 madd
 		float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z); // 2 min
 		
+		prev_dist = dist;
 		dist += df; // 1 add
 		dist = min(dist, chunk_t1); // 1 min  limit step to exactly on the exit face of the chunk
 		
@@ -427,6 +409,21 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	#if DEBUGDRAW
 	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
 	#endif
+	
+	{ // binary search for isosurface
+		float at = prev_dist, bt = dist; // at: df>0   bt: df<0   search for dist at which df=0
+		for (int i=0; i<8; ++i) {
+			float midt = (at + bt) * 0.5;
+			
+			pos = midt * ray_dir + ray_pos;
+			
+			df = eval_vox_df(pos, vox_hit);
+			
+			if (df < 0.0) bt = midt;
+			else          at = midt;
+		}
+		dist = (at + bt) * 0.5; // take avg of whatever interval is still left
+	}
 	
 	{ // calc hit info
 		
