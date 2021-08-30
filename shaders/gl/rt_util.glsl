@@ -224,34 +224,42 @@ const float epsilon = 0.001; // This epsilon should not round to zero with numbe
 
 bool _dbgdraw = false;
 
-float rounded_cube_df (vec3 p, vec3 loc, float inset, float r) {
-	vec3 closest = clamp(p, loc + inset, loc + 1.0-inset);
-	return length(closest - p) - r;
+float rounded_cube_sdf (vec3 p, vec3 loc, float size, float r) {
+	vec3 rel = p - loc;
+	vec3 a = abs(rel);
+	float sdf = max(max(a.x, a.y), a.z) - size + r;
+	if (sdf <= 0.0) return sdf;
+	
+	vec3 closest = clamp(rel, -size, +size);
+	return length(closest - rel) - r;
 }
-float sphere_df (vec3 p, vec3 loc, float r) {
-	vec3 center = loc + 0.5;
+float sphere_sdf (vec3 p, vec3 loc, float r) {
+	vec3 center = loc;
 	return length(p - center) - r;
 }
+
 float cylinderZ_df (vec3 p, vec3 loc, float r, float h0, float h1) {
 	float closestz = clamp(p.z, loc.z + h0, loc.z + h1);
 	
-	vec2 centerxy = loc.xy + 0.5;
+	vec2 centerxy = loc.xy;
 	return length(p - vec3(centerxy, closestz)) - r;
 }
 
 void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord, float noiseval) {
 	float df;
 	
-	if (bid == B_GLOWSHROOM || bid == B_LEAVES)
-		df = sphere_df(pos, vec3(vox_coord), 0.7);
-	else if (bid == B_TREE_LOG)
-		df = cylinderZ_df(pos, vec3(vox_coord), 0.4, 0.0, 1.0);
-	else if (bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6))
-		df = cylinderZ_df(pos, vec3(vox_coord), 0.55, 0.0, 1.0);
-	else
-		df = rounded_cube_df(pos, vec3(vox_coord), 0.1, 0.2);
+	pos -= 0.5; // make center of block the origin in sdf funcs
 	
-	df += noiseval;
+	if (bid == B_GLOWSHROOM || bid == B_LEAVES)
+		df = sphere_sdf(pos, vec3(vox_coord), 0.7);
+	else if (bid == B_TREE_LOG)
+		df = cylinderZ_df(pos, vec3(vox_coord), 0.4, -0.5, +0.5);
+	else if (bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6))
+		df = cylinderZ_df(pos, vec3(vox_coord), 0.55, -0.5, +0.5);
+	else
+		df = rounded_cube_sdf(pos, vec3(vox_coord), 0.55, 0.2);
+	
+	//df += noiseval;
 	
 	if (df < hit_df) {
 		hit_df = df;
@@ -289,6 +297,8 @@ float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
 }
 vec3 eval_vox_df_normal (float df, vec3 pos) {
 	ivec3 _ignore;
+	df = eval_vox_df(pos, _ignore);
+	
 	float dfX = eval_vox_df(pos + vec3(epsilon,0,0), _ignore);
 	float dfY = eval_vox_df(pos + vec3(0,epsilon,0), _ignore);
 	float dfZ = eval_vox_df(pos + vec3(0,0,epsilon), _ignore);
@@ -347,6 +357,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	ivec3 vox_hit;
 	float df;
 	
+	float prev_df = 0.0;
+	float prev_dist = 0.0;
+	
 	for (;;) {
 		VISUALIZE_ITERATION
 		
@@ -360,18 +373,41 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			
 			df = eval_vox_df(pos, vox_hit);
 			
-			if (df < 0.005)
+			if (df <= 0.0) {
+				// map 0 in [prev_df, df] use to interp between [prev_dist, dist] to get more accurate surface hit
+				//dist = mix(dist, prev_dist, -df / (prev_df - df));
+				
+				// binary search for isosurface
+				float at = prev_dist, bt = dist; // at: df>0   bt: df<0   search for dist at which df=0
+				for (int i=0; i<8; ++i) {
+					float midt = (at + bt) * 0.5;
+					
+					pos = midt * ray_dir + ray_pos;
+					
+					df = eval_vox_df(pos, vox_hit);
+					
+					if (df < 0.0) bt = midt;
+					else          at = midt;
+				}
+				dist = (at + bt) * 0.5;
+				
 				break; // hit
-		}
-		
-		#if DEBUGDRAW
-			{
-				vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
-				vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-				if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-				if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
 			}
-		#endif
+		}
+		prev_df = df;
+		prev_dist = dist;
+		
+		float min_step = 0.05; // limit min step for perf reasons, TODO: scale this to be larger the further along the ray is, parameterize relative to pixel size?
+		df = max(df, min_step);
+		
+	#if DEBUGDRAW
+		{
+			vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+		}
+	#endif
 		
 		// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
 		vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes; // 3 conv + 3 and + 3 add
@@ -394,17 +430,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	
 	{ // calc hit info
 		
-		//// snap ray to voxel entry in case we landed inside a voxel when raymarching
-		//vec3 vox_entry = vec3(coord) + mix(vec3(1.0), vec3(0.0), dir_sign);
-		//
-		//vec3 t0v = inv_dir * vox_entry + bias;
-		//dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to not count faces behind ray
-		
 		hit.bid = texelFetch(voxel_tex, vox_hit, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		
-		hit.normal = eval_vox_df_normal(df, pos);
+		hit.normal = eval_vox_df_normal(df, hit.pos);
 		
 		vec2 uv;
 		//vec2 uv_dx; // uv gradients to get mip mapping
