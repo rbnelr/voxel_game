@@ -55,6 +55,8 @@ void main () {
 	
 	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
 	
+	srand(pxpos.x, pxpos.y, 0);
+	
 	#if DEBUGDRAW
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
 	#endif
@@ -67,7 +69,31 @@ void main () {
 	Hit hit;
 	if (bray && trace_ray(ray_pos, ray_dir, INF, hit)) {
 		col = hit.col;
-		col *= max(dot(hit.normal, normalize(vec3(1,2,3))), 0.0) + 0.02;
+		
+		vec3 pos = hit.pos + hit.normal * epsilon;
+		
+		float AO = 0.0;
+		float AO_dist = 50.0;
+		int AO_sampl = 1;
+		
+		mat3 TBN = generate_TBN(hit.normal);
+		
+		for (int j=0; j<AO_sampl; ++j) {
+			vec3 dir = TBN * hemisphere_sample();
+			
+			float val = 1.0;
+			Hit hit2;
+			if (trace_ray(pos, dir, AO_dist, hit2)) {
+				//col = hit2.col;
+				float x = clamp(hit2.dist / AO_dist, 0.0, 1.0);
+				val = x*x;
+			}
+			AO += val;
+		}
+		AO /= float(AO_sampl);
+		
+		col.xyz *= (AO).xxx;
+		//col *= max(dot(hit.normal, normalize(vec3(1,2,3))), 0.0) + 0.02;
 	}
 	
 	GET_VISUALIZE_COST(col.rgb);

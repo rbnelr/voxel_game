@@ -19,6 +19,9 @@ mat3 calc_TBN (vec3 normal, vec3 tangent) {
 	
 	return mat3(tangent, bitangent, normal);
 }
+mat3 generate_TBN (vec3 normal) {
+	return calc_TBN(normal, generate_tangent(normal));
+}
 
 //// Some raytracing primitives
 
@@ -79,6 +82,75 @@ void sphere (vec3 ray_pos, vec3 ray_dir, vec3 sph_pos, float sph_r, inout float 
 	
 	cur_t = t;
 	cur_pos = sph_pos;
+}
+
+
+float fresnel (vec3 view, vec3 norm, float F0) {
+	float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
+	float x2 = x*x;
+	return F0 + ((1.0 - F0) * x2 * x2 * x);
+}
+
+vec3 hemisphere_sample () {
+	// cosine weighted sampling (100% diffuse)
+	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+	
+	// takes a uniform sample on a disc (x,y)
+	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
+	
+	// random sampling (Monte Carlo)
+	vec2 uv = rand2(); // uniform sample in [0,1) square
+	
+	// map square to disc, preserving uniformity
+	float r = sqrt(uv.y);
+	float theta = 2*PI * uv.x;
+	
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	
+	// map (project) disc up to hemisphere,
+	// turning uniform distribution into cosine weighted distribution
+	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	return dir;
+}
+vec3 hemisphere_sample_stratified (int i, int n) {
+	// cosine weighted sampling (100% diffuse)
+	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
+	
+	// takes a uniform sample on a disc (x,y)
+	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
+	
+	// stratified sampling (Quasi Monte Carlo)
+	int Nx = 4;
+	ivec2 strata = ivec2(i % Nx, i / Nx);
+	
+	float scale = 1.0 / float(Nx);
+	
+	vec2 uv = rand2(); // uniform sample in [0,1) square
+	//uv = (vec2(strata) + 0.5) * scale;
+	uv = (vec2(strata) + uv) * scale;
+	
+	// map square to disc, preserving uniformity
+	float r = sqrt(uv.y);
+	float theta = 2*PI * uv.x;
+	
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	
+	// map (project) disc up to hemisphere,
+	// turning uniform distribution into cosine weighted distribution
+	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	return dir;
+}
+
+vec3 random_in_sphere () {
+	vec3 rnd = rand3();
+    float theta = rnd.x * 2.0 * PI;
+    float phi = acos(2.0 * rnd.y - 1.0);
+    float r = pow(rnd.z, 0.33333333);
+    float sp = sin(phi);
+    float cp = cos(phi);
+    return r * vec3(sp * sin(theta), sp * cos(theta), cp);
 }
 
 //// Noise function for testing, replace with set of better noise functions later
@@ -191,7 +263,7 @@ uniform int max_iterations = 200;
 	void GET_VISUALIZE_COST (inout vec3 col) {
 		#if VISUALIZE_TIME
 		uint64_t dur = clockARB() - _ts_start;
-		float val = float(dur) / float(200000);
+		float val = float(dur) / float(1200000);
 		//float val = float(dur) / float(_iterations) / 2000.0;
 		
 		#else
@@ -261,7 +333,7 @@ void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec
 	else
 		df = rounded_cube_sdf(pos, cent, 0.43, 0.1);
 	
-	df += noiseval;
+	//df += noiseval;
 	
 	if (df < hit_df) {
 		hit_df = df;
@@ -284,7 +356,6 @@ float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
 	float df = 0.40;
 	
 	float N = noise(pos * 3.0) * 0.1;
-	//float N = 0.0;
 	
 	if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(-1,-1,-1), N);
 	if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3( 0,-1,-1), N);
@@ -344,7 +415,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		
 		// adjust ray to start where it hits cube initally
 		dist = t0;
-		max_dist = t1;
+		max_dist = min(t1, max_dist);
 	}
 	
 	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
@@ -479,84 +550,3 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 	//hit.col = vec4(vec3(dist / 200.0), 1);
 	return true; // hit
 }
-
-#if 0
-float fresnel (vec3 view, vec3 norm, float F0) {
-	float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
-	float x2 = x*x;
-	return F0 + ((1.0 - F0) * x2 * x2 * x);
-}
-
-vec3 hemisphere_sample () {
-	// cosine weighted sampling (100% diffuse)
-	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
-	
-	// takes a uniform sample on a disc (x,y)
-	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
-	
-	// random sampling (Monte Carlo)
-	vec2 uv = rand2(); // uniform sample in [0,1) square
-	
-	// map square to disc, preserving uniformity
-	float r = sqrt(uv.y);
-	float theta = 2*PI * uv.x;
-	
-	float x = r * cos(theta);
-	float y = r * sin(theta);
-	
-	// map (project) disc up to hemisphere,
-	// turning uniform distribution into cosine weighted distribution
-	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
-	return dir;
-}
-vec3 hemisphere_sample_stratified (int i, int n) {
-	// cosine weighted sampling (100% diffuse)
-	// http://www.rorydriscoll.com/2009/01/07/better-sampling/
-	
-	// takes a uniform sample on a disc (x,y)
-	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
-	
-	// stratified sampling (Quasi Monte Carlo)
-	int Nx = 4;
-	ivec2 strata = ivec2(i % Nx, i / Nx);
-	
-	float scale = 1.0 / float(Nx);
-	
-	vec2 uv = rand2(); // uniform sample in [0,1) square
-	//uv = (vec2(strata) + 0.5) * scale;
-	uv = (vec2(strata) + uv) * scale;
-	
-	// map square to disc, preserving uniformity
-	float r = sqrt(uv.y);
-	float theta = 2*PI * uv.x;
-	
-	float x = r * cos(theta);
-	float y = r * sin(theta);
-	
-	// map (project) disc up to hemisphere,
-	// turning uniform distribution into cosine weighted distribution
-	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
-	return dir;
-}
-
-vec3 random_in_sphere () {
-	vec3 rnd = rand3();
-    float theta = rnd.x * 2.0 * PI;
-    float phi = acos(2.0 * rnd.y - 1.0);
-    float r = pow(rnd.z, 0.33333333);
-    float sp = sin(phi);
-    float cp = cos(phi);
-    return r * vec3(sp * sin(theta), sp * cos(theta), cp);
-}
-
-// TODO: could optimize this to be precalculated for all normals, since we currently only have 6
-// this also will not really do what I want for arbitrary normals and also not work for normal mapping
-// this just gives you a arbitrary tangent and bitangent that does not correspond to the uvs at all
-mat3 get_tangent_to_world (vec3 normal) {
-	vec3 tangent = abs(normal.x) >= 0.9 ? vec3(0,1,0) : vec3(1,0,0);
-	vec3 bitangent = cross(normal, tangent);
-	tangent = cross(bitangent, normal);
-	
-	return mat3(tangent, bitangent, normal);
-}
-#endif
