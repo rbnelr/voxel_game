@@ -71,38 +71,62 @@ void main () {
 	
 	Hit hit;
 	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0))) {
-		col = hit.col;
-		
-		vec3 pos = hit.pos + hit.normal * epsilon;
-		
-		mat3 TBN = generate_TBN(hit.normal);
-		
-	//#if DEBUGDRAW // visualize tangent space
+		//#if DEBUGDRAW // visualize tangent space
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[0]*0.3, vec4(1,0,0,1));
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[1]*0.3, vec4(0,1,0,1));
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[2]*0.3, vec4(0,0,1,1));
 	//#endif
 		
-		const float AO_dist = 20.0;
-		const float AO_stren = 2.0;
-		const int AO_sampl = 1;
+		if (show_light) hit.col.rgb = vec3(1.0);
 		
-		vec3 dir = TBN * hemisphere_sample();
+		const float bounce_dist = 90.0;
+		const int bounce_limit = 3;
 		
-		float AO = 1.0;
+		vec3 light = vec3(0.0);
 		
-		Hit hit2;
-		if (trace_ray(pos, dir, AO_dist, hit2, vec3(0,0,1))) {
-			AO = clamp(hit2.dist / AO_dist, 0.0, 1.0);
+		vec3 A = vec3(1.0);
+		vec3 albedo = hit.col.rgb;
+		
+		float dist_remain = bounce_dist;
+		
+		vec3 normal = hit.normal;
+		vec3 pos = hit.pos + normal * epsilon;
+		
+		for (int i=0; i<bounce_limit; ++i) {
+			
+			vec3 dir;
+			
+			const float roughness = 0.6;
+			
+			float F = fresnel_roughness(max(0., -dot(normal, ray_dir)), .04, roughness);
+			if (F > rand()) {
+				dir = reflect_roughness(reflect(ray_dir, normal), normal, roughness);
+			} else {
+				A *= albedo;
+				dir = generate_TBN(normal) * hemisphere_sample();
+			}
+			
+			Hit hit2;
+			if (trace_ray(pos, dir, bounce_dist, hit2, vec3(0,0,1))) {
+				light += A * hit2.emiss;
+				albedo = hit2.col.rgb;
+				
+				dist_remain -= hit2.dist;
+				if (dist_remain <= 0.0 || max(max(A.x,A.y),A.z) < 0.02)
+					break;
+				
+				normal = hit2.normal;
+				pos = hit2.pos + normal * epsilon;
+				
+			} else {
+				break;
+			}
 		}
 		
-		AO = APPLY_TAA(AO.xxx, hit.pos, hit.normal, pxpos).x;
-		AO = pow(AO, AO_stren);
+		light = APPLY_TAA(light, hit.pos, hit.normal, pxpos);
 		
-		col.xyz *= (AO).xxx;
-		
-		if (show_light) col = vec4(AO.xxx, 1.0);
-		//col *= max(dot(hit.normal, normalize(vec3(1,2,3))), 0.0) + 0.02;
+		col.rgb = light + hit.emiss;
+		col.a = hit.col.a;
 	}
 	
 	GET_VISUALIZE_COST(col.rgb);

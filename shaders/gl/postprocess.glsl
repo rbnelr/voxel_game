@@ -58,7 +58,7 @@
 		//col = vec3(1.0) - exp(-col * vec3(exposure));
 		
 		//col = col / (col + vec3(1.0));
-		
+		//
 		//float m = max(max(col.r, col.g), col.b);
 		//if (m > 0.9) {
 		//	float f = clamp((m - 0.9) * 0.2, 0.0, 1.0);
@@ -72,6 +72,10 @@
 		//hsv.z = haarm_peter_duiker(hsv.z);
 		
 		//col = hsv2rgb(hsv);
+		
+		
+		//col = max( vec3(0), col - 0.004);
+		//col = (col*(6.2*col + .5)) / (col*(6.2*col+1.7) + 0.06);
 		
 		frag_col = col;
 	}

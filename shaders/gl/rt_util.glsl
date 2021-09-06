@@ -10,7 +10,7 @@
 
 vec3 generate_tangent (vec3 normal) { // NOTE: tangents currently do not correspond with texture uvs, normal mapping will be wrong
 	vec3 tangent = vec3(0,0,1);
-	if (abs(normal.z) > 0.99) return vec3(1,0,0);
+	if (abs(normal.z) > 0.8) return vec3(1,0,0);
 	return tangent;
 }
 mat3 calc_TBN (vec3 normal, vec3 tangent) {
@@ -85,10 +85,15 @@ void sphere (vec3 ray_pos, vec3 ray_dir, vec3 sph_pos, float sph_r, inout float 
 }
 
 
-float fresnel (vec3 view, vec3 norm, float F0) {
-	float x = clamp(1.0 - dot(view, norm), 0.0, 1.0);
+float fresnel (float dotVN, float F0) {
+	float x = clamp(1.0 - dotVN, 0.0, 1.0);
 	float x2 = x*x;
 	return F0 + ((1.0 - F0) * x2 * x2 * x);
+}
+float fresnel_roughness (float dotVN, float F0, float roughness) {
+	float x = clamp(1.0 - dotVN, 0.0, 1.0);
+	float x2 = x*x;
+	return F0 + ((max((1.0 - roughness), F0) - F0) * x2 * x2 * x);
 }
 
 vec3 hemisphere_sample () {
@@ -152,6 +157,25 @@ vec3 random_in_sphere () {
     float sp = sin(phi);
     float cp = cos(phi);
     return r * vec3(sp * sin(theta), sp * cos(theta), cp);
+}
+
+vec3 reflect_roughness (vec3 refl, vec3 normal, float roughness) {
+    mat3 TBN = generate_TBN(refl); // tangent space relative to reflected vector to be able to 'offset' it by roughness
+	
+    float a = roughness * roughness;
+    vec2 uv = rand2(); // uniform sample in [0,1) square
+	
+	//float z = sqrt(clamp( (1.0 - r.y) / 1.0 + (a-1.0) * r.y, 0.0,1.0));
+	float z = sqrt( (1.0 - uv.y) / (1.0 + (a-1.0) * uv.y) );
+	
+	float r = sqrt(1.0 - z*z);
+	float theta = 2*PI * uv.x;
+	
+	float x = r * cos(theta);
+	float y = r * sin(theta);
+	
+    vec3 dir = TBN * vec3(x,y,z);
+    return dot(dir, normal) > 0.0 ? dir : refl;
 }
 
 //// Noise function for testing, replace with set of better noise functions later
@@ -260,7 +284,7 @@ uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
 vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
-	uint age;
+	uint age = 1u;
 	
 	vec4 prev_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
 	prev_clip.xyz /= prev_clip.w;
@@ -274,14 +298,13 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
 		
 		if (distance(pos, sampl_pos) < 0.1) {
 			age = min(sampl_age, uint(taa_max_age));
-			float alpha = 1.0 / (float(age) + 1.0);
 			
-			vec3 prev_val = textureLod(taa_history_color, uv, 0.0).rgb;
-			val = mix(prev_val, val, vec3(alpha));
+			vec3 accumulated = textureLod(taa_history_color, uv, 0.0).rgb * float(age);
+			
+			age += 1u;
+			val = (accumulated + val) / float(age);
 		}
 	}
-	
-	age += 1u;
 	
 	uvec3 pos_enc = uvec3(round(pos * float(0xffff) / WORLD_SIZEf));
 	pos_enc = clamp(pos_enc, uvec3(0), uvec3(0xffff));
@@ -338,7 +361,9 @@ struct Hit {
 	float	dist;
 	vec3	normal;
 	uint	bid;
+	
 	vec4	col;
+	vec3	emiss;
 };
 
 bool _dbgdraw = false;
@@ -385,7 +410,7 @@ void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec
 		df = rounded_cube_sdf(pos, cent, 0.4, 0.14);
 	}
 	
-	df += noiseval * 0.3;
+	//df += noiseval * 0.3;
 	
 	if (df < hit_df) {
 		hit_df = df;
@@ -397,7 +422,7 @@ float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
 	ivec3 texcoord = ivec3(round(pos)) - 1;
 	
 	float df = 0.40;
-	float N = noise(pos * 3.0) * 0.1;
+	float N = noise(pos * 3.0) * 0.1 * 0.5;
 	
 #if 1 // Faster
 	// not unrolling -> less code? less registers? memory loads and math better interleaved?
@@ -614,7 +639,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
-		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 1.0).rgba;
+		float lod = log2(dist)*0.20 - 1.0;
+		hit.col = textureLod(tile_textures, vec3(uv, texid), lod).rgba;
+		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 		
 		//hit.col.rgb = hit.normal;
 		
