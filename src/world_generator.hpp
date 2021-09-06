@@ -137,7 +137,7 @@ namespace worldgen {
 }
 
 struct WorldGenerator {
-	SERIALIZE(WorldGenerator, seed_str, savefile)
+	SERIALIZE(WorldGenerator, seed_str, savefile, water_level, base_depth, large_noise, small_noise, stalac_dens, disable_grass)
 	
 	//	max_depth, base_depth,
 	//	large_noise, small_noise,
@@ -149,28 +149,45 @@ struct WorldGenerator {
 	std::string savefile = "../saves/test";
 
 	struct NoiseParam {
-		SERIALIZE(NoiseParam, period, strength, cutoff, cutoff_val)
+		SERIALIZE(NoiseParam, period, strength, cutoff, cutoff_val, mode)
 
 		float period = 20;
 		float strength = 1;
 
 		bool cutoff = false;
 		float cutoff_val = 0.0f;
+
+		static constexpr char const* MODES = "ADD\0ERODE";
+		int mode = 0;
+
+		void imgui () {
+			ImGui::DragFloat("freq", &period, 0.05f);		ImGui::SameLine();
+			ImGui::DragFloat("amp",  &strength,  0.05f);	ImGui::SameLine();
+
+			ImGui::Combo("mode", &mode, MODES); ImGui::SameLine();
+
+			ImGui::Checkbox("cutoff", &cutoff);
+
+			if (cutoff) {	ImGui::SameLine();
+				ImGui::DragFloat("cutoff_val",  &cutoff_val,  0.05f);
+			}
+		}
 	};
 
 	float max_depth = 20;
-	float base_depth = 40;
+	float base_depth = 3;
 
 	std::vector<NoiseParam> large_noise = {
-		{ 500, -1 },
-		{ 180, -1 },
-		{  70, -1.5f },
+		{ 140, 1.5f },
+		{  70, 1 },
 	};
 
 	std::vector<NoiseParam> small_noise = {
 		{ 4, 0.3f },
 		{ 20, 0.9f, true },
 	};
+
+	int water_level = -123;
 
 	bool stalac = true;
 	float stalac_dens = 0.2f;
@@ -204,14 +221,7 @@ struct WorldGenerator {
 
 		for (int i=0; i<(int)layers.size(); ++i) {
 			ImGui::PushID(i);
-			ImGui::DragFloat("freq", &layers[i].period, 0.05f);		ImGui::SameLine();
-			ImGui::DragFloat("amp",  &layers[i].strength,  0.05f);	ImGui::SameLine();
-
-			ImGui::Checkbox("cutoff", &layers[i].cutoff);
-
-			if (layers[i].cutoff) {	ImGui::SameLine();
-			ImGui::DragFloat("cutoff_val",  &layers[i].cutoff_val,  0.05f);
-			}
+			layers[i].imgui();
 			ImGui::PopID();
 		}
 
@@ -289,6 +299,23 @@ namespace worldgen {
 
 			// adjust noise values because I treat them like a SDF and they seem to be off by a factor of ~4
 			return noise3.eval<float>(p.x, p.y, p.z) * period * 0.25f;
+		}
+
+		void apply_noise_layers (float& depth, float& seed, float3 const& pos, std::vector<WorldGenerator::NoiseParam> const& layers) {
+			for (auto& n : layers) {
+				float val = noise(pos, n.period, seed++) * n.strength;
+				if (n.cutoff) val = max(val, n.cutoff_val);
+
+				switch (n.mode) {
+					case 0:
+						depth += val;
+						break;
+					case 1:
+						if (depth > 0)
+							depth -= val;
+						break;
+				}
+			}
 		}
 
 		float calc_large_noise (float3 const& pos);

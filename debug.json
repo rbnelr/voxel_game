@@ -1,7 +1,43 @@
 {
 	"world_gen": {
 		"seed_str": "test4",
-		"savefile": "../saves/test"
+		"savefile": "../saves/test",
+		"water_level": -123,
+		"base_depth": 3.0,
+		"large_noise": [
+			{
+				"period": 140.0,
+				"strength": 1.5,
+				"cutoff": false,
+				"cutoff_val": 0.0,
+				"mode": 0
+			},
+			{
+				"period": 70.0,
+				"strength": 1.0,
+				"cutoff": false,
+				"cutoff_val": 0.0,
+				"mode": 0
+			}
+		],
+		"small_noise": [
+			{
+				"period": 4.0,
+				"strength": 0.30000001192092896,
+				"cutoff": false,
+				"cutoff_val": 0.0,
+				"mode": 0
+			},
+			{
+				"period": 20.0,
+				"strength": 0.8999999761581421,
+				"cutoff": true,
+				"cutoff_val": 0.0,
+				"mode": 0
+			}
+		],
+		"stalac_dens": 0.20000000298023224,
+		"disable_grass": true
 	},
 	"chunks": {
 		"load_radius": 500.0,
@@ -16,13 +52,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				26.38169288635254,
-				16.546377182006836,
-				122.31775665283203
+				13.694344520568848,
+				-28.364294052124023,
+				-37.74016189575195
 			],
 			"rot_aer": [
-				-0.6324715614318848,
-				-0.19347238540649414,
+				0.835033655166626,
+				-0.24330350756645203,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -31,16 +67,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 10.446646690368652,
+		"base_speed": 48.0001220703125,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			-85.29840850830078,
-			-64.32823181152344,
-			102.0000991821289
+			-33.672157287597656,
+			-16.889141082763672,
+			-139.99989318847656
 		],
 		"vel": [
 			0.0,
@@ -70,7 +106,7 @@
 			"max_iterations": 512,
 			"taa": {
 				"enable": true,
-				"max_age": 31
+				"max_age": 16
 			}
 		},
 		"bloom_renderer": {

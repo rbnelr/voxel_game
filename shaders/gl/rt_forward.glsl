@@ -87,19 +87,14 @@ void main () {
 		const float AO_stren = 2.0;
 		const int AO_sampl = 1;
 		
-		float AO = 0.0;
+		vec3 dir = TBN * hemisphere_sample();
 		
-		for (int j=0; j<AO_sampl; ++j) {
-			vec3 dir = TBN * hemisphere_sample();
-			
-			float val = 1.0;
-			Hit hit2;
-			if (trace_ray(pos, dir, AO_dist, hit2, vec3(0,0,1))) {
-				val = clamp(hit2.dist / AO_dist, 0.0, 1.0);
-			}
-			AO += val;
+		float AO = 1.0;
+		
+		Hit hit2;
+		if (trace_ray(pos, dir, AO_dist, hit2, vec3(0,0,1))) {
+			AO = clamp(hit2.dist / AO_dist, 0.0, 1.0);
 		}
-		AO /= float(AO_sampl);
 		
 		AO = APPLY_TAA(AO.xxx, hit.pos, hit.normal, pxpos).x;
 		AO = pow(AO, AO_stren);

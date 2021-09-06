@@ -13,6 +13,7 @@ __m128 lerp (__m128 a, __m128 b, float t) {
 }
 
 namespace worldgen {
+
 	float NoisePass::calc_large_noise (float3 const& pos) {
 		float depth = wg->base_depth;
 		
@@ -24,12 +25,7 @@ namespace worldgen {
 		p.z /= 0.7;
 
 		float seed = 0;
-		for (auto& n : wg->large_noise) {
-			float val = noise(p, n.period, seed++) * n.strength;
-			if (n.cutoff) val = max(val, n.cutoff_val);
-		
-			depth += val;
-		}
+		apply_noise_layers(depth, seed, p, wg->large_noise);
 		
 		// smaller ridges in wall
 		float cut = noise(pos / float3(4,4,1), 15, seed++);
@@ -39,19 +35,12 @@ namespace worldgen {
 	}
 
 	BlockID NoisePass::cave_noise (float3 const& pos, float large_noise, float3 const& normal) {
-		int water_level = 23;
-
 		float depth = large_noise;
 		
 		// small scale
-		float seed = (float)wg->small_noise.size();
+		float seed = (float)wg->large_noise.size();
 
-		for (auto& n : wg->small_noise) {
-			float val = noise(pos, n.period, seed++) * n.strength;
-			if (n.cutoff) val = max(val, n.cutoff_val);
-		
-			depth += val;
-		}
+		apply_noise_layers(depth, seed, pos, wg->small_noise);
 
 		float modifer = noise01(pos / float3(1,1,3), 14, seed++);
 		
@@ -62,15 +51,15 @@ namespace worldgen {
 		float ground = clamp(map(normal.z, wg->ground_ang, 1.0f));
 		depth += wg->earth_overhang_stren * clamp(ground * 3); // create small overhangs of earth
 
-		float beach_lo = water_level - (2 + modifer*2.5f);
-		float beach_hi = water_level + (0.2f + modifer*1.2f);
+		float beach_lo = wg->water_level - (2 + modifer*2.5f);
+		float beach_hi = wg->water_level + (0.2f + modifer*1.2f);
 		bool beach = pos.z >= beach_lo && pos.z < beach_hi;
 
 		if (depth > 0) {
 
 			if (depth < wg->earth_depth * ground) {// thinner earth layer on steeper slopes
 				if (beach) return B_SAND;
-				if (pos.z >= water_level) {
+				if (pos.z >= wg->water_level) {
 					return B_EARTH;
 				} else {
 					return B_GRAVEL;
@@ -108,7 +97,7 @@ namespace worldgen {
 		//	return B_STONE;
 		//}
 
-		if (pos.z >= water_level) {
+		if (pos.z >= wg->water_level) {
 			return B_AIR;
 		} else {
 			return B_WATER;
