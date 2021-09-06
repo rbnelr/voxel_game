@@ -193,6 +193,11 @@ namespace gl {
 		ZoneScoped;
 		if (!rt_forward->prog) return;
 
+		// TAA
+		if (taa.enable)
+			taa.resize(r.framebuffer.size);
+
+		// forward pass
 		{
 			ZoneScopedN("rt_forward");
 			OGL_TRACE("rt_forward");
@@ -200,10 +205,33 @@ namespace gl {
 
 			glUseProgram(rt_forward->prog);
 
+			rt_forward->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
+
 			rt_forward->set_uniform("framebuf_size", r.framebuffer.size);
 			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
+			rt_forward->set_uniform("show_light", show_light);
+
 			rt_forward->set_uniform("max_iterations", max_iterations);
+
+			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+
+			// TAA
+			GLuint prev_color  = taa.colors[taa.cur ^ 1];
+			GLuint prev_posage = taa.posage[taa.cur ^ 1];
+			GLuint cur_color   = taa.colors[taa.cur];
+			GLuint cur_posage  = taa.posage[taa.cur];
+
+			if (taa.enable) {
+				rt_forward->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
+				rt_forward->set_uniform("taa_max_age", taa.max_age);
+
+				glBindImageTexture(5, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
+				glBindImageTexture(6, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+
+				taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+				taa.cur ^= 1;
+			}
 
 			r.state.bind_textures(rt_forward, {
 				{"voxel_tex", voxel_tex.tex},
@@ -213,12 +241,13 @@ namespace gl {
 				//{"gbuf_col" , gbuf.col },
 				//{"gbuf_norm", gbuf.norm},
 
+				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
+				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
+
 				{"tile_textures", r.tile_textures, r.tile_sampler},
 
 				{"heat_gradient", r.gradient, r.normal_sampler},
 			});
-
-			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 			int2 dispatch_size;
 			dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
@@ -238,6 +267,8 @@ namespace gl {
 		// unbind
 		glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
+		glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
+		glBindImageTexture(6, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
 	}
 
 } // namespace gl

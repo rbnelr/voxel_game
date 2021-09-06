@@ -108,6 +108,7 @@ struct glDebugDraw {
 	float line_width = 1.0f;
 
 	bool update_indirect = false;
+	bool accum_indirect = false;
 	bool _clear_indirect = false;
 
 	void imgui () {
@@ -122,6 +123,8 @@ struct glDebugDraw {
 
 		ImGui::Checkbox("update_indirect [T]", &update_indirect);
 		_clear_indirect = ImGui::Button("clear_indirect") || _clear_indirect;
+		ImGui::SameLine();
+		ImGui::Checkbox("accum_indirect", &accum_indirect);
 	}
 
 	glDebugDraw (Shaders& shaders) {
@@ -171,7 +174,7 @@ struct glDebugDraw {
 			}
 		}
 
-		if (_clear_indirect || update_indirect) {
+		if (_clear_indirect || (update_indirect && !accum_indirect)) {
 			clear_indirect();
 			_clear_indirect = false;
 		}

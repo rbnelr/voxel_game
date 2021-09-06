@@ -57,6 +57,82 @@ namespace gl {
 		}
 	};
 
+	struct TemporalAA {
+		SERIALIZE(TemporalAA, enable, max_age)
+
+		GLuint colors[2] = {};
+		GLuint posage[2] = {};
+		int2   size = 0;
+		int    cur = 0;
+
+		float4x4 prev_world2clip = (float4x4)translate(float3(NAN)); // make prev matrix invalid on first frame
+
+		Sampler sampler = {"sampler"};
+		Sampler sampler_int = {"sampler_int"};
+
+		bool enable = true;
+		int max_age = 16;
+
+		TemporalAA () {
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+
+		void resize (int2 new_size) {
+			if (colors[0] == 0 || size != new_size) {
+				glActiveTexture(GL_TEXTURE0);
+
+				if (colors[0]) { // delete old
+					glDeleteTextures(2, colors);
+					glDeleteTextures(2, posage);
+				}
+
+				size = new_size;
+
+				// create new (textures created with glTexStorage2D cannot be resized)
+				glGenTextures(2, colors);
+				glGenTextures(2, posage);
+
+				for (auto& buf : colors) {
+					glBindTexture(GL_TEXTURE_2D, buf); // opengl requires this after glGenTextures
+					glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
+					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
+				}
+
+				for (auto& buf : posage) {
+					glBindTexture(GL_TEXTURE_2D, buf);
+					glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
+					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
+				}
+
+				OGL_DBG_LABEL(GL_TEXTURE, colors[0], "RT.taa_color0");
+				OGL_DBG_LABEL(GL_TEXTURE, colors[1], "RT.taa_color1");
+				OGL_DBG_LABEL(GL_TEXTURE, posage[0], "RT.taa_posage0");
+				OGL_DBG_LABEL(GL_TEXTURE, posage[1], "RT.taa_posage1");
+
+				// clear textures to be read on first frame
+				float3 col = float3(0,0,0);
+				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
+
+				uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
+				glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
+
+				cur = 1;
+
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
+		}
+	};
+
 ////
 	struct VoxelTexture {
 		Texture3D	tex;
@@ -104,7 +180,7 @@ namespace gl {
 	};
 
 	struct Raytracer {
-		SERIALIZE(Raytracer, enable, max_iterations)
+		SERIALIZE(Raytracer, enable, max_iterations, taa)
 		
 		Shader* rt_forward = nullptr;
 		
@@ -112,6 +188,8 @@ namespace gl {
 		DFTexture df_tex;
 
 		TestRenderer test_renderer;
+
+		TemporalAA taa;
 
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
@@ -122,6 +200,7 @@ namespace gl {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
+			         {"TAA_ENABLE", taa.enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
@@ -175,8 +254,12 @@ namespace gl {
 
 		int max_iterations = 512;
 
+		bool rand_seed_time = true;
+
 		bool visualize_cost = false;
 		bool visualize_time = false;
+
+		bool show_light = false;
 
 		bool macro_change = false; // shader macro change
 		void imgui (Input& I) {
@@ -187,7 +270,15 @@ namespace gl {
 
 			ImGui::Checkbox("enable [R]", &enable);
 
+			ImGui::Checkbox("rand_seed_time", &rand_seed_time);
+
+			ImGui::SliderInt("max_age", &taa.max_age, 0, 144, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SameLine();
+			macro_change |= ImGui::Checkbox("TAA", &taa.enable);
+
 			ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
+
+			ImGui::Checkbox("show_light", &show_light);
 
 			macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 			ImGui::SameLine();

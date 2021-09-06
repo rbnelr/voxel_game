@@ -17,6 +17,7 @@ layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
 //layout(rgba16f, binding = 1) writeonly restrict uniform image2D gbuf_col ;
 //layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
 
+uniform int rand_seed_time = 0;
 uniform ivec2 framebuf_size;
 
 // Instead of executing work groups in a simple row major order
@@ -47,6 +48,8 @@ uvec2 work_group_tiling (uint N) {
 	#endif
 }
 
+uniform bool show_light = false;
+
 void main () {
 	INIT_VISUALIZE_COST();
 	
@@ -55,7 +58,7 @@ void main () {
 	
 	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
 	
-	srand(pxpos.x, pxpos.y, 0);
+	srand(pxpos.x, pxpos.y, rand_seed_time);
 	
 	#if DEBUGDRAW
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
@@ -67,32 +70,43 @@ void main () {
 	vec4 col = vec4(0.0);
 	
 	Hit hit;
-	if (bray && trace_ray(ray_pos, ray_dir, INF, hit)) {
+	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0))) {
 		col = hit.col;
 		
 		vec3 pos = hit.pos + hit.normal * epsilon;
 		
-		float AO = 0.0;
-		float AO_dist = 50.0;
-		int AO_sampl = 1;
-		
 		mat3 TBN = generate_TBN(hit.normal);
+		
+	//#if DEBUGDRAW // visualize tangent space
+	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[0]*0.3, vec4(1,0,0,1));
+	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[1]*0.3, vec4(0,1,0,1));
+	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[2]*0.3, vec4(0,0,1,1));
+	//#endif
+		
+		const float AO_dist = 20.0;
+		const float AO_stren = 2.0;
+		const int AO_sampl = 1;
+		
+		float AO = 0.0;
 		
 		for (int j=0; j<AO_sampl; ++j) {
 			vec3 dir = TBN * hemisphere_sample();
 			
 			float val = 1.0;
 			Hit hit2;
-			if (trace_ray(pos, dir, AO_dist, hit2)) {
-				//col = hit2.col;
-				float x = clamp(hit2.dist / AO_dist, 0.0, 1.0);
-				val = x*x;
+			if (trace_ray(pos, dir, AO_dist, hit2, vec3(0,0,1))) {
+				val = clamp(hit2.dist / AO_dist, 0.0, 1.0);
 			}
 			AO += val;
 		}
 		AO /= float(AO_sampl);
 		
+		AO = APPLY_TAA(AO.xxx, hit.pos, hit.normal, pxpos).x;
+		AO = pow(AO, AO_stren);
+		
 		col.xyz *= (AO).xxx;
+		
+		if (show_light) col = vec4(AO.xxx, 1.0);
 		//col *= max(dot(hit.normal, normalize(vec3(1,2,3))), 0.0) + 0.02;
 	}
 	

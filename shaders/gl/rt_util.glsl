@@ -9,15 +9,15 @@
 #include "rand.glsl"
 
 vec3 generate_tangent (vec3 normal) { // NOTE: tangents currently do not correspond with texture uvs, normal mapping will be wrong
-	vec3 tangent = vec3(0,0,+1);
-	if (abs(normal.z) > 0.99) return vec3(0,+1,0);
+	vec3 tangent = vec3(0,0,1);
+	if (abs(normal.z) > 0.99) return vec3(1,0,0);
 	return tangent;
 }
 mat3 calc_TBN (vec3 normal, vec3 tangent) {
 	vec3 bitangent = cross(normal, tangent); // generate bitangent vector orthogonal to both normal and tangent
 	tangent = cross(bitangent, normal); // regenerate tangent vector in case it was not orthogonal to normal
 	
-	return mat3(tangent, bitangent, normal);
+	return mat3(normalize(tangent), normalize(bitangent), normal);
 }
 mat3 generate_TBN (vec3 normal) {
 	return calc_TBN(normal, generate_tangent(normal));
@@ -110,7 +110,8 @@ vec3 hemisphere_sample () {
 	
 	// map (project) disc up to hemisphere,
 	// turning uniform distribution into cosine weighted distribution
-	vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	//vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
+	vec3 dir = vec3(x,y, sqrt(1.0 - uv.y));
 	return dir;
 }
 vec3 hemisphere_sample_stratified (int i, int n) {
@@ -243,6 +244,57 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 #endif
 }
 
+const float WORLD_SIZEf = float(WORLD_SIZE);
+const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
+const int CHUNK_MASK = ~63;
+const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 
+
+#if TAA_ENABLE
+layout(rgba16f , binding = 5) writeonly restrict uniform  image2D taa_color;
+layout(rgba16ui, binding = 6) writeonly restrict uniform uimage2D taa_posage;
+
+uniform  sampler2D taa_history_color;
+uniform usampler2D taa_history_posage;
+
+uniform mat4 prev_world2clip;
+uniform int taa_max_age = 256;
+
+vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
+	uint age;
+	
+	vec4 prev_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
+	prev_clip.xyz /= prev_clip.w;
+	
+	vec2 uv = prev_clip.xy * 0.5 + 0.5;
+	if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
+		uvec4 sampl = textureLod(taa_history_posage, uv, 0.0);
+		
+		vec3 sampl_pos = vec3(sampl.rgb) / float(0xffff) * WORLD_SIZEf;
+		uint sampl_age = sampl.a;
+		
+		if (distance(pos, sampl_pos) < 0.1) {
+			age = min(sampl_age, uint(taa_max_age));
+			float alpha = 1.0 / (float(age) + 1.0);
+			
+			vec3 prev_val = textureLod(taa_history_color, uv, 0.0).rgb;
+			val = mix(prev_val, val, vec3(alpha));
+		}
+	}
+	
+	age += 1u;
+	
+	uvec3 pos_enc = uvec3(round(pos * float(0xffff) / WORLD_SIZEf));
+	pos_enc = clamp(pos_enc, uvec3(0), uvec3(0xffff));
+	
+	imageStore(taa_color, pxpos, vec4(val, 0.0));
+	imageStore(taa_posage, pxpos, uvec4(pos_enc, age));
+	
+	return val;
+}
+#else
+	#define APPLY_TAA(val, pos, normal, pxpos) (val)
+#endif
+
 //
 uniform int max_iterations = 200;
 
@@ -289,11 +341,6 @@ struct Hit {
 	vec4	col;
 };
 
-const float WORLD_SIZEf = float(WORLD_SIZE);
-const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
-const int CHUNK_MASK = ~63;
-const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 
-
 bool _dbgdraw = false;
 
 float rounded_cube_sdf (vec3 p, vec3 loc, float size, float r) {
@@ -320,20 +367,25 @@ float cylinderZ_df (vec3 p, vec3 loc, float r, float h0, float h1) {
 void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord, float noiseval) {
 	float df;
 	
-	vec3 cent = vec3(vox_coord) + 0.5;
+	const vec3 cent = vec3(vox_coord) + 0.5;
+	const bool crystal = bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6);
 	
-	if (bid == B_LEAVES)
+	pos += noiseval * 0.5;
+	
+	if (bid == B_LEAVES) {
 		df = sphere_sdf(pos, cent, 0.7);
-	else if (bid == B_GLOWSHROOM)
+	} else if (bid == B_GLOWSHROOM) {
 		df = max( sphere_sdf(pos, cent, 0.5), min(-(pos.z - cent.z), cylinderZ_df(pos, cent, 0.15, -0.5, +0.5)) );
-	else if (bid == B_TREE_LOG)
-		df = cylinderZ_df(pos, cent, 0.4, -0.5, +0.5);
-	else if (bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6))
-		df = cylinderZ_df(pos, cent, 0.55, -0.5, +0.5);
-	else
-		df = rounded_cube_sdf(pos, cent, 0.43, 0.1);
+	} else if (bid == B_TREE_LOG || crystal) {
+		float r = bid == B_TREE_LOG ? 0.4 : 0.55;
+		float h = bid == B_TREE_LOG ? 0.5 : 0.3;
+		
+		df = cylinderZ_df(pos, cent, r, -h,h);
+	} else {
+		df = rounded_cube_sdf(pos, cent, 0.4, 0.14);
+	}
 	
-	//df += noiseval;
+	df += noiseval * 0.3;
 	
 	if (df < hit_df) {
 		hit_df = df;
@@ -342,29 +394,40 @@ void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec
 }
 
 float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
-	ivec3 texcoord = ivec3(round(pos));
-	
-	uint tex000 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1,-1)).r;
-	uint tex100 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1,-1)).r;
-	uint tex010 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0,-1)).r;
-	uint tex110 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0,-1)).r;
-	uint tex001 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1,-1, 0)).r;
-	uint tex101 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0,-1, 0)).r;
-	uint tex011 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(-1, 0, 0)).r;
-	uint tex111 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3( 0, 0, 0)).r;
+	ivec3 texcoord = ivec3(round(pos)) - 1;
 	
 	float df = 0.40;
-	
 	float N = noise(pos * 3.0) * 0.1;
 	
-	if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(-1,-1,-1), N);
-	if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3( 0,-1,-1), N);
-	if (tex010 > B_AIR) voxel_df(df, vox_hit, pos, tex010, texcoord + ivec3(-1, 0,-1), N);
-	if (tex110 > B_AIR) voxel_df(df, vox_hit, pos, tex110, texcoord + ivec3( 0, 0,-1), N);
-	if (tex001 > B_AIR) voxel_df(df, vox_hit, pos, tex001, texcoord + ivec3(-1,-1, 0), N);
-	if (tex101 > B_AIR) voxel_df(df, vox_hit, pos, tex101, texcoord + ivec3( 0,-1, 0), N);
-	if (tex011 > B_AIR) voxel_df(df, vox_hit, pos, tex011, texcoord + ivec3(-1, 0, 0), N);
-	if (tex111 > B_AIR) voxel_df(df, vox_hit, pos, tex111, texcoord + ivec3( 0, 0, 0), N);
+#if 1 // Faster
+	// not unrolling -> less code? less registers? memory loads and math better interleaved?
+	for (int i=0; i<8; ++i) {
+		ivec3 coord = texcoord + ivec3(i&1, (i>>1)&1, i>>2);
+		
+		uint tex = texelFetch(voxel_tex, coord, 0).r;
+		if (tex > B_AIR) voxel_df(df, vox_hit, pos, tex, coord, N);
+	}
+#else
+	// theory was that this was better because memory reads could all be kicked off at once
+	// there is no textureGather for 3d textures, perhaps that could have helped
+	uint tex000 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,0,0)).r;
+	uint tex100 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,0,0)).r;
+	uint tex010 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,1,0)).r;
+	uint tex110 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,1,0)).r;
+	uint tex001 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,0,1)).r;
+	uint tex101 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,0,1)).r;
+	uint tex011 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,1,1)).r;
+	uint tex111 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,1,1)).r;
+	
+	if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(0,0,0), N);
+	if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3(1,0,0), N);
+	if (tex010 > B_AIR) voxel_df(df, vox_hit, pos, tex010, texcoord + ivec3(0,1,0), N);
+	if (tex110 > B_AIR) voxel_df(df, vox_hit, pos, tex110, texcoord + ivec3(1,1,0), N);
+	if (tex001 > B_AIR) voxel_df(df, vox_hit, pos, tex001, texcoord + ivec3(0,0,1), N);
+	if (tex101 > B_AIR) voxel_df(df, vox_hit, pos, tex101, texcoord + ivec3(1,0,1), N);
+	if (tex011 > B_AIR) voxel_df(df, vox_hit, pos, tex011, texcoord + ivec3(0,1,1), N);
+	if (tex111 > B_AIR) voxel_df(df, vox_hit, pos, tex111, texcoord + ivec3(1,1,1), N);
+#endif
 	
 	return df;
 }
@@ -379,7 +442,7 @@ vec3 eval_vox_df_normal (float df, vec3 pos) {
 	return normalize(vec3(dfX, dfY, dfZ) - df);
 }
 
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
 	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_sign);
@@ -452,14 +515,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		float min_step = 0.05; // limit min step for perf reasons, TODO: scale this to be larger the further along the ray is, parameterize relative to pixel size?
 		df = max(df, min_step);
 		
-	#if DEBUGDRAW
-		{
-			vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
-			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
-		}
-	#endif
+	//#if DEBUGDRAW
+	//	{
+	//		vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+	//		vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+	//		if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+	//		if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+	//	}
+	//#endif
 		
 		// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
 		vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes; // 3 conv + 3 and + 3 add
@@ -474,12 +537,15 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 		dbgcol ^= 1;
 		iter++;
 		if (iter >= max_iterations || dist >= max_dist)
-			return false; // miss
+			break; // miss
 	}
 	
 	#if DEBUGDRAW
-	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(1,0,0,1));
+	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
 	#endif
+	
+	if (iter >= max_iterations || dist >= max_dist)
+		return false; // miss
 	
 	{ // binary search for isosurface
 		float at = prev_dist, bt = dist; // at: df>0   bt: df<0   search for dist at which df=0
@@ -515,28 +581,37 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit) {
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);
 			
-			//hit.normal = vec3(0.0);
-			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				//hit.normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit.pos.yz;
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
-				//hit.normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit.pos.xz;
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
-				//hit.normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit.pos.xy;
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
 			}
+			
+			if (hit.bid == B_TREE_LOG) {
+				face = 0;
+				if (abs_offs.x >= abs_offs.y) {
+					uv = hit.pos.yz;
+					if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+				} else {
+					uv = hit.pos.xz;
+					if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+				}
+			}
 		}
 		
 		uint medium_bid = B_AIR;
-		uint tex_bid = hit.bid == B_AIR ? medium_bid : hit.bid;
+		
+		uint tex_bid = hit.bid;
+		if  (hit.bid == B_AIR) tex_bid = medium_bid; 
+		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), log2(dist)*0.20 - 1.0).rgba;

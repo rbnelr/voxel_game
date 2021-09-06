@@ -27,14 +27,15 @@ struct IndirectWireInstace {
 	vec4 col;
 };
 
+const int _INDIRECT_BUFSZ = 4096;
 struct IndirectLines {
 	glDrawArraysIndirectCommand cmd;
-	IndirectLineVertex vertices[4096];
+	IndirectLineVertex vertices[_INDIRECT_BUFSZ];
 };
 struct IndirectWireInstances {
 	glDrawElementsIndirectCommand cmd;
 	uint _pad[3]; // padding for std430 alignment
-	IndirectWireInstace vertices[4096];
+	IndirectWireInstace vertices[_INDIRECT_BUFSZ];
 };
 
 layout(std430, binding = 1) restrict buffer IndirectBuffer {
@@ -50,15 +51,14 @@ layout(std430, binding = 1) restrict buffer IndirectBuffer {
 //}
 void dbgdraw_vector (vec3 pos, vec3 dir, vec4 col) {
 	uint idx = atomicAdd(_dbgdrawbuf.lines.cmd.count, 2u);
-	if (idx < 4096) {
+	if (idx < _INDIRECT_BUFSZ) {
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos      , 0), col );
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + dir, 0), col );
-		//_dbgdrawbuf.lines.cmd.count %= 4096;
 	}
 }
 void dbgdraw_point (vec3 pos, float r, vec4 col) {
 	uint idx = atomicAdd(_dbgdrawbuf.lines.cmd.count, 6u);
-	if (idx < 4096) {
+	if (idx < _INDIRECT_BUFSZ) {
 	
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos - vec3(r,0,0), 0), col );
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + vec3(r,0,0), 0), col );
@@ -68,8 +68,6 @@ void dbgdraw_point (vec3 pos, float r, vec4 col) {
 		
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos - vec3(0,0,r), 0), col );
 		_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + vec3(0,0,r), 0), col );
-		
-		//_dbgdrawbuf.lines.cmd.count %= 4096;
 	}
 }
 
