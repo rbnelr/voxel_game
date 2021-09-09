@@ -210,7 +210,21 @@ namespace gl {
 			rt_forward->set_uniform("framebuf_size", r.framebuffer.size);
 			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
+			float near_px_size;
+			{
+				// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
+				float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
+				float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.framebuffer.size),0,1); // pixel one to the up/right in cam space
+				near_px_size = b.x - a.x;
+			}
+			rt_forward->set_uniform("near_px_size", near_px_size);
+
 			rt_forward->set_uniform("show_light", lighting.show_light);
+
+			rt_forward->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
+			rt_forward->set_uniform("bounce_max_count", lighting.bounce_max_count);
+
+			rt_forward->set_uniform("roughness", lighting.roughness);
 
 			rt_forward->set_uniform("max_iterations", max_iterations);
 

@@ -104,19 +104,19 @@ vec3 hemisphere_sample () {
 	// and projects into up into a hemisphere to get the cosine weighted points on the hemisphere
 	
 	// random sampling (Monte Carlo)
-	vec2 uv = rand2(); // uniform sample in [0,1) square
+	vec2 rnd = rand2(); // uniform sample in [0,1) square
 	
 	// map square to disc, preserving uniformity
-	float r = sqrt(uv.y);
-	float theta = 2*PI * uv.x;
+	float r = sqrt(rnd.y);
+	float theta = 2*PI * rnd.x;
 	
 	float x = r * cos(theta);
 	float y = r * sin(theta);
 	
 	// map (project) disc up to hemisphere,
 	// turning uniform distribution into cosine weighted distribution
-	//vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - uv.y)));
-	vec3 dir = vec3(x,y, sqrt(1.0 - uv.y));
+	//vec3 dir = vec3(x,y, sqrt(max(0.0, 1.0 - rnd.y)));
+	vec3 dir = vec3(x,y, sqrt(1.0 - rnd.y));
 	return dir;
 }
 vec3 hemisphere_sample_stratified (int i, int n) {
@@ -163,13 +163,13 @@ vec3 reflect_roughness (vec3 refl, vec3 normal, float roughness) {
     mat3 TBN = generate_TBN(refl); // tangent space relative to reflected vector to be able to 'offset' it by roughness
 	
     float a = roughness * roughness;
-    vec2 uv = rand2(); // uniform sample in [0,1) square
+    vec2 rnd = rand2(); // uniform sample in [0,1) square
 	
 	//float z = sqrt(clamp( (1.0 - r.y) / 1.0 + (a-1.0) * r.y, 0.0,1.0));
-	float z = sqrt( (1.0 - uv.y) / (1.0 + (a-1.0) * uv.y) );
+	float z = sqrt( (1.0 - rnd.y) / (1.0 + (a-1.0) * rnd.y) );
 	
 	float r = sqrt(1.0 - z*z);
-	float theta = 2*PI * uv.x;
+	float theta = 2*PI * rnd.x;
 	
 	float x = r * cos(theta);
 	float y = r * sin(theta);
@@ -211,6 +211,11 @@ float noise(vec3 p){
 }
 
 // get pixel ray in world space based on pixel coord and matricies
+uniform float near_px_size;
+
+float near_plane_dist;
+float ray_r_per_dist;
+
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	
 #if 1 // Normal camera projection
@@ -223,9 +228,13 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	// TODO: can't get optimization to one single clip_to_world mat mul to work, why?
 	// -> clip_to_cam needs translation  cam_to_world needs to _not_ have translation
 	vec3 cam = (view.clip_to_cam * clip).xyz;
-
+	
 	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
+	
+	near_plane_dist = length(ray_dir);
 	ray_dir = normalize(ray_dir);
+	
+	ray_r_per_dist = near_px_size * (view.clip_near / near_plane_dist);
 	
 	// ray starts on the near plane
 	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
@@ -283,20 +292,36 @@ uniform usampler2D taa_history_posage;
 uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
-vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
+vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
 	uint age = 1u;
 	
 	vec4 prev_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
 	prev_clip.xyz /= prev_clip.w;
 	
+	uint cur_norm = 5;
+	if      (normal.x < -0.8) cur_norm = 0;
+	else if (normal.x > +0.8) cur_norm = 1;
+	else if (normal.y < -0.8) cur_norm = 2;
+	else if (normal.y > +0.8) cur_norm = 3;
+	else if (normal.z < -0.8) cur_norm = 4;
+	else if (normal.z > +0.8) cur_norm = 5;
+	
+	uint cur_pos = 0;
+	if      (cur_norm/2 == 0) cur_pos = (uint)coord.x;
+	else if (cur_norm/2 == 1) cur_pos = (uint)coord.y;
+	else if (cur_norm/2 == 2) cur_pos = (uint)coord.z;
+	
 	vec2 uv = prev_clip.xy * 0.5 + 0.5;
 	if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
 		uvec4 sampl = textureLod(taa_history_posage, uv, 0.0);
 		
-		vec3 sampl_pos = vec3(sampl.rgb) / float(0xffff) * WORLD_SIZEf;
+		//vec3 sampl_pos = vec3(sampl.rgb) / float(0xffff) * WORLD_SIZEf;
+		uint sampl_norm = sampl.r; // 0=-X 1=+X 2=-Y ...
+		uint sampl_pos = sampl.g; // relative to normal
 		uint sampl_age = sampl.a;
 		
-		if (distance(pos, sampl_pos) < 0.1) {
+		//if (distance(pos, sampl_pos) < 0.1) {
+		if (cur_norm == sampl_norm && cur_pos == sampl_pos) {
 			age = min(sampl_age, uint(taa_max_age));
 			
 			vec3 accumulated = textureLod(taa_history_color, uv, 0.0).rgb * float(age);
@@ -306,16 +331,16 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
 		}
 	}
 	
-	uvec3 pos_enc = uvec3(round(pos * float(0xffff) / WORLD_SIZEf));
-	pos_enc = clamp(pos_enc, uvec3(0), uvec3(0xffff));
+	//uvec3 pos_enc = uvec3(round(pos * float(0xffff) / WORLD_SIZEf));
+	//pos_enc = clamp(pos_enc, uvec3(0), uvec3(0xffff));
 	
 	imageStore(taa_color, pxpos, vec4(val, 0.0));
-	imageStore(taa_posage, pxpos, uvec4(pos_enc, age));
+	imageStore(taa_posage, pxpos, uvec4(cur_norm, cur_pos, 0u, age));
 	
 	return val;
 }
 #else
-	#define APPLY_TAA(val, pos, normal, pxpos) (val)
+	#define APPLY_TAA(val, pos, coord, normal, pxpos) (val)
 #endif
 
 //
@@ -360,6 +385,8 @@ struct Hit {
 	vec3	pos;
 	float	dist;
 	vec3	normal;
+	
+	ivec3	coord;
 	uint	bid;
 	
 	vec4	col;
@@ -368,106 +395,7 @@ struct Hit {
 
 bool _dbgdraw = false;
 
-float rounded_cube_sdf (vec3 p, vec3 loc, float size, float r) {
-	vec3 rel = p - loc;
-	vec3 a = abs(rel);
-	float sdf = max(max(a.x, a.y), a.z) - size + r;
-	if (sdf <= 0.0) return sdf;
-	
-	vec3 closest = clamp(rel, -size, +size);
-	return length(closest - rel) - r;
-}
-float sphere_sdf (vec3 p, vec3 loc, float r) {
-	vec3 center = loc;
-	return length(p - center) - r;
-}
-
-float cylinderZ_df (vec3 p, vec3 loc, float r, float h0, float h1) {
-	float closestz = clamp(p.z, loc.z + h0, loc.z + h1);
-	
-	vec2 centerxy = loc.xy;
-	return length(p - vec3(centerxy, closestz)) - r;
-}
-
-void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec3 vox_coord, float noiseval) {
-	float df;
-	
-	const vec3 cent = vec3(vox_coord) + 0.5;
-	const bool crystal = bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6);
-	
-	//pos += noiseval * 0.5;
-	
-	if (bid == B_LEAVES) {
-		df = sphere_sdf(pos, cent, 0.7);
-	} else if (bid == B_GLOWSHROOM) {
-		df = max( sphere_sdf(pos, cent, 0.5), min(-(pos.z - cent.z), cylinderZ_df(pos, cent, 0.15, -0.5, +0.5)) );
-	} else if (bid == B_TREE_LOG || crystal) {
-		float r = bid == B_TREE_LOG ? 0.4 : 0.55;
-		float h = bid == B_TREE_LOG ? 0.5 : 0.3;
-		
-		df = cylinderZ_df(pos, cent, r, -h,h);
-	} else {
-		df = rounded_cube_sdf(pos, cent, 0.4, 0.14);
-	}
-	
-	//df += noiseval * 0.3;
-	
-	if (df < hit_df) {
-		hit_df = df;
-		hit_vox = vox_coord;
-	}
-}
-
-float eval_vox_df (vec3 pos, out ivec3 vox_hit) {
-	ivec3 texcoord = ivec3(round(pos)) - 1;
-	
-	float df = 0.40;
-	float N = noise(pos * 3.0) * 0.1 * 0.5;
-	
-#if 1 // Faster
-	// not unrolling -> less code? less registers? memory loads and math better interleaved?
-	for (int i=0; i<8; ++i) {
-		ivec3 coord = texcoord + ivec3(i&1, (i>>1)&1, i>>2);
-		
-		uint tex = texelFetch(voxel_tex, coord, 0).r;
-		if (tex > B_AIR) voxel_df(df, vox_hit, pos, tex, coord, N);
-	}
-#else
-	// theory was that this was better because memory reads could all be kicked off at once
-	// there is no textureGather for 3d textures, perhaps that could have helped
-	uint tex000 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,0,0)).r;
-	uint tex100 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,0,0)).r;
-	uint tex010 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,1,0)).r;
-	uint tex110 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,1,0)).r;
-	uint tex001 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,0,1)).r;
-	uint tex101 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,0,1)).r;
-	uint tex011 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(0,1,1)).r;
-	uint tex111 = texelFetchOffset(voxel_tex, texcoord, 0, ivec3(1,1,1)).r;
-	
-	if (tex000 > B_AIR) voxel_df(df, vox_hit, pos, tex000, texcoord + ivec3(0,0,0), N);
-	if (tex100 > B_AIR) voxel_df(df, vox_hit, pos, tex100, texcoord + ivec3(1,0,0), N);
-	if (tex010 > B_AIR) voxel_df(df, vox_hit, pos, tex010, texcoord + ivec3(0,1,0), N);
-	if (tex110 > B_AIR) voxel_df(df, vox_hit, pos, tex110, texcoord + ivec3(1,1,0), N);
-	if (tex001 > B_AIR) voxel_df(df, vox_hit, pos, tex001, texcoord + ivec3(0,0,1), N);
-	if (tex101 > B_AIR) voxel_df(df, vox_hit, pos, tex101, texcoord + ivec3(1,0,1), N);
-	if (tex011 > B_AIR) voxel_df(df, vox_hit, pos, tex011, texcoord + ivec3(0,1,1), N);
-	if (tex111 > B_AIR) voxel_df(df, vox_hit, pos, tex111, texcoord + ivec3(1,1,1), N);
-#endif
-	
-	return df;
-}
-vec3 eval_vox_df_normal (float df, vec3 pos) {
-	ivec3 _ignore;
-	df = eval_vox_df(pos, _ignore);
-	
-	float dfX = eval_vox_df(pos + vec3(epsilon,0,0), _ignore);
-	float dfY = eval_vox_df(pos + vec3(0,epsilon,0), _ignore);
-	float dfZ = eval_vox_df(pos + vec3(0,0,epsilon), _ignore);
-	
-	return normalize(vec3(dfX, dfY, dfZ) - df);
-}
-
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 raycol) {
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
 	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_sign);
@@ -509,55 +437,71 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
 	float manhattan_fac = (1.0 - epsilon) / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
 	
-	vec3 pos;
-	ivec3 coord;
+	vec3 pos = dist * ray_dir + ray_pos;
+	ivec3 coord = ivec3(pos);
 	
 	int dbgcol = 0;
 	int iter = 0;
 	
-	ivec3 vox_hit;
-	float df;
-	
-	float prev_dist = 0.0;
-	
 	for (;;) {
 		VISUALIZE_ITERATION
 		
-		pos = dist * ray_dir + ray_pos;
-		coord = ivec3(pos);
+		int dfi = texelFetch(df_tex, coord, 0).r; // tex read
 		
-		df = float(texelFetch(df_tex, coord, 0).r);
-		df *= manhattan_fac;
+		// step up to exit of current cell, since DF is safe up until its bounds
+		// seems to give a little bit of perf, as this reduces iteration count
+		// of course iteration now has more instructions, so could hurt as well
+		// -> disable for now, we save iterations, but it gets slower in almost every case
+		//vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+		//dist = min(min(t1v.x, t1v.y), t1v.z);
 		
-		if (df <= 0) {
+		if (dfi > 1) {
+			float df = float(dfi) * manhattan_fac;
 			
-			df = eval_vox_df(pos, vox_hit);
+			// DF tells us that we can still step by <df> before we could possibly hit a voxel
+			// step via DF raymarching
 			
-			if (df <= 0.0)
-				break; // hit
+		//#if DEBUGDRAW
+		//	pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+		//	vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+		//	if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+		//	if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+		//#endif
+			
+			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+			vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes;
+			
+			vec3 chunk_t1v = inv_dir * chunk_exit + bias;
+			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z);
+			
+			dist += df;
+			dist = min(dist, chunk_t1); // limit step to exactly on the exit face of the chunk
+			
+			// update pos for next iteration
+			vec3 pos = dist * ray_dir + ray_pos;
+			// update coord for next iteration
+			coord = ivec3(pos);
+		} else {
+			// we need to check individual voxels by DDA now
+			
+		//#if DEBUGDRAW
+		//	if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+		//#endif
+		
+			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
+			// this avoids one memory read
+			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
+			if (dfi < 0)
+				break;
+			
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+			dist = min(min(t1v.x, t1v.y), t1v.z);
+			
+			// step on axis where exit distance is lowest
+			if      (t1v.x == dist) coord.x += step_dir.x;
+			else if (t1v.y == dist) coord.y += step_dir.y;
+			else                    coord.z += step_dir.z;
 		}
-		
-		float min_step = 0.05; // limit min step for perf reasons, TODO: scale this to be larger the further along the ray is, parameterize relative to pixel size?
-		df = max(df, min_step);
-		
-	#if DEBUGDRAW
-		{
-			vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
-			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
-		}
-	#endif
-		
-		// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
-		vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes; // 3 conv + 3 and + 3 add
-		
-		vec3 chunk_t1v = inv_dir * chunk_exit + bias; // 3 madd
-		float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z); // 2 min
-		
-		prev_dist = dist;
-		dist += df; // 1 add
-		dist = min(dist, chunk_t1); // 1 min  limit step to exactly on the exit face of the chunk
 		
 		dbgcol ^= 1;
 		iter++;
@@ -572,51 +516,53 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 	if (iter >= max_iterations || dist >= max_dist)
 		return false; // miss
 	
-	{ // binary search for isosurface
-		float at = prev_dist, bt = dist; // at: df>0   bt: df<0   search for dist at which df=0
-		for (int i=0; i<8; ++i) {
-			float midt = (at + bt) * 0.5;
-			
-			pos = midt * ray_dir + ray_pos;
-			
-			df = eval_vox_df(pos, vox_hit);
-			
-			if (df < 0.0) bt = midt;
-			else          at = midt;
-		}
-		dist = (at + bt) * 0.5; // take avg of whatever interval is still left
-	}
-	
 	{ // calc hit info
 		
-		hit.bid = texelFetch(voxel_tex, vox_hit, 0).r;
+		// snap ray to voxel entry in case we landed inside a voxel when raymarching
+		vec3 vox_entry = vec3(coord) + mix(vec3(1.0), vec3(0.0), dir_sign);
+		
+		vec3 t0v = inv_dir * vox_entry + bias;
+		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to not count faces behind ray
+		
+		hit.bid = texelFetch(voxel_tex, coord, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		
-		hit.normal = eval_vox_df_normal(df, hit.pos);
+		hit.coord = coord;
+		
+		//hit.normal = eval_vox_df_normal(df, hit.pos);
 		
 		vec2 uv;
 		//vec2 uv_dx; // uv gradients to get mip mapping
 		//vec2 uv_dy;
 		
 		int face;
+		float tex_grad;
 		{ // calc hit face, uv and normal
-			vec3 hit_center = vec3(vox_hit) + 0.5;
+			vec3 hit_center = vec3(coord) + 0.5;
 			
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);
 			
+			hit.normal = vec3(0.0);
+			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
+				hit.normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit.pos.yz;
+				tex_grad = abs(ray_dir.x);
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
 			} else if (abs_offs.y >= abs_offs.z) {
+				hit.normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit.pos.xz;
+				tex_grad = abs(ray_dir.y);
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 			} else {
+				hit.normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit.pos.xy;
+				tex_grad = abs(ray_dir.z);
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
 			}
 			
@@ -632,6 +578,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 			}
 		}
 		
+		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
+		float ray_r = (dist + base_dist) * ray_r_per_dist;
+		
+		//tex_grad = 1.0;
+		float tex_lod = log2(ray_r * float(textureSize(tile_textures, 0).x) / tex_grad);
+		
 		uint medium_bid = B_AIR;
 		
 		uint tex_bid = hit.bid;
@@ -639,11 +591,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
-		float lod = log2(dist)*0.20 - 1.0;
-		hit.col = textureLod(tile_textures, vec3(uv, texid), lod).rgba;
-		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
+		//hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
+		hit.col = textureLod(tile_textures, vec3(uv, texid), tex_lod + 1.0).rgba;
+		//hit.col = textureGrad(tile_textures, vec3(uv, texid), tex_grad, tex_grad).rgba;
 		
-		//hit.col.rgb = hit.normal;
+		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 		
 		//if (tex_bid == B_TALLGRASS && face >= 4)
 		//	hit.col = vec4(0.0);

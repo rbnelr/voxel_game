@@ -1,7 +1,6 @@
 ﻿#version 460 core
 #extension GL_NV_gpu_shader5 : enable // for uint16_t, uint8_t
-
-#extension GL_ARB_shader_group_vote : enable
+//#extension GL_ARB_shader_group_vote : enable
 
 #if VISUALIZE_COST && VISUALIZE_TIME
 	#extension GL_ARB_shader_clock : enable
@@ -9,7 +8,7 @@
 
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
-#define DEBUGDRAW 1
+#define DEBUGDRAW 0
 #include "rt_util.glsl"
 
 layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
@@ -50,8 +49,10 @@ uvec2 work_group_tiling (uint N) {
 
 uniform bool show_light = false;
 
-uniform float bounce_dist = 90.0;
-uniform int bounce_limit = 3;
+uniform float bounce_max_dist = 90.0;
+uniform int bounce_max_count = 3;
+
+uniform float roughness = 0.8;
 
 void main () {
 	INIT_VISUALIZE_COST();
@@ -72,62 +73,64 @@ void main () {
 	
 	vec4 col = vec4(0.0);
 	
+	float base_dist = near_plane_dist;
+	
 	Hit hit;
-	if (bray && trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0))) {
+	if (bray && trace_ray(ray_pos, ray_dir, INF, base_dist, hit, vec3(1,0,0))) {
+		base_dist += hit.dist;
+		
 		//#if DEBUGDRAW // visualize tangent space
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[0]*0.3, vec4(1,0,0,1));
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[1]*0.3, vec4(0,1,0,1));
 	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[2]*0.3, vec4(0,0,1,1));
 	//#endif
 		
-		if (show_light) hit.col.rgb = vec3(1.0);
+		col.a = hit.col.a;
+		col.rgb = hit.emiss;
 		
 	#if BOUNCE_ENABLE
+		if (show_light) hit.col.rgb = vec3(1.0);
+		
+		Hit phit = hit;
+		
 		vec3 light = vec3(0.0);
-		
 		vec3 A = vec3(1.0);
-		vec3 albedo = hit.col.rgb;
 		
-		float dist_remain = bounce_dist;
+		float dist_remain = bounce_max_dist;
 		
-		vec3 normal = hit.normal;
-		vec3 pos = hit.pos + normal * epsilon;
-		
-		for (int i=0; i<bounce_limit; ++i) {
+		for (int i=0; i<bounce_max_count; ++i) {
+			ray_pos = hit.pos + hit.normal * epsilon;
 			
-			vec3 dir;
+		#if 0
+			float F = fresnel_roughness(max(0., -dot(hit.normal, ray_dir)), .04, roughness);
 			
-			const float roughness = 0.001;
-			
-			float F = fresnel_roughness(max(0., -dot(normal, ray_dir)), .04, roughness);
 			if (F > rand()) {
-				dir = reflect_roughness(reflect(ray_dir, normal), normal, roughness);
+				ray_dir = reflect_roughness(reflect(ray_dir, hit.normal), hit.normal, roughness);
 			} else {
-				A *= albedo;
-				dir = generate_TBN(normal) * hemisphere_sample();
+				A *= hit.col.rgb;
+				ray_dir = generate_TBN(hit.normal) * hemisphere_sample();
 			}
+		#else
+			A *= hit.col.rgb;
+			ray_dir = generate_TBN(hit.normal) * hemisphere_sample();
+		#endif
 			
-			Hit hit2;
-			if (trace_ray(pos, dir, bounce_dist, hit2, vec3(0,0,1))) {
-				light += A * hit2.emiss;
-				albedo = hit2.col.rgb;
-				
-				dist_remain -= hit2.dist;
-				if (dist_remain <= 0.0 || max(max(A.x,A.y),A.z) < 0.02)
+			if (max(max(A.x,A.y),A.z) < 0.02)
+				break;
+			
+			if (trace_ray(ray_pos, ray_dir, dist_remain, base_dist, hit, vec3(0,0,1))) {
+				light += A * hit.emiss;
+				dist_remain -= hit.dist;
+				base_dist += hit.dist;
+				if (dist_remain <= 0.0)
 					break;
-				
-				normal = hit2.normal;
-				pos = hit2.pos + normal * epsilon;
-				
 			} else {
 				break;
 			}
 		}
 		
-		light = APPLY_TAA(light, hit.pos, hit.normal, pxpos);
-		
-		col.rgb = light + hit.emiss;
-		col.a = hit.col.a;
+		light = APPLY_TAA(light, phit.pos, phit.coord, phit.normal, pxpos);
+		col.rgb += light;
 	#else
 		col = hit.col;
 	#endif

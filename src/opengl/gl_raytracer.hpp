@@ -261,13 +261,15 @@ namespace gl {
 		bool visualize_time = false;
 
 		struct Lighting {
-			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bouce_max_count)
+			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, roughness)
 
 			bool show_light = false;
 
 			bool bounce_enable = true;
 			float bounce_max_dist = 90.0f;
-			int bouce_max_count = 4;
+			int bounce_max_count = 4;
+
+			float roughness = 0.8f;
 
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -276,7 +278,9 @@ namespace gl {
 
 				macro_change |= ImGui::Checkbox("bounce_enable", &bounce_enable);
 				ImGui::DragFloat("bounce_max_dist", &bounce_max_dist, 0.1f, 0, 256);
-				ImGui::DragInt("bouce_max_count", &bouce_max_count, 0.1f, 0, 16);
+				ImGui::DragInt("bounce_max_count", &bounce_max_count, 0.1f, 0, 16);
+
+				ImGui::SliderFloat("roughness", &roughness, 0,1);
 
 				ImGui::TreePop();
 			}
@@ -291,21 +295,21 @@ namespace gl {
 
 			ImGui::Checkbox("enable [R]", &enable);
 
-			ImGui::Checkbox("rand_seed_time", &rand_seed_time);
-
-			ImGui::SliderInt("max_age", &taa.max_age, 0, 100, "%d", ImGuiSliderFlags_Logarithmic);
-			ImGui::SameLine();
-			macro_change |= ImGui::Checkbox("TAA", &taa.enable);
-
 			ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
-
-			lighting.imgui(macro_change);
 
 			macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 			ImGui::SameLine();
 			macro_change |= ImGui::Checkbox("visualize_time", &visualize_time);
 
 			macro_change |= rt_groupsz.imgui("rt_groupsz");
+
+			ImGui::Checkbox("rand_seed_time", &rand_seed_time);
+
+			ImGui::SliderInt("max_age", &taa.max_age, 0, 100, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SameLine();
+			macro_change |= ImGui::Checkbox("TAA", &taa.enable);
+
+			lighting.imgui(macro_change);
 
 			ImGui::Separator();
 

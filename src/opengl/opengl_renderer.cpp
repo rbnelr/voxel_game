@@ -30,12 +30,12 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFil
 		clog(INFO, "[OpenglRenderer] Reload textures due to file change");
 		try_reloading([&] () { return load_static_data(); });
 	}
-
-	framebuffer.update(I.window_size);
 }
 
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	ImGui::Begin("Debug");
+
+	framebuffer.update(I.window_size);
 
 	chunk_renderer.upload_remeshed(game.chunks);
 	raytracer.update(*this, game, I);
@@ -461,7 +461,7 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 
 	{
 		Image<srgba8> img;
-		if (!img.load_from_file("textures/atlas.png", &img))
+		if (!img.load_from_file("textures/atlas_no_alpha.png", &img)) // use non alpha version in raytracer, alpha version does not filter mips correctly
 			return false;
 
 		// place layers at y dir so ot make the memory contiguous
