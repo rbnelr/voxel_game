@@ -180,7 +180,7 @@ namespace gl {
 	};
 
 	struct Raytracer {
-		SERIALIZE(Raytracer, enable, max_iterations, taa)
+		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
 		Shader* rt_forward = nullptr;
 		
@@ -201,6 +201,7 @@ namespace gl {
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
+			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
@@ -259,7 +260,27 @@ namespace gl {
 		bool visualize_cost = false;
 		bool visualize_time = false;
 
-		bool show_light = false;
+		struct Lighting {
+			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bouce_max_count)
+
+			bool show_light = false;
+
+			bool bounce_enable = true;
+			float bounce_max_dist = 90.0f;
+			int bouce_max_count = 4;
+
+			void imgui (bool& macro_change) {
+				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
+
+				ImGui::Checkbox("show_light", &show_light);
+
+				macro_change |= ImGui::Checkbox("bounce_enable", &bounce_enable);
+				ImGui::DragFloat("bounce_max_dist", &bounce_max_dist, 0.1f, 0, 256);
+				ImGui::DragInt("bouce_max_count", &bouce_max_count, 0.1f, 0, 16);
+
+				ImGui::TreePop();
+			}
+		} lighting;
 
 		bool macro_change = false; // shader macro change
 		void imgui (Input& I) {
@@ -272,13 +293,13 @@ namespace gl {
 
 			ImGui::Checkbox("rand_seed_time", &rand_seed_time);
 
-			ImGui::SliderInt("max_age", &taa.max_age, 0, 144, "%d", ImGuiSliderFlags_Logarithmic);
+			ImGui::SliderInt("max_age", &taa.max_age, 0, 100, "%d", ImGuiSliderFlags_Logarithmic);
 			ImGui::SameLine();
 			macro_change |= ImGui::Checkbox("TAA", &taa.enable);
 
 			ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 
-			ImGui::Checkbox("show_light", &show_light);
+			lighting.imgui(macro_change);
 
 			macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 			ImGui::SameLine();

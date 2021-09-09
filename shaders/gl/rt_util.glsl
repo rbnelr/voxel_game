@@ -395,7 +395,7 @@ void voxel_df (inout float hit_df, inout ivec3 hit_vox, vec3 pos, uint bid, ivec
 	const vec3 cent = vec3(vox_coord) + 0.5;
 	const bool crystal = bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6);
 	
-	pos += noiseval * 0.5;
+	//pos += noiseval * 0.5;
 	
 	if (bid == B_LEAVES) {
 		df = sphere_sdf(pos, cent, 0.7);
@@ -540,14 +540,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit, vec3 ra
 		float min_step = 0.05; // limit min step for perf reasons, TODO: scale this to be larger the further along the ray is, parameterize relative to pixel size?
 		df = max(df, min_step);
 		
-	//#if DEBUGDRAW
-	//	{
-	//		vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
-	//		vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-	//		if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-	//		if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
-	//	}
-	//#endif
+	#if DEBUGDRAW
+		{
+			vec3 pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+		}
+	#endif
 		
 		// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
 		vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes; // 3 conv + 3 and + 3 add

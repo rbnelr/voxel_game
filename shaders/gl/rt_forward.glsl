@@ -9,7 +9,7 @@
 
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
-#define DEBUGDRAW 0
+#define DEBUGDRAW 1
 #include "rt_util.glsl"
 
 layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
@@ -50,6 +50,9 @@ uvec2 work_group_tiling (uint N) {
 
 uniform bool show_light = false;
 
+uniform float bounce_dist = 90.0;
+uniform int bounce_limit = 3;
+
 void main () {
 	INIT_VISUALIZE_COST();
 	
@@ -79,9 +82,7 @@ void main () {
 		
 		if (show_light) hit.col.rgb = vec3(1.0);
 		
-		const float bounce_dist = 90.0;
-		const int bounce_limit = 3;
-		
+	#if BOUNCE_ENABLE
 		vec3 light = vec3(0.0);
 		
 		vec3 A = vec3(1.0);
@@ -96,7 +97,7 @@ void main () {
 			
 			vec3 dir;
 			
-			const float roughness = 0.6;
+			const float roughness = 0.001;
 			
 			float F = fresnel_roughness(max(0., -dot(normal, ray_dir)), .04, roughness);
 			if (F > rand()) {
@@ -127,6 +128,9 @@ void main () {
 		
 		col.rgb = light + hit.emiss;
 		col.a = hit.col.a;
+	#else
+		col = hit.col;
+	#endif
 	}
 	
 	GET_VISUALIZE_COST(col.rgb);

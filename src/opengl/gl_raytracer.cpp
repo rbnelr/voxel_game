@@ -210,7 +210,7 @@ namespace gl {
 			rt_forward->set_uniform("framebuf_size", r.framebuffer.size);
 			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
-			rt_forward->set_uniform("show_light", show_light);
+			rt_forward->set_uniform("show_light", lighting.show_light);
 
 			rt_forward->set_uniform("max_iterations", max_iterations);
 
