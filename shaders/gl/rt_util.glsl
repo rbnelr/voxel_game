@@ -299,12 +299,12 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
 	prev_clip.xyz /= prev_clip.w;
 	
 	uint cur_norm = 5;
-	if      (normal.x < -0.8) cur_norm = 0;
-	else if (normal.x > +0.8) cur_norm = 1;
-	else if (normal.y < -0.8) cur_norm = 2;
-	else if (normal.y > +0.8) cur_norm = 3;
-	else if (normal.z < -0.8) cur_norm = 4;
-	else if (normal.z > +0.8) cur_norm = 5;
+	if      (normal.x < -0.5) cur_norm = 0;
+	else if (normal.x > +0.5) cur_norm = 1;
+	else if (normal.y < -0.5) cur_norm = 2;
+	else if (normal.y > +0.5) cur_norm = 3;
+	else if (normal.z < -0.5) cur_norm = 4;
+	else if (normal.z > +0.5) cur_norm = 5;
 	
 	uint cur_pos = 0;
 	if      (cur_norm/2 == 0) cur_pos = (uint)coord.x;
@@ -384,7 +384,8 @@ uniform int max_iterations = 200;
 struct Hit {
 	vec3	pos;
 	float	dist;
-	vec3	normal;
+	vec3	normal; // normal mapped normal
+	mat3	gTBN; // non-normal mapped real geometry (uv-compatible) TBN
 	
 	ivec3	coord;
 	uint	bid;
@@ -394,6 +395,8 @@ struct Hit {
 };
 
 bool _dbgdraw = false;
+
+uniform sampler2DArray test_cubeN;
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
@@ -536,6 +539,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		//vec2 uv_dx; // uv gradients to get mip mapping
 		//vec2 uv_dy;
 		
+		mat3 TBN; // TBN based on cube uvs for normal mapping
+		
 		int face;
 		float tex_grad;
 		{ // calc hit face, uv and normal
@@ -544,26 +549,30 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 offs = (hit.pos - hit_center);
 			vec3 abs_offs = abs(offs);
 			
-			hit.normal = vec3(0.0);
+			vec3 geom_normal = vec3(0.0);
+			vec3 tang = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				hit.normal.x = sign(offs.x);
+				geom_normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
 				uv = hit.pos.yz;
 				tex_grad = abs(ray_dir.x);
 				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+				tang.y = offs.x < 0.0 ? -1 : +1;
 			} else if (abs_offs.y >= abs_offs.z) {
-				hit.normal.y = sign(offs.y);
+				geom_normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
 				uv = hit.pos.xz;
 				tex_grad = abs(ray_dir.y);
 				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+				tang.x = offs.y < 0.0 ? +1 : -1;
 			} else {
-				hit.normal.z = sign(offs.z);
+				geom_normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
 				uv = hit.pos.xy;
 				tex_grad = abs(ray_dir.z);
 				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+				tang.x = +1;
 			}
 			
 			if (hit.bid == B_TREE_LOG) {
@@ -576,13 +585,20 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 					if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
 				}
 			}
+			
+			hit.gTBN = calc_TBN(geom_normal, tang);
 		}
 		
 		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
 		float ray_r = (dist + base_dist) * ray_r_per_dist;
 		
 		//tex_grad = 1.0;
-		float tex_lod = log2(ray_r * float(textureSize(tile_textures, 0).x) / tex_grad);
+		float tex_baselod = log2(float(textureSize(tile_textures, 0).x));
+		float tex_baselodN = log2(float(textureSize(test_cubeN, 0).x));
+		
+		float rlod = log2(ray_r / tex_grad);
+		float tex_lod  = rlod + tex_baselod;
+		float tex_lodN = rlod + tex_baselodN;
 		
 		uint medium_bid = B_AIR;
 		
@@ -594,6 +610,17 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		//hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		hit.col = textureLod(tile_textures, vec3(uv, texid), tex_lod + 1.0).rgba;
 		//hit.col = textureGrad(tile_textures, vec3(uv, texid), tex_grad, tex_grad).rgba;
+		
+		{ // normal mapping
+			const float normal_map_stren = 1.0;
+			
+			vec3 sampl = textureLod(test_cubeN, vec3(uv, 5.0), tex_lodN + 1.0).rgb;
+			sampl = sampl * 2.0 - 1.0;
+			sampl.xy *= normal_map_stren;
+			
+			//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
+			hit.normal = hit.gTBN * normalize(sampl);
+		}
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 		

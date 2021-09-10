@@ -259,6 +259,7 @@ namespace gl {
 				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
 
 				{"tile_textures", r.tile_textures, r.tile_sampler},
+				{"test_cubeN", r.test_cubeN, r.tile_sampler},
 
 				{"heat_gradient", r.gradient, r.normal_sampler},
 			});

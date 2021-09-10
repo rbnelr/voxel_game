@@ -212,6 +212,7 @@ public:
 	Texture2D		gradient		= {"gradient"};
 	Texture2D		water_N_A		= {"water_N_A"};
 	Texture2D		water_N_B		= {"water_N_B"};
+	Texture2DArray	test_cubeN		= {"test_cubeN"};
 	
 	Texture2DArray	textures_A		= {"textures_A"}; // albedos
 	Texture2DArray	textures_N		= {"textures_N"}; // normals, occlusion, displacement, glossy

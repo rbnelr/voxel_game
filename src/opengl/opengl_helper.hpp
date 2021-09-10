@@ -787,15 +787,15 @@ inline IndexedMesh upload_mesh (std::string_view label,
 //// Textures
 
 // upload texture, use with sampler please
-inline bool upload_texture (GLuint tex2d, const char* filename) {
+inline bool upload_texture (GLuint tex, const char* filename, bool normal_map=false) {
 
 	Image<srgba8> img;
 	if (!img.load_from_file(filename, &img))
 		return false;
 
-	glBindTexture(GL_TEXTURE_2D, tex2d);
+	glBindTexture(GL_TEXTURE_2D, tex);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, img.size.x, img.size.y, 0,
+	glTexImage2D(GL_TEXTURE_2D, 0, normal_map ? GL_RGBA8 : GL_SRGB8_ALPHA8, img.size.x, img.size.y, 0,
 		GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
 
 	glGenerateMipmap(GL_TEXTURE_2D);
@@ -803,19 +803,21 @@ inline bool upload_texture (GLuint tex2d, const char* filename) {
 
 	return true;
 }
-inline bool upload_normal_map (GLuint tex2d, const char* filename) {
+
+inline bool upload_texture_arr (GLuint tex, int arr_count, const char* filename, bool normal_map=false) {
 
 	Image<srgba8> img;
 	if (!img.load_from_file(filename, &img))
 		return false;
 
-	glBindTexture(GL_TEXTURE_2D, tex2d);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, img.size.x, img.size.y, 0,
+	assert((img.size.y % arr_count) == 0);
+	
+	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
+	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, img.size.x, img.size.y / arr_count, arr_count, 0,
 		GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
 
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
 	return true;
 }

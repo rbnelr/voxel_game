@@ -79,14 +79,12 @@ void main () {
 	if (bray && trace_ray(ray_pos, ray_dir, INF, base_dist, hit, vec3(1,0,0))) {
 		base_dist += hit.dist;
 		
-		//#if DEBUGDRAW // visualize tangent space
-	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[0]*0.3, vec4(1,0,0,1));
-	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[1]*0.3, vec4(0,1,0,1));
-	//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, TBN[2]*0.3, vec4(0,0,1,1));
-	//#endif
-		
-		col.a = hit.col.a;
-		col.rgb = hit.emiss;
+		#if DEBUGDRAW // visualize tangent space
+		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[0]*0.3, vec4(1,0,0,1));
+		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[1]*0.3, vec4(0,1,0,1));
+		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[2]*0.3, vec4(0,0,1,1));
+		if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.normal*0.3, vec4(0,0,1,1));
+		#endif
 		
 	#if BOUNCE_ENABLE
 		if (show_light) hit.col.rgb = vec3(1.0);
@@ -95,13 +93,14 @@ void main () {
 		
 		vec3 light = vec3(0.0);
 		vec3 A = vec3(1.0);
+		//hit.col = vec4(1.0); // pretend first surface is white to make TAA store light, not light*prim_col
 		
 		float dist_remain = bounce_max_dist;
 		
 		for (int i=0; i<bounce_max_count; ++i) {
 			ray_pos = hit.pos + hit.normal * epsilon;
 			
-		#if 0
+		#if 1
 			float F = fresnel_roughness(max(0., -dot(hit.normal, ray_dir)), .04, roughness);
 			
 			if (F > rand()) {
@@ -114,6 +113,9 @@ void main () {
 			A *= hit.col.rgb;
 			ray_dir = generate_TBN(hit.normal) * hemisphere_sample();
 		#endif
+			
+			if (dot(ray_dir, hit.gTBN[2]) <= 0.0)
+				break; // normal mapping made generated ray that went into the surface TODO: what do?
 			
 			if (max(max(A.x,A.y),A.z) < 0.02)
 				break;
@@ -130,7 +132,10 @@ void main () {
 		}
 		
 		light = APPLY_TAA(light, phit.pos, phit.coord, phit.normal, pxpos);
-		col.rgb += light;
+		
+		//col.rgb = phit.col.rgb * light + phit.emiss;
+		col.rgb = light + phit.emiss;
+		col.a = phit.col.a;
 	#else
 		col = hit.col;
 	#endif
