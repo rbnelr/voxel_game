@@ -526,7 +526,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		vec3 vox_entry = vec3(coord) + mix(vec3(1.0), vec3(0.0), dir_sign);
 		
 		vec3 t0v = inv_dir * vox_entry + bias;
-		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to not count faces behind ray
+		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to ignore faces behind ray
 		
 		hit.bid = texelFetch(voxel_tex, coord, 0).r;
 		hit.dist = dist;
@@ -534,14 +534,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		hit.coord = coord;
 		
-		//hit.normal = eval_vox_df_normal(df, hit.pos);
-		
-		vec2 uv;
-		//vec2 uv_dx; // uv gradients to get mip mapping
-		//vec2 uv_dy;
-		
-		mat3 TBN; // TBN based on cube uvs for normal mapping
-		
+		// tangent space position, ie. texture uv + height above plane
+		// u points 'right'  v points 'up'  h points in face normal
+		vec3 uvh;
 		int face;
 		float tex_grad;
 		{ // calc hit face, uv and normal
@@ -554,37 +549,38 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 tang = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				geom_normal.x = sign(offs.x);
 				face = offs.x < 0.0 ? 0 : 1;
-				uv = hit.pos.yz;
-				tex_grad = abs(ray_dir.x);
-				if (offs.x < 0.0) uv.x = 1.0 - uv.x;
+				
+				geom_normal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
+				
+				uvh.x = offs.x < 0.0 ? -hit.pos.y : hit.pos.y;
+				uvh.y = hit.pos.z;
+				uvh.z = abs(offs.x)-0.5;
+				
+				tex_grad = abs(ray_dir.x);
 			} else if (abs_offs.y >= abs_offs.z) {
-				geom_normal.y = sign(offs.y);
 				face = offs.y < 0.0 ? 2 : 3;
-				uv = hit.pos.xz;
-				tex_grad = abs(ray_dir.y);
-				if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
+				
+				geom_normal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
+				
+				uvh.x = offs.y < 0.0 ? hit.pos.x : -hit.pos.x;
+				uvh.y = hit.pos.z;
+				uvh.z = abs(offs.y)-0.5;
+				
+				tex_grad = abs(ray_dir.y);
 			} else {
-				geom_normal.z = sign(offs.z);
 				face = offs.z < 0.0 ? 4 : 5;
-				uv = hit.pos.xy;
-				tex_grad = abs(ray_dir.z);
-				if (offs.z < 0.0) uv.y = 1.0 - uv.y;
+				
+				geom_normal.z = sign(offs.z);
 				tang.x = +1;
-			}
-			
-			if (hit.bid == B_TREE_LOG) {
-				face = 0;
-				if (abs_offs.x >= abs_offs.y) {
-					uv = hit.pos.yz;
-					if (offs.x < 0.0) uv.x = 1.0 - uv.x;
-				} else {
-					uv = hit.pos.xz;
-					if (offs.y >= 0.0) uv.x = 1.0 - uv.x;
-				}
+				
+				uvh.x = hit.pos.x;
+				uvh.y = offs.z < 0.0 ? -hit.pos.y : hit.pos.y;
+				uvh.z = abs(offs.z)-0.5;
+				
+				tex_grad = abs(ray_dir.z);
 			}
 			
 			hit.gTBN = calc_TBN(geom_normal, tang);
@@ -608,65 +604,60 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
-		
 		{ // parallax mapping
 			
 			//const float uv_stepsz = 0.01;
 			const float depth_step = 0.004;
-			const float parallax_stren = 0.18;
+			const float parallax_stren = -0.18;
 			
-			float z_step = dot(hit.gTBN[2], -ray_dir);
-			if (z_step > 0.0) {
+			vec3 step;
+			step.z = dot(hit.gTBN[2], ray_dir);
+			if (step.z < 0.0) {
 				
-				vec2 uv_step;
-				uv_step.x    = dot(hit.gTBN[0],  ray_dir);
-				uv_step.y    = dot(hit.gTBN[1],  ray_dir);
+				step.x = dot(hit.gTBN[0], ray_dir);
+				step.y = dot(hit.gTBN[1], ray_dir);
 				
-				uv_step *= depth_step / abs(z_step);
+				step *= depth_step / abs(step.z);
 				
-				vec2 cur_uv = uv;
-				float cur_depth = 0.0;
+				vec3 cur = uvh;
+				float prev_depthmap = 0.0, depthmap;
 				
 				for (int i=0; i<100; ++i) {
-					cur_depth += depth_step;
-					cur_uv    += uv_step;
+					VISUALIZE_ITERATION
 					
-					float depthmap = textureLod(test_cubeH, vec3(cur_uv, 1.0), tex_lodN + 1.0).r * parallax_stren;
+					depthmap = textureLod(test_cubeH, vec3(cur.xy, 1.0), tex_lodN + 1.0).r * parallax_stren;
 					
-					if (cur_depth >= depthmap) {
-						vec2 prev_uv = cur_uv - uv_step;
-						float prev_depthmap = textureLod(test_cubeH, vec3(prev_uv, 1.0), tex_lodN + 1.0).r * parallax_stren;
-						
-						float a = depthmap - cur_depth;
-						float b = prev_depthmap - cur_depth + depth_step;
-						
-						float t = a / (a-b);
-						
-						cur_uv    = mix(cur_uv, prev_uv, t);
-						cur_depth = mix(cur_depth, cur_depth-depth_step, t);
-						break;
-					}
+				#if DEBUGDRAW
+					vec3 p = hit.pos + hit.gTBN * (cur - uvh);
+					if (_dbgdraw) dbgdraw_point(p - WORLD_SIZEf/2.0, 0.02, vec4(0,1,0,1));
+				#endif
+					
+					if (cur.z <= depthmap) break;
+					prev_depthmap = depthmap;
+					
+					cur += step;
 				}
 				
-				vec2 offset = cur_uv - uv;
-				uv = cur_uv;
+				{ // linear interpolate surface between last two samples
+					float t = (depthmap - cur.z) / (depthmap - prev_depthmap - step.z);
+					cur = cur - step * t; // lerp(cur, cur - step, t)
+				}
 				
-				hit.pos += hit.gTBN * vec3(offset, -cur_depth);
+				dist += length(cur - uvh);
+				hit.pos = ray_pos + ray_dir * dist;
+				uvh = cur;
 				
-				//hit.col.xyz = cur_depth.xxx;
-				//hit.col.xy = offset;
-				//hit.col.z = 0.0;
+				hit.col.xyz = -uvh.zzz;
 			}
 		}
 		
-		//hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
-		hit.col = textureLod(tile_textures, vec3(uv, texid), tex_lod + 1.0).rgba;
-		//hit.col = textureGrad(tile_textures, vec3(uv, texid), tex_grad, tex_grad).rgba;
+		//hit.col = textureLod(tile_textures, vec3(uvh.xy, texid), 0.0).rgba;
+		hit.col = textureLod(tile_textures, vec3(uvh.xy, texid), tex_lod + 1.0).rgba;
 		
 		{ // normal mapping
 			const float normal_map_stren = 1.0;
 			
-			vec3 sampl = textureLod(test_cubeN, vec3(uv, 1.0), tex_lodN + 1.0).rgb;
+			vec3 sampl = textureLod(test_cubeN, vec3(uvh.xy, 1.0), tex_lodN + 1.0).rgb;
 			sampl = sampl * 2.0 - 1.0;
 			sampl.xy *= normal_map_stren;
 			
@@ -674,10 +665,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			hit.normal = hit.gTBN * normalize(sampl);
 		}
 		
-		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
+		//hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
-		//if (tex_bid == B_TALLGRASS && face >= 4)
-		//	hit.col = vec4(0.0);
+		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}
 	
 	//hit.col = vec4(vec3(dist / 200.0), 1);
