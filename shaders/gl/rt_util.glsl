@@ -363,7 +363,7 @@ uniform int max_iterations = 200;
 	void GET_VISUALIZE_COST (inout vec3 col) {
 		#if VISUALIZE_TIME
 		uint64_t dur = clockARB() - _ts_start;
-		float val = float(dur) / float(1200000);
+		float val = float(dur) / float(100000);
 		//float val = float(dur) / float(_iterations) / 2000.0;
 		
 		#else
@@ -397,6 +397,7 @@ struct Hit {
 bool _dbgdraw = false;
 
 uniform sampler2DArray test_cubeN;
+uniform sampler2DArray test_cubeH;
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
@@ -607,6 +608,57 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
+		
+		{ // parallax mapping
+			
+			//const float uv_stepsz = 0.01;
+			const float depth_step = 0.004;
+			const float parallax_stren = 0.18;
+			
+			float z_step = dot(hit.gTBN[2], -ray_dir);
+			if (z_step > 0.0) {
+				
+				vec2 uv_step;
+				uv_step.x    = dot(hit.gTBN[0],  ray_dir);
+				uv_step.y    = dot(hit.gTBN[1],  ray_dir);
+				
+				uv_step *= depth_step / abs(z_step);
+				
+				vec2 cur_uv = uv;
+				float cur_depth = 0.0;
+				
+				for (int i=0; i<100; ++i) {
+					cur_depth += depth_step;
+					cur_uv    += uv_step;
+					
+					float depthmap = textureLod(test_cubeH, vec3(cur_uv, 1.0), tex_lodN + 1.0).r * parallax_stren;
+					
+					if (cur_depth >= depthmap) {
+						vec2 prev_uv = cur_uv - uv_step;
+						float prev_depthmap = textureLod(test_cubeH, vec3(prev_uv, 1.0), tex_lodN + 1.0).r * parallax_stren;
+						
+						float a = depthmap - cur_depth;
+						float b = prev_depthmap - cur_depth + depth_step;
+						
+						float t = a / (a-b);
+						
+						cur_uv    = mix(cur_uv, prev_uv, t);
+						cur_depth = mix(cur_depth, cur_depth-depth_step, t);
+						break;
+					}
+				}
+				
+				vec2 offset = cur_uv - uv;
+				uv = cur_uv;
+				
+				hit.pos += hit.gTBN * vec3(offset, -cur_depth);
+				
+				//hit.col.xyz = cur_depth.xxx;
+				//hit.col.xy = offset;
+				//hit.col.z = 0.0;
+			}
+		}
+		
 		//hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		hit.col = textureLod(tile_textures, vec3(uv, texid), tex_lod + 1.0).rgba;
 		//hit.col = textureGrad(tile_textures, vec3(uv, texid), tex_grad, tex_grad).rgba;
@@ -614,7 +666,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		{ // normal mapping
 			const float normal_map_stren = 1.0;
 			
-			vec3 sampl = textureLod(test_cubeN, vec3(uv, 5.0), tex_lodN + 1.0).rgb;
+			vec3 sampl = textureLod(test_cubeN, vec3(uv, 1.0), tex_lodN + 1.0).rgb;
 			sampl = sampl * 2.0 - 1.0;
 			sampl.xy *= normal_map_stren;
 			

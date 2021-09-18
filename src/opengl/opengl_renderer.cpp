@@ -496,64 +496,12 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 		}
 	}
 
-	upload_texture(water_N_A, "textures/Water_N_A.png", true);
-	upload_texture(water_N_B, "textures/Water_N_B.png", true);
-	upload_texture_arr(test_cubeN, 6, "textures/test_cubeN.png", true);
+	upload_texture_arr(test_cubeN, "textures/test_cubeN.png", 6, GL_RGB8);
+	upload_texture_arr(test_cubeH, "textures/test_cubeH.png", 6, GL_R8);
 
 	// heat_gradient.png   rainbow_gradient.png   blue_red_gradient.png
 	upload_texture(gradient, "textures/heat_gradient.png");
 	upload_texture(gui_atlas, "textures/gui.png");
-
-	{ // test textures
-		json j;
-		load_json("textures/test_textures/textures.json", &j);
-
-		int sizes[] = { 512, 1024 };
-		Texture2DArray* texs_A[] = { &textures_A, &textures2_A };
-		Texture2DArray* texs_N[] = { &textures_N, &textures2_N };
-
-		for (int k=0; k<2; ++k) {
-			int size = sizes[k];
-			Texture2DArray& texA = *texs_A[k];
-			Texture2DArray& texB = *texs_N[k];
-			auto arr = j[prints("%d", size)];
-
-			auto count = (GLsizei)arr.size();
-			glBindTexture(GL_TEXTURE_2D_ARRAY, texA);
-			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_SRGB8_ALPHA8, size, size, count, 0,
-				GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-			glBindTexture(GL_TEXTURE_2D_ARRAY, texB);
-			glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, size, size, count*4, 0,
-				GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-			auto upload = [&] (int idx, char const* filename) {
-				Image<srgba8> img;
-				if (!img.load_from_file(prints("textures/test_textures/%s", filename).c_str(), &img))
-					return;
-
-				glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0,0,idx, size,size,1, GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
-			};
-
-			int i=0;
-			for (auto& t : arr) {
-				glBindTexture(GL_TEXTURE_2D_ARRAY, texA);
-				if (t.contains("color"))	upload(i, t["color"].get<std::string>().c_str());
-				glBindTexture(GL_TEXTURE_2D_ARRAY, texB);
-				if (t.contains("norml"))	upload(i*4+0, t["norml"].get<std::string>().c_str());
-				if (t.contains("displ"))	upload(i*4+1, t["displ"].get<std::string>().c_str());
-				if (t.contains("occlu"))	upload(i*4+2, t["occlu"].get<std::string>().c_str());
-				if (t.contains("gloss"))	upload(i*4+3, t["gloss"].get<std::string>().c_str());
-				i++;
-			}
-
-			glBindTexture(GL_TEXTURE_2D_ARRAY, texA);
-			glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-			glBindTexture(GL_TEXTURE_2D_ARRAY, texB);
-			glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-			glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-		}
-	}
 
 	return true;
 }

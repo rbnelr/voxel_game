@@ -210,16 +210,10 @@ public:
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		gradient		= {"gradient"};
-	Texture2D		water_N_A		= {"water_N_A"};
-	Texture2D		water_N_B		= {"water_N_B"};
+
 	Texture2DArray	test_cubeN		= {"test_cubeN"};
+	Texture2DArray	test_cubeH		= {"test_cubeH"};
 	
-	Texture2DArray	textures_A		= {"textures_A"}; // albedos
-	Texture2DArray	textures_N		= {"textures_N"}; // normals, occlusion, displacement, glossy
-
-	Texture2DArray	textures2_A		= {"textures2_A"}; // albedos
-	Texture2DArray	textures2_N		= {"textures2_N"}; // normals, occlusion, displacement, glossy
-
 	glDebugDraw		debug_draw = glDebugDraw(shaders);
 
 	virtual bool get_vsync () {

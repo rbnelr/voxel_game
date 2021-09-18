@@ -83,7 +83,7 @@ void main () {
 		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[0]*0.3, vec4(1,0,0,1));
 		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[1]*0.3, vec4(0,1,0,1));
 		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.gTBN[2]*0.3, vec4(0,0,1,1));
-		if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.normal*0.3, vec4(0,0,1,1));
+		//if (_dbgdraw) dbgdraw_vector(hit.pos - WORLD_SIZEf/2.0, hit.normal*0.3, vec4(0,0,1,1));
 		#endif
 		
 	#if BOUNCE_ENABLE

@@ -786,40 +786,56 @@ inline IndexedMesh upload_mesh (std::string_view label,
 
 //// Textures
 
-// upload texture, use with sampler please
-inline bool upload_texture (GLuint tex, const char* filename, bool normal_map=false) {
+// upload texture (array) from image file, texture array tiles have to be arranged vertically
+// arr_count=1 makes this normal 2d texture
+inline bool upload_texture_arr (GLuint tex, const char* filename, int arr_count=1, GLenum format=GL_SRGB8_ALPHA8) {
 
-	Image<srgba8> img;
-	if (!img.load_from_file(filename, &img))
+	int stbi_comp;
+	GLenum upload_format;
+	switch (format) {
+		case GL_R8:            stbi_comp = 1; upload_format = GL_RED; break;
+		case GL_RG8:           stbi_comp = 3; upload_format = GL_RGB; break; // stbi_comp=2 would be grey,alpha, not RG, so upload as RGB with RG internal format
+		case GL_RGB8:          stbi_comp = 3; upload_format = GL_RGB; break;
+
+		case GL_RGBA8:
+		case GL_SRGB8_ALPHA8:  stbi_comp = 4; upload_format = GL_RGBA; break;
+	}
+
+	uint64_t memsz;
+	auto data = kiss::load_binary_file(filename, &memsz);
+
+	stbi_set_flip_vertically_on_load(true); // OpenGL has textues bottom-up
+
+	int w,h,n;
+	void* pixels = (void*)stbi_load_from_memory(data.get(), (int)memsz, &w, &h, &n, stbi_comp);
+
+	if (!pixels) {
+		clog(ERROR, "[upload_texture_arr] Error uploading file \"%s\"!\n", filename);
 		return false;
+	}
 
-	glBindTexture(GL_TEXTURE_2D, tex);
+	assert((h % arr_count) == 0);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, normal_map ? GL_RGBA8 : GL_SRGB8_ALPHA8, img.size.x, img.size.y, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
+	GLenum target = arr_count == 1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_ARRAY;
 
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindTexture(target, tex);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+	if (arr_count == 1)
+		glTexImage2D(target, 0, format, w, h, 0, upload_format, GL_UNSIGNED_BYTE, pixels);
+	else
+		glTexImage3D(target, 0, format, w, h / arr_count, arr_count, 0, upload_format, GL_UNSIGNED_BYTE, pixels);
+
+	glGenerateMipmap(target);
+	glBindTexture(target, 0);
 
 	return true;
 }
 
-inline bool upload_texture_arr (GLuint tex, int arr_count, const char* filename, bool normal_map=false) {
-
-	Image<srgba8> img;
-	if (!img.load_from_file(filename, &img))
-		return false;
-
-	assert((img.size.y % arr_count) == 0);
-	
-	glBindTexture(GL_TEXTURE_2D_ARRAY, tex);
-	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, img.size.x, img.size.y / arr_count, arr_count, 0,
-		GL_RGBA, GL_UNSIGNED_BYTE, img.pixels);
-
-	glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-
-	return true;
+// upload texture, use with sampler please
+inline bool upload_texture (GLuint tex, const char* filename, GLenum format=GL_SRGB8_ALPHA8) {
+	return upload_texture_arr(tex, filename, 1, format);
 }
 
 //// Shader management
