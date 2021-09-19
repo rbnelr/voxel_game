@@ -345,6 +345,7 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
 
 //
 uniform int max_iterations = 200;
+uniform float visualize_mult = 1.0;
 
 #if VISUALIZE_COST
 	int _iterations = 0;
@@ -363,8 +364,8 @@ uniform int max_iterations = 200;
 	void GET_VISUALIZE_COST (inout vec3 col) {
 		#if VISUALIZE_TIME
 		uint64_t dur = clockARB() - _ts_start;
-		float val = float(dur) / float(100000);
-		//float val = float(dur) / float(_iterations) / 2000.0;
+		float val = float(dur) / (100000.0 * visualize_mult);
+		//float val = float(dur) / float(_iterations) / (2000.0*visualize_mult);
 		
 		#else
 		float val = float(_iterations) / float(max_iterations);
@@ -398,6 +399,87 @@ bool _dbgdraw = false;
 
 uniform sampler2DArray test_cubeN;
 uniform sampler2DArray test_cubeH;
+
+uniform float parallax_zstep = 0.004;
+uniform float parallax_max_step = 0.02;
+uniform float parallax_scale = 0.15;
+
+bool parallax_mapping (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float base_dist, inout float dist, out int face) {
+	
+	vec3 pos = dist * ray_dir + ray_pos;
+	vec3 rel  = pos - vec3(coord);
+	vec3 offs = abs(rel - 0.5);
+	
+	vec3 cur; // uv,height
+	vec3 step;
+	if (offs.x >= offs.y && offs.x >= offs.z) {
+		face = rel.x < 0.5 ? 0 : 1;
+		cur  = rel.x < 0.5 ? vec3(1.0-rel.y, rel.z, -rel.x) : vec3(rel.y, rel.z, rel.x-1.0);
+		step = rel.x < 0.5 ? vec3(-ray_dir.y, ray_dir.z, -ray_dir.x) : vec3(ray_dir.y, ray_dir.z, ray_dir.x);
+	} else if (offs.y >= offs.z) {
+		face = rel.y < 0.5 ? 2 : 3;
+		cur  = rel.y < 0.5 ? vec3(rel.x, rel.z, -rel.y) : vec3(1.0-rel.x, rel.z, rel.y-1.0);
+		step = rel.y < 0.5 ? vec3(ray_dir.x, ray_dir.z, -ray_dir.y) : vec3(-ray_dir.x, ray_dir.z, ray_dir.y);
+	} else {
+		face = rel.z < 0.5 ? 4 : 5;
+		cur  = rel.z < 0.5 ? vec3(rel.x, 1.0-rel.y, -rel.z) : vec3(rel.x, rel.y, rel.z-1.0);
+		step = rel.z < 0.5 ? vec3(ray_dir.x, -ray_dir.y, -ray_dir.z) : vec3(ray_dir.x, ray_dir.y, ray_dir.z);
+	}
+	
+	// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
+	float ray_r = (dist + base_dist) * ray_r_per_dist;
+	if (ray_r > 0.03) return true;
+	
+	float stepsz = min(parallax_zstep / (abs(step.z)+epsilon), parallax_max_step);
+	stepsz /= map(ray_r, 0.03, 0.01) + 0.1;
+	
+	vec3 start = cur;
+	step *= stepsz;
+	
+	float texlodH = log2(length(step.xy) * float(textureSize(test_cubeH, 0).x));
+	
+	float prev_height = 0.0, height;
+	
+	for (int i=0; i<100; ++i) {
+		VISUALIZE_ITERATION
+		
+		height = textureLod(test_cubeH, vec3(cur.xy, 1.0), texlodH).r * parallax_scale;
+		
+	#if DEBUGDRAW
+		vec3 p = ray_pos + ray_dir * (length(cur - start) + dist);
+		if (_dbgdraw) dbgdraw_point(p - WORLD_SIZEf/2.0, 0.02, vec4(0,1,0,1));
+	#endif
+		
+		if (cur.z <= height) break;
+		
+		prev_height = height;
+		cur += step;
+		
+		if (cur.x < 0.0 || cur.y < 0.0 || cur.x > 1.0 || cur.y > 1.0 || cur.z > 0.0)
+			return false; // miss
+	}
+	
+	{ // linear interpolate surface between last two samples
+		float t = (height - cur.z) / (height - prev_height - step.z);
+		
+		//float t0 = 0.0; // inside surface
+		//float t1 = 1.0; // outside surface
+		//for (int i=0; i<4; ++i) {
+		//	float tm = (t0+t1)*0.5;
+		//	vec3 c = cur - step * tm;
+		//	
+		//	height = textureLod(test_cubeH, vec3(c.xy, 1.0), lod).r * parallax_scale;
+		//	if (cur.z <= height) t0 = tm; // tm inside surface
+		//	else                 t1 = tm;
+		//}
+		//float t = (t0+t1)*0.5;
+		
+		cur = cur - step * t; // lerp(cur, cur - step, t)
+	}
+	
+	dist += length(cur - start);
+	return true; // hit
+}
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
@@ -446,6 +528,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	
 	int dbgcol = 0;
 	int iter = 0;
+	int face;
 	
 	for (;;) {
 		VISUALIZE_ITERATION
@@ -481,7 +564,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			dist += df;
 			dist = min(dist, chunk_t1); // limit step to exactly on the exit face of the chunk
 			
-			// update pos for next iteration
 			vec3 pos = dist * ray_dir + ray_pos;
 			// update coord for next iteration
 			coord = ivec3(pos);
@@ -495,8 +577,10 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
 			// this avoids one memory read
 			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
-			if (dfi < 0)
-				break;
+			if (dfi < 0) {
+				if (parallax_mapping(ray_pos, ray_dir, coord, base_dist, dist, face))
+					break; // hit
+			}
 			
 			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
 			dist = min(min(t1v.x, t1v.y), t1v.z);
@@ -522,65 +606,35 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	
 	{ // calc hit info
 		
-		// snap ray to voxel entry in case we landed inside a voxel when raymarching
-		vec3 vox_entry = vec3(coord) + mix(vec3(1.0), vec3(0.0), dir_sign);
-		
-		vec3 t0v = inv_dir * vox_entry + bias;
-		dist = max(max(t0v.x, t0v.y), max(t0v.z, 0.0)); // max(, 0.0) to ignore faces behind ray
-		
 		hit.bid = texelFetch(voxel_tex, coord, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
-		
 		hit.coord = coord;
 		
-		// tangent space position, ie. texture uv + height above plane
-		// u points 'right'  v points 'up'  h points in face normal
-		vec3 uvh;
-		int face;
-		float tex_grad;
+		vec2 uv;
 		{ // calc hit face, uv and normal
-			vec3 hit_center = vec3(coord) + 0.5;
-			
-			vec3 offs = (hit.pos - hit_center);
+			vec3 rel = hit.pos - vec3(coord);
+			vec3 offs = rel - 0.5;
 			vec3 abs_offs = abs(offs);
 			
 			vec3 geom_normal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
-			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
-				face = offs.x < 0.0 ? 0 : 1;
-				
+			if (face <= 1) {
 				geom_normal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
 				
-				uvh.x = offs.x < 0.0 ? -hit.pos.y : hit.pos.y;
-				uvh.y = hit.pos.z;
-				uvh.z = abs(offs.x)-0.5;
-				
-				tex_grad = abs(ray_dir.x);
-			} else if (abs_offs.y >= abs_offs.z) {
-				face = offs.y < 0.0 ? 2 : 3;
-				
+				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
+			} else if (face <= 3) {
 				geom_normal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
 				
-				uvh.x = offs.y < 0.0 ? hit.pos.x : -hit.pos.x;
-				uvh.y = hit.pos.z;
-				uvh.z = abs(offs.y)-0.5;
-				
-				tex_grad = abs(ray_dir.y);
+				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
 			} else {
-				face = offs.z < 0.0 ? 4 : 5;
-				
 				geom_normal.z = sign(offs.z);
 				tang.x = +1;
 				
-				uvh.x = hit.pos.x;
-				uvh.y = offs.z < 0.0 ? -hit.pos.y : hit.pos.y;
-				uvh.z = abs(offs.z)-0.5;
-				
-				tex_grad = abs(ray_dir.z);
+				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
 			}
 			
 			hit.gTBN = calc_TBN(geom_normal, tang);
@@ -589,13 +643,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
 		float ray_r = (dist + base_dist) * ray_r_per_dist;
 		
-		//tex_grad = 1.0;
-		float tex_baselod = log2(float(textureSize(tile_textures, 0).x));
-		float tex_baselodN = log2(float(textureSize(test_cubeN, 0).x));
-		
-		float rlod = log2(ray_r / tex_grad);
-		float tex_lod  = rlod + tex_baselod;
-		float tex_lodN = rlod + tex_baselodN;
+		float texlod  = log2(ray_r * float(textureSize(tile_textures, 0).x));
+		float texlodN = log2(ray_r * float(textureSize(test_cubeN   , 0).x));
 		
 		uint medium_bid = B_AIR;
 		
@@ -604,60 +653,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
-		{ // parallax mapping
-			
-			//const float uv_stepsz = 0.01;
-			const float depth_step = 0.004;
-			const float parallax_stren = -0.18;
-			
-			vec3 step;
-			step.z = dot(hit.gTBN[2], ray_dir);
-			if (step.z < 0.0) {
-				
-				step.x = dot(hit.gTBN[0], ray_dir);
-				step.y = dot(hit.gTBN[1], ray_dir);
-				
-				step *= depth_step / abs(step.z);
-				
-				vec3 cur = uvh;
-				float prev_depthmap = 0.0, depthmap;
-				
-				for (int i=0; i<100; ++i) {
-					VISUALIZE_ITERATION
-					
-					depthmap = textureLod(test_cubeH, vec3(cur.xy, 1.0), tex_lodN + 1.0).r * parallax_stren;
-					
-				#if DEBUGDRAW
-					vec3 p = hit.pos + hit.gTBN * (cur - uvh);
-					if (_dbgdraw) dbgdraw_point(p - WORLD_SIZEf/2.0, 0.02, vec4(0,1,0,1));
-				#endif
-					
-					if (cur.z <= depthmap) break;
-					prev_depthmap = depthmap;
-					
-					cur += step;
-				}
-				
-				{ // linear interpolate surface between last two samples
-					float t = (depthmap - cur.z) / (depthmap - prev_depthmap - step.z);
-					cur = cur - step * t; // lerp(cur, cur - step, t)
-				}
-				
-				dist += length(cur - uvh);
-				hit.pos = ray_pos + ray_dir * dist;
-				uvh = cur;
-				
-				hit.col.xyz = -uvh.zzz;
-			}
-		}
-		
-		//hit.col = textureLod(tile_textures, vec3(uvh.xy, texid), 0.0).rgba;
-		hit.col = textureLod(tile_textures, vec3(uvh.xy, texid), tex_lod + 1.0).rgba;
+		hit.col = textureLod(tile_textures, vec3(uv, texid), texlod).rgba;
 		
 		{ // normal mapping
 			const float normal_map_stren = 1.0;
 			
-			vec3 sampl = textureLod(test_cubeN, vec3(uvh.xy, 1.0), tex_lodN + 1.0).rgb;
+			vec3 sampl = textureLod(test_cubeN, vec3(uv, 1.0), texlodN).rgb;
 			sampl = sampl * 2.0 - 1.0;
 			sampl.xy *= normal_map_stren;
 			
@@ -665,7 +666,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			hit.normal = hit.gTBN * normalize(sampl);
 		}
 		
-		//hit.col.rgb = hit.normal * 0.5 + 0.5;
+		hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}

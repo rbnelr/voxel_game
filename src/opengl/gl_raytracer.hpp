@@ -259,6 +259,7 @@ namespace gl {
 
 		bool visualize_cost = false;
 		bool visualize_time = false;
+		float visualize_mult = 1;
 
 		struct Lighting {
 			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, roughness)
@@ -271,6 +272,11 @@ namespace gl {
 
 			float roughness = 0.8f;
 
+			//
+			float parallax_zstep = 0.004f;
+			float parallax_max_step = 0.02f;
+			float parallax_scale = 0.15f;
+
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
@@ -281,6 +287,10 @@ namespace gl {
 				ImGui::DragInt("bounce_max_count", &bounce_max_count, 0.1f, 0, 16);
 
 				ImGui::SliderFloat("roughness", &roughness, 0,1);
+
+				ImGui::SliderFloat("parallax_zstep", &parallax_zstep, 0.0005f, 0.1f);
+				ImGui::SliderFloat("parallax_max_step", &parallax_max_step, 0.0005f, 0.1f);
+				ImGui::SliderFloat("parallax_scale", &parallax_scale, 0.0005f, 0.25f);
 
 				ImGui::TreePop();
 			}
@@ -300,6 +310,7 @@ namespace gl {
 			macro_change |= ImGui::Checkbox("visualize_cost", &visualize_cost);
 			ImGui::SameLine();
 			macro_change |= ImGui::Checkbox("visualize_time", &visualize_time);
+			ImGui::DragFloat("visualize_mult", &visualize_mult, 0.1f, 0, 1000, "%f", ImGuiSliderFlags_Logarithmic);
 
 			macro_change |= rt_groupsz.imgui("rt_groupsz");
 

@@ -219,6 +219,10 @@ namespace gl {
 			}
 			rt_forward->set_uniform("near_px_size", near_px_size);
 
+			rt_forward->set_uniform("max_iterations", max_iterations);
+
+			rt_forward->set_uniform("visualize_mult", visualize_mult);
+
 			rt_forward->set_uniform("show_light", lighting.show_light);
 
 			rt_forward->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
@@ -226,7 +230,9 @@ namespace gl {
 
 			rt_forward->set_uniform("roughness", lighting.roughness);
 
-			rt_forward->set_uniform("max_iterations", max_iterations);
+			rt_forward->set_uniform("parallax_zstep",    lighting.parallax_zstep);
+			rt_forward->set_uniform("parallax_max_step", lighting.parallax_max_step);
+			rt_forward->set_uniform("parallax_scale",    -lighting.parallax_scale);
 
 			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
