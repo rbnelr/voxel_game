@@ -232,7 +232,7 @@ namespace gl {
 
 			rt_forward->set_uniform("parallax_zstep",    lighting.parallax_zstep);
 			rt_forward->set_uniform("parallax_max_step", lighting.parallax_max_step);
-			rt_forward->set_uniform("parallax_scale",    -lighting.parallax_scale);
+			rt_forward->set_uniform("parallax_scale",    lighting.parallax_scale);
 
 			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 

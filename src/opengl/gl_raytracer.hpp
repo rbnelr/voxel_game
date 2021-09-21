@@ -201,6 +201,8 @@ namespace gl {
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
+			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
+			         {"PRALLAX_MAPPING", lighting.parallax_map ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
@@ -272,6 +274,9 @@ namespace gl {
 
 			float roughness = 0.8f;
 
+			bool normal_map = true;
+			bool parallax_map = true;
+
 			//
 			float parallax_zstep = 0.004f;
 			float parallax_max_step = 0.02f;
@@ -287,6 +292,9 @@ namespace gl {
 				ImGui::DragInt("bounce_max_count", &bounce_max_count, 0.1f, 0, 16);
 
 				ImGui::SliderFloat("roughness", &roughness, 0,1);
+
+				macro_change |= ImGui::Checkbox("normal mapping", &normal_map);
+				macro_change |= ImGui::Checkbox("parallax mapping", &parallax_map);
 
 				ImGui::SliderFloat("parallax_zstep", &parallax_zstep, 0.0005f, 0.1f);
 				ImGui::SliderFloat("parallax_max_step", &parallax_max_step, 0.0005f, 0.1f);

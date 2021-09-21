@@ -403,6 +403,7 @@ uniform sampler2DArray test_cubeH;
 uniform float parallax_zstep = 0.004;
 uniform float parallax_max_step = 0.02;
 uniform float parallax_scale = 0.15;
+const float tex = 2.0;
 
 bool parallax_mapping (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float base_dist, inout float dist, out int face) {
 	
@@ -443,7 +444,7 @@ bool parallax_mapping (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float base_dist,
 	for (int i=0; i<100; ++i) {
 		VISUALIZE_ITERATION
 		
-		height = textureLod(test_cubeH, vec3(cur.xy, 1.0), texlodH).r * parallax_scale;
+		height = textureLod(test_cubeH, vec3(cur.xy, tex), texlodH).r * parallax_scale - parallax_scale; // [0,1] to [-0.15,0]
 		
 	#if DEBUGDRAW
 		vec3 p = ray_pos + ray_dir * (length(cur - start) + dist);
@@ -458,6 +459,7 @@ bool parallax_mapping (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float base_dist,
 		if (cur.x < 0.0 || cur.y < 0.0 || cur.x > 1.0 || cur.y > 1.0 || cur.z > 0.0)
 			return false; // miss
 	}
+	if (height <= -parallax_scale) return false; // miss
 	
 	{ // linear interpolate surface between last two samples
 		float t = (height - cur.z) / (height - prev_height - step.z);
@@ -578,7 +580,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			// this avoids one memory read
 			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
 			if (dfi < 0) {
+				#if PRALLAX_MAPPING
 				if (parallax_mapping(ray_pos, ray_dir, coord, base_dist, dist, face))
+				#endif
 					break; // hit
 			}
 			
@@ -620,6 +624,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 geom_normal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
+		#if PARALLAX_MAPPING
 			if (face <= 1) {
 				geom_normal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
@@ -636,6 +641,30 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 				
 				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
 			}
+		#else
+			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
+				face = rel.x < 0.5 ? 0 : 1;
+				
+				geom_normal.x = sign(offs.x);
+				tang.y = offs.x < 0.0 ? -1 : +1;
+				
+				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
+			} else if (abs_offs.y >= abs_offs.z) {
+				face = rel.y < 0.5 ? 2 : 3;
+				
+				geom_normal.y = sign(offs.y);
+				tang.x = offs.y < 0.0 ? +1 : -1;
+				
+				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
+			} else {
+				face = rel.z < 0.5 ? 4 : 5;
+				
+				geom_normal.z = sign(offs.z);
+				tang.x = +1;
+				
+				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
+			}
+		#endif
 			
 			hit.gTBN = calc_TBN(geom_normal, tang);
 		}
@@ -655,18 +684,22 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), texlod).rgba;
 		
+	#if NORMAL_MAPPING
 		{ // normal mapping
 			const float normal_map_stren = 1.0;
 			
-			vec3 sampl = textureLod(test_cubeN, vec3(uv, 1.0), texlodN).rgb;
+			vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), texlodN).rgb;
 			sampl = sampl * 2.0 - 1.0;
 			sampl.xy *= normal_map_stren;
 			
 			//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
 			hit.normal = hit.gTBN * normalize(sampl);
 		}
+	#else
+		hit.normal = hit.gTBN[2];
+	#endif
 		
-		hit.col.rgb = hit.normal * 0.5 + 0.5;
+		//hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}
