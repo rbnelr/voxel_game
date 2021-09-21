@@ -405,83 +405,81 @@ uniform float parallax_max_step = 0.02;
 uniform float parallax_scale = 0.15;
 const float tex = 2.0;
 
-bool parallax_mapping (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float base_dist, inout float dist, out int face) {
+#if PARALLAX_MAPPING
+
+bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
+		inout float t0, in float t1, out vec3 bevel_normal) {
 	
-	vec3 pos = dist * ray_dir + ray_pos;
-	vec3 rel  = pos - vec3(coord);
-	vec3 offs = abs(rel - 0.5);
+	#if 0
+	const float lod0 = 0.01;
+	const float lod1 = 0.5;
 	
-	vec3 cur; // uv,height
-	vec3 step;
-	if (offs.x >= offs.y && offs.x >= offs.z) {
-		face = rel.x < 0.5 ? 0 : 1;
-		cur  = rel.x < 0.5 ? vec3(1.0-rel.y, rel.z, -rel.x) : vec3(rel.y, rel.z, rel.x-1.0);
-		step = rel.x < 0.5 ? vec3(-ray_dir.y, ray_dir.z, -ray_dir.x) : vec3(ray_dir.y, ray_dir.z, ray_dir.x);
-	} else if (offs.y >= offs.z) {
-		face = rel.y < 0.5 ? 2 : 3;
-		cur  = rel.y < 0.5 ? vec3(rel.x, rel.z, -rel.y) : vec3(1.0-rel.x, rel.z, rel.y-1.0);
-		step = rel.y < 0.5 ? vec3(ray_dir.x, ray_dir.z, -ray_dir.y) : vec3(-ray_dir.x, ray_dir.z, ray_dir.y);
-	} else {
-		face = rel.z < 0.5 ? 4 : 5;
-		cur  = rel.z < 0.5 ? vec3(rel.x, 1.0-rel.y, -rel.z) : vec3(rel.x, rel.y, rel.z-1.0);
-		step = rel.z < 0.5 ? vec3(ray_dir.x, -ray_dir.y, -ray_dir.z) : vec3(ray_dir.x, ray_dir.y, ray_dir.z);
-	}
-	
-	// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
-	float ray_r = (dist + base_dist) * ray_r_per_dist;
-	if (ray_r > 0.03) return true;
-	
-	float stepsz = min(parallax_zstep / (abs(step.z)+epsilon), parallax_max_step);
-	stepsz /= map(ray_r, 0.03, 0.01) + 0.1;
-	
-	vec3 start = cur;
-	step *= stepsz;
-	
-	float texlodH = log2(length(step.xy) * float(textureSize(test_cubeH, 0).x));
-	
-	float prev_height = 0.0, height;
-	
-	for (int i=0; i<100; ++i) {
-		VISUALIZE_ITERATION
-		
-		height = textureLod(test_cubeH, vec3(cur.xy, tex), texlodH).r * parallax_scale - parallax_scale; // [0,1] to [-0.15,0]
-		
-	#if DEBUGDRAW
-		vec3 p = ray_pos + ray_dir * (length(cur - start) + dist);
-		if (_dbgdraw) dbgdraw_point(p - WORLD_SIZEf/2.0, 0.02, vec4(0,1,0,1));
+	float lod = (ray_r - lod0) / (lod1 - lod0);
+	if (lod > 1.0) return true;
+	lod = max(lod, 0.0);
+	#else
+	float lod = 0.0;
 	#endif
-		
-		if (cur.z <= height) break;
-		
-		prev_height = height;
-		cur += step;
-		
-		if (cur.x < 0.0 || cur.y < 0.0 || cur.x > 1.0 || cur.y > 1.0 || cur.z > 0.0)
-			return false; // miss
-	}
-	if (height <= -parallax_scale) return false; // miss
 	
-	{ // linear interpolate surface between last two samples
-		float t = (height - cur.z) / (height - prev_height - step.z);
+	vec3 origin = vec3(coord) + 0.5;
+	vec3 rel = origin - ray_pos;
+	
+	vec3 pos = ray_pos + ray_dir * t0;
+	vec3 rel2 = pos - origin;
+	
+	vec3 signs = sign(rel2);
+	
+	#define BEVEL_PLANES 3
+	const vec4 bevel_planes[BEVEL_PLANES] = {
+		vec4(normalize(vec3(0.0, signs.y, signs.z)), 0.67),
+		vec4(normalize(vec3(signs.x, 0.0, signs.z)), 0.67),
+		vec4(normalize(vec3(signs.x, signs.y, 0.0)), 0.67),
+		//vec4(normalize(vec3(signs.x, signs.y, signs.z)), 0.78),
 		
-		//float t0 = 0.0; // inside surface
-		//float t1 = 1.0; // outside surface
-		//for (int i=0; i<4; ++i) {
-		//	float tm = (t0+t1)*0.5;
-		//	vec3 c = cur - step * tm;
-		//	
-		//	height = textureLod(test_cubeH, vec3(c.xy, 1.0), lod).r * parallax_scale;
-		//	if (cur.z <= height) t0 = tm; // tm inside surface
-		//	else                 t1 = tm;
-		//}
-		//float t = (t0+t1)*0.5;
+		//vec4(normalize(vec3(0,-1,-1)), 0.67),
+		//vec4(normalize(vec3(0,+1,-1)), 0.67),
+		//vec4(normalize(vec3(0,-1,+1)), 0.67),
+		//vec4(normalize(vec3(0,+1,+1)), 0.67),
+		//
+		//vec4(normalize(vec3(-1,0,-1)), 0.67),
+		//vec4(normalize(vec3(+1,0,-1)), 0.67),
+		//vec4(normalize(vec3(-1,0,+1)), 0.67),
+		//vec4(normalize(vec3(+1,0,+1)), 0.67),
+		//
+		//vec4(normalize(vec3(-1,-1,0)), 0.67),
+		//vec4(normalize(vec3(+1,-1,0)), 0.67),
+		//vec4(normalize(vec3(-1,+1,0)), 0.67),
+		//vec4(normalize(vec3(+1,+1,0)), 0.67),
 		
-		cur = cur - step * t; // lerp(cur, cur - step, t)
+		//vec4(normalize(vec3(0.02,0.03,1)), 0.48),
+	};
+	
+	bevel_normal = vec3(0.0);
+	
+	for (int i=0; i<BEVEL_PLANES; ++i) {
+		vec3 plane_norm = bevel_planes[i].xyz;
+		float plane_d = mix(bevel_planes[i].w, sqrt(2.0), lod);
+		
+		float dpos = dot(rel, plane_norm) + plane_d;
+		float dnorm = dot(ray_dir, plane_norm);
+		
+		float t = dpos / dnorm;
+		
+		if (dnorm < 0.0) {
+			if (t >= t0) {
+				bevel_normal = plane_norm;
+				t0 = t;
+			}
+			//t0 = max(t, t0);
+		} else {
+			t1 = min(t, t1);
+			//if (t1 < t0) break;
+		}
 	}
 	
-	dist += length(cur - start);
-	return true; // hit
+	return t0 <= t1;
 }
+#endif
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
@@ -530,7 +528,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	
 	int dbgcol = 0;
 	int iter = 0;
-	int face;
+	
+	vec3 bevel_normal = vec3(0.0);
 	
 	for (;;) {
 		VISUALIZE_ITERATION
@@ -575,24 +574,27 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		//#if DEBUGDRAW
 		//	if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
 		//#endif
-		
+			
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+			float t1 = min(min(t1v.x, t1v.y), t1v.z);
+			
 			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
 			// this avoids one memory read
 			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
 			if (dfi < 0) {
-				#if PRALLAX_MAPPING
-				if (parallax_mapping(ray_pos, ray_dir, coord, base_dist, dist, face))
-				#endif
+			#if PARALLAX_MAPPING
+				float ray_r = (dist + base_dist) * ray_r_per_dist;
+				if (box_bevel(ray_pos, ray_dir, coord, ray_r, dist, t1, bevel_normal))
+			#endif
 					break; // hit
 			}
 			
-			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
-			dist = min(min(t1v.x, t1v.y), t1v.z);
+			dist = t1;
 			
 			// step on axis where exit distance is lowest
-			if      (t1v.x == dist) coord.x += step_dir.x;
-			else if (t1v.y == dist) coord.y += step_dir.y;
-			else                    coord.z += step_dir.z;
+			if      (t1v.x == t1) coord.x += step_dir.x;
+			else if (t1v.y == t1) coord.y += step_dir.y;
+			else                  coord.z += step_dir.z;
 		}
 		
 		dbgcol ^= 1;
@@ -616,57 +618,40 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		hit.coord = coord;
 		
 		vec2 uv;
+		int face;
 		{ // calc hit face, uv and normal
 			vec3 rel = hit.pos - vec3(coord);
 			vec3 offs = rel - 0.5;
 			vec3 abs_offs = abs(offs);
 			
-			vec3 geom_normal = vec3(0.0);
+			vec3 box_normal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
-		#if PARALLAX_MAPPING
-			if (face <= 1) {
-				geom_normal.x = sign(offs.x);
-				tang.y = offs.x < 0.0 ? -1 : +1;
-				
-				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
-			} else if (face <= 3) {
-				geom_normal.y = sign(offs.y);
-				tang.x = offs.y < 0.0 ? +1 : -1;
-				
-				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
-			} else {
-				geom_normal.z = sign(offs.z);
-				tang.x = +1;
-				
-				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
-			}
-		#else
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				face = rel.x < 0.5 ? 0 : 1;
 				
-				geom_normal.x = sign(offs.x);
+				box_normal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
 				
 				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
 			} else if (abs_offs.y >= abs_offs.z) {
 				face = rel.y < 0.5 ? 2 : 3;
 				
-				geom_normal.y = sign(offs.y);
+				box_normal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
 				
 				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
 			} else {
 				face = rel.z < 0.5 ? 4 : 5;
 				
-				geom_normal.z = sign(offs.z);
+				box_normal.z = sign(offs.z);
 				tang.x = +1;
 				
 				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
 			}
-		#endif
 			
-			hit.gTBN = calc_TBN(geom_normal, tang);
+			bool was_bevel = dot(bevel_normal, bevel_normal) != 0.0;
+			hit.gTBN = calc_TBN(was_bevel ? bevel_normal : box_normal, tang);
 		}
 		
 		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
@@ -699,11 +684,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		hit.normal = hit.gTBN[2];
 	#endif
 		
-		//hit.col.rgb = hit.normal * 0.5 + 0.5;
+		//hit.col = vec4(vec3(dist / 20.0), 1);
+		hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}
 	
-	//hit.col = vec4(vec3(dist / 200.0), 1);
 	return true; // hit
 }

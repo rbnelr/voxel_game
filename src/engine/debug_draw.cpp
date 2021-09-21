@@ -213,7 +213,7 @@ void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba 
 void DebugDraw::axis_gizmo (Camera_View const& view, int2 const& viewport_size) {
 	//float2 pos_px = float2(viewport_size.x - 100.5f, 100.5f);
 	//float2 pos_clip = pos_px / (float2)viewport_size * 2.0f - 1.0f;
-	float2 pos_clip = float2(-0.9f, -0.9f);
+	float2 pos_clip = float2(+0.9f, -0.9f);
 
 	float3 pos_cam = (float3)(view.clip_to_cam * float4(pos_clip, 0,1));
 	float3 pos_world = (float3)(view.cam_to_world * float4(pos_cam,1));

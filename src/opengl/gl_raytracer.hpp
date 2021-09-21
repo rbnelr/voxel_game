@@ -202,7 +202,7 @@ namespace gl {
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
 			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
-			         {"PRALLAX_MAPPING", lighting.parallax_map ? "1":"0"},
+			         {"PARALLAX_MAPPING", lighting.parallax_map ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
