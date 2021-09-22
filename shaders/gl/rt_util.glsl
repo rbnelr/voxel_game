@@ -407,22 +407,30 @@ const float tex = 2.0;
 
 #if PARALLAX_MAPPING
 
-vec2 plane_intersect (vec3 ray_pos, vec3 ray_dir, vec3 plane_norm, float plane_d) {
+uint read_voxel_bevel_type (ivec3 coord) {
+	uint bid = texelFetch(voxel_tex, coord, 0).r;
+	if (bid == B_GRASS) bid = B_EARTH;
+	return bid;
+}
+
+void plane_intersect (inout float t0, inout float t1, inout vec3 bevel_normal,
+		vec3 ray_pos, vec3 ray_dir, vec3 plane_norm, float plane_d) {
 	float dpos  = dot(ray_pos, plane_norm) + plane_d;
 	float dnorm = dot(ray_dir, plane_norm);
 	
 	float t = dpos / dnorm;
 	
-	float t0 = dnorm < 0.0 ? t : -INF;
-	float t1 = dnorm > 0.0 ? t : +INF;
-	
-	return vec2(t0,t1);
+	if (dnorm < 0.0) {
+		if (t > t0) bevel_normal = plane_norm;
+		t0 = max(t0, t);
+	}
+	if (dnorm > 0.0) t1 = min(t1, t);
 }
 bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
-		inout float t0, in float t1, out vec3 bevel_normal) {
+		inout float t0, in float t1, inout vec3 bevel_normal) {
 	
-	#if 1
-	const float lod0 = 0.03;
+	#if 0
+	const float lod0 = 0.07;
 	const float lod1 = 0.004;
 	
 	float lod = (ray_r - lod0) / (lod1 - lod0);
@@ -435,80 +443,36 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 	vec3 origin = vec3(coord) + 0.5;
 	vec3 rel = origin - ray_pos;
 	
-	//vec3 signs = sign((ray_dir * t0 + ray_pos) - origin);
-	vec3 signs = mix(vec3(-1), vec3(+1), greaterThan(ray_dir * t0, origin - ray_pos)); // faster than above
+	//vec3 s = sign((ray_dir * t0 + ray_pos) - origin);
+	vec3 s = mix(vec3(-1), vec3(+1), greaterThan(ray_dir * t0, rel)); // faster than above
 	
-	#define BEVEL_PLANES 4
-	float edge   = HALF_SQRT_2 - 0.03 * lod;
-	float corner = HALF_SQRT_3 - 0.07 * lod;
+	uint v0   = read_voxel_bevel_type(coord).r;
+	bool v100 = read_voxel_bevel_type(coord + ivec3(s.x,  0,  0)).r != v0;
+	bool v010 = read_voxel_bevel_type(coord + ivec3(  0,s.y,  0)).r != v0;
+	bool v001 = read_voxel_bevel_type(coord + ivec3(  0,  0,s.z)).r != v0;
 	
-	#if 0
-	const vec4 bevel_planes[BEVEL_PLANES] = {
-		vec4(normalize(vec3(0.0, signs.y, signs.z)), edge),
-		vec4(normalize(vec3(signs.x, 0.0, signs.z)), edge),
-		vec4(normalize(vec3(signs.x, signs.y, 0.0)), edge),
-		vec4(normalize(vec3(signs.x, signs.y, signs.z)), corner),
-	};
+	float rot = 0.15 * lod;
 	
-	bevel_normal = vec3(0.0);
+	vec3 p0n = INV_SQRT_2 * s * vec3(1,1,rot); // INV_SQRT_2*  to normalize()
+	vec3 p1n = INV_SQRT_2 * s * vec3(1,rot,1);
+	vec3 p2n = INV_SQRT_2 * s * vec3(rot,1,1);
+	vec3 p3n = INV_SQRT_3 * s;
 	
-	for (int i=0; i<BEVEL_PLANES; ++i) {
-		vec3 plane_norm = bevel_planes[i].xyz;
-		float plane_d = bevel_planes[i].w;
-		
-		float dpos = dot(rel, plane_norm) + plane_d;
-		float dnorm = dot(ray_dir, plane_norm);
-		
-		float t = dpos / dnorm;
-		
-		if (dnorm < 0.0) {
-			if (t >= t0) {
-				bevel_normal = plane_norm;
-				t0 = t;
-			}
-			//t0 = max(t, t0);
-		} else {
-			t1 = min(t, t1);
-		}
-	}
+	float szxy     = HALF_SQRT_2 - lod * (v100 && v010 ? 0.05 : -0.03);
+	float szxz     = HALF_SQRT_2 - lod * (v100 && v001 ? 0.05 : -0.03);
+	float szyz     = HALF_SQRT_2 - lod * (v010 && v001 ? 0.05 : -0.03);
+	float szcorner = HALF_SQRT_3 - lod * (v100 && v010 && v001 ? 0.18 : -1.0);
+	
+	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p0n, szxy);
+	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p1n, szxz);
+	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p2n, szyz);
+	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p3n, szcorner);
 	
 	if (t0 > t1) {
 		bevel_normal = vec3(0.0);
-		return false; // miss
+		return false;
 	}
-	return true; // hit
-	#else
-	
-	//vec3 p0n = normalize(vec3(0.0, signs.y, signs.z));
-	//vec3 p1n = normalize(vec3(signs.x, 0.0, signs.z));
-	//vec3 p2n = normalize(vec3(signs.x, signs.y, 0.0));
-	//vec3 p3n = normalize(vec3(signs.x, signs.y, signs.z));
-	vec3 p0n = INV_SQRT_2 * vec3(0.0, signs.y, signs.z);
-	vec3 p1n = INV_SQRT_2 * vec3(signs.x, 0.0, signs.z);
-	vec3 p2n = INV_SQRT_2 * vec3(signs.x, signs.y, 0.0);
-	vec3 p3n = INV_SQRT_3 * vec3(signs.x, signs.y, signs.z);
-	
-	vec2 p0 = plane_intersect(rel, ray_dir, p0n, edge);
-	vec2 p1 = plane_intersect(rel, ray_dir, p1n, edge);
-	vec2 p2 = plane_intersect(rel, ray_dir, p2n, edge);
-	vec2 p3 = plane_intersect(rel, ray_dir, p3n, corner);
-	
-	float pt0 = max(max(p0.x, p1.x), max(p2.x, p3.x));
-	float pt1 = min(min(p0.y, p1.y), min(p2.y, p3.y));
-	
-	t0 = max(t0, pt0);
-	t1 = min(t1, pt1);
-	
-	bevel_normal = vec3(0.0);
-	if (t0 > t1) return false; // miss
-	
-	     if (t0 == p0.x) bevel_normal = p0n;
-	else if (t0 == p1.x) bevel_normal = p1n;
-	else if (t0 == p2.x) bevel_normal = p2n;
-	else if (t0 == p3.x) bevel_normal = p3n;
-	
-	return true; // hit
-	#endif
+	return true;
 }
 #endif
 
@@ -565,7 +529,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	for (;;) {
 		VISUALIZE_ITERATION
 		
-		int dfi = texelFetch(df_tex, coord, 0).r; // tex read
+		int dfi = texelFetch(df_tex, coord, 0).r;
 		
 		// step up to exit of current cell, since DF is safe up until its bounds
 		// seems to give a little bit of perf, as this reduces iteration count
@@ -647,6 +611,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		hit.coord = coord;
+
+		
+		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
+		float ray_r = (dist + base_dist) * ray_r_per_dist;
+		
+		float texlod  = log2(ray_r * float(textureSize(tile_textures, 0).x));
+		float texlodN = log2(ray_r * float(textureSize(test_cubeN   , 0).x));
+		
 		
 		vec2 uv;
 		int face;
@@ -655,41 +627,53 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 offs = rel - 0.5;
 			vec3 abs_offs = abs(offs);
 			
-			vec3 box_normal = vec3(0.0);
+			hit.normal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				face = rel.x < 0.5 ? 0 : 1;
 				
-				box_normal.x = sign(offs.x);
+				hit.normal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
 				
 				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
 			} else if (abs_offs.y >= abs_offs.z) {
 				face = rel.y < 0.5 ? 2 : 3;
 				
-				box_normal.y = sign(offs.y);
+				hit.normal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
 				
 				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
 			} else {
 				face = rel.z < 0.5 ? 4 : 5;
 				
-				box_normal.z = sign(offs.z);
+				hit.normal.z = sign(offs.z);
 				tang.x = +1;
 				
 				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
 			}
 			
 			bool was_bevel = dot(bevel_normal, bevel_normal) != 0.0;
-			hit.gTBN = calc_TBN(was_bevel ? bevel_normal : box_normal, tang);
+			if (was_bevel) hit.normal = bevel_normal;
+			
+			hit.gTBN = calc_TBN(hit.normal, tang);
+			
+		#if NORMAL_MAPPING
+			if (!was_bevel) { // normal mapping
+				const float normal_map_stren = 1.0;
+				
+				vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), texlodN).rgb;
+				sampl = sampl * 2.0 - 1.0;
+				sampl.xy *= normal_map_stren;
+				
+				//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
+				hit.normal = hit.gTBN * normalize(sampl);
+			}
+		#else
+			hit.normal = hit.gTBN[2];
+		#endif
 		}
 		
-		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
-		float ray_r = (dist + base_dist) * ray_r_per_dist;
-		
-		float texlod  = log2(ray_r * float(textureSize(tile_textures, 0).x));
-		float texlodN = log2(ray_r * float(textureSize(test_cubeN   , 0).x));
 		
 		uint medium_bid = B_AIR;
 		
@@ -698,25 +682,11 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
+		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), texlod).rgba;
 		
-	#if NORMAL_MAPPING
-		{ // normal mapping
-			const float normal_map_stren = 1.0;
-			
-			vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), texlodN).rgb;
-			sampl = sampl * 2.0 - 1.0;
-			sampl.xy *= normal_map_stren;
-			
-			//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
-			hit.normal = hit.gTBN * normalize(sampl);
-		}
-	#else
-		hit.normal = hit.gTBN[2];
-	#endif
-		
 		//hit.col = vec4(vec3(dist / 20.0), 1);
-		hit.col.rgb = hit.normal * 0.5 + 0.5;
+		//hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}

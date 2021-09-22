@@ -133,10 +133,14 @@ void main () {
 		
 		light = APPLY_TAA(light, phit.pos, phit.coord, phit.normal, pxpos);
 		
-		//col.rgb = phit.col.rgb * light + phit.emiss;
 		col.rgb = light + phit.emiss;
 		col.a = phit.col.a;
 	#else
+		float sun = max(dot(hit.normal, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
+		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
+		
+		hit.col.rgb *= sun*sun * (1.0 - amb) + amb;
+		
 		col = hit.col;
 	#endif
 	}
