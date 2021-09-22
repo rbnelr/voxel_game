@@ -407,58 +407,54 @@ const float tex = 2.0;
 
 #if PARALLAX_MAPPING
 
+vec2 plane_intersect (vec3 ray_pos, vec3 ray_dir, vec3 plane_norm, float plane_d) {
+	float dpos  = dot(ray_pos, plane_norm) + plane_d;
+	float dnorm = dot(ray_dir, plane_norm);
+	
+	float t = dpos / dnorm;
+	
+	float t0 = dnorm < 0.0 ? t : -INF;
+	float t1 = dnorm > 0.0 ? t : +INF;
+	
+	return vec2(t0,t1);
+}
 bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 		inout float t0, in float t1, out vec3 bevel_normal) {
 	
-	#if 0
-	const float lod0 = 0.01;
-	const float lod1 = 0.5;
+	#if 1
+	const float lod0 = 0.03;
+	const float lod1 = 0.004;
 	
 	float lod = (ray_r - lod0) / (lod1 - lod0);
-	if (lod > 1.0) return true;
-	lod = max(lod, 0.0);
+	if (lod <= 0.0) return true;
+	lod = min(lod, 1.0);
 	#else
-	float lod = 0.0;
+	float lod = 1.0;
 	#endif
 	
 	vec3 origin = vec3(coord) + 0.5;
 	vec3 rel = origin - ray_pos;
 	
-	vec3 pos = ray_pos + ray_dir * t0;
-	vec3 rel2 = pos - origin;
+	//vec3 signs = sign((ray_dir * t0 + ray_pos) - origin);
+	vec3 signs = mix(vec3(-1), vec3(+1), greaterThan(ray_dir * t0, origin - ray_pos)); // faster than above
 	
-	vec3 signs = sign(rel2);
+	#define BEVEL_PLANES 4
+	float edge   = HALF_SQRT_2 - 0.03 * lod;
+	float corner = HALF_SQRT_3 - 0.07 * lod;
 	
-	#define BEVEL_PLANES 3
+	#if 0
 	const vec4 bevel_planes[BEVEL_PLANES] = {
-		vec4(normalize(vec3(0.0, signs.y, signs.z)), 0.67),
-		vec4(normalize(vec3(signs.x, 0.0, signs.z)), 0.67),
-		vec4(normalize(vec3(signs.x, signs.y, 0.0)), 0.67),
-		//vec4(normalize(vec3(signs.x, signs.y, signs.z)), 0.78),
-		
-		//vec4(normalize(vec3(0,-1,-1)), 0.67),
-		//vec4(normalize(vec3(0,+1,-1)), 0.67),
-		//vec4(normalize(vec3(0,-1,+1)), 0.67),
-		//vec4(normalize(vec3(0,+1,+1)), 0.67),
-		//
-		//vec4(normalize(vec3(-1,0,-1)), 0.67),
-		//vec4(normalize(vec3(+1,0,-1)), 0.67),
-		//vec4(normalize(vec3(-1,0,+1)), 0.67),
-		//vec4(normalize(vec3(+1,0,+1)), 0.67),
-		//
-		//vec4(normalize(vec3(-1,-1,0)), 0.67),
-		//vec4(normalize(vec3(+1,-1,0)), 0.67),
-		//vec4(normalize(vec3(-1,+1,0)), 0.67),
-		//vec4(normalize(vec3(+1,+1,0)), 0.67),
-		
-		//vec4(normalize(vec3(0.02,0.03,1)), 0.48),
+		vec4(normalize(vec3(0.0, signs.y, signs.z)), edge),
+		vec4(normalize(vec3(signs.x, 0.0, signs.z)), edge),
+		vec4(normalize(vec3(signs.x, signs.y, 0.0)), edge),
+		vec4(normalize(vec3(signs.x, signs.y, signs.z)), corner),
 	};
 	
 	bevel_normal = vec3(0.0);
 	
 	for (int i=0; i<BEVEL_PLANES; ++i) {
 		vec3 plane_norm = bevel_planes[i].xyz;
-		float plane_d = mix(bevel_planes[i].w, sqrt(2.0), lod);
+		float plane_d = bevel_planes[i].w;
 		
 		float dpos = dot(rel, plane_norm) + plane_d;
 		float dnorm = dot(ray_dir, plane_norm);
@@ -473,11 +469,46 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 			//t0 = max(t, t0);
 		} else {
 			t1 = min(t, t1);
-			//if (t1 < t0) break;
 		}
 	}
 	
-	return t0 <= t1;
+	if (t0 > t1) {
+		bevel_normal = vec3(0.0);
+		return false; // miss
+	}
+	return true; // hit
+	#else
+	
+	//vec3 p0n = normalize(vec3(0.0, signs.y, signs.z));
+	//vec3 p1n = normalize(vec3(signs.x, 0.0, signs.z));
+	//vec3 p2n = normalize(vec3(signs.x, signs.y, 0.0));
+	//vec3 p3n = normalize(vec3(signs.x, signs.y, signs.z));
+	vec3 p0n = INV_SQRT_2 * vec3(0.0, signs.y, signs.z);
+	vec3 p1n = INV_SQRT_2 * vec3(signs.x, 0.0, signs.z);
+	vec3 p2n = INV_SQRT_2 * vec3(signs.x, signs.y, 0.0);
+	vec3 p3n = INV_SQRT_3 * vec3(signs.x, signs.y, signs.z);
+	
+	vec2 p0 = plane_intersect(rel, ray_dir, p0n, edge);
+	vec2 p1 = plane_intersect(rel, ray_dir, p1n, edge);
+	vec2 p2 = plane_intersect(rel, ray_dir, p2n, edge);
+	vec2 p3 = plane_intersect(rel, ray_dir, p3n, corner);
+	
+	float pt0 = max(max(p0.x, p1.x), max(p2.x, p3.x));
+	float pt1 = min(min(p0.y, p1.y), min(p2.y, p3.y));
+	
+	t0 = max(t0, pt0);
+	t1 = min(t1, pt1);
+	
+	bevel_normal = vec3(0.0);
+	if (t0 > t1) return false; // miss
+	
+	     if (t0 == p0.x) bevel_normal = p0n;
+	else if (t0 == p1.x) bevel_normal = p1n;
+	else if (t0 == p2.x) bevel_normal = p2n;
+	else if (t0 == p3.x) bevel_normal = p3n;
+	
+	return true; // hit
+	#endif
 }
 #endif
 
