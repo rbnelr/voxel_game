@@ -202,7 +202,7 @@ namespace gl {
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
 			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
-			         {"PARALLAX_MAPPING", lighting.parallax_map ? "1":"0"},
+			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
@@ -267,6 +267,7 @@ namespace gl {
 			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, roughness)
 
 			bool show_light = false;
+			bool show_normals = false;
 
 			bool bounce_enable = true;
 			float bounce_max_dist = 90.0f;
@@ -275,7 +276,7 @@ namespace gl {
 			float roughness = 0.8f;
 
 			bool normal_map = true;
-			bool parallax_map = true;
+			bool bevel = true;
 
 			//
 			float parallax_zstep = 0.004f;
@@ -286,6 +287,7 @@ namespace gl {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 				ImGui::Checkbox("show_light", &show_light);
+				ImGui::Checkbox("show_normals", &show_normals);
 
 				macro_change |= ImGui::Checkbox("bounce_enable", &bounce_enable);
 				ImGui::DragFloat("bounce_max_dist", &bounce_max_dist, 0.1f, 0, 256);
@@ -294,7 +296,7 @@ namespace gl {
 				ImGui::SliderFloat("roughness", &roughness, 0,1);
 
 				macro_change |= ImGui::Checkbox("normal mapping", &normal_map);
-				macro_change |= ImGui::Checkbox("parallax mapping", &parallax_map);
+				macro_change |= ImGui::Checkbox("bevel", &bevel);
 
 				ImGui::SliderFloat("parallax_zstep", &parallax_zstep, 0.0005f, 0.1f);
 				ImGui::SliderFloat("parallax_max_step", &parallax_max_step, 0.0005f, 0.1f);

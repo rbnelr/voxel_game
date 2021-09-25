@@ -48,6 +48,7 @@ uvec2 work_group_tiling (uint N) {
 }
 
 uniform bool show_light = false;
+uniform bool show_normals = false;
 
 uniform float bounce_max_dist = 90.0;
 uniform int bounce_max_count = 3;
@@ -142,6 +143,9 @@ void main () {
 		hit.col.rgb *= sun*sun * (1.0 - amb) + amb;
 		
 		col = hit.col;
+		
+		if (show_normals)
+			col.rgb = hit.normal * 0.5 + 0.5;
 	#endif
 	}
 	

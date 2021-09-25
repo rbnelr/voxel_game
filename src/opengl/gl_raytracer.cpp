@@ -224,6 +224,7 @@ namespace gl {
 			rt_forward->set_uniform("visualize_mult", visualize_mult);
 
 			rt_forward->set_uniform("show_light", lighting.show_light);
+			rt_forward->set_uniform("show_normals", lighting.show_normals);
 
 			rt_forward->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
 			rt_forward->set_uniform("bounce_max_count", lighting.bounce_max_count);

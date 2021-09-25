@@ -405,8 +405,7 @@ uniform float parallax_max_step = 0.02;
 uniform float parallax_scale = 0.15;
 const float tex = 2.0;
 
-#if PARALLAX_MAPPING
-
+#if BEVEL
 uint read_voxel_bevel_type (ivec3 coord) {
 	uint bid = texelFetch(voxel_tex, coord, 0).r;
 	if (bid == B_GRASS) bid = B_EARTH;
@@ -451,22 +450,35 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 	bool v010 = read_voxel_bevel_type(coord + ivec3(  0,s.y,  0)).r != v0;
 	bool v001 = read_voxel_bevel_type(coord + ivec3(  0,  0,s.z)).r != v0;
 	
-	float rot = 0.15 * lod;
+	bool v011 = read_voxel_bevel_type(coord + ivec3(  0,s.y,s.z)).r != v0;
+	bool v101 = read_voxel_bevel_type(coord + ivec3(s.x,  0,s.z)).r != v0;
+	bool v110 = read_voxel_bevel_type(coord + ivec3(s.x,s.y,  0)).r != v0;
 	
-	vec3 p0n = INV_SQRT_2 * s * vec3(1,1,rot); // INV_SQRT_2*  to normalize()
-	vec3 p1n = INV_SQRT_2 * s * vec3(1,rot,1);
-	vec3 p2n = INV_SQRT_2 * s * vec3(rot,1,1);
-	vec3 p3n = INV_SQRT_3 * s;
+	float corn = -1.0;
+	if (v100 && v010 && v001) corn = 0.17; // bevel for blocks with 3 air blocks around
+	else {
+		// make concave edge bevel when multiple beveled edges meet
+		if ((!v100 && !v010 && !v001  && v011 && v101 && v110) ||
+	        ( v100 && !v010 && !v001  && v011) ||
+	        (!v100 &&  v010 && !v001  && v101) ||
+	        (!v100 && !v010 &&  v001  && v110)) corn = 0.05715;
+	}
 	
-	float szxy     = HALF_SQRT_2 - lod * (v100 && v010 ? 0.05 : -0.03);
-	float szxz     = HALF_SQRT_2 - lod * (v100 && v001 ? 0.05 : -0.03);
-	float szyz     = HALF_SQRT_2 - lod * (v010 && v001 ? 0.05 : -0.03);
-	float szcorner = HALF_SQRT_3 - lod * (v100 && v010 && v001 ? 0.18 : -1.0);
+	//float rot = 0.04 * lod;
+	float rot = 0.0;
 	
-	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p0n, szxy);
-	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p1n, szxz);
-	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p2n, szyz);
-	plane_intersect(t0,t1, bevel_normal, rel, ray_dir, p3n, szcorner);
+	vec3 edgeXn = normalize(s * vec3(rot,1,1));
+	vec3 edgeYn = normalize(s * vec3(1,rot,1));
+	vec3 edgeZn = normalize(s * vec3(1,1,rot));
+	vec3 cornern = normalize(s);
+	
+	float szcorner = HALF_SQRT_3 - lod * corn;
+	float szedge   = HALF_SQRT_2 - lod * 0.07;
+	
+	if (corn > -1.0)  plane_intersect(t0,t1, bevel_normal, rel, ray_dir, cornern, szcorner);
+	if (v010 && v001) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeXn, szedge);
+	if (v100 && v001) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeYn, szedge);
+	if (v100 && v010) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeZn, szedge);
 	
 	if (t0 > t1) {
 		bevel_normal = vec3(0.0);
@@ -573,11 +585,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
 			float t1 = min(min(t1v.x, t1v.y), t1v.z);
 			
-			// -1 marks solid voxels (they have 1-voxel border of 0s around them)
-			// this avoids one memory read
-			// and should eliminate all empty block id reads and thus help improve caching for the DF values by a bit
 			if (dfi < 0) {
-			#if PARALLAX_MAPPING
+			#if BEVEL
 				float ray_r = (dist + base_dist) * ray_r_per_dist;
 				if (box_bevel(ray_pos, ray_dir, coord, ray_r, dist, t1, bevel_normal))
 			#endif
@@ -686,7 +695,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		hit.col = textureLod(tile_textures, vec3(uv, texid), texlod).rgba;
 		
 		//hit.col = vec4(vec3(dist / 20.0), 1);
-		//hit.col.rgb = hit.normal * 0.5 + 0.5;
 		
 		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
 	}
