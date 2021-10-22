@@ -8,119 +8,6 @@
 namespace gl {
 	class OpenglRenderer;
 
-	static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
-	static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
-
-	// Render arbitrary meshses into gbuffer to test combining rasterized and raytraced objects
-	struct TestRenderer {
-		Shader*		shad;
-		IndexedMesh	mesh;
-
-		float3 pos = float3(-42,83,-101);
-		float2 rot = float3(0,0,0);
-		float size = 5;
-
-		TestRenderer (Shaders& shaders) {
-			shad = shaders.compile("test", {{"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)}});
-
-			auto& m = g_assets.stock_models;
-			mesh = upload_mesh("stock_mesh", m.vertices.data(), m.vertices.size(), m.indices.data(), m.indices.size());
-		}
-		void imgui () {
-			g_debugdraw.movable("Stock_mesh", &pos, 0.4f, lrgba(0.7f,0,0.7f,1));
-
-			ImGui::DragFloat3("Stock_mesh pos", &pos.x, 0.1f);
-			ImGui::DragFloat2("Stock_mesh rot", &rot.x, 0.1f);
-			ImGui::DragFloat("Stock_mesh size", &size, 0.1f);
-		}
-		void draw (OpenglRenderer& r);
-	};
-
-	struct ComputeGroupSize {
-		int2 _size;
-		int2 size;
-
-		ComputeGroupSize (int2 const& s): _size{s}, size{s} {}
-
-		bool imgui (char const* lbl) {
-			ImGui::PushID(lbl);
-
-			ImGui::InputInt2(lbl, &_size.x);
-			ImGui::SameLine(); 
-
-			bool changed = ImGui::Button("Update");
-			if (changed)
-				size = _size;
-
-			ImGui::PopID();
-			return changed;
-		}
-	};
-
-	struct TemporalAA {
-		SERIALIZE(TemporalAA, enable, max_age)
-
-		Texture2D colors[2] = {};
-		Texture2D posage[2] = {};
-		int2   size = 0;
-		int    cur = 0;
-
-		float4x4 prev_world2clip = (float4x4)translate(float3(NAN)); // make prev matrix invalid on first frame
-
-		Sampler sampler = {"TAA.sampler"};
-		Sampler sampler_int = {"TAA.sampler_int"};
-
-		bool enable = true;
-		int max_age = 16;
-
-		TemporalAA () {
-			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-			glSamplerParameteri(sampler_int, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glSamplerParameteri(sampler_int, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		}
-
-		void resize (int2 new_size) {
-			if (colors[0] == 0 || size != new_size) {
-				glActiveTexture(GL_TEXTURE0);
-
-				size = new_size;
-
-				// create new (textures created with glTexStorage2D cannot be resized)
-				colors[0] = {"RT.taa_color0"};
-				colors[1] = {"RT.taa_color1"};
-				posage[0] = {"RT.taa_posage0"};
-				posage[1] = {"RT.taa_posage1"};
-
-				for (auto& buf : colors) {
-					glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
-					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
-					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
-				}
-
-				for (auto& buf : posage) {
-					glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
-					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
-					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
-				}
-
-				// clear textures to be read on first frame
-				float3 col = float3(0,0,0);
-				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
-
-				uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
-				glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
-
-				cur = 1;
-			}
-		}
-	};
-
 	struct Gbuffer {
 		Fbo fbo = {};
 
@@ -183,6 +70,118 @@ namespace gl {
 			}
 		}
 	};
+	struct TemporalAA {
+		SERIALIZE(TemporalAA, enable, max_age)
+
+			Texture2D colors[2] = {};
+		Texture2D posage[2] = {};
+		int2   size = 0;
+		int    cur = 0;
+
+		float4x4 prev_world2clip = (float4x4)translate(float3(NAN)); // make prev matrix invalid on first frame
+
+		Sampler sampler = {"TAA.sampler"};
+		Sampler sampler_int = {"TAA.sampler_int"};
+
+		bool enable = true;
+		int max_age = 16;
+
+		TemporalAA () {
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler_int, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+
+		void resize (int2 new_size) {
+			if (colors[0] == 0 || size != new_size) {
+				glActiveTexture(GL_TEXTURE0);
+
+				size = new_size;
+
+				// create new (textures created with glTexStorage2D cannot be resized)
+				colors[0] = {"RT.taa_color0"};
+				colors[1] = {"RT.taa_color1"};
+				posage[0] = {"RT.taa_posage0"};
+				posage[1] = {"RT.taa_posage1"};
+
+				for (auto& buf : colors) {
+					glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
+					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
+				}
+
+				for (auto& buf : posage) {
+					glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
+					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
+				}
+
+				// clear textures to be read on first frame
+				float3 col = float3(0,0,0);
+				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
+
+				uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
+				glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
+
+				cur = 1;
+			}
+		}
+	};
+
+	static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
+	static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
+
+	// Render arbitrary meshses into gbuffer to test combining rasterized and raytraced objects
+	struct TestRenderer {
+		Shader*		shad;
+		IndexedMesh	mesh;
+
+		float3 pos = float3(-42,83,-101);
+		float2 rot = float3(0,0,0);
+		float size = 5;
+
+		TestRenderer (Shaders& shaders) {
+			shad = shaders.compile("test", {{"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)}});
+
+			auto& m = g_assets.stock_models;
+			mesh = upload_mesh("stock_mesh", m.vertices.data(), m.vertices.size(), m.indices.data(), m.indices.size());
+		}
+		void imgui () {
+			g_debugdraw.movable("Stock_mesh", &pos, 0.4f, lrgba(0.7f,0,0.7f,1));
+
+			ImGui::DragFloat3("Stock_mesh pos", &pos.x, 0.1f);
+			ImGui::DragFloat2("Stock_mesh rot", &rot.x, 0.1f);
+			ImGui::DragFloat("Stock_mesh size", &size, 0.1f);
+		}
+		void draw (OpenglRenderer& r);
+	};
+
+	struct ComputeGroupSize {
+		int2 _size;
+		int2 size;
+
+		ComputeGroupSize (int2 const& s): _size{s}, size{s} {}
+
+		bool imgui (char const* lbl) {
+			ImGui::PushID(lbl);
+
+			ImGui::InputInt2(lbl, &_size.x);
+			ImGui::SameLine(); 
+
+			bool changed = ImGui::Button("Update");
+			if (changed)
+				size = _size;
+
+			ImGui::PopID();
+			return changed;
+		}
+	};
 
 ////
 	struct VoxelTexture {
@@ -242,8 +241,7 @@ namespace gl {
 		TestRenderer test_renderer;
 
 		TemporalAA taa;
-		Gbuffer gbuf;
-
+		
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
 		OGL_TIMER_HISTOGRAM(rt_total);
@@ -251,11 +249,11 @@ namespace gl {
 		OGL_TIMER_HISTOGRAM(rt_lighting);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_macros () {
+		std::vector<gl::MacroDefinition> get_macros (bool forward) {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
-			         {"TAA_ENABLE", taa.enable ? "1":"0"},
+			         {"TAA_ENABLE", taa.enable && !forward ? "1":"0"},
 			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},

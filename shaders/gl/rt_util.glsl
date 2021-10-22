@@ -253,9 +253,7 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
 	
 	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
-
-	// TODO: can't get optimization to one single clip_to_world mat mul to work, why?
-	// -> clip_to_cam needs translation  cam_to_world needs to _not_ have translation
+	
 	vec3 cam = (view.clip_to_cam * clip).xyz;
 	
 	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
@@ -280,8 +278,8 @@ const int CHUNK_MASK = ~63;
 const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 
 
 #if TAA_ENABLE
-layout(rgba16f , binding = 5) writeonly restrict uniform  image2D taa_color;
-layout(rgba16ui, binding = 6) writeonly restrict uniform uimage2D taa_posage;
+layout(rgba16f , binding = 1) writeonly restrict uniform  image2D taa_color;
+layout(rgba16ui, binding = 2) writeonly restrict uniform uimage2D taa_posage;
 
 uniform  sampler2D taa_history_color;
 uniform usampler2D taa_history_posage;
@@ -398,9 +396,6 @@ bool _dbgdraw = false;
 uniform sampler2DArray test_cubeN;
 uniform sampler2DArray test_cubeH;
 
-uniform float parallax_zstep = 0.004;
-uniform float parallax_max_step = 0.02;
-uniform float parallax_scale = 0.15;
 const float tex = 2.0;
 
 #if BEVEL
@@ -608,7 +603,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	}
 	
 	#if DEBUGDRAW
-	if (_dbgdraw) dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
+	if (_dbgdraw && !primray)
+		dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
 	#endif
 	
 	if (iter >= max_iterations || dist >= max_dist)

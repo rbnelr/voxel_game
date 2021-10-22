@@ -33,8 +33,8 @@ namespace gl {
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
-		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(), {{ VERTEX_SHADER }, { FRAGMENT_SHADER }});
-		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(true ), {{ COMPUTE_SHADER }});
+		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(false), {{ COMPUTE_SHADER }});
 
 		//
 
@@ -42,11 +42,11 @@ namespace gl {
 			enable = !enable;
 
 		if (macro_change && rt_forward) {
-			rt_forward->macros = get_macros();
-			rt_forward->recompile("macro_change", false);
+			rt_forward ->macros = get_macros(true );
+			rt_forward ->recompile("macro_change", false);
 		}
 		if (macro_change && rt_lighting) {
-			rt_lighting->macros = get_macros();
+			rt_lighting->macros = get_macros(false);
 			rt_lighting->recompile("macro_change", false);
 		}
 		macro_change = false;
@@ -196,14 +196,14 @@ namespace gl {
 	void Raytracer::set_uniforms (OpenglRenderer& r, Game& game, Shader* shad) {
 		shad->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
 
-		shad->set_uniform("framebuf_size", r.framebuffer.size);
+		shad->set_uniform("framebuf_size", r.render_size);
 		shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
 		float near_px_size;
 		{
 			// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
 			float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
-			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.framebuffer.size),0,1); // pixel one to the up/right in cam space
+			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.render_size),0,1); // pixel one to the up/right in cam space
 			near_px_size = b.x - a.x;
 		}
 		shad->set_uniform("near_px_size", near_px_size);
@@ -229,114 +229,115 @@ namespace gl {
 		ZoneScoped;
 		if (!rt_forward->prog) return;
 
-		// TAA
-		if (taa.enable)
-			taa.resize(r.framebuffer.size);
-		gbuf.resize(r.framebuffer.size);
+		if (taa.enable) taa.resize(r.render_size);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+		//{ // 'forward' gbuf pass
+		//	OGL_TIMER_ZONE(timer_rt_total.timer);
+		//
+		//	{ // forward voxel raycast pass
+		//		ZoneScopedN("rt_forward");
+		//		OGL_TRACE("rt_forward");
+		//		OGL_TIMER_ZONE(timer_rt_forward.timer);
+		//
+		//		glUseProgram(rt_forward->prog);
+		//
+		//		set_uniforms(r, game, rt_forward);
+		//
+		//		r.state.bind_textures(rt_forward, {
+		//			{"voxel_tex", voxel_tex.tex},
+		//			{"df_tex", df_tex.tex},
+		//
+		//			{"tile_textures", r.tile_textures, r.tile_sampler},
+		//
+		//			{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
+		//			{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
+		//
+		//			{"heat_gradient", r.gradient, r.normal_sampler},
+		//		});
+		//
+		//		//glBindImageTexture(0, gbuf.depth.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		//		glBindImageTexture(1, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+		//		glBindImageTexture(2, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		//		glBindImageTexture(3, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		//
+		//		int2 dispatch_size;
+		//		dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+		//		dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
+		//		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+		//	}
+		//	//glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+		//	//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+		//	glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		//
+		//	// normal rasterized drawing pass for gbuf testing
+		//	glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+		//	glClear(GL_DEPTH_BUFFER_BIT);
+		//	test_renderer.draw(r);
+		//
+		//	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		//}
 
-		OGL_TIMER_ZONE(timer_rt_total.timer);
-
-		{ // forward pass
-			ZoneScopedN("rt_forward");
-			OGL_TRACE("rt_forward");
-			OGL_TIMER_ZONE(timer_rt_forward.timer);
-
-			glUseProgram(rt_forward->prog);
-
-			PipelineState s;
-			s.blend_enable = false;
-			s.depth_test = false;
-			s.depth_write = true;
-			r.state.set_no_override(s);
-
-			set_uniforms(r, game, rt_forward);
-
-			r.state.bind_textures(rt_forward, {
-				{"voxel_tex", voxel_tex.tex},
-				{"df_tex", df_tex.tex},
-
-				{"tile_textures", r.tile_textures, r.tile_sampler},
-
-				{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
-				{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
-
-				{"heat_gradient", r.gradient, r.normal_sampler},
-			});
-
-			glBindVertexArray(r.dummy_vao);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
-		}
-
-		{
-			glClear(GL_DEPTH_BUFFER_BIT);
-			test_renderer.draw(r);
-		}
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		{ // lighting pass
-			ZoneScopedN("rt_lighting");
-			OGL_TRACE("rt_lighting");
-			OGL_TIMER_ZONE(timer_rt_lighting.timer);
-
-			glUseProgram(rt_lighting->prog);
-
-			set_uniforms(r, game, rt_lighting);
-
-			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-
-			// TAA
-			GLuint prev_color  = taa.colors[taa.cur ^ 1];
-			GLuint prev_posage = taa.posage[taa.cur ^ 1];
-			GLuint cur_color   = taa.colors[taa.cur];
-			GLuint cur_posage  = taa.posage[taa.cur];
-
-			if (taa.enable) {
-				rt_forward->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
-				rt_forward->set_uniform("taa_max_age", taa.max_age);
-
-				glBindImageTexture(5, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
-				glBindImageTexture(6, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
-
-				taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
-				taa.cur ^= 1;
-			}
-
-			r.state.bind_textures(rt_lighting, {
-				{"voxel_tex", voxel_tex.tex},
-				{"df_tex", df_tex.tex},
-
-				{"gbuf_depth", gbuf.depth, gbuf.sampler},
-				{"gbuf_pos" ,  gbuf.pos, gbuf.sampler},
-				{"gbuf_col" ,  gbuf.col, gbuf.sampler},
-				{"gbuf_norm",  gbuf.norm, gbuf.sampler},
-
-				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
-				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
-
-				{"tile_textures", r.tile_textures, r.tile_sampler},
-
-				{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
-				{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
-
-				{"heat_gradient", r.gradient, r.normal_sampler},
-			});
-
-			int2 dispatch_size;
-			dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
-			dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
-
-			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-		}
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-
-		// unbind
-		glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-		glBindImageTexture(5, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
-		glBindImageTexture(6, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+		//{ // deferred lighting pass
+		//	ZoneScopedN("rt_lighting");
+		//	OGL_TRACE("rt_lighting");
+		//	OGL_TIMER_ZONE(timer_rt_lighting.timer);
+		//
+		//	glUseProgram(rt_lighting->prog);
+		//
+		//	set_uniforms(r, game, rt_lighting);
+		//
+		//	glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		//
+		//	// TAA
+		//	GLuint prev_color  = taa.colors[taa.cur ^ 1];
+		//	GLuint prev_posage = taa.posage[taa.cur ^ 1];
+		//	GLuint cur_color   = taa.colors[taa.cur];
+		//	GLuint cur_posage  = taa.posage[taa.cur];
+		//
+		//	if (taa.enable) {
+		//		rt_forward->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
+		//		rt_forward->set_uniform("taa_max_age", taa.max_age);
+		//
+		//		glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
+		//		glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+		//
+		//		taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+		//		taa.cur ^= 1;
+		//	}
+		//
+		//	r.state.bind_textures(rt_lighting, {
+		//		{"voxel_tex", voxel_tex.tex},
+		//		{"df_tex", df_tex.tex},
+		//
+		//		{"gbuf_depth", gbuf.depth, gbuf.sampler},
+		//		{"gbuf_pos" ,  gbuf.pos  , gbuf.sampler},
+		//		{"gbuf_col" ,  gbuf.col  , gbuf.sampler},
+		//		{"gbuf_norm",  gbuf.norm , gbuf.sampler},
+		//
+		//		(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
+		//		(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
+		//
+		//		{"tile_textures", r.tile_textures, r.tile_sampler},
+		//
+		//		{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
+		//		{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
+		//
+		//		{"heat_gradient", r.gradient, r.normal_sampler},
+		//	});
+		//
+		//	int2 dispatch_size;
+		//	dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+		//	dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
+		//
+		//	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+		//}
+		////glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT
+		////	|GL_COMMAND_BARRIER_BIT); // for indirect draw
+		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		//
+		//// unbind
+		//for (int i=0; i<4; ++i)
+		//	glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 	}
 
 } // namespace gl

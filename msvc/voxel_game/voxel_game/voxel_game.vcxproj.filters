@@ -205,9 +205,6 @@
     <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h">
       <Filter>kisslib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\opengl\bloom.hpp">
-      <Filter>opengl</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\containers.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -350,9 +347,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash3.cpp">
       <Filter>kisslib</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\bloom.cpp">
-      <Filter>opengl</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
       <Filter>opengl</Filter>

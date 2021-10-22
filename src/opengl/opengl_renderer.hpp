@@ -153,7 +153,7 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, bloom_renderer, debug_draw, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, imopen)
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
@@ -165,6 +165,9 @@ public:
 
 	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
+	int2			render_size;
+	Gbuffer			gbuf;
+
 	Vao				dummy_vao = {"dummy_vao"};
 
 	StateManager	state;
@@ -172,7 +175,6 @@ public:
 
 	CommonUniforms	common_uniforms;
 
-	FramebufferTexture		framebuffer;
 	bool			trigger_screenshot = false;
 	bool			screenshot_hud = false;
 
@@ -183,17 +185,13 @@ public:
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
 	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
 
-	BloomRenderer	bloom_renderer	= BloomRenderer(shaders);
-
-	Shader*			post_shad = shaders.compile("postprocess");
+	//Shader*			post_shad = shaders.compile("postprocess");
 
 	Ubo				common_uniforms_ubo = {"common_ubo"};
 
-	Sampler			tile_sampler = {"tile_sampler"};
-	Sampler			normal_sampler = {"normal_sampler"};
-	Sampler			bloom_sampler = {"bloom_sampler"};
-	Sampler			post_sampler = {"post_sampler"};
-	Sampler			normal_sampler_wrap = {"normal_sampler_wrap"};
+	Sampler			pixelated_sampler = {"pixelated_sampler"};
+	Sampler			smooth_sampler = {"smooth_sampler"};
+	Sampler			smooth_sampler_wrap = {"normal_sampler_wrap"};
 
 	Ssbo			block_meshes_ssbo = {"block_meshes_ssbo"};
 	Ssbo			block_tiles_ssbo = {"block_tiles_ssbo"};
@@ -237,35 +235,23 @@ public:
 		float max_aniso = 1.0f;
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
 
-		glSamplerParameteri(tile_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(tile_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glSamplerParameteri(tile_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameterf(tile_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameterf(pixelated_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
-		glSamplerParameteri(post_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glSamplerParameteri(post_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(post_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(post_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSamplerParameterf(post_sampler, GL_TEXTURE_MAX_ANISOTROPY, 1);
+		glSamplerParameteri(smooth_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(smooth_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glSamplerParameterf(smooth_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
-		glSamplerParameteri(bloom_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(bloom_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(bloom_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(bloom_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSamplerParameterf(bloom_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso); // 
-
-		glSamplerParameteri(normal_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(normal_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(normal_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSamplerParameterf(normal_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
-
-		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glSamplerParameteri(normal_sampler_wrap, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameterf(normal_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glSamplerParameterf(smooth_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 	}
 	virtual ~OpenglRenderer () {}
 
@@ -280,12 +266,6 @@ public:
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
 	virtual void graphics_imgui (Input& I) {
-		if (imgui_treenode("Framebuffer", &imopen.framebuffer)) {
-			framebuffer.imgui();
-
-			ImGui::TreePop();
-		}
-
 		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
 			debug_draw.imgui();
 
@@ -302,7 +282,6 @@ public:
 		}
 
 		raytracer.imgui(I);
-		bloom_renderer.imgui();
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {

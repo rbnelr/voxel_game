@@ -106,7 +106,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 		r.state.set(state);
 		r.state.bind_textures(shader, {
-			{"tile_textures", r.tile_textures, r.tile_sampler}
+			{"tile_textures", r.tile_textures, r.pixelated_sampler}
 		});
 
 		{

@@ -35,8 +35,9 @@ void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFil
 void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	ImGui::Begin("Debug");
 
-	framebuffer.update(I.window_size);
+	render_size = I.window_size;
 
+	gbuf.resize(render_size);
 	chunk_renderer.upload_remeshed(game.chunks);
 	raytracer.update(*this, game, I);
 
@@ -62,32 +63,32 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		debug_draw.update(I);
 	}
 
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	{
 		OGL_TRACE("3d draws");
 		{
 			memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
 			common_uniforms.view.set(game.view);
-			common_uniforms.view.viewport_size = (float2)framebuffer.size;
+			common_uniforms.view.viewport_size = (float2)render_size;
 			upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
-
-			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
-			glViewport(0,0, framebuffer.size.x, framebuffer.size.y);
-			glScissor(0,0, framebuffer.size.x, framebuffer.size.y);
+;
+			glViewport(0,0, render_size.x, render_size.y);
+			glScissor (0,0, render_size.x, render_size.y);
 
 			glClearColor(0,0,0,1);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
-		if (raytracer.enable)
-			raytracer.draw(*this, game);
+		//if (raytracer.enable)
+		//	raytracer.draw(*this, game);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
+		//glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
 		// draw before chunks so it shows through transparent blocks
 		if (game.player.selected_block)
 			block_highl.draw(*this, game.player.selected_block);
 
-		if (!raytracer.enable)
+		//if (!raytracer.enable)
 			chunk_renderer.draw_chunks(*this, game);
 
 		debug_draw.draw(*this);
@@ -99,57 +100,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 		// draws first and third person player items
 		player_rederer.draw(*this, game);
-	}
-
-	{
-		OGL_TRACE("post passes");
-		
-		{
-			OGL_TRACE("generate framebuffer mips");
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, framebuffer.color);
-			glGenerateMipmap(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, 0);
-		}
-
-		if (bloom_renderer.enable)
-			bloom_renderer.apply_bloom(*this, framebuffer);
-
-		{
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-			glViewport(0,0, I.window_size.x, I.window_size.y);
-			glScissor(0,0, I.window_size.x, I.window_size.y);
-
-			{
-				common_uniforms.view.viewport_size = (float2)I.window_size;
-				upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
-			}
-		}
-
-		{
-			OGL_TRACE("postprocess");
-			glUseProgram(post_shad->prog);
-
-			PipelineState s;
-			s.blend_enable = false;
-			s.depth_test = false;
-			s.depth_write = false;
-			state.set_no_override(s);
-
-			StateManager::TextureBind bloom_tex;
-			if (bloom_renderer.enable) bloom_tex = {"bloom", {GL_TEXTURE_2D, bloom_renderer.passes[1].color}, post_sampler};
-
-			state.bind_textures(post_shad, {
-				{"main_color", {GL_TEXTURE_2D, framebuffer.color}, post_sampler},
-				bloom_tex,
-			});
-
-			post_shad->set_uniform("enable_bloom", bloom_renderer.enable);
-			post_shad->set_uniform("exposure", bloom_renderer.exposure);
-
-			glDrawArrays(GL_TRIANGLES, 0, 3); // full screen triangle
-		}
 	}
 
 	{
@@ -369,7 +319,7 @@ void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
 
 		r.state.bind_textures(gui_shad, {
 			{"tex", r.gui_atlas, gui_sampler},
-			{"tile_textures", r.tile_textures, r.tile_sampler},
+			{"tile_textures", r.tile_textures, r.pixelated_sampler},
 		});
 
 		glDrawElements(GL_TRIANGLES, (GLsizei)gui_index_data.size(), GL_UNSIGNED_SHORT, (void*)0);
@@ -400,7 +350,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			glUseProgram(held_block_shad->prog);
 
 			r.state.bind_textures(held_block_shad, {
-				{"tile_textures", r.tile_textures, r.tile_sampler}
+				{"tile_textures", r.tile_textures, r.pixelated_sampler}
 			});
 
 			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.block_mat));
@@ -442,7 +392,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 			glUseProgram(held_item_shad->prog);
 			
 			r.state.bind_textures(held_item_shad, {
-				{"tile_textures", r.tile_textures, r.tile_sampler}
+				{"tile_textures", r.tile_textures, r.pixelated_sampler}
 			});
 
 			auto id = (item_id)item.id;

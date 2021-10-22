@@ -236,7 +236,6 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\bloom.hpp" />
     <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
@@ -369,10 +368,6 @@
     <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
-    <ClCompile Include="..\..\..\src\opengl\bloom.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
