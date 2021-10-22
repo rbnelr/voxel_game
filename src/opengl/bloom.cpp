@@ -4,7 +4,7 @@
 
 namespace gl {
 
-	void BloomRenderer::apply_bloom (OpenglRenderer& r, Framebuffer& main_fbo) {
+	void BloomRenderer::apply_bloom (OpenglRenderer& r, FramebufferTexture& main_fbo) {
 		resize_fbos(r.framebuffer.size);
 
 		GLuint input_tex = main_fbo.color;

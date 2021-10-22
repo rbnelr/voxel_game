@@ -239,6 +239,23 @@ public:
 
 	operator GLuint () const { return tex; }
 };
+class Fbo {
+	GLuint fbo = 0;
+public:
+	MOVE_ONLY_CLASS_MEMBER(Fbo, fbo);
+
+	Fbo () {} // not allocated
+	Fbo (std::string_view label) { // allocate
+		glGenFramebuffers(1, &fbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, label);
+	}
+	~Fbo () {
+		if (fbo) glDeleteFramebuffers(1, &fbo);
+	}
+
+	operator GLuint () const { return fbo; }
+};
 
 //// Profiling
 #if RENDERER_PROFILING
@@ -1396,12 +1413,12 @@ inline int calc_mipmaps (int w, int h) {
 }
 
 // framebuffer for rendering at different resolution and to make sure we get float buffers
-struct Framebuffer {
+struct FramebufferTexture {
 	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
 
-	GLuint color	= 0;
-	GLuint depth	= 0;
-	GLuint fbo		= 0;
+	Fbo fbo		= {};
+	Texture2D color	= {};
+	Texture2D depth	= {};
 
 	int2 size = 0;
 	float renderscale = 1.0f;
@@ -1426,45 +1443,30 @@ struct Framebuffer {
 		if (old_size != size) {
 			glActiveTexture(GL_TEXTURE0); // try clobber consistent texture at least
 
-			 // delete old
-			glDeleteTextures(1, &color);
-			glDeleteTextures(1, &depth);
-			glDeleteFramebuffers(1, &fbo);
+			fbo    = {"Framebuffer.fbo"  };
+			color  = {"Framebuffer.color"};
+			depth  = {"Framebuffer.depth"};
 
 			GLint levels = 1;
 			if (color_mips)
 				levels = calc_mipmaps(size.x, size.y);
 
 			// create new
-			glGenTextures(1, &color);
-			glBindTexture(GL_TEXTURE_2D, color);
-			glTexStorage2D(GL_TEXTURE_2D, levels, color_format, size.x, size.y);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels-1);
+			glTextureStorage2D(color, levels, color_format, size.x, size.y);
+			glTextureParameteri(color, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(color, GL_TEXTURE_MAX_LEVEL, levels-1);
 
-			glGenTextures(1, &depth);
-			glBindTexture(GL_TEXTURE_2D, depth);
-			glTexStorage2D(GL_TEXTURE_2D, 1, depth_format, size.x, size.y);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+			glTextureStorage2D(depth, 1, depth_format, size.x, size.y);
+			glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
 
-
-			glGenFramebuffers(1, &fbo);
-			glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
-			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
-
-			OGL_DBG_LABEL(GL_TEXTURE, color, "Framebuffer.color");
-			OGL_DBG_LABEL(GL_TEXTURE, depth, "Framebuffer.depth");
-			OGL_DBG_LABEL(GL_FRAMEBUFFER, fbo, "Framebuffer.fbo");
+			glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, color, 0);
+			glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, depth, 0);
 
 			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 			//if (status != GL_FRAMEBUFFER_COMPLETE) {
 			//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
 			//}
-
-			glBindTexture(GL_TEXTURE_2D, 0);
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 	}
 };

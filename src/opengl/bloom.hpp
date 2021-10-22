@@ -148,7 +148,7 @@ struct BloomRenderer {
 		gaussian.calc(radius);
 	}
 
-	void apply_bloom (OpenglRenderer& r, Framebuffer& main_fbo);
+	void apply_bloom (OpenglRenderer& r, FramebufferTexture& main_fbo);
 };
 
 }

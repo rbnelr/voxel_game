@@ -33,7 +33,8 @@ namespace gl {
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
-		if (!rt_forward) rt_forward = r.shaders.compile("rt_forward", get_forward_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(), {{ VERTEX_SHADER }, { FRAGMENT_SHADER }});
+		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
 
 		//
 
@@ -41,8 +42,12 @@ namespace gl {
 			enable = !enable;
 
 		if (macro_change && rt_forward) {
-			rt_forward->macros = get_forward_macros();
+			rt_forward->macros = get_macros();
 			rt_forward->recompile("macro_change", false);
+		}
+		if (macro_change && rt_lighting) {
+			rt_lighting->macros = get_macros();
+			rt_lighting->recompile("macro_change", false);
 		}
 		macro_change = false;
 
@@ -128,14 +133,13 @@ namespace gl {
 			if (!chunks.empty()) {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
+				OGL_TIMER_ZONE(timer_df_init.timer);
 
 				int count = (int)chunks.size();
 
 				glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8I);
 
 				{
-					OGL_TIMER_ZONE(timer_df_init.timer);
-
 					glUseProgram(df_tex.shad_init->prog);
 
 					r.state.bind_textures(df_tex.shad_init, {
@@ -189,6 +193,38 @@ namespace gl {
 		}
 	}
 
+	void Raytracer::set_uniforms (OpenglRenderer& r, Game& game, Shader* shad) {
+		shad->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
+
+		shad->set_uniform("framebuf_size", r.framebuffer.size);
+		shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
+
+		float near_px_size;
+		{
+			// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
+			float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
+			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.framebuffer.size),0,1); // pixel one to the up/right in cam space
+			near_px_size = b.x - a.x;
+		}
+		shad->set_uniform("near_px_size", near_px_size);
+
+		shad->set_uniform("max_iterations", max_iterations);
+
+		shad->set_uniform("visualize_mult", visualize_mult);
+
+		shad->set_uniform("show_light", lighting.show_light);
+		shad->set_uniform("show_normals", lighting.show_normals);
+
+		shad->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
+		shad->set_uniform("bounce_max_count", lighting.bounce_max_count);
+		shad->set_uniform("bounce_samples", lighting.bounce_samples);
+
+		shad->set_uniform("roughness", lighting.roughness);
+
+		shad->set_uniform("parallax_zstep",    lighting.parallax_zstep);
+		shad->set_uniform("parallax_max_step", lighting.parallax_max_step);
+		shad->set_uniform("parallax_scale",    lighting.parallax_scale);
+	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 		if (!rt_forward->prog) return;
@@ -196,44 +232,58 @@ namespace gl {
 		// TAA
 		if (taa.enable)
 			taa.resize(r.framebuffer.size);
+		gbuf.resize(r.framebuffer.size);
 
-		// forward pass
-		{
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+
+		OGL_TIMER_ZONE(timer_rt_total.timer);
+
+		{ // forward pass
 			ZoneScopedN("rt_forward");
 			OGL_TRACE("rt_forward");
-			OGL_TIMER_ZONE(timer_rt.timer);
+			OGL_TIMER_ZONE(timer_rt_forward.timer);
 
 			glUseProgram(rt_forward->prog);
 
-			rt_forward->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
+			PipelineState s;
+			s.blend_enable = false;
+			s.depth_test = false;
+			s.depth_write = true;
+			r.state.set_no_override(s);
 
-			rt_forward->set_uniform("framebuf_size", r.framebuffer.size);
-			rt_forward->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
+			set_uniforms(r, game, rt_forward);
 
-			float near_px_size;
-			{
-				// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
-				float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
-				float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.framebuffer.size),0,1); // pixel one to the up/right in cam space
-				near_px_size = b.x - a.x;
-			}
-			rt_forward->set_uniform("near_px_size", near_px_size);
+			r.state.bind_textures(rt_forward, {
+				{"voxel_tex", voxel_tex.tex},
+				{"df_tex", df_tex.tex},
 
-			rt_forward->set_uniform("max_iterations", max_iterations);
+				{"tile_textures", r.tile_textures, r.tile_sampler},
 
-			rt_forward->set_uniform("visualize_mult", visualize_mult);
+				{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
+				{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
 
-			rt_forward->set_uniform("show_light", lighting.show_light);
-			rt_forward->set_uniform("show_normals", lighting.show_normals);
+				{"heat_gradient", r.gradient, r.normal_sampler},
+			});
 
-			rt_forward->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
-			rt_forward->set_uniform("bounce_max_count", lighting.bounce_max_count);
+			glBindVertexArray(r.dummy_vao);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
 
-			rt_forward->set_uniform("roughness", lighting.roughness);
+		{
+			glClear(GL_DEPTH_BUFFER_BIT);
+			test_renderer.draw(r);
+		}
 
-			rt_forward->set_uniform("parallax_zstep",    lighting.parallax_zstep);
-			rt_forward->set_uniform("parallax_max_step", lighting.parallax_max_step);
-			rt_forward->set_uniform("parallax_scale",    lighting.parallax_scale);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		{ // lighting pass
+			ZoneScopedN("rt_lighting");
+			OGL_TRACE("rt_lighting");
+			OGL_TIMER_ZONE(timer_rt_lighting.timer);
+
+			glUseProgram(rt_lighting->prog);
+
+			set_uniforms(r, game, rt_lighting);
 
 			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
@@ -254,13 +304,14 @@ namespace gl {
 				taa.cur ^= 1;
 			}
 
-			r.state.bind_textures(rt_forward, {
+			r.state.bind_textures(rt_lighting, {
 				{"voxel_tex", voxel_tex.tex},
 				{"df_tex", df_tex.tex},
 
-				//{"gbuf_pos" , gbuf.pos },
-				//{"gbuf_col" , gbuf.col },
-				//{"gbuf_norm", gbuf.norm},
+				{"gbuf_depth", gbuf.depth, gbuf.sampler},
+				{"gbuf_pos" ,  gbuf.pos, gbuf.sampler},
+				{"gbuf_col" ,  gbuf.col, gbuf.sampler},
+				{"gbuf_norm",  gbuf.norm, gbuf.sampler},
 
 				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
 				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
@@ -280,13 +331,6 @@ namespace gl {
 			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 		}
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-
-		//{
-		//	glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
-		//	glClear(GL_DEPTH_BUFFER_BIT);
-		//
-		//	test_renderer.draw(r);
-		//}
 
 		// unbind
 		glBindImageTexture(0, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);

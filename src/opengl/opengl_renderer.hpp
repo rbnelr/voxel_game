@@ -143,8 +143,6 @@ struct PlayerRenderer {
 	Shader*			held_block_shad;
 	Shader*			held_item_shad;
 
-	Vao				dummy_vao = {"dummy_vao"};
-
 	PlayerRenderer (Shaders& shaders) {
 		held_block_shad    = shaders.compile("held_block");
 		held_item_shad     = shaders.compile("held_item");
@@ -167,12 +165,14 @@ public:
 
 	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
+	Vao				dummy_vao = {"dummy_vao"};
+
 	StateManager	state;
 	Shaders			shaders;
 
 	CommonUniforms	common_uniforms;
 
-	Framebuffer		framebuffer;
+	FramebufferTexture		framebuffer;
 	bool			trigger_screenshot = false;
 	bool			screenshot_hud = false;
 

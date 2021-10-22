@@ -28,13 +28,13 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-	layout(location = 0) out vec4 frag_pos;
-	layout(location = 1) out vec4 frag_col;
-	layout(location = 2) out vec4 frag_norm;
+	layout(location=0) out vec4 frag_pos;
+	layout(location=1) out vec4 frag_col;
+	layout(location=2) out vec3 frag_norm;
 	
 	void main () {
 		frag_pos = vec4(vs.pos + float(WORLD_SIZE)/2.0, 0.0);
 		frag_col = vec4(0.9,0.9,0.9, 0.0);
-		frag_norm = vec4(normalize(vs.norm), 0.0);
+		frag_norm = normalize(vs.norm);
 	}
 #endif

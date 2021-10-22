@@ -1,4 +1,5 @@
 
+#define DEBUGDRAW 1
 #include "common.glsl"
 
 #if DEBUGDRAW
@@ -8,7 +9,9 @@
 #include "gpu_voxels.glsl"
 #include "rand.glsl"
 
-vec3 generate_tangent (vec3 normal) { // NOTE: tangents currently do not correspond with texture uvs, normal mapping will be wrong
+// Generate arbitrary tangent space
+// only use for random sampling, since there's a discontinuity
+vec3 generate_tangent (vec3 normal) {
 	vec3 tangent = vec3(0,0,1);
 	if (abs(normal.z) > 0.8) return vec3(1,0,0);
 	return tangent;
@@ -210,6 +213,34 @@ float noise(vec3 p){
 	return val * 2.0 - 1.0;
 }
 
+// Instead of executing work groups in a simple row major order
+// reorder them into columns of width N (by returning a different 2d index)
+// in each column the work groups are still row major order
+// replicates this: https://developer.nvidia.com/blog/optimizing-compute-shaders-for-l2-locality-using-thread-group-id-swizzling/
+uvec2 work_group_tiling (uint N) {
+	#if 0
+	return gl_WorkGroupID.xy;
+	#else
+	uint idx = gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x;
+	
+	uint column_size       = gl_NumWorkGroups.y * N;
+	uint full_column_count = gl_NumWorkGroups.x / N;
+	uint last_column_width = gl_NumWorkGroups.x % N;
+	
+	uint column_idx = idx / column_size;
+	uint idx_in_column = idx % column_size;
+	
+	uint column_width = N;
+	if (column_idx == full_column_count)
+		column_width = last_column_width;
+	
+	uvec2 wg_swizzled;
+	wg_swizzled.y = idx_in_column / column_width;
+	wg_swizzled.x = idx_in_column % column_width + column_idx * N;
+	return wg_swizzled;
+	#endif
+}
+
 // get pixel ray in world space based on pixel coord and matricies
 uniform float near_px_size;
 
@@ -217,8 +248,6 @@ float near_plane_dist;
 float ray_r_per_dist;
 
 bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
-	
-#if 1 // Normal camera projection
 	//vec2 px_center = px_pos + rand2();
 	vec2 px_center = px_pos + vec2(0.5);
 	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
@@ -243,38 +272,6 @@ bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	ray_pos += float(WORLD_SIZE/2);
 	
 	return true;
-
-#else // 360 Sphere Projections
-	
-	vec2 px_center = (px_pos + vec2(0.5)) / view.viewport_size; // [0,1]
-	
-	#if 0 // Equirectangular projection
-		float lon = (px_center.x - 0.5) * PI*2;
-		float lat = (px_center.y - 0.5) * PI;
-	#else // Mollweide projection
-		float x = px_center.x * 2.0 - 1.0;
-		float y = px_center.y * 2.0 - 1.0;
-		
-		if ((x*x + y*y) > 1.0)
-			return false;
-		
-		float theta = asin(y);
-		
-		float lon = (PI * x) / cos(theta);
-		float lat = asin((2.0 * theta + sin(2.0 * theta)) / PI);
-	#endif
-	
-	float c = cos(lat);
-	vec3 dir_cam = vec3(c * sin(lon), sin(lat), -c * cos(lon));
-	
-	ray_dir = (view.cam_to_world * vec4(dir_cam, 0)).xyz;
-	ray_pos = (view.cam_to_world * vec4(0,0,0,1)).xyz;
-	
-	// make relative to gpu world representation (could bake into matrix)
-	ray_pos += float(WORLD_SIZE/2);
-
-	return true;
-#endif
 }
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
@@ -386,13 +383,14 @@ struct Hit {
 	vec3	pos;
 	float	dist;
 	vec3	normal; // normal mapped normal
-	mat3	gTBN; // non-normal mapped real geometry (uv-compatible) TBN
+	vec3	gnormal; // non-normal mapped real geometry (uv-compatible) TBN
 	
 	ivec3	coord;
 	uint	bid;
 	
 	vec4	col;
 	vec3	emiss;
+	float	emiss_raw;
 };
 
 bool _dbgdraw = false;
@@ -488,7 +486,8 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 }
 #endif
 
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit, vec3 raycol) {
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit,
+		vec3 raycol, bool primray) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
 	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_sign);
@@ -586,6 +585,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			float t1 = min(min(t1v.x, t1v.y), t1v.z);
 			
 			if (dfi < 0) {
+				if (!primray) break;
 			#if BEVEL
 				float ray_r = (dist + base_dist) * ray_r_per_dist;
 				if (box_bevel(ray_pos, ray_dir, coord, ray_r, dist, t1, bevel_normal))
@@ -636,36 +636,37 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			vec3 offs = rel - 0.5;
 			vec3 abs_offs = abs(offs);
 			
-			hit.normal = vec3(0.0);
+			hit.gnormal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				face = rel.x < 0.5 ? 0 : 1;
 				
-				hit.normal.x = sign(offs.x);
+				hit.gnormal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
 				
 				uv = offs.x < 0.0 ? vec2(1.0-rel.y, rel.z) : vec2(rel.y, rel.z);
 			} else if (abs_offs.y >= abs_offs.z) {
 				face = rel.y < 0.5 ? 2 : 3;
 				
-				hit.normal.y = sign(offs.y);
+				hit.gnormal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
 				
 				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
 			} else {
 				face = rel.z < 0.5 ? 4 : 5;
 				
-				hit.normal.z = sign(offs.z);
+				hit.gnormal.z = sign(offs.z);
 				tang.x = +1;
 				
 				uv = offs.z < 0.0 ? vec2(rel.x, 1.0-rel.y) : vec2(rel.x, rel.y);
 			}
 			
 			bool was_bevel = dot(bevel_normal, bevel_normal) != 0.0;
-			if (was_bevel) hit.normal = bevel_normal;
+			if (was_bevel) hit.gnormal = bevel_normal;
 			
-			hit.gTBN = calc_TBN(hit.normal, tang);
+			hit.normal = hit.gnormal;
+			mat3 gTBN = calc_TBN(hit.gnormal, tang);
 			
 		#if NORMAL_MAPPING
 			if (!was_bevel) { // normal mapping
@@ -678,8 +679,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 				//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
 				hit.normal = hit.gTBN * normalize(sampl);
 			}
-		#else
-			hit.normal = hit.gTBN[2];
 		#endif
 		}
 		
@@ -696,7 +695,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		
 		//hit.col = vec4(vec3(dist / 20.0), 1);
 		
-		hit.emiss = hit.col.rgb * get_emmisive(tex_bid);
+		hit.emiss_raw = get_emmisive(tex_bid);
+		hit.emiss = hit.col.rgb * hit.emiss_raw;
 	}
 	
 	return true; // hit

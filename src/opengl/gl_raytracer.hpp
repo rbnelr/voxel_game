@@ -16,8 +16,8 @@ namespace gl {
 		Shader*		shad;
 		IndexedMesh	mesh;
 
-		float3 pos = float3(-18.3f,0,40);
-		float2 rot = float3(deg(-90),0,0);
+		float3 pos = float3(-42,83,-101);
+		float2 rot = float3(0,0,0);
 		float size = 5;
 
 		TestRenderer (Shaders& shaders) {
@@ -60,15 +60,15 @@ namespace gl {
 	struct TemporalAA {
 		SERIALIZE(TemporalAA, enable, max_age)
 
-		GLuint colors[2] = {};
-		GLuint posage[2] = {};
+		Texture2D colors[2] = {};
+		Texture2D posage[2] = {};
 		int2   size = 0;
 		int    cur = 0;
 
 		float4x4 prev_world2clip = (float4x4)translate(float3(NAN)); // make prev matrix invalid on first frame
 
-		Sampler sampler = {"sampler"};
-		Sampler sampler_int = {"sampler_int"};
+		Sampler sampler = {"TAA.sampler"};
+		Sampler sampler_int = {"TAA.sampler_int"};
 
 		bool enable = true;
 		int max_age = 16;
@@ -89,35 +89,25 @@ namespace gl {
 			if (colors[0] == 0 || size != new_size) {
 				glActiveTexture(GL_TEXTURE0);
 
-				if (colors[0]) { // delete old
-					glDeleteTextures(2, colors);
-					glDeleteTextures(2, posage);
-				}
-
 				size = new_size;
 
 				// create new (textures created with glTexStorage2D cannot be resized)
-				glGenTextures(2, colors);
-				glGenTextures(2, posage);
+				colors[0] = {"RT.taa_color0"};
+				colors[1] = {"RT.taa_color1"};
+				posage[0] = {"RT.taa_posage0"};
+				posage[1] = {"RT.taa_posage1"};
 
 				for (auto& buf : colors) {
-					glBindTexture(GL_TEXTURE_2D, buf); // opengl requires this after glGenTextures
 					glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
 					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
 					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
 				}
 
 				for (auto& buf : posage) {
-					glBindTexture(GL_TEXTURE_2D, buf);
 					glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
 					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
 					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
 				}
-
-				OGL_DBG_LABEL(GL_TEXTURE, colors[0], "RT.taa_color0");
-				OGL_DBG_LABEL(GL_TEXTURE, colors[1], "RT.taa_color1");
-				OGL_DBG_LABEL(GL_TEXTURE, posage[0], "RT.taa_posage0");
-				OGL_DBG_LABEL(GL_TEXTURE, posage[1], "RT.taa_posage1");
 
 				// clear textures to be read on first frame
 				float3 col = float3(0,0,0);
@@ -127,8 +117,69 @@ namespace gl {
 				glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
 
 				cur = 1;
+			}
+		}
+	};
 
-				glBindTexture(GL_TEXTURE_2D, 0);
+	struct Gbuffer {
+		Fbo fbo = {};
+
+		Texture2D depth = {};
+		Texture2D pos = {};
+		Texture2D col = {};
+		Texture2D norm = {};
+
+		int2 size = -1;
+
+		Sampler sampler = {"Gbuf.sampler"};
+
+		Gbuffer () {
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+
+		void resize (int2 new_size) {
+			if (fbo == 0 || size != new_size) {
+				glActiveTexture(GL_TEXTURE0);
+
+				size = new_size;
+
+				depth = {"Gbuf.depth"};
+				pos   = {"Gbuf.pos"  };
+				col   = {"Gbuf.col"  };
+				norm  = {"Gbuf.norm" };
+				fbo   = {"Gbuf.fbo"  };
+
+				glTextureStorage2D(depth, 1, GL_DEPTH_COMPONENT32F, size.x, size.y);
+				glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glTextureStorage2D(pos, 1, GL_RGBA32F, size.x, size.y);
+				glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glTextureStorage2D(col, 1, GL_RGBA16F, size.x, size.y);
+				glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
+				glTextureParameteri(norm, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(norm, GL_TEXTURE_MAX_LEVEL, 0);
+
+				glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, depth, 0);
+				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, pos, 0);
+				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT1, col, 0);
+				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT2, norm, 0);
+
+				GLuint bufs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+				glNamedFramebufferDrawBuffers(fbo, 3, bufs);
+
+				//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+				//if (status != GL_FRAMEBUFFER_COMPLETE) {
+				//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+				//}
 			}
 		}
 	};
@@ -183,6 +234,7 @@ namespace gl {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
 		Shader* rt_forward = nullptr;
+		Shader* rt_lighting = nullptr;
 		
 		VoxelTexture voxel_tex;
 		DFTexture df_tex;
@@ -190,13 +242,16 @@ namespace gl {
 		TestRenderer test_renderer;
 
 		TemporalAA taa;
+		Gbuffer gbuf;
 
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
-		OGL_TIMER_HISTOGRAM(rt);
+		OGL_TIMER_HISTOGRAM(rt_total);
+		OGL_TIMER_HISTOGRAM(rt_forward);
+		OGL_TIMER_HISTOGRAM(rt_lighting);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_forward_macros () {
+		std::vector<gl::MacroDefinition> get_macros () {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
@@ -264,7 +319,7 @@ namespace gl {
 		float visualize_mult = 1;
 
 		struct Lighting {
-			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, roughness)
+			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, bounce_samples, roughness)
 
 			bool show_light = false;
 			bool show_normals = false;
@@ -272,10 +327,11 @@ namespace gl {
 			bool bounce_enable = true;
 			float bounce_max_dist = 90.0f;
 			int bounce_max_count = 4;
+			int bounce_samples = 1;
 
 			float roughness = 0.8f;
 
-			bool normal_map = true;
+			bool normal_map = false;
 			bool bevel = true;
 
 			//
@@ -291,7 +347,8 @@ namespace gl {
 
 				macro_change |= ImGui::Checkbox("bounce_enable", &bounce_enable);
 				ImGui::DragFloat("bounce_max_dist", &bounce_max_dist, 0.1f, 0, 256);
-				ImGui::DragInt("bounce_max_count", &bounce_max_count, 0.1f, 0, 16);
+				ImGui::SliderInt("bounce_max_count", &bounce_max_count, 0, 16);
+				ImGui::SliderInt("bounce_samples", &bounce_samples, 1, 16);
 
 				ImGui::SliderFloat("roughness", &roughness, 0,1);
 
@@ -310,7 +367,9 @@ namespace gl {
 		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-			OGL_TIMER_HISTOGRAM_UPDATE(rt, I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_total   , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_forward , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_lighting, I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
 
 			ImGui::Checkbox("enable [R]", &enable);
@@ -347,6 +406,7 @@ namespace gl {
 		// update things and upload changes to gpu
 		void update (OpenglRenderer& r, Game& game, Input& I);
 
+		void set_uniforms (OpenglRenderer& r, Game& game, Shader* shad);
 		void draw (OpenglRenderer& r, Game& game);
 	};
 

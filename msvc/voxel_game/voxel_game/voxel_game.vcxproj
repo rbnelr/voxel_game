@@ -234,7 +234,6 @@
     <ClInclude Include="..\..\..\src\kisslib\threadsafe_queue.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\timer.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
     <ClInclude Include="..\..\..\src\opengl\bloom.hpp" />

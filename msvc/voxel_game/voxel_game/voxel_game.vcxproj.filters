@@ -148,9 +148,6 @@
     <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp">
       <Filter>kisslib\tracy</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyC.h">
-      <Filter>kisslib\tracy</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
       <Filter>kisslib\tracy</Filter>
     </ClInclude>

@@ -436,7 +436,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 
 			glUniform1fv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
 
-			glBindVertexArray(dummy_vao);
+			glBindVertexArray(r.dummy_vao);
 			glDrawArrays(GL_TRIANGLES, 0, count*6);
 		} else {
 			glUseProgram(held_item_shad->prog);
