@@ -232,6 +232,7 @@ namespace gl {
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
+		Shader* rt_forward_frag = nullptr;
 		Shader* rt_forward = nullptr;
 		Shader* rt_lighting = nullptr;
 		Shader* rt_post = nullptr;
@@ -252,7 +253,7 @@ namespace gl {
 		OGL_TIMER_HISTOGRAM(rt_post);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_macros (bool enable_taa) {
+		std::vector<gl::MacroDefinition> get_macros (bool enable_taa, bool frag=false) {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
@@ -261,7 +262,8 @@ namespace gl {
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
+			         {"VISUALIZE_TIME", visualize_time ? "1":"0"},
+			         {"FRAGMENT", frag ? "1":"0"}
 			};
 		}
 
@@ -368,6 +370,9 @@ namespace gl {
 			}
 		} lighting;
 
+
+		bool test = false;
+
 		bool macro_change = false; // shader macro change
 		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -377,6 +382,8 @@ namespace gl {
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_lighting, I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_post    , I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
+
+			ImGui::Checkbox("test", &test);
 
 			ImGui::Checkbox("enable [R]", &enable);
 
