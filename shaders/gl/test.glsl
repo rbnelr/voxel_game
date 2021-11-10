@@ -33,8 +33,8 @@ layout(location = 0) vs2fs VS {
 	layout(location=2) out vec3 frag_norm;
 	
 	void main () {
-		frag_pos = vec4(vs.pos + float(WORLD_SIZE)/2.0, 0.0);
+		//frag_pos = vec4(vs.pos + float(WORLD_SIZE)/2.0, 0.0);
 		frag_col = vec4(0.9,0.9,0.9, 0.0);
-		frag_norm = normalize(vs.norm);
+		//frag_norm = normalize(vs.norm);
 	}
 #endif

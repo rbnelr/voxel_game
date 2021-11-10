@@ -243,7 +243,7 @@ namespace gl {
 		if (taa.enable) taa.resize(r.render_size);
 		gbuf.resize(r.render_size);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+		if (!test) glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
 
 		{ // 'forward' gbuf pass
 			
@@ -360,7 +360,7 @@ namespace gl {
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-		{ // post
+		if (!test) { // post
 			OGL_TIMER_ZONE(timer_rt_post.timer);
 			ZoneScopedN("rt_post");
 			OGL_TRACE("rt_post");

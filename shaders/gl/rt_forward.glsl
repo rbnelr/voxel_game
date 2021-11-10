@@ -25,9 +25,10 @@ layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
 #else
 #include "fullscreen_triangle.glsl"
 
-	layout(location=0) out vec4 frag_pos;
-	layout(location=1) out vec4 frag_col;
-	layout(location=2) out vec3 frag_norm;
+	//layout(location=0) out vec4 frag_pos;
+	//layout(location=1) out vec4 frag_col;
+	//layout(location=2) out vec3 frag_norm;
+	out vec4 frag_col;
 #endif
 
 #if defined(_FRAGMENT) || !FRAGMENT
@@ -75,13 +76,15 @@ void main () {
 	
 #if !FRAGMENT
 	//imageStore(gbuf_depth, pxpos, vec4(0.5, 0,0,0));
-	imageStore(gbuf_pos, pxpos, vec4(pos, 0.0));
-	imageStore(gbuf_col, pxpos, col);
-	imageStore(gbuf_pos, pxpos, vec4(norm, 0.0));
+	//imageStore(gbuf_pos , pxpos, vec4(pos, 0.0));
+	imageStore(gbuf_col , pxpos, col);
+	//imageStore(gbuf_norm, pxpos, vec4(norm, 0.0));
 #else
-		frag_pos = vec4(pos, 0.0);
-		frag_col = col;
-		frag_norm = norm;
+	//	frag_pos = vec4(pos, 0.0);
+	//	frag_col = col;
+	//	frag_norm = norm;
+	
+	frag_col = col;
 #endif
 }
 #endif

@@ -43,7 +43,7 @@ namespace gl {
 				glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
 
-				glTextureStorage2D(pos, 1, GL_RGBA32F, size.x, size.y);
+				glTextureStorage2D(pos, 1, GL_RGBA16F, size.x, size.y);
 				glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
 
