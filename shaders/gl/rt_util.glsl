@@ -26,68 +26,7 @@ mat3 generate_TBN (vec3 normal) {
 	return calc_TBN(normal, generate_tangent(normal));
 }
 
-//// Some raytracing primitives
-
-// The MIT License
-// Copyright © 2016 Inigo Quilez
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-float ray_capsule (in vec3 ro, in vec3 rd, in vec3 pa, in vec3 pb, in float r) {
-    vec3  ba = pb - pa;
-    vec3  oa = ro - pa;
-
-    float baba = dot(ba,ba);
-    float bard = dot(ba,rd);
-    float baoa = dot(ba,oa);
-    float rdoa = dot(rd,oa);
-    float oaoa = dot(oa,oa);
-
-    float a = baba      - bard*bard;
-    float b = baba*rdoa - baoa*bard;
-    float c = baba*oaoa - baoa*baoa - r*r*baba;
-    float h = b*b - a*c;
-    if (h >= 0.0) {
-        float t = (-b-sqrt(h))/a;
-        float y = baoa + t*bard;
-        // body
-        if(y > 0.0 && y < baba) return t;
-        // caps
-        vec3 oc = (y<=0.0) ? oa : ro - pb;
-        b = dot(rd,oc);
-        c = dot(oc,oc) - r*r;
-        h = b*b - c;
-        if (h > 0.0) return -b - sqrt(h);
-    }
-    return -1.0;
-}
-vec3 capsule_normal (in vec3 pos, in vec3 a, in vec3 b, in float r) {
-    vec3  ba = b - a;
-    vec3  pa = pos - a;
-    float h = clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);
-    return (pa - h*ba)/r;
-}
-
-float ray_sphere (in vec3 ro, in vec3 rd, in vec3 sph, in float r) {
-	vec3 oc = ro - sph;
-	float b = dot( oc, rd );
-	float c = dot( oc, oc ) - r*r;
-	float h = b*b - c;
-	if( h<0.0 ) return INF;
-	return -b - sqrt( h );
-}
-vec3 sphere_normal (in vec3 pos, in vec3 sph) {
-    return normalize(pos-sph.xyz);
-}
-
-void sphere (vec3 ray_pos, vec3 ray_dir, vec3 sph_pos, float sph_r, inout float cur_t, inout vec3 cur_pos) {
-	float t = ray_sphere(ray_pos, ray_dir, sph_pos, sph_r);
-	if (t >= cur_t) return;
-	
-	cur_t = t;
-	cur_pos = sph_pos;
-}
-
-
+//// 
 float fresnel (float dotVN, float F0) {
 	float x = clamp(1.0 - dotVN, 0.0, 1.0);
 	float x2 = x*x;
@@ -241,35 +180,24 @@ uvec2 work_group_tiling (uint N) {
 	#endif
 }
 
+bool _dbgdraw = false;
+
 // get pixel ray in world space based on pixel coord and matricies
 uniform float near_px_size;
 
-float near_plane_dist;
-float ray_r_per_dist;
-
-bool get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
+void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	//vec2 px_center = px_pos + rand2();
 	vec2 px_center = px_pos + vec2(0.5);
-	vec2 ndc = px_center / view.viewport_size * 2.0 - 1.0;
 	
-	vec4 clip = vec4(ndc, -1, 1) * view.clip_near; // ndc = clip / clip.w;
+	vec2 uv = px_center / view.viewport_size * 2.0 - 1.0;
 	
-	vec3 cam = (view.clip_to_cam * clip).xyz;
+	ray_dir = view.frust_x*uv.x + view.frust_y*uv.y + view.frust_z;
+	ray_pos = view.cam_pos + ray_dir;
 	
-	ray_dir = (view.cam_to_world * vec4(cam, 0)).xyz;
-	
-	near_plane_dist = length(ray_dir);
 	ray_dir = normalize(ray_dir);
-	
-	ray_r_per_dist = near_px_size * (view.clip_near / near_plane_dist);
-	
-	// ray starts on the near plane
-	ray_pos = (view.cam_to_world * vec4(cam, 1)).xyz;
 	
 	// make relative to gpu world representation (could bake into matrix)
 	ray_pos += float(WORLD_SIZE/2);
-	
-	return true;
 }
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
@@ -391,8 +319,6 @@ struct Hit {
 	float	emiss_raw;
 };
 
-bool _dbgdraw = false;
-
 uniform sampler2DArray test_cubeN;
 uniform sampler2DArray test_cubeH;
 
@@ -418,19 +344,8 @@ void plane_intersect (inout float t0, inout float t1, inout vec3 bevel_normal,
 	}
 	if (dnorm > 0.0) t1 = min(t1, t);
 }
-bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
+bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 		inout float t0, in float t1, inout vec3 bevel_normal) {
-	
-	#if 0
-	const float lod0 = 0.07;
-	const float lod1 = 0.004;
-	
-	float lod = (ray_r - lod0) / (lod1 - lod0);
-	if (lod <= 0.0) return true;
-	lod = min(lod, 1.0);
-	#else
-	float lod = 1.0;
-	#endif
 	
 	vec3 origin = vec3(coord) + 0.5;
 	vec3 rel = origin - ray_pos;
@@ -465,8 +380,8 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 	vec3 edgeZn = normalize(s * vec3(1,1,rot));
 	vec3 cornern = normalize(s);
 	
-	float szcorner = HALF_SQRT_3 - lod * corn;
-	float szedge   = HALF_SQRT_2 - lod * 0.07;
+	float szcorner = HALF_SQRT_3 - corn;
+	float szedge   = HALF_SQRT_2 - 0.07;
 	
 	if (corn > -1.0)  plane_intersect(t0,t1, bevel_normal, rel, ray_dir, cornern, szcorner);
 	if (v010 && v001) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeXn, szedge);
@@ -481,7 +396,7 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord, float ray_r,
 }
 #endif
 
-bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out Hit hit,
+bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
@@ -582,8 +497,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			if (dfi < 0) {
 				if (!primray) break;
 			#if BEVEL
-				float ray_r = (dist + base_dist) * ray_r_per_dist;
-				if (box_bevel(ray_pos, ray_dir, coord, ray_r, dist, t1, bevel_normal))
+				if (box_bevel(ray_pos, ray_dir, coord, dist, t1, bevel_normal))
 			#endif
 					break; // hit
 			}
@@ -603,7 +517,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 	}
 	
 	#if DEBUGDRAW
-	if (_dbgdraw && !primray)
+	if (_dbgdraw)
 		dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
 	#endif
 	
@@ -616,14 +530,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		hit.coord = coord;
-
-		
-		// width the ray would be at this hit point if it was a cone covering the pixel it tries to render
-		float ray_r = (dist + base_dist) * ray_r_per_dist;
-		
-		float texlod  = log2(ray_r * float(textureSize(tile_textures, 0).x));
-		float texlodN = log2(ray_r * float(textureSize(test_cubeN   , 0).x));
-		
 		
 		vec2 uv;
 		int face;
@@ -668,7 +574,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 			if (!was_bevel) { // normal mapping
 				const float normal_map_stren = 1.0;
 				
-				vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), texlodN).rgb;
+				vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), 0.0).rgb;
 				sampl = sampl * 2.0 - 1.0;
 				sampl.xy *= normal_map_stren;
 				
@@ -687,7 +593,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, float base_dist, out
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
 		
-		hit.col = textureLod(tile_textures, vec3(uv, texid), texlod).rgba;
+		hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		
 		//hit.col = vec4(vec3(dist / 20.0), 1);
 		

@@ -33,11 +33,16 @@ struct ViewUniforms {
 
 	float    clip_near;
 	float    clip_far;
+
 	float2   viewport_size;
 
-	void set (Camera_View const& view) {
-		memset(this, 0, sizeof(*this)); // zero padding
+	// for simpler RT get_ray calculation float4 for padding
+	float4   frust_x;
+	float4   frust_y;
+	float4   frust_z;
+	float4   cam_pos; // cam position
 
+	void set (Camera_View const& view, float2 const& render_size) {
 		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
 		world_to_cam = (float4x4)view.world_to_cam;
 		cam_to_clip = view.cam_to_clip;
@@ -48,6 +53,22 @@ struct ViewUniforms {
 
 		clip_near = view.clip_near;
 		clip_far = view.clip_far;
+
+		viewport_size = render_size;
+
+		{
+			float3 cam_x   = (float3)cam_to_world.arr[0];
+			float3 cam_y   = (float3)cam_to_world.arr[1];
+			float3 cam_z   = (float3)cam_to_world.arr[2];
+			float3 cam_pos = (float3)view.cam_to_world.arr[3];
+
+			float2 frustrum_size = (float2)(view.clip_to_cam * (float4(1,1,-1,1) * view.clip_near));
+
+			this->frust_x = float4(cam_x * frustrum_size.x, 0);
+			this->frust_y = float4(cam_y * frustrum_size.y, 0);
+			this->frust_z = float4(-cam_z * view.clip_near, 0);
+			this->cam_pos = float4(cam_pos, 0);
+		}
 	}
 };
 struct CommonUniforms {

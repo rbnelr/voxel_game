@@ -67,8 +67,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		OGL_TRACE("3d draws");
 		{
 			memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
-			common_uniforms.view.set(game.view);
-			common_uniforms.view.viewport_size = (float2)render_size;
+			common_uniforms.view.set(game.view, (float2)render_size);
 			upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
 ;
 			glViewport(0,0, render_size.x, render_size.y);

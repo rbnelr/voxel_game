@@ -32,12 +32,12 @@ void main () {
 	#endif
 	
 	vec3 ray_pos, ray_dir;
-	bool bray = get_ray(vec2(pxpos), ray_pos, ray_dir);
+	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	vec4 col = vec4(0,0,0,1);
 	
 	Hit hit;
-	if (bray && trace_ray(ray_pos, ray_dir, INF, near_plane_dist, hit, vec3(1,0,0),true)) {
+	if (trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0),true)) {
 		
 		col = vec4(hit.col.rgb, hit.emiss_raw);
 		if (show_normals) col.rgb = hit.normal * 0.5 + 0.5;

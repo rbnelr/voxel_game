@@ -51,8 +51,15 @@ struct View {
 	float clip_near;
 	// far clip plane distance (positive)
 	float clip_far;
+	
 	// viewport size in pixels
 	vec2 viewport_size;
+	
+	// for simpler RT get_ray calculation
+	vec3 frust_x;
+	vec3 frust_y;
+	vec3 frust_z;
+	vec3 cam_pos;
 	
 	vec2 cursor_pos; // mostly for debugging
 };

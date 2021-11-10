@@ -214,8 +214,8 @@ namespace gl {
 		{ // 'forward' gbuf pass
 			
 			{ // forward voxel raycast pass
-				ZoneScopedN("rt_forward");
-				OGL_TRACE("rt_forward");
+				ZoneScopedN("rt_shad");
+				OGL_TRACE("rt_shad");
 				OGL_TIMER_ZONE(timer_rt_shad.timer);
 		
 				glUseProgram(rt_shad->prog);

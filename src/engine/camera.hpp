@@ -27,6 +27,8 @@ struct Camera_View {
 	// far clip plane distance (positive)
 	float		clip_far;
 
+	float2		frustrum_size;
+
 	View_Frustrum frustrum;
 
 	void calc_frustrum();
