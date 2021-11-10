@@ -618,9 +618,9 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		
 		float texid = float(block_tiles[tex_bid].sides[face]);
 		
-		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		
+		hit.col = texelFetch(vct_texPZ, coord, 0) * VCT_UNPACK;
 		//hit.col = vec4(vec3(dist / 100.0), 1);
 		
 		hit.emiss_raw = get_emmisive(tex_bid);

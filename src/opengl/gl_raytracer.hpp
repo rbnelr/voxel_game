@@ -277,6 +277,107 @@ namespace gl {
 		}
 	};
 
+	struct VCT_Data {
+		static constexpr int TEX_WIDTH = GPU_WORLD_SIZE;
+		static constexpr size_t _size = (sizeof(uint8_t)*4 * TEX_WIDTH*TEX_WIDTH*TEX_WIDTH) / MB;
+
+		static constexpr int COMPUTE_FILTER_LOCAL_SIZE = 4;
+
+		static constexpr int MIPS = get_const_log2((uint32_t)TEX_WIDTH)+1;
+
+		// how many octree layers to filter per uploaded chunk (rest are done for whole world)
+		// only compute mips per chunk until dipatch size is 4^3, to not waste dispatches for workgroups with only 1 or 2 active threads
+		static constexpr int FILTER_CHUNK_MIPS = get_const_log2((uint32_t)(CHUNK_SIZE/2 / 4))+1;
+
+		// Require glTextureView to allow compute shader to write into srgb texture via imageStore
+		struct VctTexture {
+			Texture3D tex;
+
+			// texview to allow binding GL_SRGB8_ALPHA8 as GL_RGBA8UI in compute shader (imageStore does not support srgb)
+			// this way at least I can manually do the srgb conversion before writing
+			GLuint texview;
+
+			VctTexture (std::string_view label, int mipmaps, int3 const& size, bool sparse=false): tex{label} {
+				if (sparse) {
+					glTextureParameteri(tex, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
+					glTextureParameteri(tex, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
+				}
+				glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, size.x,size.y,size.z);
+				glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
+
+				lrgba col = srgba(0,0,0,0);
+				glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
+
+				glGenTextures(1, &texview);
+				glTextureView(texview, GL_TEXTURE_3D, tex, GL_RGBA8UI, 0,mipmaps, 0,1);
+
+				OGL_DBG_LABEL(GL_TEXTURE, texview, label + ".texview");
+			}
+			~VctTexture () {
+				glDeleteTextures(1, &texview);
+			}
+		}; 
+
+		VctTexture textures[6] = {
+			{"VCT.texNX", MIPS, TEX_WIDTH},
+			{"VCT.texPX", MIPS, TEX_WIDTH},
+			{"VCT.texNY", MIPS, TEX_WIDTH},
+			{"VCT.texPY", MIPS, TEX_WIDTH},
+			{"VCT.texNZ", MIPS, TEX_WIDTH},
+			{"VCT.texPZ", MIPS, TEX_WIDTH},
+		};
+
+		Sampler sampler = {"sampler"};
+		Sampler filter_sampler = {"filter_sampler"};
+
+		Shader* filter_mip0;
+		Shader* filter;
+
+		int3 sparse_size;
+		array3D<bool> sparse_page_state;
+
+		int3 get_sparse_texture3d_config (GLenum texel_format) {
+			int3 res;
+			glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_X_ARB, 1, &res.x);
+			glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_Y_ARB, 1, &res.y);
+			glGetInternalformativ(GL_TEXTURE_3D, texel_format, GL_VIRTUAL_PAGE_SIZE_Z_ARB, 1, &res.z);
+			return res;
+		}
+
+		VCT_Data (Shaders& shaders) {
+			filter_mip0  = shaders.compile("vct_filter", {{"MIP0","1"}}, {COMPUTE_SHADER});
+			filter       = shaders.compile("vct_filter", {{"MIP0","0"}}, {COMPUTE_SHADER});
+
+			lrgba color = lrgba(0,0,0,0);
+
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // GL_LINEAR_MIPMAP_NEAREST
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
+
+			glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(filter_sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+			sparse_size = get_sparse_texture3d_config(GL_SRGB8_ALPHA8);
+
+			sparse_page_state.resize(int3(GPU_WORLD_SIZE) / sparse_size);
+			sparse_page_state.clear(true);
+
+			assert(GLAD_GL_ARB_sparse_texture && // for sparse texture support
+				GLAD_GL_ARB_sparse_texture2); // for relying on decommitted texture regions reading as zero
+											  //	assert(GLAD_GL_NV_memory_object_sparse);
+		}
+
+		void visualize_sparse (OpenglRenderer& r);
+		void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
+	};
+
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
@@ -285,6 +386,7 @@ namespace gl {
 		
 		VoxelTexture voxel_tex;
 		DFTexture df_tex;
+		VCT_Data vct_data;
 
 		//TestRenderer test_renderer;
 
@@ -311,7 +413,7 @@ namespace gl {
 			};
 		}
 
-		Raytracer (Shaders& shaders): df_tex(shaders) {
+		Raytracer (Shaders& shaders): df_tex(shaders), vct_data(shaders) {
 			#if 0
 				int max_sparse_texture_size;
 				int max_sparse_3d_texture_size;
