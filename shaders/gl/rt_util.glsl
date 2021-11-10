@@ -398,6 +398,8 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
+	max_dist = 100.0;
+	
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
 	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_sign);
@@ -421,11 +423,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		// calculate entry and exit coords into whole world cube
 		vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
 		vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
-		float t0 = max(max(t0v.x, t0v.y), t0v.z);
-		float t1 = min(min(t1v.x, t1v.y), t1v.z);
-		
-		t0 = max(t0, 0.0);
-		t1 = max(t1, 0.0);
+		float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
+		float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
 		
 		// ray misses world texture
 		if (t1 <= t0)
@@ -447,6 +446,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	vec3 bevel_normal = vec3(0.0);
 	
+#if 0
 	for (;;) {
 		VISUALIZE_ITERATION
 		
@@ -495,9 +495,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			float t1 = min(min(t1v.x, t1v.y), t1v.z);
 			
 			if (dfi < 0) {
-				if (!primray) break;
 			#if BEVEL
-				if (box_bevel(ray_pos, ray_dir, coord, dist, t1, bevel_normal))
+				if (primray || box_bevel(ray_pos, ray_dir, coord, dist, t1, bevel_normal))
 			#endif
 					break; // hit
 			}
@@ -515,6 +514,33 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		if (iter >= max_iterations || dist >= max_dist)
 			break; // miss
 	}
+#else
+	vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+	vec3 tstep = inv_dir * mix(vec3(-1), vec3(+1), dir_sign);
+	
+	for (;;) {
+		VISUALIZE_ITERATION
+		
+		//#if DEBUGDRAW
+		//	if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+		//#endif
+		
+		int dfi = texelFetch(df_tex, coord, 0).r;
+		
+		if (dfi < 0)
+			break; // hit
+		
+		dist = min(min(t1v.x, t1v.y), t1v.z);
+		
+		if (dist >= max_dist)
+			break; // miss
+		
+		// step on axis where exit distance is lowest
+		if      (t1v.x == dist) { coord.x += step_dir.x; t1v.x += tstep.x; }
+		else if (t1v.y == dist) { coord.y += step_dir.y; t1v.y += tstep.y; }
+		else                    { coord.z += step_dir.z; t1v.z += tstep.z; }
+	}
+#endif
 	
 	#if DEBUGDRAW
 	if (_dbgdraw)
@@ -595,7 +621,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		
-		//hit.col = vec4(vec3(dist / 20.0), 1);
+		//hit.col = vec4(vec3(dist / 100.0), 1);
 		
 		hit.emiss_raw = get_emmisive(tex_bid);
 		hit.emiss = hit.col.rgb * hit.emiss_raw;
