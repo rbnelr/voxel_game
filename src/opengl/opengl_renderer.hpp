@@ -166,7 +166,6 @@ public:
 	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
 
 	int2			render_size;
-	Gbuffer			gbuf;
 
 	Vao				dummy_vao = {"dummy_vao"};
 
@@ -184,8 +183,6 @@ public:
 
 	BlockHighlight	block_highl		= BlockHighlight(shaders);
 	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
-
-	//Shader*			post_shad = shaders.compile("postprocess");
 
 	Ubo				common_uniforms_ubo = {"common_ubo"};
 

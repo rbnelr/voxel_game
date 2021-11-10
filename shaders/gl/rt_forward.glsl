@@ -13,10 +13,12 @@ layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 uniform int rand_seed_time = 0;
 uniform ivec2 framebuf_size;
 
-layout(rgba32f, binding = 0) writeonly restrict uniform image2D gbuf_depth;
-layout(rgba32f, binding = 1) writeonly restrict uniform image2D gbuf_pos;
-layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_col;
-layout(rgba16f, binding = 3) writeonly restrict uniform image2D gbuf_norm;
+uniform bool show_normals = false;
+
+//layout(rgba32f, binding = 0) writeonly restrict uniform image2D gbuf_depth;
+layout(rgba32f, binding = 0) writeonly restrict uniform image2D gbuf_pos;
+layout(rgba16f, binding = 1) writeonly restrict uniform image2D gbuf_col;
+layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
 
 void main () {
 	INIT_VISUALIZE_COST();
@@ -37,24 +39,26 @@ void main () {
 	
 	float depth = INF;
 	vec3 pos  = vec3(-100.0);
-	vec4 col  = vec4(1,0,0,1);
+	vec4 col  = vec4(0,0,0,1);
 	vec3 norm = vec3(0.0);
 	
-	//Hit hit;
-	//if (bray && trace_ray(ray_pos, ray_dir, INF, near_plane_dist, hit, vec3(1,0,0),true)) {
-	//	vec4 clip = view.world_to_clip * vec4(hit.pos, 1.0);
-	//	float ndc_depth = clip.z / clip.w;
-	//	
-	//	//gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
-	//	
-	//	pos = hit.pos;
-	//	col = vec4(hit.col.rgb, hit.emiss_raw);
-	//	norm = hit.normal;
-	//}
+	Hit hit;
+	if (bray && trace_ray(ray_pos, ray_dir, INF, near_plane_dist, hit, vec3(1,0,0),true)) {
+		vec4 clip = view.world_to_clip * vec4(hit.pos, 1.0);
+		float ndc_depth = clip.z / clip.w;
+		
+		//gl_FragDepth = ((gl_DepthRange.diff * ndc_depth) + gl_DepthRange.near + gl_DepthRange.far) / 2.0;
+		
+		pos = hit.pos;
+		col = vec4(hit.col.rgb, hit.emiss_raw);
+		norm = hit.normal;
+		
+		if (show_normals) col.rgb = hit.normal * 0.5 + 0.5;
+	}
 	
 	GET_VISUALIZE_COST(col.rgb);
 	
-	//gl_FragDepth = -0.5; // why is this not working?
+	//imageStore(gbuf_depth, pxpos, vec4(0.5, 0,0,0));
 	imageStore(gbuf_pos, pxpos, vec4(pos, 0.0));
 	imageStore(gbuf_col, pxpos, col);
 	imageStore(gbuf_pos, pxpos, vec4(norm, 0.0));

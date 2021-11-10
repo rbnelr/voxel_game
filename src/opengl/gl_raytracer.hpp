@@ -234,12 +234,14 @@ namespace gl {
 		
 		Shader* rt_forward = nullptr;
 		Shader* rt_lighting = nullptr;
+		Shader* rt_post = nullptr;
 		
 		VoxelTexture voxel_tex;
 		DFTexture df_tex;
 
 		TestRenderer test_renderer;
 
+		Gbuffer gbuf;
 		TemporalAA taa;
 		
 		ComputeGroupSize rt_groupsz = int2(8,8);
@@ -247,13 +249,14 @@ namespace gl {
 		OGL_TIMER_HISTOGRAM(rt_total);
 		OGL_TIMER_HISTOGRAM(rt_forward);
 		OGL_TIMER_HISTOGRAM(rt_lighting);
+		OGL_TIMER_HISTOGRAM(rt_post);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_macros (bool forward) {
+		std::vector<gl::MacroDefinition> get_macros (bool enable_taa) {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
-			         {"TAA_ENABLE", taa.enable && !forward ? "1":"0"},
+			         {"TAA_ENABLE", enable_taa ? "1":"0"},
 			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
@@ -337,6 +340,8 @@ namespace gl {
 			float parallax_max_step = 0.02f;
 			float parallax_scale = 0.15f;
 
+			float post_exposure = 1.0f;
+
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
@@ -356,6 +361,8 @@ namespace gl {
 				ImGui::SliderFloat("parallax_zstep", &parallax_zstep, 0.0005f, 0.1f);
 				ImGui::SliderFloat("parallax_max_step", &parallax_max_step, 0.0005f, 0.1f);
 				ImGui::SliderFloat("parallax_scale", &parallax_scale, 0.0005f, 0.25f);
+				
+				ImGui::SliderFloat("post_exposure", &post_exposure, 0.0005f, 4.0f);
 
 				ImGui::TreePop();
 			}
@@ -368,6 +375,7 @@ namespace gl {
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_total   , I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_forward , I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_lighting, I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_post    , I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
 
 			ImGui::Checkbox("enable [R]", &enable);

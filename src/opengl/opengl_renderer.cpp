@@ -37,7 +37,6 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	render_size = I.window_size;
 
-	gbuf.resize(render_size);
 	chunk_renderer.upload_remeshed(game.chunks);
 	raytracer.update(*this, game, I);
 
@@ -79,8 +78,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
 
-		//if (raytracer.enable)
-		//	raytracer.draw(*this, game);
+		if (raytracer.enable)
+			raytracer.draw(*this, game);
 
 		//glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
@@ -88,7 +87,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		if (game.player.selected_block)
 			block_highl.draw(*this, game.player.selected_block);
 
-		//if (!raytracer.enable)
+		if (!raytracer.enable)
 			chunk_renderer.draw_chunks(*this, game);
 
 		debug_draw.draw(*this);

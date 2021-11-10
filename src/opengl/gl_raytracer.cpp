@@ -33,8 +33,9 @@ namespace gl {
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
-		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(true ), {{ COMPUTE_SHADER }});
-		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(false), {{ COMPUTE_SHADER }});
+		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(false)     , {{ COMPUTE_SHADER }});
+		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(taa.enable), {{ COMPUTE_SHADER }});
+		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post"    , get_macros(false)     );
 
 		//
 
@@ -42,12 +43,16 @@ namespace gl {
 			enable = !enable;
 
 		if (macro_change && rt_forward) {
-			rt_forward ->macros = get_macros(true );
+			rt_forward ->macros = get_macros(false);
 			rt_forward ->recompile("macro_change", false);
 		}
 		if (macro_change && rt_lighting) {
-			rt_lighting->macros = get_macros(false);
+			rt_lighting->macros = get_macros(taa.enable);
 			rt_lighting->recompile("macro_change", false);
+		}
+		if (macro_change && rt_post) {
+			rt_post->macros = get_macros(false);
+			rt_post->recompile("macro_change", false);
 		}
 		macro_change = false;
 
@@ -228,54 +233,53 @@ namespace gl {
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 		if (!rt_forward->prog) return;
+		OGL_TIMER_ZONE(timer_rt_total.timer);
 
 		if (taa.enable) taa.resize(r.render_size);
+		gbuf.resize(r.render_size);
 
-		//{ // 'forward' gbuf pass
-		//	OGL_TIMER_ZONE(timer_rt_total.timer);
-		//
-		//	{ // forward voxel raycast pass
-		//		ZoneScopedN("rt_forward");
-		//		OGL_TRACE("rt_forward");
-		//		OGL_TIMER_ZONE(timer_rt_forward.timer);
-		//
-		//		glUseProgram(rt_forward->prog);
-		//
-		//		set_uniforms(r, game, rt_forward);
-		//
-		//		r.state.bind_textures(rt_forward, {
-		//			{"voxel_tex", voxel_tex.tex},
-		//			{"df_tex", df_tex.tex},
-		//
-		//			{"tile_textures", r.tile_textures, r.tile_sampler},
-		//
-		//			{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
-		//			{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
-		//
-		//			{"heat_gradient", r.gradient, r.normal_sampler},
-		//		});
-		//
-		//		//glBindImageTexture(0, gbuf.depth.tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		//		glBindImageTexture(1, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-		//		glBindImageTexture(2, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		//		glBindImageTexture(3, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		//
-		//		int2 dispatch_size;
-		//		dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
-		//		dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
-		//		glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-		//	}
-		//	//glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-		//	//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-		//	glMemoryBarrier(GL_ALL_BARRIER_BITS);
-		//
-		//	// normal rasterized drawing pass for gbuf testing
-		//	glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
-		//	glClear(GL_DEPTH_BUFFER_BIT);
-		//	test_renderer.draw(r);
-		//
-		//	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		//}
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+
+		{ // 'forward' gbuf pass
+			
+			{ // forward voxel raycast pass
+				ZoneScopedN("rt_forward");
+				OGL_TRACE("rt_forward");
+				OGL_TIMER_ZONE(timer_rt_forward.timer);
+		
+				glUseProgram(rt_forward->prog);
+		
+				set_uniforms(r, game, rt_forward);
+		
+				r.state.bind_textures(rt_forward, {
+					{"voxel_tex", voxel_tex.tex},
+					{"df_tex", df_tex.tex},
+		
+					{"tile_textures", r.tile_textures, r.pixelated_sampler},
+		
+					{"test_cubeN", r.test_cubeN, r.smooth_sampler_wrap},
+					{"test_cubeH", r.test_cubeH, r.smooth_sampler_wrap},
+		
+					{"heat_gradient", r.gradient, r.smooth_sampler},
+				});
+		
+				glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+				glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				
+				int2 dispatch_size;
+				dispatch_size.x = (gbuf.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+				dispatch_size.y = (gbuf.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
+				glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+			}
+			//glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+			//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+			glMemoryBarrier(GL_ALL_BARRIER_BITS);
+			
+			// normal rasterized drawing pass for gbuf testing
+			glClear(GL_DEPTH_BUFFER_BIT);
+			test_renderer.draw(r);
+		}
 
 		//{ // deferred lighting pass
 		//	ZoneScopedN("rt_lighting");
@@ -334,10 +338,36 @@ namespace gl {
 		////glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT
 		////	|GL_COMMAND_BARRIER_BIT); // for indirect draw
 		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
-		//
-		//// unbind
-		//for (int i=0; i<4; ++i)
-		//	glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		{ // post
+			OGL_TIMER_ZONE(timer_rt_post.timer);
+			ZoneScopedN("rt_post");
+			OGL_TRACE("rt_post");
+			
+			PipelineState s;
+			s.depth_test = false;
+			s.depth_write = false;
+			s.blend_enable = false;
+			r.state.set(s);
+
+			glUseProgram(rt_post->prog);
+
+			set_uniforms(r, game, rt_post);
+			rt_post->set_uniform("exposure", lighting.post_exposure);
+
+			r.state.bind_textures(rt_post, {
+				{"gbuf_col" ,  gbuf.col  , gbuf.sampler},
+			});
+
+			glBindVertexArray(r.dummy_vao);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
+
+		// unbind
+		for (int i=0; i<4; ++i)
+			glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 	}
 
 } // namespace gl

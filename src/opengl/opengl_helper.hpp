@@ -1238,6 +1238,8 @@ struct StateManager {
 		glBlendFunc(state.blend_func.sfactor, state.blend_func.dfactor);
 
 		glPolygonMode(GL_FRONT_AND_BACK, state.poly_mode == POLY_FILL ? GL_FILL : GL_LINE);
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 	// set opengl drawing state to a set of values, where only changes are applied
