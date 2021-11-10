@@ -7,56 +7,24 @@
 #include "engine/window.hpp" // for frame_counter hack
 
 namespace gl {
-
-	void TestRenderer::draw (OpenglRenderer& r) {
-		ZoneScoped;
-		OGL_TRACE("TestRenderer draw");
-
-		PipelineState s;
-		s.depth_test = true;
-		s.blend_enable = false;
-		r.state.set(s);
-
-		glUseProgram(shad->prog);
-		r.state.bind_textures(shad, {});
-
-		float4x4 mat = (float4x4)translate(pos) * (float4x4)(rotate3_Z(rot.x) * rotate3_X(rot.y)) * (float4x4)scale((float3)size);
-		shad->set_uniform("model2world", mat);
-
-		glBindVertexArray(mesh.ib.vao);
-		glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);
-	}
-
-////
 	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
 		ZoneScoped;
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
-		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward" , get_macros(false)     , {{ COMPUTE_SHADER }});
-		if (!rt_forward_frag ) rt_forward_frag  = r.shaders.compile("rt_forward" , get_macros(false, true));
-		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(taa.enable), {{ COMPUTE_SHADER }});
-		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post"    , get_macros(false)     );
+		if (!rt_shad) rt_shad = r.shaders.compile("rt_shad", get_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_post) rt_post = r.shaders.compile("rt_post");
 
 		//
 
 		if (I.buttons[KEY_R].went_down)
 			enable = !enable;
 
-		if (macro_change && rt_forward) {
-			rt_forward ->macros = get_macros(false);
-			rt_forward ->recompile("macro_change", false);
-		}
-		if (macro_change && rt_forward_frag) {
-			rt_forward_frag ->macros = get_macros(false, true);
-			rt_forward_frag ->recompile("macro_change", false);
-		}
-		if (macro_change && rt_lighting) {
-			rt_lighting->macros = get_macros(taa.enable);
-			rt_lighting->recompile("macro_change", false);
+		if (macro_change && rt_shad) {
+			rt_shad ->macros = get_macros();
+			rt_shad ->recompile("macro_change", false);
 		}
 		if (macro_change && rt_post) {
-			rt_post->macros = get_macros(false);
 			rt_post->recompile("macro_change", false);
 		}
 		macro_change = false;
@@ -237,28 +205,24 @@ namespace gl {
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
-		if (!rt_forward->prog) return;
+		if (!rt_shad->prog || !rt_post->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
 
 		if (taa.enable) taa.resize(r.render_size);
-		gbuf.resize(r.render_size);
-
-		if (!test) glBindFramebuffer(GL_FRAMEBUFFER, gbuf.fbo);
+		rt_col.resize(r.render_size);
 
 		{ // 'forward' gbuf pass
 			
 			{ // forward voxel raycast pass
 				ZoneScopedN("rt_forward");
 				OGL_TRACE("rt_forward");
-				OGL_TIMER_ZONE(timer_rt_forward.timer);
+				OGL_TIMER_ZONE(timer_rt_shad.timer);
 		
-				auto* shad = test ? rt_forward_frag : rt_forward;
-
-				glUseProgram(shad->prog);
+				glUseProgram(rt_shad->prog);
 		
-				set_uniforms(r, game, shad);
+				set_uniforms(r, game, rt_shad);
 		
-				r.state.bind_textures(shad, {
+				r.state.bind_textures(rt_shad, {
 					{"voxel_tex", voxel_tex.tex},
 					{"df_tex", df_tex.tex},
 		
@@ -270,97 +234,80 @@ namespace gl {
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
 				
-				if (!test) {
-					glBindImageTexture(0, gbuf.pos  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-					glBindImageTexture(1, gbuf.col  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-					glBindImageTexture(2, gbuf.norm , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				glBindImageTexture(0, rt_col.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
-					int2 dispatch_size;
-					dispatch_size.x = (gbuf.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
-					dispatch_size.y = (gbuf.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
-					glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-				} else {
-					PipelineState s;
-					s.depth_test = false;
-					s.depth_write = false;
-					s.blend_enable = false;
-					r.state.set(s);
-
-					glBindVertexArray(r.dummy_vao);
-					glDrawArrays(GL_TRIANGLES, 0, 3);
-				}
-
-
+				int2 dispatch_size;
+				dispatch_size.x = (rt_col.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+				dispatch_size.y = (rt_col.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
+				glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 			}
-			if (!test) glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT |
-				GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 			
-			// normal rasterized drawing pass for gbuf testing
-			glClear(GL_DEPTH_BUFFER_BIT);
-			test_renderer.draw(r);
+			//// normal rasterized drawing pass for gbuf testing
+			//glClear(GL_DEPTH_BUFFER_BIT);
+			//test_renderer.draw(r);
 		}
 
-		//{ // deferred lighting pass
-		//	ZoneScopedN("rt_lighting");
-		//	OGL_TRACE("rt_lighting");
-		//	OGL_TIMER_ZONE(timer_rt_lighting.timer);
-		//
-		//	glUseProgram(rt_lighting->prog);
-		//
-		//	set_uniforms(r, game, rt_lighting);
-		//
-		//	glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-		//
-		//	// TAA
-		//	GLuint prev_color  = taa.colors[taa.cur ^ 1];
-		//	GLuint prev_posage = taa.posage[taa.cur ^ 1];
-		//	GLuint cur_color   = taa.colors[taa.cur];
-		//	GLuint cur_posage  = taa.posage[taa.cur];
-		//
-		//	if (taa.enable) {
-		//		rt_forward->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
-		//		rt_forward->set_uniform("taa_max_age", taa.max_age);
-		//
-		//		glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
-		//		glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
-		//
-		//		taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
-		//		taa.cur ^= 1;
-		//	}
-		//
-		//	r.state.bind_textures(rt_lighting, {
-		//		{"voxel_tex", voxel_tex.tex},
-		//		{"df_tex", df_tex.tex},
-		//
-		//		{"gbuf_depth", gbuf.depth, gbuf.sampler},
-		//		{"gbuf_pos" ,  gbuf.pos  , gbuf.sampler},
-		//		{"gbuf_col" ,  gbuf.col  , gbuf.sampler},
-		//		{"gbuf_norm",  gbuf.norm , gbuf.sampler},
-		//
-		//		(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
-		//		(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
-		//
-		//		{"tile_textures", r.tile_textures, r.tile_sampler},
-		//
-		//		{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
-		//		{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
-		//
-		//		{"heat_gradient", r.gradient, r.normal_sampler},
-		//	});
-		//
-		//	int2 dispatch_size;
-		//	dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
-		//	dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
-		//
-		//	glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
-		//}
-		////glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT
-		////	|GL_COMMAND_BARRIER_BIT); // for indirect draw
-		//glMemoryBarrier(GL_ALL_BARRIER_BITS);
+	#if 0
+		{ // deferred lighting pass
+			ZoneScopedN("rt_lighting");
+			OGL_TRACE("rt_lighting");
+			OGL_TIMER_ZONE(timer_rt_lighting.timer);
+		
+			glUseProgram(rt_lighting->prog);
+		
+			set_uniforms(r, game, rt_lighting);
+		
+			glBindImageTexture(0, r.framebuffer.color, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		
+			// TAA
+			GLuint prev_color  = taa.colors[taa.cur ^ 1];
+			GLuint prev_posage = taa.posage[taa.cur ^ 1];
+			GLuint cur_color   = taa.colors[taa.cur];
+			GLuint cur_posage  = taa.posage[taa.cur];
+		
+			if (taa.enable) {
+				rt_forward->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
+				rt_forward->set_uniform("taa_max_age", taa.max_age);
+		
+				glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
+				glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+		
+				taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+				taa.cur ^= 1;
+			}
+		
+			r.state.bind_textures(rt_lighting, {
+				{"voxel_tex", voxel_tex.tex},
+				{"df_tex", df_tex.tex},
+		
+				{"gbuf_depth", gbuf.depth, gbuf.sampler},
+				{"gbuf_pos" ,  gbuf.pos  , gbuf.sampler},
+				{"gbuf_col" ,  gbuf.col  , gbuf.sampler},
+				{"gbuf_norm",  gbuf.norm , gbuf.sampler},
+		
+				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
+				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
+		
+				{"tile_textures", r.tile_textures, r.tile_sampler},
+		
+				{"test_cubeN", r.test_cubeN, r.normal_sampler_wrap},
+				{"test_cubeH", r.test_cubeH, r.normal_sampler_wrap},
+		
+				{"heat_gradient", r.gradient, r.normal_sampler},
+			});
+		
+			int2 dispatch_size;
+			dispatch_size.x = (r.framebuffer.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
+			dispatch_size.y = (r.framebuffer.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
+		
+			glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
+		}
+		//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT
+		//	|GL_COMMAND_BARRIER_BIT); // for indirect draw
+	#endif
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		if (!test) { // post
+		{ // post
 			OGL_TIMER_ZONE(timer_rt_post.timer);
 			ZoneScopedN("rt_post");
 			OGL_TRACE("rt_post");
@@ -377,7 +324,7 @@ namespace gl {
 			rt_post->set_uniform("exposure", lighting.post_exposure);
 
 			r.state.bind_textures(rt_post, {
-				{"gbuf_col" ,  gbuf.col  , gbuf.sampler},
+				{"rt_col", rt_col.col, rt_col.sampler},
 			});
 
 			glBindVertexArray(r.dummy_vao);

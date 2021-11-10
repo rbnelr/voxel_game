@@ -8,6 +8,7 @@
 namespace gl {
 	class OpenglRenderer;
 
+#if 0
 	struct Gbuffer {
 		Fbo fbo = {};
 
@@ -43,7 +44,7 @@ namespace gl {
 				glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
 
-				glTextureStorage2D(pos, 1, GL_RGBA16F, size.x, size.y);
+				glTextureStorage2D(pos, 1, GL_RGBA32F, size.x, size.y);
 				glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
 
@@ -67,6 +68,35 @@ namespace gl {
 				//if (status != GL_FRAMEBUFFER_COMPLETE) {
 				//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
 				//}
+			}
+		}
+	};
+#endif
+	struct RTCol {
+		Texture2D col = {};
+
+		int2 size = -1;
+
+		Sampler sampler = {"RTCol.sampler"};
+
+		RTCol () {
+			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		}
+
+		void resize (int2 new_size) {
+			if (size != new_size) {
+				glActiveTexture(GL_TEXTURE0);
+
+				size = new_size;
+
+				col   = {"Gbuf.col"  };
+
+				glTextureStorage2D(col, 1, GL_RGBA16F, size.x, size.y);
+				glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
 			}
 		}
 	};
@@ -137,6 +167,7 @@ namespace gl {
 	static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
 	static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
+#if 0
 	// Render arbitrary meshses into gbuffer to test combining rasterized and raytraced objects
 	struct TestRenderer {
 		Shader*		shad;
@@ -159,9 +190,26 @@ namespace gl {
 			ImGui::DragFloat2("Stock_mesh rot", &rot.x, 0.1f);
 			ImGui::DragFloat("Stock_mesh size", &size, 0.1f);
 		}
-		void draw (OpenglRenderer& r);
-	};
+		void draw (OpenglRenderer& r) {
+			ZoneScoped;
+			OGL_TRACE("TestRenderer draw");
 
+			PipelineState s;
+			s.depth_test = true;
+			s.blend_enable = false;
+			r.state.set(s);
+
+			glUseProgram(shad->prog);
+			r.state.bind_textures(shad, {});
+
+			float4x4 mat = (float4x4)translate(pos) * (float4x4)(rotate3_Z(rot.x) * rotate3_X(rot.y)) * (float4x4)scale((float3)size);
+			shad->set_uniform("model2world", mat);
+
+			glBindVertexArray(mesh.ib.vao);
+			glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);		
+		}
+	};
+#endif
 	struct ComputeGroupSize {
 		int2 _size;
 		int2 size;
@@ -232,42 +280,38 @@ namespace gl {
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
-		Shader* rt_forward_frag = nullptr;
-		Shader* rt_forward = nullptr;
-		Shader* rt_lighting = nullptr;
+		Shader* rt_shad = nullptr;
 		Shader* rt_post = nullptr;
 		
 		VoxelTexture voxel_tex;
 		DFTexture df_tex;
 
-		TestRenderer test_renderer;
+		//TestRenderer test_renderer;
 
-		Gbuffer gbuf;
+		RTCol rt_col;
 		TemporalAA taa;
 		
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
 		OGL_TIMER_HISTOGRAM(rt_total);
-		OGL_TIMER_HISTOGRAM(rt_forward);
-		OGL_TIMER_HISTOGRAM(rt_lighting);
+		OGL_TIMER_HISTOGRAM(rt_shad);
 		OGL_TIMER_HISTOGRAM(rt_post);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_macros (bool enable_taa, bool frag=false) {
+		std::vector<gl::MacroDefinition> get_macros () {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
-			         {"TAA_ENABLE", enable_taa ? "1":"0"},
+			         {"TAA_ENABLE", taa.enable ? "1":"0"},
 			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			         {"VISUALIZE_TIME", visualize_time ? "1":"0"},
-			         {"FRAGMENT", frag ? "1":"0"}
+			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
 		}
 
-		Raytracer (Shaders& shaders): df_tex(shaders), test_renderer(shaders) {
+		Raytracer (Shaders& shaders): df_tex(shaders) {
 			#if 0
 				int max_sparse_texture_size;
 				int max_sparse_3d_texture_size;
@@ -370,20 +414,14 @@ namespace gl {
 			}
 		} lighting;
 
-
-		bool test = false;
-
 		bool macro_change = false; // shader macro change
 		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_total   , I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_forward , I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_lighting, I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_post    , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_total, I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_shad , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_post , I.dt)
 			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
-
-			ImGui::Checkbox("test", &test);
 
 			ImGui::Checkbox("enable [R]", &enable);
 
@@ -404,11 +442,8 @@ namespace gl {
 
 			lighting.imgui(macro_change);
 
-			ImGui::Separator();
-
-			//ImGui::SliderFloat("vct_diff_renderscale", &vct_diff_framebuf.renderscale, .5f, 1, "%.2f");
-
-			test_renderer.imgui();
+			//ImGui::Separator();
+			//test_renderer.imgui();
 
 			//
 			ImGui::TreePop();
