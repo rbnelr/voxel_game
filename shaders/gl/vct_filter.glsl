@@ -29,12 +29,12 @@ uvec4 pack_texel (vec4 lrgba) {
 	return rgba8;
 }
 
-layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mipNX;
-layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mipPX;
-layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mipNY;
-layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mipPY;
-layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mipNZ;
-layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
+layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mip0;
+layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mip1;
+layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mip2;
+layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mip3;
+layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mip4;
+layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mip5;
 
 #if MIP0
 	void main () {
@@ -47,79 +47,39 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		
 		uint bid = texelFetch(voxel_tex, dst_pos, 0).r;
 		
-		float texid = float(block_tiles[bid].sides[0]);
-		vec4 col = textureLod(tile_textures, vec3(vec2(0.5), texid), 100.0);
-		
 		//if (bid == B_MAGMA) col = vec4(0.0);
 		//if (bid == B_GLOWSHROOM) col = vec4(0.0);
 		
-		//uint bids[3][3][3];
-		//for (int z=0; z<3; ++z)
-		//for (int y=0; y<3; ++y)
-		//for (int x=0; x<3; ++x)
-		//	bids[z][y][x] = texelFetch(voxel_tex, dst_pos + ivec3(x-1,y-1,z-1), 0).r;
+		float alpha = bid == B_AIR ? 0.0 : 1.0;
 		
-		float alpha = 1.0;
-		if      (bid == B_AIR   ) alpha = 0.0;
-		//else if (bid == B_LEAVES) alpha = 0.3;
+	#if 0
+		vec4 colNX = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[0])), 100.0);
+		vec4 colPX = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[1])), 100.0);
+		vec4 colNY = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[2])), 100.0);
+		vec4 colPY = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[3])), 100.0);
+		vec4 colNZ = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[4])), 100.0);
+		vec4 colPZ = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[5])), 100.0);
 		
-		//vec3 emissive = (col.rgb * get_emmisive(bid));
-		//emissive += col.rgb * 0.3; // makes everything glow, for testing
+		imageStore(write_mip0, dst_pos, pack_texel(vec4(colPX.rgb * alpha, alpha)));
+		imageStore(write_mip1, dst_pos, pack_texel(vec4(colNX.rgb * alpha, alpha)));
+		imageStore(write_mip2, dst_pos, pack_texel(vec4(colPY.rgb * alpha, alpha)));
+		imageStore(write_mip3, dst_pos, pack_texel(vec4(colNY.rgb * alpha, alpha)));
+		imageStore(write_mip4, dst_pos, pack_texel(vec4(colPZ.rgb * alpha, alpha)));
+		imageStore(write_mip5, dst_pos, pack_texel(vec4(colNZ.rgb * alpha, alpha)));
+	#else
+		vec4 col = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[0])), 100.0);
 		
-		vec3 emissive = col.rgb;
-		
-	#if 1
-		//bool visible = false;
-		//for (int z=0; z<3; ++z)
-		//for (int y=0; y<3; ++y)
-		//for (int x=0; x<3; ++x)
-		//	if (x!=1 || y!=1 || z!=1)
-		//		visible = visible || bids[z][y][x] == B_AIR;
-		
-		//bool visible =
-		//	(bids[1][1][0] == B_AIR) || (bids[1][1][2] == B_AIR) ||
-		//	(bids[1][0][1] == B_AIR) || (bids[1][2][1] == B_AIR) ||
-		//	(bids[0][1][1] == B_AIR) || (bids[2][1][1] == B_AIR);
-		
-		//if (!visible) emissive = vec3(0.0);
-		//if (!visible) alpha = 0.0;
+		vec3 emissive = col.rgb * get_emmisive(bid);
+		//emissive += col.rgb * 0.0;
 		
 		emissive *= alpha;
 		
-		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissive, alpha)));
-	#else
-		uint bidNX = bids[1][1][0];
-		uint bidPX = bids[1][1][2];
-		uint bidNY = bids[1][0][1];
-		uint bidPY = bids[1][2][1];
-		uint bidNZ = bids[0][1][1];
-		uint bidPZ = bids[2][1][1];
-		
-		float alphaNX = bidPX == B_AIR ? alpha : 0.0;
-		float alphaPX = bidNX == B_AIR ? alpha : 0.0;
-		float alphaNY = bidPY == B_AIR ? alpha : 0.0;
-		float alphaPY = bidNY == B_AIR ? alpha : 0.0;
-		float alphaNZ = bidPZ == B_AIR ? alpha : 0.0;
-		float alphaPZ = bidNZ == B_AIR ? alpha : 0.0;
-		
-		vec3 emissiveNX = emissive * alphaNX;
-		vec3 emissivePX = emissive * alphaPX;
-		vec3 emissiveNY = emissive * alphaNY;
-		vec3 emissivePY = emissive * alphaPY;
-		vec3 emissiveNZ = emissive * alphaNZ;
-		vec3 emissivePZ = emissive * alphaPZ;
-		
-		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissiveNX, alphaNX)));
-		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissivePX, alphaPX)));
-		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissiveNY, alphaNY)));
-		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissivePY, alphaPY)));
-		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissiveNZ, alphaNZ)));
-		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissivePZ, alphaPZ)));
+		imageStore(write_mip0, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip1, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip2, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip3, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip4, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip5, dst_pos, pack_texel(vec4(emissive, alpha)));
 	#endif
 	}
 #else
@@ -190,30 +150,30 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 			ivec3 src_pos = dst_pos * 2;
 			
 			{
-				LOAD(vct_texNX, read_mip)
-				STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
+				LOAD(vct_tex[0], read_mip)
+				STORE(write_mip0, preintegrate(b,a, d,c, f,e, h,g));
 			}
 			{
-				LOAD(vct_texPX, read_mip)
-				STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
-			}
-			
-			{
-				LOAD(vct_texNY, read_mip)
-				STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
-			}
-			{
-				LOAD(vct_texPY, read_mip)
-				STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
+				LOAD(vct_tex[1], read_mip)
+				STORE(write_mip1, preintegrate(a,b, c,d, e,f, g,h));
 			}
 			
 			{
-				LOAD(vct_texNZ, read_mip)
-				STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
+				LOAD(vct_tex[2], read_mip)
+				STORE(write_mip2, preintegrate(c,a, d,b, g,e, h,f));
 			}
 			{
-				LOAD(vct_texPZ, read_mip)
-				STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
+				LOAD(vct_tex[3], read_mip)
+				STORE(write_mip3, preintegrate(a,c, b,d, e,g, f,h));
+			}
+			
+			{
+				LOAD(vct_tex[4], read_mip)
+				STORE(write_mip4, preintegrate(e,a, f,b, g,c, h,d));
+			}
+			{
+				LOAD(vct_tex[5], read_mip)
+				STORE(write_mip5, preintegrate(a,e, b,f, c,g, d,h));
 			}
 		}
 	}

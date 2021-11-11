@@ -55,18 +55,18 @@ namespace gl {
 
 				// for page in texture for chunk
 				for (int pz=0; pz<pages_per_chunk.z; ++pz)
-					for (int py=0; py<pages_per_chunk.y; ++py)
-						for (int px=0; px<pages_per_chunk.x; ++px) {
+				for (int py=0; py<pages_per_chunk.y; ++py)
+				for (int px=0; px<pages_per_chunk.x; ++px) {
 
-							int3 idx = chunk_pos * pages_per_chunk + int3(px,py,pz);
-							bool page_sparse = sparse_page_state[idx];
+					int3 idx = chunk_pos * pages_per_chunk + int3(px,py,pz);
+					bool page_sparse = sparse_page_state[idx];
 
-							if (page_sparse) {
-								int3 offs = idx * sparse_size;
-								for (int dir=0; dir<6; ++dir)
-									glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, true);
-							}
-						}
+					if (page_sparse) {
+						int3 offs = idx * sparse_size;
+						for (int dir=0; dir<6; ++dir)
+							glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, true);
+					}
+				}
 			}
 		}
 
@@ -132,14 +132,8 @@ namespace gl {
 		{ // layer 1+
 			glUseProgram(filter->prog);
 
-			r.state.bind_textures(filter, {
-				{"vct_texNX", textures[0].tex, filter_sampler},
-				{"vct_texPX", textures[1].tex, filter_sampler},
-				{"vct_texNY", textures[2].tex, filter_sampler},
-				{"vct_texPY", textures[3].tex, filter_sampler},
-				{"vct_texNZ", textures[4].tex, filter_sampler},
-				{"vct_texPZ", textures[5].tex, filter_sampler},
-			});
+			r.state.bind_textures(filter, {});
+			bind_textures(filter, 0);
 
 			// filter only texels for each chunk (up to 4x4x4 work groups)
 			for (int layer=1; layer<FILTER_CHUNK_MIPS; ++layer)
@@ -170,35 +164,35 @@ namespace gl {
 
 				// for page in texture for chunk
 				for (int pz=0; pz<pages_per_chunk.z; ++pz)
-					for (int py=0; py<pages_per_chunk.y; ++py)
-						for (int px=0; px<pages_per_chunk.x; ++px) {
+				for (int py=0; py<pages_per_chunk.y; ++py)
+				for (int px=0; px<pages_per_chunk.x; ++px) {
 
-							bool sparse = true;
+					bool sparse = true;
 
-							// for subchunks in page
-							for (int sz=0; sz<subchunks_per_page.z; ++sz)
-								for (int sy=0; sy<subchunks_per_page.y; ++sy)
-									for (int sx=0; sx<subchunks_per_page.x; ++sx) {
+					// for subchunks in page
+					for (int sz=0; sz<subchunks_per_page.z; ++sz)
+					for (int sy=0; sy<subchunks_per_page.y; ++sy)
+					for (int sx=0; sx<subchunks_per_page.x; ++sx) {
 
-										int3 idx = int3(px,py,pz) * subchunks_per_page + int3(sx,sy,sz);
-										auto aubc = vox.subchunks[IDX3D(idx.x,idx.y,idx.z, SUBCHUNK_COUNT)];
-										bool is_air = aubc == air;
-										if (!is_air) {
-											sparse = false;
-											goto end;
-										}
-									} end:;
-
-							int3 idx = chunk_pos * pages_per_chunk + int3(px,py,pz);
-							bool& page_sparse = sparse_page_state[idx];
-							page_sparse = sparse;
-
-							if (sparse) {
-								int3 offs = idx * sparse_size;
-								for (int dir=0; dir<6; ++dir)
-									glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, false);
-							}
+						int3 idx = int3(px,py,pz) * subchunks_per_page + int3(sx,sy,sz);
+						auto aubc = vox.subchunks[IDX3D(idx.x,idx.y,idx.z, SUBCHUNK_COUNT)];
+						bool is_air = aubc == air;
+						if (!is_air) {
+							sparse = false;
+							goto end;
 						}
+					} end:;
+
+					int3 idx = chunk_pos * pages_per_chunk + int3(px,py,pz);
+					bool& page_sparse = sparse_page_state[idx];
+					page_sparse = sparse;
+
+					if (sparse) {
+						int3 offs = idx * sparse_size;
+						for (int dir=0; dir<6; ++dir)
+							glTexturePageCommitmentEXT(textures[dir].tex, 0, offs.x,offs.y,offs.z, sparse_size.x,sparse_size.y,sparse_size.z, false);
+					}
+				}
 			}
 		}
 	}
@@ -206,14 +200,14 @@ namespace gl {
 		auto col = srgba(255, 255,   0, 255);
 
 		for (int pz=0; pz<sparse_page_state.size.z; pz++)
-			for (int py=0; py<sparse_page_state.size.y; py++)
-				for (int px=0; px<sparse_page_state.size.x; px++) {
-					bool page_sparse = sparse_page_state.get(px,py,pz);
-					if (page_sparse) {
-						float3 pos = (float3)(int3(px,py,pz) * sparse_size - GPU_WORLD_SIZE/2);
-						g_debugdraw.wire_cube(pos + (float3)(sparse_size/2), (float3)sparse_size * 0.997f, col);
-					}
-				}
+		for (int py=0; py<sparse_page_state.size.y; py++)
+		for (int px=0; px<sparse_page_state.size.x; px++) {
+			bool page_sparse = sparse_page_state.get(px,py,pz);
+			if (page_sparse) {
+				float3 pos = (float3)(int3(px,py,pz) * sparse_size - GPU_WORLD_SIZE/2);
+				g_debugdraw.wire_cube(pos + (float3)(sparse_size/2), (float3)sparse_size * 0.997f, col);
+			}
+		}
 	}
 
 	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
@@ -412,19 +406,10 @@ namespace gl {
 					{"df_tex", df_tex.tex},
 		
 					{"tile_textures", r.tile_textures, r.pixelated_sampler},
-
-					{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler},
-					{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler},
-					{"vct_texNY", vct_data.textures[2].tex, vct_data.sampler},
-					{"vct_texPY", vct_data.textures[3].tex, vct_data.sampler},
-					{"vct_texNZ", vct_data.textures[4].tex, vct_data.sampler},
-					{"vct_texPZ", vct_data.textures[5].tex, vct_data.sampler},
-		
-					{"test_cubeN", r.test_cubeN, r.smooth_sampler_wrap},
-					{"test_cubeH", r.test_cubeH, r.smooth_sampler_wrap},
 		
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
+				vct_data.bind_textures(rt_shad, 4); // 4 is number of textures bound ^ above
 				
 				glBindImageTexture(0, rt_col.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 

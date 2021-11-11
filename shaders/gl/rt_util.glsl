@@ -398,7 +398,7 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
-	max_dist = 100.0;
+	max_dist = 400.0;
 	
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
@@ -514,33 +514,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		if (iter >= max_iterations || dist >= max_dist)
 			break; // miss
 	}
-#else
-	vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
-	vec3 tstep = inv_dir * mix(vec3(-1), vec3(+1), dir_sign);
-	
-	for (;;) {
-		VISUALIZE_ITERATION
-		
-		//#if DEBUGDRAW
-		//	if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
-		//#endif
-		
-		int dfi = texelFetch(df_tex, coord, 0).r;
-		
-		if (dfi < 0)
-			break; // hit
-		
-		dist = min(min(t1v.x, t1v.y), t1v.z);
-		
-		if (dist >= max_dist)
-			break; // miss
-		
-		// step on axis where exit distance is lowest
-		if      (t1v.x == dist) { coord.x += step_dir.x; t1v.x += tstep.x; }
-		else if (t1v.y == dist) { coord.y += step_dir.y; t1v.y += tstep.y; }
-		else                    { coord.z += step_dir.z; t1v.z += tstep.z; }
-	}
-#endif
 	
 	#if DEBUGDRAW
 	if (_dbgdraw)
@@ -549,6 +522,58 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	if (iter >= max_iterations || dist >= max_dist)
 		return false; // miss
+#else
+	int lod = 3;
+	int lodsz = 1<<lod;
+	
+	coord &= ~(lodsz-1);
+	
+	vec3 t1v = inv_dir * vec3(coord + vox_exit*lodsz) + bias;
+	vec3 tstep = inv_dir * mix(vec3(-1), vec3(+1), dir_sign);
+	
+	step_dir *= lodsz;
+	tstep *= lodsz;
+	
+	vec4 accum = vec4(0.0);
+	int axis = 0;
+	ivec3 faces = mix(ivec3(0,2,4), ivec3(1,3,5), dir_sign);
+	
+	for (;;) {
+		VISUALIZE_ITERATION
+		
+		#if DEBUGDRAW
+		if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + float(lodsz)/2.0 - WORLD_SIZEf/2.0, vec3(lodsz), vec4(1,1,0,1));
+		#endif
+		
+		//int dfi = texelFetch(df_tex, coord, 0).r;
+		vec4 vct = texelFetch(vct_tex[faces[axis]], coord>>lod, lod) * VCT_UNPACK;
+		
+		accum.rgb += (1.0 - accum.a) * vct.rgb;
+		accum.a   += (1.0 - accum.a) * vct.a;
+		
+		if (accum.a > 0.98)
+			break;
+		
+		dist = min(min(t1v.x, t1v.y), t1v.z);
+		
+		if (++iter >= max_iterations || dist >= max_dist)
+			break;
+		
+		// step on axis where exit distance is lowest
+		if      (t1v.x == dist) { coord.x += step_dir.x; t1v.x += tstep.x; axis = 0; }
+		else if (t1v.y == dist) { coord.y += step_dir.y; t1v.y += tstep.y; axis = 1; }
+		else                    { coord.z += step_dir.z; t1v.z += tstep.z; axis = 2; }
+	}
+	
+	#if DEBUGDRAW
+	if (_dbgdraw)
+		dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
+	#endif
+	
+	hit.col = vec4(accum.rgb, 1.0) * accum.a;
+	
+	return true;
+#endif
 	
 	{ // calc hit info
 		
@@ -620,7 +645,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		
 		hit.col = textureLod(tile_textures, vec3(uv, texid), 0.0).rgba;
 		
-		hit.col = texelFetch(vct_texPZ, coord, 0) * VCT_UNPACK;
 		//hit.col = vec4(vec3(dist / 100.0), 1);
 		
 		hit.emiss_raw = get_emmisive(tex_bid);

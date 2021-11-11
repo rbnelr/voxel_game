@@ -328,6 +328,19 @@ namespace gl {
 			{"VCT.texPZ", MIPS, TEX_WIDTH},
 		};
 
+		void bind_textures (Shader* shad, int base_tex_unit) {
+
+			GLint units[6];
+			for (int i=0; i<6; ++i) {
+				int unit = base_tex_unit + i;
+				glActiveTexture(GL_TEXTURE0 + unit);
+				glBindSampler(unit, sampler);
+				glBindTexture(GL_TEXTURE_3D, textures[i].tex);
+				units[i] = unit;
+			}
+			glUniform1iv(shad->get_uniform_location("vct_tex[0]"), 6, units);
+		}
+
 		Sampler sampler = {"sampler"};
 		Sampler filter_sampler = {"filter_sampler"};
 
