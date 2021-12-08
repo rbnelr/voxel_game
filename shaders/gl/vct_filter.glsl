@@ -70,7 +70,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mip5;
 		vec4 col = textureLod(tile_textures, vec3(vec2(0.5), float(block_tiles[bid].sides[0])), 100.0);
 		
 		vec3 emissive = col.rgb * get_emmisive(bid);
-		//emissive += col.rgb * 0.0;
+		emissive += col.rgb * 0.1;
 		
 		emissive *= alpha;
 		

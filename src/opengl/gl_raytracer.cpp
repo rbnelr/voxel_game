@@ -381,6 +381,11 @@ namespace gl {
 		shad->set_uniform("parallax_zstep",    lighting.parallax_zstep);
 		shad->set_uniform("parallax_max_step", lighting.parallax_max_step);
 		shad->set_uniform("parallax_scale",    lighting.parallax_scale);
+
+		static int lod = 2;
+		ImGui::SliderInt("lod", &lod, 0, 10);
+		lod = clamp(lod, 0, 10);
+		shad->set_uniform("test_lod", lod);
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;

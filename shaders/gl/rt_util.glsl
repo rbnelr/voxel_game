@@ -396,6 +396,8 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 }
 #endif
 
+uniform int test_lod = 2;
+
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
 	max_dist = 400.0;
@@ -523,8 +525,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	if (iter >= max_iterations || dist >= max_dist)
 		return false; // miss
 #else
-	int lod = 3;
-	int lodsz = 1<<lod;
+	int lodsz = 1<<test_lod;
 	
 	coord &= ~(lodsz-1);
 	
@@ -546,7 +547,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		#endif
 		
 		//int dfi = texelFetch(df_tex, coord, 0).r;
-		vec4 vct = texelFetch(vct_tex[faces[axis]], coord>>lod, lod) * VCT_UNPACK;
+		vec4 vct = texelFetch(vct_tex[faces[axis]], coord>>test_lod, test_lod) * VCT_UNPACK;
 		
 		accum.rgb += (1.0 - accum.a) * vct.rgb;
 		accum.a   += (1.0 - accum.a) * vct.a;
