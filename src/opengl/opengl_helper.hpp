@@ -1416,7 +1416,7 @@ inline int calc_mipmaps (int w, int h) {
 
 struct RenderScale {
 
-	int2 size = 0;
+	int2 size = -1;
 	float renderscale = 1.0f;
 
 	bool nearest = false;

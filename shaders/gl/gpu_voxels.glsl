@@ -48,12 +48,17 @@
 #define B_GLOWSHROOM	27
 
 float get_emmisive (uint bid) {
-	if (      bid == B_MAGMA   ) return 4.0; // 7
-	else if ( bid == B_CRYSTAL ) return 10.0;
-	else if ( bid == B_URANIUM ) return 3.2;
-	else if ( bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6 ) return 10.0;
-	else if ( bid == B_GLOWSHROOM ) return 2.0; // 12
+	if (      bid == B_MAGMA      ) return 4.0*  0.4; // 7
+	else if ( bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6) ) return 4.0*  1.0;
+	else if ( bid == B_URANIUM    ) return 4.0*  0.32;
+	else if ( bid == B_GLOWSHROOM ) return 4.0*  0.2; // 12
 	return 0.0;
+}
+float get_fake_alpha (uint bid) {
+	if      ( bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6) ) return 0.1;
+	else if ( bid == B_LEAVES )  return 0.9;
+	//else if ( bid == B_GLOWSHROOM ) return 2.0; // 12
+	return 1.0;
 }
 
 
@@ -71,7 +76,7 @@ float get_emmisive (uint bid) {
 #define OCTREE_MIPS			10
 
 
-#define VCT_COL_MAX 10.0
+#define VCT_COL_MAX 4.0
 #define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
 
 

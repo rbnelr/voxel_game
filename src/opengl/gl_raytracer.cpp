@@ -112,14 +112,13 @@ namespace gl {
 	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
 		ZoneScoped;
 
-		renderscale.update(r.render_size);
-
+		if (renderscale.update(r.render_size)) {
+			taa.resize(renderscale.size);
+			gbuf.resize(renderscale.size);
+			framebuf.resize(renderscale.size, renderscale.nearest);
+		}
 		r.update_view(game.view, renderscale.size);
 
-		if (taa.enable) taa.resize(renderscale.size);
-		gbuf.resize(renderscale.size);
-		framebuf.resize(renderscale.size, renderscale.nearest);
-		
 		macro_change |= vct_conedev(r, game);
 		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 
@@ -504,6 +503,7 @@ namespace gl {
 		shad->set_uniform("roughness", lighting.roughness);
 
 		shad->set_uniform("vct_primary_cone_width", lighting.vct_primary_cone_width);
+		shad->set_uniform("vct_min_start_dist", lighting.vct_min_start_dist);
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;

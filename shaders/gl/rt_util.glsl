@@ -591,35 +591,47 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 uniform float vct_stepsize = 1.0;
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
-	float lod = log2(size);
 	
-	#if 1
-	// prevent small samples from being way too blurry
-	// -> simulate negative lods (size < 1.0) by snapping texture coords to nearest texels
-	// when approaching size=0
-	// size = 0.5 would snap [0.25,0.75] to 0.5
-	//              and lerp [0.75,1.25] in [0.5,1.5]
-	size = min(size, 1.0);
-	texcoord = 0.5 * size + texcoord;
-	texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
-	#endif
-	texcoord *= INV_WORLD_SIZEf;
+	// Since we are heavily bottlenecked by memory access
+	// it is actually faster to branch to minimize cache trashing
+	// by special-casing LOD0 (since all 6 directions are identical)
 	
-	vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
-	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
-	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
-	
-	vec3 sqr = dir * dir;
-	vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
-	
-	//vec3 weight = min(abs(dir) * 15.0, 1.0);
-	//valX.a *= weight.x;
-	//valY.a *= weight.y;
-	//valZ.a *= weight.z;
-	
-	val.a = max(max(valX.a, valY.a), valZ.a);
-	
-	return val;
+	if (size <= 1.0) {
+		#if 1
+		// prevent small samples from being way too blurry
+		// -> simulate negative lods (size < 1.0) by snapping texture coords to nearest texels
+		// when approaching size=0
+		// size = 0.5 would snap [0.25,0.75] to 0.5
+		//              and lerp [0.75,1.25] in [0.5,1.5]
+		texcoord = 0.5 * size + texcoord;
+		texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
+		//texcoord = floor(texcoord);
+		#endif
+		texcoord *= INV_WORLD_SIZEf;
+		
+		return textureLod(vct_texNX, texcoord, 0.0) * VCT_UNPACK;
+	}
+	else {
+		float lod = log2(size);
+		
+		texcoord *= INV_WORLD_SIZEf;
+		
+		vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
+		vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
+		vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
+		
+		vec3 sqr = dir * dir;
+		vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+		
+		//vec3 weight = min(abs(dir) * 15.0, 1.0);
+		//valX.a *= weight.x;
+		//valY.a *= weight.y;
+		//valZ.a *= weight.z;
+		
+		//val.a = max(max(valX.a, valY.a), valZ.a);
+		
+		return val;
+	}
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	
@@ -640,15 +652,38 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		
 		vec4 sampl = read_vct_texture(pos, cone_dir, size);
 		
-		vec3 new_col = color + transp * sampl.rgb;
-		float new_transp = transp - transp * sampl.a;
-		//transp -= transp * pow(sampl.a, 1.0 / min(stepsize, 1.0));
+		vec3 emiss = sampl.rgb;
+		float through = 1.0 - sampl.a;
+		
+		// correct sample for step sizes <1, since they are no longer preintegrated like the larger LODs
+		if (stepsize < 1.0) {
+			// correct emmission samples
+			// because we accumulate it 1/stepsize too often
+			// emiss *= stepsize
+			// TODO: this totally breaks with alpha close to 1 since only one or a few samples are taken
+			//  yet the emiss is usually supposed to be the same irrelevant of stepsize
+			
+			//emiss *= stepsize;
+			
+			float a = 0.1;
+			float b = 0.8;
+			emiss *= mix(1.0, stepsize, clamp((through - a) / (b-a), 0.0, 1.0));
+			
+			// correct alpha sample
+			// transp accumulation can be thought of (1-alpha)^x
+			// so with stepsize=0.5 it's equivalent to multiplying twice as much -> (1-alpha)^2x
+			// so to correct we do ((1-alpha)^1/2)^2x
+			through = pow(through, stepsize);
+		}
+		
+		vec3 new_col = color + transp * emiss;
+		float new_transp = transp * through;
 		
 		#if DEBUGDRAW
 		if (_dbgdraw && dbg) {
 			//vec4 col = vec4(1,0,0,1);
 			//vec4 col = vec4(sampl.rgb, 1.0-transp);
-			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
+			//vec4 col = vec4(vec3(sampl.a), transp);
 			vec4 col = vec4(vec3(sampl.a), 1.0);
 			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
 		}
@@ -659,7 +694,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 		
 		dist += stepsize;
 		
-		if (transp < 0.005 || dist >= max_dist)
+		if (transp < 0.002 || dist >= max_dist)
 			break;
 	}
 	

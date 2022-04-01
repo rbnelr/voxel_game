@@ -61,14 +61,17 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//for (int x=0; x<3; ++x)
 		//	bids[z][y][x] = texelFetch(voxel_tex, dst_pos + ivec3(x-1,y-1,z-1), 0).r;
 		
-		float alpha = 1.0;
-		if      (bid == B_AIR   ) alpha = 0.0;
-		//else if (bid == B_LEAVES) alpha = 0.3;
+		float alpha = 0.0;
+		vec3 emissive = vec3(0.0);
 		
-		vec3 emissive = (col.rgb * get_emmisive(bid));
-		//emissive += col.rgb * 0.03; // makes everything glow, for testing
+		if (bid != B_AIR) {
+			alpha = get_fake_alpha(bid);
+			emissive = col.rgb * get_emmisive(bid);
+			
+			//emissive += col.rgb * 0.2; // makes everything glow, for testing
+		}
 		
-	#if 1
+		
 		//bool visible = false;
 		//for (int z=0; z<3; ++z)
 		//for (int y=0; y<3; ++y)
@@ -84,43 +87,12 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//if (!visible) emissive = vec3(0.0);
 		//if (!visible) alpha = 0.0;
 		
-		emissive *= alpha;
-		
 		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissive, alpha)));
 		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissive, alpha)));
-	#else
-		uint bidNX = bids[1][1][0];
-		uint bidPX = bids[1][1][2];
-		uint bidNY = bids[1][0][1];
-		uint bidPY = bids[1][2][1];
-		uint bidNZ = bids[0][1][1];
-		uint bidPZ = bids[2][1][1];
-		
-		float alphaNX = bidPX == B_AIR ? alpha : 0.0;
-		float alphaPX = bidNX == B_AIR ? alpha : 0.0;
-		float alphaNY = bidPY == B_AIR ? alpha : 0.0;
-		float alphaPY = bidNY == B_AIR ? alpha : 0.0;
-		float alphaNZ = bidPZ == B_AIR ? alpha : 0.0;
-		float alphaPZ = bidNZ == B_AIR ? alpha : 0.0;
-		
-		vec3 emissiveNX = emissive * alphaNX;
-		vec3 emissivePX = emissive * alphaPX;
-		vec3 emissiveNY = emissive * alphaNY;
-		vec3 emissivePY = emissive * alphaPY;
-		vec3 emissiveNZ = emissive * alphaNZ;
-		vec3 emissivePZ = emissive * alphaPZ;
-		
-		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissiveNX, alphaNX)));
-		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissivePX, alphaPX)));
-		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissiveNY, alphaNY)));
-		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissivePY, alphaPY)));
-		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissiveNZ, alphaNZ)));
-		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissivePZ, alphaPZ)));
-	#endif
 	}
 #else
 	uniform int read_mip;

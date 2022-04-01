@@ -69,8 +69,8 @@ layout(std140, binding = 4) uniform ConeConfig {
 	Cone cones[32];
 } cones;
 
-uniform float vct_start_dist = 1.0 / 5.0;
 uniform float vct_primary_cone_width = 1.0;
+uniform float vct_min_start_dist = 1.0 / 5.0;
 
 #if VCT
 shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
@@ -109,7 +109,7 @@ void main () {
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	vec4 col = trace_cone(ray_pos, ray_dir,
-		vct_primary_cone_width, vct_start_dist, 1000.0, true);
+		vct_primary_cone_width, vct_min_start_dist, 1000.0, true);
 	
 	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
 	
@@ -134,9 +134,11 @@ void main () {
 		Cone c = cones.cones[coneid];
 		
 		vec3 cone_dir = gbuf.TBN * c.dir;
+		
+		float start_dist = vct_min_start_dist;
 				
 		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope,
-			vct_start_dist, 1000.0, true).rgb * c.weight;
+			start_dist, 1000.0, coneid == 8u).rgb * c.weight;
 		
 		cone_results[threadid][coneid] = light;
 	}

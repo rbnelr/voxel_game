@@ -147,38 +147,36 @@ namespace gl {
 		}
 
 		void resize (int2 new_size) {
-			if (colors[0] == 0 || size != new_size) {
-				glActiveTexture(GL_TEXTURE0);
+			glActiveTexture(GL_TEXTURE0);
 
-				size = new_size;
+			size = new_size;
 
-				// create new (textures created with glTexStorage2D cannot be resized)
-				colors[0] = {"RT.taa_color0"};
-				colors[1] = {"RT.taa_color1"};
-				posage[0] = {"RT.taa_posage0"};
-				posage[1] = {"RT.taa_posage1"};
+			// create new (textures created with glTexStorage2D cannot be resized)
+			colors[0] = {"RT.taa_color0"};
+			colors[1] = {"RT.taa_color1"};
+			posage[0] = {"RT.taa_posage0"};
+			posage[1] = {"RT.taa_posage1"};
 
-				for (auto& buf : colors) {
-					glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
-					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
-					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
-				}
-
-				for (auto& buf : posage) {
-					glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
-					glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
-					glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
-				}
-
-				// clear textures to be read on first frame
-				float3 col = float3(0,0,0);
-				glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
-
-				uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
-				glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
-
-				cur = 1;
+			for (auto& buf : colors) {
+				glTextureStorage2D(buf, 1, GL_RGBA16F, size.x, size.y);
+				glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
 			}
+
+			for (auto& buf : posage) {
+				glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
+				glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
+				glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
+			}
+
+			// clear textures to be read on first frame
+			float3 col = float3(0,0,0);
+			glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
+
+			uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
+			glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
+
+			cur = 1;
 		}
 	};
 
@@ -513,7 +511,9 @@ namespace gl {
 
 			bool vct = true;
 			bool vct_dbg_primary = false;
+
 			float vct_primary_cone_width = 0.01f;
+			float vct_min_start_dist = 1.0f / 5; // 1/32
 
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -538,6 +538,7 @@ namespace gl {
 				macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 				
 				ImGui::SliderFloat("vct_primary_cone_width", &vct_primary_cone_width, 0.0005f, 0.2f);
+				ImGui::SliderFloat("vct_min_start_dist", &vct_min_start_dist, 0.001f, 16.0f);
 
 				ImGui::TreePop();
 			}
