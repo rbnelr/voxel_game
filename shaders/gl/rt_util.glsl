@@ -215,24 +215,27 @@ uniform usampler2D taa_history_posage;
 uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
-vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
+vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
 	uint age = 1u;
 	
 	vec4 prev_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
 	prev_clip.xyz /= prev_clip.w;
 	
 	uint cur_norm = 5;
-	if      (normal.x < -0.5) cur_norm = 0;
-	else if (normal.x > +0.5) cur_norm = 1;
-	else if (normal.y < -0.5) cur_norm = 2;
-	else if (normal.y > +0.5) cur_norm = 3;
-	else if (normal.z < -0.5) cur_norm = 4;
-	else if (normal.z > +0.5) cur_norm = 5;
-	
 	uint cur_pos = 0;
-	if      (cur_norm/2 == 0) cur_pos = (uint)coord.x;
-	else if (cur_norm/2 == 1) cur_pos = (uint)coord.y;
-	else if (cur_norm/2 == 2) cur_pos = (uint)coord.z;
+	
+	if (abs(normal.x) > 0.5) {
+		cur_norm = normal.x < 0.0 ? 0 : 1;
+		cur_pos = uint(floor(pos.x - 0.5)) + (normal.x < 0.0 ? 1 : 0);
+	} else if (abs(normal.y) > 0.5) {
+		cur_norm = normal.y < 0.0 ? 2 : 3;
+		cur_pos = uint(floor(pos.y - 0.5)) + (normal.y < 0.0 ? 1 : 0);
+	} else {
+		cur_norm = normal.z < 0.0 ? 4 : 5;
+		cur_pos = uint(floor(pos.z - 0.5)) + (normal.z < 0.0 ? 1 : 0);
+	}
+	
+	//bool hit = false;
 	
 	vec2 uv = prev_clip.xy * 0.5 + 0.5;
 	if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
@@ -251,6 +254,8 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
 			
 			age += 1u;
 			val = (accumulated + val) / float(age);
+			
+			//hit = true;
 		}
 	}
 	
@@ -261,9 +266,10 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, ivec3 coord, vec3 normal, ivec2 pxpos) {
 	imageStore(taa_posage, pxpos, uvec4(cur_norm, cur_pos, 0u, age));
 	
 	return val;
+	//return hit ? vec3(0,1,0) : vec3(1,0,0);
 }
 #else
-	#define APPLY_TAA(val, pos, coord, normal, pxpos) (val)
+	#define APPLY_TAA(val, pos, normal, pxpos) (val)
 #endif
 
 //
@@ -311,7 +317,7 @@ struct Hit {
 	vec3	normal; // normal mapped normal
 	vec3	gnormal; // non-normal mapped real geometry (uv-compatible) TBN
 	
-	ivec3	coord;
+	//ivec3	coord;
 	uint	bid;
 	
 	vec4	col;
@@ -522,7 +528,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		hit.bid = texelFetch(voxel_tex, coord, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
-		hit.coord = coord;
+		//hit.coord = coord;
 		
 		vec2 uv;
 		int face;
@@ -562,9 +568,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			
 			hit.normal = hit.gnormal;
 			mat3 gTBN = calc_TBN(hit.gnormal, tang);
-			
 		}
-		
 		
 		uint medium_bid = B_AIR;
 		

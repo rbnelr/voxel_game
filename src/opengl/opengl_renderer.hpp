@@ -227,9 +227,6 @@ public:
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		gradient		= {"gradient"};
 
-	Texture2DArray	test_cubeN		= {"test_cubeN"};
-	Texture2DArray	test_cubeH		= {"test_cubeH"};
-	
 	glDebugDraw		debug_draw = glDebugDraw(shaders);
 
 	virtual bool get_vsync () {

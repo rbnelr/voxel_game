@@ -72,36 +72,56 @@ namespace gl {
 		}
 	};
 #endif
-	struct RTCol {
-		Texture2D col = {};
+	struct Gbuffer {
+		Texture2D pos  = {};
+		Texture2D col  = {};
+		Texture2D norm = {};
 
-		int2 size = -1;
+		void resize (int2 size) {
+			glActiveTexture(GL_TEXTURE0);
 
-		Sampler sampler = {"RTCol.sampler"};
+			pos   = {"gbuf.pos"  }; // could be computed from depth
+			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
+			norm  = {"gbuf.norm" }; // rgb normal
 
-		void resize (int2 new_size, bool nearest) {
+			glTextureStorage2D(pos , 1, GL_RGBA32F, size.x, size.y);
+			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
+			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
+
+			glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
+
+			glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
+
+			glTextureParameteri(norm, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(norm, GL_TEXTURE_MAX_LEVEL, 0);
+		}
+	};
+	struct Framebuffer {
+		Texture2D col  = {};
+
+		Sampler sampler = {"RTBuf.sampler"};
+
+		void resize (int2 size, bool nearest) {
 			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, nearest ? GL_NEAREST : GL_LINEAR);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-			if (size != new_size) {
-				glActiveTexture(GL_TEXTURE0);
+			glActiveTexture(GL_TEXTURE0);
 
-				size = new_size;
+			col   = {"RTBuf.col"  };
 
-				col   = {"Gbuf.col"};
-
-				glTextureStorage2D(col, 1, GL_RGBA16F, size.x, size.y);
-				glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
-			}
+			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
+			glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
 		}
 	};
 	struct TemporalAA {
 		SERIALIZE(TemporalAA, enable, max_age)
 
-			Texture2D colors[2] = {};
+		Texture2D colors[2] = {};
 		Texture2D posage[2] = {};
 		int2   size = 0;
 		int    cur = 0;
@@ -392,8 +412,9 @@ namespace gl {
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
-		Shader* rt_shad = nullptr;
-		Shader* rt_post = nullptr;
+		Shader* rt_forward   = nullptr;
+		Shader* rt_lighting  = nullptr;
+		Shader* rt_post      = nullptr;
 		
 		RenderScale renderscale;
 
@@ -403,13 +424,16 @@ namespace gl {
 
 		//TestRenderer test_renderer;
 
-		RTCol rt_col;
+		Gbuffer     gbuf;
+		Framebuffer framebuf;
+
 		TemporalAA taa;
 		
 		ComputeGroupSize rt_groupsz = int2(8,8);
 
 		OGL_TIMER_HISTOGRAM(rt_total);
-		OGL_TIMER_HISTOGRAM(rt_shad);
+		OGL_TIMER_HISTOGRAM(rt_forward);
+		OGL_TIMER_HISTOGRAM(rt_lighting);
 		OGL_TIMER_HISTOGRAM(rt_post);
 		OGL_TIMER_HISTOGRAM(df_init);
 
@@ -521,10 +545,11 @@ namespace gl {
 		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_total, I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_shad , I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(rt_post , I.dt)
-			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_total    , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_forward  , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_lighting , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(rt_post     , I.dt)
+			OGL_TIMER_HISTOGRAM_UPDATE(df_init     , I.dt)
 
 			ImGui::Checkbox("enable [R]", &enable);
 
