@@ -44,7 +44,7 @@ void main () {
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
-	vec3 pos  = vec3(-1000.0 * 1000.0*1000.0*1000.0, 0.0, 0.0);
+	vec3 pos  = vec3(-1000.0 * 1000000.0, 0.0, 0.0);
 	vec4 col  = vec4(0,0,0,0);
 	vec3 norm = vec3(0,0,0);
 	

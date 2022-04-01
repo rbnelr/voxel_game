@@ -399,7 +399,6 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
-	max_dist = 400.0;
 	
 	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
 	
@@ -630,9 +629,9 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 	float transp = 1.0; // inverse alpha to support alpha stepsize fix
 	
 	for (int i=0; i<4000; ++i) {
-		//if (gl_LocalInvocationID.z == 0) {
+		if (gl_LocalInvocationID.z == 0) {
 			VISUALIZE_ITERATION
-		//}
+		}
 		
 		vec3 pos = cone_pos + cone_dir * dist;
 		float size = cone_slope * 2.0 * dist;

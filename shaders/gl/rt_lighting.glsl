@@ -6,11 +6,11 @@
 	#extension GL_ARB_shader_clock : enable
 #endif
 
-//#if VCT_DIFFUSE && !VCT_DBG_PRIMARY
-//layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y, local_size_z = WG_CONES) in;
-//#else
+#if VCT && !VCT_DBG_PRIMARY
+layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y, local_size_z = WG_CONES) in;
+#else
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
-//#endif
+#endif
 
 #include "rt_util.glsl"
 
@@ -55,7 +55,7 @@ bool read_gbuf (ivec2 pxpos, out Gbuf g, out float depth) {
 	g.col = vec4(col.rgb, 1.0);
 	g.emiss = col.rgb * col.w;
 	
-	return g.pos.x > -99.0;
+	return g.pos.x > -1000.0 * 1000000.0;
 }
 
 struct Cone {
@@ -72,15 +72,17 @@ layout(std140, binding = 4) uniform ConeConfig {
 uniform float vct_start_dist = 1.0 / 5.0;
 uniform float vct_primary_cone_width = 1.0;
 
+#if VCT
+shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
+	
 void main () {
 	INIT_VISUALIZE_COST();
 	
-	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
+	uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
+	uint coneid   = gl_LocalInvocationID.z;
+	
 	ivec2 wgroupid = ivec2(work_group_tiling(20u));
-	
-	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
-	
-	srand(pxpos.x, pxpos.y, rand_seed_time);
+	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + ivec2(gl_LocalInvocationID.xy);
 	
 	#if DEBUGDRAW
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
@@ -102,35 +104,91 @@ void main () {
 	
 	if (show_light) gbuf.col.rgb = vec3(1.0);
 	
-	vec4 col = vec4(0.0);
-	
-#if VCT
-	
-	#if VCT_DBG_PRIMARY
+#if VCT_DBG_PRIMARY
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
-	col = trace_cone(ray_pos, ray_dir,
+	vec4 col = trace_cone(ray_pos, ray_dir,
 		vct_primary_cone_width, vct_start_dist, 1000.0, true);
-	#else
-		
-	vec3 light = vec3(0.0);
 	
-	for (int i=0; i<cones.count.x; ++i) {
-		Cone c = cones.cones[i];
+	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
+	
+	GET_VISUALIZE_COST(col.rgb);
+	
+	imageStore(img_col, pxpos, col);
+#else
+	
+	// let each z-layer of threads of the WG handle one cone
+	// to improve cache access pattern of VCT
+	// since all cones will be handled simultaneously
+	// rather than cone#0 first for each single processor core on the gpu, then cone#1 etc.
+	// this pattern presumably casues too many voxels to be accessed at once
+	// (looking into the distance, each pixel can be in a different voxel)
+	// adding the Z layer to the WG, cuts down on the visible layer and makes it so that
+	// all cones of a single pixel are handled at once, which will share significant data due to starting in the same voxel
+	// and even though the following cells will differ due to differing directions
+	// the LOD increases, thus quickly increasing the amount of shared data again
+	// (pixels come nearer and nearer in the scaled down version of the world that is the LOD)
+	// This WG optimization makes a _MAJOR_ difference, it avoids 60fps -> 5fps slowdowns in the worst case
+	if (did_hit) {
+		Cone c = cones.cones[coneid];
 		
 		vec3 cone_dir = gbuf.TBN * c.dir;
 				
-		vec3 res = trace_cone(gbuf.pos, cone_dir, c.slope,
+		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope,
 			vct_start_dist, 1000.0, true).rgb * c.weight;
 		
-		light += res;
+		cone_results[threadid][coneid] = light;
+	}
+	barrier();
+		
+	// Write out results for pixel on z==0 threads in WG
+	if (coneid == 0u) {
+		
+		vec3 light = vec3(0.0);
+		
+		if (did_hit) {
+			for (uint i=0u; i<WG_CONES; ++i)
+				light += cone_results[threadid][i];
+		}
+		
+		vec4 col;
+		col.rgb = gbuf.col.rgb * light + gbuf.emiss;
+		col.a = gbuf.col.a;
+		
+		if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
+		
+		GET_VISUALIZE_COST(col.rgb);
+		
+		imageStore(img_col, pxpos, col);
 	}
 	
-	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
-	col.a = gbuf.col.a;
+#endif
+}
+#else //// Ray-based RT
+
+void main () {
+	INIT_VISUALIZE_COST();
+	
+	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
+	ivec2 wgroupid = ivec2(work_group_tiling(20u));
+	
+	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
+	
+	srand(pxpos.x, pxpos.y, rand_seed_time);
+	
+	#if DEBUGDRAW
+	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
 	#endif
-#else
+	
+	Gbuf gbuf;
+	float hit_depth;
+	bool did_hit = read_gbuf(pxpos, gbuf, hit_depth);
+	
+	if (show_light) gbuf.col.rgb = vec3(1.0);
+	
+	vec4 col = vec4(0.0);
+	
 	#if BOUNCE_ENABLE
 	vec3 light = vec3(0.0);
 	
@@ -189,7 +247,6 @@ void main () {
 		col = gbuf.col;
 	}
 	#endif
-#endif
 	
 	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
 	
@@ -197,3 +254,5 @@ void main () {
 	
 	imageStore(img_col, pxpos, col);
 }
+#endif
+	

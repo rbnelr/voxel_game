@@ -119,6 +119,9 @@ namespace gl {
 		if (taa.enable) taa.resize(renderscale.size);
 		gbuf.resize(renderscale.size);
 		framebuf.resize(renderscale.size, renderscale.nearest);
+		
+		macro_change |= vct_conedev(r, game);
+		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
@@ -129,9 +132,6 @@ namespace gl {
 
 		//
 		
-		macro_change |= vct_conedev(r, game);
-		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
-
 		if (I.buttons[KEY_R].went_down)
 			enable = !enable;
 
