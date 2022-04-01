@@ -6,7 +6,11 @@
 	#extension GL_ARB_shader_clock : enable
 #endif
 
+//#if VCT_DIFFUSE && !VCT_DBG_PRIMARY
+//layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y, local_size_z = WG_CONES) in;
+//#else
 layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
+//#endif
 
 #include "rt_util.glsl"
 
@@ -28,19 +32,45 @@ uniform sampler2D gbuf_pos;
 uniform sampler2D gbuf_col;
 uniform sampler2D gbuf_norm;
 
-bool read_gbuf (ivec2 pxpos, out Hit hit, out float depth) {
-	hit.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
-	vec4 col    = texelFetch(gbuf_col , pxpos, 0);
-	hit.normal  = texelFetch(gbuf_norm, pxpos, 0).rgb;
+struct Gbuf {
+	vec3 pos;
+	vec3 normal;
+	vec4 col;
+	vec3 emiss;
+	
+	mat3 TBN;
+};
+bool read_gbuf (ivec2 pxpos, out Gbuf g, out float depth) {
+	g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
+	vec4 col  = texelFetch(gbuf_col , pxpos, 0);
+	g.normal  = texelFetch(gbuf_norm, pxpos, 0).rgb;
+	
+	g.normal = normalize(g.normal);
+	
+	g.TBN = calc_TBN(g.normal, generate_tangent(g.normal));
 	
 	//hit.dist = depth;
 	//hit.coord = ivec3(floor(hit.pos));
 	
-	hit.col = vec4(col.rgb, 1.0);
-	hit.emiss = col.rgb * col.w;
+	g.col = vec4(col.rgb, 1.0);
+	g.emiss = col.rgb * col.w;
 	
-	return hit.pos.x > -99.0;
+	return g.pos.x > -99.0;
 }
+
+struct Cone {
+	vec3   dir;
+	float  slope;
+	float  weight;
+	float _pad0, _pad1, _pad2;
+};
+layout(std140, binding = 4) uniform ConeConfig {
+	ivec4 count; // vector for padding
+	Cone cones[32];
+} cones;
+
+uniform float vct_start_dist = 1.0 / 5.0;
+uniform float vct_primary_cone_width = 1.0;
 
 void main () {
 	INIT_VISUALIZE_COST();
@@ -56,9 +86,9 @@ void main () {
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
 	#endif
 	
-	Hit hit;
+	Gbuf gbuf;
 	float hit_depth;
-	bool did_hit = read_gbuf(pxpos, hit, hit_depth);
+	bool did_hit = read_gbuf(pxpos, gbuf, hit_depth);
 	
 	#if 0 && DEBUGDRAW
 	if (_dbgdraw) {
@@ -70,17 +100,45 @@ void main () {
 	}
 	#endif
 	
-	if (show_light) hit.col.rgb = vec3(1.0);
+	if (show_light) gbuf.col.rgb = vec3(1.0);
 	
 	vec4 col = vec4(0.0);
 	
-	#if BOUNCE_ENABLE
+#if VCT
 	
+	#if VCT_DBG_PRIMARY
+	vec3 ray_pos, ray_dir;
+	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	
+	col = trace_cone(ray_pos, ray_dir,
+		vct_primary_cone_width, vct_start_dist, 1000.0, true);
+	#else
+		
+	vec3 light = vec3(0.0);
+	
+	for (int i=0; i<cones.count.x; ++i) {
+		Cone c = cones.cones[i];
+		
+		vec3 cone_dir = gbuf.TBN * c.dir;
+				
+		vec3 res = trace_cone(gbuf.pos, cone_dir, c.slope,
+			vct_start_dist, 1000.0, true).rgb * c.weight;
+		
+		light += res;
+	}
+	
+	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
+	col.a = gbuf.col.a;
+	#endif
+#else
+	#if BOUNCE_ENABLE
 	vec3 light = vec3(0.0);
 	
 	if (did_hit) {
 		for (int j=0; j<bounce_samples; ++j) {
-			Hit hit2 = hit;
+			Hit hit2;
+			hit2.pos = gbuf.pos;
+			hit2.normal = gbuf.normal;
 			
 			vec3 A = vec3(1.0);
 			
@@ -117,22 +175,23 @@ void main () {
 		light *= 1.0 / float(bounce_samples);
 	}
 	
-	light = APPLY_TAA(light, hit.pos, hit.normal, pxpos);
+	light = APPLY_TAA(light, gbuf.pos, gbuf.normal, pxpos);
 	
-	col.rgb = hit.col.rgb * light + hit.emiss;
-	col.a = hit.col.a;
+	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
+	col.a = gbuf.col.a;
 	#else
 	if (did_hit) {
-		float sun = max(dot(hit.normal, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
+		float sun = max(dot(gbuf.normal, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
 		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
 		
-		hit.col.rgb *= sun*sun * (1.0 - amb) + amb;
+		gbuf.col.rgb *= sun*sun * (1.0 - amb) + amb;
 		
-		col = hit.col;
+		col = gbuf.col;
 	}
 	#endif
+#endif
 	
-	if (show_normals) col.rgb = hit.normal * 0.5 + 0.5;
+	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
 	
 	GET_VISUALIZE_COST(col.rgb);
 	

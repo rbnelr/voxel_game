@@ -7,6 +7,108 @@
 #include "engine/window.hpp" // for frame_counter hack
 
 namespace gl {
+	
+	//
+	lrgba cols[] = {
+		{1,0,0,1},
+		{0,1,0,1},
+		{0,0,1,1},
+		{1,1,0,1},
+		{1,0,1,1},
+		{0,1,1,1},
+	};
+	bool Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
+		static bool draw_cones=false, draw_boxes=false;
+		static float start_dist = 0.16f;
+	
+		ImGui::Checkbox("draw cones", &draw_cones);
+		ImGui::SameLine();
+		ImGui::Checkbox("draw boxes", &draw_boxes);
+		ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
+
+		struct Set {
+			int count = 8;
+			float cone_ang = 40.1f;
+
+			float start_azim = 22.5f;
+			float elev_offs = 2.1f;
+
+			float weight = 1.0f;
+		};
+		static std::vector<Set> sets = {
+			{ 8, 40.1f, 22.5f, 2.1f, 0.25f },
+			{ 4, 38.9f, 45.0f, 40.2f, 1.0f },
+		};
+
+		int set_count = (int)sets.size();
+		ImGui::DragInt("sets", &set_count, 0.01f);
+		sets.resize(set_count);
+
+		cone_data.count = 0;
+
+		float total_weight = 0;
+
+		bool count_changed = false;
+
+		int j=0;
+		for (auto& s : sets) {
+			ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set");
+
+			count_changed = ImGui::SliderInt("count", &s.count, 0, 16) || count_changed;
+			ImGui::DragFloat("cone_ang", &s.cone_ang, 0.1f, 0, 180);
+
+			ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
+			ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
+
+			ImGui::DragFloat("weight", &s.weight, 0.01f);
+
+			float ang = deg(s.cone_ang);
+
+			for (int i=0; i<s.count; ++i) {
+				float3 cone_pos = game.player.pos;
+
+				float3x3 rot = rotate3_Z((float)(i-1) / s.count * deg(360) + deg(s.start_azim)) *
+						rotate3_Y(deg(90) - ang * 0.5f - deg(s.elev_offs));
+
+				auto& col = cols[i % ARRLEN(cols)];
+				if (draw_cones) g_debugdraw.wire_cone(cone_pos, ang, 30, rot, col, 32, 4);
+
+				float3 cone_dir = rot * float3(0,0,1);
+				float cone_slope = tan(ang * 0.5f);
+				float dist = start_dist;
+
+				cone_data.cones[j++] = { cone_dir, cone_slope, s.weight, 0 };
+		
+				int j=0;
+				while (j++ < 100 && dist < 100.0f) {
+					float3 pos = cone_pos + cone_dir * dist;
+					float r = cone_slope * dist;
+					//g_debugdraw.wire_sphere(pos, r, col, 16, 4);
+					if (draw_boxes) g_debugdraw.wire_cube(pos, r*2, col);
+
+					dist = (dist + r) / (1.0f - cone_slope);
+				}
+
+				total_weight += s.weight;
+			}
+
+			cone_data.count += s.count;
+
+			ImGui::TreePop();
+		}
+
+		// normalize weights
+		j=0;
+		for (auto& s : sets) {
+			for (int i=0; i<s.count; ++i) {
+				cone_data.cones[j++].weight /= total_weight;
+			}
+		}
+
+		return count_changed;
+	}
+
+
 	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
 		ZoneScoped;
 
@@ -26,6 +128,9 @@ namespace gl {
 		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post");
 
 		//
+		
+		macro_change |= vct_conedev(r, game);
+		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 
 		if (I.buttons[KEY_R].went_down)
 			enable = !enable;
@@ -146,8 +251,14 @@ namespace gl {
 		{ // layer 1+
 			glUseProgram(filter->prog);
 
-			r.state.bind_textures(filter, {});
-			bind_textures(filter, 0);
+			r.state.bind_textures(filter, {
+				{"vct_texNX", textures[0].tex, sampler },
+				{"vct_texPX", textures[1].tex, sampler },
+				{"vct_texNY", textures[2].tex, sampler },
+				{"vct_texPY", textures[3].tex, sampler },
+				{"vct_texNZ", textures[4].tex, sampler },
+				{"vct_texPZ", textures[5].tex, sampler },
+			});
 
 			// filter only texels for each chunk (up to 4x4x4 work groups)
 			for (int layer=1; layer<FILTER_CHUNK_MIPS; ++layer)
@@ -391,6 +502,8 @@ namespace gl {
 		shad->set_uniform("bounce_samples", lighting.bounce_samples);
 
 		shad->set_uniform("roughness", lighting.roughness);
+
+		shad->set_uniform("vct_primary_cone_width", lighting.vct_primary_cone_width);
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
@@ -416,7 +529,6 @@ namespace gl {
 					
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
-				vct_data.bind_textures(rt_forward, 4); // 4 is number of textures bound ^ above
 				
 				glBindImageTexture(0, gbuf.pos , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 				glBindImageTexture(1, gbuf.col , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
@@ -468,11 +580,18 @@ namespace gl {
 			r.state.bind_textures(rt_lighting, {
 				{"voxel_tex", voxel_tex.tex},
 				{"df_tex", df_tex.tex},
+
+				{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler },
+				{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler },
+				{"vct_texNY", vct_data.textures[2].tex, vct_data.sampler },
+				{"vct_texPY", vct_data.textures[3].tex, vct_data.sampler },
+				{"vct_texNZ", vct_data.textures[4].tex, vct_data.sampler },
+				{"vct_texPZ", vct_data.textures[5].tex, vct_data.sampler },
 		
 				{"gbuf_pos" ,  gbuf.pos  },
 				{"gbuf_col" ,  gbuf.col  },
 				{"gbuf_norm",  gbuf.norm },
-		
+				
 				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
 				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
 		

@@ -346,19 +346,6 @@ namespace gl {
 			{"VCT.texPZ", MIPS, TEX_WIDTH},
 		};
 
-		void bind_textures (Shader* shad, int base_tex_unit) {
-
-			GLint units[6];
-			for (int i=0; i<6; ++i) {
-				int unit = base_tex_unit + i;
-				glActiveTexture(GL_TEXTURE0 + unit);
-				glBindSampler(unit, sampler);
-				glBindTexture(GL_TEXTURE_3D, textures[i].tex);
-				units[i] = unit;
-			}
-			glUniform1iv(shad->get_uniform_location("vct_tex[0]"), 6, units);
-		}
-
 		Sampler sampler = {"sampler"};
 		Sampler filter_sampler = {"filter_sampler"};
 
@@ -441,9 +428,12 @@ namespace gl {
 			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
+			         {"WG_CONES", prints("%d", cone_data.count)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
+			         {"VCT", lighting.vct ? "1":"0"},
+			         {"VCT_DBG_PRIMARY", lighting.vct_dbg_primary ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
@@ -505,7 +495,7 @@ namespace gl {
 
 		struct Lighting {
 			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, bounce_samples, roughness)
-
+			
 			bool show_light = false;
 			bool show_normals = false;
 
@@ -519,6 +509,11 @@ namespace gl {
 			bool bevel = true;
 
 			float post_exposure = 1.0f;
+
+
+			bool vct = true;
+			bool vct_dbg_primary = false;
+			float vct_primary_cone_width = 0.01f;
 
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
@@ -536,6 +531,13 @@ namespace gl {
 				macro_change |= ImGui::Checkbox("bevel", &bevel);
 
 				ImGui::SliderFloat("post_exposure", &post_exposure, 0.0005f, 4.0f);
+				
+				ImGui::Separator();
+
+				macro_change |= ImGui::Checkbox("vct", &vct);
+				macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
+				
+				ImGui::SliderFloat("vct_primary_cone_width", &vct_primary_cone_width, 0.0005f, 0.2f);
 
 				ImGui::TreePop();
 			}
@@ -586,6 +588,24 @@ namespace gl {
 
 		void set_uniforms (OpenglRenderer& r, Game& game, Shader* shad);
 		void draw (OpenglRenderer& r, Game& game);
+
+	
+		struct Cone {
+			float3 dir;
+			float  slope;
+			float  weight;
+			float3 _pad;
+		};
+		struct ConeConfig {
+			int count;
+			int _pad[3];
+			Cone cones[32];
+		};
+		ConeConfig cone_data;
+
+		Ubo cones_ubo = {"RT.cones_ubo"};
+
+		bool vct_conedev (OpenglRenderer& r, Game& game);
 	};
 
 } // namespace gl

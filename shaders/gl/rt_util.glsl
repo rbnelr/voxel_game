@@ -587,3 +587,85 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	return true; // hit
 }
+
+
+uniform float vct_stepsize = 1.0;
+
+vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
+	float lod = log2(size);
+	
+	#if 1
+	// prevent small samples from being way too blurry
+	// -> simulate negative lods (size < 1.0) by snapping texture coords to nearest texels
+	// when approaching size=0
+	// size = 0.5 would snap [0.25,0.75] to 0.5
+	//              and lerp [0.75,1.25] in [0.5,1.5]
+	size = min(size, 1.0);
+	texcoord = 0.5 * size + texcoord;
+	texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
+	#endif
+	texcoord *= INV_WORLD_SIZEf;
+	
+	vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
+	vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
+	vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
+	
+	vec3 sqr = dir * dir;
+	vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+	
+	//vec3 weight = min(abs(dir) * 15.0, 1.0);
+	//valX.a *= weight.x;
+	//valY.a *= weight.y;
+	//valZ.a *= weight.z;
+	
+	val.a = max(max(valX.a, valY.a), valZ.a);
+	
+	return val;
+}
+vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
+	
+	float dist = start_dist;
+	
+	vec3 color = vec3(0.0);
+	float transp = 1.0; // inverse alpha to support alpha stepsize fix
+	
+	for (int i=0; i<4000; ++i) {
+		//if (gl_LocalInvocationID.z == 0) {
+			VISUALIZE_ITERATION
+		//}
+		
+		vec3 pos = cone_pos + cone_dir * dist;
+		float size = cone_slope * 2.0 * dist;
+		
+		float stepsize = size * vct_stepsize;
+		
+		vec4 sampl = read_vct_texture(pos, cone_dir, size);
+		
+		vec3 new_col = color + transp * sampl.rgb;
+		float new_transp = transp - transp * sampl.a;
+		//transp -= transp * pow(sampl.a, 1.0 / min(stepsize, 1.0));
+		
+		#if DEBUGDRAW
+		if (_dbgdraw && dbg) {
+			//vec4 col = vec4(1,0,0,1);
+			//vec4 col = vec4(sampl.rgb, 1.0-transp);
+			//vec4 col = vec4(vec3(sampl.a), 1.0-transp);
+			vec4 col = vec4(vec3(sampl.a), 1.0);
+			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
+		}
+		#endif
+		
+		color = new_col;
+		transp = new_transp;
+		
+		dist += stepsize;
+		
+		if (transp < 0.005 || dist >= max_dist)
+			break;
+	}
+	
+	//return vec4(vec3(dist / 300.0), 1.0);
+	//return vec4(vec3(transp), 1.0);
+	return vec4(color, 1.0 - transp);
+}
+

@@ -55,11 +55,11 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		
 		
 		
-		uint bids[3][3][3];
-		for (int z=0; z<3; ++z)
-		for (int y=0; y<3; ++y)
-		for (int x=0; x<3; ++x)
-			bids[z][y][x] = texelFetch(voxel_tex, dst_pos + ivec3(x-1,y-1,z-1), 0).r;
+		//uint bids[3][3][3];
+		//for (int z=0; z<3; ++z)
+		//for (int y=0; y<3; ++y)
+		//for (int x=0; x<3; ++x)
+		//	bids[z][y][x] = texelFetch(voxel_tex, dst_pos + ivec3(x-1,y-1,z-1), 0).r;
 		
 		float alpha = 1.0;
 		if      (bid == B_AIR   ) alpha = 0.0;
@@ -69,20 +69,20 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//emissive += col.rgb * 0.03; // makes everything glow, for testing
 		
 	#if 1
-		bool visible = false;
-		for (int z=0; z<3; ++z)
-		for (int y=0; y<3; ++y)
-		for (int x=0; x<3; ++x)
-			if (x!=1 || y!=1 || z!=1)
-				visible = visible || bids[z][y][x] == B_AIR;
+		//bool visible = false;
+		//for (int z=0; z<3; ++z)
+		//for (int y=0; y<3; ++y)
+		//for (int x=0; x<3; ++x)
+		//	if (x!=1 || y!=1 || z!=1)
+		//		visible = visible || bids[z][y][x] == B_AIR;
 		
 		//bool visible =
 		//	(bids[1][1][0] == B_AIR) || (bids[1][1][2] == B_AIR) ||
 		//	(bids[1][0][1] == B_AIR) || (bids[1][2][1] == B_AIR) ||
 		//	(bids[0][1][1] == B_AIR) || (bids[2][1][1] == B_AIR);
 		
-		if (!visible) emissive = vec3(0.0);
-		if (!visible) alpha = 0.0;
+		//if (!visible) emissive = vec3(0.0);
+		//if (!visible) alpha = 0.0;
 		
 		emissive *= alpha;
 		
@@ -190,29 +190,29 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 			ivec3 src_pos = dst_pos * 2;
 			
 			{
-				LOAD(vct_tex[0], read_mip)
+				LOAD(vct_texNX, read_mip)
 				STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
 			}
 			{
-				LOAD(vct_tex[1], read_mip)
+				LOAD(vct_texPX, read_mip)
 				STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
 			}
 			
 			{
-				LOAD(vct_tex[2], read_mip)
+				LOAD(vct_texNY, read_mip)
 				STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
 			}
 			{
-				LOAD(vct_tex[3], read_mip)
+				LOAD(vct_texPY, read_mip)
 				STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
 			}
 			
 			{
-				LOAD(vct_tex[4], read_mip)
+				LOAD(vct_texNZ, read_mip)
 				STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
 			}
 			{
-				LOAD(vct_tex[5], read_mip)
+				LOAD(vct_texPZ, read_mip)
 				STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
 			}
 		}
