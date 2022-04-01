@@ -319,11 +319,6 @@ struct Hit {
 	float	emiss_raw;
 };
 
-uniform sampler2DArray test_cubeN;
-uniform sampler2DArray test_cubeH;
-
-const float tex = 2.0;
-
 #if BEVEL
 uint read_voxel_bevel_type (ivec3 coord) {
 	uint bid = texelFetch(voxel_tex, coord, 0).r;
@@ -396,8 +391,6 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 }
 #endif
 
-uniform int test_lod = 2;
-
 bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		vec3 raycol, bool primray) {
 	max_dist = 400.0;
@@ -448,7 +441,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	vec3 bevel_normal = vec3(0.0);
 	
-#if 0
 	for (;;) {
 		VISUALIZE_ITERATION
 		
@@ -498,8 +490,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			
 			if (dfi < 0) {
 			#if BEVEL
-				if (primray || box_bevel(ray_pos, ray_dir, coord, dist, t1, bevel_normal))
-			#endif
+				if (box_bevel(ray_pos, ray_dir, coord, dist, t1, bevel_normal))
+			#endif // !primray || 
 					break; // hit
 			}
 			
@@ -524,57 +516,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	if (iter >= max_iterations || dist >= max_dist)
 		return false; // miss
-#else
-	int lodsz = 1<<test_lod;
-	
-	coord &= ~(lodsz-1);
-	
-	vec3 t1v = inv_dir * vec3(coord + vox_exit*lodsz) + bias;
-	vec3 tstep = inv_dir * mix(vec3(-1), vec3(+1), dir_sign);
-	
-	step_dir *= lodsz;
-	tstep *= lodsz;
-	
-	vec4 accum = vec4(0.0);
-	int axis = 0;
-	ivec3 faces = mix(ivec3(0,2,4), ivec3(1,3,5), dir_sign);
-	
-	for (;;) {
-		VISUALIZE_ITERATION
-		
-		#if DEBUGDRAW
-		if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + float(lodsz)/2.0 - WORLD_SIZEf/2.0, vec3(lodsz), vec4(1,1,0,1));
-		#endif
-		
-		//int dfi = texelFetch(df_tex, coord, 0).r;
-		vec4 vct = texelFetch(vct_tex[faces[axis]], coord>>test_lod, test_lod) * VCT_UNPACK;
-		
-		accum.rgb += (1.0 - accum.a) * vct.rgb;
-		accum.a   += (1.0 - accum.a) * vct.a;
-		
-		if (accum.a > 0.98)
-			break;
-		
-		dist = min(min(t1v.x, t1v.y), t1v.z);
-		
-		if (++iter >= max_iterations || dist >= max_dist)
-			break;
-		
-		// step on axis where exit distance is lowest
-		if      (t1v.x == dist) { coord.x += step_dir.x; t1v.x += tstep.x; axis = 0; }
-		else if (t1v.y == dist) { coord.y += step_dir.y; t1v.y += tstep.y; axis = 1; }
-		else                    { coord.z += step_dir.z; t1v.z += tstep.z; axis = 2; }
-	}
-	
-	#if DEBUGDRAW
-	if (_dbgdraw)
-		dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
-	#endif
-	
-	hit.col = vec4(accum.rgb, 1.0) * accum.a;
-	
-	return true;
-#endif
 	
 	{ // calc hit info
 		
@@ -622,18 +563,6 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			hit.normal = hit.gnormal;
 			mat3 gTBN = calc_TBN(hit.gnormal, tang);
 			
-		#if NORMAL_MAPPING
-			if (!was_bevel) { // normal mapping
-				const float normal_map_stren = 1.0;
-				
-				vec3 sampl = textureLod(test_cubeN, vec3(uv, tex), 0.0).rgb;
-				sampl = sampl * 2.0 - 1.0;
-				sampl.xy *= normal_map_stren;
-				
-				//hit.normal = hit.gTBN * vec3(sampl, sqrt(1.0 - sampl.x*sampl.x - sampl.y*sampl.y));
-				hit.normal = hit.gTBN * normalize(sampl);
-			}
-		#endif
 		}
 		
 		

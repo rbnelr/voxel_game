@@ -10,6 +10,14 @@ namespace gl {
 	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
 		ZoneScoped;
 
+		renderscale.update(r.render_size);
+
+		r.update_view(game.view, renderscale.size);
+
+		if (taa.enable) taa.resize(renderscale.size);
+		rt_col.resize(renderscale.size, renderscale.nearest);
+
+
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
 		if (!rt_shad) rt_shad = r.shaders.compile("rt_shad", get_macros(), {{ COMPUTE_SHADER }});
@@ -353,14 +361,14 @@ namespace gl {
 	void Raytracer::set_uniforms (OpenglRenderer& r, Game& game, Shader* shad) {
 		shad->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
 
-		shad->set_uniform("framebuf_size", r.render_size);
+		shad->set_uniform("framebuf_size", renderscale.size);
 		shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
 		float near_px_size;
 		{
 			// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
 			float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
-			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)r.render_size),0,1); // pixel one to the up/right in cam space
+			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)renderscale.size),0,1); // pixel one to the up/right in cam space
 			near_px_size = b.x - a.x;
 		}
 		shad->set_uniform("near_px_size", near_px_size);
@@ -378,10 +386,6 @@ namespace gl {
 
 		shad->set_uniform("roughness", lighting.roughness);
 
-		shad->set_uniform("parallax_zstep",    lighting.parallax_zstep);
-		shad->set_uniform("parallax_max_step", lighting.parallax_max_step);
-		shad->set_uniform("parallax_scale",    lighting.parallax_scale);
-
 		static int lod = 2;
 		ImGui::SliderInt("lod", &lod, 0, 10);
 		lod = clamp(lod, 0, 10);
@@ -392,10 +396,7 @@ namespace gl {
 		if (!rt_shad->prog || !rt_post->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
 
-		if (taa.enable) taa.resize(r.render_size);
-		rt_col.resize(r.render_size);
-
-		{ // 'forward' gbuf pass
+		{ // 'forward' pass
 			
 			{ // forward voxel raycast pass
 				ZoneScopedN("rt_shad");
@@ -406,15 +407,37 @@ namespace gl {
 		
 				set_uniforms(r, game, rt_shad);
 		
+				
+				// TAA
+				GLuint prev_color  = taa.colors[taa.cur ^ 1];
+				GLuint prev_posage = taa.posage[taa.cur ^ 1];
+				GLuint cur_color   = taa.colors[taa.cur];
+				GLuint cur_posage  = taa.posage[taa.cur];
+		
+				if (taa.enable) {
+					rt_shad->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
+					rt_shad->set_uniform("taa_max_age", taa.max_age);
+		
+					glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
+					glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+		
+					taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+					taa.cur ^= 1;
+				}
+
+		
 				r.state.bind_textures(rt_shad, {
 					{"voxel_tex", voxel_tex.tex},
 					{"df_tex", df_tex.tex},
+					
+					(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
+					(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
 		
 					{"tile_textures", r.tile_textures, r.pixelated_sampler},
-		
+					
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
-				vct_data.bind_textures(rt_shad, 4); // 4 is number of textures bound ^ above
+				vct_data.bind_textures(rt_shad, 6); // 4 is number of textures bound ^ above
 				
 				glBindImageTexture(0, rt_col.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
@@ -488,6 +511,8 @@ namespace gl {
 		//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT
 		//	|GL_COMMAND_BARRIER_BIT); // for indirect draw
 	#endif
+		
+		r.update_view(game.view, r.render_size);
 
 		{ // post
 			OGL_TIMER_ZONE(timer_rt_post.timer);

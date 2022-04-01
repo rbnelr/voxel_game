@@ -1414,6 +1414,28 @@ inline int calc_mipmaps (int w, int h) {
 	return count;
 }
 
+struct RenderScale {
+
+	int2 size = 0;
+	float renderscale = 1.0f;
+
+	bool nearest = false;
+	
+	void imgui () {
+		ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", size.x, size.y, (float)(size.x * size.y) / (1000*1000));
+		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
+
+		ImGui::Checkbox("nearest", &nearest);
+	}
+
+	bool update (int2 output_size) {
+		auto old_size = size;
+		size = max(1, roundi((float2)output_size * renderscale));
+
+		return old_size != size;
+	}
+};
+
 // framebuffer for rendering at different resolution and to make sure we get float buffers
 struct FramebufferTexture {
 	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
@@ -1422,16 +1444,10 @@ struct FramebufferTexture {
 	Texture2D color	= {};
 	Texture2D depth	= {};
 
-	int2 size = 0;
-	float renderscale = 1.0f;
-
-	bool nearest = false;
+	RenderScale renderscale;
 
 	void imgui () {
-		ImGui::Text("res: %4d x %4d px (%5.2f Mpx)", size.x, size.y, (float)(size.x * size.y) / (1000*1000));
-		ImGui::SliderFloat("renderscale", &renderscale, 0.02f, 2.0f);
-
-		ImGui::Checkbox("nearest", &nearest);
+		renderscale.imgui();
 	}
 
 	static constexpr GLenum color_format = GL_RGBA16F;// GL_RGBA32F   GL_SRGB8_ALPHA8
@@ -1439,32 +1455,29 @@ struct FramebufferTexture {
 	static constexpr bool color_mips = true;
 
 	void update (int2 window_size) {
-		auto old_size = size;
-		size = max(1, roundi((float2)window_size * renderscale));
-
-		if (old_size != size) {
+		if (renderscale.update(window_size)) {
 			glActiveTexture(GL_TEXTURE0); // try clobber consistent texture at least
-
+		
 			fbo    = {"Framebuffer.fbo"  };
 			color  = {"Framebuffer.color"};
 			depth  = {"Framebuffer.depth"};
-
+		
 			GLint levels = 1;
 			if (color_mips)
-				levels = calc_mipmaps(size.x, size.y);
-
+				levels = calc_mipmaps(renderscale.size.x, renderscale.size.y);
+		
 			// create new
-			glTextureStorage2D(color, levels, color_format, size.x, size.y);
+			glTextureStorage2D(color, levels, color_format, renderscale.size.x, renderscale.size.y);
 			glTextureParameteri(color, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(color, GL_TEXTURE_MAX_LEVEL, levels-1);
-
-			glTextureStorage2D(depth, 1, depth_format, size.x, size.y);
+		
+			glTextureStorage2D(depth, 1, depth_format, renderscale.size.x, renderscale.size.y);
 			glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
-
+		
 			glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, color, 0);
 			glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, depth, 0);
-
+		
 			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 			//if (status != GL_FRAMEBUFFER_COMPLETE) {
 			//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);

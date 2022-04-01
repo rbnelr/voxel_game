@@ -79,20 +79,18 @@ namespace gl {
 
 		Sampler sampler = {"RTCol.sampler"};
 
-		RTCol () {
+		void resize (int2 new_size, bool nearest) {
 			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, nearest ? GL_NEAREST : GL_LINEAR);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		}
 
-		void resize (int2 new_size) {
 			if (size != new_size) {
 				glActiveTexture(GL_TEXTURE0);
 
 				size = new_size;
 
-				col   = {"Gbuf.col"  };
+				col   = {"Gbuf.col"};
 
 				glTextureStorage2D(col, 1, GL_RGBA16F, size.x, size.y);
 				glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
@@ -397,6 +395,8 @@ namespace gl {
 		Shader* rt_shad = nullptr;
 		Shader* rt_post = nullptr;
 		
+		RenderScale renderscale;
+
 		VoxelTexture voxel_tex;
 		DFTexture df_tex;
 		VCT_Data vct_data;
@@ -418,7 +418,6 @@ namespace gl {
 			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
 			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
 			         {"TAA_ENABLE", taa.enable ? "1":"0"},
-			         {"NORMAL_MAPPING", lighting.normal_map ? "1":"0"},
 			         {"BEVEL", lighting.bevel ? "1":"0"},
 			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
@@ -493,13 +492,7 @@ namespace gl {
 
 			float roughness = 0.8f;
 
-			bool normal_map = false;
 			bool bevel = true;
-
-			//
-			float parallax_zstep = 0.004f;
-			float parallax_max_step = 0.02f;
-			float parallax_scale = 0.15f;
 
 			float post_exposure = 1.0f;
 
@@ -516,13 +509,8 @@ namespace gl {
 
 				ImGui::SliderFloat("roughness", &roughness, 0,1);
 
-				macro_change |= ImGui::Checkbox("normal mapping", &normal_map);
 				macro_change |= ImGui::Checkbox("bevel", &bevel);
 
-				ImGui::SliderFloat("parallax_zstep", &parallax_zstep, 0.0005f, 0.1f);
-				ImGui::SliderFloat("parallax_max_step", &parallax_max_step, 0.0005f, 0.1f);
-				ImGui::SliderFloat("parallax_scale", &parallax_scale, 0.0005f, 0.25f);
-				
 				ImGui::SliderFloat("post_exposure", &post_exposure, 0.0005f, 4.0f);
 
 				ImGui::TreePop();
@@ -539,6 +527,8 @@ namespace gl {
 			OGL_TIMER_HISTOGRAM_UPDATE(df_init, I.dt)
 
 			ImGui::Checkbox("enable [R]", &enable);
+
+			renderscale.imgui();
 
 			ImGui::SliderInt("max_iterations", &max_iterations, 1, 1024, "%4d", ImGuiSliderFlags_Logarithmic);
 

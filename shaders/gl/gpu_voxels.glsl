@@ -78,11 +78,4 @@ float get_emmisive (uint bid) {
 uniform usampler3D voxel_tex;
 uniform isampler3D df_tex;
 
-//uniform sampler3D vct_texNX;
-//uniform sampler3D vct_texPX;
-//uniform sampler3D vct_texNY;
-//uniform sampler3D vct_texPY;
-//uniform sampler3D vct_texNZ;
-//uniform sampler3D vct_texPZ;
-
 uniform sampler3D vct_tex[6];

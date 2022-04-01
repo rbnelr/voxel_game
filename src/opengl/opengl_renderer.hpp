@@ -238,6 +238,15 @@ public:
 	virtual void set_vsync (bool state) {
 		ctx.set_vsync(state);
 	}
+	
+	void update_view (Camera_View const& view, int2 viewport_size) {
+		memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
+		common_uniforms.view.set(view, (float2)viewport_size);
+		upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
+			
+		glViewport(0,0, viewport_size.x, viewport_size.y);
+		glScissor (0,0, viewport_size.x, viewport_size.y);
+	}
 
 	bool load_textures (GenericVertexData& mesh_data); // can be reloaded
 	bool load_static_data ();
