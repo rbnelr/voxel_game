@@ -40,10 +40,18 @@ struct Gbuf {
 	
 	mat3 TBN;
 };
-bool read_gbuf (ivec2 pxpos, out Gbuf g, out float depth) {
-	g.pos     = texelFetch(gbuf_pos , pxpos, 0).rgb;
-	vec4 col  = texelFetch(gbuf_col , pxpos, 0);
-	g.normal  = texelFetch(gbuf_norm, pxpos, 0).rgb;
+bool read_gbuf (ivec2 pxpos, out Gbuf g) {
+	
+	float depth = texelFetch(gbuf_pos , pxpos, 0).r;
+	vec4 col    = texelFetch(gbuf_col , pxpos, 0);
+	g.normal    = texelFetch(gbuf_norm, pxpos, 0).rgb;
+	
+	// reconstruct position from depth
+	vec3 ray_pos, ray_dir;
+	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	
+	g.pos    = depth_to_pos(ray_dir, depth);
+	
 	
 	g.normal = normalize(g.normal);
 	
@@ -53,9 +61,9 @@ bool read_gbuf (ivec2 pxpos, out Gbuf g, out float depth) {
 	//hit.coord = ivec3(floor(hit.pos));
 	
 	g.col = vec4(col.rgb, 1.0);
-	g.emiss = col.rgb * col.w;
+	g.emiss = col.rgb * col.a;
 	
-	return g.pos.x > -1000.0 * 1000000.0;
+	return depth > 0.0;
 }
 
 struct Cone {
@@ -89,13 +97,12 @@ void main () {
 	#endif
 	
 	Gbuf gbuf;
-	float hit_depth;
-	bool did_hit = read_gbuf(pxpos, gbuf, hit_depth);
+	bool did_hit = read_gbuf(pxpos, gbuf);
 	
 	#if 0 && DEBUGDRAW
 	if (_dbgdraw) {
-		vec3 p = hit.pos - WORLD_SIZEf/2.0;
-		mat3 TBN = generate_TBN(hit.normal);
+		vec3 p = gbuf.pos - WORLD_SIZEf/2.0;
+		mat3 TBN = generate_TBN(gbuf.normal);
 		dbgdraw_vector(p, TBN[0] * 0.3, vec4(1,0,0,1));
 		dbgdraw_vector(p, TBN[1] * 0.3, vec4(0,1,0,1));
 		dbgdraw_vector(p, TBN[2] * 0.3, vec4(0,0,1,1));
@@ -184,8 +191,7 @@ void main () {
 	#endif
 	
 	Gbuf gbuf;
-	float hit_depth;
-	bool did_hit = read_gbuf(pxpos, gbuf, hit_depth);
+	bool did_hit = read_gbuf(pxpos, gbuf);
 	
 	if (show_light) gbuf.col.rgb = vec3(1.0);
 	

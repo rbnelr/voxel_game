@@ -34,13 +34,20 @@ struct ViewUniforms {
 	float    clip_near;
 	float    clip_far;
 
+	float2   _pad;
+
 	float2   viewport_size;
+	// 1 / viewport_size * 2
+	// use  px_center * inv_double_viewport_size - 1.0  to get [-1,1] uvs from px coords
+	float2   inv_viewport_size2;
 
 	// for simpler RT get_ray calculation float4 for padding
-	float4   frust_x;
-	float4   frust_y;
-	float4   frust_z;
+	float4   frust_x; // from center of near plane to right edge
+	float4   frust_y; // from center of near plane to top edge
+	float4   frust_z; // from camera center to center of near plane
+
 	float4   cam_pos; // cam position
+	float4   cam_forw; // like frust_z but normalized to 1 world unit
 
 	void set (Camera_View const& view, float2 const& render_size) {
 		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
@@ -55,6 +62,7 @@ struct ViewUniforms {
 		clip_far = view.clip_far;
 
 		viewport_size = render_size;
+		inv_viewport_size2 = 2.0f / render_size;
 
 		{
 			float3 cam_x   = (float3)cam_to_world.arr[0];
@@ -62,12 +70,12 @@ struct ViewUniforms {
 			float3 cam_z   = (float3)cam_to_world.arr[2];
 			float3 cam_pos = (float3)view.cam_to_world.arr[3];
 
-			float2 frustrum_size = (float2)(view.clip_to_cam * (float4(1,1,-1,1) * view.clip_near));
-
-			this->frust_x = float4(cam_x * frustrum_size.x, 0);
-			this->frust_y = float4(cam_y * frustrum_size.y, 0);
+			this->frust_x = float4(cam_x * view.frustrum_size.x / 2.0f, 0);
+			this->frust_y = float4(cam_y * view.frustrum_size.y / 2.0f, 0);
 			this->frust_z = float4(-cam_z * view.clip_near, 0);
 			this->cam_pos = float4(cam_pos, 0);
+
+			this->cam_forw = float4(normalize(-cam_z), 0);
 		}
 	}
 };

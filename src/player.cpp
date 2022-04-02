@@ -146,7 +146,7 @@ Camera_View Player::calc_matricies (int2 const& viewport_size, Chunks& chunks) {
 	Camera_View view;
 	view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
 	view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
-	view.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &view.frustrum, &view.clip_to_cam);
+	view.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &view.clip_to_cam, &view.frustrum, &view.frustrum_size);
 	view.clip_near = cam.clip_near;
 	view.clip_far = cam.clip_far;
 	view.calc_frustrum();

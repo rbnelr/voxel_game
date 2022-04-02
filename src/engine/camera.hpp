@@ -128,11 +128,11 @@ struct Camera {
 	}
 
 	// Calculate camera projection matrix
-	float4x4 calc_cam_to_clip (int2 viewport_size, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
+	float4x4 calc_cam_to_clip (int2 viewport_size, float4x4* clip_to_cam=nullptr, View_Frustrum* frust=nullptr, float2* frust_size=nullptr);
 };
 
-float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
-float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192, View_Frustrum* frust=nullptr, float4x4* clip_to_cam=nullptr);
+float4x4 perspective_matrix (float vfov, float aspect, float clip_near=1.0f/32, float clip_far=8192, float4x4* clip_to_cam=nullptr, View_Frustrum* frust=nullptr, float2* frust_size=nullptr);
+float4x4 orthographic_matrix (float vsize, float aspect, float clip_near=1.0f/32, float clip_far=8192, float4x4* clip_to_cam=nullptr, View_Frustrum* frust=nullptr, float2* frust_size=nullptr);
 
 // rotate azimuth, elevation via mouselook
 void rotate_with_mouselook (Input& I, float* azimuth, float* elevation, float vfov);

@@ -23,7 +23,7 @@ uniform int bounce_max_count = 3;
 uniform float roughness = 0.8;
 
 
-layout(rgba32f, binding = 0) writeonly restrict uniform image2D gbuf_pos;
+layout(r32f,    binding = 0) writeonly restrict uniform image2D gbuf_pos;
 layout(rgba16f, binding = 1) writeonly restrict uniform image2D gbuf_col;
 layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
 
@@ -44,14 +44,15 @@ void main () {
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
-	vec3 pos  = vec3(-1000.0 * 1000000.0, 0.0, 0.0);
+	float depth = -1.0;
 	vec4 col  = vec4(0,0,0,0);
 	vec3 norm = vec3(0,0,0);
+	
 	
 	Hit hit;
 	if (trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0),true)) {
 		
-		pos = hit.pos;
+		depth = pos_to_depth(hit.pos);
 		
 		col.rgb = hit.col.rgb;
 		col.a = hit.emiss_raw;
@@ -61,7 +62,7 @@ void main () {
 	
 	//GET_VISUALIZE_COST(col.rgb);
 	
-	imageStore(gbuf_pos, pxpos, vec4(pos, 0.0));
+	imageStore(gbuf_pos, pxpos, vec4(depth, 0,0,0));
 	imageStore(gbuf_col, pxpos, col);
-	imageStore(gbuf_norm, pxpos, vec4(norm, 0.0));
+	imageStore(gbuf_norm, pxpos, vec4(norm, 0));
 }

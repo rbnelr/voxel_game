@@ -117,7 +117,6 @@ namespace gl {
 			gbuf.resize(renderscale.size);
 			framebuf.resize(renderscale.size, renderscale.nearest);
 		}
-		r.update_view(game.view, renderscale.size);
 
 		macro_change |= vct_conedev(r, game);
 		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
@@ -480,14 +479,14 @@ namespace gl {
 		shad->set_uniform("framebuf_size", renderscale.size);
 		shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
-		float near_px_size;
+		float base_px_size;
 		{
-			// compute size of pixel in world space while on near plane (for knowing ray widths for AA)
-			float4 a = game.view.clip_to_cam * float4(0,0,0,1); // center of screen in cam space
-			float4 b = game.view.clip_to_cam * float4(float2(1.0f / (float2)renderscale.size),0,1); // pixel one to the up/right in cam space
-			near_px_size = b.x - a.x;
+			// frustrum_size (world-space size of near plane) / clip_near -> world-space width of frustrum at 1m z dist
+			// pixels / (frustrum_size / clip_near) -> pixels that a ~1m object has at 1m
+			// divide this by any object's z-distance to get a pixel size for LOD purposes
+			base_px_size = (float)renderscale.size.x / game.view.frustrum_size.x * game.view.clip_near;
 		}
-		shad->set_uniform("near_px_size", near_px_size);
+		shad->set_uniform("base_px_size", base_px_size);
 
 		shad->set_uniform("max_iterations", max_iterations);
 
@@ -509,6 +508,8 @@ namespace gl {
 		ZoneScoped;
 		if (!rt_forward->prog || !rt_lighting->prog || !rt_post->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
+		
+		r.update_view(game.view, renderscale.size);
 
 		{ // forward pass -> writes to gbuf
 			
@@ -530,7 +531,7 @@ namespace gl {
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
 				
-				glBindImageTexture(0, gbuf.pos , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+				glBindImageTexture(0, gbuf.pos , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
 				glBindImageTexture(1, gbuf.col , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 				glBindImageTexture(2, gbuf.norm, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 

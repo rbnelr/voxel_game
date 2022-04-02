@@ -43,20 +43,20 @@ void Camera_View::calc_frustrum () {
 	};
 }
 
-float4x4 Camera::calc_cam_to_clip (int2 viewport_size, View_Frustrum* frust, float4x4* clip_to_cam) {
+float4x4 Camera::calc_cam_to_clip (int2 viewport_size, float4x4* clip_to_cam, View_Frustrum* frust, float2* frust_size) {
 	float aspect = (float)viewport_size.x / (float)viewport_size.y;
 
 	if (mode == PERSPECTIVE) {
-		return perspective_matrix(vfov, aspect, clip_near, clip_far, frust, clip_to_cam);
+		return perspective_matrix(vfov, aspect, clip_near, clip_far, clip_to_cam, frust, frust_size);
 	} else {
 		assert(mode == ORTHOGRAPHIC);
 
-		return orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far, frust, clip_to_cam);
+		return orthographic_matrix(ortho_vsize, aspect, clip_near, clip_far, clip_to_cam, frust, frust_size);
 	}
 }
 
 // https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
-float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far, View_Frustrum* frust, float4x4* clip_to_cam) {
+float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float clip_far, float4x4* clip_to_cam, View_Frustrum* frust, float2* frust_size) {
 	float2 frust_scale;
 	frust_scale.y = tan(vfov / 2);
 	frust_scale.x = frust_scale.y * aspect;
@@ -80,7 +80,7 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 
 	//a = (clip_far + clip_near) / (clip_near - clip_far);
 	//b = (2.0f * clip_far * clip_near) / (clip_near - clip_far);
-
+	
 	if (frust) {
 		frust->corners[0] = float3(-frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
 		frust->corners[1] = float3(+frust_scale.x * clip_near, -frust_scale.y * clip_near, -clip_near);
@@ -90,6 +90,9 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 		frust->corners[5] = float3(+frust_scale.x * clip_far , -frust_scale.y * clip_far , -clip_far );
 		frust->corners[6] = float3(+frust_scale.x * clip_far , +frust_scale.y * clip_far , -clip_far );
 		frust->corners[7] = float3(-frust_scale.x * clip_far , +frust_scale.y * clip_far , -clip_far );
+	}
+	if (frust_size) {
+		*frust_size = frust_scale * 2.0f * clip_near;
 	}
 	if (clip_to_cam) {
 		*clip_to_cam = float4x4(
@@ -107,7 +110,7 @@ float4x4 perspective_matrix (float vfov, float aspect, float clip_near, float cl
 	);
 }
 
-float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float clip_far, View_Frustrum* frust, float4x4* clip_to_cam) {
+float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float clip_far, float4x4* clip_to_cam, View_Frustrum* frust, float2* frust_size) {
 	float hsize = vsize * aspect;
 
 	float x = 2.0f / hsize;
@@ -130,6 +133,9 @@ float4x4 orthographic_matrix (float vsize, float aspect, float clip_near, float 
 		frust->corners[5] = float3(1.0f / +x, 1.0f / -y, -clip_far );
 		frust->corners[6] = float3(1.0f / +x, 1.0f / +y, -clip_far );
 		frust->corners[7] = float3(1.0f / -x, 1.0f / +y, -clip_far );
+	}
+	if (frust_size) {
+		*frust_size = float2(hsize, vsize);
 	}
 	if (clip_to_cam) {
 		*clip_to_cam = float4x4(
@@ -235,7 +241,7 @@ Camera_View Flycam::update (Input& I, int2 const& viewport_size) {
 	Camera_View v;
 	v.world_to_cam = world_to_cam_rot * translate(-cam.pos);
 	v.cam_to_world = translate(cam.pos) * cam_to_world_rot;
-	v.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &v.frustrum, &v.clip_to_cam);
+	v.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &v.clip_to_cam, &v.frustrum, &v.frustrum_size);
 	v.clip_near = cam.clip_near;
 	v.clip_far = cam.clip_far;
 	v.calc_frustrum();

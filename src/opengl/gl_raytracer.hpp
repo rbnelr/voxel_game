@@ -8,70 +8,6 @@
 namespace gl {
 	class OpenglRenderer;
 
-#if 0
-	struct Gbuffer {
-		Fbo fbo = {};
-
-		Texture2D depth = {};
-		Texture2D pos = {};
-		Texture2D col = {};
-		Texture2D norm = {};
-
-		int2 size = -1;
-
-		Sampler sampler = {"Gbuf.sampler"};
-
-		Gbuffer () {
-			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		}
-
-		void resize (int2 new_size) {
-			if (fbo == 0 || size != new_size) {
-				glActiveTexture(GL_TEXTURE0);
-
-				size = new_size;
-
-				depth = {"Gbuf.depth"};
-				pos   = {"Gbuf.pos"  };
-				col   = {"Gbuf.col"  };
-				norm  = {"Gbuf.norm" };
-				fbo   = {"Gbuf.fbo"  };
-
-				glTextureStorage2D(depth, 1, GL_DEPTH_COMPONENT32F, size.x, size.y);
-				glTextureParameteri(depth, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(depth, GL_TEXTURE_MAX_LEVEL, 0);
-
-				glTextureStorage2D(pos, 1, GL_RGBA32F, size.x, size.y);
-				glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
-
-				glTextureStorage2D(col, 1, GL_RGBA16F, size.x, size.y);
-				glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
-
-				glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
-				glTextureParameteri(norm, GL_TEXTURE_BASE_LEVEL, 0);
-				glTextureParameteri(norm, GL_TEXTURE_MAX_LEVEL, 0);
-
-				glNamedFramebufferTexture(fbo, GL_DEPTH_ATTACHMENT, depth, 0);
-				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, pos, 0);
-				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT1, col, 0);
-				glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT2, norm, 0);
-
-				GLuint bufs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-				glNamedFramebufferDrawBuffers(fbo, 3, bufs);
-
-				//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-				//if (status != GL_FRAMEBUFFER_COMPLETE) {
-				//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
-				//}
-			}
-		}
-	};
-#endif
 	struct Gbuffer {
 		Texture2D pos  = {};
 		Texture2D col  = {};
@@ -80,11 +16,11 @@ namespace gl {
 		void resize (int2 size) {
 			glActiveTexture(GL_TEXTURE0);
 
-			pos   = {"gbuf.pos"  }; // could be computed from depth
+			pos   = {"gbuf.pos"  }; // only depth -> reconstruct position
 			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
 			norm  = {"gbuf.norm" }; // rgb normal
 
-			glTextureStorage2D(pos , 1, GL_RGBA32F, size.x, size.y);
+			glTextureStorage2D(pos , 1, GL_R32F, size.x, size.y);
 			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
 			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
 

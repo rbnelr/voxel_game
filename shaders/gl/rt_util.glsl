@@ -166,7 +166,7 @@ uvec2 work_group_tiling (uint N) {
 	uint full_column_count = gl_NumWorkGroups.x / N;
 	uint last_column_width = gl_NumWorkGroups.x % N;
 	
-	uint column_idx = idx / column_size;
+	uint column_idx    = idx / column_size;
 	uint idx_in_column = idx % column_size;
 	
 	uint column_width = N;
@@ -182,22 +182,43 @@ uvec2 work_group_tiling (uint N) {
 
 bool _dbgdraw = false;
 
-// get pixel ray in world space based on pixel coord and matricies
-uniform float near_px_size;
+// divide this by any object's z-distance to get a pixel size for LOD purposes
+uniform float base_px_size;
+
+//float get_px_size () {
+//	
+//}
 
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	//vec2 px_center = px_pos + rand2();
 	vec2 px_center = px_pos + vec2(0.5);
 	
-	vec2 uv = px_center / view.viewport_size * 2.0 - 1.0;
+	// turn [0, viewport_size] into [-1, +1]
+	// equivalent to  px_center / viewport_size * 2 - 1
+	vec2 uv = px_center * view.inv_viewport_size2 - vec2(1.0);
 	
-	ray_dir = view.frust_x*uv.x + view.frust_y*uv.y + view.frust_z;
-	ray_pos = view.cam_pos + ray_dir;
+	// multiplying uvs with near plane basis vectors
+	vec3 near_offs = view.frust_x*uv.x + view.frust_y*uv.y + view.frust_z;
+	// actually normalize near_offs to get a real dir vector
+	ray_dir = normalize(near_offs);
 	
-	ray_dir = normalize(ray_dir);
+	// ray pos on near plane
+	ray_pos = view.cam_pos + near_offs;
 	
 	// make relative to gpu world representation (could bake into matrix)
 	ray_pos += float(WORLD_SIZE/2);
+}
+
+// Convert gpu world coords to cam depth values, which can be reconstructed
+// knowing the original ray_dir, to save on storage space
+float pos_to_depth (vec3 pos) {
+	return dot(pos - float(WORLD_SIZE/2) - view.cam_pos, view.cam_forw);
+}
+vec3 depth_to_pos (vec3 ray_dir, float depth) {
+	// dist from cam_pos in direction of ray_dir
+	float dist = depth / dot(ray_dir, view.cam_forw);
+	
+	return ray_dir * dist + view.cam_pos + float(WORLD_SIZE/2);
 }
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
