@@ -126,7 +126,7 @@ namespace gl {
 		// this would not be needed in a sane programming language (reflection support)
 		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward",  get_macros(), {{ COMPUTE_SHADER }});
 		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
-		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post");
+		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post", get_macros());
 
 		//
 		
@@ -621,6 +621,9 @@ namespace gl {
 			
 		r.update_view(game.view, r.render_size);
 
+		static float gauss_radius_px = 0.01f;
+		ImGui::SliderFloat("gauss_radius_px", &gauss_radius_px, 0.01f, 40);
+
 		{ // rescale image
 			OGL_TIMER_ZONE(timer_rt_post.timer);
 			ZoneScopedN("rt_post");
@@ -636,9 +639,10 @@ namespace gl {
 
 			set_uniforms(r, game, rt_post);
 			rt_post->set_uniform("exposure", lighting.post_exposure);
+			rt_post->set_uniform("gauss_radius_px", gauss_radius_px);
 
 			r.state.bind_textures(rt_post, {
-				{"gbuf_col", framebuf.col, framebuf.sampler},
+				{"framebuf_col", framebuf.col, framebuf.sampler},
 			});
 
 			glBindVertexArray(r.dummy_vao);

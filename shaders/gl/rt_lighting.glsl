@@ -14,19 +14,6 @@ layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
 #include "rt_util.glsl"
 
-layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
-
-uniform int rand_seed_time = 0;
-uniform ivec2 framebuf_size;
-
-uniform bool show_light = false;
-uniform bool show_normals = false;
-
-uniform float bounce_max_dist = 90.0;
-uniform int bounce_max_count = 3;
-uniform int bounce_samples = 1;
-
-uniform float roughness = 0.8;
 
 uniform sampler2D gbuf_pos;
 uniform sampler2D gbuf_col;
@@ -63,6 +50,21 @@ bool read_gbuf (ivec2 pxpos, out Gbuf g) {
 	
 	return g.depth > 0.0;
 }
+
+
+layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
+
+uniform int rand_seed_time = 0;
+uniform ivec2 framebuf_size;
+
+uniform bool show_light = false;
+uniform bool show_normals = false;
+
+uniform float bounce_max_dist = 90.0;
+uniform int bounce_max_count = 3;
+uniform int bounce_samples = 1;
+
+uniform float roughness = 0.8;
 
 struct Cone {
 	vec3   dir;
@@ -188,6 +190,7 @@ void main () {
 	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + threadid;
 	
 	srand(pxpos.x, pxpos.y, rand_seed_time);
+	//srand(pxpos.x, pxpos.y, 0);
 	
 	#if DEBUGDRAW
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
@@ -247,7 +250,7 @@ void main () {
 	light = APPLY_TAA(light, gbuf.pos, gbuf.normal, pxpos);
 	
 	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
-	col.a = gbuf.col.a;
+	col.a   = gbuf.col.a;
 	#else
 	if (did_hit) {
 		float sun = max(dot(gbuf.normal, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);

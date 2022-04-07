@@ -106,7 +106,7 @@
 			"max_iterations": 512,
 			"taa": {
 				"enable": true,
-				"max_age": 400
+				"max_age": 100
 			},
 			"lighting": {
 				"bounce_enable": true,

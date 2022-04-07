@@ -239,57 +239,47 @@ uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
 vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
-	uint age = 1u;
-	
-	vec4 prev_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
-	prev_clip.xyz /= prev_clip.w;
-	
-	uint cur_norm = 5;
-	uint cur_pos = 0;
-	
-	if (abs(normal.x) > 0.5) {
-		cur_norm = normal.x < 0.0 ? 0 : 1;
-		cur_pos = uint(floor(pos.x - 0.5)) + (normal.x < 0.0 ? 1 : 0);
-	} else if (abs(normal.y) > 0.5) {
-		cur_norm = normal.y < 0.0 ? 2 : 3;
-		cur_pos = uint(floor(pos.y - 0.5)) + (normal.y < 0.0 ? 1 : 0);
-	} else {
-		cur_norm = normal.z < 0.0 ? 4 : 5;
-		cur_pos = uint(floor(pos.z - 0.5)) + (normal.z < 0.0 ? 1 : 0);
+	uvec2 cur_face_id;
+	{
+		float cur_posf;
+		if (abs(normal.x) > 0.5) {
+			cur_face_id.x = 0 + (normal.x > 0.0 ? 1 : 0);
+			cur_posf = pos.x;
+		} else if (abs(normal.y) > 0.5) {
+			cur_face_id.x = 2 + (normal.y > 0.0 ? 1 : 0);
+			cur_posf = pos.y;
+		} else {
+			cur_face_id.x = 4 + (normal.z > 0.0 ? 1 : 0);
+			cur_posf = pos.z;
+		}
+		cur_face_id.y = uint(floor(cur_posf - 0.5));
 	}
 	
-	//bool hit = false;
+	vec4 reproj_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
+	vec2 reproj_uv = (reproj_clip.xy / reproj_clip.w) * 0.5 + 0.5;
 	
-	vec2 uv = prev_clip.xy * 0.5 + 0.5;
-	if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-		uvec4 sampl = textureLod(taa_history_posage, uv, 0.0);
+	uint age = 1u;
+	if (  reproj_uv.x >= 0.0 && reproj_uv.x <= 1.0 &&
+	      reproj_uv.y >= 0.0 && reproj_uv.y <= 1.0  ) {
+		uvec3 sampl = textureLod(taa_history_posage, reproj_uv, 0.0).xyz; // face normal, face pos, sample age
 		
-		//vec3 sampl_pos = vec3(sampl.rgb) / float(0xffff) * WORLD_SIZEf;
-		uint sampl_norm = sampl.r; // 0=-X 1=+X 2=-Y ...
-		uint sampl_pos = sampl.g; // relative to normal
-		uint sampl_age = sampl.a;
+		uvec2 sampl_id = sampl.xy;
+		uint sampl_age = sampl.z;
 		
-		//if (distance(pos, sampl_pos) < 0.1) {
-		if (cur_norm == sampl_norm && cur_pos == sampl_pos) {
-			age = min(sampl_age, uint(taa_max_age));
+		if (cur_face_id == sampl_id) {
+			sampl_age = min(sampl_age, uint(taa_max_age));
+			age = sampl_age + 1u;
 			
-			vec3 accumulated = textureLod(taa_history_color, uv, 0.0).rgb * float(age);
+			vec3 accumulated = textureLod(taa_history_color, reproj_uv, 0.0).rgb * float(sampl_age);
 			
-			age += 1u;
 			val = (accumulated + val) / float(age);
-			
-			//hit = true;
 		}
 	}
 	
-	//uvec3 pos_enc = uvec3(round(pos * float(0xffff) / WORLD_SIZEf));
-	//pos_enc = clamp(pos_enc, uvec3(0), uvec3(0xffff));
-	
 	imageStore(taa_color, pxpos, vec4(val, 0.0));
-	imageStore(taa_posage, pxpos, uvec4(cur_norm, cur_pos, 0u, age));
+	imageStore(taa_posage, pxpos, uvec4(cur_face_id, age, 0u));
 	
 	return val;
-	//return hit ? vec3(0,1,0) : vec3(1,0,0);
 }
 #else
 	#define APPLY_TAA(val, pos, normal, pxpos) (val)
