@@ -2,43 +2,46 @@
 #include "fullscreen_triangle.glsl"
 
 #ifdef _FRAGMENT
-	#include "rt_util.glsl"
-	
-	uniform sampler2D framebuf_col;
-	
-	uniform ivec2 framebuf_size;
+	uniform sampler2D input_tex;
 	
 	uniform float gauss_radius_px = 20;
 	
 	uniform float exposure = 1.0;
 	
-	float gauss_kernel (vec2 offs) {
+	float gauss_kernel (float x) {
 		float sigma = 0.35 * gauss_radius_px;
 		
-		float a = offs.x*offs.x + offs.y*offs.y;
-		float b = -2.0 * sigma * sigma;
-		return exp(a / b);
+		return exp((x*x) / (-2.0 * sigma * sigma));
 	}
 	
 	out vec3 frag_col;
 	void main () {
-		vec2 px_sz = 1.0 / vec2(framebuf_size);
+		vec2 px_sz = 1.0 / textureSize(input_tex, 0).xy;
 		
 		vec3 col = vec3(0.0);
 		float total = 0.0;
 		
 		int r = int(ceil(gauss_radius_px));
-		for (int x=-r; x<=r; ++x) {
-			for (int y=-r; y<=r; ++y) {
-				vec2 offs = vec2(ivec2(x,y));
-				float weight = gauss_kernel(offs);
-				
-				col += texture(framebuf_col, vs_uv + px_sz * offs).rgb * weight;
-				total += weight;
-			}
+		
+	#if PASS == 0
+		for (int i=-r; i<=r; ++i) {
+			float weight = gauss_kernel(float(i));
+			
+			col   += weight * texture(input_tex, vs_uv + vec2(px_sz.x * float(i), 0.0)).rgb;
+			total += weight;
 		}
 		col /= total;
+	#else
+		for (int i=-r; i<=r; ++i) {
+			float weight = gauss_kernel(float(i));
+			
+			col   += weight * texture(input_tex, vs_uv + vec2(0.0, px_sz.y * float(i))).rgb;
+			total += weight;
+		}
+		col /= total;
+		col *= exposure;
+	#endif
 		
-		frag_col = col * exposure;
+		frag_col = col;
 	}
 #endif

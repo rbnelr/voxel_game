@@ -115,21 +115,13 @@ namespace gl {
 		if (renderscale.update(r.render_size)) {
 			taa.resize(renderscale.size);
 			gbuf.resize(renderscale.size);
-			framebuf.resize(renderscale.size, renderscale.nearest);
+			framebuf0.resize(renderscale.size, renderscale.nearest);
+			framebuf1.resize(renderscale.size, renderscale.nearest);
 		}
 
 		macro_change |= vct_conedev(r, game);
 		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 
-
-		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
-		// this would not be needed in a sane programming language (reflection support)
-		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward",  get_macros(), {{ COMPUTE_SHADER }});
-		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
-		if (!rt_post    ) rt_post     = r.shaders.compile("rt_post", get_macros());
-
-		//
-		
 		if (I.buttons[KEY_R].went_down)
 			enable = !enable;
 
@@ -137,6 +129,13 @@ namespace gl {
 			lighting.vct = !lighting.vct;
 			macro_change = true;
 		}
+
+		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
+		// this would not be needed in a sane programming language (reflection support)
+		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward",  get_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_post0   ) rt_post0    = r.shaders.compile("rt_post", get_post_macros(0));
+		if (!rt_post1   ) rt_post1    = r.shaders.compile("rt_post", get_post_macros(1));
 
 		if (macro_change && rt_forward) {
 			rt_forward->macros = get_macros();
@@ -146,8 +145,13 @@ namespace gl {
 			rt_lighting->macros = get_macros();
 			rt_lighting->recompile("macro_change", false);
 		}
-		if (macro_change && rt_post) {
-			rt_post->recompile("macro_change", false);
+		if (macro_change && rt_post0) {
+			rt_post0->macros = get_post_macros(0);
+			rt_post0->recompile("macro_change", false);
+		}
+		if (macro_change && rt_post1) {
+			rt_post1->macros = get_post_macros(1);
+			rt_post1->recompile("macro_change", false);
 		}
 		macro_change = false;
 
@@ -513,7 +517,7 @@ namespace gl {
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
-		if (!rt_forward->prog || !rt_lighting->prog || !rt_post->prog) return;
+		if (!rt_forward->prog || !rt_lighting->prog || !rt_post0->prog || !rt_post1->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
 		
 		r.update_view(game.view, renderscale.size);
@@ -566,7 +570,7 @@ namespace gl {
 		
 			set_uniforms(r, game, rt_lighting);
 		
-			glBindImageTexture(0, framebuf.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+			glBindImageTexture(0, framebuf0.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		
 			// TAA
 			GLuint prev_color  = taa.colors[taa.cur ^ 1];
@@ -618,13 +622,11 @@ namespace gl {
 				glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 		}
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-			
-		r.update_view(game.view, r.render_size);
-
+		
 		static float gauss_radius_px = 0.01f;
-		ImGui::SliderFloat("gauss_radius_px", &gauss_radius_px, 0.01f, 40);
+		ImGui::SliderFloat("gauss_radius_px", &gauss_radius_px, 0.01f, 1000, "%.3f", ImGuiSliderFlags_Logarithmic);
 
-		{ // rescale image
+		{
 			OGL_TIMER_ZONE(timer_rt_post.timer);
 			ZoneScopedN("rt_post");
 			OGL_TRACE("rt_post");
@@ -635,18 +637,41 @@ namespace gl {
 			s.blend_enable = false;
 			r.state.set(s);
 
-			glUseProgram(rt_post->prog);
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuf1.fbo);
 
-			set_uniforms(r, game, rt_post);
-			rt_post->set_uniform("exposure", lighting.post_exposure);
-			rt_post->set_uniform("gauss_radius_px", gauss_radius_px);
+			{ // upscale and horizontal blur
+				glUseProgram(rt_post0->prog);
 
-			r.state.bind_textures(rt_post, {
-				{"framebuf_col", framebuf.col, framebuf.sampler},
-			});
+				set_uniforms(r, game, rt_post0);
+				rt_post0->set_uniform("exposure", lighting.post_exposure);
+				rt_post0->set_uniform("gauss_radius_px", gauss_radius_px);
 
-			glBindVertexArray(r.dummy_vao);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+				r.state.bind_textures(rt_post0, {
+					{"input_tex", framebuf0.col, framebuf0.sampler},
+				});
+
+				glBindVertexArray(r.dummy_vao);
+				glDrawArrays(GL_TRIANGLES, 0, 3);
+			}
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			
+			r.update_view(game.view, r.render_size);
+
+			{ // vertical blur and exposure mapping
+				glUseProgram(rt_post1->prog);
+
+				set_uniforms(r, game, rt_post1);
+				rt_post1->set_uniform("exposure", lighting.post_exposure);
+				rt_post1->set_uniform("gauss_radius_px", gauss_radius_px);
+
+				r.state.bind_textures(rt_post1, {
+					{"input_tex", framebuf1.col, framebuf1.sampler},
+				});
+
+				glBindVertexArray(r.dummy_vao);
+				glDrawArrays(GL_TRIANGLES, 0, 3);
+			}
 		}
 
 		//// try to all potentially bound textures

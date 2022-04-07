@@ -36,6 +36,7 @@ namespace gl {
 	};
 	struct Framebuffer {
 		Texture2D col  = {};
+		Fbo fbo = {};
 
 		Sampler sampler = {"RTBuf.sampler"};
 
@@ -47,11 +48,19 @@ namespace gl {
 
 			glActiveTexture(GL_TEXTURE0);
 
-			col   = {"RTBuf.col"  };
+			fbo   = {"RTBuf.fbo" };
+			col   = {"RTBuf.col" };
 
 			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
 			glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
+			
+			glNamedFramebufferTexture(fbo, GL_COLOR_ATTACHMENT0, col, 0);
+		
+			//GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+			//if (status != GL_FRAMEBUFFER_COMPLETE) {
+			//	fprintf(stderr, "glCheckFramebufferStatus: %x\n", status);
+			//}
 		}
 	};
 	struct TemporalAA {
@@ -335,7 +344,8 @@ namespace gl {
 		
 		Shader* rt_forward   = nullptr;
 		Shader* rt_lighting  = nullptr;
-		Shader* rt_post      = nullptr;
+		Shader* rt_post0     = nullptr;
+		Shader* rt_post1     = nullptr;
 		
 		RenderScale renderscale;
 
@@ -346,7 +356,8 @@ namespace gl {
 		//TestRenderer test_renderer;
 
 		Gbuffer     gbuf;
-		Framebuffer framebuf;
+		Framebuffer framebuf0;
+		Framebuffer framebuf1;
 
 		TemporalAA taa;
 		
@@ -371,6 +382,9 @@ namespace gl {
 			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
 			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
 			};
+		}
+		std::vector<gl::MacroDefinition> get_post_macros (int pass) {
+			return { {"PASS", prints("%d", pass)} };
 		}
 
 		Raytracer (Shaders& shaders): df_tex(shaders), vct_data(shaders) {
