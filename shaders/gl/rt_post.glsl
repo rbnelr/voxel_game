@@ -1,4 +1,4 @@
-﻿#version 460 core
+#version 460 core
 #include "fullscreen_triangle.glsl"
 
 #ifdef _FRAGMENT

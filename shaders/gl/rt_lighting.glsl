@@ -1,4 +1,4 @@
-﻿#version 460 core
+#version 460 core
 #extension GL_NV_gpu_shader5 : enable // for uint16_t, uint8_t
 //#extension GL_ARB_shader_group_vote : enable
 
@@ -33,6 +33,8 @@ uniform sampler2D gbuf_col;
 uniform sampler2D gbuf_norm;
 
 struct Gbuf {
+	float depth;
+	
 	vec3 pos;
 	vec3 normal;
 	vec4 col;
@@ -42,28 +44,24 @@ struct Gbuf {
 };
 bool read_gbuf (ivec2 pxpos, out Gbuf g) {
 	
-	float depth = texelFetch(gbuf_pos , pxpos, 0).r;
-	vec4 col    = texelFetch(gbuf_col , pxpos, 0);
-	g.normal    = texelFetch(gbuf_norm, pxpos, 0).rgb;
+	g.depth  = texelFetch(gbuf_pos , pxpos, 0).r;
+	vec4 col = texelFetch(gbuf_col , pxpos, 0);
+	g.normal = texelFetch(gbuf_norm, pxpos, 0).rgb;
 	
 	// reconstruct position from depth
 	vec3 ray_pos, ray_dir;
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
-	g.pos    = depth_to_pos(ray_dir, depth);
+	g.pos    = depth_to_pos(ray_dir, g.depth);
 	
+	g.col = vec4(col.rgb, 1.0);
+	g.emiss = col.rgb * col.a;
 	
 	g.normal = normalize(g.normal);
 	
 	g.TBN = calc_TBN(g.normal, generate_tangent(g.normal));
 	
-	//hit.dist = depth;
-	//hit.coord = ivec3(floor(hit.pos));
-	
-	g.col = vec4(col.rgb, 1.0);
-	g.emiss = col.rgb * col.a;
-	
-	return depth > 0.0;
+	return g.depth > 0.0;
 }
 
 struct Cone {
@@ -89,17 +87,29 @@ void main () {
 	uint threadid = gl_LocalInvocationID.y * WG_PIXELS_X + gl_LocalInvocationID.x;
 	uint coneid   = gl_LocalInvocationID.z;
 	
-	ivec2 wgroupid = ivec2(work_group_tiling(20u));
+	ivec2 wgroupid = ivec2(work_group_tiling(16u));
 	ivec2 pxpos = wgroupid * ivec2(WG_PIXELS_X,WG_PIXELS_Y) + ivec2(gl_LocalInvocationID.xy);
 	
 	#if DEBUGDRAW
 	_dbgdraw = update_debugdraw && pxpos.x == framebuf_size.x/2 && pxpos.y == framebuf_size.y/2;
 	#endif
 	
+#if VCT_DBG_PRIMARY
+	vec3 ray_pos, ray_dir;
+	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	
+	vec4 col = trace_cone(ray_pos, ray_dir,
+		vct_primary_cone_width, vct_min_start_dist, 1000.0, true);
+	
+	GET_VISUALIZE_COST(col.rgb);
+	
+	imageStore(img_col, pxpos, col);
+#else
+	
 	Gbuf gbuf;
 	bool did_hit = read_gbuf(pxpos, gbuf);
 	
-	#if 0 && DEBUGDRAW
+	#if 1 && DEBUGDRAW
 	if (_dbgdraw) {
 		vec3 p = gbuf.pos - WORLD_SIZEf/2.0;
 		mat3 TBN = generate_TBN(gbuf.normal);
@@ -110,20 +120,14 @@ void main () {
 	#endif
 	
 	if (show_light) gbuf.col.rgb = vec3(1.0);
+	if (show_normals) gbuf.col.rgb = gbuf.normal * 0.5 + 0.5;
 	
-#if VCT_DBG_PRIMARY
-	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	// approx linear px per voxel (per m) for this rendered surface
+	//float lod_px = get_px_size(gbuf.depth);
 	
-	vec4 col = trace_cone(ray_pos, ray_dir,
-		vct_primary_cone_width, vct_min_start_dist, 1000.0, true);
-	
-	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
-	
-	GET_VISUALIZE_COST(col.rgb);
-	
-	imageStore(img_col, pxpos, col);
-#else
+	float start_dist = vct_min_start_dist;
+	//if (lod_px < 3.5)
+	//	start_dist = 4.0;
 	
 	// let each z-layer of threads of the WG handle one cone
 	// to improve cache access pattern of VCT
@@ -141,11 +145,10 @@ void main () {
 		Cone c = cones.cones[coneid];
 		
 		vec3 cone_dir = gbuf.TBN * c.dir;
-		
-		float start_dist = vct_min_start_dist;
 				
 		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope,
-			start_dist, 1000.0, coneid == 8u).rgb * c.weight;
+			start_dist, 1000.0, true).rgb * c.weight;
+			// coneid == 8u
 		
 		cone_results[threadid][coneid] = light;
 	}

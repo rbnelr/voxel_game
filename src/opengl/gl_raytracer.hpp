@@ -250,10 +250,10 @@ namespace gl {
 			GLuint texview;
 
 			VctTexture (std::string_view label, int mipmaps, int3 const& size, bool sparse=false): tex{label} {
-				if (sparse) {
-					glTextureParameteri(tex, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
-					glTextureParameteri(tex, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
-				}
+				//if (sparse) {
+				//	glTextureParameteri(tex, GL_TEXTURE_SPARSE_ARB, GL_TRUE);
+				//	glTextureParameteri(tex, GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, 0);
+				//}
 				glTextureStorage3D(tex, mipmaps, GL_SRGB8_ALPHA8, size.x,size.y,size.z);
 				glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, mipmaps-1);
@@ -321,8 +321,8 @@ namespace gl {
 			sparse_page_state.resize(int3(GPU_WORLD_SIZE) / sparse_size);
 			sparse_page_state.clear(true);
 
-			assert(GLAD_GL_ARB_sparse_texture && // for sparse texture support
-				GLAD_GL_ARB_sparse_texture2); // for relying on decommitted texture regions reading as zero
+			//assert(GLAD_GL_ARB_sparse_texture && // for sparse texture support
+			//	GLAD_GL_ARB_sparse_texture2); // for relying on decommitted texture regions reading as zero
 											  //	assert(GLAD_GL_NV_memory_object_sparse);
 		}
 
@@ -451,6 +451,8 @@ namespace gl {
 			float vct_primary_cone_width = 0.01f;
 			float vct_min_start_dist = 1.0f / 5; // 1/32
 
+			float test = 1.0f;
+
 			void imgui (bool& macro_change) {
 				if (!ImGui::TreeNodeEx("lighting", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
@@ -470,11 +472,13 @@ namespace gl {
 				
 				ImGui::Separator();
 
-				macro_change |= ImGui::Checkbox("vct", &vct);
+				macro_change |= ImGui::Checkbox("Vct [V]", &vct);
 				macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 				
 				ImGui::SliderFloat("vct_primary_cone_width", &vct_primary_cone_width, 0.0005f, 0.2f);
-				ImGui::SliderFloat("vct_min_start_dist", &vct_min_start_dist, 0.001f, 16.0f);
+				ImGui::SliderFloat("vct_min_start_dist", &vct_min_start_dist, 0.001f, 4.0f);
+
+				ImGui::DragFloat("test", &test, 0.01f);
 
 				ImGui::TreePop();
 			}

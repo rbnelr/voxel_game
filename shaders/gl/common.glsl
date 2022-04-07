@@ -11,7 +11,7 @@ float map (float x, float a, float b) {
 	return (x - a) / (b - a);
 }
 
-const float INF			= 1. / 0.;
+const float INF			= 99999999999999999999999999.0; // 1. / 0. breaks on AMD
 
 const float PI			= 3.1415926535897932384626433832795;
 

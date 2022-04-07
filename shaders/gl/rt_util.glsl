@@ -182,13 +182,6 @@ uvec2 work_group_tiling (uint N) {
 
 bool _dbgdraw = false;
 
-// divide this by any object's z-distance to get a pixel size for LOD purposes
-uniform float base_px_size;
-
-//float get_px_size () {
-//	
-//}
-
 void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	//vec2 px_center = px_pos + rand2();
 	vec2 px_center = px_pos + vec2(0.5);
@@ -219,6 +212,15 @@ vec3 depth_to_pos (vec3 ray_dir, float depth) {
 	float dist = depth / dot(ray_dir, view.cam_forw);
 	
 	return ray_dir * dist + view.cam_pos + float(WORLD_SIZE/2);
+}
+
+// divide this by any object's z-distance to get a pixel size for LOD purposes
+uniform float base_px_size;
+
+// get pixels per meter at certain distance
+// where depth is the camera-space z distance relative to the camera origin (not near plane)
+float get_px_size (float depth) {
+	return base_px_size / depth;
 }
 
 const float WORLD_SIZEf = float(WORLD_SIZE);
@@ -610,6 +612,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 
 
 uniform float vct_stepsize = 1.0;
+uniform float test;
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	

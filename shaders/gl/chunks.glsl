@@ -32,7 +32,7 @@ layout(location = 0) vs2fs VS {
 		//       so should avoid this
 		//  3: simply assume jitter will never be >= 0.5 and just round the coord to ints
 		ivec3 voxel_coord = ivec3(round(voxel_pos_world));
-		if (any(damaged_block != voxel_coord)) return -1;
+		if (damaged_block != voxel_coord) return -1;
 
 		return clamp(floor(damage * damage_tiles_count), 0.0, damage_tiles_count) + damage_tiles_first;
 	}
