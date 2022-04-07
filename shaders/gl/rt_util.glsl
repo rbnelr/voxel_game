@@ -229,8 +229,8 @@ const int CHUNK_MASK = ~63;
 const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 
 
 #if TAA_ENABLE
-layout(rgba16f , binding = 1) writeonly restrict uniform  image2D taa_color;
-layout(rgba16ui, binding = 2) writeonly restrict uniform uimage2D taa_posage;
+layout(rgba16f, binding = 1) writeonly restrict uniform  image2D taa_color;
+layout(rg16ui , binding = 2) writeonly restrict uniform uimage2D taa_posage;
 
 uniform  sampler2D taa_history_color;
 uniform usampler2D taa_history_posage;
@@ -238,35 +238,19 @@ uniform usampler2D taa_history_posage;
 uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
-vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
-	uvec2 cur_face_id;
-	{
-		float cur_posf;
-		if (abs(normal.x) > 0.5) {
-			cur_face_id.x = 0 + (normal.x > 0.0 ? 1 : 0);
-			cur_posf = pos.x;
-		} else if (abs(normal.y) > 0.5) {
-			cur_face_id.x = 2 + (normal.y > 0.0 ? 1 : 0);
-			cur_posf = pos.y;
-		} else {
-			cur_face_id.x = 4 + (normal.z > 0.0 ? 1 : 0);
-			cur_posf = pos.z;
-		}
-		cur_face_id.y = uint(floor(cur_posf - 0.5));
-	}
-	
+vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos, uint faceid) {
 	vec4 reproj_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
 	vec2 reproj_uv = (reproj_clip.xy / reproj_clip.w) * 0.5 + 0.5;
 	
 	uint age = 1u;
 	if (  reproj_uv.x >= 0.0 && reproj_uv.x <= 1.0 &&
 	      reproj_uv.y >= 0.0 && reproj_uv.y <= 1.0  ) {
-		uvec3 sampl = textureLod(taa_history_posage, reproj_uv, 0.0).xyz; // face normal, face pos, sample age
+		uvec2 sampl = textureLod(taa_history_posage, reproj_uv, 0.0).xy; // face normal, face pos, sample age
 		
-		uvec2 sampl_id = sampl.xy;
-		uint sampl_age = sampl.z;
+		uint sampl_id  = sampl.x;
+		uint sampl_age = sampl.y;
 		
-		if (cur_face_id == sampl_id) {
+		if (faceid == sampl_id) {
 			sampl_age = min(sampl_age, uint(taa_max_age));
 			age = sampl_age + 1u;
 			
@@ -277,12 +261,12 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos) {
 	}
 	
 	imageStore(taa_color, pxpos, vec4(val, 0.0));
-	imageStore(taa_posage, pxpos, uvec4(cur_face_id, age, 0u));
+	imageStore(taa_posage, pxpos, uvec4(faceid, age, 0u, 0u));
 	
 	return val;
 }
 #else
-	#define APPLY_TAA(val, pos, normal, pxpos) (val)
+	#define APPLY_TAA(val, pos, normal, pxpos, faceid) (val)
 #endif
 
 //
@@ -331,6 +315,7 @@ struct Hit {
 	vec3	gnormal; // non-normal mapped real geometry (uv-compatible) TBN
 	
 	//ivec3	coord;
+	uint	faceid;
 	uint	bid;
 	
 	vec4	col;
@@ -552,8 +537,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			hit.gnormal = vec3(0.0);
 			vec3 tang = vec3(0.0);
 			
+			
 			if (abs_offs.x >= abs_offs.y && abs_offs.x >= abs_offs.z) {
 				face = rel.x < 0.5 ? 0 : 1;
+				
+				hit.faceid  = face << 13;
+				hit.faceid |= ~(2<<13) & uint(coord.x);
 				
 				hit.gnormal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
@@ -562,12 +551,18 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			} else if (abs_offs.y >= abs_offs.z) {
 				face = rel.y < 0.5 ? 2 : 3;
 				
+				hit.faceid  = face << 13;
+				hit.faceid |= ~(2<<13) & uint(coord.y);
+				
 				hit.gnormal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
 				
 				uv = offs.y < 0.0 ? vec2(rel.x, rel.z) : vec2(1.0-rel.x, rel.z);
 			} else {
 				face = rel.z < 0.5 ? 4 : 5;
+				
+				hit.faceid  = face << 13;
+				hit.faceid |= ~(2<<13) & uint(coord.z);
 				
 				hit.gnormal.z = sign(offs.z);
 				tang.x = +1;

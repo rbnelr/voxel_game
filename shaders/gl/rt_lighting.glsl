@@ -16,11 +16,13 @@ layout(local_size_x = WG_PIXELS_X, local_size_y = WG_PIXELS_Y) in;
 
 
 uniform sampler2D gbuf_pos;
+uniform usampler2D gbuf_faceid;
 uniform sampler2D gbuf_col;
 uniform sampler2D gbuf_norm;
 
 struct Gbuf {
 	float depth;
+	uint  faceid;
 	
 	vec3 pos;
 	vec3 normal;
@@ -31,9 +33,10 @@ struct Gbuf {
 };
 bool read_gbuf (ivec2 pxpos, out Gbuf g) {
 	
-	g.depth  = texelFetch(gbuf_pos , pxpos, 0).r;
-	vec4 col = texelFetch(gbuf_col , pxpos, 0);
-	g.normal = texelFetch(gbuf_norm, pxpos, 0).rgb;
+	g.depth  = texelFetch(gbuf_pos   , pxpos, 0).r;
+	g.faceid = texelFetch(gbuf_faceid, pxpos, 0).r;
+	vec4 col = texelFetch(gbuf_col   , pxpos, 0);
+	g.normal = texelFetch(gbuf_norm  , pxpos, 0).rgb;
 	
 	// reconstruct position from depth
 	vec3 ray_pos, ray_dir;
@@ -247,7 +250,7 @@ void main () {
 		light *= 1.0 / float(bounce_samples);
 	}
 	
-	light = APPLY_TAA(light, gbuf.pos, gbuf.normal, pxpos);
+	light = APPLY_TAA(light, gbuf.pos, gbuf.normal, pxpos, gbuf.faceid);
 	
 	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
 	col.a   = gbuf.col.a;

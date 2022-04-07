@@ -24,8 +24,9 @@ uniform float roughness = 0.8;
 
 
 layout(r32f,    binding = 0) writeonly restrict uniform image2D gbuf_pos;
-layout(rgba16f, binding = 1) writeonly restrict uniform image2D gbuf_col;
-layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_norm;
+layout(r16ui,   binding = 1) writeonly restrict uniform uimage2D gbuf_faceid;
+layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_col;
+layout(rgba16f, binding = 3) writeonly restrict uniform image2D gbuf_norm;
 
 void main () {
 	//INIT_VISUALIZE_COST();
@@ -45,6 +46,7 @@ void main () {
 	get_ray(vec2(pxpos), ray_pos, ray_dir);
 	
 	float depth = -1.0;
+	uint faceid = 0xffffu;
 	vec4 col  = vec4(0,0,0,0);
 	vec3 norm = vec3(0,0,0);
 	
@@ -53,6 +55,8 @@ void main () {
 	if (trace_ray(ray_pos, ray_dir, INF, hit, vec3(1,0,0),true)) {
 		
 		depth = pos_to_depth(hit.pos);
+		
+		faceid = hit.faceid;
 		
 		col.rgb = hit.col.rgb;
 		col.a = hit.emiss_raw;
@@ -63,6 +67,7 @@ void main () {
 	//GET_VISUALIZE_COST(col.rgb);
 	
 	imageStore(gbuf_pos, pxpos, vec4(depth, 0,0,0));
+	imageStore(gbuf_faceid, pxpos, uvec4(faceid, 0,0,0));
 	imageStore(gbuf_col, pxpos, col);
 	imageStore(gbuf_norm, pxpos, vec4(norm, 0));
 }

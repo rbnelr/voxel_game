@@ -542,16 +542,17 @@ namespace gl {
 					{"heat_gradient", r.gradient, r.smooth_sampler},
 				});
 				
-				glBindImageTexture(0, gbuf.pos , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
-				glBindImageTexture(1, gbuf.col , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
-				glBindImageTexture(2, gbuf.norm, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				glBindImageTexture(0, gbuf.pos   , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+				glBindImageTexture(1, gbuf.faceid, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R16UI);
+				glBindImageTexture(2, gbuf.col   , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+				glBindImageTexture(3, gbuf.norm  , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 
 				int2 dispatch_size;
 				dispatch_size.x = (renderscale.size.x + rt_groupsz.size.x -1) / rt_groupsz.size.x;
 				dispatch_size.y = (renderscale.size.y + rt_groupsz.size.y -1) / rt_groupsz.size.y;
 				glDispatchCompute(dispatch_size.x, dispatch_size.y, 1);
 				
-				for (int i=0; i<3; ++i)
+				for (int i=0; i<4; ++i)
 					glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
@@ -583,7 +584,7 @@ namespace gl {
 				rt_lighting->set_uniform("taa_max_age", taa.max_age);
 		
 				glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
-				glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16UI);
+				glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI);
 		
 				taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
 				taa.cur ^= 1;
@@ -600,9 +601,10 @@ namespace gl {
 				{"vct_texNZ", vct_data.textures[4].tex, vct_data.sampler },
 				{"vct_texPZ", vct_data.textures[5].tex, vct_data.sampler },
 		
-				{"gbuf_pos" ,  gbuf.pos  },
-				{"gbuf_col" ,  gbuf.col  },
-				{"gbuf_norm",  gbuf.norm },
+				{"gbuf_pos"   , gbuf.pos    },
+				{"gbuf_faceid", gbuf.faceid },
+				{"gbuf_col"   , gbuf.col    },
+				{"gbuf_norm"  , gbuf.norm   },
 				
 				(taa.enable ? StateManager::TextureBind{"taa_history_color", {GL_TEXTURE_2D, prev_color}, taa.sampler} : StateManager::TextureBind{}),
 				(taa.enable ? StateManager::TextureBind{"taa_history_posage", {GL_TEXTURE_2D, prev_posage}, taa.sampler_int} : StateManager::TextureBind{}),
@@ -647,6 +649,7 @@ namespace gl {
 				rt_post0->set_uniform("gauss_radius_px", gauss_radius_px);
 
 				r.state.bind_textures(rt_post0, {
+					{"gbuf_faceid", gbuf.faceid },
 					{"input_tex", framebuf0.col, framebuf0.sampler},
 				});
 
@@ -666,6 +669,7 @@ namespace gl {
 				rt_post1->set_uniform("gauss_radius_px", gauss_radius_px);
 
 				r.state.bind_textures(rt_post1, {
+					{"gbuf_faceid", gbuf.faceid },
 					{"input_tex", framebuf1.col, framebuf1.sampler},
 				});
 

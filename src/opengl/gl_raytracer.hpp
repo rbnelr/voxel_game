@@ -9,27 +9,32 @@ namespace gl {
 	class OpenglRenderer;
 
 	struct Gbuffer {
-		Texture2D pos  = {};
-		Texture2D col  = {};
-		Texture2D norm = {};
+		Texture2D pos    = {};
+		Texture2D faceid = {};
+		Texture2D col    = {};
+		Texture2D norm   = {};
 
 		void resize (int2 size) {
 			glActiveTexture(GL_TEXTURE0);
 
-			pos   = {"gbuf.pos"  }; // only depth -> reconstruct position
-			col   = {"gbuf.col"  }; // rgb albedo + emissive multiplier
-			norm  = {"gbuf.norm" }; // rgb normal
+			pos    = {"gbuf.pos"    }; // only depth -> reconstruct position
+			faceid = {"gbuf.faceid" }; // u16 
+			col    = {"gbuf.col"    }; // rgb albedo + emissive multiplier
+			norm   = {"gbuf.norm"   }; // rgb normal
 
-			glTextureStorage2D(pos , 1, GL_R32F, size.x, size.y);
-			glTextureStorage2D(col , 1, GL_RGBA16F, size.x, size.y);
-			glTextureStorage2D(norm, 1, GL_RGBA16F, size.x, size.y);
-
+			glTextureStorage2D (pos , 1, GL_R32F, size.x, size.y);
 			glTextureParameteri(pos, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(pos, GL_TEXTURE_MAX_LEVEL, 0);
 
+			glTextureStorage2D (faceid , 1, GL_R16UI, size.x, size.y);
+			glTextureParameteri(faceid, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(faceid, GL_TEXTURE_MAX_LEVEL, 0);
+
+			glTextureStorage2D (col , 1, GL_RGBA16F, size.x, size.y);
 			glTextureParameteri(col, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(col, GL_TEXTURE_MAX_LEVEL, 0);
 
+			glTextureStorage2D (norm, 1, GL_RGBA16F, size.x, size.y);
 			glTextureParameteri(norm, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(norm, GL_TEXTURE_MAX_LEVEL, 0);
 		}
@@ -109,7 +114,7 @@ namespace gl {
 			}
 
 			for (auto& buf : posage) {
-				glTextureStorage2D(buf, 1, GL_RGBA16UI, size.x, size.y);
+				glTextureStorage2D(buf, 1, GL_RG16UI, size.x, size.y);
 				glTextureParameteri(buf, GL_TEXTURE_BASE_LEVEL, 0);
 				glTextureParameteri(buf, GL_TEXTURE_MAX_LEVEL, 0);
 			}
@@ -118,8 +123,8 @@ namespace gl {
 			float3 col = float3(0,0,0);
 			glClearTexImage(colors[0], 0, GL_RGB, GL_FLOAT, &col.x);
 
-			uint32_t pos[4] = { 0u, 0u, 0u, 0xffffu };
-			glClearTexImage(posage[0], 0, GL_RGBA_INTEGER, GL_UNSIGNED_INT, pos);
+			uint32_t pos[4] = { 0u, 0xffffu };
+			glClearTexImage(posage[0], 0, GL_RG_INTEGER, GL_UNSIGNED_INT, pos);
 
 			cur = 1;
 		}

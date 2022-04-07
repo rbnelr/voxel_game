@@ -3,6 +3,7 @@
 
 #ifdef _FRAGMENT
 	uniform sampler2D input_tex;
+	uniform usampler2D gbuf_faceid;
 	
 	uniform float gauss_radius_px = 20;
 	
@@ -21,26 +22,78 @@
 		vec3 col = vec3(0.0);
 		float total = 0.0;
 		
+		uint faceid = texture(gbuf_faceid, vs_uv).r;
+		
 		int r = int(ceil(gauss_radius_px));
+		
+#if 1
 		
 	#if PASS == 0
 		for (int i=-r; i<=r; ++i) {
-			float weight = gauss_kernel(float(i));
+			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
 			
-			col   += weight * texture(input_tex, vs_uv + vec2(px_sz.x * float(i), 0.0)).rgb;
-			total += weight;
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			}
 		}
 		col /= total;
 	#else
 		for (int i=-r; i<=r; ++i) {
-			float weight = gauss_kernel(float(i));
+			vec2 uv = vs_uv + vec2(0.0, px_sz.y * float(i));
 			
-			col   += weight * texture(input_tex, vs_uv + vec2(0.0, px_sz.y * float(i))).rgb;
-			total += weight;
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			}
 		}
 		col /= total;
 		col *= exposure;
 	#endif
+#else
+	
+	#if PASS == 0
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv - vec2(px_sz.x * float(i), 0.0);
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		col /= total;
+	#else
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv - vec2(0.0, px_sz.y * float(i));
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv + vec2(0.0, px_sz.y * float(i));
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		col /= total;
+		col *= exposure;
+	#endif
+
+#endif
 		
 		frag_col = col;
 	}
