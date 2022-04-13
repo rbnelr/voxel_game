@@ -97,7 +97,7 @@ struct Input {
 	//  if cursor is enabled and rmb down
 	float2 get_mouselook_delta () {
 		float2 delta = 0;
-		if (!cursor_enabled || buttons[MOUSE_BUTTON_RIGHT].is_down) {
+		if (!cursor_enabled || buttons[MOUSE_BUTTON_MIDDLE].is_down) {
 			delta = mouse_delta;
 		}
 		return delta;

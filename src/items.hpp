@@ -1,6 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
+#include "assets.hpp"
 
 enum item_id : uint32_t {
 	I_NULL			=0,

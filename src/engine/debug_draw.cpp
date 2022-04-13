@@ -170,6 +170,17 @@ void DebugDraw::wire_frustrum (Camera_View const& view, lrgba const& col) {
 	}
 }
 
+void DebugDraw::quad (float3 const& center, float2 size, lrgba const& col) {
+	auto* out = push_back(tris, 6);
+	
+	*out++ = { center + float3(+0.5f,-0.5f, 0.0f), float3(0,0,1), col };
+	*out++ = { center + float3(+0.5f,+0.5f, 0.0f), float3(0,0,1), col };
+	*out++ = { center + float3(-0.5f,-0.5f, 0.0f), float3(0,0,1), col };
+	*out++ = { center + float3(-0.5f,-0.5f, 0.0f), float3(0,0,1), col };
+	*out++ = { center + float3(+0.5f,+0.5f, 0.0f), float3(0,0,1), col };
+	*out++ = { center + float3(-0.5f,+0.5f, 0.0f), float3(0,0,1), col };
+}
+
 void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides) {
 	auto* out = push_back(tris, sides * 4 * 3); // tri for bottom + top cap + 2 tris for side
 
@@ -177,7 +188,7 @@ void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba 
 
 	float sin0=0, cos0=1; // optimize not calling sin 2x per loop
 
-	auto push_tri = [&] (float3 pos, float3 normal) {
+	auto push = [&] (float3 pos, float3 normal) {
 		out->pos = pos * float3(radius, radius, height) + base;
 		out->normal = normal;
 		out->col = col;
@@ -190,20 +201,20 @@ void DebugDraw::cylinder (float3 const& base, float radius, float height, lrgba 
 		float sin1 = sin(ang1);
 		float cos1 = cos(ang1);
 
-		push_tri(float3(   0,    0, 0), float3(0, 0, -1));
-		push_tri(float3(cos1, sin1, 0), float3(0, 0, -1));
-		push_tri(float3(cos0, sin0, 0), float3(0, 0, -1));
+		push(float3(   0,    0, 0), float3(0, 0, -1));
+		push(float3(cos1, sin1, 0), float3(0, 0, -1));
+		push(float3(cos0, sin0, 0), float3(0, 0, -1));
 
-		push_tri(float3(cos1, sin1, 0), float3(cos1, sin1, 0));
-		push_tri(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
-		push_tri(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
-		push_tri(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
-		push_tri(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
-		push_tri(float3(cos0, sin0, 1), float3(cos0, sin0, 0));
+		push(float3(cos1, sin1, 0), float3(cos1, sin1, 0));
+		push(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
+		push(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
+		push(float3(cos0, sin0, 0), float3(cos0, sin0, 0));
+		push(float3(cos1, sin1, 1), float3(cos1, sin1, 0));
+		push(float3(cos0, sin0, 1), float3(cos0, sin0, 0));
 
-		push_tri(float3(   0,    0, 1), float3(0, 0, +1));
-		push_tri(float3(cos0, sin0, 1), float3(0, 0, +1));
-		push_tri(float3(cos1, sin1, 1), float3(0, 0, +1));
+		push(float3(   0,    0, 1), float3(0, 0, +1));
+		push(float3(cos0, sin0, 1), float3(0, 0, +1));
+		push(float3(cos1, sin1, 1), float3(0, 0, +1));
 
 		sin0 = sin1;
 		cos0 = cos1;

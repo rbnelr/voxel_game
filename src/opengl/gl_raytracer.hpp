@@ -5,6 +5,8 @@
 #include "assets.hpp"
 #include "game.hpp"
 
+#include "engine/window.hpp" // frame_counter
+
 namespace gl {
 	class OpenglRenderer;
 
@@ -343,7 +345,7 @@ namespace gl {
 		void visualize_sparse (OpenglRenderer& r);
 		void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
 	};
-
+	
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
@@ -447,7 +449,9 @@ namespace gl {
 		float visualize_mult = 1;
 
 		struct Lighting {
-			SERIALIZE(Lighting, bounce_enable, bounce_max_dist, bounce_max_count, bounce_samples, roughness)
+			SERIALIZE(Lighting,
+				bounce_enable, bounce_max_dist, bounce_max_count, bounce_samples, roughness,
+				vct)
 			
 			bool show_light = false;
 			bool show_normals = false;

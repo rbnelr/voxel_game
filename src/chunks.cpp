@@ -676,6 +676,8 @@ void Chunks::flag_touching_neighbours (Chunk* c) {
 void Chunks::update_chunk_meshing (Game& game) {
 	ZoneScoped;
 
+	test.update(game);
+
 	upload_slices.clear();
 	upload_slices.shrink_to_fit();
 
@@ -1032,6 +1034,89 @@ void Chunks::save_chunks_to_disk (const char* save_dirname) {
 	}
 }
 
+
+void Chunks::fill_sphere (float3 const& center, float radius, block_id bid) {
+	
+	int3 start = floori(center - radius);
+	int3 end   =  ceili(center + radius);
+
+	for (int z=start.z; z<end.z; ++z)
+	for (int y=start.y; y<end.y; ++y)
+	for (int x=start.x; x<end.x; ++x) {
+		float dist = length(((float3)int3(x,y,z)+0.5f) - center);
+		if (dist <= radius)
+			write_block(x,y,z, bid);
+	}
+}
+
+//
+bool Chunks::raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist) {
+	ZoneScoped;
+
+	bool did_hit = false;
+
+	raycast_voxels(*this, ray, [&] (int3 const& pos, int axis, float dist) -> bool {
+		//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
+
+		hit.pos = pos;
+		hit.bid = read_block(pos.x, pos.y, pos.z);
+
+		if (dist > max_dist) {
+			if (hit_at_max_dist) {
+				hit.face = (BlockFace)-1; // select block itself instead of face (for creative mode block placing)
+				did_hit = true;
+			}
+			return true;
+		}
+
+		if ((g_assets.block_types.block_breakable(hit.bid))) {
+			hit.face = (BlockFace)face_from_stepmask(axis, ray.dir);
+			did_hit = true;
+			return true;
+		}
+		return false;
+	});
+
+	return did_hit;
+}
+
+void VoxelEdits::update (Input& I, Game& game) {
+
+	bool did_hit = false;
+	float3 hit_pos;
+	
+	Ray ray = screen_ray(I.cursor_pos, game.view, (float2)I.window_size);
+
+	switch (brush_mode) {
+	
+		case RAYCAST: {
+			VoxelHit hit;
+			did_hit = game.chunks.raycast_breakable_blocks(ray, brush_ray_max_dist, hit, true);
+			if (did_hit) hit_pos = (float3)hit.pos + 0.5f;
+		} break;
+		
+		case PLANE: {
+			Plane p = { brush_plane, normalize(brush_plane_normal) };
+			did_hit = ray_plane_intersect(ray, p, &hit_pos);
+		} break;
+	}
+
+	if (did_hit) {
+		auto air_bid   = g_assets.block_types.map_id("air");
+		auto brush_bid = g_assets.block_types.map_id(brush_block);
+	
+		g_debugdraw.wire_sphere(hit_pos, brush_size*0.5f, lrgba(1,0,1,1));
+
+		auto& l = I.buttons[MOUSE_BUTTON_LEFT];
+		auto& r = I.buttons[MOUSE_BUTTON_RIGHT];
+
+		if (brush_repeat ? l.is_down : l.went_down)
+			game.chunks.fill_sphere(hit_pos, brush_size*0.5f, brush_bid);
+		else if (brush_repeat ? r.is_down : r.went_down)
+			game.chunks.fill_sphere(hit_pos, brush_size*0.5f, air_bid);
+	}
+}
+
 int get_axis (float3 const& next) {
 	if (next.x <= next.y && next.x <= next.z) return 0;
 	else if (               next.y <= next.z) return 1;
@@ -1171,5 +1256,80 @@ void _dev_raycast (Chunks& chunks, Camera_View& view) {
 				break; // out of chunk
 			}
 		}
+	}
+}
+
+void Test::update (Game& game) {
+	
+	ImGui::Begin("LPV_test");
+
+	init |= ImGui::DragInt3("chunk_pos", &chunk_pos.x, 0.05f);
+	init |= ImGui::DragInt("z", &z, 0.05f);
+
+	init |= ImGui::DragInt("max_light", &max_light, 0.05f);
+
+	init |= ImGui::Button("Reinit");
+
+	ImGui::End();
+
+
+	auto air = g_assets.block_types.map_id("air");
+	auto glow = g_assets.block_types.map_id("crystal5");
+
+
+	g_debugdraw.wire_cube((float3)chunk_pos * CHUNK_SIZE + CHUNK_SIZE/2 + float3(0,0,(float)z),
+		CHUNK_SIZE, lrgba(1,0,0,1));
+
+	auto cid = game.chunks.query_chunk(chunk_pos);
+	if (cid == U16_NULL) return;
+
+	auto chunk = game.chunks[cid];
+
+	init |= !!(chunk.flags & Chunk::VOXELS_DIRTY);
+
+	if (init) {
+		init = false;
+
+		// init
+		for (int y=0; y<CHUNK_SIZE; ++y)
+		for (int x=0; x<CHUNK_SIZE; ++x) {
+			auto bid = game.chunks.read_block(x, y, z, cid);
+
+			light[y][x] = bid == glow ? max_light : 0;
+
+			//if (light[y][x])
+			//	g_debugdraw.wire_cube((float3)p + 0.5f, 1, lrgba(1,0,0,1));
+		}
+	}
+			
+	auto get = [&] (int x, int y) {
+		if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_SIZE) return 0;
+		return light[y][x];
+	};
+
+	// propagate
+	for (int y=0; y<CHUNK_SIZE; ++y)
+	for (int x=0; x<CHUNK_SIZE; ++x) {
+		auto bid = game.chunks.read_block(x, y, z, cid);
+
+		if (bid == air) {
+			int l = light[y][x];
+
+			l = max(l, get(x-1,y  ) - 1);
+			l = max(l, get(x+1,y  ) - 1);
+			l = max(l, get(x  ,y-1) - 1);
+			l = max(l, get(x  ,y+1) - 1);
+
+			light[y][x] = l;
+		}
+	}
+
+	// draw
+	for (int y=0; y<CHUNK_SIZE; ++y)
+	for (int x=0; x<CHUNK_SIZE; ++x) {
+		int3 p = chunk_pos * CHUNK_SIZE + int3(x,y,z);
+
+		float c = (float)light[y][x] / (float)max_light;
+		g_debugdraw.quad((float3)p + float3(0.5f,0.5f, 1.01f), 1, lrgba(c,0,0, 0.90f));
 	}
 }

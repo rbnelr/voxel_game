@@ -133,7 +133,8 @@ struct DebugDraw {
 	void wire_sphere (float3 const& pos, float r, lrgba const& col, int angres=32, int wires=16);
 	void wire_cone (float3 const& pos, float ang, float length, float3x3 const& rot, lrgba const& col, int circres=16, int wires=8);
 	void wire_frustrum (Camera_View const& view, lrgba const& col);
-
+	
+	void quad (float3 const& center, float2 size, lrgba const& col);
 	void cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides=32);
 	
 	void axis_gizmo (Camera_View const& view, int2 const& viewport_size);

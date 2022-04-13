@@ -161,6 +161,7 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 			ivec3 dst_pos = ivec3(pos + offsets[chunk_idx]);
 			ivec3 src_pos = dst_pos * 2;
 			
+		#if 0
 			{
 				LOAD(vct_texNX, read_mip)
 				STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
@@ -187,6 +188,17 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 				LOAD(vct_texPZ, read_mip)
 				STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
 			}
+		#else
+			{
+				LOAD(vct_texPZ, read_mip)
+				STORE(write_mipNX, (a+e+b+f+c+g+d+h)/8.0);
+				//STORE(write_mipPX, (a+e+b+f+c+g+d+h)/8.0);
+				//STORE(write_mipNY, (a+e+b+f+c+g+d+h)/8.0);
+				//STORE(write_mipPY, (a+e+b+f+c+g+d+h)/8.0);
+				//STORE(write_mipNZ, (a+e+b+f+c+g+d+h)/8.0);
+				//STORE(write_mipPZ, (a+e+b+f+c+g+d+h)/8.0);
+			}
+		#endif
 		}
 	}
 #endif

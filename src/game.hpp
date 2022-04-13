@@ -45,7 +45,4 @@ struct Game {
 	void imgui (Window& window, Input& I, Renderer* renderer);
 	void update (Window& window, Input& I);
 
-	//
-	bool raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist=false);
-
 };

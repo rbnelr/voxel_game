@@ -1,7 +1,7 @@
 {
 	"world_gen": {
 		"seed_str": "test4",
-		"savefile": "../saves/test",
+		"savefile": "../saves/test2",
 		"water_level": -123,
 		"base_depth": 3.0,
 		"large_noise": [
@@ -40,25 +40,43 @@
 		"disable_grass": true
 	},
 	"chunks": {
-		"load_radius": 500.0,
-		"load_from_disk": false,
+		"load_radius": 300.0,
+		"load_from_disk": true,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
 		"visualize_subchunks": false,
 		"visualize_radius": false,
-		"debug_frustrum_culling": false
+		"debug_frustrum_culling": false,
+		"edits": {
+			"open": true,
+			"brush_block": "earth",
+			"brush_mode": 1,
+			"brush_size": 1.0,
+			"brush_repeat": true,
+			"brush_ray_max_dist": 50.0,
+			"brush_plane": [
+				0.0,
+				0.0,
+				-92.5
+			],
+			"brush_plane_normal": [
+				0.0,
+				0.0,
+				1.0
+			]
+		}
 	},
 	"flycam": {
 		"cam": {
 			"pos": [
-				-130.24490356445313,
-				74.98423767089844,
-				-118.39561462402344
+				-24.88433265686035,
+				33.65206527709961,
+				-57.267215728759766
 			],
 			"rot_aer": [
-				-2.1898388862609863,
-				0.3325178623199463,
+				1.5547873973846436,
+				-1.3561853170394897,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -67,7 +85,7 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 12.86133098602295,
+		"base_speed": 13.784431457519531,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -92,7 +110,7 @@
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
-		"graphics": true,
+		"graphics": false,
 		"world": true,
 		"chunks": true,
 		"entities": true
@@ -109,11 +127,12 @@
 				"max_age": 100
 			},
 			"lighting": {
-				"bounce_enable": true,
+				"bounce_enable": false,
 				"bounce_max_dist": 128.0,
 				"bounce_max_count": 4,
 				"bounce_samples": 1,
-				"roughness": 0.21400000154972076
+				"roughness": 0.21400000154972076,
+				"vct": false
 			}
 		},
 		"debug_draw": {

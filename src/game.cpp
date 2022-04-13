@@ -120,6 +120,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 		}
 
 		if (imgui_header("Chunks", &imopen.chunks)) {
+			chunks.edits.imgui(I);
 			chunks.imgui(renderer);
 			block_update.imgui();
 		}
@@ -186,6 +187,10 @@ void Game::update (Window& window, Input& I) {
 	block_update.update_blocks(I, chunks);
 
 	chunks.update_chunk_loading(*this);
+	
+	if (chunks.edits.open)
+		chunks.edits.update(I, *this);
+	
 	chunks.update_chunk_meshing(*this);
 
 	if (activate_flycam || player.third_person) {
@@ -198,35 +203,4 @@ void Game::update (Window& window, Input& I) {
 
 	g_debugdraw.finish_selectables();
 	ImGui::End();
-}
-
-//
-bool Game::raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist) {
-	ZoneScoped;
-
-	bool did_hit = false;
-
-	raycast_voxels(chunks, ray, [&] (int3 const& pos, int axis, float dist) -> bool {
-		//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
-
-		hit.pos = pos;
-		hit.bid = chunks.read_block(pos.x, pos.y, pos.z);
-
-		if (dist > max_dist) {
-			if (hit_at_max_dist) {
-				hit.face = (BlockFace)-1; // select block itself instead of face (for creative mode block placing)
-				did_hit = true;
-			}
-			return true;
-		}
-
-		if ((g_assets.block_types.block_breakable(hit.bid))) {
-			hit.face = (BlockFace)face_from_stepmask(axis, ray.dir);
-			did_hit = true;
-			return true;
-		}
-		return false;
-	});
-
-	return did_hit;
 }

@@ -601,6 +601,8 @@ uniform float test;
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	
+#if 0
+	
 	// Since we are heavily bottlenecked by memory access
 	// it is actually faster to branch to minimize cache trashing
 	// by special-casing LOD0 (since all 6 directions are identical)
@@ -641,6 +643,23 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 		
 		return val;
 	}
+#else
+	float lod = log2(size);
+	
+	// prevent small samples from being way too blurry
+	// -> simulate negative lods (size < 1.0) by snapping texture coords to nearest texels
+	// when approaching size=0
+	// size = 0.5 would snap [0.25,0.75] to 0.5
+	//              and lerp [0.75,1.25] in [0.5,1.5]
+	if (size <= 1.0) {
+		texcoord = 0.5 * size + texcoord;
+		texcoord = min(fract(texcoord) * (1.0 / size) - 0.5, 0.5) + floor(texcoord);
+	}
+	
+	texcoord *= INV_WORLD_SIZEf;
+	
+	return textureLod(vct_texNX, texcoord, lod) * VCT_UNPACK;
+#endif
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	

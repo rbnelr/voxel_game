@@ -52,15 +52,18 @@ namespace gl {
 
 		int j=0;
 		for (auto& s : sets) {
-			ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set");
+			if (ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set")) {
 
-			count_changed = ImGui::SliderInt("count", &s.count, 0, 16) || count_changed;
-			ImGui::DragFloat("cone_ang", &s.cone_ang, 0.1f, 0, 180);
+				count_changed = ImGui::SliderInt("count", &s.count, 0, 16) || count_changed;
+				ImGui::DragFloat("cone_ang", &s.cone_ang, 0.1f, 0, 180);
 
-			ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
-			ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
+				ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
+				ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
 
-			ImGui::DragFloat("weight", &s.weight, 0.01f);
+				ImGui::DragFloat("weight", &s.weight, 0.01f);
+
+				ImGui::TreePop();
+			}
 
 			float ang = deg(s.cone_ang);
 
@@ -93,8 +96,6 @@ namespace gl {
 			}
 
 			cone_data.count += s.count;
-
-			ImGui::TreePop();
 		}
 
 		// normalize weights

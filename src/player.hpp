@@ -1,6 +1,5 @@
 #pragma once
 #include "common.hpp"
-#include "chunks.hpp"
 #include "engine/camera.hpp"
 #include "physics.hpp"
 #include "items.hpp"

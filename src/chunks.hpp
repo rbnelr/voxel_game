@@ -2,6 +2,7 @@
 #include "common.hpp"
 #include "blocks.hpp"
 #include "assets.hpp"
+#include "player.hpp"
 
 #if 1
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
@@ -300,9 +301,60 @@ inline std::string get_chunk_filename (int3 const& pos, char const* dirname) {
 chunk_id try_load_chunk_from_disk (Chunks& chunks, int3 const& pos, char const* dirname);
 void save_chunk_to_disk (Chunks& chunks, chunk_id cid, char const* dirname);
 
+struct VoxelEdits {
+	SERIALIZE(VoxelEdits, open, brush_block, brush_mode, brush_size, brush_repeat,
+		brush_ray_max_dist, brush_plane, brush_plane_normal)
+	
+	enum BrushMode : int {
+		RAYCAST,
+		PLANE,
+	};
+	
+	bool        open = false;
+
+	std::string brush_block = "earth";
+
+	BrushMode   brush_mode = RAYCAST;
+
+	float       brush_size = 1;
+	bool        brush_repeat = true;
+
+	//bool        brush_snap = true; // false=smooth sphere from hit point, cant do currently since raycast only returns ints
+	
+	float       brush_ray_max_dist = 50;
+
+	float3      brush_plane = 0;
+	float3      brush_plane_normal = float3(0,0,1);
+
+	void imgui (Input& I) {
+		ImGui::Checkbox("Voxel Edits", &open);
+		if (I.buttons[KEY_K].went_down)
+			open = !open;
+
+		if (open && ImGui::Begin("Voxel Edits", &open)) {
+
+			ImGui::InputText("brush_block", &brush_block);
+
+			ImGui::Combo("brush_mode", (int*)&brush_mode, "RAYCAST\0PLANE");
+			
+			ImGui::DragFloat("brush_size", &brush_size, 0.05f);
+			ImGui::Checkbox("brush_repeat", &brush_repeat);
+			//ImGui::Checkbox("brush_snap", &brush_snap);
+
+			ImGui::DragFloat("brush_ray_max_dist", &brush_ray_max_dist, 0.05f);
+			ImGui::DragFloat3("brush_plane", &brush_plane.x, 0.05f);
+			ImGui::DragFloat3("brush_plane_normal", &brush_plane_normal.x, 0.05f);
+
+			ImGui::End();
+		}
+	}
+	void update (Input& I, Game& game);
+};
+
 struct Chunks {
 	SERIALIZE(Chunks, load_radius, load_from_disk, unload_hyster, mesh_world_border,
-		visualize_chunks, visualize_subchunks, visualize_radius, debug_frustrum_culling)
+		visualize_chunks, visualize_subchunks, visualize_radius, debug_frustrum_culling,
+		edits)
 
 	BlockAllocator<Chunk>			chunks			= { MAX_CHUNKS };
 	BlockAllocator<ChunkVoxels>		chunk_voxels	= { MAX_CHUNKS }; // TODO: get rid of alloc bitset here;  always same id as chunk, ie. this is just a SOA array together with chunks
@@ -315,6 +367,8 @@ struct Chunks {
 	chunk_pos_set					queued_chunks; // queued for async worldgen
 
 	BlueNoiseTexture				blue_noise_tex;
+
+	VoxelEdits                      edits;
 
 	chunk_id query_chunk (int3 const& pos) {
 		//ZoneScoped;
@@ -428,12 +482,22 @@ struct Chunks {
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);
+	
+	//
+	void fill_sphere (float3 const& center, float radius, block_id bid);
 
+	bool raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist=false);
+	
 };
 
 inline int _toint (float f) { return *(int*)&f; }
 inline float _tofloat (int i) { return *(float*)&i; }
 
+inline int face_from_stepmask (int axis, float3 const& ray_dir) {
+	if      (axis == 0) return ray_dir.x >= 0 ? 0 : 1;
+	else if (axis == 1) return ray_dir.y >= 0 ? 2 : 3;
+	else                return ray_dir.z >= 0 ? 4 : 5;
+}
 template <typename Func>
 void raycast_voxels (Chunks& chunks, Ray const& ray, Func hit_voxel) {
 	int3 stepdir;
@@ -474,10 +538,22 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, Func hit_voxel) {
 		}
 	}
 }
-inline int face_from_stepmask (int axis, float3 const& ray_dir) {
-	if      (axis == 0) return ray_dir.x >= 0 ? 0 : 1;
-	else if (axis == 1) return ray_dir.y >= 0 ? 2 : 3;
-	else                return ray_dir.z >= 0 ? 4 : 5;
-}
 
 void _dev_raycast (Chunks& chunks, Camera_View& view);
+
+
+struct Test {
+
+	int light[CHUNK_SIZE][CHUNK_SIZE];
+
+	int3 chunk_pos = int3(-1,0,-2);
+	int z = 35;
+
+	int max_light = 56; // 128
+
+	bool init = false;
+
+	void update (Game& game);
+};
+
+inline Test test;

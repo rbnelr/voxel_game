@@ -176,7 +176,7 @@ void Player::calc_selected_block (SelectedBlock& block, Game& game, Camera_View&
 	ray.pos = view.cam_to_world * float3(0,0,0);
 
 	VoxelHit hit;
-	block.is_selected = game.raycast_breakable_blocks(ray, reach, hit, game.creative_mode);
+	block.is_selected = game.chunks.raycast_breakable_blocks(ray, reach, hit, game.creative_mode);
 	if (block.is_selected) block.hit = hit; // only overwrite hit when
 }
 

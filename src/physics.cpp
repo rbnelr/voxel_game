@@ -2,6 +2,7 @@
 #include "physics.hpp"
 #include "blocks.hpp"
 #include "player.hpp"
+#include "chunks.hpp"
 
 CollisionHit calc_earliest_collision (Chunks& chunks, PhysicsObject& obj) {
 	ZoneScoped;
