@@ -941,16 +941,14 @@ void Chunks::visualize_chunk (chunk_id cid, Chunk& chunk, bool empty, bool culle
 		auto& vox = chunk_voxels[cid];
 
 		uint32_t subc_i = 0;
-		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
-			for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE) {
-				for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
-					if ((vox.subchunks[subc_i] & SUBC_SPARSE_BIT) == 0) {
-						float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
-						g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
-					}
-					subc_i++;
-				}
+		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE)
+		for (int sy=0; sy<CHUNK_SIZE; sy += SUBCHUNK_SIZE)
+		for (int sx=0; sx<CHUNK_SIZE; sx += SUBCHUNK_SIZE) {
+			if ((vox.subchunks[subc_i] & SUBC_SPARSE_BIT) == 0) {
+				float3 pos = (float3)(chunk.pos * CHUNK_SIZE + int3(sx,sy,sz)) + SUBCHUNK_SIZE/2;
+				g_debugdraw.wire_cube(pos, (float3)SUBCHUNK_SIZE * 0.997f, DBG_DENSE_SUBCHUNK_COL);
 			}
+			subc_i++;
 		}
 	}
 }
@@ -1081,6 +1079,8 @@ bool Chunks::raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit&
 }
 
 void VoxelEdits::update (Input& I, Game& game) {
+	if (!I.cursor_enabled)
+		return;
 
 	bool did_hit = false;
 	float3 hit_pos;
@@ -1263,10 +1263,10 @@ void Test::update (Game& game) {
 	
 	ImGui::Begin("LPV_test");
 
-	init |= ImGui::DragInt3("chunk_pos", &chunk_pos.x, 0.05f);
-	init |= ImGui::DragInt("z", &z, 0.05f);
+	init |= ImGui::DragInt3("chunk_pos", &chunk_pos.x, 0.1f);
+	init |= ImGui::DragInt("z", &z, 0.1f);
 
-	init |= ImGui::DragInt("max_light", &max_light, 0.05f);
+	init |= ImGui::DragInt("max_light", &max_light, 0.1f);
 
 	init |= ImGui::Button("Reinit");
 
@@ -1295,32 +1295,82 @@ void Test::update (Game& game) {
 		for (int x=0; x<CHUNK_SIZE; ++x) {
 			auto bid = game.chunks.read_block(x, y, z, cid);
 
-			light[y][x] = bid == glow ? max_light : 0;
+			light0[y][x] = bid == glow ? max_light : 0;
 
 			//if (light[y][x])
 			//	g_debugdraw.wire_cube((float3)p + 0.5f, 1, lrgba(1,0,0,1));
 		}
-	}
-			
-	auto get = [&] (int x, int y) {
-		if (x < 0 || x >= CHUNK_SIZE || y < 0 || y >= CHUNK_SIZE) return 0;
-		return light[y][x];
-	};
 
-	// propagate
-	for (int y=0; y<CHUNK_SIZE; ++y)
-	for (int x=0; x<CHUNK_SIZE; ++x) {
-		auto bid = game.chunks.read_block(x, y, z, cid);
+		#define GET(ARR, X,Y) ((X) < 0 || (X) >= CHUNK_SIZE || (Y) < 0 || (Y) >= CHUNK_SIZE ? 0 : (ARR)[Y][X])
 
-		if (bid == air) {
-			int l = light[y][x];
+		// propagate
+		for (int y=1; y<CHUNK_SIZE; y++) {
+			for (int x=0; x<CHUNK_SIZE; x++) {
+				auto pbid = game.chunks.read_block(x, y-1, z, cid);
+				auto bid = game.chunks.read_block(x, y, z, cid);
+				
+				int cur = light0[y][x];
 
-			l = max(l, get(x-1,y  ) - 1);
-			l = max(l, get(x+1,y  ) - 1);
-			l = max(l, get(x  ,y-1) - 1);
-			l = max(l, get(x  ,y+1) - 1);
-
-			light[y][x] = l;
+				if (bid == air) {
+					                 cur = max(cur, GET(light1, x  ,y-1) - 2);
+					if (pbid == air) cur = max(cur, GET(light1, x-1,y-1) - 3);
+					if (pbid == air) cur = max(cur, GET(light1, x+1,y-1) - 3);
+				}
+				
+				light1[y][x] = cur;
+			}
+		}
+		
+		for (int y=CHUNK_SIZE-2; y>=0; y--) {
+			for (int x=0; x<CHUNK_SIZE; x++) {
+				auto pbid = game.chunks.read_block(x, y+1, z, cid);
+				auto bid = game.chunks.read_block(x, y, z, cid);
+				
+				int cur = light0[y][x];
+		
+				if (bid == air) {
+					                 cur = max(cur, GET(light2, x  ,y+1) - 2);
+					if (pbid == air) cur = max(cur, GET(light2, x-1,y+1) - 3);
+					if (pbid == air) cur = max(cur, GET(light2, x+1,y+1) - 3);
+				}
+				
+				light2[y][x] = cur;
+			}
+		}
+		
+		
+		for (int x=1; x<CHUNK_SIZE; x++) {
+			for (int y=0; y<CHUNK_SIZE; y++) {
+				auto pbid = game.chunks.read_block(x-1, y, z, cid);
+				auto bid = game.chunks.read_block(x, y, z, cid);
+				
+				int cur = light0[y][x];
+		
+				if (bid == air) {
+					                 cur = max(cur, GET(light3, x-1,y  ) - 2);
+					if (pbid == air) cur = max(cur, GET(light3, x-1,y-1) - 3);
+					if (pbid == air) cur = max(cur, GET(light3, x-1,y+1) - 3);
+				}
+				
+				light3[y][x] = cur;
+			}
+		}
+		
+		for (int x=CHUNK_SIZE-2; x>=0; x--) {
+			for (int y=0; y<CHUNK_SIZE; y++) {
+				auto pbid = game.chunks.read_block(x+1, y, z, cid);
+				auto bid = game.chunks.read_block(x, y, z, cid);
+				
+				int cur = light0[y][x];
+		
+				if (bid == air) {
+					                 cur = max(cur, GET(light4, x+1,y  ) - 2);
+					if (pbid == air) cur = max(cur, GET(light4, x+1,y-1) - 3);
+					if (pbid == air) cur = max(cur, GET(light4, x+1,y+1) - 3);
+				}
+				
+				light4[y][x] = cur;
+			}
 		}
 	}
 
@@ -1329,7 +1379,14 @@ void Test::update (Game& game) {
 	for (int x=0; x<CHUNK_SIZE; ++x) {
 		int3 p = chunk_pos * CHUNK_SIZE + int3(x,y,z);
 
-		float c = (float)light[y][x] / (float)max_light;
-		g_debugdraw.quad((float3)p + float3(0.5f,0.5f, 1.01f), 1, lrgba(c,0,0, 0.90f));
+		light0[y][x] = max(max(max(light1[y][x], light2[y][x]), light3[y][x]), light4[y][x]);
+
+		float c = (float)light0[y][x] / (float)max_light;
+		lrgba col = lrgba(pow(c, 2.2f), 0,0, 0.98f);
+
+		if (light0[y][x] == (float)max_light)
+			col = lrgba(1,1,0, 0.98f);
+
+		g_debugdraw.quad((float3)p + float3(0.5f,0.5f, 0.01f), 1, col);
 	}
 }

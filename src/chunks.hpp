@@ -544,7 +544,11 @@ void _dev_raycast (Chunks& chunks, Camera_View& view);
 
 struct Test {
 
-	int light[CHUNK_SIZE][CHUNK_SIZE];
+	int light0[CHUNK_SIZE][CHUNK_SIZE] = {};
+	int light1[CHUNK_SIZE][CHUNK_SIZE] = {};
+	int light2[CHUNK_SIZE][CHUNK_SIZE] = {};
+	int light3[CHUNK_SIZE][CHUNK_SIZE] = {};
+	int light4[CHUNK_SIZE][CHUNK_SIZE] = {};
 
 	int3 chunk_pos = int3(-1,0,-2);
 	int z = 35;
