@@ -1292,47 +1292,94 @@ void Test::update (Game& game) {
 
 	//init |= !!(chunk.flags & Chunk::VOXELS_DIRTY);
 
+	static constexpr int2 DIRS[4] = {
+		int2(+1,  0),
+		int2( 0, +1),
+		int2(-1,  0),
+		int2( 0, -1),
+	};
+	static constexpr int2 SEC_DIRS[4] = {
+		int2(0, 1),
+		int2(1, 0),
+		int2(0, 1),
+		int2(1, 0),
+	};
+
 	if (propagate) {
-		#define GET(ARR, X,Y) ((X) < 0 || (X) >= CHUNK_SIZE || (Y) < 0 || (Y) >= CHUNK_SIZE ? 0 : (ARR)[Y][X])
+		#define GET(ARR, X,Y) ((X) < 0 || (X) >= CHUNK_SIZE || (Y) < 0 || (Y) >= CHUNK_SIZE ? Cell{} : (ARR)[Y][X])
 	
 		// propagate
 		for (int y=0; y<CHUNK_SIZE; y++) {
 			for (int x=0; x<CHUNK_SIZE; x++) {
 				auto bid = game.chunks.read_block(x, y, z, cid);
 				
-				int cur = light[y][x] - 1;
-				
-				if (bid == glow)
-					cur = max(cur, max_light);
-				
-				if (bid == air) {
-					cur = max(cur, GET(light, x-1,y  ) - 1);
-					cur = max(cur, GET(light, x+1,y  ) - 1);
-					cur = max(cur, GET(light, x  ,y-1) - 1);
-					cur = max(cur, GET(light, x  ,y+1) - 1);
-				}
+				auto& in  = light[y][x];
+				auto& out = light_buf[y][x];
 
-				light_buf[y][x] = cur;
+				for (int dir=0; dir<4; ++dir) {
+					int cur = max(in.dirs[dir] - 1, 0);
+
+					if (bid == glow)
+						cur = max(cur, max_light);
+					
+					auto eval_neighbour = [&] (int X, int Y) {
+						if (X >= 0 && X < CHUNK_SIZE && Y >= 0 && Y < CHUNK_SIZE)
+							return light[Y][X].dirs[dir];
+						return 0;
+					};
+
+					if (bid == air) {
+						int2 d = DIRS[dir];
+						int2 s = SEC_DIRS[dir];
+
+						cur = max(cur, eval_neighbour(x - d.x, y - d.y) - 1);
+
+						cur = max(cur, eval_neighbour(x - d.x + s.x, y - d.y + s.y) - 2);
+						cur = max(cur, eval_neighbour(x - d.x - s.x, y - d.y - s.y) - 2);
+					}
+
+					out.dirs[dir] = cur;
+				}
 			}
 		}
 		
 		for (int y=0; y<CHUNK_SIZE; y++)
 		for (int x=0; x<CHUNK_SIZE; x++) {
+			auto bid = game.chunks.read_block(x, y, z, cid);
+
 			light[y][x] = light_buf[y][x];
 		}
 	}
+
+	float3 cols[4] = {
+		float3(1,0,0),
+		float3(0,1,0),
+		float3(0,0,1),
+		float3(1,0,1),
+	};
 
 	// draw
 	for (int y=0; y<CHUNK_SIZE; ++y)
 	for (int x=0; x<CHUNK_SIZE; ++x) {
 		int3 p = chunk_pos * CHUNK_SIZE + int3(x,y,z);
 
-		float c = (float)light[y][x] / (float)max_light;
-		lrgba col = lrgba(pow(c, 2.2f), 0,0, 0.98f);
+		for (int dir=0; dir<4; ++dir) {
+			int val = light[y][x].dirs[dir];
 
-		if (light[y][x] == (float)max_light)
-			col = lrgba(1,1,0, 0.98f);
+			float c = (float)val / (float)max_light;
+			lrgba col = lrgba(cols[dir] * pow(c, 2.2f), 1);
 
-		g_debugdraw.quad((float3)p + float3(0.5f,0.5f, 0.01f), 1, col);
+			if (val == max_light)
+				col = lrgba(1,1,0, 1);
+
+			float len = c * 0.48f;
+			
+			g_debugdraw.quad((float3)p + float3(0.5f,0.5f, 0.01f), 1, lrgba(0,0,0, 0.5f));
+
+			g_debugdraw.vector(
+				(float3)p + float3(0.5f,0.5f, 0.01f),
+				rotate3_Z((float)dir * deg(90.0f)) * (float3(1, 0, 0) * len),
+				col);
+		}
 	}
 }

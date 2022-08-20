@@ -541,16 +541,19 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, Func hit_voxel) {
 
 void _dev_raycast (Chunks& chunks, Camera_View& view);
 
-
 struct Test {
+	
+	struct Cell {
+		int dirs[4];
+	};
 
-	int light[CHUNK_SIZE][CHUNK_SIZE] = {};
-	int light_buf[CHUNK_SIZE][CHUNK_SIZE] = {};
+	Cell light    [CHUNK_SIZE][CHUNK_SIZE] = {};
+	Cell light_buf[CHUNK_SIZE][CHUNK_SIZE] = {};
 
 	int3 chunk_pos = int3(-1,0,-2);
 	int z = 35;
 
-	int max_light = 56; // 128
+	int max_light = 50; // 128
 
 	bool init = false;
 
