@@ -204,12 +204,9 @@ namespace gl {
 		static constexpr int BATCHSIZE = 16;
 		int3 offsets[BATCHSIZE];
 
-		auto dispatch_chunked = [&] (int layer, Shader* shad) {
+		auto dispatch_chunked = [&] (int layer, Shader* shad, bool mip0=false) {
 			int size = CHUNK_SIZE >> layer;
 			shad->set_uniform("size", (GLuint)size);
-
-			for (int dir=0; dir<6; ++dir)
-				glBindImageTexture(dir, textures[dir].texview, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
 
 			if (layer >= 0)
 				shad->set_uniform("read_mip", layer-1);
@@ -233,9 +230,6 @@ namespace gl {
 			shad->set_uniform("size", (GLuint)size);
 			shad->set_uniform("read_mip", layer-1);
 
-			for (int dir=0; dir<6; ++dir)
-				glBindImageTexture(dir, textures[dir].texview, layer, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
-
 			memset(offsets, 0, sizeof(offsets));
 			glUniform3uiv(shad->get_uniform_location("offsets[0]"), ARRLEN(offsets), (GLuint*)offsets);
 
@@ -252,14 +246,17 @@ namespace gl {
 				//{"df_tex",    r.raytracer.df_tex.tex},
 				{"tile_textures", r.tile_textures, r.pixelated_sampler},
 			});
-
+			
+			glBindImageTexture(0, tex_mip0.texview, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+			
 			dispatch_chunked(0, filter_mip0);
 		}
-
+		
 		{ // layer 1+
 			glUseProgram(filter->prog);
-
+			
 			r.state.bind_textures(filter, {
+				{"vct_tex_mip0",  tex_mip0.tex, sampler },
 				{"vct_texNX", textures[0].tex, sampler },
 				{"vct_texPX", textures[1].tex, sampler },
 				{"vct_texNY", textures[2].tex, sampler },
@@ -267,15 +264,24 @@ namespace gl {
 				{"vct_texNZ", textures[4].tex, sampler },
 				{"vct_texPZ", textures[5].tex, sampler },
 			});
-
+			
 			// filter only texels for each chunk (up to 4x4x4 work groups)
-			for (int layer=1; layer<FILTER_CHUNK_MIPS; ++layer)
+			for (int layer=1; layer<FILTER_CHUNK_MIPS; ++layer) {
+				
+				for (int dir=0; dir<6; ++dir)
+					glBindImageTexture(dir, textures[dir].texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+			
 				dispatch_chunked(layer, filter);
-		}
-
-		{ // filter whole texture again for remaining mips
-			for (int layer=FILTER_CHUNK_MIPS; layer<MIPS; ++layer)
+			}
+			
+			// filter whole texture again for remaining mips
+			for (int layer=FILTER_CHUNK_MIPS; layer<MIPS; ++layer) {
+				
+				for (int dir=0; dir<6; ++dir)
+					glBindImageTexture(dir, textures[dir].texview, layer-1, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8UI);
+				
 				dispatch_whole(layer, filter);
+			}
 		}
 
 		// unbind
@@ -514,6 +520,9 @@ namespace gl {
 		shad->set_uniform("vct_primary_cone_width", lighting.vct_primary_cone_width);
 		shad->set_uniform("vct_min_start_dist", lighting.vct_min_start_dist);
 
+		shad->set_uniform("vct_diffuse", lighting.vct_diffuse);
+		shad->set_uniform("vct_specular", lighting.vct_specular);
+
 		shad->set_uniform("test", lighting.test);
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
@@ -558,9 +567,9 @@ namespace gl {
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 			
-			//// normal rasterized drawing pass for gbuf testing
-			//glClear(GL_DEPTH_BUFFER_BIT);
-			//test_renderer.draw(r);
+			// normal rasterized drawing pass for gbuf testing
+			glClear(GL_DEPTH_BUFFER_BIT);
+			test_renderer.draw(r);
 		}
 
 		{ // deferred lighting pass  gbuf -> lit image
@@ -594,7 +603,8 @@ namespace gl {
 			r.state.bind_textures(rt_lighting, {
 				{"voxel_tex", voxel_tex.tex},
 				{"df_tex", df_tex.tex},
-
+				
+				{"vct_tex_mip0", vct_data.tex_mip0.tex, vct_data.sampler },
 				{"vct_texNX", vct_data.textures[0].tex, vct_data.sampler },
 				{"vct_texPX", vct_data.textures[1].tex, vct_data.sampler },
 				{"vct_texNY", vct_data.textures[2].tex, vct_data.sampler },
@@ -683,5 +693,23 @@ namespace gl {
 		//for (int i=0; i<3; ++i)
 		//	glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 	}
+	
+	void TestRenderer::draw (OpenglRenderer& r) {
+		ZoneScoped;
+		OGL_TRACE("TestRenderer draw");
 
+		PipelineState s;
+		s.depth_test = true;
+		s.blend_enable = false;
+		r.state.set(s);
+
+		glUseProgram(shad->prog);
+		r.state.bind_textures(shad, {});
+
+		float4x4 mat = (float4x4)translate(pos) * (float4x4)(rotate3_Z(rot.x) * rotate3_X(rot.y)) * (float4x4)scale((float3)size);
+		shad->set_uniform("model2world", mat);
+
+		glBindVertexArray(mesh.ib.vao);
+		glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);		
+	}
 } // namespace gl

@@ -135,7 +135,7 @@ namespace gl {
 	static constexpr int GPU_WORLD_SIZE_CHUNKS = 8;
 	static constexpr int GPU_WORLD_SIZE = GPU_WORLD_SIZE_CHUNKS * CHUNK_SIZE;
 
-#if 0
+#if 1
 	// Render arbitrary meshses into gbuffer to test combining rasterized and raytraced objects
 	struct TestRenderer {
 		Shader*		shad;
@@ -158,24 +158,7 @@ namespace gl {
 			ImGui::DragFloat2("Stock_mesh rot", &rot.x, 0.1f);
 			ImGui::DragFloat("Stock_mesh size", &size, 0.1f);
 		}
-		void draw (OpenglRenderer& r) {
-			ZoneScoped;
-			OGL_TRACE("TestRenderer draw");
-
-			PipelineState s;
-			s.depth_test = true;
-			s.blend_enable = false;
-			r.state.set(s);
-
-			glUseProgram(shad->prog);
-			r.state.bind_textures(shad, {});
-
-			float4x4 mat = (float4x4)translate(pos) * (float4x4)(rotate3_Z(rot.x) * rotate3_X(rot.y)) * (float4x4)scale((float3)size);
-			shad->set_uniform("model2world", mat);
-
-			glBindVertexArray(mesh.ib.vao);
-			glDrawElements(GL_TRIANGLES, mesh.index_count, GL_UNSIGNED_INT, nullptr);		
-		}
+		void draw (OpenglRenderer& r);
 	};
 #endif
 	struct ComputeGroupSize {
@@ -287,13 +270,14 @@ namespace gl {
 			}
 		}; 
 
+		VctTexture tex_mip0 = {"VCT.tex_mip0", 1, TEX_WIDTH};
 		VctTexture textures[6] = {
-			{"VCT.texNX", MIPS, TEX_WIDTH},
-			{"VCT.texPX", MIPS, TEX_WIDTH},
-			{"VCT.texNY", MIPS, TEX_WIDTH},
-			{"VCT.texPY", MIPS, TEX_WIDTH},
-			{"VCT.texNZ", MIPS, TEX_WIDTH},
-			{"VCT.texPZ", MIPS, TEX_WIDTH},
+			{"VCT.texNX", MIPS-1, TEX_WIDTH/2},
+			{"VCT.texPX", MIPS-1, TEX_WIDTH/2},
+			{"VCT.texNY", MIPS-1, TEX_WIDTH/2},
+			{"VCT.texPY", MIPS-1, TEX_WIDTH/2},
+			{"VCT.texNZ", MIPS-1, TEX_WIDTH/2},
+			{"VCT.texPZ", MIPS-1, TEX_WIDTH/2},
 		};
 
 		Sampler sampler = {"sampler"};
@@ -360,7 +344,7 @@ namespace gl {
 		DFTexture df_tex;
 		VCT_Data vct_data;
 
-		//TestRenderer test_renderer;
+		TestRenderer test_renderer;
 
 		Gbuffer     gbuf;
 		Framebuffer framebuf0;
@@ -394,7 +378,7 @@ namespace gl {
 			return { {"PASS", prints("%d", pass)} };
 		}
 
-		Raytracer (Shaders& shaders): df_tex(shaders), vct_data(shaders) {
+		Raytracer (Shaders& shaders): df_tex(shaders), vct_data(shaders), test_renderer(shaders) {
 			#if 0
 				int max_sparse_texture_size;
 				int max_sparse_3d_texture_size;
@@ -473,6 +457,9 @@ namespace gl {
 
 			float vct_primary_cone_width = 0.01f;
 			float vct_min_start_dist = 1.0f / 5; // 1/32
+			
+			bool vct_diffuse = true;
+			bool vct_specular = false;
 
 			float test = 1.0f;
 
@@ -500,6 +487,9 @@ namespace gl {
 				
 				ImGui::SliderFloat("vct_primary_cone_width", &vct_primary_cone_width, 0.0005f, 0.2f);
 				ImGui::SliderFloat("vct_min_start_dist", &vct_min_start_dist, 0.001f, 4.0f);
+				
+				ImGui::Checkbox("vct_diffuse", &vct_diffuse);
+				ImGui::Checkbox("vct_specular", &vct_specular);
 
 				ImGui::DragFloat("test", &test, 0.01f);
 

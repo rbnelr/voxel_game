@@ -83,6 +83,7 @@ float get_fake_alpha (uint bid) {
 uniform usampler3D voxel_tex;
 uniform isampler3D df_tex;
 
+uniform sampler3D vct_tex_mip0;
 uniform sampler3D vct_texNX;
 uniform sampler3D vct_texPX;
 uniform sampler3D vct_texNY;

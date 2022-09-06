@@ -29,14 +29,9 @@ uvec4 pack_texel (vec4 lrgba) {
 	return rgba8;
 }
 
-layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mipNX;
-layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mipPX;
-layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mipNY;
-layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mipPY;
-layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mipNZ;
-layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
-
 #if MIP0
+	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mip0;
+	
 	void main () {
 		uvec3 pos = uvec3(gl_GlobalInvocationID.xyz);
 		
@@ -87,14 +82,17 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 		//if (!visible) emissive = vec3(0.0);
 		//if (!visible) alpha = 0.0;
 		
-		imageStore(write_mipNX, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPX, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipNY, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPY, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipNZ, dst_pos, pack_texel(vec4(emissive, alpha)));
-		imageStore(write_mipPZ, dst_pos, pack_texel(vec4(emissive, alpha)));
+		imageStore(write_mip0, dst_pos, pack_texel(vec4(emissive, alpha)));
 	}
 #else
+	
+	layout(rgba8ui, binding = 0) writeonly restrict uniform uimage3D write_mipNX;
+	layout(rgba8ui, binding = 1) writeonly restrict uniform uimage3D write_mipPX;
+	layout(rgba8ui, binding = 2) writeonly restrict uniform uimage3D write_mipNY;
+	layout(rgba8ui, binding = 3) writeonly restrict uniform uimage3D write_mipPY;
+	layout(rgba8ui, binding = 4) writeonly restrict uniform uimage3D write_mipNZ;
+	layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
+	
 	uniform int read_mip;
 	
 	uniform int src_width;
@@ -161,44 +159,43 @@ layout(rgba8ui, binding = 5) writeonly restrict uniform uimage3D write_mipPZ;
 			ivec3 dst_pos = ivec3(pos + offsets[chunk_idx]);
 			ivec3 src_pos = dst_pos * 2;
 			
-		#if 0
-			{
-				LOAD(vct_texNX, read_mip)
+			if (read_mip == 0) {
+				LOAD(vct_tex_mip0, 0)
+				
 				STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
-			}
-			{
-				LOAD(vct_texPX, read_mip)
 				STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
-			}
-			
-			{
-				LOAD(vct_texNY, read_mip)
 				STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
-			}
-			{
-				LOAD(vct_texPY, read_mip)
 				STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
-			}
-			
-			{
-				LOAD(vct_texNZ, read_mip)
 				STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
-			}
-			{
-				LOAD(vct_texPZ, read_mip)
 				STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
+			} else {
+				{
+					LOAD(vct_texNX, read_mip-1)
+					STORE(write_mipNX, preintegrate(b,a, d,c, f,e, h,g));
+				}
+				{
+					LOAD(vct_texPX, read_mip-1)
+					STORE(write_mipPX, preintegrate(a,b, c,d, e,f, g,h));
+				}
+				
+				{
+					LOAD(vct_texNY, read_mip-1)
+					STORE(write_mipNY, preintegrate(c,a, d,b, g,e, h,f));
+				}
+				{
+					LOAD(vct_texPY, read_mip-1)
+					STORE(write_mipPY, preintegrate(a,c, b,d, e,g, f,h));
+				}
+				
+				{
+					LOAD(vct_texNZ, read_mip-1)
+					STORE(write_mipNZ, preintegrate(e,a, f,b, g,c, h,d));
+				}
+				{
+					LOAD(vct_texPZ, read_mip-1)
+					STORE(write_mipPZ, preintegrate(a,e, b,f, c,g, d,h));
+				}
 			}
-		#else
-			{
-				LOAD(vct_texPZ, read_mip)
-				STORE(write_mipNX, (a+e+b+f+c+g+d+h)/8.0);
-				//STORE(write_mipPX, (a+e+b+f+c+g+d+h)/8.0);
-				//STORE(write_mipNY, (a+e+b+f+c+g+d+h)/8.0);
-				//STORE(write_mipPY, (a+e+b+f+c+g+d+h)/8.0);
-				//STORE(write_mipNZ, (a+e+b+f+c+g+d+h)/8.0);
-				//STORE(write_mipPZ, (a+e+b+f+c+g+d+h)/8.0);
-			}
-		#endif
 		}
 	}
 #endif

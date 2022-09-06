@@ -87,7 +87,10 @@ uniform float vct_min_start_dist = 1.0 / 5.0;
 
 #if VCT
 shared vec3 cone_results[WG_PIXELS_X*WG_PIXELS_Y][WG_CONES];
-	
+
+uniform bool vct_diffuse = true;
+uniform bool vct_specular = false;
+
 void main () {
 	INIT_VISUALIZE_COST();
 	
@@ -163,19 +166,16 @@ void main () {
 	// Write out results for pixel on z==0 threads in WG
 	if (coneid == 0u) {
 		
-		bool specular = true;
-		bool diffuse = true;
-		
 		vec3 light = vec3(0.0);
 		if (did_hit) {
-			if (specular) {
+			if (vct_specular) {
 				vec3 dir = reflect(gbuf.ray_dir, gbuf.normal);
 				float fres = fresnel(dot(-gbuf.ray_dir, gbuf.normal), 0.3);
 				
 				light = trace_cone(gbuf.pos, dir, vct_primary_cone_width, start_dist, 1000.0, true).rgb * fres;
 			}
 			
-			if (diffuse) {
+			if (vct_diffuse) {
 				for (uint i=0u; i<WG_CONES; ++i)
 					light += cone_results[threadid][i];
 			}

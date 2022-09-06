@@ -616,10 +616,10 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 		#endif
 		texcoord *= INV_WORLD_SIZEf;
 		
-		return textureLod(vct_texNX, texcoord, 0.0) * VCT_UNPACK;
+		return textureLod(vct_tex_mip0, texcoord, 0.0) * VCT_UNPACK;
 	}
 	else {
-		float lod = log2(size);
+		float lod = log2(size)-1; // -1 because of seperate mip0 texture
 		
 		texcoord *= INV_WORLD_SIZEf;
 		
