@@ -332,6 +332,8 @@ uint read_voxel_bevel_type (ivec3 coord) {
 
 void plane_intersect (inout float t0, inout float t1, inout vec3 bevel_normal,
 		vec3 ray_pos, vec3 ray_dir, vec3 plane_norm, float plane_d) {
+	plane_norm = normalize(plane_norm);
+	
 	float dpos  = dot(ray_pos, plane_norm) + plane_d;
 	float dnorm = dot(ray_dir, plane_norm);
 	
@@ -344,7 +346,7 @@ void plane_intersect (inout float t0, inout float t1, inout vec3 bevel_normal,
 	if (dnorm > 0.0) t1 = min(t1, t);
 }
 bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
-		inout float t0, in float t1, inout vec3 bevel_normal) {
+		inout float t0, in float t1, inout vec3 norm) {
 	
 	vec3 origin = vec3(coord) + 0.5;
 	vec3 rel = origin - ray_pos;
@@ -362,7 +364,7 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 	bool v110 = read_voxel_bevel_type(coord + ivec3(s.x,s.y,  0)).r != v0;
 	
 	float corn = -1.0;
-	if (v100 && v010 && v001) corn = 0.17; // bevel for blocks with 3 air blocks around
+	if (v100 && v010 && v001) corn = 0.18; // bevel for blocks with 3 air blocks around
 	else {
 		// make concave edge bevel when multiple beveled edges meet
 		if ((!v100 && !v010 && !v001  && v011 && v101 && v110) ||
@@ -371,24 +373,18 @@ bool box_bevel (vec3 ray_pos, vec3 ray_dir, ivec3 coord,
 	        (!v100 && !v010 &&  v001  && v110)) corn = 0.05715;
 	}
 	
-	//float rot = 0.04 * lod;
 	float rot = 0.0;
-	
-	vec3 edgeXn = normalize(s * vec3(rot,1,1));
-	vec3 edgeYn = normalize(s * vec3(1,rot,1));
-	vec3 edgeZn = normalize(s * vec3(1,1,rot));
-	vec3 cornern = normalize(s);
 	
 	float szcorner = HALF_SQRT_3 - corn;
 	float szedge   = HALF_SQRT_2 - 0.07;
 	
-	if (corn > -1.0)  plane_intersect(t0,t1, bevel_normal, rel, ray_dir, cornern, szcorner);
-	if (v010 && v001) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeXn, szedge);
-	if (v100 && v001) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeYn, szedge);
-	if (v100 && v010) plane_intersect(t0,t1, bevel_normal, rel, ray_dir, edgeZn, szedge);
+	if (corn > -1.0)  plane_intersect(t0,t1, norm, rel, ray_dir, s, szcorner);
+	if (v010 && v001) plane_intersect(t0,t1, norm, rel, ray_dir, s * vec3(rot,1,1), szedge);
+	if (v100 && v001) plane_intersect(t0,t1, norm, rel, ray_dir, s * vec3(1,rot,1), szedge);
+	if (v100 && v010) plane_intersect(t0,t1, norm, rel, ray_dir, s * vec3(1,1,rot), szedge);
 	
 	if (t0 > t1) {
-		bevel_normal = vec3(0.0);
+		norm = vec3(0.0);
 		return false;
 	}
 	return true;
@@ -601,7 +597,7 @@ uniform float test;
 
 vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	
-#if 0
+#if 1
 	
 	// Since we are heavily bottlenecked by memory access
 	// it is actually faster to branch to minimize cache trashing

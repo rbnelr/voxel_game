@@ -30,6 +30,9 @@ struct Gbuf {
 	vec3 emiss;
 	
 	mat3 TBN;
+	
+	vec3 ray_pos;
+	vec3 ray_dir;
 };
 bool read_gbuf (ivec2 pxpos, out Gbuf g) {
 	
@@ -39,10 +42,9 @@ bool read_gbuf (ivec2 pxpos, out Gbuf g) {
 	g.normal = texelFetch(gbuf_norm  , pxpos, 0).rgb;
 	
 	// reconstruct position from depth
-	vec3 ray_pos, ray_dir;
-	get_ray(vec2(pxpos), ray_pos, ray_dir);
+	get_ray(vec2(pxpos), g.ray_pos, g.ray_dir);
 	
-	g.pos    = depth_to_pos(ray_dir, g.depth);
+	g.pos    = depth_to_pos(g.ray_dir, g.depth);
 	
 	g.col = vec4(col.rgb, 1.0);
 	g.emiss = col.rgb * col.a;
@@ -151,8 +153,7 @@ void main () {
 		
 		vec3 cone_dir = gbuf.TBN * c.dir;
 				
-		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope,
-			start_dist, 1000.0, true).rgb * c.weight;
+		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope, start_dist, 1000.0, true).rgb * c.weight;
 			// coneid == 8u
 		
 		cone_results[threadid][coneid] = light;
@@ -162,11 +163,22 @@ void main () {
 	// Write out results for pixel on z==0 threads in WG
 	if (coneid == 0u) {
 		
-		vec3 light = vec3(0.0);
+		bool specular = true;
+		bool diffuse = true;
 		
+		vec3 light = vec3(0.0);
 		if (did_hit) {
-			for (uint i=0u; i<WG_CONES; ++i)
-				light += cone_results[threadid][i];
+			if (specular) {
+				vec3 dir = reflect(gbuf.ray_dir, gbuf.normal);
+				float fres = fresnel(dot(-gbuf.ray_dir, gbuf.normal), 0.3);
+				
+				light = trace_cone(gbuf.pos, dir, vct_primary_cone_width, start_dist, 1000.0, true).rgb * fres;
+			}
+			
+			if (diffuse) {
+				for (uint i=0u; i<WG_CONES; ++i)
+					light += cone_results[threadid][i];
+			}
 		}
 		
 		vec4 col;

@@ -49,7 +49,7 @@
 		"visualize_radius": false,
 		"debug_frustrum_culling": false,
 		"edits": {
-			"open": true,
+			"open": false,
 			"brush_block": "earth",
 			"brush_mode": 1,
 			"brush_size": 1.0,
@@ -70,13 +70,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-31.549230575561523,
-				26.302936553955078,
-				-58.56639099121094
+				-60.001583099365234,
+				93.36886596679688,
+				-90.14055633544922
 			],
 			"rot_aer": [
-				-0.017640352249145508,
-				-1.4060126543045044,
+				2.9822590351104736,
+				-0.28205594420433044,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -85,7 +85,7 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 13.784431457519531,
+		"base_speed": 20.89328384399414,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -110,8 +110,8 @@
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
-		"graphics": false,
-		"world": true,
+		"graphics": true,
+		"world": false,
 		"chunks": true,
 		"entities": true
 	},
@@ -132,7 +132,7 @@
 				"bounce_max_count": 4,
 				"bounce_samples": 1,
 				"roughness": 0.21400000154972076,
-				"vct": false
+				"vct": true
 			}
 		},
 		"debug_draw": {

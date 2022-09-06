@@ -540,26 +540,3 @@ void raycast_voxels (Chunks& chunks, Ray const& ray, Func hit_voxel) {
 }
 
 void _dev_raycast (Chunks& chunks, Camera_View& view);
-
-struct Test {
-	
-	struct Cell {
-		int dirs[4];
-	};
-
-	Cell light    [CHUNK_SIZE][CHUNK_SIZE] = {};
-	Cell light_buf[CHUNK_SIZE][CHUNK_SIZE] = {};
-
-	int3 chunk_pos = int3(-1,0,-2);
-	int z = 35;
-
-	int max_light = 50; // 128
-
-	bool init = false;
-
-	bool auto_prop = true;
-
-	void update (Game& game);
-};
-
-inline Test test;
