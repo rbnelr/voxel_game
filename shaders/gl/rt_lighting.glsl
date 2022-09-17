@@ -197,7 +197,7 @@ void main () {
 #else //// Ray-based RT
 
 void main () {
-	INIT_VISUALIZE_COST();
+	//INIT_VISUALIZE_COST();
 	
 	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
 	ivec2 wgroupid = ivec2(work_group_tiling(20u));
@@ -279,7 +279,7 @@ void main () {
 	
 	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
 	
-	GET_VISUALIZE_COST(col.rgb);
+	//GET_VISUALIZE_COST(col.rgb);
 	
 	imageStore(img_col, pxpos, col);
 }

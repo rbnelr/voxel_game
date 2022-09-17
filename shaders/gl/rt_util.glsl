@@ -229,6 +229,7 @@ float get_px_size (float depth) {
 	return base_px_size / depth;
 }
 
+const int WORLD_SIZE_MASK = WORLD_SIZE-1;
 const float WORLD_SIZEf = float(WORLD_SIZE);
 const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
 const int CHUNK_MASK = ~63;
@@ -417,31 +418,34 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	vec3 inv_dir = 1.0 / ray_dir;
 	vec3 bias = inv_dir * -ray_pos;
 	
-	float dist;
-	{ // allow ray to start outside of world texture cube for nice debugging views
-		vec3 world_min = vec3(        0.0) + epsilon;
-		vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
-		
-		// calculate entry and exit coords into whole world cube
-		vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
-		vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
-		float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
-		float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
-		
-		// ray misses world texture
-		if (t1 <= t0)
-			return false;
-		
-		// adjust ray to start where it hits cube initally
-		dist = t0;
-		max_dist = min(t1, max_dist);
-	}
+	max_dist = 1000.f;
+	float dist = 0;
+	
+	//float dist;
+	//{ // allow ray to start outside of world texture cube for nice debugging views
+	//	vec3 world_min = vec3(        0.0) + epsilon;
+	//	vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
+	//	
+	//	// calculate entry and exit coords into whole world cube
+	//	vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
+	//	vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
+	//	float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
+	//	float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
+	//	
+	//	// ray misses world texture
+	//	if (t1 <= t0)
+	//		return false;
+	//	
+	//	// adjust ray to start where it hits cube initally
+	//	dist = t0;
+	//	max_dist = min(t1, max_dist);
+	//}
 	
 	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
 	float manhattan_fac = (1.0 - epsilon) / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
 	
 	vec3 pos = dist * ray_dir + ray_pos;
-	ivec3 coord = ivec3(pos);
+	ivec3 coord = ivec3(floor(pos));
 	
 	int dbgcol = 0;
 	int iter = 0;
@@ -451,7 +455,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	for (;;) {
 		VISUALIZE_ITERATION
 		
-		int dfi = texelFetch(df_tex, coord, 0).r;
+		int dfi = texelFetch(df_tex, (coord) & WORLD_SIZE_MASK, 0).r;
 		
 		// step up to exit of current cell, since DF is safe up until its bounds
 		// seems to give a little bit of perf, as this reduces iteration count
@@ -466,12 +470,12 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			// DF tells us that we can still step by <df> before we could possibly hit a voxel
 			// step via DF raymarching
 			
-		//#if DEBUGDRAW
-		//	pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
-		//	vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-		//	if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-		//	if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
-		//#endif
+		#if DEBUGDRAW
+			pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
+			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
+			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
+			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+		#endif
 			
 			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
 			vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes;
@@ -484,13 +488,14 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			
 			vec3 pos = dist * ray_dir + ray_pos;
 			// update coord for next iteration
-			coord = ivec3(pos);
+			//coord = ivec3(pos);
+			coord = ivec3(floor(pos));
 		} else {
 			// we need to check individual voxels by DDA now
 			
-		//#if DEBUGDRAW
-		//	if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
-		//#endif
+		#if DEBUGDRAW
+			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+		#endif
 			
 			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
 			float t1 = min(min(t1v.x, t1v.y), t1v.z);
@@ -526,7 +531,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	{ // calc hit info
 		
-		hit.bid = texelFetch(voxel_tex, coord, 0).r;
+		hit.bid = texelFetch(voxel_tex, coord & WORLD_SIZE_MASK, 0).r;
 		hit.dist = dist;
 		hit.pos = dist * ray_dir + ray_pos;
 		//hit.coord = coord;

@@ -190,19 +190,25 @@ namespace gl {
 			tex = {"RT.voxels"};
 
 			glTextureStorage3D(tex, 1, GL_R16UI, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
+
+			//
 			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
 
 			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_REPEAT);
 
-			lrgba color = lrgba(0,0,0,0);
-			glTextureParameterfv(tex, GL_TEXTURE_BORDER_COLOR, &color.x);
-
-			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_BYTE, nullptr); // clear texture to B_NULL
+			//lrgba color = lrgba(0,0,0,0);
+			//glTextureParameterfv(tex, GL_TEXTURE_BORDER_COLOR, &color.x);
+			
+			//
+			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_SHORT, nullptr); // clear texture to B_NULL
 		}
 	};
 	struct DFTexture {
@@ -223,6 +229,20 @@ namespace gl {
 
 			glTextureStorage3D(tex, 1, GL_R8I, GPU_WORLD_SIZE, GPU_WORLD_SIZE, GPU_WORLD_SIZE);
 
+			//
+			glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+			glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+
+			glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+			glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			//glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_REPEAT);
+
+			//
 			int dist = 255; // max dist
 			glClearTexImage(tex, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &dist);
 		}
