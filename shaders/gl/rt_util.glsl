@@ -199,19 +199,25 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	ray_pos = view.cam_pos + near_offs;
 	
 	// make relative to gpu world representation (could bake into matrix)
-	ray_pos += float(WORLD_SIZE/2);
+	ray_pos += vec3(WORLD_SIZE/2 - voxtex_pos);
 }
 
-// Convert gpu world coords to cam depth values, which can be reconstructed
+// Convert gpu 3d texture coords to cam depth values, which can be reconstructed
 // knowing the original ray_dir, to save on storage space
+// NOTE: that these are not 'real' depth values
+//   as we do not take the near plane into account, but it does not matter
+//   this is because we only need any kind of 1d float that can help reconstruct the ray hit
 float pos_to_depth (vec3 pos) {
-	return dot(pos - float(WORLD_SIZE/2) - view.cam_pos, view.cam_forw);
+	pos -= vec3(WORLD_SIZE/2 - voxtex_pos);
+	return dot(pos - view.cam_pos, view.cam_forw);
 }
 vec3 depth_to_pos (vec3 ray_dir, float depth) {
 	// dist from cam_pos in direction of ray_dir
 	float dist = depth / dot(ray_dir, view.cam_forw);
 	
-	return ray_dir * dist + view.cam_pos + float(WORLD_SIZE/2);
+	vec3 pos = ray_dir * dist + view.cam_pos;
+	pos += vec3(WORLD_SIZE/2 - voxtex_pos);
+	return pos;
 }
 
 // divide this by any object's z-distance to get a pixel size for LOD purposes
@@ -239,7 +245,9 @@ uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
 vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos, uint faceid) {
-	vec4 reproj_clip = prev_world2clip * vec4(pos - WORLD_SIZEf/2, 1.0);
+	pos -= vec3(WORLD_SIZEf/2 - voxtex_pos);
+	
+	vec4 reproj_clip = prev_world2clip * vec4(pos, 1.0);
 	vec2 reproj_uv = (reproj_clip.xy / reproj_clip.w) * 0.5 + 0.5;
 	
 	uint age = 1u;

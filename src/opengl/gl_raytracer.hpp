@@ -421,7 +421,9 @@ namespace gl {
 
 			#endif
 		}
-
+		
+		int3 voxtex_pos = 0;
+		
 		bool enable = true;
 
 		int max_iterations = 512;
@@ -530,6 +532,8 @@ namespace gl {
 
 			//ImGui::Separator();
 			//test_renderer.imgui();
+
+			ImGui::DragInt3("voxtex_pos", &voxtex_pos.x, 0.01f);
 
 			//
 			ImGui::TreePop();

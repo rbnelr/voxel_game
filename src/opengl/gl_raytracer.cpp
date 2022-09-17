@@ -524,6 +524,8 @@ namespace gl {
 		shad->set_uniform("vct_specular", lighting.vct_specular);
 
 		shad->set_uniform("test", lighting.test);
+
+		shad->set_uniform("voxtex_pos", voxtex_pos);
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;

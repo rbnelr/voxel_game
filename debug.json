@@ -41,7 +41,7 @@
 	},
 	"chunks": {
 		"load_radius": 300.0,
-		"load_from_disk": true,
+		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -75,8 +75,8 @@
 				-90.14055633544922
 			],
 			"rot_aer": [
-				2.9822590351104736,
-				-0.28205594420433044,
+				2.6435177326202393,
+				-0.28482455015182495,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -92,9 +92,9 @@
 	},
 	"player": {
 		"pos": [
-			-36.94747543334961,
+			-50.415714263916016,
 			3.0177910327911377,
-			-108.9999008178711
+			-107.9999008178711
 		],
 		"vel": [
 			0.0,
@@ -111,7 +111,7 @@
 	"imopen": {
 		"performance": true,
 		"graphics": true,
-		"world": false,
+		"world": true,
 		"chunks": true,
 		"entities": true
 	},
