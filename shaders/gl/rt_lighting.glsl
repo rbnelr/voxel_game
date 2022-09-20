@@ -156,7 +156,7 @@ void main () {
 		
 		vec3 cone_dir = gbuf.TBN * c.dir;
 				
-		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope, start_dist, 1000.0, true).rgb * c.weight;
+		vec3 light = trace_cone(gbuf.pos, cone_dir, c.slope, start_dist, WORLD_SIZEf/2.0, true).rgb * c.weight;
 			// coneid == 8u
 		
 		cone_results[threadid][coneid] = light;

@@ -199,7 +199,7 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 	ray_pos = view.cam_pos + near_offs;
 	
 	// make relative to gpu world representation (could bake into matrix)
-	ray_pos += vec3(WORLD_SIZE/2 - voxtex_pos);
+	//ray_pos += vec3(WORLD_SIZE/2 - voxtex_pos);
 }
 
 // Convert gpu 3d texture coords to cam depth values, which can be reconstructed
@@ -208,7 +208,7 @@ void get_ray (vec2 px_pos, out vec3 ray_pos, out vec3 ray_dir) {
 //   as we do not take the near plane into account, but it does not matter
 //   this is because we only need any kind of 1d float that can help reconstruct the ray hit
 float pos_to_depth (vec3 pos) {
-	pos -= vec3(WORLD_SIZE/2 - voxtex_pos);
+	//pos -= vec3(WORLD_SIZE/2 - voxtex_pos);
 	return dot(pos - view.cam_pos, view.cam_forw);
 }
 vec3 depth_to_pos (vec3 ray_dir, float depth) {
@@ -216,7 +216,7 @@ vec3 depth_to_pos (vec3 ray_dir, float depth) {
 	float dist = depth / dot(ray_dir, view.cam_forw);
 	
 	vec3 pos = ray_dir * dist + view.cam_pos;
-	pos += vec3(WORLD_SIZE/2 - voxtex_pos);
+	//pos += vec3(WORLD_SIZE/2 - voxtex_pos);
 	return pos;
 }
 
@@ -246,7 +246,7 @@ uniform mat4 prev_world2clip;
 uniform int taa_max_age = 256;
 
 vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos, uint faceid) {
-	pos -= vec3(WORLD_SIZEf/2 - voxtex_pos);
+	//pos -= vec3(WORLD_SIZEf/2 - voxtex_pos);
 	
 	vec4 reproj_clip = prev_world2clip * vec4(pos, 1.0);
 	vec2 reproj_uv = (reproj_clip.xy / reproj_clip.w) * 0.5 + 0.5;
@@ -418,28 +418,25 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	vec3 inv_dir = 1.0 / ray_dir;
 	vec3 bias = inv_dir * -ray_pos;
 	
-	max_dist = 1000.f;
-	float dist = 0;
-	
-	//float dist;
-	//{ // allow ray to start outside of world texture cube for nice debugging views
-	//	vec3 world_min = vec3(        0.0) + epsilon;
-	//	vec3 world_max = vec3(WORLD_SIZEf) - epsilon;
-	//	
-	//	// calculate entry and exit coords into whole world cube
-	//	vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
-	//	vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
-	//	float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
-	//	float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
-	//	
-	//	// ray misses world texture
-	//	if (t1 <= t0)
-	//		return false;
-	//	
-	//	// adjust ray to start where it hits cube initally
-	//	dist = t0;
-	//	max_dist = min(t1, max_dist);
-	//}
+	float dist;
+	{ // allow ray to start outside of world texture cube for nice debugging views
+		vec3 world_min = voxtex_world_min                     + epsilon;
+		vec3 world_max = voxtex_world_min + vec3(WORLD_SIZEf) - epsilon;
+		
+		// calculate entry and exit coords into whole world cube
+		vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
+		vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
+		float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
+		float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
+		
+		// ray misses world texture
+		if (t1 <= t0)
+			return false;
+		
+		// adjust ray to start where it hits cube initally
+		dist = t0;
+		max_dist = min(t1, max_dist);
+	}
 	
 	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
 	float manhattan_fac = (1.0 - epsilon) / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
@@ -473,8 +470,8 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		#if DEBUGDRAW
 			pos = dist * ray_dir + ray_pos; // fix pos not being updated after DDA (just for dbg)
 			vec4 col = dbgcol==0 ? vec4(1,0,0,1) : vec4(0.8,0.2,0,1);
-			if (_dbgdraw) dbgdraw_wire_sphere(pos - WORLD_SIZEf/2.0, vec3(df*2.0), col);
-			if (_dbgdraw) dbgdraw_point(      pos - WORLD_SIZEf/2.0,      df*0.5 , col);
+			if (_dbgdraw) dbgdraw_wire_sphere(pos, vec3(df*2.0), col);
+			if (_dbgdraw) dbgdraw_point(      pos,      df*0.5 , col);
 		#endif
 			
 			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
@@ -494,7 +491,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 			// we need to check individual voxels by DDA now
 			
 		#if DEBUGDRAW
-			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5 - WORLD_SIZEf/2.0, vec3(1.0), vec4(1,1,0,1));
+			if (_dbgdraw) dbgdraw_wire_cube(vec3(coord) + 0.5, vec3(1.0), vec4(1,1,0,1));
 		#endif
 			
 			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
@@ -523,7 +520,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 	
 	#if DEBUGDRAW
 	if (_dbgdraw)
-		dbgdraw_vector(ray_pos - WORLD_SIZEf/2.0, ray_dir * dist, vec4(raycol,1));
+		dbgdraw_vector(ray_pos, ray_dir * dist, vec4(raycol,1));
 	#endif
 	
 	if (iter >= max_iterations || dist >= max_dist)
@@ -672,6 +669,8 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	
+	// TODO: limit cone tracing to world texture box, to avoid light from wrapped regions of 3d texture
+		
 	float dist = start_dist;
 	
 	vec3 color = vec3(0.0);
@@ -722,7 +721,7 @@ vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dis
 			//vec4 col = vec4(sampl.rgb, 1.0-transp);
 			//vec4 col = vec4(vec3(sampl.a), transp);
 			vec4 col = vec4(vec3(sampl.a), 1.0);
-			dbgdraw_wire_cube(pos - WORLD_SIZEf/2.0, vec3(size), col);
+			dbgdraw_wire_cube(pos, vec3(size), col);
 		}
 		#endif
 		

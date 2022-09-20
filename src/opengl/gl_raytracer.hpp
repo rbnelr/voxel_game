@@ -325,10 +325,13 @@ namespace gl {
 
 			glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // GL_LINEAR_MIPMAP_NEAREST
 			glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
-			glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
+			//glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			//glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			//glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
+			//glSamplerParameterfv(sampler, GL_TEXTURE_BORDER_COLOR, &color.x);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glSamplerParameteri(sampler, GL_TEXTURE_WRAP_R, GL_REPEAT);
 
 			glSamplerParameteri(filter_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			glSamplerParameteri(filter_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -442,7 +445,7 @@ namespace gl {
 			#endif
 		}
 		
-		int3 voxtex_pos = 0;
+		int3 voxtex_offset;
 		
 		bool enable = true;
 
@@ -552,8 +555,6 @@ namespace gl {
 
 			//ImGui::Separator();
 			//test_renderer.imgui();
-
-			ImGui::DragInt3("voxtex_pos", &voxtex_pos.x, 0.01f);
 
 			//
 			ImGui::TreePop();

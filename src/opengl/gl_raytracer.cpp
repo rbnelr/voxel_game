@@ -352,8 +352,17 @@ namespace gl {
 	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 
+		int3 offset = roundi(game.player.pos) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
+		voxtex_offset = offset;
+
 		std::vector<int3> chunks;
 
+		// TODO: actually support for chunk unloading?
+
+		// take all chunks that have had voxels updated AND are inside the sliding window of gpu voxel memory
+		//  -> ie chunk coords [voxtex_offset, voxtex_offset + GPU_WORLD_SIZE_CHUNKS)
+		// and "decompress" them ie. de-sparsify them, then upload them to dense voxel region on gpu
+		// but upload them using world positions wrapped by GPU_WORLD_SIZE_CHUNKS instead, so that sliding the window by 1 chunk does not require moving all the contents
 		if (!game.chunks.upload_voxels.empty()) {
 			OGL_TRACE("raytracer upload changes");
 
@@ -364,10 +373,12 @@ namespace gl {
 				auto& chunk = game.chunks.chunks[cid];
 				auto& vox = game.chunks.chunk_voxels[cid];
 
-				int3 pos = chunk.pos + GPU_WORLD_SIZE_CHUNKS/2;
-				if ( (unsigned)(pos.x) < GPU_WORLD_SIZE_CHUNKS && // use 3 unsigned comparisons instead of 6 signed ones
-					 (unsigned)(pos.y) < GPU_WORLD_SIZE_CHUNKS &&
-					 (unsigned)(pos.z) < GPU_WORLD_SIZE_CHUNKS ) {
+				int3 rel_pos = chunk.pos - voxtex_offset;
+				int3 wrap_pos = chunk.pos & (GPU_WORLD_SIZE_CHUNKS-1);
+
+				if ( (unsigned)(rel_pos.x) < GPU_WORLD_SIZE_CHUNKS && // use 3 unsigned comparisons instead of 6 signed ones
+					 (unsigned)(rel_pos.y) < GPU_WORLD_SIZE_CHUNKS &&
+					 (unsigned)(rel_pos.z) < GPU_WORLD_SIZE_CHUNKS ) {
 					//OGL_TRACE("upload chunk data");
 
 					{
@@ -408,16 +419,19 @@ namespace gl {
 						ZoneScopedN("glTextureSubImage3D");
 
 						glTextureSubImage3D(voxel_tex.tex, 0,
-							pos.x*CHUNK_SIZE, pos.y*CHUNK_SIZE, pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
+							wrap_pos.x*CHUNK_SIZE, wrap_pos.y*CHUNK_SIZE, wrap_pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
 							GL_RED_INTEGER, GL_UNSIGNED_SHORT, buffer);
 					}
 
-					chunks.push_back(pos);
+					chunks.push_back(wrap_pos);
 				}
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
 		}
+
+		// Use uploaded dense voxel gpu data to compute VCT data in compute shader
+		// (batched into multiple chunks per compute invoke)
 		{
 			//chunks.clear(); // for profiling df gen
 			//for (int y=0; y<4; ++y)
@@ -525,7 +539,7 @@ namespace gl {
 
 		shad->set_uniform("test", lighting.test);
 
-		shad->set_uniform("voxtex_pos", voxtex_pos);
+		shad->set_uniform("voxtex_world_min", (float3)(voxtex_offset * CHUNK_SIZE));
 	}
 	void Raytracer::draw (OpenglRenderer& r, Game& game) {
 		ZoneScoped;

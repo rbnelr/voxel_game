@@ -91,4 +91,4 @@ uniform sampler3D vct_texPY;
 uniform sampler3D vct_texNZ;
 uniform sampler3D vct_texPZ;
 
-uniform ivec3 voxtex_pos;
+uniform vec3 voxtex_world_min;
