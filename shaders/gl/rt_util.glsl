@@ -334,7 +334,7 @@ struct Hit {
 
 #if BEVEL
 uint read_voxel_bevel_type (ivec3 coord) {
-	uint bid = texelFetch(voxel_tex, coord, 0).r;
+	uint bid = texelFetch(voxel_tex, coord & WORLD_SIZE_MASK, 0).r;
 	if (bid == B_GRASS) bid = B_EARTH;
 	return bid;
 }
@@ -475,6 +475,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 		#endif
 			
 			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+			// TODO: could cache chunk_t1 and simply recompute if dist >= chunk_t1
 			vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes;
 			
 			vec3 chunk_t1v = inv_dir * chunk_exit + bias;

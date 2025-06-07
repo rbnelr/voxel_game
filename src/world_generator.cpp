@@ -437,7 +437,7 @@ namespace worldgen {
 				int wz = z + chunkpos.z;
 
 				auto place_stalac = [&] (int x, int y, int z, float rand1, float rand2) {
-					if (wx > -5) return; // for vct dev
+					//if (wx > -5) return; // for vct dev
 
 					float scale = lerp(0.4f, 2.5f, rand1);
 

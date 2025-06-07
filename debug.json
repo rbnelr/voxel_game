@@ -44,7 +44,7 @@
 		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
-		"visualize_chunks": true,
+		"visualize_chunks": false,
 		"visualize_subchunks": false,
 		"visualize_radius": false,
 		"debug_frustrum_culling": false,
@@ -70,13 +70,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				136.5079803466797,
-				-276.132080078125,
-				25.74405288696289
+				-43.63972854614258,
+				81.49935913085938,
+				-95.2813949584961
 			],
 			"rot_aer": [
-				-1.0965783596038818,
-				-0.07443396002054214,
+				2.6620399951934814,
+				-0.27098649740219116,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -85,16 +85,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 67.8824234008789,
+		"base_speed": 12.861334800720215,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			0.0,
-			0.0,
-			9.999999747378752e-05
+			-41.54790115356445,
+			32.46649932861328,
+			-111.9999008178711
 		],
 		"vel": [
 			0.0,
@@ -124,13 +124,13 @@
 			"max_iterations": 380,
 			"taa": {
 				"enable": true,
-				"max_age": 100
+				"max_age": 256
 			},
 			"lighting": {
-				"bounce_enable": false,
+				"bounce_enable": true,
 				"bounce_max_dist": 128.0,
 				"bounce_max_count": 4,
-				"bounce_samples": 1,
+				"bounce_samples": 2,
 				"roughness": 0.21400000154972076,
 				"vct": false
 			}
