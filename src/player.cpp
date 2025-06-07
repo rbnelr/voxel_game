@@ -6,7 +6,7 @@
 void Player::update_controls (Input& I, Game& game) {
 	memset(&inp, 0, sizeof(inp));
 
-	if (!game.activate_flycam || game.creative_mode) {
+	if (game.player_controls_active() || game.creative_mode) {
 
 		inp.attack      = !inventory.is_open && I.buttons[MOUSE_BUTTON_LEFT].went_down;
 		inp.attack_held = !inventory.is_open && I.buttons[MOUSE_BUTTON_LEFT].is_down;
@@ -29,7 +29,7 @@ void Player::update_controls (Input& I, Game& game) {
 		}
 	}
 
-	if (!game.activate_flycam) {
+	if (game.player_controls_active()) {
 		//// toggle camera view
 		if (I.buttons[KEY_F].went_down)
 			third_person = !third_person;
@@ -105,7 +105,7 @@ void Player::update (Input& I, int2 const& viewport_size, Game& game) {
 
 	game.view = game.player_view;
 	if (game.activate_flycam)
-		game.view = game.flycam.update(I, viewport_size);
+		game.view = game.flycam.update(I, viewport_size, game.player_controls_active());
 
 	//
 	auto& block = selected_block;

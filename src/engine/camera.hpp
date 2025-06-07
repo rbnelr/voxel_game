@@ -176,5 +176,5 @@ struct Flycam {
 
 	float3x3 calc_world_to_cam_rot (float3x3* cam_to_world_rot);
 
-	Camera_View update (Input& I, int2 const& viewport_size);
+	Camera_View update (Input& I, int2 const& viewport_size, bool lock_controls=false);
 };

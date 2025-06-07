@@ -32,6 +32,9 @@ struct Game {
 	BlockUpdate block_update;
 
 	bool activate_flycam = false;
+	bool flycam_control_player = false;
+	bool player_controls_active () { return !activate_flycam || flycam_control_player; }
+
 	bool creative_mode = false;
 	bool trigger_place_block = false;
 

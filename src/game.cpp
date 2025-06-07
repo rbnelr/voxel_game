@@ -139,6 +139,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 					flycam.cam.pos = player.pos + player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
 				}
 			}
+			if (open) ImGui::Checkbox("flycam_control_player", &flycam_control_player);
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
 				player.pos = flycam.cam.pos;

@@ -191,15 +191,17 @@ float3x3 Flycam::calc_world_to_cam_rot (float3x3* cam_to_world_rot) {
 	return calc_aer_rotation(cam.rot_aer, cam_to_world_rot);
 }
 
-Camera_View Flycam::update (Input& I, int2 const& viewport_size) {
+Camera_View Flycam::update (Input& I, int2 const& viewport_size, bool lock_controls) {
 
-	//// look
-	rotate_with_mouselook(I, &cam.rot_aer.x, &cam.rot_aer.y, cam.vfov);
+	
+	if (!lock_controls) { //// look
+		rotate_with_mouselook(I, &cam.rot_aer.x, &cam.rot_aer.y, cam.vfov);
+	}
 
 	float3x3 cam_to_world_rot;
 	float3x3 world_to_cam_rot = calc_aer_rotation(cam.rot_aer, &cam_to_world_rot);
 
-	{ //// movement
+	if (!lock_controls) { //// movement
 		float3 move_dir = 0;
 		if (I.buttons[KEY_A]           .is_down) move_dir.x -= 1;
 		if (I.buttons[KEY_D]           .is_down) move_dir.x += 1;
@@ -227,7 +229,7 @@ Camera_View Flycam::update (Input& I, int2 const& viewport_size) {
 		cam.pos += cam_to_world_rot * translation_cam_space;
 	}
 
-	{ //// fov change
+	if (!lock_controls) { //// fov change
 		if (!I.buttons[KEY_F].is_down) {
 			float delta_log = 0.1f * I.mouse_wheel_delta;
 			base_speed = powf(2, log2f(base_speed) +delta_log );
