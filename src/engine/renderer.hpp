@@ -37,7 +37,7 @@ public:
 	virtual void render_frame (GLFWwindow* window, Input& I, Game& game) = 0;
 
 	virtual void screenshot_imgui (Input& I) = 0;
-	virtual void graphics_imgui (Input& I) = 0;
+	virtual void graphics_imgui (Input& I, Game& g) = 0;
 	virtual void chunk_renderer_imgui (Chunks& chunks) = 0;
 };
 

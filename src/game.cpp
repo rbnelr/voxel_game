@@ -98,7 +98,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			//	g_window.switch_render_backend = true;
 
 			if (renderer)
-				renderer->graphics_imgui(I);
+				renderer->graphics_imgui(I, *this);
 		}
 
 		if (imgui_header("World", &imopen.world)) {
@@ -152,6 +152,8 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 			if (open) flycam.imgui("flycam");
 			if (open) player.imgui("player");
+
+			if (open) ImGui::Checkbox("chunk_loading_follow_flycam", &chunk_loading_follow_flycam);
 
 			if (open) ImGui::Separator();
 		}

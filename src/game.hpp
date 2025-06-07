@@ -39,6 +39,11 @@ struct Game {
 	Camera_View player_view;
 	Camera_View view;
 
+	bool chunk_loading_follow_flycam = true;
+	float3 chunk_loading_center () {
+		return chunk_loading_follow_flycam && activate_flycam ? flycam.cam.pos : player.pos;
+	}
+
 	Game ();
 	~Game ();
 

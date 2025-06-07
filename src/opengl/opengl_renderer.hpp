@@ -297,7 +297,7 @@ public:
 		ImGui::SameLine();
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
-	virtual void graphics_imgui (Input& I) {
+	virtual void graphics_imgui (Input& I, Game& g) {
 		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
 			debug_draw.imgui();
 
@@ -313,7 +313,7 @@ public:
 			ImGui::TreePop();
 		}
 
-		raytracer.imgui(I);
+		raytracer.imgui(I, g);
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {

@@ -8,108 +8,6 @@
 
 namespace gl {
 	
-	//
-	lrgba cols[] = {
-		{1,0,0,1},
-		{0,1,0,1},
-		{0,0,1,1},
-		{1,1,0,1},
-		{1,0,1,1},
-		{0,1,1,1},
-	};
-	bool Raytracer::vct_conedev (OpenglRenderer& r, Game& game) {
-		static bool draw_cones=false, draw_boxes=false;
-		static float start_dist = 0.16f;
-	
-		ImGui::Checkbox("draw cones", &draw_cones);
-		ImGui::SameLine();
-		ImGui::Checkbox("draw boxes", &draw_boxes);
-		ImGui::SliderFloat("start_dist", &start_dist, 0.05f, 2);
-
-		struct Set {
-			int count = 8;
-			float cone_ang = 40.1f;
-
-			float start_azim = 22.5f;
-			float elev_offs = 2.1f;
-
-			float weight = 1.0f;
-		};
-		static std::vector<Set> sets = {
-			{ 8, 40.1f, 22.5f, 2.1f, 0.25f },
-			{ 4, 38.9f, 45.0f, 40.2f, 1.0f },
-		};
-
-		int set_count = (int)sets.size();
-		ImGui::DragInt("sets", &set_count, 0.01f);
-		sets.resize(set_count);
-
-		cone_data.count = 0;
-
-		float total_weight = 0;
-
-		bool count_changed = false;
-
-		int j=0;
-		for (auto& s : sets) {
-			if (ImGui::TreeNodeEx(&s, ImGuiTreeNodeFlags_DefaultOpen, "Set")) {
-
-				count_changed = ImGui::SliderInt("count", &s.count, 0, 16) || count_changed;
-				ImGui::DragFloat("cone_ang", &s.cone_ang, 0.1f, 0, 180);
-
-				ImGui::DragFloat("start_azim", &s.start_azim, 0.1f);
-				ImGui::DragFloat("elev_offs", &s.elev_offs, 0.1f);
-
-				ImGui::DragFloat("weight", &s.weight, 0.01f);
-
-				ImGui::TreePop();
-			}
-
-			float ang = deg(s.cone_ang);
-
-			for (int i=0; i<s.count; ++i) {
-				float3 cone_pos = game.player.pos;
-
-				float3x3 rot = rotate3_Z((float)(i-1) / s.count * deg(360) + deg(s.start_azim)) *
-						rotate3_Y(deg(90) - ang * 0.5f - deg(s.elev_offs));
-
-				auto& col = cols[i % ARRLEN(cols)];
-				if (draw_cones) g_debugdraw.wire_cone(cone_pos, ang, 30, rot, col, 32, 4);
-
-				float3 cone_dir = rot * float3(0,0,1);
-				float cone_slope = tan(ang * 0.5f);
-				float dist = start_dist;
-
-				cone_data.cones[j++] = { cone_dir, cone_slope, s.weight, 0 };
-		
-				int j=0;
-				while (j++ < 100 && dist < 100.0f) {
-					float3 pos = cone_pos + cone_dir * dist;
-					float r = cone_slope * dist;
-					//g_debugdraw.wire_sphere(pos, r, col, 16, 4);
-					if (draw_boxes) g_debugdraw.wire_cube(pos, r*2, col);
-
-					dist = (dist + r) / (1.0f - cone_slope);
-				}
-
-				total_weight += s.weight;
-			}
-
-			cone_data.count += s.count;
-		}
-
-		// normalize weights
-		j=0;
-		for (auto& s : sets) {
-			for (int i=0; i<s.count; ++i) {
-				cone_data.cones[j++].weight /= total_weight;
-			}
-		}
-
-		return count_changed;
-	}
-
-
 	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
 		ZoneScoped;
 
@@ -120,7 +18,6 @@ namespace gl {
 			framebuf1.resize(renderscale.size, renderscale.nearest);
 		}
 
-		macro_change |= vct_conedev(r, game);
 		upload_bind_ubo(cones_ubo, 4, &cone_data, sizeof(cone_data));
 
 		if (I.buttons[KEY_R].went_down)
@@ -651,9 +548,6 @@ namespace gl {
 				glBindImageTexture(i, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 		}
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-		
-		static float gauss_radius_px = 0.01f;
-		ImGui::SliderFloat("gauss_radius_px", &gauss_radius_px, 0.01f, 1000, "%.3f", ImGuiSliderFlags_Logarithmic);
 
 		{
 			OGL_TIMER_ZONE(timer_rt_post.timer);

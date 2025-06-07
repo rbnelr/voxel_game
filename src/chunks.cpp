@@ -336,12 +336,13 @@ void Chunks::update_chunk_loading (Game& game) {
 			bucket.push_back(chunk_pos);
 	};
 
+	float3 loading_center = game.chunk_loading_center();
 	{
 		ZoneScopedN("iterate chunk loading");
 		
 		if (visualize_chunks) {
 			if (visualize_radius) {
-				g_debugdraw.wire_sphere(game.player.pos, load_radius, DBG_RADIUS_COL);
+				g_debugdraw.wire_sphere(loading_center, load_radius, DBG_RADIUS_COL);
 
 				//auto sz = (float)(chunks_arr.size * CHUNK_SIZE);
 				//g_debugdraw.wire_cube((float3)chunks_arr.pos * CHUNK_SIZE + sz/2, sz, DBG_CHUNK_ARRAY_COL);
@@ -355,7 +356,7 @@ void Chunks::update_chunk_loading (Game& game) {
 	#if 0
 		// chunk distance based on dist to box, ie closest point in box is used as distance
 
-		float3 const& player_pos = game.player.pos;
+		float3 const& player_pos = loading_center;
 
 		auto chunk_dist_sqr = [&] (int3 const& pos) {
 			float pos_relx = player_pos.x - pos.x * (float)CHUNK_SIZE;
@@ -377,8 +378,8 @@ void Chunks::update_chunk_loading (Game& game) {
 	#if 0
 		float sz = (float)CHUNK_SIZE;
 
-		float3 const& player_pos = game.player.pos;
-		float3 dist_base = sz/2 - game.player.pos;
+		float3 const& player_pos = loading_center;
+		float3 dist_base = sz/2 - loading_center;
 
 		auto chunk_dist_sqr = [&] (int3 const& pos) {
 
@@ -398,8 +399,8 @@ void Chunks::update_chunk_loading (Game& game) {
 		// which it is not supposed to (https://stackoverflow.com/questions/38443452/alignment-and-sse-strange-behaviour)
 		// this is likely a compiler bug
 		
-		//auto dist_base = _mm_sub_ps(szh, _mm_loadu_ps(&game.player.pos.x));
-		auto dist_base = _mm_sub_ps(szh, _mm_set_ps(0, game.player.pos.z, game.player.pos.y, game.player.pos.x)); // workaround for the bug
+		//auto dist_base = _mm_sub_ps(szh, _mm_loadu_ps(&loading_center.x));
+		auto dist_base = _mm_sub_ps(szh, _mm_set_ps(0, loading_center.z, loading_center.y, loading_center.x)); // workaround for the bug
 
 		auto chunk_dist_sqr = [&] (int3 const& pos) {
 
@@ -418,7 +419,7 @@ void Chunks::update_chunk_loading (Game& game) {
 	#endif
 
 		{
-			int3 pos = floori(game.player.pos / CHUNK_SIZE);
+			int3 pos = floori(loading_center / CHUNK_SIZE);
 			if (chunks_map.find(pos) == chunks_map.end()) { // chunk not yet loaded
 				if (queued_chunks.find(pos) == queued_chunks.end()) // chunk not yet queued for worldgen
 					add_chunk_to_generate(pos, 0, 1);
