@@ -40,11 +40,11 @@
 		"disable_grass": true
 	},
 	"chunks": {
-		"load_radius": 400.0,
+		"load_radius": 350.0,
 		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
-		"visualize_chunks": false,
+		"visualize_chunks": true,
 		"visualize_subchunks": false,
 		"visualize_radius": false,
 		"debug_frustrum_culling": false,
@@ -70,13 +70,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-219.00338745117188,
-				-322.24151611328125,
-				154.8593292236328
+				-86.12319946289063,
+				36.4578971862793,
+				-89.87004089355469
 			],
 			"rot_aer": [
-				-0.33149242401123047,
-				-0.27651935815811157,
+				1.8157508373260498,
+				-0.564429759979248,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -85,16 +85,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 83.5730209350586,
+		"base_speed": 3.693451166152954,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			-50.415714263916016,
-			3.0177910327911377,
-			-107.9999008178711
+			0.0,
+			0.0,
+			9.999999747378752e-05
 		],
 		"vel": [
 			0.0,
@@ -102,8 +102,8 @@
 			0.0
 		],
 		"rot_ae": [
-			2.729309320449829,
-			0.2368413507938385
+			-3.136051893234253,
+			-1.0581921339035034
 		],
 		"third_person": false
 	},
@@ -127,7 +127,7 @@
 				"max_age": 100
 			},
 			"lighting": {
-				"bounce_enable": false,
+				"bounce_enable": true,
 				"bounce_max_dist": 128.0,
 				"bounce_max_count": 4,
 				"bounce_samples": 1,

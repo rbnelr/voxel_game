@@ -261,7 +261,7 @@ vec3 APPLY_TAA (vec3 val, vec3 pos, vec3 normal, ivec2 pxpos, uint faceid) {
 		
 		if (faceid == sampl_id) {
 			sampl_age = min(sampl_age, uint(taa_max_age));
-			age = sampl_age + 1u;
+			age = sampl_age + 1u; // TODO: is increment after clamping correct?
 			
 			vec3 accumulated = textureLod(taa_history_color, reproj_uv, 0.0).rgb * float(sampl_age);
 			
@@ -548,7 +548,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 				face = rel.x < 0.5 ? 0 : 1;
 				
 				hit.faceid  = face << 13;
-				hit.faceid |= ~(2<<13) & uint(coord.x);
+				hit.faceid |= 0x1fffu & uint(coord.x);
 				
 				hit.gnormal.x = sign(offs.x);
 				tang.y = offs.x < 0.0 ? -1 : +1;
@@ -558,7 +558,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 				face = rel.y < 0.5 ? 2 : 3;
 				
 				hit.faceid  = face << 13;
-				hit.faceid |= ~(2<<13) & uint(coord.y);
+				hit.faceid |= 0x1fffu & uint(coord.y);
 				
 				hit.gnormal.y = sign(offs.y);
 				tang.x = offs.y < 0.0 ? +1 : -1;
@@ -568,7 +568,7 @@ bool trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist, out Hit hit,
 				face = rel.z < 0.5 ? 4 : 5;
 				
 				hit.faceid  = face << 13;
-				hit.faceid |= ~(2<<13) & uint(coord.z);
+				hit.faceid |= 0x1fffu & uint(coord.z);
 				
 				hit.gnormal.z = sign(offs.z);
 				tang.x = +1;
@@ -631,6 +631,13 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 	else {
 		float lod = log2(size)-1; // -1 because of seperate mip0 texture
 		
+	#if 1
+		
+		// improves perf by quite a bit by cutting samples texels in ~half
+		// but makes lighting less smooth and more artifacty
+		// might not be worth it for ~33% speed up
+		lod = round(lod);
+		
 		texcoord *= INV_WORLD_SIZEf;
 		
 		vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
@@ -640,12 +647,43 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 		vec3 sqr = dir * dir;
 		vec4 val = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
 		
-		//vec3 weight = min(abs(dir) * 15.0, 1.0);
-		//valX.a *= weight.x;
-		//valY.a *= weight.y;
-		//valZ.a *= weight.z;
+	#else
 		
-		//val.a = max(max(valX.a, valY.a), valZ.a);
+		// Manual mipmap interp allows for
+		// 1. acutally lerping with mip0, which I overlooked orginally
+		// 2. implementing clip-mapping for larger VCT radius 
+		
+		float fl = floor(lod);
+		float lod_t = lod - fl;
+		lod = fl;
+		
+		texcoord *= INV_WORLD_SIZEf;
+		
+		vec3 sqr = dir * dir;
+		
+		vec4 val0;
+		{
+			vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
+			vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
+			vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
+			
+			val0 = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+		}
+		
+		vec4 val1;
+		{
+			lod += 1.0;
+			
+			vec4 valX = textureLod(dir.x < 0.0 ? vct_texNX : vct_texPX, texcoord, lod);
+			vec4 valY = textureLod(dir.y < 0.0 ? vct_texNY : vct_texPY, texcoord, lod);
+			vec4 valZ = textureLod(dir.z < 0.0 ? vct_texNZ : vct_texPZ, texcoord, lod);
+			
+			val1 = (valX*sqr.x + valY*sqr.y + valZ*sqr.z) * VCT_UNPACK;
+		}
+		
+		vec4 val = mix(val0, val1, lod_t);
+		
+	#endif
 		
 		return val;
 	}
@@ -669,12 +707,34 @@ vec4 read_vct_texture (vec3 texcoord, vec3 dir, float size) {
 }
 vec4 trace_cone (vec3 cone_pos, vec3 cone_dir, float cone_slope, float start_dist, float max_dist, bool dbg) {
 	
-	// TODO: limit cone tracing to world texture box, to avoid light from wrapped regions of 3d texture
-		
-	float dist = start_dist;
-	
 	vec3 color = vec3(0.0);
 	float transp = 1.0; // inverse alpha to support alpha stepsize fix
+	
+	float dist = start_dist;
+	
+	{ // allow ray to start outside of world texture cube for nice debugging views
+		bvec3 dir_sign = greaterThanEqual(cone_dir, vec3(0.0));
+		
+		vec3 inv_dir = 1.0 / cone_dir;
+		vec3 bias = inv_dir * -cone_pos;
+		
+		vec3 world_min = voxtex_world_min                     + epsilon;
+		vec3 world_max = voxtex_world_min + vec3(WORLD_SIZEf) - epsilon;
+		
+		// calculate entry and exit coords into whole world cube
+		vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
+		vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
+		float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
+		float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
+		
+		// ray misses world texture
+		if (t1 <= t0)
+			return vec4(color, 1.0 - transp);
+		
+		// adjust ray to start where it hits cube initally
+		dist     = max(t0, start_dist);
+		max_dist = min(t1, max_dist);
+	}
 	
 	for (int i=0; i<4000; ++i) {
 		if (gl_LocalInvocationID.z == 0) {

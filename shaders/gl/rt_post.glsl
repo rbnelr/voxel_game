@@ -26,11 +26,11 @@
 		
 		int r = int(ceil(gauss_radius_px));
 		
-#if 1
+#if 0
 		
 	#if PASS == 0
 		for (int i=-r; i<=r; ++i) {
-			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
+			vec2 uv = vs_uv + vec2(0.0, px_sz.y * float(i));
 			
 			if (faceid == texture(gbuf_faceid, uv).r) {
 				float weight = gauss_kernel(float(i));
@@ -41,7 +41,7 @@
 		col /= total;
 	#else
 		for (int i=-r; i<=r; ++i) {
-			vec2 uv = vs_uv + vec2(0.0, px_sz.y * float(i));
+			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
 			
 			if (faceid == texture(gbuf_faceid, uv).r) {
 				float weight = gauss_kernel(float(i));
@@ -56,24 +56,6 @@
 	
 	#if PASS == 0
 		for (int i=0; i<=r; ++i) {
-			vec2 uv = vs_uv - vec2(px_sz.x * float(i), 0.0);
-			if (faceid == texture(gbuf_faceid, uv).r) {
-				float weight = gauss_kernel(float(i));
-				col   += weight * texture(input_tex, uv).rgb;
-				total += weight;
-			} else break;
-		}
-		for (int i=0; i<=r; ++i) {
-			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
-			if (faceid == texture(gbuf_faceid, uv).r) {
-				float weight = gauss_kernel(float(i));
-				col   += weight * texture(input_tex, uv).rgb;
-				total += weight;
-			} else break;
-		}
-		col /= total;
-	#else
-		for (int i=0; i<=r; ++i) {
 			vec2 uv = vs_uv - vec2(0.0, px_sz.y * float(i));
 			if (faceid == texture(gbuf_faceid, uv).r) {
 				float weight = gauss_kernel(float(i));
@@ -83,6 +65,24 @@
 		}
 		for (int i=0; i<=r; ++i) {
 			vec2 uv = vs_uv + vec2(0.0, px_sz.y * float(i));
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		col /= total;
+	#else
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv - vec2(px_sz.x * float(i), 0.0);
+			if (faceid == texture(gbuf_faceid, uv).r) {
+				float weight = gauss_kernel(float(i));
+				col   += weight * texture(input_tex, uv).rgb;
+				total += weight;
+			} else break;
+		}
+		for (int i=0; i<=r; ++i) {
+			vec2 uv = vs_uv + vec2(px_sz.x * float(i), 0.0);
 			if (faceid == texture(gbuf_faceid, uv).r) {
 				float weight = gauss_kernel(float(i));
 				col   += weight * texture(input_tex, uv).rgb;

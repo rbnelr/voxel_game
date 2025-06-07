@@ -7,7 +7,7 @@
 #include "engine/window.hpp" // for frame_counter hack
 
 namespace gl {
-
+	
 void ChunkRenderer::upload_remeshed (Chunks& chunks) {
 	ZoneScoped;
 	OGL_TRACE("chunks upload remeshed");

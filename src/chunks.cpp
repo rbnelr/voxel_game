@@ -716,7 +716,7 @@ void Chunks::update_chunk_meshing (Game& game) {
 
 	{
 		ZoneScopedN("remesh process slices");
-
+		
 		// upload remeshed slices and register them in chunk mesh
 		auto process_slices = [&] (ChunkMeshData& remeshed, uint32_t* pvertex_count, slice_id* pslices) {
 			ZoneScopedN("process_slices");
@@ -760,6 +760,9 @@ void Chunks::update_chunk_meshing (Game& game) {
 			for (size_t i=0; i<count; ++i) {
 				auto res = std::move(results[i]);
 				auto& chunk = chunks[res->chunk];
+
+				g_ChunkMeshExporter.export_(chunk, res->opaque_vertices, false);
+				g_ChunkMeshExporter.export_(chunk, res->transp_vertices, true);
 
 				process_slices(res->opaque_vertices, &chunk.opaque_mesh_vertex_count, &chunk.opaque_mesh_slices);
 				process_slices(res->transp_vertices, &chunk.transp_mesh_vertex_count, &chunk.transp_mesh_slices);
@@ -883,6 +886,9 @@ void Chunks::imgui (Renderer* renderer) {
 	print_block_allocator(subchunks, "subchunks alloc");
 
 	ImGui::Spacing();
+
+	if (ImGui::Button("_Export Chunk Meshes"))
+		g_ChunkMeshExporter.export_file();
 	
 #if 0
 	if (ImGui::TreeNode("count_hash_collisions")) {

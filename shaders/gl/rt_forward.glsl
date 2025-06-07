@@ -29,7 +29,7 @@ layout(rgba16f, binding = 2) writeonly restrict uniform image2D gbuf_col;
 layout(rgba16f, binding = 3) writeonly restrict uniform image2D gbuf_norm;
 
 void main () {
-	INIT_VISUALIZE_COST();
+	//INIT_VISUALIZE_COST();
 	
 	ivec2 threadid = ivec2(gl_LocalInvocationID.xy);
 	ivec2 wgroupid = ivec2(work_group_tiling(20u));
@@ -64,7 +64,7 @@ void main () {
 		norm = hit.normal;
 	}
 	
-	GET_VISUALIZE_COST(col.rgb);
+	//GET_VISUALIZE_COST(col.rgb);
 	
 	imageStore(gbuf_pos, pxpos, vec4(depth, 0,0,0));
 	imageStore(gbuf_faceid, pxpos, uvec4(faceid, 0,0,0));

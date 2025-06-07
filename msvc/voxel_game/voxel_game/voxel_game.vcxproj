@@ -29,27 +29,27 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Validate|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -430,29 +430,26 @@
     <None Include="..\..\..\blocks.json" />
     <None Include="..\..\..\shaders.json" />
     <None Include="..\..\..\shaders\gl\block_highlight.glsl" />
-    <None Include="..\..\..\shaders\gl\bloom.glsl" />
     <None Include="..\..\..\shaders\gl\chunks.glsl" />
     <None Include="..\..\..\shaders\gl\common.glsl" />
     <None Include="..\..\..\shaders\gl\dbg_indirect_draw.glsl" />
     <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
     <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
-    <None Include="..\..\..\shaders\gl\debug_wire_cube.glsl" />
     <None Include="..\..\..\shaders\gl\debug_wire_instance.glsl" />
     <None Include="..\..\..\shaders\gl\fullscreen_triangle.glsl" />
     <None Include="..\..\..\shaders\gl\gpu_voxels.glsl" />
     <None Include="..\..\..\shaders\gl\gui.glsl" />
     <None Include="..\..\..\shaders\gl\held_block.glsl" />
     <None Include="..\..\..\shaders\gl\held_item.glsl" />
-    <None Include="..\..\..\shaders\gl\postprocess.glsl" />
     <None Include="..\..\..\shaders\gl\rand.glsl" />
     <None Include="..\..\..\shaders\gl\rt_df_gen.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_df_init.glsl" />
     <None Include="..\..\..\shaders\gl\rt_forward.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_gbufgen.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_octree_filter.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_lighting.glsl" />
+    <None Include="..\..\..\shaders\gl\rt_post.glsl" />
     <None Include="..\..\..\shaders\gl\rt_util.glsl" />
     <None Include="..\..\..\shaders\gl\test.glsl" />
     <None Include="..\..\..\shaders\gl\vct_filter.glsl" />
-    <None Include="..\..\..\shaders\gl\vct_shade.glsl" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="test.natvis" />

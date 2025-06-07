@@ -284,7 +284,7 @@ namespace worldgen {
 		block_id voxels[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 
 		NoisePass (int3 chunk_pos, WorldGenerator const* wg):
-			chunk_pos{chunk_pos}, wg{wg}, noise3{wg->seed} {
+			chunk_pos{chunk_pos}, wg{wg}, noise3{(int64_t)wg->seed} {
 
 		}
 
