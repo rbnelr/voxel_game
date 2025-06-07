@@ -445,7 +445,7 @@ namespace gl {
 			#endif
 		}
 		
-		int3 voxtex_offset;
+		int3 voxtex_offset = 0;
 		
 		bool enable = true;
 

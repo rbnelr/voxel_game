@@ -307,6 +307,8 @@ void Chunks::free_chunk (chunk_id cid) {
 
 void Chunks::update_chunk_loading (Game& game) {
 	ZoneScoped;
+
+	unload_chunks = {};
 	
 	// clamp for sanity
 	load_radius = clamp(load_radius, 0.0f, 20000.0f);
@@ -452,6 +454,8 @@ void Chunks::update_chunk_loading (Game& game) {
 				}
 			} else {
 				// chunk outside unload radius
+				unload_chunks.push_back(chunk.pos);
+
 				chunks_map.erase(chunk.pos);
 				free_chunk(cid);
 			}

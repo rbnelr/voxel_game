@@ -138,6 +138,17 @@ struct DebugDraw {
 	void cylinder (float3 const& base, float radius, float height, lrgba const& col, int sides=32);
 	
 	void axis_gizmo (Camera_View const& view, int2 const& viewport_size);
+	
+	struct StayCube {
+		float3 pos;
+		float3 size;
+		lrgba col;
+		float timer;
+	};
+	std::vector<StayCube> stay_cubes;
+	void wire_cube_stay (float3 const& pos, float3 const& size, lrgba const& col, float stay_time) {
+		stay_cubes.push_back({ pos, size, col, stay_time });
+	}
 
 	////
 	// Imgui-style interface to create selectable 'objects' in the 3d world
@@ -172,6 +183,21 @@ struct DebugDraw {
 				if (vel) *vel = 0;
 		}
 		return selected;
+	}
+
+	void update (Input& I) {
+		if (stay_cubes.size() > 0) {
+			for (auto it = stay_cubes.begin(); it != stay_cubes.end();) {
+				wire_cube(it->pos, it->size, it->col);
+				it->timer -= I.real_dt;
+				if (it->timer <= 0) {
+					it = stay_cubes.erase(it);
+				}
+				else {
+					it++;
+				}
+			}
+		}
 	}
 };
 

@@ -127,6 +127,9 @@ struct SliceNode {
 
 static constexpr uint32_t SUBC_SPARSE_BIT = 0x80000000u;
 
+struct DenseChunkVoxels {
+	block_id voxels[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+};
 struct SubchunkVoxels {
 	block_id voxels[SUBCHUNK_VOXEL_COUNT];
 };
@@ -479,6 +482,8 @@ struct Chunks {
 	std::vector<UploadSlice> upload_slices;
 
 	std::vector<chunk_id> upload_voxels; // VOXELS_DIRTY of this frame
+
+	std::vector<int3> unload_chunks; // Consumed by renderer, cleared beginning of next frame
 
 	// queue and finialize chunks that should be generated
 	void update_chunk_meshing (Game& game);

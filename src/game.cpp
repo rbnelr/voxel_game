@@ -204,5 +204,6 @@ void Game::update (Window& window, Input& I) {
 	}
 
 	g_debugdraw.finish_selectables();
+	g_debugdraw.update(I);
 	ImGui::End();
 }

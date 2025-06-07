@@ -249,82 +249,186 @@ namespace gl {
 	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
 		ZoneScoped;
 
-		int3 offset = roundi(game.player.pos) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
+		// These are the base chunk positions of the GPU_WORLD_SIZE_CHUNKS cube of voxels in world space
+		int3 offset = roundi(game.chunk_loading_center()) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
+		int3 old_offset = voxtex_offset;
 		voxtex_offset = offset;
+		
+		//g_debugdraw.wire_cube((float3)(voxtex_offset+GPU_WORLD_SIZE_CHUNKS/2)*CHUNK_SIZE, GPU_WORLD_SIZE_CHUNKS*CHUNK_SIZE, lrgba(.5f,.5f,.5f,1));
 
-		std::vector<int3> chunks;
+		std::unordered_set<int3> reupload_chunks; // deduplicate due to 3 planar iterations and changed chunks
+		std::unordered_set<int3> clear_chunks;
+		std::vector<int3> reupload_chunk_flat;
+		
+		auto chunk_in_gpu_world = [&] (int3 chunk_pos) {
+			int3 rel_pos = chunk_pos - voxtex_offset;
+			return (unsigned)(rel_pos.x) < GPU_WORLD_SIZE_CHUNKS &&
+			       (unsigned)(rel_pos.y) < GPU_WORLD_SIZE_CHUNKS &&
+			       (unsigned)(rel_pos.z) < GPU_WORLD_SIZE_CHUNKS;
+		};
 
-		// TODO: actually support for chunk unloading?
+		{ // Find gpu world chunks which have wrapped around if gpu world cube moves
+			auto reupload_chunk = [&] (int3 chunk_pos_rel) {
+				int3 world_pos = chunk_pos_rel + offset;
+				assert(chunk_in_gpu_world(world_pos));
+				reupload_chunks.emplace(world_pos);
+			};
+			
+			if (offset != old_offset) {
+				//int3 move = offset - old_offset;
+				//int3 lo = 0;
+				//int3 hi = GPU_WORLD_SIZE_CHUNKS;
+				//if (all(move < GPU_WORLD_SIZE_CHUNKS)) {
+				//	lo = select(move > 0, GPU_WORLD_SIZE_CHUNKS-move, 0);
+				//	hi = select(move > 0, GPU_WORLD_SIZE_CHUNKS, move);
+				//}
+				//
+				//for (int x=lo.x; x<hi.x; x++)
+				//for (int y=0; y<GPU_WORLD_SIZE_CHUNKS; y++)
+				//for (int z=0; z<GPU_WORLD_SIZE_CHUNKS; z++) {
+				//	reupload_chunk(int3(x,y,z));
+				//}
+				//for (int y=lo.y; y<hi.y; y++)
+				//for (int x=0; x<GPU_WORLD_SIZE_CHUNKS; x++)
+				//for (int z=0; z<GPU_WORLD_SIZE_CHUNKS; z++) {
+				//	reupload_chunk(int3(x,y,z));
+				//}
+				//for (int z=lo.z; z<hi.z; z++)
+				//for (int x=0; x<GPU_WORLD_SIZE_CHUNKS; x++)
+				//for (int y=0; z<GPU_WORLD_SIZE_CHUNKS; z++) {
+				//	reupload_chunk(int3(x,y,z));
+				//}
+			
+				for (int x=0; x<GPU_WORLD_SIZE_CHUNKS; x++)
+				for (int y=0; y<GPU_WORLD_SIZE_CHUNKS; y++)
+				for (int z=0; z<GPU_WORLD_SIZE_CHUNKS; z++) {
+					int3 world_pos = int3(x,y,z) + offset; // world position of all gpu chunks after shifting gpu world
+					int3 old_pos_rel = world_pos - old_offset; // world pos of chunk before movement 
+				
+					bool was_inside =
+						(unsigned)(old_pos_rel.x) < GPU_WORLD_SIZE_CHUNKS &&
+						(unsigned)(old_pos_rel.y) < GPU_WORLD_SIZE_CHUNKS &&
+						(unsigned)(old_pos_rel.z) < GPU_WORLD_SIZE_CHUNKS;
+					if (!was_inside)
+						reupload_chunk(int3(x,y,z));
+				}
+			}
+		}
 
+		//// Reupload any chunks with changes
 		// take all chunks that have had voxels updated AND are inside the sliding window of gpu voxel memory
 		//  -> ie chunk coords [voxtex_offset, voxtex_offset + GPU_WORLD_SIZE_CHUNKS)
+		for (auto cid : game.chunks.upload_voxels) {
+			auto& chunk = game.chunks.chunks[cid];
+			if (chunk_in_gpu_world(chunk.pos)) {
+				reupload_chunks.emplace(chunk.pos);
+			}
+		}
+		// Unload chunks to unload
+		for (auto cpos : game.chunks.unload_chunks) {
+			if (chunk_in_gpu_world(cpos)) {
+				clear_chunks.emplace(int3(cpos));
+			}
+		}
+		
+		// temp buffer to 'decompress' my sparse subchunks and enable uploading them in a single glTextureSubImage3D per chunk
+		//block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE]; // WARNING: having two of these (even in separate scopes) apparently overflows the stack!
+		auto* buffer = (DenseChunkVoxels*)malloc(sizeof(DenseChunkVoxels)*2);
+		
+
+		//// Execute reupload
 		// and "decompress" them ie. de-sparsify them, then upload them to dense voxel region on gpu
 		// but upload them using world positions wrapped by GPU_WORLD_SIZE_CHUNKS instead, so that sliding the window by 1 chunk does not require moving all the contents
-		if (!game.chunks.upload_voxels.empty()) {
+		if (!reupload_chunks.empty()) {
 			OGL_TRACE("raytracer upload changes");
 
-			// temp buffer to 'decompress' my sparse subchunks and enable uploading them in a single glTextureSubImage3D per chunk
-			block_id buffer[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
-			
-			for (auto cid : game.chunks.upload_voxels) {
+			for (auto pos : reupload_chunks) {
+				auto it = game.chunks.chunks_map.find(pos);
+				if (it == game.chunks.chunks_map.end()) {
+					// Chunk should be reuploaded due to gpu world movement, but we have no chunk loaded there, need to clear data
+					clear_chunks.emplace(int3(pos));
+					continue;
+				}
+
+				clear_chunks.erase(int3(pos)); // don't clear chunks we overwrite anyway
+
+				auto cid = it->second;
 				auto& chunk = game.chunks.chunks[cid];
 				auto& vox = game.chunks.chunk_voxels[cid];
 
-				int3 rel_pos = chunk.pos - voxtex_offset;
+				assert(chunk_in_gpu_world(chunk.pos));
 				int3 wrap_pos = chunk.pos & (GPU_WORLD_SIZE_CHUNKS-1);
+				
+				//OGL_TRACE("upload chunk data");
 
-				if ( (unsigned)(rel_pos.x) < GPU_WORLD_SIZE_CHUNKS && // use 3 unsigned comparisons instead of 6 signed ones
-					 (unsigned)(rel_pos.y) < GPU_WORLD_SIZE_CHUNKS &&
-					 (unsigned)(rel_pos.z) < GPU_WORLD_SIZE_CHUNKS ) {
-					//OGL_TRACE("upload chunk data");
+				{
+					ZoneScopedN("decompress");
 
-					{
-						ZoneScopedN("decompress");
+					for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
+					for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
+					for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
 
-						for (int sz=0; sz<SUBCHUNK_COUNT; ++sz)
-						for (int sy=0; sy<SUBCHUNK_COUNT; ++sy)
-						for (int sx=0; sx<SUBCHUNK_COUNT; ++sx) {
-
-							auto subc = vox.subchunks[IDX3D(sx,sy,sz, SUBCHUNK_SIZE)];
-							if (subc & SUBC_SPARSE_BIT) {
-								block_id val = (block_id)(subc & ~SUBC_SPARSE_BIT);
+						auto subc = vox.subchunks[IDX3D(sx,sy,sz, SUBCHUNK_SIZE)];
+						if (subc & SUBC_SPARSE_BIT) {
+							block_id val = (block_id)(subc & ~SUBC_SPARSE_BIT);
 							
-								block_id val_packed[SUBCHUNK_SIZE];
-								for (int i=0; i<SUBCHUNK_SIZE; ++i)
-									val_packed[i] = val;
+							block_id val_packed[SUBCHUNK_SIZE];
+							for (int i=0; i<SUBCHUNK_SIZE; ++i)
+								val_packed[i] = val;
 							
-								for (int z=0; z<SUBCHUNK_SIZE; ++z)
-								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
-									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
-									memcpy(dst, val_packed, sizeof(block_id)*SUBCHUNK_SIZE);
-								}
+							for (int z=0; z<SUBCHUNK_SIZE; ++z)
+							for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+								auto* dst = &buffer->voxels[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
+								memcpy(dst, val_packed, sizeof(block_id)*SUBCHUNK_SIZE);
+							}
 							
-							} else {
-								auto* data = game.chunks.subchunks[subc].voxels;
+						} else {
+							auto* data = game.chunks.subchunks[subc].voxels;
 							
-								for (int z=0; z<SUBCHUNK_SIZE; ++z)
-								for (int y=0; y<SUBCHUNK_SIZE; ++y) {
-									auto* dst = &buffer[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
-									auto* src = &data[IDX3D(0,y,z, SUBCHUNK_SIZE)];
-									memcpy(dst, src, sizeof(block_id)*SUBCHUNK_SIZE);
-								}
+							for (int z=0; z<SUBCHUNK_SIZE; ++z)
+							for (int y=0; y<SUBCHUNK_SIZE; ++y) {
+								auto* dst = &buffer->voxels[sz*SUBCHUNK_SIZE + z][sy*SUBCHUNK_SIZE + y][sx*SUBCHUNK_SIZE + 0];
+								auto* src = &data[IDX3D(0,y,z, SUBCHUNK_SIZE)];
+								memcpy(dst, src, sizeof(block_id)*SUBCHUNK_SIZE);
 							}
 						}
 					}
-
-					{
-						ZoneScopedN("glTextureSubImage3D");
-
-						glTextureSubImage3D(voxel_tex.tex, 0,
-							wrap_pos.x*CHUNK_SIZE, wrap_pos.y*CHUNK_SIZE, wrap_pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
-							GL_RED_INTEGER, GL_UNSIGNED_SHORT, buffer);
-					}
-
-					chunks.push_back(wrap_pos);
 				}
+
+				{
+					ZoneScopedN("glTextureSubImage3D");
+
+					glTextureSubImage3D(voxel_tex.tex, 0,
+						wrap_pos.x*CHUNK_SIZE, wrap_pos.y*CHUNK_SIZE, wrap_pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
+						GL_RED_INTEGER, GL_UNSIGNED_SHORT, &buffer->voxels);
+				}
+
+				//g_debugdraw.wire_cube_stay((float3)pos*CHUNK_SIZE+CHUNK_SIZE/2, CHUNK_SIZE, lrgba(0,1,0,1), 2);
+
+				reupload_chunk_flat.push_back(wrap_pos);
 			}
 			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+		}
+		
+		// Unload chunks by replacing them with null voxels
+		// Do this before DF gen to be correct
+		if (!clear_chunks.empty()) {
+			memset(&buffer->voxels, 0, sizeof(buffer->voxels));
 
+			for (auto cpos : clear_chunks) {
+				assert(chunk_in_gpu_world(cpos));
+
+				int3 wrap_pos = cpos & (GPU_WORLD_SIZE_CHUNKS-1);
+
+				// Actually unloaded and not replaced, reupload empty chunk
+				glTextureSubImage3D(voxel_tex.tex, 0,
+					wrap_pos.x*CHUNK_SIZE, wrap_pos.y*CHUNK_SIZE, wrap_pos.z*CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE,
+					GL_RED_INTEGER, GL_UNSIGNED_SHORT, &buffer->voxels);
+					
+				reupload_chunk_flat.push_back(wrap_pos);
+
+				//g_debugdraw.wire_cube_stay((float3)(wrap_pos + voxtex_offset)*CHUNK_SIZE+CHUNK_SIZE/2, CHUNK_SIZE, lrgba(1,.5f,0,1), 2);
+			}
 		}
 
 		// Use uploaded dense voxel gpu data to compute VCT data in compute shader
@@ -336,12 +440,12 @@ namespace gl {
 			//	chunks.push_back({x,y,7});
 			//}
 
-			if (!chunks.empty()) {
+			if (!reupload_chunk_flat.empty()) {
 				ZoneScopedN("rt_df_gen");
 				OGL_TRACE("rt_df_gen");
 				OGL_TIMER_ZONE(timer_df_init.timer);
 
-				int count = (int)chunks.size();
+				int count = (int)reupload_chunk_flat.size();
 
 				glBindImageTexture(4, df_tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8I);
 
@@ -358,7 +462,7 @@ namespace gl {
 
 						int3 offsets[BATCHSIZE] = {};
 						for (int j=0; j<subcount; ++j)
-							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+							offsets[j] = reupload_chunk_flat[i+j] * CHUNK_SIZE;
 
 						df_tex.shad_init->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
 
@@ -383,7 +487,7 @@ namespace gl {
 				
 						int3 offsets[BATCHSIZE] = {};
 						for (int j=0; j<subcount; ++j)
-							offsets[j] = chunks[i+j] * CHUNK_SIZE;
+							offsets[j] = reupload_chunk_flat[i+j] * CHUNK_SIZE;
 				
 						shad->set_uniform_array("offsets[0]", offsets, BATCHSIZE);
 				
@@ -397,7 +501,9 @@ namespace gl {
 
 			glBindImageTexture(4, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); // unbind
 		}
-		vct_data.recompute_mips(r, game, chunks);
+		vct_data.recompute_mips(r, game, reupload_chunk_flat);
+
+		free(buffer);
 	}
 
 	void Raytracer::set_uniforms (OpenglRenderer& r, Game& game, Shader* shad) {

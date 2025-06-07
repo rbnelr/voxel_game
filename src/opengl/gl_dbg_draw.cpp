@@ -103,6 +103,7 @@ void glDebugDraw::draw (OpenglRenderer& r) {
 				glDrawElementsInstanced(GL_LINES, ARRLEN(DebugDraw::_wire_cube_indices), GL_UNSIGNED_SHORT,
 					(void*)0, (GLsizei)g_debugdraw.wire_cubes.size());
 			}
+			
 		}
 
 		{
