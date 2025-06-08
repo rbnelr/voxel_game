@@ -64,7 +64,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	{
-		glClearColor(0,0,0,1);
+		glClearColor(fog.fog_col.x, fog.fog_col.y, fog.fog_col.z,1);
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		OGL_TRACE("3d draws");
@@ -442,6 +443,8 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 	// heat_gradient.png   rainbow_gradient.png   blue_red_gradient.png
 	upload_texture(gradient, "textures/heat_gradient.png");
 	upload_texture(gui_atlas, "textures/gui.png");
+
+	upload_texture(water_displ, "textures/periodic_perlin.png");
 
 	return true;
 }

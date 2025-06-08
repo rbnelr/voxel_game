@@ -109,6 +109,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			{"tile_textures", r.tile_textures, r.pixelated_sampler},
 
 			{"voxel_tex", r.raytracer.voxel_tex.tex}, // Take this from the raytracer for testing
+			{"water_displ_tex", r.water_displ},
 		});
 
 		{
@@ -120,6 +121,9 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			shader->set_uniform("damage_tiles_count", (float)r.damage_tiles.count);
 
 			shader->set_uniform("detail_draw_dist", detail_draw_dist);
+
+			shader->set_uniform("fog_col", r.fog.fog_col);
+			shader->set_uniform("fog_dens", r.fog.fog_dens * 0.001f);
 		}
 
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");
@@ -164,6 +168,9 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			draw_slices(shad_transparent, state_transparant, DT_TRANSPARENT, drawcount_transparent);
 		}
 	}
+
+	water_scrolling_t += g_window.input.real_dt * 0.01f;
+	water_scrolling_t = fmodf(water_scrolling_t, 1.0f);
 }
 
 } // namespace gl

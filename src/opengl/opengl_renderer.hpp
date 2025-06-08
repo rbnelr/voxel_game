@@ -238,8 +238,22 @@ public:
 	Texture2DArray	tile_textures	= {"tile_textures"};
 	Texture2D		gui_atlas		= {"gui_atlas"};
 	Texture2D		gradient		= {"gradient"};
+	Texture2D		water_displ		= {"water_displ"};
 
 	glDebugDraw		debug_draw = glDebugDraw(shaders);
+
+	struct Fog {
+		lrgb fog_col = lrgb(0.2f, 0.27f, 0.19f);
+		float fog_dens = 1.0f; // 1/1000
+
+		void imgui () {
+			if (!ImGui::TreeNode("fog")) return;
+			imgui_ColorEdit("fog_col", &fog_col);
+			ImGui::DragFloat("fog_dens", &fog_dens, 0.001f);
+			ImGui::TreePop();
+		}
+	};
+	Fog fog;
 
 	virtual bool get_vsync () {
 		return ctx.vsync;
@@ -316,6 +330,8 @@ public:
 
 			ImGui::TreePop();
 		}
+
+		fog.imgui();
 
 		raytracer.imgui(I, g);
 	}

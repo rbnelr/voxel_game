@@ -106,3 +106,12 @@ uniform sampler2DArray	textures_N;
 uniform sampler2DArray	textures2_A;
 uniform sampler2DArray	textures2_N;
 
+uniform vec3 fog_col = vec3(0.2, 0.27, 0.19);
+uniform float fog_dens = 0.01;
+
+vec3 calc_fog (vec3 pix_col, vec3 pos_cam) {
+	float dist = length(pos_cam);
+	float x = min(dist, 1000.0) * fog_dens;
+	float f = pow(2.0, -(x*x));
+	return mix(fog_col, pix_col, vec3(f));
+}

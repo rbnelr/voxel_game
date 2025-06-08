@@ -40,7 +40,7 @@
 		"disable_grass": true
 	},
 	"chunks": {
-		"load_radius": 450.0,
+		"load_radius": 600.0,
 		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
@@ -70,13 +70,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-45.10593032836914,
-				-8.640705108642578,
-				-104.89435577392578
+				-71.50970458984375,
+				9.41603946685791,
+				-99.34386444091797
 			],
 			"rot_aer": [
-				0.050446510314941406,
-				-0.6336424350738525,
+				2.6803972721099854,
+				0.01969126984477043,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -110,7 +110,7 @@
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
-		"graphics": true,
+		"graphics": false,
 		"world": true,
 		"chunks": true,
 		"entities": true

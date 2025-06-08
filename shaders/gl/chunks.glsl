@@ -16,6 +16,8 @@ layout(location = 0) vs2fs VS {
 } vs;
 
 uniform float detail_draw_dist = 256;
+uniform sampler2D water_displ_tex;
+uniform float water_scrolling_t = 0;
 
 #ifdef _VERTEX
 	layout(location = 0) in vec3	voxel_pos; // pos of voxel instance in chunk
@@ -46,6 +48,20 @@ uniform float detail_draw_dist = 256;
 		return clamp(floor(damage * damage_tiles_count), 0.0, damage_tiles_count) + damage_tiles_first;
 	}
 	
+	vec3 water_displ (vec2 pos_world) {
+		const float scale1 = 1.0 / 20;
+		const float scale2 = 1.0 / 45;
+		const vec2 dir1 = vec2(3,3);
+		const vec2 dir2 = vec2(-2,3);
+		float val1 = texture(water_displ_tex, pos_world * scale1 + dir1 * water_scrolling_t).r;
+		float val2 = texture(water_displ_tex, pos_world * scale2 + dir2 * water_scrolling_t).r;
+		//float x = val1 * 0.1;
+		//float y = val2 * 0.1;
+		float z = mix(val1, val2, .4) * -0.5;
+		
+		return vec3(0, 0, z);
+	}
+	
 	// returns [-1, 1)
 	vec3 rand_offset (ivec3 vertex_pos) {
 		srand(vertex_pos.x, vertex_pos.y, vertex_pos.z);
@@ -56,7 +72,8 @@ uniform float detail_draw_dist = 256;
 	int encode (uint bid) {
 		// don't nudge ever
 		if (bid == B_NULL      ) return 0;
-		if (bid == B_AIR       )  return 0;
+		if (bid == B_AIR       ) return 0;
+		if (bid == B_WATER     ) return 4;
 		if (bid == B_TORCH     ) return 0;
 		if (bid == B_TALLGRASS ) return 0;
 		if (bid == B_GLOWSHROOM) return 0;
@@ -73,7 +90,7 @@ uniform float detail_draw_dist = 256;
 		    cls == 1 && other_cls == 2) return false;
 		return true;
 	}
-	void test_vertex_displacement (vec3 vox_pos, inout vec3 vert_pos, inout vec3 dbg_col) {
+	void vertex_displacement (vec3 vox_pos, inout vec3 vert_pos, inout vec3 dbg_col) {
 		float dist = distance(vert_pos, view.lod_center);
 		float fade_dist = 32;
 		if (dist > detail_draw_dist + fade_dist) return;
@@ -83,7 +100,8 @@ uniform float detail_draw_dist = 256;
 		ivec3 vox_coord = ivec3(floor(vox_pos + vec3(0.5f, 0.5f, 0.5f))); // Why does this work?
 		ivec3 vert_coord = ivec3(round(vert_pos));
 		
-		int cls = encode(read_voxel(vox_coord));
+		uint bid = read_voxel(vox_coord);
+		int cls = encode(bid);
 		//if (cls == 0) dbg_col = vec3(1,0,0);
 		if (cls <= 0) return;
 		
@@ -111,7 +129,14 @@ uniform float detail_draw_dist = 256;
 		}
 		//dbg_col = vec3(d);
 		
-		vec3 offs = d * s*vec3(-0.2f) + rand_offset(vert_coord)*0.05f;
+		vec3 offs = vec3(0);
+		if (bid == B_WATER) {
+			offs += water_displ(vert_pos.xy);
+		}
+		else {
+			offs += d * s*vec3(-0.2f) + rand_offset(vert_coord)*0.05f;
+		}
+		
 		vert_pos += offs * fade;
 	}
 
@@ -126,7 +151,7 @@ uniform float detail_draw_dist = 256;
 		vec3 vert_pos_world = mesh_pos_model + vox_pos_world;
 		
 		vs.dbg_col = vec3(0);
-		test_vertex_displacement(vox_pos_world, vert_pos_world, vs.dbg_col);
+		vertex_displacement(vox_pos_world, vert_pos_world, vs.dbg_col);
 
 		gl_Position =		view.world_to_clip * vec4(vert_pos_world, 1);
 		vs.uvi =			vec3(uv, texid);
@@ -173,6 +198,8 @@ uniform float detail_draw_dist = 256;
 		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
 		
 		col.rgb *= sun*sun * (1.0 - amb) + amb;
+		
+		col.rgb = calc_fog(col.rgb, vs.pos_cam);
 		
 		col.rgb = col.rgb + vs.dbg_col;
 	

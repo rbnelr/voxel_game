@@ -74,6 +74,8 @@ struct ChunkRenderer {
 	bool _draw_chunks = true; // allow disabling for debugging
 
 	float detail_draw_dist = 200;
+
+	float water_scrolling_t = 0;
 	
 	void imgui (Chunks& chunks) {
 
