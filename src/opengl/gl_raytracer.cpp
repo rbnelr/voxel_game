@@ -250,7 +250,7 @@ namespace gl {
 		ZoneScoped;
 
 		// These are the base chunk positions of the GPU_WORLD_SIZE_CHUNKS cube of voxels in world space
-		int3 offset = roundi(game.chunk_loading_center()) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
+		int3 offset = roundi(game.lod_center()) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
 		int3 old_offset = voxtex_offset;
 		voxtex_offset = offset;
 		
@@ -299,9 +299,9 @@ namespace gl {
 				//	reupload_chunk(int3(x,y,z));
 				//}
 			
-				for (int x=0; x<GPU_WORLD_SIZE_CHUNKS; x++)
+				for (int z=0; z<GPU_WORLD_SIZE_CHUNKS; z++)
 				for (int y=0; y<GPU_WORLD_SIZE_CHUNKS; y++)
-				for (int z=0; z<GPU_WORLD_SIZE_CHUNKS; z++) {
+				for (int x=0; x<GPU_WORLD_SIZE_CHUNKS; x++) {
 					int3 world_pos = int3(x,y,z) + offset; // world position of all gpu chunks after shifting gpu world
 					int3 old_pos_rel = world_pos - old_offset; // world pos of chunk before movement 
 				
@@ -549,7 +549,7 @@ namespace gl {
 		if (!rt_forward->prog || !rt_lighting->prog || !rt_post0->prog || !rt_post1->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
 		
-		r.update_view(game.view, renderscale.size);
+		r.update_view(game.view, renderscale.size, game.lod_center());
 
 		{ // forward pass -> writes to gbuf
 			
@@ -686,7 +686,7 @@ namespace gl {
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			
-			r.update_view(game.view, r.render_size);
+			r.update_view(game.view, r.render_size, game.lod_center());
 
 			{ // vertical blur and exposure mapping
 				glUseProgram(rt_post1->prog);

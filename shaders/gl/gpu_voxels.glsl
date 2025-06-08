@@ -24,6 +24,7 @@
 #define SUBCHUNK_COUNT		(CHUNK_SIZE / SUBCHUNK_SIZE) // size of chunk in subchunks per axis
 
 
+#define B_NULL			0
 #define B_AIR			1
 #define B_WATER			3
 #define B_EARTH			4
@@ -64,7 +65,8 @@ float get_fake_alpha (uint bid) {
 
 // set by shader macro from engine code: WORLD_SIZE_CHUNKS  // number of chunks for fixed subchunk texture (for now)
 
-#define WORLD_SIZE			(WORLD_SIZE_CHUNKS * CHUNK_SIZE)
+#define WORLD_SIZE_CHUNKS_ 8
+#define WORLD_SIZE			(WORLD_SIZE_CHUNKS_ * CHUNK_SIZE)
 
 #define VOXTEX_SIZE			2048 // max width, height, depth of sparse voxel texture (subchunk voxels)
 #define VOXTEX_SIZE_SHIFT	11
@@ -79,6 +81,8 @@ float get_fake_alpha (uint bid) {
 #define VCT_COL_MAX 4.0
 #define VCT_UNPACK vec4(VCT_COL_MAX,VCT_COL_MAX,VCT_COL_MAX, 1.0)
 
+const int WORLD_SIZE_MASK = WORLD_SIZE-1;
+const float WORLD_SIZEf = float(WORLD_SIZE);
 
 uniform usampler3D voxel_tex;
 uniform isampler3D df_tex;
@@ -92,3 +96,7 @@ uniform sampler3D vct_texNZ;
 uniform sampler3D vct_texPZ;
 
 uniform vec3 voxtex_world_min;
+
+uint read_voxel (ivec3 coord_world) {
+	return texelFetch(voxel_tex, coord_world & WORLD_SIZE_MASK, 0).r;
+}

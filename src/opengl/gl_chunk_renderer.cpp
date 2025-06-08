@@ -106,7 +106,9 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 		r.state.set(state);
 		r.state.bind_textures(shader, {
-			{"tile_textures", r.tile_textures, r.pixelated_sampler}
+			{"tile_textures", r.tile_textures, r.pixelated_sampler},
+
+			{"voxel_tex", r.raytracer.voxel_tex.tex}, // Take this from the raytracer for testing
 		});
 
 		{
@@ -116,6 +118,8 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 			shader->set_uniform("damage_tiles_first", (float)r.damage_tiles.first);
 			shader->set_uniform("damage_tiles_count", (float)r.damage_tiles.count);
+
+			shader->set_uniform("detail_draw_dist", detail_draw_dist);
 		}
 
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");

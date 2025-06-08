@@ -49,7 +49,9 @@ struct ViewUniforms {
 	float4   cam_pos; // cam position
 	float4   cam_forw; // like frust_z but normalized to 1 world unit
 
-	void set (Camera_View const& view, float2 const& render_size) {
+	float4   lod_center;
+
+	void set (Camera_View const& view, float2 const& render_size, float3 lod_center) {
 		world_to_clip = view.cam_to_clip * (float4x4)view.world_to_cam;
 		world_to_cam = (float4x4)view.world_to_cam;
 		cam_to_clip = view.cam_to_clip;
@@ -76,6 +78,8 @@ struct ViewUniforms {
 			this->cam_pos = float4(cam_pos, 0);
 
 			this->cam_forw = float4(normalize(-cam_z), 0);
+
+			this->lod_center = float4(lod_center, 0);
 		}
 	}
 };
@@ -244,9 +248,9 @@ public:
 		ctx.set_vsync(state);
 	}
 	
-	void update_view (Camera_View const& view, int2 viewport_size) {
+	void update_view (Camera_View const& view, int2 viewport_size, float3 lod_center) {
 		memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
-		common_uniforms.view.set(view, (float2)viewport_size);
+		common_uniforms.view.set(view, (float2)viewport_size, lod_center);
 		upload_bind_ubo(common_uniforms_ubo, 0, &common_uniforms, sizeof(common_uniforms));
 			
 		glViewport(0,0, viewport_size.x, viewport_size.y);

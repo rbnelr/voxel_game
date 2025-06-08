@@ -338,7 +338,7 @@ void Chunks::update_chunk_loading (Game& game) {
 			bucket.push_back(chunk_pos);
 	};
 
-	float3 loading_center = game.chunk_loading_center();
+	float3 loading_center = game.lod_center();
 	{
 		ZoneScopedN("iterate chunk loading");
 		

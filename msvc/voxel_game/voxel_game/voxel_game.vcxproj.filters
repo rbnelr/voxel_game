@@ -392,6 +392,9 @@
     <Filter Include="opengl\glad">
       <UniqueIdentifier>{549d7535-531e-40de-9ffe-4bf1f67dcc2a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{ae1e71ba-6769-48f0-a0dc-b459911e0961}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\shaders.json" />

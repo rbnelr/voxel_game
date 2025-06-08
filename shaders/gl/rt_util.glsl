@@ -229,8 +229,6 @@ float get_px_size (float depth) {
 	return base_px_size / depth;
 }
 
-const int WORLD_SIZE_MASK = WORLD_SIZE-1;
-const float WORLD_SIZEf = float(WORLD_SIZE);
 const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
 const int CHUNK_MASK = ~63;
 const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 

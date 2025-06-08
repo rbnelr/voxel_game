@@ -67,7 +67,7 @@ struct View {
 	vec3 cam_pos; // cam position
 	vec3 cam_forw; // cam position
 	
-	vec2 cursor_pos; // mostly for debugging
+	vec3 lod_center;
 };
 
 #define FIXEDPOINT_FAC (1.0 / 256.0)

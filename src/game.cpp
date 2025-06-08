@@ -154,7 +154,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (open) flycam.imgui("flycam");
 			if (open) player.imgui("player");
 
-			if (open) ImGui::Checkbox("chunk_loading_follow_flycam", &chunk_loading_follow_flycam);
+			if (open) ImGui::Checkbox("lod_follow_flycam", &lod_follow_flycam);
 
 			if (open) ImGui::Separator();
 		}

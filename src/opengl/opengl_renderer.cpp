@@ -72,7 +72,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		if (raytracer.enable)
 			raytracer.draw(*this, game);
 		else
-			update_view(game.view, render_size);
+			update_view(game.view, render_size, game.lod_center());
 
 		//glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 

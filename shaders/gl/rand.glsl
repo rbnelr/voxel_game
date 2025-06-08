@@ -44,6 +44,9 @@ uint rand_state = 0;
 void srand (uint x, uint y, uint z) {
 	rand_state = wang_hash(wang_hash(wang_hash(x) ^ y) ^ z);
 }
+void srand (int x, int y, int z) {
+	srand(uint(x), uint(y), uint(z));
+}
 
 uint irand () {
 	rand_state = wang_hash(rand_state);

@@ -72,6 +72,8 @@ struct ChunkRenderer {
 	size_t draw_instances = 0;
 
 	bool _draw_chunks = true; // allow disabling for debugging
+
+	float detail_draw_dist = 200;
 	
 	void imgui (Chunks& chunks) {
 
@@ -110,7 +112,8 @@ struct ChunkRenderer {
 			print_bitset_allocator(chunks.slices.slots, CHUNK_SLICE_SIZE, ALLOC_SIZE);
 			ImGui::TreePop();
 		}
-
+		
+		ImGui::DragFloat("detail_draw_dist", &detail_draw_dist);
 	}
 
 	void upload_remeshed (Chunks& chunks);
