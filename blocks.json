@@ -99,6 +99,7 @@
 			//"mesh": "X-leaves",
 			"tex": [2,1],
 			"transparency": "alpha_test"
+			//"transparency": "alpha_test"
 		},
 
 		"torch": {

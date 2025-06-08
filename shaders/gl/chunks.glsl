@@ -4,7 +4,7 @@
 
 layout(location = 0) vs2fs VS {
 	vec3	uvi; // uv + tex_index
-	//vec3	normal_cam;
+	vec3	normal_world;
 	float	damage_tile; // -1 for no damage render
 } vs;
 
@@ -41,14 +41,14 @@ layout(location = 0) vs2fs VS {
 	void main () {
 		BlockMeshVertex v = block_meshes.vertices[meshid][gl_VertexID];
 		vec3 mesh_pos_model		= v.pos.xyz;
-		//vec3 mesh_norm_model	= v.normal.xyz;
+		vec3 mesh_norm_model	= v.normal.xyz;
 		vec2 uv					= v.uv.xy;
 		
 		vec3 vox_pos_world = voxel_pos * FIXEDPOINT_FAC + chunk_pos;
 
 		gl_Position =		view.world_to_clip * vec4(mesh_pos_model + vox_pos_world, 1);
 		vs.uvi =			vec3(uv, texid);
-		//vs.normal_cam =		mat3(view.world_to_cam) * mesh_norm_model;
+		vs.normal_world =	mesh_norm_model;
 		vs.damage_tile =	calc_damage_tile(vox_pos_world);
 	}
 #endif
@@ -74,8 +74,13 @@ layout(location = 0) vs2fs VS {
 			col.rgb *= 1.0 + vec3(dmg_tint);
 		}
 
-		//vec3 norm = normalize(vs.normal_cam); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
+		vec3 norm = normalize(vs.normal_world); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
 
+		float sun = max(dot(norm, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
+		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
+		
+		col.rgb *= sun*sun * (1.0 - amb) + amb;
+	
 	#ifdef _WIREFRAME
 		col = vec4(1.0);
 	#endif

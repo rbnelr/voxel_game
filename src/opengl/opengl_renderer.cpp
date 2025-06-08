@@ -403,7 +403,8 @@ bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
 
 	{
 		Image<srgba8> img;
-		if (!img.load_from_file("textures/atlas_no_alpha.png", &img)) // use non alpha version in raytracer, alpha version does not filter mips correctly
+		//if (!img.load_from_file("textures/atlas_no_alpha.png", &img)) // use non alpha version in raytracer, alpha version does not filter mips correctly
+		if (!img.load_from_file("textures/atlas.png", &img))
 			return false;
 
 		// place layers at y dir so ot make the memory contiguous
