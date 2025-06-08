@@ -108,10 +108,22 @@ uniform sampler2DArray	textures2_N;
 
 uniform vec3 fog_col = vec3(0.2, 0.27, 0.19);
 uniform float fog_dens = 0.01;
+uniform vec3 water_fog_col = vec3(0.02, 0.07, 0.1);
+uniform float water_fog_dens = 0.06;
+uniform float water_z = 0;
 
-vec3 calc_fog (vec3 pix_col, vec3 pos_cam) {
+vec3 calc_fog (vec3 pix_col, vec3 pos_cam, vec3 pos_world) {
+	// Incorrect HACK:
+	// Would have to compute ray from cam to water surface, then from surface to underwater ground and do fog computation split
+	// Simple volumetric raymarch would solve this and be really cool for a voxel game!
+	float water_t = clamp(map(pos_world.z, water_z+1.0, water_z), 0.0, 1.0);
+	
+	vec3 f_col = mix(fog_col, water_fog_col, vec3(water_t));
+	float dens = mix(fog_dens, water_fog_dens, water_t);
+	
 	float dist = length(pos_cam);
-	float x = min(dist, 1000.0) * fog_dens;
+	float x = min(dist, 1000.0) * dens;
 	float f = pow(2.0, -(x*x));
-	return mix(fog_col, pix_col, vec3(f));
+	
+	return mix(f_col, pix_col, vec3(f));
 }

@@ -4,16 +4,18 @@
 		"savefile": "../saves/test2",
 		"water_level": -123,
 		"base_depth": 3.0,
+		"large_noise_flatten": 3.0,
+		"small_noise_flatten": 2.0,
 		"large_noise": [
 			{
-				"period": 140.0,
+				"period": 120.0,
 				"strength": 1.5,
 				"cutoff": false,
 				"cutoff_val": 0.0,
 				"mode": 0
 			},
 			{
-				"period": 70.0,
+				"period": 50.0,
 				"strength": 1.0,
 				"cutoff": false,
 				"cutoff_val": 0.0,
@@ -40,7 +42,7 @@
 		"disable_grass": true
 	},
 	"chunks": {
-		"load_radius": 600.0,
+		"load_radius": 500.0,
 		"load_from_disk": false,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
@@ -70,13 +72,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-71.50970458984375,
-				9.41603946685791,
-				-99.34386444091797
+				-5.243186950683594,
+				-65.93907928466797,
+				-124.3868179321289
 			],
 			"rot_aer": [
-				2.6803972721099854,
-				0.01969126984477043,
+				-0.043193817138671875,
+				-0.3069756329059601,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -85,16 +87,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 13.784436225891113,
+		"base_speed": 25.722652435302734,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			-73.1352310180664,
-			1.1822203397750854,
-			-104.9999008178711
+			-54.768943786621094,
+			-81.68163299560547,
+			-108.9999008178711
 		],
 		"vel": [
 			0.0,
@@ -102,19 +104,20 @@
 			0.0
 		],
 		"rot_ae": [
-			0.1479792594909668,
-			-0.8651581406593323
+			-1.1348378658294678,
+			-0.07591921836137772
 		],
 		"third_person": false
 	},
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
-		"graphics": false,
+		"graphics": true,
 		"world": true,
 		"chunks": true,
 		"entities": true
 	},
+	"lod_follow_flycam": false,
 	"renderer_opengl": {
 		"chunk_renderer": {
 			"_draw_chunks": true
@@ -139,6 +142,20 @@
 			"draw_occluded": false,
 			"occluded_alpha": 0.30000001192092896,
 			"line_width": 2.0
+		},
+		"fog": {
+			"fog_col": [
+				0.20000001788139343,
+				0.2700001299381256,
+				0.1900000125169754
+			],
+			"fog_dens": 1.0,
+			"water_fog_col": [
+				0.017721718177199364,
+				0.05196954309940338,
+				0.07618537545204163
+			],
+			"water_fog_dens": 20.0
 		},
 		"imopen": {
 			"framebuffer": true,

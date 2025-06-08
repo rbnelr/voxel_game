@@ -121,9 +121,14 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			shader->set_uniform("damage_tiles_count", (float)r.damage_tiles.count);
 
 			shader->set_uniform("detail_draw_dist", detail_draw_dist);
+			
+			shader->set_uniform("water_scrolling_t", water_scrolling_t);
 
 			shader->set_uniform("fog_col", r.fog.fog_col);
 			shader->set_uniform("fog_dens", r.fog.fog_dens * 0.001f);
+			shader->set_uniform("water_fog_col", r.fog.water_fog_col);
+			shader->set_uniform("water_fog_dens", r.fog.water_fog_dens * 0.001f);
+			shader->set_uniform("water_z", (float)game.world_gen.water_level);
 		}
 
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");

@@ -186,7 +186,7 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, imopen)
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
@@ -243,13 +243,23 @@ public:
 	glDebugDraw		debug_draw = glDebugDraw(shaders);
 
 	struct Fog {
+		SERIALIZE(Fog, fog_col, fog_dens, water_fog_col, water_fog_dens)
+
 		lrgb fog_col = lrgb(0.2f, 0.27f, 0.19f);
 		float fog_dens = 1.0f; // 1/1000
+		
+		lrgb water_fog_col = lrgb(0.02f, 0.07f, 0.1f);
+		float water_fog_dens = 6.0f; // 1/1000
 
 		void imgui () {
 			if (!ImGui::TreeNode("fog")) return;
+
 			imgui_ColorEdit("fog_col", &fog_col);
 			ImGui::DragFloat("fog_dens", &fog_dens, 0.001f);
+
+			imgui_ColorEdit("water_fog_col", &water_fog_col);
+			ImGui::DragFloat("water_fog_dens", &water_fog_dens, 0.001f);
+
 			ImGui::TreePop();
 		}
 	};

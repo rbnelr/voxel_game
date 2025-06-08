@@ -7,7 +7,7 @@
 #include "assets.hpp"
 
 struct Game {
-#define SERIALIZE_NORMAL     world_gen, chunks, flycam, player, activate_flycam, imopen
+#define SERIALIZE_NORMAL     world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam
 
 	friend void to_json (nlohmann::ordered_json& j, const Game& t);
 	friend void from_json (const nlohmann::ordered_json& j, Game& t);
@@ -42,7 +42,7 @@ struct Game {
 	Camera_View player_view;
 	Camera_View view;
 
-	bool lod_follow_flycam = true;
+	bool lod_follow_flycam = false;
 	float3 lod_center () {
 		return lod_follow_flycam && activate_flycam ? flycam.cam.pos : player.pos;
 	}

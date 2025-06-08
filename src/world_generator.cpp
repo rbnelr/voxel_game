@@ -22,7 +22,7 @@ namespace worldgen {
 
 		float3 p = pos;
 		// make noise 'flatter' 0.7 to flatten world
-		p.z /= 0.7;
+		p.z *= wg->large_noise_flatten;
 
 		float seed = 0;
 		apply_noise_layers(depth, seed, p, wg->large_noise);
@@ -39,8 +39,10 @@ namespace worldgen {
 		
 		// small scale
 		float seed = (float)wg->large_noise.size();
-
-		apply_noise_layers(depth, seed, pos, wg->small_noise);
+		
+		float3 p = pos; // Only sue for noise layers
+		p.z *= wg->small_noise_flatten;
+		apply_noise_layers(depth, seed, p, wg->small_noise);
 
 		float modifer = noise01(pos / float3(1,1,3), 14, seed++);
 		

@@ -137,7 +137,9 @@ namespace worldgen {
 }
 
 struct WorldGenerator {
-	SERIALIZE(WorldGenerator, seed_str, savefile, water_level, base_depth, large_noise, small_noise, stalac_dens, disable_grass)
+	SERIALIZE(WorldGenerator, seed_str, savefile, water_level, base_depth,
+		large_noise_flatten, small_noise_flatten,
+		large_noise, small_noise, stalac_dens, disable_grass)
 	
 	//	max_depth, base_depth,
 	//	large_noise, small_noise,
@@ -187,6 +189,9 @@ struct WorldGenerator {
 		{ 20, 0.9f, true },
 	};
 
+	float large_noise_flatten = 2;
+	float small_noise_flatten = 2;
+
 	int water_level = -123;
 
 	bool stalac = true;
@@ -198,7 +203,7 @@ struct WorldGenerator {
 	float earth_overhang_stren = 0.55f;
 
 	float earth_depth = 5;
-	float rock_depth = 1;
+	float rock_depth = 7;
 
 	float tree_desity_period = 200;
 	float tree_density_amp = 1.5f;
@@ -241,6 +246,9 @@ struct WorldGenerator {
 		ImGui::DragFloat("base_depth", &base_depth, 0.1f);
 
 		ImGui::Spacing();
+
+		ImGui::DragFloat("large_noise_flatten", &large_noise_flatten, 0.1f);
+		ImGui::DragFloat("small_noise_flatten", &small_noise_flatten, 0.1f);
 
 		ImGui::Spacing();
 		imgui_noise_layers("large_noise", large_noise);

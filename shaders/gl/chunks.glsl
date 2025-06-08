@@ -7,6 +7,7 @@
 layout(location = 0) vs2fs VS {
 	vec3	uvi; // uv + tex_index
 	
+	vec3	pos_world;
 	vec3	pos_cam;
 	mat3	cam2world;
 	//vec3	normal_world;
@@ -156,6 +157,7 @@ uniform float water_scrolling_t = 0;
 		gl_Position =		view.world_to_clip * vec4(vert_pos_world, 1);
 		vs.uvi =			vec3(uv, texid);
 		
+		vs.pos_world =		vert_pos_world;
 		vs.pos_cam =		(view.world_to_cam * vec4(vert_pos_world, 1)).xyz;
 		vs.cam2world =		mat3(view.cam_to_world);
 		//vs.normal_world =	mesh_norm_model;
@@ -199,7 +201,7 @@ uniform float water_scrolling_t = 0;
 		
 		col.rgb *= sun*sun * (1.0 - amb) + amb;
 		
-		col.rgb = calc_fog(col.rgb, vs.pos_cam);
+		col.rgb = calc_fog(col.rgb, vs.pos_cam, vs.pos_world);
 		
 		col.rgb = col.rgb + vs.dbg_col;
 	
