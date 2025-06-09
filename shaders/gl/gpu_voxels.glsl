@@ -48,6 +48,7 @@
 #define B_CRYSTAL6		26
 #define B_GLOWSHROOM	27
 
+// TODO: turn into texture to eliminate cost of this function?
 float get_emmisive (uint bid) {
 	if (      bid == B_MAGMA      ) return 4.0*  0.4; // 7
 	else if ( bid == B_CRYSTAL || (bid >= B_CRYSTAL2 && bid <= B_CRYSTAL6) ) return 4.0*  1.0;

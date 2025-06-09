@@ -14,6 +14,8 @@ layout(location = 0) vs2fs VS {
 	
 	float	damage_tile; // -1 for no damage render
 	vec3	dbg_col;
+	
+	flat uint bid;
 } vs;
 
 uniform float detail_draw_dist = 256;
@@ -101,8 +103,8 @@ uniform float water_scrolling_t = 0;
 		ivec3 vox_coord = ivec3(floor(vox_pos + vec3(0.5f, 0.5f, 0.5f))); // Why does this work?
 		ivec3 vert_coord = ivec3(round(vert_pos));
 		
-		uint bid = read_voxel(vox_coord);
-		int cls = encode(bid);
+		vs.bid = read_voxel(vox_coord);
+		int cls = encode(vs.bid);
 		//if (cls == 0) dbg_col = vec3(1,0,0);
 		if (cls <= 0) return;
 		
@@ -131,7 +133,7 @@ uniform float water_scrolling_t = 0;
 		//dbg_col = vec3(d);
 		
 		vec3 offs = vec3(0);
-		if (bid == B_WATER) {
+		if (vs.bid == B_WATER) {
 			offs += water_displ(vert_pos.xy);
 		}
 		else {
@@ -196,10 +198,10 @@ uniform float water_scrolling_t = 0;
 
 		//vec3 norm = normalize(vs.normal_world); // shouldn't be needed since I don't use geometry with curved geometry, but just in case
 
-		float sun = max(dot(norm, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
 		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
-		
-		col.rgb *= sun*sun * (1.0 - amb) + amb;
+		float sun = max(dot(norm, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
+		col.rgb *= sun*sun*sun*sun * (1.0 - amb) + amb;
+		col.rgb += col.rgb * get_emmisive(vs.bid)*2;
 		
 		col.rgb = calc_fog(col.rgb, vs.pos_cam, vs.pos_world);
 		
