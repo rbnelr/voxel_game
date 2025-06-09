@@ -593,6 +593,7 @@ namespace gl {
 		struct Conedev {
 			bool draw_cones=false, draw_boxes=false;
 			float start_dist = 0.16f;
+			bool refresh = true;
 	
 			struct Set {
 				int count = 8;
@@ -608,17 +609,9 @@ namespace gl {
 				{ 4, 38.9f, 45.0f, 40.2f, 1.0f },
 			};
 
-			bool vct_conedev (Game& game, Raytracer& rt) {
+			bool imgui () {
 				if (!ImGui::TreeNodeEx("vct_conedev")) return false;
-
-				lrgba cols[] = {
-					{1,0,0,1},
-					{0,1,0,1},
-					{0,0,1,1},
-					{1,1,0,1},
-					{1,0,1,1},
-					{0,1,1,1},
-				};
+				refresh = true;
 
 				ImGui::Checkbox("draw cones", &draw_cones);
 				ImGui::SameLine();
@@ -628,10 +621,6 @@ namespace gl {
 				int set_count = (int)sets.size();
 				ImGui::DragInt("sets", &set_count, 0.01f);
 				sets.resize(set_count);
-
-				rt.cone_data.count = 0;
-
-				float total_weight = 0;
 
 				bool count_changed = false;
 
@@ -649,7 +638,32 @@ namespace gl {
 
 						ImGui::TreePop();
 					}
+				}
 
+				ImGui::TreePop();
+				return count_changed;
+			}
+			// NOTE: kinda broken after I refactored it! Need to debug to get debug drawing working again
+			bool vct_conedev (Game& game, Raytracer& rt) {
+				bool count_changed = imgui();
+				if (!refresh) return false;
+				refresh = false;
+
+				lrgba cols[] = {
+					{1,0,0,1},
+					{0,1,0,1},
+					{0,0,1,1},
+					{1,1,0,1},
+					{1,0,1,1},
+					{0,1,1,1},
+				};
+
+				rt.cone_data.count = 0;
+
+				float total_weight = 0;
+
+				int j=0;
+				for (auto& s : sets) {
 					float ang = deg(s.cone_ang);
 
 					for (int i=0; i<s.count; ++i) {
@@ -691,7 +705,6 @@ namespace gl {
 					}
 				}
 
-				ImGui::TreePop();
 				return count_changed;
 			}
 		};

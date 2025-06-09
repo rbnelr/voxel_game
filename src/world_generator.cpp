@@ -483,7 +483,7 @@ namespace worldgen {
 					if (chunks.blue_noise_tex.sample(wx,wy,wz) < tree_density) {
 						place_tree(x,y,z, rand1, rand2);
 					}
-					else if (chunks.blue_noise_tex.sample(wx+17,wy-13,wz+3) < (grass_density * 0.05f)) {
+					else if (chunks.blue_noise_tex.sample(wx+17,wy-13,wz+3) < (grass_density * 0.02f)) {
 						write_block(x,y,z, B_GLOWSHROOM);
 					}
 					else if (!wg->disable_grass && chance(rand, (double)grass_density)) {

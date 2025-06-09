@@ -180,6 +180,7 @@ uniform float water_scrolling_t = 0;
 	//layout(location = 1) out vec4 frag_normal;
 	void main () {
 		vec4 col = texture(tile_textures, vs.uvi);
+		//col = vec4(1);
 
 	#if ALPHA_TEST && !defined(_WIREFRAME)
 		if (col.a <= ALPHA_TEST_THRES / 255.0)

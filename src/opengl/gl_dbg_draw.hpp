@@ -129,7 +129,7 @@ struct glDebugDraw {
 		set_overrides(state);
 		draw_func();
 
-		if (wireframe_solid) {
+		if (wireframe && wireframe_solid) {
 			_wireframe_pass = 1;
 			set_overrides(state);
 
