@@ -196,7 +196,7 @@ struct WorldGenerator {
 
 	bool stalac = true;
 	float stalac_dens = 0.2f;
-	
+
 	bool disable_grass = false;
 
 	float ground_ang = 0.55f;

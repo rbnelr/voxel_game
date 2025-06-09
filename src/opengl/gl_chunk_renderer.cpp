@@ -101,9 +101,9 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 
 	auto draw_slices = [&] (Shader* shader, PipelineState& state, DrawType type, int& drawcount) {
 		if (!shader) return;
-
+		
 		glUseProgram(shader->prog);
-
+		r.debug_draw.wireframe_able_shader(shader);
 		r.state.set(state);
 		r.state.bind_textures(shader, {
 			{"tile_textures", r.tile_textures, r.pixelated_sampler},

@@ -7,6 +7,10 @@
 #define vs2fs in
 #endif
 
+#ifdef _WIREFRAME
+uniform bool _WIREFRAME_PASS = false;
+#endif
+
 float map (float x, float a, float b) {
 	return (x - a) / (b - a);
 }
@@ -116,7 +120,7 @@ vec3 calc_fog (vec3 pix_col, vec3 pos_cam, vec3 pos_world) {
 	// Incorrect HACK:
 	// Would have to compute ray from cam to water surface, then from surface to underwater ground and do fog computation split
 	// Simple volumetric raymarch would solve this and be really cool for a voxel game!
-	float water_t = clamp(map(pos_world.z, water_z+1.0, water_z), 0.0, 1.0);
+	float water_t = clamp(map(pos_world.z, water_z-0.5, water_z-1.5), 0.0, 1.0);
 	
 	vec3 f_col = mix(fog_col, water_fog_col, vec3(water_t));
 	float dens = mix(fog_dens, water_fog_dens, water_t);

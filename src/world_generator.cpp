@@ -441,7 +441,8 @@ namespace worldgen {
 				auto place_stalac = [&] (int x, int y, int z, float rand1, float rand2) {
 					//if (wx > -5) return; // for vct dev
 
-					float scale = lerp(0.4f, 2.5f, rand1);
+					float scale = lerp(0.4f, 2.5f, abs(rand1));
+					//scale = scale*scale*scale*scale * 2.0f;
 
 					int variation = clamp(floori(rand2 * 6), 0,5);
 					static constexpr BlockID BIDS[] = { B_CRYSTAL, B_CRYSTAL2, B_CRYSTAL3, B_CRYSTAL4, B_CRYSTAL5, B_CRYSTAL6 };
@@ -488,21 +489,21 @@ namespace worldgen {
 					else if (!wg->disable_grass && chance(rand, (double)grass_density)) {
 						write_block(x,y,z, B_TALLGRASS);
 					}
-					else if (!wg->disable_grass && chance(rand, 0.003)) {
+					else if (!wg->disable_grass && chance(rand, 0.003f)) {
 						write_block(x,y,z, B_TORCH);
 					}
 				}
 
 
-				if (above == wg->bids[B_STONE] && wg->stalac) {
+				if (above == wg->bids[B_STONE]) {
 
 					// get a 'random' but deterministic value based on block position and face
 					uint64_t h = hash(int3(wx*6 +BF_BOTTOM, wy,wz), wg->seed);
 
 					float rand1 = (float)(h & 0xffffffff) * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
 					float rand2 = (float)(h >> 32)        * (1.0f / (float)(uint32_t)-1); // uniform in [0, 1]
-
-					if (chunks.blue_noise_tex.sample(wx,wy,wz) < wg->stalac_dens * 0.001f) {
+					
+					if (wg->stalac && chunks.blue_noise_tex.sample(wx,wy,wz) < wg->stalac_dens * 0.001f) {
 						place_stalac(x,y,z, rand1, rand2);
 					}
 				}

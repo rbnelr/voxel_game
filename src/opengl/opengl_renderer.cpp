@@ -44,11 +44,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("set state defaults");
 
-		state.override_poly = debug_draw.wireframe;
-		state.override_cull = debug_draw.wireframe && debug_draw.wireframe_backfaces;
-		state.override_state.poly_mode = POLY_LINE;
-		state.override_state.culling = false;
-
+		debug_draw.set_overrides(state);
 		state.set_default();
 	}
 
@@ -81,8 +77,11 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		if (game.player.selected_block)
 			block_highl.draw(*this, game.player.selected_block);
 
-		if (!raytracer.enable)
-			chunk_renderer.draw_chunks(*this, game);
+		debug_draw.draw_wireframe_able(state, [&] () {
+			if (!raytracer.enable) {
+				chunk_renderer.draw_chunks(*this, game);
+			}
+		});
 
 		debug_draw.draw(*this);
 

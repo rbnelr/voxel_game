@@ -206,7 +206,7 @@ uniform float water_scrolling_t = 0;
 		col.rgb = col.rgb + vs.dbg_col;
 	
 	#ifdef _WIREFRAME
-		//col = vec4(1.0);
+		if (_WIREFRAME_PASS) col.rgb = vec3(0);
 	#endif
 		frag_col = col;
 		//frag_normal = vec4(norm.xyz, 1.0); // alpha 1 incase blending happens to never blend normals

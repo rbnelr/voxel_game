@@ -103,17 +103,63 @@ struct glDebugDraw {
 	bool draw_occluded = false;
 	float occluded_alpha = 0.3f;
 
-	bool  wireframe = false;
-	bool  wireframe_backfaces = true;
-	float line_width = 1.0f;
-
 	bool update_indirect = false;
 	bool accum_indirect = false;
 	bool _clear_indirect = false;
 
+	
+	bool  wireframe = false;
+	bool  wireframe_solid = true;
+	bool  wireframe_backfaces = true;
+	float line_width = 1.0f;
+
+	int  _wireframe_pass;
+
+	void set_overrides (StateManager& state) {
+		state.override_poly = wireframe && (!wireframe_solid || _wireframe_pass > 0);
+		state.override_cull = wireframe && wireframe_backfaces;
+
+		state.override_state.poly_mode = POLY_LINE;
+		state.override_state.culling = false;
+	}
+
+	template <typename FUNC>
+	void draw_wireframe_able (StateManager& state, FUNC draw_func) {
+		_wireframe_pass = 0;
+		set_overrides(state);
+		draw_func();
+
+		if (wireframe_solid) {
+			_wireframe_pass = 1;
+			set_overrides(state);
+
+			glEnable(GL_POLYGON_OFFSET_LINE);
+			glPolygonOffset(0.0f, 2.0f);
+
+			draw_func();
+
+			glDisable(GL_POLYGON_OFFSET_LINE);
+		}
+
+		set_overrides(state);
+	}
+	void wireframe_able_shader (Shader* shader) {
+		if (wireframe) {
+			bool val = false;
+			if (wireframe_solid) {
+				val = _wireframe_pass > 0; // draw normal first, then wireframe on top
+			}
+			else {
+				val = true; // normal wireframe
+			}
+			shader->set_uniform("_WIREFRAME_PASS", val);
+		}
+	}
+
 	void imgui () {
 		ImGui::Checkbox("wireframe", &wireframe);
 		ImGui::SameLine();
+		ImGui::Checkbox("solid", &wireframe_solid);
 		ImGui::Checkbox("backfaces", &wireframe_backfaces);
 
 		ImGui::SliderFloat("line_width", &line_width, 1.0f, 8.0f);
