@@ -127,6 +127,7 @@ struct DebugDraw {
 	}
 
 	void point (float3 const& pos, float3 const& size, lrgba const& col);
+	void line (float3 const& a, float3 const& b, lrgba const& col);
 	void vector (float3 const& pos, float3 const& dir, lrgba const& col);
 
 	void wire_cube (float3 const& pos, float3 const& size, lrgba const& col);

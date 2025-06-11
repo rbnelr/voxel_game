@@ -1,7 +1,7 @@
 {
 	"world_gen": {
 		"seed_str": "test4",
-		"savefile": "../saves/test2",
+		"savefile": "../saves/test",
 		"water_level": -123,
 		"base_depth": 3.0,
 		"large_noise_flatten": 3.0,
@@ -38,12 +38,12 @@
 				"mode": 0
 			}
 		],
-		"stalac_dens": 0.10000000149011612,
-		"disable_grass": true
+		"stalac_dens": 0.30000001192092896,
+		"disable_grass": false
 	},
 	"chunks": {
-		"load_radius": 500.0,
-		"load_from_disk": false,
+		"load_radius": 250.0,
+		"load_from_disk": true,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
 		"visualize_chunks": false,
@@ -54,31 +54,31 @@
 			"open": false,
 			"brush_block": "earth",
 			"brush_mode": 1,
-			"brush_size": 1.0,
+			"brush_size": 2.0,
 			"brush_repeat": true,
 			"brush_ray_max_dist": 50.0,
 			"brush_plane": [
-				0.0,
-				0.0,
-				-92.5
+				-75.0,
+				-39.5,
+				-117.0
 			],
 			"brush_plane_normal": [
 				0.0,
-				0.0,
-				1.0
+				-1.0,
+				0.0
 			]
 		}
 	},
 	"flycam": {
 		"cam": {
 			"pos": [
-				-86.9709243774414,
-				-45.57442092895508,
-				-107.81236267089844
+				-41.590091705322266,
+				-75.29756927490234,
+				-102.2236099243164
 			],
 			"rot_aer": [
-				-1.5786378383636475,
-				-0.05505438148975372,
+				0.02251458168029785,
+				0.20240536332130432,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -87,16 +87,16 @@
 			"vfov": 1.384182333946228,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 25.722652435302734,
+		"base_speed": 3.215336799621582,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			-54.768943786621094,
-			-81.68163299560547,
-			-108.9999008178711
+			-83.77863311767578,
+			-49.808990478515625,
+			-114.9999008178711
 		],
 		"vel": [
 			0.0,
@@ -104,8 +104,8 @@
 			0.0
 		],
 		"rot_ae": [
-			-1.1348378658294678,
-			-0.07591921836137772
+			1.887380838394165,
+			-0.8407208323478699
 		],
 		"third_person": false
 	},
@@ -117,7 +117,7 @@
 		"chunks": true,
 		"entities": true
 	},
-	"lod_follow_flycam": false,
+	"lod_follow_flycam": true,
 	"renderer_opengl": {
 		"chunk_renderer": {
 			"_draw_chunks": true
@@ -145,9 +145,9 @@
 		},
 		"fog": {
 			"fog_col": [
-				0.20000001788139343,
-				0.2700001299381256,
-				0.1900000125169754
+				0.27365490794181824,
+				0.40856215357780457,
+				0.24617241322994232
 			],
 			"fog_dens": 1.0,
 			"water_fog_col": [
@@ -157,9 +157,20 @@
 			],
 			"water_fog_dens": 20.0
 		},
+		"rc_testing": {
+			"base_pos": [
+				-75,
+				-40,
+				-117
+			],
+			"size": [
+				100,
+				53
+			]
+		},
 		"imopen": {
 			"framebuffer": true,
-			"debugdraw": true,
+			"debugdraw": false,
 			"gui": false
 		}
 	}

@@ -214,6 +214,9 @@
     <ClInclude Include="..\..\..\src\opengl\gl_dbg_draw.hpp">
       <Filter>opengl</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp">
+      <Filter>opengl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -352,6 +355,9 @@
       <Filter>opengl</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp">
+      <Filter>opengl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
   </ItemGroup>

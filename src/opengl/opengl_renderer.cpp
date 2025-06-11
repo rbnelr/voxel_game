@@ -40,6 +40,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	chunk_renderer.upload_remeshed(game.chunks);
 	raytracer.update(*this, game, I);
 
+
 	glLineWidth(debug_draw.line_width);
 	{
 		OGL_TRACE("set state defaults");
@@ -82,6 +83,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 				chunk_renderer.draw_chunks(*this, game);
 			}
 		});
+
+		rc_testing.update(game, *this);
 
 		debug_draw.draw(*this);
 

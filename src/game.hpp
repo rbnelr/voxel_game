@@ -42,7 +42,7 @@ struct Game {
 	Camera_View player_view;
 	Camera_View view;
 
-	bool lod_follow_flycam = false;
+	bool lod_follow_flycam = true;
 	float3 lod_center () {
 		return lod_follow_flycam && activate_flycam ? flycam.cam.pos : player.pos;
 	}

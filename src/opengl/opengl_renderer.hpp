@@ -9,6 +9,7 @@
 #include "gl_dbg_draw.hpp"
 #include "bloom.hpp"
 #include "engine/input.hpp"
+#include "opengl/radiance_cascades.hpp"
 
 namespace gl {
 
@@ -186,7 +187,7 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc_testing, imopen)
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
@@ -265,6 +266,8 @@ public:
 	};
 	Fog fog;
 
+	RadianceCascadesTesting rc_testing = RadianceCascadesTesting(*this);
+
 	virtual bool get_vsync () {
 		return ctx.vsync;
 	}
@@ -326,6 +329,9 @@ public:
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
 	virtual void graphics_imgui (Input& I, Game& g) {
+		ImGui::Checkbox("rc_testing", &rc_testing.imopen);
+		rc_testing.imgui();
+
 		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
 			debug_draw.imgui();
 

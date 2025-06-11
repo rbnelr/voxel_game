@@ -2,6 +2,13 @@
 #include "debug_draw.hpp"
 #include "camera.hpp"
 
+void DebugDraw::line (float3 const& a, float3 const& b, lrgba const& col) {
+	auto* out = push_back(lines, 2);
+
+	*out++ = { a, col };
+	*out++ = { b, col };
+}
+
 void DebugDraw::vector (float3 const& pos, float3 const& dir, lrgba const& col) {
 	auto* out = push_back(lines, 2);
 

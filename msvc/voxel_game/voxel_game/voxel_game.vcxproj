@@ -249,6 +249,7 @@
     <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp" />
     <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp" />
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />
@@ -394,6 +395,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
     <ClCompile Include="..\..\..\src\physics.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
