@@ -8,6 +8,7 @@ namespace gl {
 TexturedQuadDrawer::TexturedQuadDrawer (OpenglRenderer& r) {
 	shad = r.shaders.compile("debug_texture");
 	shad_2dArray = r.shaders.compile("debug_texture", {{"TEX_ARRAY","1"}});
+	shad_3d = r.shaders.compile("debug_texture", {{"TEX3D","1"}});
 
 	GenericVertex verts[] = {
 		{ float3(0,0,0), float3(0,0,1), float2(0,0), lrgba(1) },
@@ -72,6 +73,8 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			trace_shad->set_uniform("spacing", spacing);
 			trace_shad->set_uniform("interval", interval);
 			trace_shad->set_uniform("num_probes", num_probes);
+			trace_shad->set_uniform("scale_factor", sqrtf((float)base_rays));
+			trace_shad->set_uniform("branching_factor", (float)base_rays);
 
 		
 			auto& tex = cascade_texs[casc];

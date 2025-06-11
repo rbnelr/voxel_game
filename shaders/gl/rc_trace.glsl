@@ -1,23 +1,23 @@
 #version 460 core
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(rgba16f, binding = 4) restrict uniform image2DArray out_tex;
+layout(rgba16f, binding = 4) restrict uniform image3D out_tex;
 
 #include "common.glsl"
 #include "gpu_voxels.glsl"
+
+uniform ivec3 dispatch_size;
 
 uniform ivec3 world_base_pos;
 uniform ivec2 world_size;
 uniform int num_rays;
 uniform float spacing;
 uniform vec2 interval;
-uniform ivec3 dispatch_size;
+uniform float scale_factor;
+uniform float branching_factor;
 
 uniform bool has_higher_cascade;
-uniform sampler2DArray higher_cascade;
-
-const int scale_factor = 2;
-const int branching_factor = 4;
+uniform sampler3D higher_cascade;
 
 vec4 sample_vox (vec2 local_pos) {
 	ivec2 vox_pos = ivec2(floor(local_pos));
@@ -41,14 +41,16 @@ vec4 avgerage_higher_cascade_rays (vec2 probe_pos, int ray_idx) {
 	
 	float hi_spacing = spacing * scale_factor;
 	vec2 hi_probe_coord = probe_pos / hi_spacing - 0.5;
-	int hi_rays = ray_idx * branching_factor;
+	float hi_rays = float(ray_idx) * branching_factor;
+	
+	vec3 texsz = 1.0 / textureSize(higher_cascade, 0);
 	
 	vec4 col = vec4(0);
-	for (float ray=float(hi_rays); ray < float(hi_rays + branching_factor); ray++) {
-		vec2 uv = hi_probe_coord / vec2(textureSize(higher_cascade, 0).xy);
-		col += texture(higher_cascade, vec3(uv, ray), 0);
+	for (float ray=hi_rays; ray < hi_rays + branching_factor; ray++) {
+		vec3 uv = (vec3(hi_probe_coord, float(ray)) + 0.5) * texsz;
+		col += texture(higher_cascade, uv, 0);
 	}
-	return col / float(branching_factor);
+	return col / branching_factor;
 }
 
 void main () {
@@ -58,12 +60,15 @@ void main () {
 	ivec2 probe_coord = invocID.xy;
 	int ray_idx = invocID.z;
 	
-	// probes with spacing 1 are on voxel centers, spacing two on center of every second voxel
+	// spacing 1: 0.5, 1.5, 2.5, so voxel centers
+	// spacing 2: 1.0, 3.0, 5.0, so between voxels
 	vec2 probe_pos = spacing * (vec2(probe_coord) + 0.5);
+	// counter-clockwise rays, first cascade X pattern, next subdivided like standard layout
 	float angle_step = 2.0*PI / float(num_rays);
 	float ang = (float(ray_idx) + 0.5) * angle_step;
 	vec2 dir = vec2(cos(ang), sin(ang));
 	
+	// start exactly where previous raymarching left off
 	float cur_dist = interval.x;
 	
 	vec4 col = vec4(0);
@@ -71,10 +76,10 @@ void main () {
 		if (cur_dist > interval.y) break;
 		vec2 cur_pos = probe_pos + cur_dist * dir;
 		if (out_of_bounds(cur_pos)) break;
-		
+		// sample nearest voxel, this might cause aliasing
 		vec4 vox_col = sample_vox(cur_pos);
 		col = vox_col;
-		if (col.a > 0.9) break;
+		if (col.a > 0.9) break; // arbitrary cutoff, note that colors are raw voxel texture alphas, no interpolation
 		
 		cur_dist += min(spacing, 1);
 	}
