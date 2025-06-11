@@ -18,10 +18,33 @@ layout(location = 0) vs2fs VS {
 #endif
 
 #ifdef _FRAGMENT
-	uniform sampler2D tex;
-
 	out vec4 frag_col;
+#ifdef TEX_ARRAY
+	uniform sampler2DArray tex;
+	uniform int arr_idx = -1;
+	uniform int grid_width = -1;
+	void main () {
+		vec2 uv = vs.uv;
+		int idx = arr_idx;
+		
+		if (arr_idx < 0) {
+			// show all array textures as a grid
+			int count = textureSize(tex, 0).z;
+			int w = grid_width > 0 ? grid_width : int(sqrt(float(count)));
+			int h = (count + w-1) / w;
+			
+			uv *= vec2(ivec2(w,h));
+			ivec2 coord = ivec2(uv);
+			uv -= vec2(coord);
+			idx = coord.x + coord.y * w;
+		}
+		// else show requested array index
+		frag_col = texture(tex, vec3(uv, float(idx)));
+	}
+#else
+	uniform sampler2D tex;
 	void main () {
 		frag_col = texture(tex, vs.uv);
 	}
+#endif
 #endif

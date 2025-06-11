@@ -1,7 +1,7 @@
 #version 460 core
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
-layout(rgba16f, binding = 4) restrict uniform image2D out_tex;
+layout(rgba16f, binding = 4) restrict uniform image2DArray out_tex;
 
 #include "common.glsl"
 #include "gpu_voxels.glsl"
@@ -11,13 +11,10 @@ uniform ivec2 world_size;
 uniform int num_rays;
 uniform float spacing;
 uniform vec2 interval;
-uniform ivec2 num_probes;
-uniform ivec2 ray_regions;
+uniform ivec3 dispatch_size;
 
-uniform ivec2 dispatch_size;
-
-uniform float higher_cascade_spacing;
-uniform sampler2D higher_cascade;
+uniform bool has_higher_cascade;
+uniform sampler2DArray higher_cascade;
 
 const int scale_factor = 2;
 const int branching_factor = 4;
@@ -42,32 +39,24 @@ bool out_of_bounds (vec2 local_pos) {
 
 vec4 avgerage_higher_cascade_rays (vec2 probe_pos, int ray_idx) {
 	
-	float higher_spacing = spacing * scale_factor;
-	vec2 higher_probe_coord = probe_pos / higher_spacing - 0.5;
-	
-	int higher_rays = ray_idx * branching_factor;
-	ivec2 higher_num_probes = num_probes / 2;
-	ivec2 higher_ray_regions = ray_regions * 2;
+	float hi_spacing = spacing * scale_factor;
+	vec2 hi_probe_coord = probe_pos / hi_spacing - 0.5;
+	int hi_rays = ray_idx * branching_factor;
 	
 	vec4 col = vec4(0);
-	for (int ray=higher_rays; ray < higher_rays+branching_factor; ray++) {
-		ivec2 ray_region = ivec2(ray % higher_ray_regions.x,
-		                         ray / higher_ray_regions.y);
-		vec2 uv = higher_probe_coord + ray_region * higher_num_probes;
-		uv /= vec2(textureSize(higher_cascade, 0));
-		col += texture(higher_cascade, uv, 0);
+	for (float ray=float(hi_rays); ray < float(hi_rays + branching_factor); ray++) {
+		vec2 uv = hi_probe_coord / vec2(textureSize(higher_cascade, 0).xy);
+		col += texture(higher_cascade, vec3(uv, ray), 0);
 	}
 	return col / float(branching_factor);
 }
 
 void main () {
-	ivec2 invocIdx = ivec2(gl_GlobalInvocationID.xy);
-	if (invocIdx.x >= dispatch_size.x || invocIdx.y >= dispatch_size.y)
-		return;
-		
-	ivec2 _ray = invocIdx / num_probes;
-	ivec2 probe_coord = invocIdx % num_probes;
-	int ray_idx = _ray.x + ray_regions.x * _ray.y;
+	ivec3 invocID = ivec3(gl_GlobalInvocationID);
+	if (any(greaterThan(invocID, dispatch_size))) return;
+	
+	ivec2 probe_coord = invocID.xy;
+	int ray_idx = invocID.z;
 	
 	// probes with spacing 1 are on voxel centers, spacing two on center of every second voxel
 	vec2 probe_pos = spacing * (vec2(probe_coord) + 0.5);
@@ -92,10 +81,10 @@ void main () {
 	
 	vec4 total_col = col;
 	
-	if (higher_cascade_spacing > 0.0f && total_col.a < 0.999) {
+	if (has_higher_cascade && total_col.a < 0.999) {
 		vec4 far_col = avgerage_higher_cascade_rays(probe_pos, ray_idx);
 		total_col = mix(far_col, total_col, total_col.a);
 	}
 	
-	imageStore(out_tex, invocIdx, total_col);
+	imageStore(out_tex, invocID, total_col);
 }

@@ -13,7 +13,7 @@ struct ComputeTexture {
 	int2 size;
 
 	ComputeTexture () {}
-	ComputeTexture (std::string_view label, int2 const& size): tex{label} {
+	ComputeTexture (std::string_view label, int2 size): tex{label} {
 		this->size = size;
 
 		glTextureStorage2D(tex, 1, GL_RGBA16F, size.x,size.y);
@@ -24,8 +24,26 @@ struct ComputeTexture {
 		glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
 	}
 };
+struct ComputeTextureArray {
+	Texture2DArray tex;
+	int3 size;
+
+	ComputeTextureArray () {}
+	ComputeTextureArray (std::string_view label, int2 size, int array_count): tex{label} {
+		this->size = int3(size, array_count);
+
+		glTextureStorage3D(tex, 1, GL_RGBA16F, size.x,size.y, array_count);
+		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+
+		lrgba col = srgba(0,0,0,0);
+		glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
+	}
+};
+
 struct TexturedQuadDrawer {
 	gl::Shader* shad;
+	gl::Shader* shad_2dArray;
 	IndexedMesh quad;
 
 	Sampler sampl = {"sampl"};
@@ -48,6 +66,23 @@ struct TexturedQuadDrawer {
 		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
 		glBindVertexArray(0);
 	}
+	void draw (StateManager& state, float3 pos, float3 size, Texture2DArray& tex, int arr_idx=-1, int grid_width=-1, bool nearest=false) {
+		glUseProgram(shad_2dArray->prog);
+		PipelineState s;
+		state.set(s);
+		state.bind_textures(shad_2dArray, {
+			{"tex", tex, nearest ? sampl_nearest : sampl},
+		});
+
+		auto obj2world = translate(pos) * rotate3_X(deg(90)) * scale(size);
+		shad_2dArray->set_uniform("obj2world", (float4x4)obj2world);
+		shad_2dArray->set_uniform("arr_idx", arr_idx);
+		shad_2dArray->set_uniform("grid_width", grid_width);
+
+		glBindVertexArray(quad.ib.vao);
+		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
+		glBindVertexArray(0);
+	}
 };
 
 class RadianceCascadesTesting {
@@ -65,6 +100,7 @@ public:
 	float base_interval = 3;
 
 	int show_cascade = -1;
+	int show_ray = -1;
 
 	int get_num_rays (int casc) { return (int)powf((float)base_rays, (float)casc+1); }
 	float get_spacing (int casc) { return base_spacing * (int)powf(sqrtf((float)base_rays), (float)casc); }
@@ -78,21 +114,13 @@ public:
 	int2 get_num_probes (float spacing) {
 		return ceili((float2)size / spacing);
 	}
-	int2 get_ray_regions (int casc) {
-		int num = get_num_rays(casc);
-		int w = (int)sqrtf((float)num);
-		int h = (num + w-1) / w;
-		return int2(w,h);
-	}
 
 	bool recreate = true;
 	
 	gl::Shader* trace_shad;
 	gl::Shader* combine_shad;
 
-	static constexpr int2 GROUP_SZ = int2(8,8);
-
-	std::unique_ptr<ComputeTexture[]> cascade_texs;
+	std::unique_ptr<ComputeTextureArray[]> cascade_texs;
 	ComputeTexture result_tex;
 
 	TexturedQuadDrawer tex_draw;
@@ -111,19 +139,19 @@ public:
 			ImGui::DragFloat("base_interval", &base_interval, 0.1f, 1, 16);
 
 			ImGui::SliderInt("show_cascade", &show_cascade, -1, cascades-1);
+			ImGui::SliderInt("show_ray", &show_ray, -1, get_num_rays(max(show_cascade, 0))-1);
 		}
 		ImGui::End();
 	}
 
 	void do_recreate () {
-		cascade_texs = std::make_unique<ComputeTexture[]>(cascades);
+		cascade_texs = std::make_unique<ComputeTextureArray[]>(cascades);
 		for (int casc=0; casc<cascades; casc++) {
 
 			int2 probes = get_num_probes(get_spacing(casc));
-			int2 rays = get_ray_regions(casc);
-			int2 tex_res = probes * rays;
+			int rays = get_num_rays(casc);
 
-			cascade_texs[casc] = ComputeTexture("RCtex", tex_res);
+			cascade_texs[casc] = ComputeTextureArray("RCtex", probes, rays);
 		}
 
 		result_tex = ComputeTexture("RCtex", get_num_probes(get_spacing(0)));
