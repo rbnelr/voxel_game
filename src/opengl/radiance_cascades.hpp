@@ -19,6 +19,10 @@ struct ComputeTexture {
 		glTextureStorage2D(tex, 1, GL_RGBA16F, size.x,size.y);
 		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 		lrgba col = srgba(0,0,0,0);
 		glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
@@ -36,6 +40,10 @@ struct ComputeTextureArray {
 		glTextureStorage3D(tex, 1, GL_RGBA16F, size.x,size.y, array_count);
 		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
 		lrgba col = srgba(0,0,0,0);
@@ -116,7 +124,7 @@ public:
 
 	int cascades = 7;
 	float base_spacing = 0.125f;
-	int base_rays = 4;
+	int base_rays = 4; // = branching_factor  ->  sqrt(base_rays) = scale_factor
 	float base_interval_mul = 1;
 
 	int show_cascade = -1;
@@ -165,6 +173,19 @@ public:
 			int num_rays = get_num_rays(max(show_cascade, 0));
 			//_show_ray_ang = (float(show_ray) + 0.5) / (float)num_rays * deg(360);
 			show_ray = roundi(_show_ray_ang * (float)num_rays / deg(360) - 0.5f);
+
+			if (show_cascade < 0)
+				ImGui::Text("Showing Result (Average light from all directions at %.3f m res)", base_spacing);
+			else {
+				auto spacing = get_spacing(show_cascade);
+				auto probes = get_num_probes(spacing);
+				auto rays = get_num_rays(show_cascade);
+				ImGui::Text("Showing Cascade #%d", show_cascade);
+				ImGui::Text("%dx%d Probes at %.3f spacing", probes.x, probes.y, spacing);
+				ImGui::Text("%d Rays per Probe, Ray spacing: %.3f deg", rays, 360.0f / (float)rays);
+				ImGui::Text("Ray interval %.1f to %.1f m", get_interval(show_cascade).x, get_interval(show_cascade).y);
+				ImGui::Text("Rays stored and traced in Cascade: %d", probes.x * probes.y * rays);
+			}
 		}
 		ImGui::End();
 	}

@@ -64,7 +64,6 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			int num_rays = get_num_rays(casc);
 			float spacing = get_spacing(casc);
 			float2 interval = get_interval(casc);
-			int2 num_probes = get_num_probes(spacing);
 		
 			trace_shad->set_uniform("has_higher_cascade", has_higher_cascade);
 			trace_shad->set_uniform("world_base_pos", base_pos);
@@ -72,7 +71,6 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			trace_shad->set_uniform("num_rays", num_rays);
 			trace_shad->set_uniform("spacing", spacing);
 			trace_shad->set_uniform("interval", interval);
-			trace_shad->set_uniform("num_probes", num_probes);
 			trace_shad->set_uniform("scale_factor", sqrtf((float)base_rays));
 			trace_shad->set_uniform("branching_factor", (float)base_rays);
 

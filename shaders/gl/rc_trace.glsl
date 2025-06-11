@@ -20,6 +20,7 @@ uniform bool has_higher_cascade;
 uniform sampler3D higher_cascade;
 
 vec4 sample_vox (vec2 local_pos) {
+#if 1
 	ivec2 vox_pos = ivec2(floor(local_pos));
 	ivec3 world_pos = world_base_pos + ivec3(vox_pos.x, 0, vox_pos.y);
 	
@@ -31,6 +32,8 @@ vec4 sample_vox (vec2 local_pos) {
 	col.rgb *= get_emmisive(bid);
 	
 	return col;
+#else
+#endif
 }
 bool out_of_bounds (vec2 local_pos) {
 	ivec2 p = ivec2(floor(local_pos));
@@ -45,9 +48,11 @@ vec4 avgerage_higher_cascade_rays (vec2 probe_pos, int ray_idx) {
 	
 	vec3 texsz = 1.0 / textureSize(higher_cascade, 0);
 	
+	// While it is kind of obvious in this version, I don't pre-average
+	// since my understanding is that if you store all rays, you can later evaluate hemispheres for 3d surface lighting or even attempt to extract specular light
 	vec4 col = vec4(0);
 	for (float ray=hi_rays; ray < hi_rays + branching_factor; ray++) {
-		vec3 uv = (vec3(hi_probe_coord, float(ray)) + 0.5) * texsz;
+		vec3 uv = (vec3(hi_probe_coord, ray) + 0.5) * texsz;
 		col += texture(higher_cascade, uv, 0);
 	}
 	return col / branching_factor;
@@ -69,7 +74,7 @@ void main () {
 	vec2 dir = vec2(cos(ang), sin(ang));
 	
 	// start exactly where previous raymarching left off
-	float cur_dist = interval.x;
+	float cur_dist = max(interval.x - spacing*0.5, 0.0);
 	
 	vec4 col = vec4(0);
 	for (int i=0; i<1000; i++) {
