@@ -114,6 +114,7 @@ void main () {
 	GET_VISUALIZE_COST(col.rgb);
 	
 	imageStore(img_col, pxpos, col);
+	return;
 #else
 	
 	Gbuf gbuf;

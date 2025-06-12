@@ -115,7 +115,7 @@ struct TexturedQuadDrawer {
 
 class RadianceCascadesTesting {
 public:
-	SERIALIZE(RadianceCascadesTesting, base_pos, size)
+	SERIALIZE(RadianceCascadesTesting, imopen, base_pos, size)
 
 	bool imopen = true;
 

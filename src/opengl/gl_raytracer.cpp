@@ -44,6 +44,10 @@ namespace gl {
 			rt_lighting->macros = get_macros();
 			rt_lighting->recompile("macro_change", false);
 		}
+		if (macro_change && rt_lightingVCT) {
+			rt_lightingVCT->macros = get_macros() + MacroDefinition{"VCT","1"};
+			rt_lightingVCT->recompile("macro_change", false);
+		}
 		if (macro_change && rt_post0) {
 			rt_post0->macros = get_post_macros(0);
 			rt_post0->recompile("macro_change", false);
@@ -526,7 +530,8 @@ namespace gl {
 
 		shad->set_uniform("visualize_mult", visualize_mult);
 
-		shad->set_uniform("show_light", lighting.show_light);
+		// HACK: when blurring light (rather than final image) for denoising vct_dbg_primary is harder to make work
+		shad->set_uniform("show_light", lighting.show_light || lighting.vct_dbg_primary);
 		shad->set_uniform("show_normals", lighting.show_normals);
 
 		shad->set_uniform("bounce_max_dist", lighting.bounce_max_dist);
