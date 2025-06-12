@@ -19,7 +19,15 @@ uniform float branching_factor;
 uniform bool has_higher_cascade;
 uniform sampler3D higher_cascade;
 
-vec4 sample_vox (vec2 local_pos) {
+// Expensive! This exact stuff is already cached by VCT texture!
+vec4 voxel_col_lookup (ivec3 world_pos) {
+	uint bid = read_voxel(world_pos);
+	float texid = float(block_tiles[bid].sides[1]);
+	vec4 col = bid <= B_AIR ? vec4(0) : textureLod(tile_textures, vec3(0.5,0.5, texid), 99.0).rgba;
+	col.rgb *= get_emmisive(bid);
+	return col;
+}
+vec4 sample_scene (vec2 local_pos) {
 #if 1
 	ivec2 vox_pos = ivec2(floor(local_pos));
 	ivec3 world_pos = world_base_pos + ivec3(vox_pos.x, 0, vox_pos.y);
@@ -33,6 +41,20 @@ vec4 sample_vox (vec2 local_pos) {
 	
 	return col;
 #else
+	// Bilinear voxel emiss + alpha lookup
+	// I thought this would improve artefacting, but it causes rays starting close to a voxel and going away from it to still get some alpha
+	// This (at least partially) causes even more artefacting
+	vec2 _floored = floor(local_pos - 0.5);
+	vec2 t = local_pos - 0.5 - _floored;
+	
+	ivec3 world_pos = world_base_pos + ivec3(int(_floored.x), 0, int(_floored.y));
+	
+	vec4 col00 = voxel_col_lookup(world_pos);
+	vec4 col01 = voxel_col_lookup(world_pos + ivec3(1, 0, 0));
+	vec4 col10 = voxel_col_lookup(world_pos + ivec3(0, 0, 1));
+	vec4 col11 = voxel_col_lookup(world_pos + ivec3(1, 0, 1));
+	
+	return mix(mix(col00, col01, t.x), mix(col10, col11, t.x), t.y);
 #endif
 }
 bool out_of_bounds (vec2 local_pos) {
@@ -74,27 +96,28 @@ void main () {
 	vec2 dir = vec2(cos(ang), sin(ang));
 	
 	// start exactly where previous raymarching left off
-	float cur_dist = max(interval.x - spacing*0.5, 0.0);
+	// fudge a little, try to combat halo
+	float cur_dist = max(interval.x - spacing*0.25, 0.0);
 	
 	vec4 col = vec4(0);
 	for (int i=0; i<1000; i++) {
 		if (cur_dist > interval.y) break;
 		vec2 cur_pos = probe_pos + cur_dist * dir;
 		if (out_of_bounds(cur_pos)) break;
-		// sample nearest voxel, this might cause aliasing
-		vec4 vox_col = sample_vox(cur_pos);
-		col = vox_col;
-		if (col.a > 0.9) break; // arbitrary cutoff, note that colors are raw voxel texture alphas, no interpolation
 		
-		cur_dist += min(spacing, 1);
+		vec4 vox_col = sample_scene(cur_pos);
+		if (vox_col.a > 0.5) {
+			col = vec4(vox_col.rgb, 1.0);
+			break; // arbitrary cutoff, note that colors are raw voxel texture alphas, no interpolation
+		}
+		
+		cur_dist += min(spacing, 0.5); // helps with aliasing
 	}
 	
-	vec4 total_col = col;
-	
-	if (has_higher_cascade && total_col.a < 0.999) {
+	if (has_higher_cascade && col.a < 0.999) {
 		vec4 far_col = avgerage_higher_cascade_rays(probe_pos, ray_idx);
-		total_col = mix(far_col, total_col, total_col.a);
+		col = mix(far_col, col, col.a);
 	}
 	
-	imageStore(out_tex, invocID, total_col);
+	imageStore(out_tex, invocID, col);
 }

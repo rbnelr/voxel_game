@@ -35,6 +35,7 @@ RadianceCascadesTesting::RadianceCascadesTesting (OpenglRenderer& r): tex_draw{r
 }
 
 void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
+	if (!imopen) return;
 	if (recreate) do_recreate();
 	recreate = false;
 	

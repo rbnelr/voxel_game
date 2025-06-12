@@ -62,8 +62,8 @@ layout(rgba32f, binding = 0) writeonly restrict uniform image2D img_col;
 uniform int rand_seed_time = 0;
 uniform ivec2 framebuf_size;
 
-uniform bool show_light = false;
-uniform bool show_normals = false;
+//uniform bool show_light = false;
+//uniform bool show_normals = false;
 
 uniform float bounce_max_dist = 90.0;
 uniform int bounce_max_count = 3;
@@ -129,9 +129,6 @@ void main () {
 	}
 	#endif
 	
-	if (show_light) gbuf.col.rgb = vec3(1.0);
-	if (show_normals) gbuf.col.rgb = gbuf.normal * 0.5 + 0.5;
-	
 	// approx linear px per voxel (per m) for this rendered surface
 	//float lod_px = get_px_size(gbuf.depth);
 	
@@ -181,15 +178,9 @@ void main () {
 			}
 		}
 		
-		vec4 col;
-		col.rgb = gbuf.col.rgb * light + gbuf.emiss;
-		col.a = gbuf.col.a;
+		GET_VISUALIZE_COST(light);
 		
-		if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
-		
-		GET_VISUALIZE_COST(col.rgb);
-		
-		imageStore(img_col, pxpos, col);
+		imageStore(img_col, pxpos, vec4(light, 1.0));
 	}
 	
 #endif
@@ -213,8 +204,6 @@ void main () {
 	
 	Gbuf gbuf;
 	bool did_hit = read_gbuf(pxpos, gbuf);
-	
-	if (show_light) gbuf.col.rgb = vec3(1.0);
 	
 	vec4 col = vec4(0.0);
 	
@@ -264,24 +253,19 @@ void main () {
 	
 	light = APPLY_TAA(light, gbuf.pos, gbuf.normal, pxpos, gbuf.faceid);
 	
-	col.rgb = gbuf.col.rgb * light + gbuf.emiss;
-	col.a   = gbuf.col.a;
 	#else
+	vec3 light = vec3(0.0);
 	if (did_hit) {
 		float sun = max(dot(gbuf.normal, normalize(vec3(1, 1.8, 4.0))) * 0.5 + 0.5, 0.0);
 		const vec3 amb = vec3(0.1,0.1,0.3) * 0.4;
 		
-		gbuf.col.rgb *= sun*sun * (1.0 - amb) + amb;
-		
-		col = gbuf.col;
+		light = sun*sun * (1.0 - amb) + amb;
 	}
 	#endif
 	
-	if (show_normals) col.rgb = gbuf.normal * 0.5 + 0.5;
+	GET_VISUALIZE_COST(light);
 	
-	//GET_VISUALIZE_COST(col.rgb);
-	
-	imageStore(img_col, pxpos, col);
+	imageStore(img_col, pxpos, vec4(light, 1.0));
 }
 #endif
 	

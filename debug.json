@@ -51,10 +51,10 @@
 		"visualize_radius": false,
 		"debug_frustrum_culling": false,
 		"edits": {
-			"open": false,
+			"open": true,
 			"brush_block": "earth",
 			"brush_mode": 1,
-			"brush_size": 4.550000190734863,
+			"brush_size": 1.0,
 			"brush_repeat": true,
 			"brush_ray_max_dist": 50.0,
 			"brush_plane": [
@@ -77,7 +77,7 @@
 				-99.98077392578125
 			],
 			"rot_aer": [
-				0.06680512428283691,
+				0.06403684616088867,
 				0.01629648357629776,
 				0.0
 			],
@@ -123,7 +123,7 @@
 			"_draw_chunks": true
 		},
 		"raytracer": {
-			"enable": false,
+			"enable": true,
 			"max_iterations": 380,
 			"taa": {
 				"enable": true,

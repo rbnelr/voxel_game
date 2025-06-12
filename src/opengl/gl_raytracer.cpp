@@ -677,7 +677,7 @@ namespace gl {
 
 				r.state.bind_textures(rt_post0, {
 					{"gbuf_faceid", gbuf.faceid },
-					{"input_tex", framebuf0.col, framebuf0.sampler},
+					{"light", framebuf0.col, framebuf0.sampler},
 				});
 
 				glBindVertexArray(r.dummy_vao);
@@ -697,7 +697,9 @@ namespace gl {
 
 				r.state.bind_textures(rt_post1, {
 					{"gbuf_faceid", gbuf.faceid },
-					{"input_tex", framebuf1.col, framebuf1.sampler},
+					{"light", framebuf1.col, framebuf1.sampler},
+					{"gbuf_col", gbuf.col},
+					{"gbuf_norm", gbuf.norm},
 				});
 
 				glBindVertexArray(r.dummy_vao);

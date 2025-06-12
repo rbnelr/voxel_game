@@ -157,6 +157,7 @@ public:
 	RadianceCascadesTesting (OpenglRenderer& r);
 
 	void imgui () {
+		if (!imopen) return;
 		if (ImGui::Begin("RadianceCascadesTesting", &imopen)) {
 
 			ImGui::DragInt3("base_pos", &base_pos.x, 0.1f);
@@ -197,10 +198,10 @@ public:
 			int2 probes = get_num_probes(get_spacing(casc));
 			int rays = get_num_rays(casc);
 
-			cascade_texs[casc] = ComputeTextureArray("RCtex", probes, rays);
+			cascade_texs[casc] = ComputeTextureArray("RCtex", max(probes, 1), clamp(rays, 1, 32*1024));
 		}
 
-		result_tex = ComputeTexture("RCtex", get_num_probes(get_spacing(0)));
+		result_tex = ComputeTexture("RCtex", max(get_num_probes(get_spacing(0)), 1));
 	}
 	void update (Game& game, OpenglRenderer& r);
 };
