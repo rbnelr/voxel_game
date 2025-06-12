@@ -489,9 +489,9 @@ namespace worldgen {
 					else if (!wg->disable_grass && chance(rand, (double)grass_density)) {
 						write_block(x,y,z, B_TALLGRASS);
 					}
-					else if (!wg->disable_grass && chance(rand, 0.003f)) {
-						write_block(x,y,z, B_TORCH);
-					}
+					//else if (!wg->disable_grass && chance(rand, 0.003f)) {
+					//	write_block(x,y,z, B_TORCH);
+					//}
 				}
 
 

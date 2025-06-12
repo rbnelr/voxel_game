@@ -51,7 +51,7 @@
 		"visualize_radius": false,
 		"debug_frustrum_culling": false,
 		"edits": {
-			"open": true,
+			"open": false,
 			"brush_block": "earth",
 			"brush_mode": 1,
 			"brush_size": 1.0,
@@ -77,8 +77,8 @@
 				-99.98077392578125
 			],
 			"rot_aer": [
-				0.06403684616088867,
-				0.01629648357629776,
+				-0.041161537170410156,
+				0.019064847379922867,
 				0.0
 			],
 			"mode": "PERSPECTIVE",

@@ -872,12 +872,27 @@ struct MacroDefinition {
 	std::string value;
 };
 
+struct MacroDefs {
+	std::vector<MacroDefinition> vec;
+
+	MacroDefs () {}
+	MacroDefs (std::initializer_list<MacroDefinition> vec): vec{vec} {}
+	MacroDefs (std::vector<MacroDefinition> const& vec): vec{vec} {}
+	MacroDefs (std::vector<MacroDefinition>&& vec): vec{vec} {}
+
+	MacroDefs operator+ (MacroDefinition const& r) {
+		auto copy = *this;
+		copy.vec.push_back(r);
+		return copy;
+	}
+};
+
 struct Shader {
 	std::string						name;
 	std::string						dbgname;
 
 	std::vector<ShaderStage>		stages;
-	std::vector<MacroDefinition>	macros;
+	MacroDefs						macros;
 
 	uniform_set						uniforms;
 	std::vector<std::string>		src_files;
@@ -921,7 +936,7 @@ struct Shader {
 			macro_text += prints("#define %s\n", SHADER_STAGE_MACRO[stage]);
 			if (wireframe)
 				macro_text += prints("#define _WIREFRAME\n");
-			for (auto& m : macros)
+			for (auto& m : macros.vec)
 				macro_text += prints("#define %s %s\n", m.name.c_str(), m.value.c_str());
 			macro_text += "\n";
 			std::string stage_source = preprocessor_insert_macro_defs(source, filename.c_str(), macro_text);
@@ -1099,9 +1114,9 @@ struct Shaders {
 		}
 	}
 
-	Shader* compile (
+	inline Shader* compile (
 		char const* name, char const* dbgname,
-		std::vector<MacroDefinition>&& macros,
+		MacroDefs&& macros = {},
 		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
 		ZoneScoped;
 
@@ -1118,26 +1133,11 @@ struct Shaders {
 		return ptr;
 	}
 
-	Shader* compile (
+	inline Shader* compile (
 		char const* name,
-		std::vector<MacroDefinition>&& macros,
+		MacroDefs&& macros = {},
 		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
 		return compile(name, name, std::move(macros), stages);
-	}
-
-	Shader* compile (
-		char const* name,
-		std::initializer_list<MacroDefinition> macros = {},
-		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
-		return compile(name, name, std::move(macros), stages);
-	}
-
-	// optional dbgname version to differentiate same-filename-different-macro shaders in debugger
-	Shader* compile (
-		char const* filename, char const* dbgname,
-		std::initializer_list<MacroDefinition> macros = {},
-		std::initializer_list<ShaderStage> stages = { VERTEX_SHADER, FRAGMENT_SHADER }) {
-		return compile(filename, dbgname, std::vector<MacroDefinition>(macros), stages);
 	}
 };
 

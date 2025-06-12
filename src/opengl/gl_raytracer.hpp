@@ -352,12 +352,13 @@ namespace gl {
 		void visualize_sparse (OpenglRenderer& r);
 		void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
 	};
-	
+
 	struct Raytracer {
 		SERIALIZE(Raytracer, enable, max_iterations, taa, lighting)
 		
 		Shader* rt_forward   = nullptr;
 		Shader* rt_lighting  = nullptr;
+		Shader* rt_lightingVCT = nullptr;
 		Shader* rt_post0     = nullptr;
 		Shader* rt_post1     = nullptr;
 		
@@ -383,19 +384,19 @@ namespace gl {
 		OGL_TIMER_HISTOGRAM(rt_post);
 		OGL_TIMER_HISTOGRAM(df_init);
 
-		std::vector<gl::MacroDefinition> get_macros () {
-			return { {"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
-			         {"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
-			         {"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
-			         {"WG_CONES", prints("%d", cone_data.count)},
-			         {"TAA_ENABLE", taa.enable ? "1":"0"},
-			         {"BEVEL", lighting.bevel ? "1":"0"},
-			         {"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
-			         {"VCT", lighting.vct ? "1":"0"},
-			         {"VCT_DBG_PRIMARY", lighting.vct_dbg_primary ? "1":"0"},
-			         {"VISUALIZE_COST", visualize_cost ? "1":"0"},
-			         {"VISUALIZE_TIME", visualize_time ? "1":"0"}
-			};
+		gl::MacroDefs get_macros () {
+			return gl::MacroDefs{{
+				{"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)},
+				{"WG_PIXELS_X", prints("%d", rt_groupsz.size.x)},
+				{"WG_PIXELS_Y", prints("%d", rt_groupsz.size.y)},
+				{"WG_CONES", prints("%d", cone_data.count)},
+				{"TAA_ENABLE", taa.enable ? "1":"0"},
+				{"BEVEL", lighting.bevel ? "1":"0"},
+				{"BOUNCE_ENABLE", lighting.bounce_enable ? "1":"0"},
+				{"VCT_DBG_PRIMARY", lighting.vct_dbg_primary ? "1":"0"},
+				{"VISUALIZE_COST", visualize_cost ? "1":"0"},
+				{"VISUALIZE_TIME", visualize_time ? "1":"0"}
+			}};
 		}
 		std::vector<gl::MacroDefinition> get_post_macros (int pass) {
 			return { {"PASS", prints("%d", pass)} };
@@ -509,7 +510,7 @@ namespace gl {
 				
 				ImGui::Separator();
 
-				macro_change |= ImGui::Checkbox("Vct [V]", &vct);
+				ImGui::Checkbox("Vct [V]", &vct);
 				macro_change |= ImGui::Checkbox("vct_dbg_primary", &vct_dbg_primary);
 				
 				ImGui::SliderFloat("vct_primary_cone_width", &vct_primary_cone_width, 0.0005f, 0.2f);

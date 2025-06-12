@@ -25,13 +25,14 @@ namespace gl {
 
 		if (I.buttons[KEY_V].went_down) {
 			lighting.vct = !lighting.vct;
-			macro_change = true;
 		}
 
 		// lazy init these (instead of doing it in ctor) to allow json changes to affect the macros
 		// this would not be needed in a sane programming language (reflection support)
 		if (!rt_forward ) rt_forward  = r.shaders.compile("rt_forward",  get_macros(), {{ COMPUTE_SHADER }});
 		if (!rt_lighting) rt_lighting = r.shaders.compile("rt_lighting", get_macros(), {{ COMPUTE_SHADER }});
+		if (!rt_lightingVCT) rt_lightingVCT = r.shaders.compile("rt_lighting",
+			get_macros() + MacroDefinition{"VCT","1"}, {{ COMPUTE_SHADER }});
 		if (!rt_post0   ) rt_post0    = r.shaders.compile("rt_post", get_post_macros(0));
 		if (!rt_post1   ) rt_post1    = r.shaders.compile("rt_post", get_post_macros(1));
 
@@ -595,10 +596,12 @@ namespace gl {
 			ZoneScopedN("rt_lighting");
 			OGL_TRACE("rt_lighting");
 			OGL_TIMER_ZONE(timer_rt_lighting.timer);
+
+			auto& shad = lighting.vct ? rt_lightingVCT : rt_lighting;
 		
-			glUseProgram(rt_lighting->prog);
+			glUseProgram(shad->prog);
 		
-			set_uniforms(r, game, rt_lighting);
+			set_uniforms(r, game, shad);
 		
 			glBindImageTexture(0, framebuf0.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		
@@ -609,8 +612,8 @@ namespace gl {
 			GLuint cur_posage  = taa.posage[taa.cur];
 		
 			if (taa.enable) {
-				rt_lighting->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
-				rt_lighting->set_uniform("taa_max_age", taa.max_age);
+				shad->set_uniform("prev_world2clip", taa.prev_world2clip); // invalid on first frame, should be ok since history age = 0
+				shad->set_uniform("taa_max_age", taa.max_age);
 		
 				glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
 				glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI);
@@ -619,7 +622,7 @@ namespace gl {
 				taa.cur ^= 1;
 			}
 		
-			r.state.bind_textures(rt_lighting, {
+			r.state.bind_textures(shad, {
 				{"voxel_tex", voxel_tex.tex},
 				{"df_tex", df_tex.tex},
 				
