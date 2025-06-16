@@ -126,7 +126,7 @@ public:
 	int cascades = 7;
 	float base_spacing = 0.125f;
 	int base_rays = 4; // = branching_factor  ->  sqrt(base_rays) = scale_factor
-	float base_interval_mul = 1;
+	float base_interval_mul = sqrtf(2.0f);
 
 	int show_cascade = -1;
 	int show_ray = -1;

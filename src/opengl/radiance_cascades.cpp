@@ -119,7 +119,7 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			//}
 		}
 
-		g_debugdraw.point((float3)base_pos + float3(_dbg_pos.x, 0.9f, _dbg_pos.y), 0.1f, lrgba(1,1,1,0.5f));
+		//g_debugdraw.point((float3)base_pos + float3(_dbg_pos.x, 0.9f, _dbg_pos.y), 0.1f, lrgba(1,1,1,0.5f));
 	}
 	
 	if (combine_shad->prog) {

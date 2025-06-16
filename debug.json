@@ -169,9 +169,9 @@
 				53
 			],
 			"cascades": 6,
-			"base_spacing": 0.15000000596046448,
+			"base_spacing": 0.10000000149011612,
 			"base_rays": 4,
-			"base_interval_mul": 1.0,
+			"base_interval_mul": 1.4142135381698608,
 			"_dbg_pos": [
 				7.5,
 				13.600000381469727
