@@ -81,17 +81,18 @@ uniform float water_scrolling_t = 0;
 		if (bid == B_TALLGRASS ) return 0;
 		if (bid == B_GLOWSHROOM) return 0;
 		
-		if (bid == B_TREE_LOG ) return 2;
+		//if (bid == B_TREE_LOG ) return 2;
 		if (bid == B_LEAVES   ) return 3;
 		
 		return 1; // normal connection to each other
 	}
-	bool nudge (uint bid, int other_cls) {
+	// Do we want to 'connect' to the block?
+	bool conn (uint bid, int other_cls) {
 		uint cls = encode(bid);
-		if (cls == other_cls) return false;
-		if (cls == 2 && other_cls == 1 ||
-		    cls == 1 && other_cls == 2) return false;
-		return true;
+		if (cls == other_cls) return true;
+		//if (cls == 2 && other_cls == 1 ||
+		//    cls == 1 && other_cls == 2) return true; // this does not do anything, goal was to connect tree to earth but nothing else, but could implement using class pair LUT
+		return false;
 	}
 	void vertex_displacement (vec3 vox_pos, inout vec3 vert_pos, inout vec3 dbg_col) {
 		float dist = distance(vert_pos, view.lod_center);
@@ -108,27 +109,31 @@ uniform float water_scrolling_t = 0;
 		//if (cls == 0) dbg_col = vec3(1,0,0);
 		if (cls <= 0) return;
 		
+		float jitter_scale = 0.05;
+		float smooth_scale = 0.2;
+		
 		ivec3 s = mix(ivec3(-1), ivec3(+1), greaterThan(vert_coord, vox_coord));
 		
-		bool v100 = nudge(read_voxel(vox_coord + ivec3(s.x,  0,  0)), cls);
-		bool v010 = nudge(read_voxel(vox_coord + ivec3(  0,s.y,  0)), cls);
-		bool v110 = nudge(read_voxel(vox_coord + ivec3(s.x,s.y,  0)), cls);
-		bool v001 = nudge(read_voxel(vox_coord + ivec3(  0,  0,s.z)), cls);
-		bool v101 = nudge(read_voxel(vox_coord + ivec3(s.x,  0,s.z)), cls);
-		bool v011 = nudge(read_voxel(vox_coord + ivec3(  0,s.y,s.z)), cls);
-		bool v111 = nudge(read_voxel(vox_coord + ivec3(s.x,s.y,s.z)), cls);
+		// are 7 neightbour blocks of vertex 'connected'?
+		bool c100 = conn(read_voxel(vox_coord + ivec3(s.x,  0,  0)), cls);
+		bool c010 = conn(read_voxel(vox_coord + ivec3(  0,s.y,  0)), cls);
+		bool c110 = conn(read_voxel(vox_coord + ivec3(s.x,s.y,  0)), cls);
+		bool c001 = conn(read_voxel(vox_coord + ivec3(  0,  0,s.z)), cls);
+		bool c101 = conn(read_voxel(vox_coord + ivec3(s.x,  0,s.z)), cls);
+		bool c011 = conn(read_voxel(vox_coord + ivec3(  0,s.y,s.z)), cls);
+		bool c111 = conn(read_voxel(vox_coord + ivec3(s.x,s.y,s.z)), cls);
 		
-		int count = int(v100) + int(v010) + int(v110) +
-		            int(v001) + int(v101) + int(v011) + int(v111);
+		int count = int(c100) + int(c010) + int(c110) +
+		            int(c001) + int(c101) + int(c011) + int(c111);
 		
 		vec3 d = vec3(0);
-		if (count == 7) {
+		if (count == 0) { // corner, move in
 			d = vec3(1,1,1);
 		}
-		else if (count == 6) {
-			if      (!v100) d = vec3(0,1,1);
-			else if (!v010) d = vec3(1,0,1);
-			else if (!v001) d = vec3(1,1,0);
+		else if (count == 1) { // edge, move perpendicular to edge axis
+			if      (c100) d = vec3(0,1,1);
+			else if (c010) d = vec3(1,0,1);
+			else if (c001) d = vec3(1,1,0);
 		}
 		//dbg_col = vec3(d);
 		
@@ -137,7 +142,22 @@ uniform float water_scrolling_t = 0;
 			offs += water_displ(vert_pos.xy);
 		}
 		else {
-			offs += d * s*vec3(-0.2f) + rand_offset(vert_coord)*0.05f;
+			if (vs.bid == B_LEAVES) {
+				// common leaves pattern
+				vec3 axis_mask;
+				if      (meshid < 2) axis_mask = d * vec3(0,1,1);
+				else if (meshid < 4) axis_mask = d * vec3(1,0,1);
+				else                 axis_mask = d * vec3(1,1,0);
+				offs += vec3(s) * 0.190 * axis_mask; // scale 16 pixels so that the outermost 2 exit the voxel
+				
+				//smooth_scale *= 2;
+			}
+			if (vs.bid == B_TREE_LOG) {
+				jitter_scale *= 1.5;
+			}
+			
+			
+			offs += d * s*(-smooth_scale) + rand_offset(vert_coord)*jitter_scale;
 		}
 		
 		vert_pos += offs * fade;

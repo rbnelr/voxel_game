@@ -1,8 +1,6 @@
 #pragma once
 #include "common.hpp"
 
-#define DEFAULT_GRAVITY 20
-
 static inline constexpr float COLLISION_EPSILON = 0.0001f; // floats have about 7 decimal digits of precision, so this only works up to about 10km in each direction, at some point the collision system just gets unreliable
 
 struct CollisionResponse {
@@ -40,8 +38,7 @@ struct Player;
 struct World;
 
 struct Physics {
-
-	float3 grav_accel = float3(0, 0, -DEFAULT_GRAVITY);
+	float3 grav_accel = float3(0, 0, -20);
 
 	void imgui () {
 		if (!ImGui::CollapsingHeader("Physics")) return;
@@ -49,11 +46,11 @@ struct Physics {
 		ImGui::DragFloat3("grav_accel", &grav_accel.x, 0.2f);
 	}
 
-	static float jump_height_from_jump_impulse (float jump_impulse_up, float grav_mag) {
-		return jump_impulse_up*jump_impulse_up / grav_mag * 0.5f;
+	float jump_height_from_jump_impulse (float jump_impulse_up) {
+		return jump_impulse_up*jump_impulse_up / -grav_accel.z * 0.5f;
 	}
-	static float jump_impulse_for_jump_height (float jump_height, float grav_mag) {
-		return sqrt( 2.0f * jump_height * grav_mag );
+	float jump_impulse_for_jump_height (float jump_height) {
+		return sqrt( 2.0f * jump_height * -grav_accel.z );
 	}
 
 	void update_object (float dt, Chunks& chunks, PhysicsObject& obj);
@@ -63,4 +60,3 @@ struct Physics {
 
 // Global physics
 inline Physics physics;
-

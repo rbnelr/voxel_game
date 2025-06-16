@@ -65,17 +65,26 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			int num_rays = get_num_rays(casc);
 			float spacing = get_spacing(casc);
 			float2 interval = get_interval(casc);
+			float2 hi_interval = has_higher_cascade ? get_interval(casc+1) : 0;
 		
+			auto dbg_col = dbg_cols[casc % ARRLEN(dbg_cols)];
+			int dbg_ray = roundi(_show_ray_ang * (float)num_rays / deg(360) - 0.5f);
+			
+			trace_shad->set_uniform("cascade", casc);
 			trace_shad->set_uniform("has_higher_cascade", has_higher_cascade);
 			trace_shad->set_uniform("world_base_pos", base_pos);
 			trace_shad->set_uniform("world_size", size);
 			trace_shad->set_uniform("num_rays", num_rays);
 			trace_shad->set_uniform("spacing", spacing);
 			trace_shad->set_uniform("interval", interval);
+			trace_shad->set_uniform("hi_interval", hi_interval);
 			trace_shad->set_uniform("scale_factor", sqrtf((float)base_rays));
 			trace_shad->set_uniform("branching_factor", (float)base_rays);
+			trace_shad->set_uniform("dbg_col", dbg_col);
+			trace_shad->set_uniform("dbg_pos", _dbg_pos);
+			trace_shad->set_uniform("dbg_ray", dbg_ray);
+			trace_shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
-		
 			auto& tex = cascade_texs[casc];
 			glBindImageTexture(4, tex.tex, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F);
 			
@@ -96,12 +105,13 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 			//		float ang = (float(ray) + 0.5f) * angle_step;
 			//		float2 dir = float2(cosf(ang), sinf(ang));
 			//
-			//		auto col = dbg_cols[casc % ARRLEN(dbg_cols)];
 			//		g_debugdraw.line(mat * float3(probe_pos + dir*interval.x, 0),
-			//						 mat * float3(probe_pos + dir*interval.y, 0), col);
+			//						 mat * float3(probe_pos + dir*interval.y, 0), dbg_col);
 			//	}
 			//}
 		}
+
+		g_debugdraw.point((float3)base_pos + float3(_dbg_pos.x, 0.9f, _dbg_pos.y), 0.1f, lrgba(1,1,1,0.5f));
 	}
 	
 	if (combine_shad->prog) {

@@ -50,15 +50,18 @@ layout(std430, binding = 1) restrict buffer IndirectBuffer {
 //	_dbgdrawbuf.wire_spheres.cmd.primCount = 0;
 //}
 void dbgdraw_vector (vec3 pos, vec3 dir, vec4 col) {
+	// I think sometimes things break because too many debug vectors means count goes out of range
+	if (_dbgdrawbuf.lines.cmd.count + 2u > _INDIRECT_BUFSZ) return;
 	uint idx = atomicAdd(_dbgdrawbuf.lines.cmd.count, 2u);
-	if (idx >= _INDIRECT_BUFSZ) return;
+	if (idx+2u > _INDIRECT_BUFSZ) return;
 	
 	_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos      , 0), col );
 	_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + dir, 0), col );
 }
 void dbgdraw_point (vec3 pos, float r, vec4 col) {
+	if (_dbgdrawbuf.lines.cmd.count + 6u > _INDIRECT_BUFSZ) return;
 	uint idx = atomicAdd(_dbgdrawbuf.lines.cmd.count, 6u);
-	if (idx >= _INDIRECT_BUFSZ) return;
+	if (idx+6u > _INDIRECT_BUFSZ) return;
 	
 	_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos - vec3(r,0,0), 0), col );
 	_dbgdrawbuf.lines.vertices[idx++] = IndirectLineVertex( vec4(pos + vec3(r,0,0), 0), col );

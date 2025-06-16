@@ -175,7 +175,7 @@ struct Player {
 
 	CollisionResponse collison_response;
 
-	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f, DEFAULT_GRAVITY)); // jump height based on the default gravity, tweaked gravity will change the jump height
+	float3 jump_impulse = float3(0,0, physics.jump_impulse_for_jump_height(1.2f)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
 	float3x4 head_to_world;
 

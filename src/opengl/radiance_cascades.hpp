@@ -115,7 +115,8 @@ struct TexturedQuadDrawer {
 
 class RadianceCascadesTesting {
 public:
-	SERIALIZE(RadianceCascadesTesting, imopen, base_pos, size)
+	SERIALIZE(RadianceCascadesTesting, imopen, base_pos, size, cascades, base_spacing, base_rays, base_interval_mul,
+		_dbg_pos)
 
 	bool imopen = true;
 
@@ -130,6 +131,7 @@ public:
 	int show_cascade = -1;
 	int show_ray = -1;
 	float _show_ray_ang = deg(90);
+	float2 _dbg_pos = 0;
 
 	int get_num_rays (int casc) { return (int)powf((float)base_rays, (float)casc+1); }
 	float get_spacing (int casc) { return base_spacing * (int)powf(sqrtf((float)base_rays), (float)casc); }
@@ -170,6 +172,8 @@ public:
 
 			ImGui::SliderInt("show_cascade", &show_cascade, -1, cascades-1);
 			ImGui::SliderAngle("show_ray (by angle)", &_show_ray_ang, -10, 360);
+
+			ImGui::DragFloat2("dbg_pos", &_dbg_pos.x, 0.1f);
 
 			int num_rays = get_num_rays(max(show_cascade, 0));
 			//_show_ray_ang = (float(show_ray) + 0.5) / (float)num_rays * deg(360);
