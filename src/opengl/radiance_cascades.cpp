@@ -38,6 +38,8 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 	if (!imopen) return;
 	if (recreate) do_recreate();
 	recreate = false;
+
+	OGL_TRACE("radiance cascades");
 	
 	lrgba dbg_cols[] = {
 		lrgba(0,0,1,1),
@@ -52,15 +54,21 @@ void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
 		glUseProgram(trace_shad->prog);
 
 		for (int casc=cascades-1; casc>=0; casc--) {
+			OGL_TRACE("radiance cascade");
+
 			bool has_higher_cascade = casc < cascades-1;
 
 			r.state.bind_textures(trace_shad, {
 				{"tile_textures", r.tile_textures, r.pixelated_sampler},
 				{"voxel_tex", r.raytracer.voxel_tex.tex},
+				{"df_tex", r.raytracer.df_tex.tex},
+
 				(has_higher_cascade ?
 					StateManager::TextureBind{"higher_cascade", cascade_texs[casc+1].tex} :
 					StateManager::TextureBind{"higher_cascade", Texture2D{}}),
 			});
+			
+			trace_shad->set_uniform("voxtex_world_min", (float3)(r.raytracer.voxtex_offset * CHUNK_SIZE));
 
 			int num_rays = get_num_rays(casc);
 			float spacing = get_spacing(casc);

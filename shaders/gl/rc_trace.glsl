@@ -33,6 +33,15 @@ uniform float branching_factor;
 uniform bool has_higher_cascade;
 uniform sampler3D higher_cascade;
 
+
+// rgb: linear light emitted along ray
+// a: opacity blocking light along ray
+vec4 blend_light (vec4 background, vec4 foreground) {
+	return mix(background, vec4(foreground.rgb, 1.0), foreground.aaaa);
+}
+
+#if 0
+
 // Expensive! This exact stuff is already cached by VCT texture!
 vec4 voxel_col_lookup (ivec3 world_pos) {
 	uint bid = read_voxel(world_pos);
@@ -77,12 +86,6 @@ bool out_of_bounds (vec2 local_pos) {
 	return p.x < 0 || p.y < 0 || p.x >= world_size.x || p.y >= world_size.y;
 }
 
-// rgb: linear light emitted along ray
-// a: opacity blocking light along ray
-vec4 blend_light (vec4 background, vec4 foreground) {
-	return mix(background, vec4(foreground.rgb, 1.0), foreground.aaaa);
-}
-
 vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 #if DEBUGDRAW
 	if (update_debugdraw) {
@@ -122,10 +125,156 @@ vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 			break; // arbitrary cutoff, note that colors are raw voxel texture alphas, no interpolation
 		}
 		
-		cur_dist += min(spacing, 0.5); // raymarch at half voxel res, seems to help with aliasing
+		cur_dist += min(spacing, 0.05); // raymarch at half voxel res, seems to help with aliasing
 	}
 	return col;
 }
+#else
+
+const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
+const int CHUNK_MASK = ~63;
+const float epsilon = 0.001; // This epsilon should not round to zero with numbers up to 4096 
+uniform int max_iterations = 200;
+
+vec4 trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
+	
+	bvec3 dir_sign = greaterThanEqual(ray_dir, vec3(0.0));
+	
+	ivec3 step_dir = mix(ivec3(-1), ivec3(+1), dir_sign);
+	ivec3 vox_exit = mix(ivec3(0), ivec3(1), dir_sign);
+	
+	// project to chunk bounds that are epsilon futher out to avoid ray getting stuck when exiting chunk
+	// NOTE: this means we can sometimes step along the diagonal between chunks, missing cells
+	vec3 chunk_exit_planes = mix(vec3(-epsilon), vec3(64.0 + epsilon), dir_sign);
+	
+	// precompute part of plane projection equation
+	// prefer  'pos * inv_dir + bias'  over  'inv_dir * (pos - ray_pos)'
+	// due to madd instruction
+	vec3 inv_dir = 1.0 / ray_dir;
+	vec3 bias = inv_dir * -ray_pos;
+	
+	float dist;
+	{ // allow ray to start outside of world texture cube for nice debugging views
+		vec3 world_min = voxtex_world_min                     + epsilon;
+		vec3 world_max = voxtex_world_min + vec3(WORLD_SIZEf) - epsilon;
+		
+		// calculate entry and exit coords into whole world cube
+		vec3 t0v = mix(world_max, world_min, dir_sign) * inv_dir + bias;
+		vec3 t1v = mix(world_min, world_max, dir_sign) * inv_dir + bias;
+		float t0 = max( max(max(t0v.x, t0v.y), t0v.z), 0.0);
+		float t1 = max( min(min(t1v.x, t1v.y), t1v.z), 0.0);
+		
+		// ray misses world texture
+		if (t1 <= t0)
+			return vec4(0); // miss
+		
+		// adjust ray to start where it hits cube initally
+		dist = t0;
+		max_dist = min(t1, max_dist);
+	}
+	
+	// step epsilon less than 1m to possibly avoid somtimes missing one voxel cell when DF stepping
+	float manhattan_fac = (1.0 - epsilon) / (abs(ray_dir.x) + abs(ray_dir.y) + abs(ray_dir.z));
+	
+	vec3 pos = dist * ray_dir + ray_pos;
+	ivec3 coord = ivec3(floor(pos));
+	
+	int iter = 0;
+	
+	for (;;) {
+		int dfi = texelFetch(df_tex, (coord) & WORLD_SIZE_MASK, 0).r;
+		
+		// step up to exit of current cell, since DF is safe up until its bounds
+		// seems to give a little bit of perf, as this reduces iteration count
+		// of course iteration now has more instructions, so could hurt as well
+		// -> disable for now, we save iterations, but it gets slower in almost every case
+		//vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+		//dist = min(min(t1v.x, t1v.y), t1v.z);
+		
+		if (dfi > 1) {
+			float df = float(dfi) * manhattan_fac;
+			
+			// DF tells us that we can still step by <df> before we could possibly hit a voxel
+			// step via DF raymarching
+			
+			// compute chunk exit, since DF is not valid for things outside of the chunk it is generated for
+			// TODO: could cache chunk_t1 and simply recompute if dist >= chunk_t1
+			vec3 chunk_exit = vec3(coord & CHUNK_MASK) + chunk_exit_planes;
+			
+			vec3 chunk_t1v = inv_dir * chunk_exit + bias;
+			float chunk_t1 = min(min(chunk_t1v.x, chunk_t1v.y), chunk_t1v.z);
+			
+			dist += df;
+			dist = min(dist, chunk_t1); // limit step to exactly on the exit face of the chunk
+			
+			vec3 pos = dist * ray_dir + ray_pos;
+			// update coord for next iteration
+			//coord = ivec3(pos);
+			coord = ivec3(floor(pos));
+		} else {
+			// we need to check individual voxels by DDA now
+			
+			vec3 t1v = inv_dir * vec3(coord + vox_exit) + bias;
+			float t1 = min(min(t1v.x, t1v.y), t1v.z);
+			
+			if (dfi < 0) {
+				break; // hit
+			}
+			
+			dist = t1;
+			
+			// step on axis where exit distance is lowest
+			if      (t1v.x == t1) coord.x += step_dir.x;
+			else if (t1v.y == t1) coord.y += step_dir.y;
+			else                  coord.z += step_dir.z;
+		}
+		
+		iter++;
+		if (iter >= max_iterations || dist >= max_dist)
+			break; // miss
+	}
+	
+	if (iter >= max_iterations || dist >= max_dist)
+		return vec4(0); // miss
+	
+	uint bid = texelFetch(voxel_tex, coord & WORLD_SIZE_MASK, 0).r;
+	
+	float texid = float(block_tiles[bid].sides[1]);
+	vec4 col = bid <= B_AIR ? vec4(0) : textureLod(tile_textures, vec3(0.5,0.5, texid), 99.0).rgba;
+	col.rgb *= get_emmisive(bid);
+	return col;
+}
+
+vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
+#if DEBUGDRAW
+	if (update_debugdraw) {
+		ivec2 probe_coord = ivec3(gl_GlobalInvocationID).xy;
+		int ray_idx = ivec3(gl_GlobalInvocationID).z;
+		
+		ivec2 coord = ivec2(round(dbg_pos / spacing - 0.5));
+		ivec2 diff = (coord - probe_coord); // abs
+		
+		if (  cascade <= 1 &&
+			(cascade == 0 ? ray_idx == dbg_ray : ray_idx/4 == dbg_ray/4) &&
+			  diff.x >= 0 && diff.x <= 0 &&
+			  diff.y >= 0 && diff.y <= 0  ) {
+			vec2 a = point + start_dist * dir;
+			vec2 ab = (max_dist - start_dist) * dir;
+			
+			dbgdraw_vector(world_base_pos + vec3(a.x, .95, a.y), vec3(ab.x, 0, ab.y), dbg_col);
+			
+			//if (c.a > 0.1) {
+			//	dbgdraw_point(world_base_pos + vec3(probe_pos.x, .95, probe_pos.y), 0.03, dbg_col);
+			//}
+		}
+	}
+#endif
+	
+	vec2 s = point + dir * start_dist;
+	return trace_ray(world_base_pos + vec3(s.x, 0.5, s.y), vec3(dir.x, 0.0, dir.y), max_dist - start_dist);
+}
+#endif
+
 vec4 trace_ray_between (vec2 start, vec2 end) {
 	vec2 dir = end - start;
 	float max_dist = length(dir);
