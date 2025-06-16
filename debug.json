@@ -72,22 +72,22 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-65.86634063720703,
-				-46.48110580444336,
-				-102.40385437011719
+				-33.77965545654297,
+				-91.0113296508789,
+				-95.55133819580078
 			],
 			"rot_aer": [
-				0.1913759708404541,
-				-0.21624603867530823,
+				0.03936123847961426,
+				0.010303294286131859,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
 			"clip_near": 0.03125,
 			"clip_far": 8192.0,
-			"vfov": 1.384182333946228,
+			"vfov": 1.2050007581710815,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 12.861334800720215,
+		"base_speed": 13.784436225891113,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
@@ -123,7 +123,7 @@
 			"_draw_chunks": true
 		},
 		"raytracer": {
-			"enable": false,
+			"enable": true,
 			"max_iterations": 380,
 			"taa": {
 				"enable": true,
@@ -168,13 +168,13 @@
 				100,
 				53
 			],
-			"cascades": 7,
-			"base_spacing": 0.125,
+			"cascades": 6,
+			"base_spacing": 0.15000000596046448,
 			"base_rays": 4,
 			"base_interval_mul": 1.0,
 			"_dbg_pos": [
 				7.5,
-				13.399999618530273
+				13.600000381469727
 			]
 		},
 		"imopen": {

@@ -83,8 +83,6 @@ vec4 blend_light (vec4 background, vec4 foreground) {
 	return mix(background, vec4(foreground.rgb, 1.0), foreground.aaaa);
 }
 
-vec4 _dbg_col;
-
 vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 #if DEBUGDRAW
 	if (update_debugdraw) {
@@ -101,7 +99,7 @@ vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 			vec2 a = point + start_dist * dir;
 			vec2 ab = (max_dist - start_dist) * dir;
 			
-			dbgdraw_vector(world_base_pos + vec3(a.x, .95, a.y), vec3(ab.x, 0, ab.y), _dbg_col);
+			dbgdraw_vector(world_base_pos + vec3(a.x, .95, a.y), vec3(ab.x, 0, ab.y), dbg_col);
 			
 			//if (c.a > 0.1) {
 			//	dbgdraw_point(world_base_pos + vec3(probe_pos.x, .95, probe_pos.y), 0.03, dbg_col);
@@ -137,77 +135,11 @@ vec4 trace_ray_between (vec2 start, vec2 end) {
 	return trace_ray(start, dir, 0.0, max_dist);
 }
 
-vec4 avgerage_higher_cascade_rays (vec2 probe_pos, int ray_idx, vec2 ray_end, vec2 ray_dir) {
-	
-#if 0
-	// Hardware bilinear filtering without bilinear fix
-	float hi_spacing = spacing * scale_factor;
-	vec2 hi_probe_coord = probe_pos / hi_spacing - 0.5;
-	float hi_rays = float(ray_idx) * branching_factor;
-	
-	vec3 texsz = 1.0 / textureSize(higher_cascade, 0);
-	
-	// While it is kind of obvious in this version, I don't pre-average
-	// since my understanding is that if you store all rays, you can later evaluate hemispheres for 3d surface lighting or even attempt to extract specular light
-	vec4 col = vec4(0);
-	for (float ray=hi_rays; ray < hi_rays + branching_factor; ray++) {
-		vec3 uv = (vec3(hi_probe_coord, ray) + 0.5) * texsz;
-		col += texture(higher_cascade, uv);
-	}
-	return col / branching_factor;
-#else
-	// Bilinear fix implementation
-	
-	// parent cascade probe spacing and ray count
-	float hi_spacing = spacing * scale_factor;
-	int hi_rays = ray_idx * int(branching_factor);
-	// parent probe indices and bilinear factors based on this probe's position
-	vec2 hi_probe_coordF = probe_pos / hi_spacing - 0.5;
-	vec2 tmpF = floor(hi_probe_coordF);
-	ivec2 hi_probe_coord = ivec2(tmpF);
-	vec2 bilin = hi_probe_coordF - tmpF;
-	
-	//
-	vec2 hi_probe_pos = hi_spacing * (tmpF + 0.5);
-	vec2 hi_rays_start = hi_probe_pos + hi_interval.x * ray_dir;
-	
-	_dbg_col = vec4(_dbg_col.rgb, 0.1);
-	vec4 fix00 = trace_ray_between(ray_end, hi_rays_start );
-	vec4 fix10 = trace_ray_between(ray_end, hi_rays_start + vec2(hi_spacing, 0.0));
-	vec4 fix01 = trace_ray_between(ray_end, hi_rays_start + vec2(0.0, hi_spacing));
-	vec4 fix11 = trace_ray_between(ray_end, hi_rays_start + vec2(hi_spacing, hi_spacing));
-	
-	// Manual bilinear sample with no pre-averaging
-	vec4 c00 = vec4(0);
-	vec4 c10 = vec4(0);
-	vec4 c01 = vec4(0);
-	vec4 c11 = vec4(0);
-	for (int ray=hi_rays; ray < hi_rays + int(branching_factor); ray++) {
-		ivec3 P = ivec3(hi_probe_coord, ray);
-		c00 += texelFetchOffset(higher_cascade, P, 0, ivec3(0,0,0));
-		c10 += texelFetchOffset(higher_cascade, P, 0, ivec3(1,0,0));
-		c01 += texelFetchOffset(higher_cascade, P, 0, ivec3(0,1,0));
-		c11 += texelFetchOffset(higher_cascade, P, 0, ivec3(1,1,0));
-	}
-	//c00 = blend_light(c00, fix00);
-	//c10 = blend_light(c10, fix10);
-	//c01 = blend_light(c01, fix01);
-	//c11 = blend_light(c11, fix11);
-	c00 = c00 * (1.0 - fix00.a);
-	c10 = c10 * (1.0 - fix10.a);
-	c01 = c01 * (1.0 - fix01.a);
-	c11 = c11 * (1.0 - fix11.a);
-	
-	vec4 col = mix(mix(c00, c10, bilin.x),
-				   mix(c01, c11, bilin.x), bilin.y);
-	return col / branching_factor;
-#endif
-}
+#define BILINEAR_FIX 1
 
 void main () {
 	ivec3 invocID = ivec3(gl_GlobalInvocationID);
 	if (any(greaterThan(invocID, dispatch_size))) return;
-	_dbg_col = dbg_col;
 	
 	ivec2 probe_coord = invocID.xy;
 	int ray_idx = invocID.z;
@@ -220,17 +152,81 @@ void main () {
 	float ang = (float(ray_idx) + 0.5) * angle_step;
 	vec2 dir = vec2(cos(ang), sin(ang));
 	
-	// start exactly where previous raymarching left off
-	// fudge a little, try to combat halo
-	//float start_dist = max(interval.x - spacing*0.25, 0.0); // Move this to cpu!
+	#if !BILINEAR_FIX
 	vec4 col = trace_ray(probe_pos, dir, interval.x, interval.y);
 	
-	vec2 ray_end = probe_pos + dir * interval.y;
-	
-	if (has_higher_cascade && col.a < 0.999) {
-		vec4 far_col = avgerage_higher_cascade_rays(probe_pos, ray_idx, ray_end, dir);
+	if (has_higher_cascade) {
+		// Hardware bilinear filtering without bilinear fix
+		float hi_spacing = spacing * scale_factor;
+		vec2 hi_probe_coord = probe_pos / hi_spacing - 0.5;
+		float hi_rays = float(ray_idx) * branching_factor;
+		
+		vec3 texsz = 1.0 / textureSize(higher_cascade, 0);
+		
+		// While it is kind of obvious in this version, I don't pre-average
+		// since my understanding is that if you store all rays, you can later evaluate hemispheres for 3d surface lighting or even attempt to extract specular light
+		vec4 far_col = vec4(0);
+		for (float ray=hi_rays; ray < hi_rays + branching_factor; ray++) {
+			vec3 uv = (vec3(hi_probe_coord, ray) + 0.5) * texsz;
+			far_col += texture(higher_cascade, uv);
+		}
+		far_col /= branching_factor;
+		
 		col = blend_light(far_col, col);
 	}
+	#else
+	vec4 col;
+	if (has_higher_cascade) {
+		vec2 ray_start = probe_pos + dir * interval.x;
+		
+		// parent cascade probe spacing and ray count
+		float hi_spacing = spacing * scale_factor;
+		int hi_rays = ray_idx * int(branching_factor);
+		// parent probe indices and bilinear factors based on this probe's position
+		vec2 hi_probe_coordF = probe_pos / hi_spacing - 0.5;
+		vec2 tmpF = floor(hi_probe_coordF);
+		ivec2 hi_probe_coord = ivec2(tmpF);
+		vec2 bilin = hi_probe_coordF - tmpF;
+		
+		vec2 hi_probe_pos = hi_spacing * (tmpF + 0.5);
+		vec2 hi_rays_start = hi_probe_pos + hi_interval.x * dir; // reuse this probe dir
+		
+		// Bilinear fix implementation
+		// Cast ray from probe interval start to approx center of 4 parent probe interval starts
+		vec4 close00 = trace_ray_between(ray_start, hi_rays_start);
+		vec4 close10 = trace_ray_between(ray_start, hi_rays_start + vec2(hi_spacing, 0.0));
+		vec4 close01 = trace_ray_between(ray_start, hi_rays_start + vec2(0.0, hi_spacing));
+		vec4 close11 = trace_ray_between(ray_start, hi_rays_start + vec2(hi_spacing, hi_spacing));
+		
+		// Manual bilinear sample (with no pre-averaging)
+		vec4 far00 = vec4(0);
+		vec4 far10 = vec4(0);
+		vec4 far01 = vec4(0);
+		vec4 far11 = vec4(0);
+		for (int ray=hi_rays; ray < hi_rays + int(branching_factor); ray++) {
+			ivec3 P = ivec3(hi_probe_coord, ray);
+			far00 += texelFetchOffset(higher_cascade, P, 0, ivec3(0,0,0));
+			far10 += texelFetchOffset(higher_cascade, P, 0, ivec3(1,0,0));
+			far01 += texelFetchOffset(higher_cascade, P, 0, ivec3(0,1,0));
+			far11 += texelFetchOffset(higher_cascade, P, 0, ivec3(1,1,0));
+		}
+		far00 *= 1.0 / branching_factor;
+		far10 *= 1.0 / branching_factor;
+		far01 *= 1.0 / branching_factor;
+		far11 *= 1.0 / branching_factor;
+		
+		vec4 c00 = blend_light(far00, close00);
+		vec4 c10 = blend_light(far10, close10);
+		vec4 c01 = blend_light(far01, close01);
+		vec4 c11 = blend_light(far11, close11);
+		
+		col = mix(mix(c00, c10, bilin.x),
+		          mix(c01, c11, bilin.x), bilin.y);
+	}
+	else {
+		col = trace_ray(probe_pos, dir, interval.x, interval.y);
+	}
+	#endif
 	
 	imageStore(out_tex, invocID, col);
 }
