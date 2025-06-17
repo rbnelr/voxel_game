@@ -141,7 +141,8 @@ vec4 trace_ray (vec3 ray_pos, vec3 ray_dir, float max_dist) {
 	
 	float texid = float(block_tiles[bid].sides[1]);
 	vec4 col = bid <= B_AIR ? vec4(0) : textureLod(tile_textures, vec3(0.5,0.5, texid), 99.0).rgba;
-	col.rgb *= get_emmisive(bid) + 0.05;
+	col.rgb *= get_emmisive(bid) + 0.1;
+	//col.rgb *= get_emmisive(bid);
 	return col;
 }
 
@@ -152,10 +153,10 @@ vec4 trace_ray (vec3 point, vec3 dir, float start_dist, float max_dist) {
 		ivec2 ray_idx   =       ivec3(gl_GlobalInvocationID).xy % rays_oct;
 		
 		if (all(equal(probe_idx, dbg_idx))) {
-			//vec3 a = point + start_dist * dir;
-			//vec3 ab = (max_dist - start_dist) * dir;
-			vec3 a = point + 10 * dir;
-			vec3 ab = (11 - 10) * dir;
+			vec3 a = point + start_dist * dir;
+			vec3 ab = (max_dist - start_dist) * dir;
+			//vec3 a = point + 10 * dir;
+			//vec3 ab = (11 - 10) * dir;
 			
 			dbgdraw_vector(world_base_pos + a, ab, dbg_col);
 		}

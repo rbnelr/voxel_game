@@ -5,7 +5,7 @@
 
 namespace gl {
 
-TexturedQuadDrawer::TexturedQuadDrawer (OpenglRenderer& r) {
+QuadDrawer::QuadDrawer (OpenglRenderer& r) {
 	shad = r.shaders.compile("debug_texture");
 	shad_2dArray = r.shaders.compile("debug_texture", {{"TEX_ARRAY","1"}});
 	shad_3d = r.shaders.compile("debug_texture", {{"TEX3D","1"}});
@@ -29,7 +29,7 @@ TexturedQuadDrawer::TexturedQuadDrawer (OpenglRenderer& r) {
 	glSamplerParameteri(sampl_nearest, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-RadianceCascades2D::RadianceCascades2D (OpenglRenderer& r): tex_draw{r} {
+RadianceCascades2D::RadianceCascades2D (OpenglRenderer& r): vis_draw{r} {
 	trace_shad = r.shaders.compile("rc_trace", {}, {{ COMPUTE_SHADER }});
 	combine_shad = r.shaders.compile("rc_combine", {}, {{ COMPUTE_SHADER }});
 }
@@ -101,6 +101,8 @@ void RadianceCascades2D::update (Game& game, OpenglRenderer& r) {
 			constexpr int3 GROUP_SZ = int3(4,4,4);
 			int3 dispatch_size = (tex.size + GROUP_SZ-1) / GROUP_SZ;
 			glDispatchCompute(dispatch_size.x, dispatch_size.y, dispatch_size.z);
+			
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 
 			//float3x4 mat = translate((float3)base_pos) * rotate3_X(deg(90));
 			//for (int y=0; y<4; ++y)
@@ -147,8 +149,8 @@ void RadianceCascades2D::update (Game& game, OpenglRenderer& r) {
 		float3 p = (float3)base_pos + float3(0,1,0);
 		float3 sz = float3((float2)tex_size, 1);
 
-		if (show_cascade >= 0) tex_draw.draw(cascade_texs[show_cascade].tex, r.state, transform(p, float3(deg(90),0,0), sz), show_ray,-1, true);
-		else                   tex_draw.draw(result_tex.tex, r.state, transform(p, float3(deg(90),0,0), sz), true);
+		if (show_cascade >= 0) vis_draw.draw(cascade_texs[show_cascade].tex, r.state, transform(p, float3(deg(90),0,0), sz), show_ray,-1, true);
+		else                   vis_draw.draw(result_tex.tex, r.state, transform(p, float3(deg(90),0,0), sz), true);
 	
 		float3 fsize = float3((float)size.x, 1, (float)size.y);
 		g_debugdraw.wire_cube((float3)base_pos + fsize*0.5f, fsize, lrgba(1,0,0,1));
@@ -157,8 +159,9 @@ void RadianceCascades2D::update (Game& game, OpenglRenderer& r) {
 }
 
 
-RadianceCascades3D::RadianceCascades3D (OpenglRenderer& r): tex_draw{r} {
+RadianceCascades3D::RadianceCascades3D (OpenglRenderer& r): vis_draw{r} {
 	trace_shad = r.shaders.compile("rc_trace3d", {}, {{ COMPUTE_SHADER }});
+	vis_shad = r.shaders.compile("rc_vis3d");
 }
 
 void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
@@ -190,7 +193,7 @@ void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
 		float spacing = get_spacing();
 		int2 rays_oct = get_rays_oct();
 
-		int3 dbg_idx = floori(_dbg_pos / spacing - 0.5f);
+		int3 dbg_idx = floori(dbg_pos / spacing - 0.5f);
 
 		trace_shad->set_uniform("world_base_pos", base_pos);
 		trace_shad->set_uniform("world_size", size);
@@ -207,19 +210,42 @@ void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
 		constexpr int3 GROUP_SZ = int3(4,4,4);
 		int3 dispatch_size = (total + GROUP_SZ-1) / GROUP_SZ;
 		glDispatchCompute(dispatch_size.x, dispatch_size.y, dispatch_size.z);
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
 	}
 	
 	{
 		g_debugdraw.wire_cube((float3)base_pos + (float3)size*0.5f, (float3)size, lrgba(1,0,0,1));
-
+		
 		float spacing = get_spacing();
+		int2 rays_oct = get_rays_oct();
+
 		float3 tex_size = (float3)get_num_probes(spacing) * spacing;
 
-		int z_idx = floori(_dbg_pos.z / spacing - 0.5f);
+		int z_idx = floori(dbg_pos.z / spacing - 0.5f);
 		float z_slice = ((float)z_idx + 0.5f) * spacing;
 
 		float3 p = (float3)base_pos + float3(0,0,z_slice);
-		tex_draw.draw(cascade0_tex.tex, r.state, transform(p, float3(0,0,0), tex_size), z_idx,-1, true);
+
+		if (vis) {
+			if (vis_shad->prog) {
+				glUseProgram(vis_shad->prog);
+				
+				r.state.bind_textures(vis_shad, {
+					{"cascade0_tex", cascade0_tex.tex},
+				});
+				
+				vis_shad->set_uniform("world_base_pos", base_pos);
+				vis_shad->set_uniform("world_size", size);
+				vis_shad->set_uniform("spacing", spacing);
+				vis_shad->set_uniform("rays_oct", rays_oct);
+
+				vis_draw.draw_using(vis_shad, r.state, transform(p, float3(0,0,0), tex_size));
+			}
+		}
+		else {
+			vis_draw.draw(cascade0_tex.tex, r.state, transform(p, float3(0,0,0), tex_size), z_idx,-1, true);
+		}
 	}
 }
 }

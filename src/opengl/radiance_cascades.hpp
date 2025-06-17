@@ -81,7 +81,7 @@ struct RCProbeTexture3D {
 	}
 };
 
-struct TexturedQuadDrawer {
+struct QuadDrawer {
 	gl::Shader* shad;
 	gl::Shader* shad_2dArray;
 	gl::Shader* shad_3d;
@@ -90,7 +90,7 @@ struct TexturedQuadDrawer {
 	Sampler sampl = {"sampl"};
 	Sampler sampl_nearest = {"sampl_nearest"};
 
-	TexturedQuadDrawer (OpenglRenderer& r);
+	QuadDrawer (OpenglRenderer& r);
 
 	void draw (Texture2D& tex, StateManager& state, float3x4 obj2world, bool nearest=false) {
 		glUseProgram(shad->prog);
@@ -141,6 +141,19 @@ struct TexturedQuadDrawer {
 		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
 		glBindVertexArray(0);
 	}
+
+	// do glUseProgram beforehand
+	void draw_using (Shader* shad, StateManager& state, float3x4 obj2world) {
+		PipelineState s;
+		s.culling = false;
+		state.set(s);
+		
+		shad->set_uniform("obj2world", (float4x4)obj2world);
+
+		glBindVertexArray(quad.ib.vao);
+		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
+		glBindVertexArray(0);
+	}
 };
 
 class RadianceCascades2D {
@@ -184,7 +197,7 @@ public:
 	std::unique_ptr<RCProbeTexture2D[]> cascade_texs;
 	RCComputeTexture result_tex;
 
-	TexturedQuadDrawer tex_draw;
+	QuadDrawer vis_draw;
 
 	RadianceCascades2D (OpenglRenderer& r);
 
@@ -243,7 +256,7 @@ public:
 class RadianceCascades3D {
 public:
 	SERIALIZE(RadianceCascades3D, imopen, base_pos, size, base_spacing, base_rays_oct,
-		_dbg_pos)
+		dbg_pos, vis)
 
 	bool imopen = true;
 
@@ -254,7 +267,7 @@ public:
 	float base_spacing = 4; // cascade0 probe spacing
 	int base_rays_oct = 2; // width/height of ocahedral encoding used for probe rays (?)
 
-	float3 _dbg_pos = 0;
+	float3 dbg_pos = 0;
 	
 	float get_spacing () { // for casc0 for now
 		return base_spacing;
@@ -269,10 +282,13 @@ public:
 	bool recreate = true;
 	
 	gl::Shader* trace_shad;
+	gl::Shader* vis_shad;
 
 	RCProbeTexture3D cascade0_tex;
 	
-	TexturedQuadDrawer tex_draw;
+	QuadDrawer vis_draw;
+
+	bool vis = true;
 
 	RadianceCascades3D (OpenglRenderer& r);
 
@@ -284,12 +300,23 @@ public:
 			recreate |= ImGui::DragInt3("size", &size.x, 0.1f);
 
 			recreate |= ImGui::DragFloat("base_spacing", &base_spacing, 0.1f, 0.1f, 64);
-			recreate |= ImGui::DragInt("base_rays_oct", &base_rays_oct, 0.1f, 1, 16);
+			recreate |= ImGui::DragInt("base_rays_oct", &base_rays_oct, 0.1f, 1, 128);
 			
-			ImGui::DragFloat3("dbg_pos", &_dbg_pos.x, 0.1f);
+			ImGui::DragFloat3("dbg_pos", &dbg_pos.x, 0.1f);
+			ImGui::Checkbox("visualize", &vis);
+			
+			{ // Mem use
+				auto mem_sz = cascade0_tex.mem_size();
+				ImGui::Text("Total Mem: %.3f MB", (float)mem_sz / 1024/1024);
 
-			auto mem_sz = cascade0_tex.mem_size();
-			ImGui::Text("Total Mem: %.3f MB", (float)mem_sz / 1024/1024);
+				int3 probes = get_num_probes(base_spacing);
+				int2 rays_oct = get_rays_oct();
+				size_t total = (size_t)probes.x * probes.y * probes.z * rays_oct.x * rays_oct.y;
+				ImGui::Text("Cascade 0: %dx%dx%d(%llu) Probes at %dx%d(%llu) Rays (%.3f Mrays)",
+					probes.x, probes.y, probes.z, (size_t)probes.x * probes.y * probes.z,
+					rays_oct.x, rays_oct.y, (size_t)rays_oct.x * rays_oct.y,
+					(float)total / 1000000);
+			}
 		}
 		ImGui::End();
 	}
