@@ -187,7 +187,7 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, rc3D, imopen)
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
@@ -267,6 +267,7 @@ public:
 	Fog fog;
 
 	RadianceCascades2D rc2D = RadianceCascades2D(*this);
+	RadianceCascades3D rc3D = RadianceCascades3D(*this);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;
@@ -330,7 +331,9 @@ public:
 	}
 	virtual void graphics_imgui (Input& I, Game& g) {
 		ImGui::Checkbox("rc2D", &rc2D.imopen);
+		ImGui::Checkbox("rc3D", &rc3D.imopen);
 		rc2D.imgui();
+		rc3D.imgui();
 
 		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
 			debug_draw.imgui();

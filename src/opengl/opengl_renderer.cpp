@@ -85,6 +85,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		});
 
 		rc2D.update(game, *this);
+		rc3D.update(game, *this);
 
 		debug_draw.draw(*this);
 

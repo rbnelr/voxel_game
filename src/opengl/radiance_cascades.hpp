@@ -8,12 +8,12 @@ struct Game;
 namespace gl {
 class OpenglRenderer;
 
-struct ComputeTexture {
+struct RCComputeTexture { // Normal 2d texture for results
 	Texture2D tex;
 	int2 size;
 
-	ComputeTexture () {}
-	ComputeTexture (std::string_view label, int2 size): tex{label} {
+	RCComputeTexture () {}
+	RCComputeTexture (std::string_view label, int2 size): tex{label} {
 		this->size = size;
 
 		glTextureStorage2D(tex, 1, GL_RGBA16F, size.x,size.y);
@@ -28,16 +28,46 @@ struct ComputeTexture {
 		glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
 	}
 };
-struct ComputeTextureArray {
+struct RCProbeTexture2D {
 	//Texture2DArray tex;
 	Texture3D tex; // use 3d texture because arary count is really limited
 	int3 size;
 
-	ComputeTextureArray () {}
-	ComputeTextureArray (std::string_view label, int2 size, int array_count): tex{label} {
+	RCProbeTexture2D () {}
+	RCProbeTexture2D (std::string_view label, int2 size, int array_count): tex{label} {
 		this->size = int3(size, array_count);
 
 		glTextureStorage3D(tex, 1, GL_RGBA16F, size.x,size.y, array_count);
+		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
+		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		lrgba col = srgba(0,0,0,0);
+		glClearTexImage(tex, 0, GL_RGBA, GL_FLOAT, &col.x);
+	}
+};
+struct RCProbeTexture3D {
+	Texture3D tex;
+	int3 num_probes;
+	int2 rays_octh_size;
+	int3 total_size () { return int3(rays_octh_size, 1) * num_probes; }
+	size_t mem_size () {
+		auto num = total_size();
+		size_t sz = num.x * num.y * num.z;
+		return sz * (2*4); // sizeof(RGBA16F)
+	}
+
+	RCProbeTexture3D () {}
+	RCProbeTexture3D (std::string_view label, int3 num_probes, int2 rays_octh_size): tex{label} {
+		this->num_probes = num_probes;
+		this->rays_octh_size = rays_octh_size;
+		int3 sz = total_size();
+
+		glTextureStorage3D(tex, 1, GL_RGBA16F, sz.x,sz.y,sz.z);
 		glTextureParameteri(tex, GL_TEXTURE_BASE_LEVEL, 0);
 		glTextureParameteri(tex, GL_TEXTURE_MAX_LEVEL, 0);
 		glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -62,30 +92,30 @@ struct TexturedQuadDrawer {
 
 	TexturedQuadDrawer (OpenglRenderer& r);
 
-	void draw (StateManager& state, float3 pos, float3 size, Texture2D& tex, bool nearest=false) {
+	void draw (Texture2D& tex, StateManager& state, float3x4 obj2world, bool nearest=false) {
 		glUseProgram(shad->prog);
 		PipelineState s;
+		s.culling = false;
 		state.set(s);
 		state.bind_textures(shad, {
 			{"tex", tex, nearest ? sampl_nearest : sampl},
 		});
-
-		auto obj2world = translate(pos) * rotate3_X(deg(90)) * scale(size);
+		
 		shad->set_uniform("obj2world", (float4x4)obj2world);
 
 		glBindVertexArray(quad.ib.vao);
 		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
 		glBindVertexArray(0);
 	}
-	void draw (StateManager& state, float3 pos, float3 size, Texture2DArray& tex, int arr_idx=-1, int grid_width=-1, bool nearest=false) {
+	void draw (Texture2DArray& tex, StateManager& state, float3x4 obj2world, int arr_idx=-1, int grid_width=-1, bool nearest=false) {
 		glUseProgram(shad_2dArray->prog);
 		PipelineState s;
+		s.culling = false;
 		state.set(s);
 		state.bind_textures(shad_2dArray, {
 			{"tex", tex, nearest ? sampl_nearest : sampl},
 		});
-
-		auto obj2world = translate(pos) * rotate3_X(deg(90)) * scale(size);
+		
 		shad_2dArray->set_uniform("obj2world", (float4x4)obj2world);
 		shad_2dArray->set_uniform("arr_idx", arr_idx);
 		shad_2dArray->set_uniform("grid_width", grid_width);
@@ -94,17 +124,17 @@ struct TexturedQuadDrawer {
 		glDrawElements(GL_TRIANGLES, quad.index_count, GL_UNSIGNED_INT, NULL);
 		glBindVertexArray(0);
 	}
-	void draw (StateManager& state, float3 pos, float3 size, Texture3D& tex, int z_idx=-1, int grid_width=-1, bool nearest=false) {
+	void draw (Texture3D& tex, StateManager& state, float3x4 obj2world, int z_idx=-1, int grid_width=-1, bool nearest=false) {
 		glUseProgram(shad_3d->prog);
 		PipelineState s;
+		s.culling = false;
 		state.set(s);
 		state.bind_textures(shad_3d, {
 			{"tex", tex, nearest ? sampl_nearest : sampl},
 		});
-
-		auto obj2world = translate(pos) * rotate3_X(deg(90)) * scale(size);
+		
 		shad_3d->set_uniform("obj2world", (float4x4)obj2world);
-		shad_3d->set_uniform("arr_idx", z_idx);
+		shad_3d->set_uniform("z_idx", z_idx);
 		shad_3d->set_uniform("grid_width", grid_width);
 
 		glBindVertexArray(quad.ib.vao);
@@ -151,8 +181,8 @@ public:
 	gl::Shader* trace_shad;
 	gl::Shader* combine_shad;
 
-	std::unique_ptr<ComputeTextureArray[]> cascade_texs;
-	ComputeTexture result_tex;
+	std::unique_ptr<RCProbeTexture2D[]> cascade_texs;
+	RCComputeTexture result_tex;
 
 	TexturedQuadDrawer tex_draw;
 
@@ -196,16 +226,79 @@ public:
 	}
 
 	void do_recreate () {
-		cascade_texs = std::make_unique<ComputeTextureArray[]>(cascades);
+		cascade_texs = std::make_unique<RCProbeTexture2D[]>(cascades);
 		for (int casc=0; casc<cascades; casc++) {
 
 			int2 probes = get_num_probes(get_spacing(casc));
 			int rays = get_num_rays(casc);
 
-			cascade_texs[casc] = ComputeTextureArray("RCtex", max(probes, 1), clamp(rays, 1, 32*1024));
+			cascade_texs[casc] = RCProbeTexture2D("RCtex", max(probes, 1), clamp(rays, 1, 32*1024));
 		}
 
-		result_tex = ComputeTexture("RCtex", max(get_num_probes(get_spacing(0)), 1));
+		result_tex = RCComputeTexture("RCtex", max(get_num_probes(get_spacing(0)), 1));
+	}
+	void update (Game& game, OpenglRenderer& r);
+};
+
+class RadianceCascades3D {
+public:
+	SERIALIZE(RadianceCascades3D, imopen, base_pos, size, base_spacing, base_rays_oct,
+		_dbg_pos)
+
+	bool imopen = true;
+
+	// limited region the probes exist in for testing purposed
+	int3 base_pos = 0;
+	int3 size = 100;
+
+	float base_spacing = 4; // cascade0 probe spacing
+	int base_rays_oct = 2; // width/height of ocahedral encoding used for probe rays (?)
+
+	float3 _dbg_pos = 0;
+	
+	float get_spacing () { // for casc0 for now
+		return base_spacing;
+	}
+	int2 get_rays_oct () { // for casc0 for now
+		return int2(base_rays_oct, base_rays_oct);
+	}
+	int3 get_num_probes (float spacing) {
+		return ceili((float3)size / spacing);
+	}
+
+	bool recreate = true;
+	
+	gl::Shader* trace_shad;
+
+	RCProbeTexture3D cascade0_tex;
+	
+	TexturedQuadDrawer tex_draw;
+
+	RadianceCascades3D (OpenglRenderer& r);
+
+	void imgui () {
+		if (!imopen) return;
+		if (ImGui::Begin("RadianceCascades3D", &imopen)) {
+
+			ImGui::DragInt3("base_pos", &base_pos.x, 0.1f);
+			recreate |= ImGui::DragInt3("size", &size.x, 0.1f);
+
+			recreate |= ImGui::DragFloat("base_spacing", &base_spacing, 0.1f, 0.1f, 64);
+			recreate |= ImGui::DragInt("base_rays_oct", &base_rays_oct, 0.1f, 1, 16);
+			
+			ImGui::DragFloat3("dbg_pos", &_dbg_pos.x, 0.1f);
+
+			auto mem_sz = cascade0_tex.mem_size();
+			ImGui::Text("Total Mem: %.3f MB", (float)mem_sz / 1024/1024);
+		}
+		ImGui::End();
+	}
+
+	void do_recreate () {
+
+		int3 probes = get_num_probes(base_spacing);
+		int2 rays_oct = get_rays_oct();
+		cascade0_tex = RCProbeTexture3D("RCtex", probes, rays_oct);
 	}
 	void update (Game& game, OpenglRenderer& r);
 };

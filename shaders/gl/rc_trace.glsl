@@ -280,7 +280,6 @@ vec4 trace_ray_between (vec2 start, vec2 end) {
 	vec2 dir = end - start;
 	float max_dist = length(dir);
 	dir = normalize(dir);
-	float cur_dist = 0.0;
 	
 	return trace_ray(start, dir, 0.0, max_dist);
 }

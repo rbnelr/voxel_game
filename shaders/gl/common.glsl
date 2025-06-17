@@ -131,3 +131,17 @@ vec3 calc_fog (vec3 pix_col, vec3 pos_cam, vec3 pos_world) {
 	
 	return mix(f_col, pix_col, vec3(f));
 }
+
+vec2 dir2octah (vec3 dir) {
+	dir /= abs(dir.x) + abs(dir.y) + abs(dir.z);
+	vec2 uv = dir.z >= 0.0 ?
+		dir.xy :
+		(1.0 - abs(dir.yx)) * sign(dir.xy);
+	return uv * 0.5 + 0.5;
+}
+vec3 octah2dir (vec2 uv) {
+	vec2 o = uv * 2.0 - 1.0;
+	vec3 norm = vec3(o, 1.0 - abs(o.x) - abs(o.y));
+	if (norm.z < 0.0) norm.xy += sign(norm.xy) * norm.z;
+	return normalize(norm);
+}
