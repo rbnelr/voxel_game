@@ -113,9 +113,9 @@ struct TexturedQuadDrawer {
 	}
 };
 
-class RadianceCascadesTesting {
+class RadianceCascades2D {
 public:
-	SERIALIZE(RadianceCascadesTesting, imopen, base_pos, size, cascades, base_spacing, base_rays, base_interval_mul,
+	SERIALIZE(RadianceCascades2D, imopen, base_pos, size, cascades, base_spacing, base_rays, base_interval_mul,
 		_dbg_pos)
 
 	bool imopen = true;
@@ -156,11 +156,11 @@ public:
 
 	TexturedQuadDrawer tex_draw;
 
-	RadianceCascadesTesting (OpenglRenderer& r);
+	RadianceCascades2D (OpenglRenderer& r);
 
 	void imgui () {
 		if (!imopen) return;
-		if (ImGui::Begin("RadianceCascadesTesting", &imopen)) {
+		if (ImGui::Begin("RadianceCascades2D", &imopen)) {
 
 			ImGui::DragInt3("base_pos", &base_pos.x, 0.1f);
 			recreate |= ImGui::DragInt2("size", &size.x, 0.1f);
@@ -209,4 +209,4 @@ public:
 	}
 	void update (Game& game, OpenglRenderer& r);
 };
-}
+} // namespace gl

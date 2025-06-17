@@ -187,7 +187,7 @@ struct PlayerRenderer {
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc_testing, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, imopen)
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
@@ -266,7 +266,7 @@ public:
 	};
 	Fog fog;
 
-	RadianceCascadesTesting rc_testing = RadianceCascadesTesting(*this);
+	RadianceCascades2D rc2D = RadianceCascades2D(*this);
 
 	virtual bool get_vsync () {
 		return ctx.vsync;
@@ -329,8 +329,8 @@ public:
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
 	virtual void graphics_imgui (Input& I, Game& g) {
-		ImGui::Checkbox("rc_testing", &rc_testing.imopen);
-		rc_testing.imgui();
+		ImGui::Checkbox("rc2D", &rc2D.imopen);
+		rc2D.imgui();
 
 		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
 			debug_draw.imgui();

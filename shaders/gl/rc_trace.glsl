@@ -40,7 +40,11 @@ vec4 blend_light (vec4 background, vec4 foreground) {
 	return mix(background, vec4(foreground.rgb, 1.0), foreground.aaaa);
 }
 
-#if 0
+#define BILINEAR_FIX 1
+#define ACCURATE_TRACING 1
+
+#if !ACCURATE_TRACING
+//// Shitty raymarched implementation due since I could not be bothered intially
 
 // Expensive! This exact stuff is already cached by VCT texture!
 vec4 voxel_col_lookup (ivec3 world_pos) {
@@ -130,6 +134,7 @@ vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 	return col;
 }
 #else
+//// Accurate voxel raytracing taken from my path tracer
 
 const float INV_WORLD_SIZEf = 1.0 / WORLD_SIZEf;
 const int CHUNK_MASK = ~63;
@@ -261,11 +266,7 @@ vec4 trace_ray (vec2 point, vec2 dir, float start_dist, float max_dist) {
 			vec2 a = point + start_dist * dir;
 			vec2 ab = (max_dist - start_dist) * dir;
 			
-			dbgdraw_vector(world_base_pos + vec3(a.x, .95, a.y), vec3(ab.x, 0, ab.y), dbg_col);
-			
-			//if (c.a > 0.1) {
-			//	dbgdraw_point(world_base_pos + vec3(probe_pos.x, .95, probe_pos.y), 0.03, dbg_col);
-			//}
+			//dbgdraw_vector(world_base_pos + vec3(a.x, .95, a.y), vec3(ab.x, 0, ab.y), dbg_col);
 		}
 	}
 #endif
@@ -283,8 +284,6 @@ vec4 trace_ray_between (vec2 start, vec2 end) {
 	
 	return trace_ray(start, dir, 0.0, max_dist);
 }
-
-#define BILINEAR_FIX 1
 
 void main () {
 	ivec3 invocID = ivec3(gl_GlobalInvocationID);
@@ -340,6 +339,16 @@ void main () {
 		vec2 hi_probe_pos = hi_spacing * (tmpF + 0.5);
 		vec2 hi_rays_start = hi_probe_pos + hi_interval.x * dir; // reuse this probe dir
 		
+	//#if DEBUGDRAW
+	//	ivec2 coord = ivec2(round(dbg_pos / spacing - 0.5));
+	//	ivec2 diff = (coord - probe_coord); // abs
+	//	if ( cascade <= 4 && ray_idx == 0 &&
+	//		  diff.x >= -1 && diff.x <= 1 &&
+	//		  diff.y >= -1 && diff.y <= 1  ) {
+	//		dbgdraw_point(world_base_pos + vec3(probe_pos.x, .95, probe_pos.y), 0.03, dbg_col);
+	//	}
+	//#endif
+		
 		// Bilinear fix implementation
 		// Cast ray from probe interval start to approx center of 4 parent probe interval starts
 		vec4 close00 = trace_ray_between(ray_start, hi_rays_start);
@@ -371,6 +380,8 @@ void main () {
 		
 		col = mix(mix(c00, c10, bilin.x),
 		          mix(c01, c11, bilin.x), bilin.y);
+		//col = (c00 + c10 + c01 + c11) * 0.25;
+		//col = vec4(bilin, 0, 1);
 	}
 	else {
 		col = trace_ray(probe_pos, dir, interval.x, interval.y);

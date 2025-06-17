@@ -157,7 +157,7 @@
 			],
 			"water_fog_dens": 20.0
 		},
-		"rc_testing": {
+		"rc2D": {
 			"imopen": true,
 			"base_pos": [
 				-75,

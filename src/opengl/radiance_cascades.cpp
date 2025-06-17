@@ -29,12 +29,12 @@ TexturedQuadDrawer::TexturedQuadDrawer (OpenglRenderer& r) {
 	glSamplerParameteri(sampl_nearest, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
-RadianceCascadesTesting::RadianceCascadesTesting (OpenglRenderer& r): tex_draw{r} {
+RadianceCascades2D::RadianceCascades2D (OpenglRenderer& r): tex_draw{r} {
 	trace_shad = r.shaders.compile("rc_trace", {}, {{ COMPUTE_SHADER }});
 	combine_shad = r.shaders.compile("rc_combine", {}, {{ COMPUTE_SHADER }});
 }
 
-void RadianceCascadesTesting::update (Game& game, OpenglRenderer& r) {
+void RadianceCascades2D::update (Game& game, OpenglRenderer& r) {
 	if (!imopen) return;
 	if (recreate) do_recreate();
 	recreate = false;
