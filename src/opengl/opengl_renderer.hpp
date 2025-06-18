@@ -167,9 +167,9 @@ struct GuiRenderer {
 		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glSamplerParameterf(gui_sampler, GL_TEXTURE_MAX_ANISOTROPY, 1);
 	}
-	void draw_gui (OpenglRenderer& r, Input& I, Game& game);
+	void draw_gui (OpenglRenderer& r, Input& I);
 
-	void update_gui (Input& I, Game& game);
+	void update_gui (Input& I);
 };
 
 // Drawing of meshes that are displayed in first and third person for now
@@ -181,7 +181,7 @@ struct PlayerRenderer {
 		held_block_shad    = shaders.compile("held_block");
 		held_item_shad     = shaders.compile("held_item");
 	}
-	void draw (OpenglRenderer& r, Game& game);
+	void draw (OpenglRenderer& r);
 
 };
 
@@ -352,7 +352,7 @@ public:
 
 		fog.imgui();
 
-		raytracer.imgui(I, g);
+		raytracer.imgui(I);
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {

@@ -1,5 +1,8 @@
 #include "common.hpp"
 #include "opengl_renderer.hpp"
+#include "items.hpp"
+#include "game.hpp"
+#include "player.hpp"
 
 #include "GLFW/glfw3.h" // include after glad
 
@@ -37,8 +40,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 	render_size = I.window_size;
 
-	chunk_renderer.upload_remeshed(game.chunks);
-	raytracer.update(*this, game, I);
+	chunk_renderer.upload_remeshed(*game.chunks);
+	raytracer.update(*this, I);
 
 
 	glLineWidth(debug_draw.line_width);
@@ -68,34 +71,34 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		OGL_TRACE("3d draws");
 
 		if (raytracer.enable)
-			raytracer.draw(*this, game);
+			raytracer.draw(*this);
 		else
-			update_view(game.view, render_size, game.lod_center());
+			update_view(g->view, render_size, g->lod_center());
 
 		//glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.fbo);
 
 		// draw before chunks so it shows through transparent blocks
-		if (game.player.selected_block)
-			block_highl.draw(*this, game.player.selected_block);
+		if (g->player->selected_block)
+			block_highl.draw(*this, g->player->selected_block);
 
 		debug_draw.draw_wireframe_able(state, [&] () {
 			if (!raytracer.enable) {
-				chunk_renderer.draw_chunks(*this, game);
+				chunk_renderer.draw_chunks(*this);
 			}
 		});
 
-		rc2D.update(game, *this);
-		rc3D.update(game, *this);
+		rc2D.update(*this);
+		rc3D.update(*this);
 
 		debug_draw.draw(*this);
 
-		if (!game.activate_flycam && !game.player.third_person) {
+		if (!g->activate_flycam && !g->player->third_person) {
 			// clear depth buffer to draw first person items on top of everything to avoid clipping into walls
 			glClear(GL_DEPTH_BUFFER_BIT); // NOTE: clobbers the depth buffer, if it's still needed for SSAO etc. we might want to use a second depth buffer instead
 		}
 
 		// draws first and third person player items
-		player_rederer.draw(*this, game);
+		player_rederer.draw(*this);
 	}
 
 	{
@@ -103,8 +106,8 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
 
-		if (!game.activate_flycam || game.creative_mode)
-			gui_renderer.draw_gui(*this, I, game);
+		if (!g->activate_flycam || g->creative_mode)
+			gui_renderer.draw_gui(*this, I);
 
 		ImGui::End();
 		ctx.imgui_draw();
@@ -199,9 +202,9 @@ void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id
 		GUIVertex* verts = push_quads(3);
 		
 		float tile_idxs[] = {
-			(float)g_assets.block_tiles[item].sides[BF_NEG_X],
-			(float)g_assets.block_tiles[item].sides[BF_NEG_Y],
-			(float)g_assets.block_tiles[item].sides[BF_POS_Z],
+			(float)g->assets->block_tiles[item].sides[BF_NEG_X],
+			(float)g->assets->block_tiles[item].sides[BF_NEG_Y],
+			(float)g->assets->block_tiles[item].sides[BF_POS_Z],
 		};
 		
 		for (int i=0; i<12; ++i) {
@@ -222,7 +225,7 @@ void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id
 	}
 }
 
-void GuiRenderer::update_gui (Input& I, Game& game) {
+void GuiRenderer::update_gui (Input& I) {
 	gui_vertex_data.clear();
 	gui_index_data.clear();
 
@@ -243,7 +246,7 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 	bool clicked = I.cursor_enabled && I.buttons[MOUSE_BUTTON_LEFT].went_down;
 
 	auto draw_items_grid = [&] (Item* items, int count, int w, int h, float2 const& anchor, int selected=-1) {
-		auto& backpack = game.player.inventory.backpack;
+		auto& backpack = g->player->inventory.backpack;
 
 		float2 start = anchor -(float2)int2(w-1,h-1)/2 * frame_sz;
 
@@ -254,11 +257,11 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 
 			bool hovered = I.cursor_enabled && idx2 == hovered_idx;
 			if (hovered && clicked) {
-				std::swap(items[i], game.player.inventory.hand);
+				std::swap(items[i], g->player->inventory.hand);
 				clicked = false;
 			}
 			auto& tex = hovered ?
-				//(game.player.inventory.hand.id != I_NULL ? frame_grabbed_uv : frame_highl_uv) :
+				//(g->player->inventory.hand.id != I_NULL ? frame_grabbed_uv : frame_highl_uv) :
 				frame_highl_uv :
 				frame_uv;
 
@@ -278,14 +281,14 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 	};
 
 	{ // toolbar
-		auto& toolbar = game.player.inventory.toolbar;
+		auto& toolbar = g->player->inventory.toolbar;
 
 		float2 anchor = float2(screen_center.x, frame_sz/2 +1*sz);
 		draw_items_grid(toolbar.slots, ARRLEN(toolbar.slots), ARRLEN(toolbar.slots), 1, anchor, toolbar.selected);
 	}
 
-	if (game.player.inventory.is_open) { // backpack
-		auto& backpack = game.player.inventory.backpack;
+	if (g->player->inventory.is_open) { // backpack
+		auto& backpack = g->player->inventory.backpack;
 
 		static int w = 10;
 		ImGui::DragInt("backpack gui w", &w, 0.05f);
@@ -293,15 +296,15 @@ void GuiRenderer::update_gui (Input& I, Game& game) {
 		float2 anchor = screen_center;
 		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
 
-		if (I.cursor_enabled && game.player.inventory.hand.id != I_NULL)
-			draw_item_quad(I.cursor_pos_bottom_up +(item_sz/2), item_sz, game.player.inventory.hand.id);
+		if (I.cursor_enabled && g->player->inventory.hand.id != I_NULL)
+			draw_item_quad(I.cursor_pos_bottom_up +(item_sz/2), item_sz, g->player->inventory.hand.id);
 	}
 }
-void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
+void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I) {
 	ZoneScoped;
 	OGL_TRACE("gui");
 	
-	update_gui(I, game);
+	update_gui(I);
 
 	glBindVertexArray(gui_ib.vao);
 	stream_buffer(gui_ib, gui_vertex_data, gui_index_data);
@@ -323,24 +326,24 @@ void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I, Game& game) {
 }
 
 //// PlayerRenderer
-void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
+void PlayerRenderer::draw (OpenglRenderer& r) {
 	ZoneScoped;
 	OGL_TRACE("player");
 
-	auto& item = game.player.inventory.toolbar.get_selected();
+	auto& item = g->player->inventory.toolbar.get_selected();
 	
 	if (item.id != I_NULL) {
-		auto& assets = g_assets.player;
+		auto& assets = *g->assets;
 	
-		float anim_t = game.player.break_block.anim_t != 0 ? game.player.break_block.anim_t : game.player.block_place.anim_t;
-		auto a = assets.animation.calc(anim_t);
+		float anim_t = g->player->break_block.anim_t != 0 ? g->player->break_block.anim_t : g->player->block_place.anim_t;
+		auto a = assets.player.animation.calc(anim_t);
 
 		PipelineState s;
 		s.depth_test = true;
 		s.blend_enable = true;
 		r.state.set(s);
 
-		float3x4 mat = game.player.head_to_world * translate(a.pos) * a.rot;
+		float3x4 mat = g->player->head_to_world * translate(a.pos) * a.rot;
 
 		if (item.is_block()) {
 			glUseProgram(held_block_shad->prog);
@@ -349,13 +352,13 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 				{"tile_textures", r.tile_textures, r.pixelated_sampler}
 			});
 
-			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.block_mat));
+			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.player.block_mat));
 
 			//
 			auto bid = (block_id)item.id;
 
-			auto& tile = g_assets.block_tiles[bid];
-			int meshid = g_assets.block_meshes.block_meshes[(block_id)item.id];
+			auto& tile = assets.block_tiles[bid];
+			int meshid = assets.block_meshes.block_meshes[(block_id)item.id];
 
 			static constexpr int MAX_MESH_SLICES = 64;
 			float texids[MAX_MESH_SLICES] = {};
@@ -370,7 +373,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 					texids[i] = (float)tile.calc_tex_index((BlockFace)i, 0);
 				}
 			} else {
-				auto& bm_info = g_assets.block_meshes.meshes[meshid];
+				auto& bm_info = assets.block_meshes.meshes[meshid];
 
 				held_block_shad->set_uniform("meshid", bm_info.index);
 
@@ -393,7 +396,7 @@ void PlayerRenderer::draw (OpenglRenderer& r, Game& game) {
 
 			auto id = (item_id)item.id;
 
-			held_item_shad->set_uniform("model_to_world", (float4x4)(mat * assets.tool_mat));
+			held_item_shad->set_uniform("model_to_world", (float4x4)(mat * assets.player.tool_mat));
 			held_item_shad->set_uniform("texid", (float)ITEM_TILES[id - MAX_BLOCK_ID]);
 
 			glBindVertexArray(r.mesh_data.vao);
@@ -456,14 +459,14 @@ bool OpenglRenderer::load_static_data () {
 
 	{
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_meshes_ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_meshes.slices.size() * sizeof(g_assets.block_meshes.slices[0]),
-		                                       g_assets.block_meshes.slices.data(), GL_STREAM_DRAW);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, g->assets->block_meshes.slices.size() * sizeof(g->assets->block_meshes.slices[0]),
+		                                       g->assets->block_meshes.slices.data(), GL_STREAM_DRAW);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, block_meshes_ssbo);
 	}
 	{
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, block_tiles_ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, g_assets.block_tiles.size() * sizeof(g_assets.block_tiles[0]),
-		                                       g_assets.block_tiles.data(), GL_STREAM_DRAW);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, g->assets->block_tiles.size() * sizeof(g->assets->block_tiles[0]),
+		                                       g->assets->block_tiles.data(), GL_STREAM_DRAW);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_tiles_ssbo);
 	}
 

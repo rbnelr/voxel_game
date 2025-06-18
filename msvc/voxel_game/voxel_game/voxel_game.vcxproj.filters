@@ -106,35 +106,11 @@
     <ClInclude Include="..\..\..\src\game.hpp">
       <Filter>game</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\player.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\audio\audio.hpp">
       <Filter>audio</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\audio\read_wav.hpp">
       <Filter>audio</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\block_update.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\blocks.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\chunk_mesher.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\chunks.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\items.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\physics.hpp">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\world_generator.hpp">
-      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp">
       <Filter>open_simplex_noise</Filter>
@@ -153,9 +129,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\assets.hpp">
-      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h">
       <Filter>opengl\glad</Filter>
@@ -216,6 +189,39 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp">
       <Filter>opengl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\assets.hpp">
+      <Filter>game\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\blocks.hpp">
+      <Filter>game\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\items.hpp">
+      <Filter>game\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\world_generator.hpp">
+      <Filter>game\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\chunks.hpp">
+      <Filter>game\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\chunk_mesher.hpp">
+      <Filter>game\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\block_interaction.hpp">
+      <Filter>game\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\block_update.hpp">
+      <Filter>game\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\inventory.hpp">
+      <Filter>game\gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\physics.hpp">
+      <Filter>game\systems</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\player.hpp">
+      <Filter>game\gameplay</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -282,29 +288,11 @@
     <ClCompile Include="..\..\..\src\game.cpp">
       <Filter>game</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\player.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\audio\audio.cpp">
       <Filter>audio</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\audio\read_wav.cpp">
       <Filter>audio</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\block_update.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\chunk_mesher.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\chunks.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\physics.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\world_generator.cpp">
-      <Filter>game</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp">
       <Filter>open_simplex_noise</Filter>
@@ -314,9 +302,6 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp">
       <Filter>kisslib\tracy</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\assets.cpp">
-      <Filter>game</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c">
       <Filter>opengl\glad</Filter>
@@ -360,6 +345,21 @@
     <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\assets.cpp">
+      <Filter>game\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\world_generator.cpp">
+      <Filter>game\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\chunks.cpp">
+      <Filter>game\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\chunk_mesher.cpp">
+      <Filter>game\systems</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\player.cpp">
+      <Filter>game\gameplay</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">
@@ -398,8 +398,11 @@
     <Filter Include="opengl\glad">
       <UniqueIdentifier>{549d7535-531e-40de-9ffe-4bf1f67dcc2a}</UniqueIdentifier>
     </Filter>
-    <Filter Include="util">
-      <UniqueIdentifier>{ae1e71ba-6769-48f0-a0dc-b459911e0961}</UniqueIdentifier>
+    <Filter Include="game\gameplay">
+      <UniqueIdentifier>{20f957cf-f16f-4907-92ea-c9ec988c89e2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\systems">
+      <UniqueIdentifier>{6af96aca-cf53-4594-9935-c23a3714b1e5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

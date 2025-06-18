@@ -2,7 +2,6 @@
 #include "common.hpp"
 #include "blocks.hpp"
 #include "assets.hpp"
-#include "player.hpp"
 
 #if 1
 #define CHUNK_SIZE			64 // size of chunk in blocks per axis
@@ -140,8 +139,8 @@ struct ChunkVoxels {
 inline constexpr uint32_t MAX_SUBCHUNKS = (uint32_t)( (32ull *GB) / sizeof(SubchunkVoxels) );
 
 // Use comma operator to assert and return value in expression
-#define CHECK_BLOCK(b) (assert((b) >= B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) , b)
-//#define CHECK_BLOCK(b) ( ((b) >= B_NULL && (b) < (block_id)g_assets.block_types.blocks.size()) ? b : B_NULL )
+#define CHECK_BLOCK(b) (assert((b) >= B_NULL && (b) < (block_id)g->assets->block_types.blocks.size()) , b)
+//#define CHECK_BLOCK(b) ( ((b) >= B_NULL && (b) < (block_id)g->assets.block_types.blocks.size()) ? b : B_NULL )
 
 struct Chunk {
 	enum Flags : uint32_t {
@@ -351,7 +350,7 @@ struct VoxelEdits {
 			ImGui::End();
 		}
 	}
-	void update (Input& I, Game& game);
+	void update (Input& I);
 };
 
 struct Chunks {
@@ -473,7 +472,7 @@ struct Chunks {
 	uint32_t pending_chunks = 0; // chunks waiting to be queued
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_loading (Game& game);
+	void update_chunk_loading ();
 	
 	struct UploadSlice {
 		slice_id		sliceid;
@@ -486,13 +485,10 @@ struct Chunks {
 	std::vector<int3> unload_chunks; // Consumed by renderer, cleared beginning of next frame
 
 	// queue and finialize chunks that should be generated
-	void update_chunk_meshing (Game& game);
+	void update_chunk_meshing ();
 	
 	//
 	void fill_sphere (float3 const& center, float radius, block_id bid);
-
-	bool raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist=false);
-	
 };
 
 inline int _toint (float f) { return *(int*)&f; }
@@ -503,8 +499,10 @@ inline int face_from_stepmask (int axis, float3 const& ray_dir) {
 	else if (axis == 1) return ray_dir.y >= 0 ? 2 : 3;
 	else                return ray_dir.z >= 0 ? 4 : 5;
 }
+
+// DDA raycast through voxels
 template <typename Func>
-void raycast_voxels (Chunks& chunks, Ray const& ray, Func hit_voxel) {
+inline void raycast_voxels (Ray const& ray, Func hit_voxel) {
 	int3 stepdir;
 	stepdir.x = ray.dir.x >= 0 ? 1 : -1;
 	stepdir.y = ray.dir.y >= 0 ? 1 : -1;

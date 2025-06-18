@@ -224,8 +224,8 @@ namespace worldgen {
 		block_id air   = wg->bids[B_AIR];
 		block_id earth = wg->bids[B_EARTH];
 		
-		auto& vox   = chunks.chunk_voxels[cid];
-		auto& voxnz = chunks.chunk_voxels[neighbours.get(0,0,-1)];
+		auto& vox   = chunks->chunk_voxels[cid];
+		auto& voxnz = chunks->chunk_voxels[neighbours.get(0,0,-1)];
 
 		uint32_t subchunk_i = 0;
 		for (int sz=0; sz<CHUNK_SIZE; sz += SUBCHUNK_SIZE) {
@@ -245,10 +245,10 @@ namespace worldgen {
 					for (int by=0; by<SUBCHUNK_SIZE; ++by)
 					for (int bx=0; bx<SUBCHUNK_SIZE; ++bx) {
 
-						block_id below = (prev_val & SUBC_SPARSE_BIT) ? (block_id)(prev_val & ~SUBC_SPARSE_BIT) : chunks.subchunks[prev_val].voxels[block_i + BZ * (SUBCHUNK_SIZE-1)];
+						block_id below = (prev_val & SUBC_SPARSE_BIT) ? (block_id)(prev_val & ~SUBC_SPARSE_BIT) : chunks->subchunks[prev_val].voxels[block_i + BZ * (SUBCHUNK_SIZE-1)];
 						
 						for (int bz=0; bz < ((val & SUBC_SPARSE_BIT) ? 1 : SUBCHUNK_SIZE); ++bz) {
-							block_id bid = (val & SUBC_SPARSE_BIT) ? (block_id)(val & ~SUBC_SPARSE_BIT) : chunks.subchunks[val].voxels[block_i + bz*BZ];
+							block_id bid = (val & SUBC_SPARSE_BIT) ? (block_id)(val & ~SUBC_SPARSE_BIT) : chunks->subchunks[val].voxels[block_i + bz*BZ];
 
 							if (bid == air && below == earth)
 								block(sx+bx, sy+by, sz+bz, below);

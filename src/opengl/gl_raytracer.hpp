@@ -4,6 +4,7 @@
 #include "opengl_shaders.hpp"
 #include "assets.hpp"
 #include "game.hpp"
+#include "player.hpp"
 
 #include "engine/window.hpp" // frame_counter
 
@@ -148,7 +149,7 @@ namespace gl {
 		TestRenderer (Shaders& shaders) {
 			shad = shaders.compile("test", {{"WORLD_SIZE_CHUNKS", prints("%d", GPU_WORLD_SIZE_CHUNKS)}});
 
-			auto& m = g_assets.stock_models;
+			auto& m = g->assets->stock_models;
 			mesh = upload_mesh("stock_mesh", m.vertices.data(), m.vertices.size(), m.indices.data(), m.indices.size());
 		}
 		void imgui () {
@@ -350,7 +351,7 @@ namespace gl {
 		}
 
 		void visualize_sparse (OpenglRenderer& r);
-		void recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks);
+		void recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks);
 	};
 
 	struct Raytracer {
@@ -526,7 +527,7 @@ namespace gl {
 		} lighting;
 
 		bool macro_change = false; // shader macro change
-		void imgui (Input& I, Game& g) {
+		void imgui (Input& I) {
 			if (!ImGui::TreeNodeEx("Raytracer", ImGuiTreeNodeFlags_DefaultOpen)) return;
 
 			OGL_TIMER_HISTOGRAM_UPDATE(rt_total    , I.dt)
@@ -560,20 +561,18 @@ namespace gl {
 
 			//ImGui::Separator();
 			//test_renderer.imgui();
-			
-			macro_change |= conedev.vct_conedev(g, *this);
 
 			//
 			ImGui::TreePop();
 		}
 
-		void upload_changes (OpenglRenderer& r, Game& game);
+		void upload_changes (OpenglRenderer& r);
 
 		// update things and upload changes to gpu
-		void update (OpenglRenderer& r, Game& game, Input& I);
+		void update (OpenglRenderer& r, Input& I);
 
-		void set_uniforms (OpenglRenderer& r, Game& game, Shader* shad);
-		void draw (OpenglRenderer& r, Game& game);
+		void set_uniforms (OpenglRenderer& r, Shader* shad);
+		void draw (OpenglRenderer& r);
 
 	
 		struct Cone {
@@ -645,7 +644,7 @@ namespace gl {
 				return count_changed;
 			}
 			// NOTE: kinda broken after I refactored it! Need to debug to get debug drawing working again
-			bool vct_conedev (Game& game, Raytracer& rt) {
+			bool vct_conedev (Raytracer& rt) {
 				bool count_changed = imgui();
 				if (!refresh) return false;
 				refresh = false;
@@ -668,7 +667,7 @@ namespace gl {
 					float ang = deg(s.cone_ang);
 
 					for (int i=0; i<s.count; ++i) {
-						float3 cone_pos = game.player.pos;
+						float3 cone_pos = g->player->pos;
 
 						float3x3 rot = rotate3_Z((float)(i-1) / s.count * deg(360) + deg(s.start_azim)) *
 								rotate3_Y(deg(90) - ang * 0.5f - deg(s.elev_offs));

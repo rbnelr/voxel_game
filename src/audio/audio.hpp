@@ -105,18 +105,11 @@ public:
 	void play_sound (Sound* sound, float volume, float speed);
 };
 
-// Global audio manager
-extern AudioManager audio_manager;
-
 struct Sound {
 	AudioManager::Sound* sound = nullptr;
 
 	Sound () {}
-	Sound (std::string name, float volume=1, float speed=1) {
-		sound = audio_manager.load_sound(std::move(name), volume, speed);
-	}
+	Sound (std::string name, float volume=1, float speed=1);
 
-	void play (float volume=1, float speed=1) {
-		audio_manager.play_sound(sound, volume, speed);
-	}
+	void play (float volume=1, float speed=1);
 };

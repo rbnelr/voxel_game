@@ -93,3 +93,7 @@ using namespace kissmath;
 #include "engine/input.hpp"
 #include "engine/renderer.hpp"
 #include "engine/debug_draw.hpp"
+
+// Global game to access stuff like audio manager
+struct Game;
+extern Game* g;

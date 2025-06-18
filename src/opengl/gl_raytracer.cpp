@@ -8,8 +8,10 @@
 
 namespace gl {
 	
-	void Raytracer::update (OpenglRenderer& r, Game& game, Input& I) {
+	void Raytracer::update (OpenglRenderer& r, Input& I) {
 		ZoneScoped;
+		
+		macro_change |= conedev.vct_conedev(*this);
 
 		if (renderscale.update(r.render_size)) {
 			taa.resize(renderscale.size);
@@ -58,11 +60,11 @@ namespace gl {
 		}
 		macro_change = false;
 
-		upload_changes(r, game);
+		upload_changes(r);
 	}
 
 
-	void VCT_Data::recompute_mips (OpenglRenderer& r, Game& game, std::vector<int3> const& chunks) {
+	void VCT_Data::recompute_mips (OpenglRenderer& r, std::vector<int3> const& chunks) {
 		if (chunks.empty())
 			return;
 		ZoneScoped;
@@ -76,7 +78,7 @@ namespace gl {
 		//
 		//	int3 pages_per_chunk = CHUNK_SIZE / sparse_size;
 		//	int3 subchunks_per_page = sparse_size / SUBCHUNK_SIZE;
-		//	auto air = SUBC_SPARSE_BIT | g_assets.block_types.map_id("air");
+		//	auto air = SUBC_SPARSE_BIT | g->assets.block_types.map_id("air");
 		//
 		//	for (auto& chunk_pos : chunks) {
 		//		auto chunk_id = game.chunks.query_chunk(chunk_pos - GPU_WORLD_SIZE_CHUNKS/2);
@@ -197,7 +199,7 @@ namespace gl {
 		//
 		//	int3 pages_per_chunk = CHUNK_SIZE / sparse_size;
 		//	int3 subchunks_per_page = sparse_size / SUBCHUNK_SIZE;
-		//	auto air = SUBC_SPARSE_BIT | g_assets.block_types.map_id("air");
+		//	auto air = SUBC_SPARSE_BIT | g->assets.block_types.map_id("air");
 		//
 		//	for (auto& chunk_pos : chunks) {
 		//		auto chunk_id = game.chunks.query_chunk(chunk_pos - GPU_WORLD_SIZE_CHUNKS/2);
@@ -251,11 +253,13 @@ namespace gl {
 		}
 	}
 
-	void Raytracer::upload_changes (OpenglRenderer& r, Game& game) {
+	void Raytracer::upload_changes (OpenglRenderer& r) {
 		ZoneScoped;
 
+		auto& chunks = *g->chunks;
+
 		// These are the base chunk positions of the GPU_WORLD_SIZE_CHUNKS cube of voxels in world space
-		int3 offset = roundi(game.lod_center()) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
+		int3 offset = roundi(g->lod_center()) / CHUNK_SIZE - GPU_WORLD_SIZE_CHUNKS/2;
 		int3 old_offset = voxtex_offset;
 		voxtex_offset = offset;
 		
@@ -323,14 +327,14 @@ namespace gl {
 		//// Reupload any chunks with changes
 		// take all chunks that have had voxels updated AND are inside the sliding window of gpu voxel memory
 		//  -> ie chunk coords [voxtex_offset, voxtex_offset + GPU_WORLD_SIZE_CHUNKS)
-		for (auto cid : game.chunks.upload_voxels) {
-			auto& chunk = game.chunks.chunks[cid];
+		for (auto cid : chunks.upload_voxels) {
+			auto& chunk = chunks.chunks[cid];
 			if (chunk_in_gpu_world(chunk.pos)) {
 				reupload_chunks.emplace(chunk.pos);
 			}
 		}
 		// Unload chunks to unload
-		for (auto cpos : game.chunks.unload_chunks) {
+		for (auto cpos : chunks.unload_chunks) {
 			if (chunk_in_gpu_world(cpos)) {
 				clear_chunks.emplace(int3(cpos));
 			}
@@ -348,8 +352,8 @@ namespace gl {
 			OGL_TRACE("raytracer upload changes");
 
 			for (auto pos : reupload_chunks) {
-				auto it = game.chunks.chunks_map.find(pos);
-				if (it == game.chunks.chunks_map.end()) {
+				auto it = chunks.chunks_map.find(pos);
+				if (it == chunks.chunks_map.end()) {
 					// Chunk should be reuploaded due to gpu world movement, but we have no chunk loaded there, need to clear data
 					clear_chunks.emplace(int3(pos));
 					continue;
@@ -358,8 +362,8 @@ namespace gl {
 				clear_chunks.erase(int3(pos)); // don't clear chunks we overwrite anyway
 
 				auto cid = it->second;
-				auto& chunk = game.chunks.chunks[cid];
-				auto& vox = game.chunks.chunk_voxels[cid];
+				auto& chunk = chunks.chunks[cid];
+				auto& vox = chunks.chunk_voxels[cid];
 
 				assert(chunk_in_gpu_world(chunk.pos));
 				int3 wrap_pos = chunk.pos & (GPU_WORLD_SIZE_CHUNKS-1);
@@ -388,7 +392,7 @@ namespace gl {
 							}
 							
 						} else {
-							auto* data = game.chunks.subchunks[subc].voxels;
+							auto* data = chunks.subchunks[subc].voxels;
 							
 							for (int z=0; z<SUBCHUNK_SIZE; ++z)
 							for (int y=0; y<SUBCHUNK_SIZE; ++y) {
@@ -506,12 +510,12 @@ namespace gl {
 
 			glBindImageTexture(4, 0, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R8); // unbind
 		}
-		vct_data.recompute_mips(r, game, reupload_chunk_flat);
+		vct_data.recompute_mips(r, reupload_chunk_flat);
 
 		free(buffer);
 	}
 
-	void Raytracer::set_uniforms (OpenglRenderer& r, Game& game, Shader* shad) {
+	void Raytracer::set_uniforms (OpenglRenderer& r, Shader* shad) {
 		shad->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
 
 		shad->set_uniform("framebuf_size", renderscale.size);
@@ -522,7 +526,7 @@ namespace gl {
 			// frustrum_size (world-space size of near plane) / clip_near -> world-space width of frustrum at 1m z dist
 			// pixels / (frustrum_size / clip_near) -> pixels that a ~1m object has at 1m
 			// divide this by any object's z-distance to get a pixel size for LOD purposes
-			base_px_size = (float)renderscale.size.x / game.view.frustrum_size.x * game.view.clip_near;
+			base_px_size = (float)renderscale.size.x / g->view.frustrum_size.x * g->view.clip_near;
 		}
 		shad->set_uniform("base_px_size", base_px_size);
 
@@ -550,12 +554,12 @@ namespace gl {
 
 		shad->set_uniform("voxtex_world_min", (float3)(voxtex_offset * CHUNK_SIZE));
 	}
-	void Raytracer::draw (OpenglRenderer& r, Game& game) {
+	void Raytracer::draw (OpenglRenderer& r) {
 		ZoneScoped;
 		if (!rt_forward->prog || !rt_lighting->prog || !rt_post0->prog || !rt_post1->prog) return;
 		OGL_TIMER_ZONE(timer_rt_total.timer);
 		
-		r.update_view(game.view, renderscale.size, game.lod_center());
+		r.update_view(g->view, renderscale.size, g->lod_center());
 
 		{ // forward pass -> writes to gbuf
 			
@@ -566,7 +570,7 @@ namespace gl {
 				
 				glUseProgram(rt_forward->prog);
 				
-				set_uniforms(r, game, rt_forward);
+				set_uniforms(r, rt_forward);
 				
 				r.state.bind_textures(rt_forward, {
 					{"voxel_tex", voxel_tex.tex},
@@ -606,7 +610,7 @@ namespace gl {
 		
 			glUseProgram(shad->prog);
 		
-			set_uniforms(r, game, shad);
+			set_uniforms(r, shad);
 		
 			glBindImageTexture(0, framebuf0.col, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		
@@ -623,7 +627,7 @@ namespace gl {
 				glBindImageTexture(1, cur_color , 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F );
 				glBindImageTexture(2, cur_posage, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16UI);
 		
-				taa.prev_world2clip = game.view.cam_to_clip * (float4x4)game.view.world_to_cam;
+				taa.prev_world2clip = g->view.cam_to_clip * (float4x4)g->view.world_to_cam;
 				taa.cur ^= 1;
 			}
 		
@@ -679,7 +683,7 @@ namespace gl {
 			{ // upscale and horizontal blur
 				glUseProgram(rt_post0->prog);
 
-				set_uniforms(r, game, rt_post0);
+				set_uniforms(r, rt_post0);
 				rt_post0->set_uniform("exposure", lighting.post_exposure);
 				rt_post0->set_uniform("gauss_radius_px", gauss_radius_px);
 
@@ -694,12 +698,12 @@ namespace gl {
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			
-			r.update_view(game.view, r.render_size, game.lod_center());
+			r.update_view(g->view, r.render_size, g->lod_center());
 
 			{ // vertical blur and exposure mapping
 				glUseProgram(rt_post1->prog);
 
-				set_uniforms(r, game, rt_post1);
+				set_uniforms(r, rt_post1);
 				rt_post1->set_uniform("exposure", lighting.post_exposure);
 				rt_post1->set_uniform("gauss_radius_px", gauss_radius_px);
 

@@ -62,7 +62,7 @@ struct Item {
 	}
 	const char* get_name () {
 		if (id == I_NULL)			return "null";
-		else if (id < MAX_BLOCK_ID)	return g_assets.block_types[(block_id)id].name.c_str();
+		else if (id < MAX_BLOCK_ID)	return g->assets->block_types[(block_id)id].name.c_str();
 		else						return ITEM_NAMES[id - MAX_BLOCK_ID];
 	}
 

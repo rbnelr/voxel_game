@@ -3,8 +3,8 @@
 #include "chunk_mesher.hpp"
 #include "game.hpp"
 #include "world_generator.hpp"
-#include "voxel_light.hpp"
-#include "chunk_mesher.hpp"
+#include "items.hpp"
+#include "block_interaction.hpp"
 
 //#pragma optimize("", off)
 
@@ -305,7 +305,7 @@ void Chunks::free_chunk (chunk_id cid) {
 
 #include "immintrin.h"
 
-void Chunks::update_chunk_loading (Game& game) {
+void Chunks::update_chunk_loading () {
 	ZoneScoped;
 
 	unload_chunks = {};
@@ -338,7 +338,7 @@ void Chunks::update_chunk_loading (Game& game) {
 			bucket.push_back(chunk_pos);
 	};
 
-	float3 loading_center = game.lod_center();
+	float3 loading_center = g->lod_center();
 	{
 		ZoneScopedN("iterate chunk loading");
 		
@@ -483,7 +483,7 @@ void Chunks::update_chunk_loading (Game& game) {
 				n.neighbours[z+1][y+1][x+1] = nid;
 			}
 
-			worldgen::object_pass(*this, cid, n, &game._threads_world_gen);
+			worldgen::object_pass(*this, cid, n, g->_threads_world_gen.get());
 
 			chunk.flags |= Chunk::LOADED_PHASE2 | Chunk::REMESH;
 		};
@@ -571,7 +571,7 @@ void Chunks::update_chunk_loading (Game& game) {
 
 					chunk_id cid = U16_NULL;
 					if (load_from_disk)
-						cid = try_load_chunk_from_disk(*this, genchunk, game.world_gen.savefile.c_str());
+						cid = try_load_chunk_from_disk(*this, genchunk, g->world_gen->savefile.c_str());
 					
 					if (cid != U16_NULL) {
 						// finished chunk was loaded from disk
@@ -581,7 +581,7 @@ void Chunks::update_chunk_loading (Game& game) {
 						// chunk could not be loaded from disk, generate chunk
 						ZoneScopedN("phase 1 job");
 
-						auto job = std::make_unique<WorldgenJob>(genchunk, &game._threads_world_gen);
+						auto job = std::make_unique<WorldgenJob>(genchunk, g->_threads_world_gen.get());
 						
 						jobs[queued_count++] = std::move(job);
 
@@ -678,7 +678,7 @@ void Chunks::flag_touching_neighbours (Chunk* c) {
 	c->clear_dirty_rect();
 }
 
-void Chunks::update_chunk_meshing (Game& game) {
+void Chunks::update_chunk_meshing () {
 	ZoneScoped;
 
 	upload_slices.clear();
@@ -708,7 +708,7 @@ void Chunks::update_chunk_meshing (Game& game) {
 			auto& chunk = chunks[cid];
 			
 			if (chunk.flags & Chunk::REMESH) {
-				auto job = std::make_unique<RemeshChunkJob>(*this, cid, game.world_gen, mesh_world_border);
+				auto job = std::make_unique<RemeshChunkJob>(*this, cid, *g->world_gen, mesh_world_border);
 				remesh_jobs.emplace_back(std::move(job));
 			}
 
@@ -992,7 +992,7 @@ chunk_id try_load_chunk_from_disk (Chunks& chunks, int3 const& pos, char const* 
 			// turn unknown block ids into safe nulls
 			// (happens when loading save that was saves with more block types)
 			auto& v = chunks.subchunks[alloc_subc].voxels;
-			auto count = g_assets.block_types.count();
+			auto count = g->assets->block_types.count();
 			for (int i=0; i<SUBCHUNK_VOXEL_COUNT; ++i) {
 				if (v[i] >= count) v[i] = B_NULL;
 			}
@@ -1057,50 +1057,20 @@ void Chunks::fill_sphere (float3 const& center, float radius, block_id bid) {
 }
 
 //
-bool Chunks::raycast_breakable_blocks (Ray const& ray, float max_dist, VoxelHit& hit, bool hit_at_max_dist) {
-	ZoneScoped;
-
-	bool did_hit = false;
-
-	raycast_voxels(*this, ray, [&] (int3 const& pos, int axis, float dist) -> bool {
-		//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
-
-		hit.pos = pos;
-		hit.bid = read_block(pos.x, pos.y, pos.z);
-
-		if (dist > max_dist) {
-			if (hit_at_max_dist) {
-				hit.face = (BlockFace)-1; // select block itself instead of face (for creative mode block placing)
-				did_hit = true;
-			}
-			return true;
-		}
-
-		if ((g_assets.block_types.block_breakable(hit.bid))) {
-			hit.face = (BlockFace)face_from_stepmask(axis, ray.dir);
-			did_hit = true;
-			return true;
-		}
-		return false;
-	});
-
-	return did_hit;
-}
-
-void VoxelEdits::update (Input& I, Game& game) {
+void VoxelEdits::update (Input& I) {
 	if (!I.cursor_enabled)
 		return;
 
 	bool did_hit = false;
 	float3 hit_pos;
 	
-	Ray ray = screen_ray(I.cursor_pos, game.view, (float2)I.window_size);
+	Ray ray = screen_ray(I.cursor_pos, g->view, (float2)I.window_size);
 
 	switch (brush_mode) {
 	
 		case RAYCAST: {
 			VoxelHit hit;
-			did_hit = game.chunks.raycast_breakable_blocks(ray, brush_ray_max_dist, hit, true);
+			did_hit = BlockInteraction::raycast_breakable_blocks(*g->chunks, ray, brush_ray_max_dist, hit, true);
 			if (did_hit) hit_pos = (float3)hit.pos + 0.5f;
 		} break;
 		
@@ -1111,8 +1081,8 @@ void VoxelEdits::update (Input& I, Game& game) {
 	}
 
 	if (did_hit) {
-		auto air_bid   = g_assets.block_types.map_id("air");
-		auto brush_bid = g_assets.block_types.map_id(brush_block);
+		auto air_bid   = g->assets->block_types.map_id("air");
+		auto brush_bid = g->assets->block_types.map_id(brush_block);
 	
 		g_debugdraw.wire_sphere(hit_pos, brush_size*0.5f, lrgba(1,0,1,1));
 
@@ -1120,9 +1090,9 @@ void VoxelEdits::update (Input& I, Game& game) {
 		auto& r = I.buttons[MOUSE_BUTTON_RIGHT];
 
 		if (brush_repeat ? l.is_down : l.went_down)
-			game.chunks.fill_sphere(hit_pos, brush_size*0.5f, brush_bid);
+			g->chunks->fill_sphere(hit_pos, brush_size*0.5f, brush_bid);
 		else if (brush_repeat ? r.is_down : r.went_down)
-			game.chunks.fill_sphere(hit_pos, brush_size*0.5f, air_bid);
+			g->chunks->fill_sphere(hit_pos, brush_size*0.5f, air_bid);
 	}
 }
 

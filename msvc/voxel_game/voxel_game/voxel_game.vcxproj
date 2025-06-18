@@ -186,6 +186,7 @@
     <ClInclude Include="..\..\..\src\audio\audio.hpp" />
     <ClInclude Include="..\..\..\src\audio\read_wav.hpp" />
     <ClInclude Include="..\..\..\src\blocks.hpp" />
+    <ClInclude Include="..\..\..\src\block_interaction.hpp" />
     <ClInclude Include="..\..\..\src\block_update.hpp" />
     <ClInclude Include="..\..\..\src\chunks.hpp" />
     <ClInclude Include="..\..\..\src\chunk_mesher.hpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
     <ClInclude Include="..\..\..\src\imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="..\..\..\src\inventory.hpp" />
     <ClInclude Include="..\..\..\src\items.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\allocator.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\animation.hpp" />
@@ -259,16 +261,6 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
     <ClCompile Include="..\..\..\src\audio\read_wav.cpp" />
-    <ClCompile Include="..\..\..\src\block_update.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\chunks.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
@@ -397,26 +389,7 @@
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp" />
     <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
-    <ClCompile Include="..\..\..\src\physics.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\player.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
+    <ClCompile Include="..\..\..\src\player.cpp" />
     <ClCompile Include="..\..\..\src\world_generator.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>

@@ -2,6 +2,7 @@
 #include "gl_chunk_renderer.hpp"
 #include "chunks.hpp"
 #include "chunk_mesher.hpp"
+#include "world_generator.hpp"
 #include "opengl_renderer.hpp"
 
 #include "engine/window.hpp" // for frame_counter hack
@@ -36,13 +37,13 @@ void ChunkRenderer::upload_remeshed (Chunks& chunks) {
 	}
 }
 
-void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
+void ChunkRenderer::draw_chunks (OpenglRenderer& r) {
 	ZoneScoped;
 	OGL_TRACE("draw_chunks");
 	
-	auto& chunks = game.chunks;
+	auto& chunks = *g->chunks;
 
-	auto& cull_view = chunks.debug_frustrum_culling ? game.player_view : game.view;
+	auto& cull_view = chunks.debug_frustrum_culling ? g->player_view : g->view;
 
 	{
 		ZoneScopedN("chunk culling pass");
@@ -113,7 +114,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 		});
 
 		{
-			auto& block = game.player.selected_block;
+			auto& block = g->player->selected_block;
 			shader->set_uniform("damage",        block.is_selected ? block.damage : 0.0f);
 			shader->set_uniform("damaged_block", block.is_selected ? block.hit.pos : int3(0));
 
@@ -128,7 +129,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r, Game& game) {
 			shader->set_uniform("fog_dens", r.fog.fog_dens * 0.001f);
 			shader->set_uniform("water_fog_col", r.fog.water_fog_col);
 			shader->set_uniform("water_fog_dens", r.fog.water_fog_dens * 0.001f);
-			shader->set_uniform("water_z", (float)game.world_gen.water_level);
+			shader->set_uniform("water_z", (float)g->world_gen->water_level);
 		}
 
 		auto chunk_pos_loc = shader->get_uniform_location("chunk_pos");

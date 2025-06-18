@@ -1,5 +1,7 @@
 #include "common.hpp"
 #include "window.hpp"
+#include "game.hpp"
+#include "chunks.hpp"
 
 #include "imgui/imgui_impl_glfw.h"
 #include "GLFW/glfw3.h"
@@ -198,7 +200,7 @@ void Window::close_window () {
 void Window::switch_renderer () {
 	renderer = nullptr;
 	close_window();
-	game->chunks.renderer_switch();
+	g->chunks->renderer_switch();
 	
 	open_window();
 
@@ -211,10 +213,11 @@ void Window::switch_renderer () {
 void Window::run () {
 	open_window(); // open window first to get feedback when clicking exe
 
-	g_assets = Assets::load(); // load assets before renderer so renderer can rely on assets in ctor
-	g_window.renderer = start_renderer(g_window.render_backend, g_window.window);
-
+	// Create Game first, so assets are loaded
 	g_window.game = std::make_unique<Game>();
+	// Create renderer so game can load deserialize json for renderer
+	g_window.renderer = start_renderer(g_window.render_backend, g_window.window);
+	g_window.game->init(); // deserializes everything including renderer (but not assets?)
 
 	glfw_input_pre_gameloop(g_window);
 

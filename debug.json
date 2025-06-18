@@ -1,7 +1,7 @@
 {
 	"world_gen": {
 		"seed_str": "test4",
-		"savefile": "../saves/testRC3d",
+		"savefile": "../saves/testMovem",
 		"water_level": -123,
 		"base_depth": 3.0,
 		"large_noise_flatten": 3.0,
@@ -112,9 +112,9 @@
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
-		"graphics": true,
-		"world": true,
-		"chunks": true,
+		"graphics": false,
+		"world": false,
+		"chunks": false,
 		"entities": true
 	},
 	"lod_follow_flycam": false,
@@ -178,7 +178,7 @@
 			]
 		},
 		"rc3D": {
-			"imopen": true,
+			"imopen": false,
 			"base_pos": [
 				-101,
 				-89,

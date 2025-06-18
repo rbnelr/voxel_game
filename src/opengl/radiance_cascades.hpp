@@ -250,7 +250,7 @@ public:
 
 		result_tex = RCComputeTexture("RCtex", max(get_num_probes(get_spacing(0)), 1));
 	}
-	void update (Game& game, OpenglRenderer& r);
+	void update (OpenglRenderer& r);
 };
 
 class RadianceCascades3D {
@@ -327,6 +327,6 @@ public:
 		int2 rays_oct = get_rays_oct();
 		cascade0_tex = RCProbeTexture3D("RCtex", probes, rays_oct);
 	}
-	void update (Game& game, OpenglRenderer& r);
+	void update (OpenglRenderer& r);
 };
 } // namespace gl

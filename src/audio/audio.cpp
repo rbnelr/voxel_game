@@ -8,13 +8,13 @@ using namespace kissmath;
 
 #include <atomic>
 
+#include "game.hpp"
+
 namespace audio {
 	AudioData16 load_sound_data_from_file (const char* filepath) {
 		return load_wav(filepath);
 	}
 }
-
-AudioManager audio_manager;
 
 ////
 constexpr double SAMPLE_RATE = 44100; // output sample rate
@@ -156,3 +156,11 @@ struct PortAudio {
 };
 
 PortAudio g_portaudio;
+
+Sound::Sound (std::string name, float volume, float speed) {
+	sound = g->audio->load_sound(std::move(name), volume, speed);
+}
+
+void Sound::play (float volume, float speed) {
+	g->audio->play_sound(sound, volume, speed);
+}

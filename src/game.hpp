@@ -1,10 +1,19 @@
 #pragma once
 #include "common.hpp"
 #include "engine/camera.hpp"
-#include "world_generator.hpp"
-#include "block_update.hpp"
-#include "player.hpp"
-#include "assets.hpp"
+
+// Game is stored as a global such that systems needed everywhere can be accessed like g->assets->
+//  (audio, assets, chunks, etc.)
+// The systems are forward declared and put into Game as pointers (instead of included as header and used used by-value)
+//  to allow headers to access them though game without game needing the system header
+//  (causing circular reference which the C++ compiler throws a hissy fit about despite this being a common pattern in other languages...)
+struct Assets;
+class AudioManager;
+struct Physics;
+struct Chunks;
+struct WorldGenerator;
+struct BlockUpdate;
+struct Player;
 
 struct Game {
 #define SERIALIZE_NORMAL     world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam
@@ -18,18 +27,22 @@ struct Game {
 	};
 	ImguiOpen imopen;
 
+	std::unique_ptr<AudioManager> audio;
+	std::unique_ptr<Assets> assets;
+
 	bool dbg_pause = false;
 	Timing_Histogram fps_display;
 
-	WorldGenerator world_gen; // modified by imgui etc.
-	WorldGenerator _threads_world_gen; // used in threads, do not modify
+	std::unique_ptr<WorldGenerator> world_gen; // modified by imgui etc.
+	std::unique_ptr<WorldGenerator> _threads_world_gen; // used in threads, do not modify
 
-	Chunks chunks;
+	std::unique_ptr<Physics> physics;
+	std::unique_ptr<Chunks> chunks;
 
-	Flycam flycam = { float3(-5, -10, 50), float3(0, deg(-20), 0), 12 };
-	Player player = { float3(0.5f,0.5f,34) };
+	std::unique_ptr<Flycam> flycam;
+	std::unique_ptr<Player> player;
 
-	BlockUpdate block_update;
+	std::unique_ptr<BlockUpdate> block_update;
 
 	bool activate_flycam = false;
 	bool flycam_control_player = false;
@@ -43,14 +56,14 @@ struct Game {
 	Camera_View view;
 
 	bool lod_follow_flycam = true;
-	float3 lod_center () {
-		return lod_follow_flycam && activate_flycam ? flycam.cam.pos : player.pos;
-	}
+	float3 lod_center ();
 
 	Game ();
+	void init (); // Called after renderer is inited, since renderer wants access to game.assets
 	~Game ();
-
+	
 	void imgui (Window& window, Input& I, Renderer* renderer);
 	void update (Window& window, Input& I);
-
 };
+
+extern Game* g;

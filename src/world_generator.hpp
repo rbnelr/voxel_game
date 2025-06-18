@@ -2,6 +2,8 @@
 #include "common.hpp"
 #include "blocks.hpp"
 #include "chunks.hpp"
+#include "assets.hpp"
+#include "game.hpp"
 
 inline uint64_t get_seed (std::string_view str) {
 	str = kiss::trim(str);
@@ -126,7 +128,7 @@ namespace worldgen {
 
 		void load () {
 			for (int i=0; i<B_COUNT; ++i) {
-				bids[i] = g_assets.block_types.map_id(names[i]);
+				bids[i] = g->assets->block_types.map_id(names[i]);
 			}
 		}
 
@@ -214,6 +216,11 @@ struct WorldGenerator {
 	worldgen::BlockIDs	bids;
 	
 	WorldGenerator () {
+		bids.load();
+	}
+	WorldGenerator (WorldGenerator const& other) {
+		*this = other;
+
 		bids.load();
 	}
 

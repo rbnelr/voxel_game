@@ -3,6 +3,7 @@
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 #include "assets.hpp"
+#include "chunks.hpp"
 #include "game.hpp"
 
 namespace gl {
@@ -120,7 +121,7 @@ struct ChunkRenderer {
 
 	void upload_remeshed (Chunks& chunks);
 
-	void draw_chunks (OpenglRenderer& r, Game& game);
+	void draw_chunks (OpenglRenderer& r);
 
 };
 

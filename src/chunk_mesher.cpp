@@ -2,7 +2,7 @@
 #include "chunk_mesher.hpp"
 #include "world_generator.hpp"
 #include "assets.hpp"
-#include "player.hpp"
+#include "game.hpp"
 
 struct CallCtx {
 	RemeshChunkJob& j;
@@ -551,10 +551,10 @@ chunk_id get_neighbour_blocks (Chunks& chunks, Chunk& chunk, int neighbour) {
 }
 
 RemeshChunkJob::RemeshChunkJob (Chunks& chunks, chunk_id cid, WorldGenerator const& wg, bool mesh_world_border) {
-	block_types			= g_assets.block_types.blocks.data();
-	block_meshes		= g_assets.block_meshes.block_meshes.data();
-	block_meshes_meshes	= g_assets.block_meshes.meshes.data();
-	block_tiles			= g_assets.block_tiles.data();
+	block_types			= g->assets->block_types.blocks.data();
+	block_meshes		= g->assets->block_meshes.block_meshes.data();
+	block_meshes_meshes	= g->assets->block_meshes.meshes.data();
+	block_tiles			= g->assets->block_tiles.data();
 
 	this->chunk_voxels		= chunks.chunk_voxels.arr;
 	this->subchunks			= chunks.subchunks.arr;

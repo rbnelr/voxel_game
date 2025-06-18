@@ -2,6 +2,10 @@
 #include "game.hpp"
 #include "engine/window.hpp"
 #include "kisslib/threadpool.hpp"
+#include "world_generator.hpp"
+#include "block_update.hpp"
+#include "chunks.hpp"
+#include "player.hpp"
 
 void to_json (nlohmann::ordered_json& j, const Game& t) {
 	_JSON_EXPAND(_JSON_PASTE(_JSON_TO, SERIALIZE_NORMAL))
@@ -14,21 +18,44 @@ void from_json (const nlohmann::ordered_json& j, Game& t) {
 				g_window.renderer->deserialize(j["renderer_opengl"]);
 }
 
+// Global game definition
+Game* g = nullptr;
+
 Game::Game () {
 	ZoneScoped;
-	load("debug.json", this); 
+	g = this;
+	
+	audio = std::make_unique<AudioManager>();
+	assets = std::make_unique<Assets>( Assets::load() );
+
+	physics = std::make_unique<Physics>();
+	chunks = std::make_unique<Chunks>();
+
+	flycam = std::make_unique<Flycam>();
+	player = std::make_unique<Player>();
+
+	world_gen = std::make_unique<WorldGenerator>();
 	
 	//set_process_high_priority();
 	set_thread_priority(TPRIO_MAIN);
 	set_thread_preferred_core(0);
 	set_thread_description(">> gameloop");
+}
+void Game::init () {
+	load("debug.json", this);
 
-	_threads_world_gen = world_gen; // apply changes loaded by load("debug.json")
-	_threads_world_gen.seed = get_seed(_threads_world_gen.seed_str);
+	// apply changes loaded by load("debug.json")
+	_threads_world_gen = std::make_unique<WorldGenerator>(*world_gen);
+	_threads_world_gen->seed = get_seed(_threads_world_gen->seed_str);
 }
 Game::~Game () {
 	ZoneScoped;
-	//save("debug.json", *this); 
+	//save("debug.json", *this);
+	g = nullptr;
+}
+
+float3 Game::lod_center () {
+	return lod_follow_flycam && activate_flycam ? flycam->cam.pos : player->pos;
 }
 
 // try to do all debug guis in here,
@@ -88,43 +115,11 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			fps_display.push_timing(I.real_dt);
 			fps_display.imgui_display("framerate", I.dt, true);
 
-			//ImGui::Text("Chunks drawn %4d / %4d", world->chunks.chunks.count() - world->chunks.count_culled, world->chunks.chunks.count());
+			//ImGui::Text("Chunks drawn %4d / %4d", world->chunks->chunks->count() - world->chunks->count_culled, world->chunks->chunks->count());
 		}
 
 		window.input.imgui();
 		
-		if (imgui_header("Graphics", &imopen.graphics)) {
-			//if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL"))
-			//	g_window.switch_render_backend = true;
-
-			if (renderer)
-				renderer->graphics_imgui(I, *this);
-		}
-
-		if (imgui_header("World", &imopen.world)) {
-
-			if (ImGui::Button("Recreate")) {
-				chunks.destroy();
-				_threads_world_gen = world_gen; // make copy that can safely be used in threads while main version is edited by imgui
-				_threads_world_gen.seed = get_seed(_threads_world_gen.seed_str);
-			}
-
-			ImGui::InputText("savefile", &world_gen.savefile);
-			ImGui::SameLine();
-			ImGui::Checkbox("Load", &chunks.load_from_disk);
-			ImGui::SameLine();
-			if (ImGui::Button("Save"))
-				chunks.save_chunks_to_disk(world_gen.savefile.c_str());
-
-			world_gen.imgui();
-		}
-
-		if (imgui_header("Chunks", &imopen.chunks)) {
-			chunks.edits.imgui(I);
-			chunks.imgui(renderer);
-			block_update.imgui();
-		}
-
 		{
 			bool open = imgui_header("Misc", &imopen.entities);
 
@@ -134,15 +129,15 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 				if (activate_flycam) {
 					float3x3 cam_to_world_rot;
-					flycam.calc_world_to_cam_rot(&cam_to_world_rot);
+					flycam->calc_world_to_cam_rot(&cam_to_world_rot);
 
-					flycam.cam.pos = player.pos + player.head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
+					flycam->cam.pos = player->pos + player->head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
 				}
 			}
 			if (open) ImGui::Checkbox("flycam_control_player", &flycam_control_player);
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
-				player.pos = flycam.cam.pos;
+				player->pos = flycam->cam.pos;
 			}
 
 			if (open) ImGui::Checkbox("Creative Mode [C]", &creative_mode);
@@ -151,12 +146,44 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 
 			if (open) ImGui::Separator();
 
-			if (open) flycam.imgui("flycam");
-			if (open) player.imgui("player");
+			if (open) flycam->imgui("flycam");
+			if (open) player->imgui("player");
 
 			if (open) ImGui::Checkbox("lod_follow_flycam", &lod_follow_flycam);
 
 			if (open) ImGui::Separator();
+		}
+
+		if (imgui_header("World", &imopen.world)) {
+
+			if (ImGui::Button("Recreate")) {
+				chunks->destroy();
+				_threads_world_gen = std::make_unique<WorldGenerator>(*world_gen); // make copy that can safely be used in threads while main version is edited by imgui
+				_threads_world_gen->seed = get_seed(_threads_world_gen->seed_str);
+			}
+
+			ImGui::InputText("savefile", &world_gen->savefile);
+			ImGui::SameLine();
+			ImGui::Checkbox("Load", &chunks->load_from_disk);
+			ImGui::SameLine();
+			if (ImGui::Button("Save"))
+				chunks->save_chunks_to_disk(world_gen->savefile.c_str());
+
+			world_gen->imgui();
+		}
+
+		if (imgui_header("Chunks", &imopen.chunks)) {
+			chunks->edits.imgui(I);
+			chunks->imgui(renderer);
+			block_update->imgui();
+		}
+		
+		if (imgui_header("Graphics", &imopen.graphics)) {
+			//if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL"))
+			//	g_window.switch_render_backend = true;
+
+			if (renderer)
+				renderer->graphics_imgui(I, *this);
 		}
 
 	}
@@ -170,38 +197,33 @@ void Game::update (Window& window, Input& I) {
 
 	g_debugdraw.clear();
 
-	player.update_controls(I, *this);
-
-	player.update_movement(I, *this);
-	physics.update_player(I.dt, chunks, player);
-
-	player.update(I, I.window_size, *this);
+	player->update(I);
 
 	g_debugdraw.prepare_selectables(view, I, I.cursor_enabled);
 
-	auto& sel = player.selected_block;
+	auto& sel = player->selected_block;
 	if (sel)
-		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.hit.pos.x, sel.hit.pos.y, sel.hit.pos.z, g_assets.block_types[sel.hit.bid].name.c_str());
+		ImGui::Text("Selected Block: (%+4d, %+4d, %+4d) %s", sel.hit.pos.x, sel.hit.pos.y, sel.hit.pos.z, g->assets->block_types[sel.hit.bid].name.c_str());
 	else
 		ImGui::Text("Selected Block: None");
 
 	//_dev_raycast(chunks, player_view);
 
-	block_update.update_blocks(I, chunks);
+	block_update->update_blocks(I);
 
-	chunks.update_chunk_loading(*this);
+	chunks->update_chunk_loading();
 	
-	if (chunks.edits.open)
-		chunks.edits.update(I, *this);
+	if (chunks->edits.open)
+		chunks->edits.update(I);
 	
-	chunks.update_chunk_meshing(*this);
+	chunks->update_chunk_meshing();
 
-	if (activate_flycam || player.third_person) {
-		g_debugdraw.cylinder(player.pos, player.radius, player.height, lrgba(1,0,1,0.5f));
+	if (activate_flycam || player->third_person) {
+		g_debugdraw.cylinder(player->pos, player->radius, player->height, lrgba(1,0,1,0.5f));
 	}
 	if (activate_flycam) {
 		g_debugdraw.axis_gizmo(view, I.window_size);
-		g_debugdraw.movable("player", &player.pos, 0.4f, lrgba(0.7f,0,0.7f,1), &player.vel);
+		g_debugdraw.movable("player", &player->pos, 0.4f, lrgba(0.7f,0,0.7f,1), &player->vel);
 	}
 
 	g_debugdraw.finish_selectables();

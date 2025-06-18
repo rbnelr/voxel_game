@@ -1,7 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "blocks.hpp"
-#include "engine/renderer.hpp"
+//#include "engine/renderer.hpp"
 
 static constexpr int  TILE_SIZE = 16;
 inline constexpr int2 TILEMAP_SIZE = int2(16,16);
@@ -225,9 +225,6 @@ struct Assets {
 		return a;
 	}
 };
-
-// global assets because these are needed in a lot of places
-inline Assets g_assets;
 
 struct BlockHighlightSubmeshes {
 	GenericSubmesh block_highlight, face_highlight;

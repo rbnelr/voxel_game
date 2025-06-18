@@ -90,6 +90,9 @@ struct BlockTypes {
 		auto& b = blocks[id];
 		return b.collision == CM_SOLID || b.collision == CM_BREAKABLE;
 	}
+	inline bool block_replaceable (block_id id) {
+		return !block_breakable(id); // Currently air and liquid is replaceable
+	}
 };
 
 enum BlockFace {

@@ -133,7 +133,7 @@ struct ChunkMeshExporter {
 			for (uint32_t i=0; i<slice_vertex_count; i++) {
 				auto& instance = slice.verts[i];
 
-				auto& mesh_slice = g_assets.block_meshes.slices[instance.meshid];
+				auto& mesh_slice = g->assets.block_meshes.slices[instance.meshid];
 				float3 vox_pos = (float3)(int3(instance.posx, instance.posy, instance.posz)) * 1.0f / BlockMeshInstance_FIXEDPOINT_FAC;
 				vox_pos += (float3)(chunk.pos * CHUNK_SIZE);
 

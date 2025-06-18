@@ -34,7 +34,7 @@ RadianceCascades2D::RadianceCascades2D (OpenglRenderer& r): vis_draw{r} {
 	combine_shad = r.shaders.compile("rc_combine", {}, {{ COMPUTE_SHADER }});
 }
 
-void RadianceCascades2D::update (Game& game, OpenglRenderer& r) {
+void RadianceCascades2D::update (OpenglRenderer& r) {
 	if (!imopen) return;
 	if (recreate) do_recreate();
 	recreate = false;
@@ -164,7 +164,7 @@ RadianceCascades3D::RadianceCascades3D (OpenglRenderer& r): vis_draw{r} {
 	vis_shad = r.shaders.compile("rc_vis3d");
 }
 
-void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
+void RadianceCascades3D::update (OpenglRenderer& r) {
 	if (!imopen) return;
 	if (recreate) do_recreate();
 	recreate = false;
