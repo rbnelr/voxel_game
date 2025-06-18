@@ -12,7 +12,8 @@ struct Block;
 struct Game;
 
 struct Player {
-	SERIALIZE(Player, pos, vel, rot_ae, third_person)
+	SERIALIZE(Player, pos, vel, rot_ae, third_person,
+		movement_params)
 
 	// Player ground position
 	float3	pos = 0;
@@ -21,7 +22,7 @@ struct Player {
 	float3	vel = 0;
 
 	// Player look rotation
-	float2	rot_ae =		float2(deg(0), deg(-10)); // azimuth elevation
+	float2	rot_ae = float2(deg(0), deg(-10)); // azimuth elevation
 
 	//// Cameras
 	bool third_person = false;
@@ -61,11 +62,18 @@ struct Player {
 	float radius = 0.4f;
 	float height = 1.7f;
 
-	float walk_speed = 5.0f;
-	float run_speed = 13.0f;
+	struct MovementParams {
+		SERIALIZE(MovementParams, walk_speed, run_speed,
+			walk_accel_base, walk_accel_proport, air_control_accel_base)
 
-	float walk_accel_base = 5;
-	float walk_accel_proport = 10;
+		float walk_speed = 3.5f;
+		float run_speed = 8;
+
+		float walk_accel_base = 5;
+		float walk_accel_proport = 10;
+		float air_control_accel_base = 2;
+	};
+	MovementParams movement_params;
 
 	CollisionResponse collison_response;
 
@@ -100,10 +108,12 @@ struct Player {
 		ImGui::DragFloat("radius", &radius, 0.05f);
 		ImGui::DragFloat("height", &height, 0.05f);
 
-		ImGui::DragFloat("walk_speed", &walk_speed, 0.05f);
-		ImGui::DragFloat("run_speed", &run_speed, 0.05f);
-		ImGui::DragFloat("walk_accel_base", &walk_accel_base, 0.05f);
-		ImGui::DragFloat("walk_accel_proport", &walk_accel_proport, 0.05f);
+		auto& m = movement_params;
+		ImGui::DragFloat("walk_speed", &m.walk_speed, 0.05f);
+		ImGui::DragFloat("run_speed", &m.run_speed, 0.05f);
+		ImGui::DragFloat("walk_accel_base", &m.walk_accel_base, 0.05f);
+		ImGui::DragFloat("walk_accel_proport", &m.walk_accel_proport, 0.05f);
+		ImGui::DragFloat("air_control_accel_base", &m.air_control_accel_base, 0.05f);
 
 		collison_response.imgui();
 
@@ -202,11 +212,12 @@ struct Player {
 
 		float dist = tps_camera_dist;
 
-		//{
-		//	float hit_dist;
-		//	if (world.raycast_breakable_blocks(world.player->selected_block, ray, dist, false, &hit_dist))
-		//		dist = max(hit_dist - 0.05f, 0.0f);
-		//}
+		{
+			VoxelHit hit;
+			if (BlockInteraction::raycast_breakable_blocks(*g->chunks, ray, dist, hit, false)) {
+				dist = max(hit.dist - 0.05f, 0.0f);
+			}
+		}
 
 		return tps_camera_base_pos + tps_camera_dir * dist;
 	}

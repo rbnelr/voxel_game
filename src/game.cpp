@@ -9,13 +9,15 @@
 
 void to_json (nlohmann::ordered_json& j, const Game& t) {
 	_JSON_EXPAND(_JSON_PASTE(_JSON_TO, SERIALIZE_NORMAL))
-		if (g_window.render_backend == RenderBackend::OPENGL)
-			g_window.renderer->serialize(j["renderer_opengl"]);
+	if (g_window.render_backend == RenderBackend::OPENGL)
+		g_window.renderer->serialize(j["renderer_opengl"]);
+	j["input"] = g_window.input;
 }
 void from_json (const nlohmann::ordered_json& j, Game& t) {
 	_JSON_EXPAND(_JSON_PASTE(_JSON_FROM, SERIALIZE_NORMAL))
-		if (g_window.render_backend == RenderBackend::OPENGL && j.contains("renderer_opengl"))
-				g_window.renderer->deserialize(j["renderer_opengl"]);
+	if (g_window.render_backend == RenderBackend::OPENGL && j.contains("renderer_opengl"))
+		g_window.renderer->deserialize(j["renderer_opengl"]);
+	if (j.contains("input")) j.at("input").get_to(g_window.input);
 }
 
 // Global game definition

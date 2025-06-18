@@ -8,6 +8,7 @@ struct VoxelHit {
 	int3		pos;
 	block_id	bid;
 	BlockFace	face; // -1 == no face
+	float		dist;
 };
 struct SelectedBlock {
 	VoxelHit	hit;
@@ -87,6 +88,7 @@ struct BlockInteraction {
 		raycast_voxels(ray, [&] (int3 const& pos, int axis, float dist) -> bool {
 			//g_debugdraw.wire_cube((float3)pos+0.5f, 1, lrgba(1,0,0,1));
 
+			hit.dist = dist;
 			hit.pos = pos;
 			hit.bid = chunks.read_block(pos.x, pos.y, pos.z);
 

@@ -11,6 +11,8 @@ struct ButtonState {
 };
 
 struct Input {
+	SERIALIZE(Input, mouselook_sensitiviy_divider, view_elevation_down_limit, view_elevation_up_limit)
+
 	//// Input Data
 	// zero on first frame
 	// else duration of the prev frame scaled by time_scale but never larger than max_dt

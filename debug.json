@@ -72,13 +72,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-102.34491729736328,
-				-69.83289337158203,
-				-100.44189453125
+				-71.4830551147461,
+				-48.75961685180664,
+				-111.38636779785156
 			],
 			"rot_aer": [
-				-1.391869068145752,
-				-0.4496343731880188,
+				1.396515130996704,
+				-0.2230939269065857,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -87,16 +87,16 @@
 			"vfov": 1.2050007581710815,
 			"ortho_vsize": 10.0
 		},
-		"base_speed": 7.386900901794434,
+		"base_speed": 7.917083740234375,
 		"max_speed": 1000000.0,
 		"speedup_factor": 2.0,
 		"fast_multiplier": 4.0
 	},
 	"player": {
 		"pos": [
-			-81.14000701904297,
-			-48.982906341552734,
-			-114.9999008178711
+			-78.52836608886719,
+			-46.81139373779297,
+			-112.0999984741211
 		],
 		"vel": [
 			0.0,
@@ -104,16 +104,23 @@
 			0.0
 		],
 		"rot_ae": [
-			1.887380838394165,
-			-0.8407208323478699
+			-0.5944106578826904,
+			-0.281655877828598
 		],
-		"third_person": false
+		"third_person": false,
+		"movement_params": {
+			"walk_speed": 3.5,
+			"run_speed": 8.0,
+			"walk_accel_base": 5.0,
+			"walk_accel_proport": 10.0,
+			"air_control_accel_base": 6.0
+		}
 	},
 	"activate_flycam": true,
 	"imopen": {
 		"performance": true,
 		"graphics": false,
-		"world": false,
+		"world": true,
 		"chunks": false,
 		"entities": true
 	},
@@ -203,5 +210,10 @@
 			"debugdraw": true,
 			"gui": false
 		}
+	},
+	"input": {
+		"mouselook_sensitiviy_divider": 500.0,
+		"view_elevation_down_limit": -0.1745329350233078,
+		"view_elevation_up_limit": 0.0872664600610733
 	}
 }
