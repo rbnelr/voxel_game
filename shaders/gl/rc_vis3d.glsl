@@ -28,13 +28,15 @@ layout(location = 0) vs2fs VS {
 	
 	uniform ivec3 world_base_pos;
 	uniform ivec2 world_size;
-	uniform float spacing;
+	uniform ivec3 num_probes;
 	uniform ivec2 rays_oct;
+	uniform float spacing;
 
 	out vec4 frag_col;
 	void main () {
 		vec3 pos = vs.pos_world - vec3(world_base_pos);
 		ivec3 probe_idx = ivec3(floor(pos / spacing));
+		vec3 probe_idxF = pos / spacing;
 		
 	#if 0
 		// cosine-weighted average light, aka diffuse light
@@ -45,7 +47,7 @@ layout(location = 0) vs2fs VS {
 			vec3 dir_world = octah2dir(uv);
 			float cos_weight = max(dot(normalize(vs.norm_world), dir_world), 0.0);
 			
-			ivec3 P = ivec3(probe_idx.xy * rays_oct + ivec2(x,y), probe_idx.z);
+			ivec3 P = ivec3(probe_idx.xy + ivec2(x,y) * num_probes.xy, probe_idx.z);
 			col += texelFetch(cascade0_tex, P, 0) * cos_weight;
 		}
 		frag_col = col / (rays_oct.x * rays_oct.y);
@@ -57,11 +59,13 @@ layout(location = 0) vs2fs VS {
 		//ivec3 P = ivec3(probe_idx.xy * rays_oct + uv, probe_idx.z);
 		//frag_col = texelFetch(cascade0_tex, P, 0);
 		
-		vec2 uv = dir2octah(refl_dir) * vec2(rays_oct);
-		vec3 P = vec3(vec2(probe_idx.xy * rays_oct) + uv,
-		             float(probe_idx.z) + 0.5);
 		vec3 sz = vec3(textureSize(cascade0_tex, 0));
-		frag_col = textureLod(cascade0_tex, P / sz, 0.0);
+		
+		vec2 ray_uv = vec2(ivec2(dir2octah(refl_dir) * vec2(rays_oct))) / rays_oct;
+		vec3 uv = probe_idxF + vec3(ray_uv * vec2(num_probes.xy), 0);
+		//frag_col = textureLod(cascade0_tex, uv / sz, 0.0);
+		
+		frag_col = texelFetch(cascade0_tex, ivec3(floor(uv)), 0);
 	#endif
 	}
 #endif

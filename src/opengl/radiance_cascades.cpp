@@ -191,14 +191,16 @@ void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
 		trace_shad->set_uniform("voxtex_world_min", (float3)(r.raytracer.voxtex_offset * CHUNK_SIZE));
 
 		float spacing = get_spacing();
+		int3 num_probes = get_num_probes(spacing);
 		int2 rays_oct = get_rays_oct();
 
 		int3 dbg_idx = floori(dbg_pos / spacing - 0.5f);
 
 		trace_shad->set_uniform("world_base_pos", base_pos);
 		trace_shad->set_uniform("world_size", size);
-		trace_shad->set_uniform("spacing", spacing);
+		trace_shad->set_uniform("num_probes", num_probes);
 		trace_shad->set_uniform("rays_oct", rays_oct);
+		trace_shad->set_uniform("spacing", spacing);
 		trace_shad->set_uniform("dbg_idx", dbg_idx);
 		trace_shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);
 
@@ -218,9 +220,10 @@ void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
 		g_debugdraw.wire_cube((float3)base_pos + (float3)size*0.5f, (float3)size, lrgba(1,0,0,1));
 		
 		float spacing = get_spacing();
+		int3 num_probes = get_num_probes(spacing);
 		int2 rays_oct = get_rays_oct();
 
-		float3 tex_size = (float3)get_num_probes(spacing) * spacing;
+		float3 tex_size = (float3)num_probes * spacing;
 
 		int z_idx = floori(dbg_pos.z / spacing - 0.5f);
 		float z_slice = ((float)z_idx + 0.5f) * spacing;
@@ -237,8 +240,9 @@ void RadianceCascades3D::update (Game& game, OpenglRenderer& r) {
 				
 				vis_shad->set_uniform("world_base_pos", base_pos);
 				vis_shad->set_uniform("world_size", size);
-				vis_shad->set_uniform("spacing", spacing);
+				vis_shad->set_uniform("num_probes", num_probes);
 				vis_shad->set_uniform("rays_oct", rays_oct);
+				vis_shad->set_uniform("spacing", spacing);
 
 				vis_draw.draw_using(vis_shad, r.state, transform(p, float3(0,0,0), tex_size));
 			}

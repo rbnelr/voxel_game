@@ -22,8 +22,9 @@ uniform ivec3 dispatch_size;
 
 uniform ivec3 world_base_pos;
 uniform ivec2 world_size;
-uniform float spacing;
+uniform ivec3 num_probes;
 uniform ivec2 rays_oct;
+uniform float spacing;
 
 // rgb: linear light emitted along ray
 // a: opacity blocking light along ray
@@ -178,8 +179,10 @@ void main () {
 	ivec3 invocID = ivec3(gl_GlobalInvocationID);
 	if (any(greaterThan(invocID, dispatch_size))) return;
 	
-	ivec3 probe_idx = ivec3(invocID.xy / rays_oct, invocID.z);
-	ivec2 ray_idx   =       invocID.xy % rays_oct;
+	//ivec3 probe_idx = ivec3(invocID.xy / rays_oct, invocID.z);
+	//ivec2 ray_idx   =       invocID.xy % rays_oct;
+	ivec2 ray_idx   =       invocID.xy / num_probes.xy;
+	ivec3 probe_idx = ivec3(invocID.xy % num_probes.xy, invocID.z);
 	
 	vec3 probe_pos = spacing * (vec3(probe_idx) + 0.5);
 	

@@ -54,7 +54,7 @@ struct RCProbeTexture3D {
 	Texture3D tex;
 	int3 num_probes;
 	int2 rays_octh_size;
-	int3 total_size () { return int3(rays_octh_size, 1) * num_probes; }
+	int3 total_size () { return num_probes * int3(rays_octh_size, 1); }
 	size_t mem_size () {
 		auto num = total_size();
 		size_t sz = num.x * num.y * num.z;
