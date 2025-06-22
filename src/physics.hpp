@@ -426,6 +426,7 @@ struct Physics {
 			printf("");
 		}
 
+		// Need at least 3 iterations to handle jumping into corners correctly, which sucks
 		for (int i=0; i<3; i++) {
 			auto hit = world_voxel_box_collision(chunks, obj);
 			
@@ -471,8 +472,8 @@ struct Physics {
 		// but could consider capping velocity to reflect missing movement step
 
 
-		static int frame_counter = 0;
-		clog("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
-			obj.grounded ? "(grounded)":"");
+		//static int frame_counter = 0;
+		//clog("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
+		//	obj.grounded ? "(grounded)":"");
 	}
 };

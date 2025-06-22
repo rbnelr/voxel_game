@@ -3,6 +3,15 @@
 #include "game.hpp"
 #include "player.hpp"
 
+// TODO: verify this is working
+// Look at https://stackoverflow.com/questions/2708476/rotation-interpolation
+inline float alerp (float ang0, float ang1, float t) {
+	float offset = wrap(ang1 - ang0, TAU);
+	if (abs(offset) > PI)
+		offset -= TAU;
+	return wrap(ang0 + offset * t, TAU);
+}
+
 void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	ZoneScoped;
 	
@@ -58,6 +67,16 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	pos = obj.pos;
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
+	
+	cur_speed = length(vel);
+
+	float walking_ang = atan2f(-vel.x, vel.y);
+	float anim_fac = clamp(map(cur_speed, m.walk_speed, m.run_speed), 0.0f, 1.0f);
+	float facing_ang = alerp(rot_ae.x, walking_ang, anim_fac * 0.5f);
+
+	clog("%f %f", rot_ae.x, walking_ang);
+
+	update_body_dynamics(I, facing_ang);
 
 #if 1 // movement speed plotting to better develop movement code
 	{
@@ -96,4 +115,40 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		ImGui::End();
 	}
 #endif
+}
+
+inline float rotate_towards_range (Input& I, float cur, float target,
+		float speed_scaled, float speed_flat, float2 orig_range, float2 output_range) {
+	if (cur == INF) return target; // Skip animation using INF as signal, useful for load etc.
+
+	float t = clamp(map(target, orig_range.x, orig_range.y), 0.0f, 1.0f);
+	target = lerp(output_range.x, output_range.y, t);
+
+	float offset = target - cur;
+	float delta = abs(offset) * speed_scaled + speed_flat;
+	cur += copysignf(1.0f, offset) * min(delta * I.dt, abs(offset));
+	return cur;
+}
+inline float rotate_towards_shorter_angle (Input& I, float cur, float target,
+		float speed_scaled, float speed_flat) {
+	if (cur == INF) return target; // Skip animation using INF as signal, useful for load etc.
+
+	float offset = wrap(target - cur, deg(360));
+	if (abs(offset) > deg(180))
+		offset -= deg(360);
+
+	float delta = abs(offset) * speed_scaled + speed_flat;
+	cur += copysignf(1.0f, offset) * min(delta * I.dt, abs(offset));
+	return wrap(cur, deg(360));
+}
+
+// Body rotation azimuth (x) is still wonky af, probably because of 360deg wraparound not working?
+void Player::update_body_dynamics (Input& I, float facing_ang) {
+	body_rot.x = rotate_towards_shorter_angle(I, body_rot.x, facing_ang, deg(1200), deg(70));
+	body_rot.y = rotate_towards_range(I, body_rot.y, rot_ae.y, deg(800), deg(50),
+		deg(float2(-90, +90)), deg(float2(-60, +70)));
+}
+
+void Player::update_view_dynamics (Input& I) {
+
 }

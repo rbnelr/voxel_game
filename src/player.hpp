@@ -62,6 +62,13 @@ struct Player {
 	float width = 0.6f;
 	float height () { return head_pivot.z + 0.05f; }
 
+	// Visual direction of body (only for first and third person body and arms)
+	float2 body_rot = INF;
+	float3 head_bob_offset = 0;
+
+	void update_body_dynamics (Input& I, float facing_ang);
+	void update_view_dynamics (Input& I);
+
 	bool grounded = false;
 
 	struct MovementParams {
@@ -259,6 +266,10 @@ struct Player {
 		view.calc_frustrum();
 
 		return view;
+	}
+
+	float3x4 body_to_world () {
+		return translate(pos) * rotate3_Z(body_rot.x) * translate(head_pivot) * rotate3_X(body_rot.y);
 	}
 };
 

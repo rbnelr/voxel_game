@@ -343,7 +343,7 @@ void PlayerRenderer::draw (OpenglRenderer& r) {
 		s.blend_enable = true;
 		r.state.set(s);
 
-		float3x4 mat = g->player->head_to_world * translate(a.pos) * a.rot;
+		float3x4 mat = g->player->body_to_world() * translate(a.pos) * a.rot;
 
 		if (item.is_block()) {
 			glUseProgram(held_block_shad->prog);
