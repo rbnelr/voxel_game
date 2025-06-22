@@ -13,7 +13,7 @@ struct Game;
 
 struct Player {
 	SERIALIZE(Player, pos, vel, rot_ae, third_person,
-		movement_params)
+		visual_dynamics, movement_params)
 
 	// Player ground position
 	float3	pos = 0;
@@ -46,7 +46,7 @@ struct Player {
 
 	// Fps camera pivot for fps mode ie. where your eyes are
 	//  First and third person cameras rotate around this
-	float3 head_pivot = float3(0, 0, 1.6f);
+	float3 head_pivot = float3(0, 0, 1.55f);
 
 	// Closest position the third person camera can go relative to head_pivot
 	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
@@ -60,16 +60,42 @@ struct Player {
 
 	//// Physics
 	float width = 0.6f;
-	float height () { return head_pivot.z + 0.05f; }
+	float height () { return head_pivot.z + 0.15f; }
 
 	// Visual direction of body (only for first and third person body and arms)
 	float2 body_rot = INF;
 	float3 head_bob_offset = 0;
+	float3 head_bob_vel = 0;
 
 	void update_body_dynamics (Input& I, float facing_ang);
+
+	// Make head bob to react to worldspace velocity change
+	void apply_head_bob_impulse (float3 delta_vel);
 	void update_view_dynamics (Input& I);
 
 	bool grounded = false;
+	
+	struct VisualDynamicsParams {
+		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max)
+			
+		float bob_strength = 2;
+		float spring_k = 1;
+		float spring_damp = 1;
+		float3 offset_max = 0.2f;
+		float vel_max = 5;
+		
+		void imgui () {
+			if (ImGui::TreeNode("Visual Dynamics")) {
+				ImGui::DragFloat("bob_strength", &bob_strength, 0.1f);
+				ImGui::DragFloat("spring_k", &spring_k, 0.1f);
+				ImGui::DragFloat("spring_damp", &spring_damp, 0.1f);
+				ImGui::DragFloat3("offset_max", &offset_max.x, 0.1f);
+				ImGui::DragFloat("vel_max", &vel_max, 0.1f);
+				ImGui::TreePop();
+			}
+		}
+	};
+	VisualDynamicsParams visual_dynamics;
 
 	struct MovementParams {
 		SERIALIZE(MovementParams, walk_speed, run_speed, allow_backwards_sprint,
@@ -85,6 +111,20 @@ struct Player {
 		float walk_accel_boost = 50;
 
 		float air_control_accel_base = 1;
+		
+		void imgui () {
+			if (ImGui::TreeNode("Movement Params")) {
+				ImGui::DragFloat("walk_speed", &walk_speed, 0.05f);
+				ImGui::DragFloat("run_speed", &run_speed, 0.05f);
+				ImGui::Checkbox("allow_backwards_sprint", &allow_backwards_sprint);
+				ImGui::DragFloat("walk_accel_scaled_max", &walk_accel_scaled_max, 0.05f);
+				ImGui::DragFloat("walk_accel_scaled", &walk_accel_scaled, 0.05f);
+				ImGui::DragFloat("walk_accel_boost", &walk_accel_boost, 0.05f);
+
+				ImGui::DragFloat("air_control_accel_base", &air_control_accel_base, 0.05f);
+				ImGui::TreePop();
+			}
+		}
 	};
 	MovementParams movement_params;
 
@@ -123,18 +163,8 @@ struct Player {
 			ImGui::TreePop();
 		}
 		
-		if (ImGui::TreeNode("Movement Dynamics")) {
-			auto& m = movement_params;
-			ImGui::DragFloat("walk_speed", &m.walk_speed, 0.05f);
-			ImGui::DragFloat("run_speed", &m.run_speed, 0.05f);
-			ImGui::Checkbox("allow_backwards_sprint", &m.allow_backwards_sprint);
-			ImGui::DragFloat("walk_accel_scaled_max", &m.walk_accel_scaled_max, 0.05f);
-			ImGui::DragFloat("walk_accel_scaled", &m.walk_accel_scaled, 0.05f);
-			ImGui::DragFloat("walk_accel_boost", &m.walk_accel_boost, 0.05f);
-
-			ImGui::DragFloat("air_control_accel_base", &m.air_control_accel_base, 0.05f);
-			ImGui::TreePop();
-		}
+		visual_dynamics.imgui();
+		movement_params.imgui();
 
 		collison_response.imgui();
 
@@ -248,18 +278,20 @@ struct Player {
 		float3x3 head_elevation = rotate3_X(rot_ae.y);
 		float3x3 head_elevation_inv = rotate3_X(-rot_ae.y);
 
-		float3 cam_pos = 0;
+		float3 cam_offs_local = 0;
 		if (third_person)
-			cam_pos = calc_third_person_cam_pos(chunks, body_rotation, head_elevation);
+			cam_offs_local = calc_third_person_cam_pos(chunks, body_rotation, head_elevation);
+
+		float3 pos_world = pos + head_bob_offset;
 
 		Camera& cam = third_person ? tps_camera : fps_camera;
 
-		float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos);
-		head_to_world = translate(pos) * body_rotation * translate(head_pivot) * head_elevation;
+		float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos_world);
+		head_to_world = translate(pos_world) * body_rotation * translate(head_pivot) * head_elevation;
 
 		Camera_View view;
-		view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_pos) * world_to_head;
-		view.cam_to_world = head_to_world * translate(cam_pos) * rotate3_X(deg(90));
+		view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_offs_local) * world_to_head;
+		view.cam_to_world = head_to_world * translate(cam_offs_local) * rotate3_X(deg(90));
 		view.cam_to_clip = cam.calc_cam_to_clip(viewport_size, &view.clip_to_cam, &view.frustrum, &view.frustrum_size);
 		view.clip_near = cam.clip_near;
 		view.clip_far = cam.clip_far;

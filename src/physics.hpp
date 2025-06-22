@@ -396,7 +396,7 @@ struct Physics {
 				}
 			}
 			
-			g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, srgba(40,40,40,100));
+			//g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, srgba(40,40,40,100));
 		}
 
 		return res_hit;
@@ -422,22 +422,16 @@ struct Physics {
 		////
 		float remain_dt = I.dt;
 
-		if (I.buttons[KEY_N].went_down) {
-			printf("");
-		}
-
 		// Need at least 3 iterations to handle jumping into corners correctly, which sucks
 		for (int i=0; i<3; i++) {
 			auto hit = world_voxel_box_collision(chunks, obj);
 			
-			obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
-			g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
-			if (hit) {
-				float end_t = min(hit.t0, 1.0f);
-				float3 collided_pos = obj.pos + obj.vel * end_t;
-			
-				obj.dbgdraw_aabb(collided_pos, lrgba(1,1,0,1));
-			}
+			//if (hit) {
+			//	float end_t = min(hit.t0, 1.0f);
+			//	float3 collided_pos = obj.pos + obj.vel * end_t;
+			//
+			//	obj.dbgdraw_aabb(collided_pos, lrgba(1,1,0,1));
+			//}
 
 			if (hit && grounded && abs(obj.vel.z) < min_speed) {
 				grounded = true;
@@ -467,6 +461,9 @@ struct Physics {
 		}
 
 		obj.grounded = grounded;
+
+		obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
+		g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
 
 		// if remaining time, ignore it to prefer non-clipping to executing full movement speed
 		// but could consider capping velocity to reflect missing movement step

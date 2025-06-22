@@ -31,26 +31,29 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 		float2 delta_vel = target_vel - (float2)vel;
 		float delta_speed = length(delta_vel);
-
-		float accel = 0;
+		
+		float move_accel = 0;
 		if (grounded) {
 			// scale acceleration to higher when standing still, and lower when close to target speed
 			float control_fac = 1.0f - smoothstep(clamp(cur_speed / (m.walk_speed*2), 0.0f, 1.0f));
 			float linear_boost = m.walk_accel_boost * pow(control_fac, 3.0f);
-			accel = min(pow(delta_speed, 1.5f) * m.walk_accel_scaled, m.walk_accel_scaled_max) + linear_boost;
+			move_accel = min(pow(delta_speed, 1.5f) * m.walk_accel_scaled, m.walk_accel_scaled_max) + linear_boost;
 		}
 
-		accel = max(accel, m.air_control_accel_base);
+		move_accel = max(move_accel, m.air_control_accel_base);
 
-		delta_vel = normalizesafe(delta_vel) * min(accel * I.dt, delta_speed);
+		delta_vel = normalizesafe(delta_vel) * min(move_accel * I.dt, delta_speed);
 		vel += float3(delta_vel, 0);
 	};
 	player_walk_dynamics();
 
 	//// jumping
 	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
-	if (inp.jump_held/*went_down*/ && grounded)
+	if (inp.jump_held/*went_down*/ && grounded) {
 		vel += jump_impulse;
+		// Head bob on jump
+		apply_head_bob_impulse(jump_impulse);
+	}
 
 	////
 	PhysicsObject obj;
@@ -64,6 +67,10 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 	g->physics->update_object(I, *g->chunks, obj);
 	
+	// Head bob on collision, ie landing, hitting a wall etc.
+	float3 collision_impulse = obj.vel - vel;
+	apply_head_bob_impulse(collision_impulse);
+	
 	pos = obj.pos;
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
@@ -74,20 +81,21 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	float anim_fac = clamp(map(cur_speed, m.walk_speed, m.run_speed), 0.0f, 1.0f);
 	float facing_ang = alerp(rot_ae.x, walking_ang, anim_fac * 0.5f);
 
-	clog("%f %f", rot_ae.x, walking_ang);
-
 	update_body_dynamics(I, facing_ang);
+
+	//apply_head_bob_impulse(vel - prev_vel); // full accel as impulse for luls
+	update_view_dynamics(I);
 
 #if 1 // movement speed plotting to better develop movement code
 	{
-		float3 calc_accel3d = (vel - prev_vel) / I.dt;
-		float calc_accel = length(calc_accel3d);
-
 		static constexpr int COUNT = 128;
 		static float vels[COUNT] = {};
 		static float poss[COUNT] = {};
 		static float accels[COUNT] = {};
 		static int cur = 0;
+		
+		float3 calc_accel3d = (vel - prev_vel) / (I.dt + 0.0001f);
+		float calc_accel = length(calc_accel3d);
 
 		float cur_speed = length((float2)vel);
 
@@ -149,6 +157,27 @@ void Player::update_body_dynamics (Input& I, float facing_ang) {
 		deg(float2(-90, +90)), deg(float2(-60, +70)));
 }
 
+void Player::apply_head_bob_impulse (float3 delta_vel) {
+	head_bob_vel -= visual_dynamics.bob_strength * delta_vel;
+}
 void Player::update_view_dynamics (Input& I) {
+	auto& vd = visual_dynamics;
+	
+	// Spring constant
+	float3 offs_t = head_bob_offset / vd.offset_max;
+	float3 spring_accel = offs_t * vd.spring_k * -3;
+	// Spring dampening
+	spring_accel -= head_bob_vel / vd.offset_max * vd.spring_damp;
+	// Apply spring accel
+	head_bob_vel += spring_accel * I.dt;
+	head_bob_vel = clamp(head_bob_vel, -vd.vel_max, +vd.vel_max);
 
+	head_bob_offset += head_bob_vel * I.dt;
+	head_bob_offset = clamp(head_bob_offset, -vd.offset_max, +vd.offset_max);
+
+	ImGui::Text("head_bob_vel: %6.3f %6.3f %6.3f", head_bob_vel.x, head_bob_vel.y, head_bob_vel.z);
+	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);
+
+	if (g->activate_flycam)
+		g_debugdraw.wire_cube(pos + head_pivot + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
 }

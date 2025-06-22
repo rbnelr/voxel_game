@@ -94,27 +94,39 @@
 	},
 	"player": {
 		"pos": [
-			-78.8269271850586,
-			-54.954593658447266,
+			-78.52288055419922,
+			-54.86579132080078,
 			-114.0
 		],
 		"vel": [
-			0.0,
-			0.0,
+			2.6469779601696886e-23,
+			-2.6469779601696886e-23,
 			0.0
 		],
 		"rot_ae": [
-			-2.1498589515686035,
-			-0.4332008957862854
+			1.228058099746704,
+			-0.2108244001865387
 		],
 		"third_person": false,
+		"visual_dynamics": {
+			"bob_strength": 2.0,
+			"spring_k": 20.0,
+			"spring_damp": 5.0,
+			"offset_max": [
+				0.2199999988079071,
+				0.2199999988079071,
+				0.30000001192092896
+			],
+			"vel_max": 100.0
+		},
 		"movement_params": {
 			"walk_speed": 4.0,
 			"run_speed": 8.0,
+			"allow_backwards_sprint": false,
 			"walk_accel_scaled_max": 15.0,
 			"walk_accel_scaled": 2.0,
 			"walk_accel_boost": 50.0,
-			"air_control_accel_base": 0.0
+			"air_control_accel_base": 2.0
 		}
 	},
 	"activate_flycam": false,
