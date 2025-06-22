@@ -77,8 +77,8 @@
 				-111.20457458496094
 			],
 			"rot_aer": [
-				-1.3894377946853638,
-				-0.329133540391922,
+				-1.3147273063659668,
+				-0.36287346482276917,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -94,8 +94,8 @@
 	},
 	"player": {
 		"pos": [
-			-78.52836608886719,
-			-46.81139373779297,
+			-78.8269271850586,
+			-54.954593658447266,
 			-114.0
 		],
 		"vel": [
@@ -104,19 +104,20 @@
 			0.0
 		],
 		"rot_ae": [
-			-0.5944106578826904,
-			-0.281655877828598
+			-2.1498589515686035,
+			-0.4332008957862854
 		],
 		"third_person": false,
 		"movement_params": {
-			"walk_speed": 3.5,
+			"walk_speed": 4.0,
 			"run_speed": 8.0,
-			"walk_accel_base": 5.0,
-			"walk_accel_proport": 10.0,
-			"air_control_accel_base": 6.0
+			"walk_accel_scaled_max": 15.0,
+			"walk_accel_scaled": 2.0,
+			"walk_accel_boost": 50.0,
+			"air_control_accel_base": 0.0
 		}
 	},
-	"activate_flycam": true,
+	"activate_flycam": false,
 	"imopen": {
 		"performance": true,
 		"graphics": false,

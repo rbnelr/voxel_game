@@ -65,15 +65,19 @@ struct Player {
 	bool grounded = false;
 
 	struct MovementParams {
-		SERIALIZE(MovementParams, walk_speed, run_speed,
-			walk_accel_base, walk_accel_proport, air_control_accel_base)
+		SERIALIZE(MovementParams, walk_speed, run_speed, allow_backwards_sprint,
+			walk_accel_scaled_max, walk_accel_scaled, walk_accel_boost,
+			air_control_accel_base)
 
 		float walk_speed = 3.5f;
 		float run_speed = 8;
+		bool allow_backwards_sprint = false;
 
-		float walk_accel_base = 5;
-		float walk_accel_proport = 10;
-		float air_control_accel_base = 2;
+		float walk_accel_scaled_max = 20;
+		float walk_accel_scaled = 2;
+		float walk_accel_boost = 50;
+
+		float air_control_accel_base = 1;
 	};
 	MovementParams movement_params;
 
@@ -107,14 +111,23 @@ struct Player {
 		fps_camera.imgui("fps_camera");
 		tps_camera.imgui("tps_camera");
 
-		ImGui::DragFloat("width", &width, 0.05f);
+		if (ImGui::TreeNode("Collision")) {
+			ImGui::DragFloat("width", &width, 0.05f);
+			ImGui::TreePop();
+		}
+		
+		if (ImGui::TreeNode("Movement Dynamics")) {
+			auto& m = movement_params;
+			ImGui::DragFloat("walk_speed", &m.walk_speed, 0.05f);
+			ImGui::DragFloat("run_speed", &m.run_speed, 0.05f);
+			ImGui::Checkbox("allow_backwards_sprint", &m.allow_backwards_sprint);
+			ImGui::DragFloat("walk_accel_scaled_max", &m.walk_accel_scaled_max, 0.05f);
+			ImGui::DragFloat("walk_accel_scaled", &m.walk_accel_scaled, 0.05f);
+			ImGui::DragFloat("walk_accel_boost", &m.walk_accel_boost, 0.05f);
 
-		auto& m = movement_params;
-		ImGui::DragFloat("walk_speed", &m.walk_speed, 0.05f);
-		ImGui::DragFloat("run_speed", &m.run_speed, 0.05f);
-		ImGui::DragFloat("walk_accel_base", &m.walk_accel_base, 0.05f);
-		ImGui::DragFloat("walk_accel_proport", &m.walk_accel_proport, 0.05f);
-		ImGui::DragFloat("air_control_accel_base", &m.air_control_accel_base, 0.05f);
+			ImGui::DragFloat("air_control_accel_base", &m.air_control_accel_base, 0.05f);
+			ImGui::TreePop();
+		}
 
 		collison_response.imgui();
 
@@ -158,7 +171,6 @@ struct Player {
 			if (I.buttons[KEY_D].is_down) inp.move_dir.x += 1;
 			if (I.buttons[KEY_S].is_down) inp.move_dir.y -= 1;
 			if (I.buttons[KEY_W].is_down) inp.move_dir.y += 1;
-			inp.move_dir = normalizesafe(inp.move_dir);
 
 			inp.jump_held = I.buttons[KEY_SPACE].is_down;
 			inp.sprint    = I.buttons[KEY_LEFT_SHIFT].is_down;

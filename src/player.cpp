@@ -6,28 +6,37 @@
 void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	ZoneScoped;
 	
-	float3 prev_vel = vel;
-
 	//// walking
 	float2x2 body_rotation = rotate2(rot_ae.x);
+	float3 prev_vel = vel;
+	float cur_speed = length(vel);
 
-	{
-		auto& m = movement_params;
+	auto& m = movement_params;
+	
+	auto player_walk_dynamics = [&] () {
+		bool forward_move = inp.move_dir.y > 0.0f;
+		bool do_sprint = inp.sprint && (forward_move || m.allow_backwards_sprint);
+		float target_speed = do_sprint ? m.run_speed : m.walk_speed;
 
-		float target_speed = inp.sprint ? m.run_speed : m.walk_speed;
-		float2 target_vel = body_rotation * (inp.move_dir * target_speed);
-
+		float2 target_vel = body_rotation * (normalizesafe(inp.move_dir) * target_speed);
 
 		float2 delta_vel = target_vel - (float2)vel;
 		float delta_speed = length(delta_vel);
 
-		float accel = m.air_control_accel_base;
-		if (grounded)
-			accel = delta_speed * m.walk_accel_proport + m.walk_accel_base;
+		float accel = 0;
+		if (grounded) {
+			// scale acceleration to higher when standing still, and lower when close to target speed
+			float control_fac = 1.0f - smoothstep(clamp(cur_speed / (m.walk_speed*2), 0.0f, 1.0f));
+			float linear_boost = m.walk_accel_boost * pow(control_fac, 3.0f);
+			accel = min(pow(delta_speed, 1.5f) * m.walk_accel_scaled, m.walk_accel_scaled_max) + linear_boost;
+		}
+
+		accel = max(accel, m.air_control_accel_base);
 
 		delta_vel = normalizesafe(delta_vel) * min(accel * I.dt, delta_speed);
 		vel += float3(delta_vel, 0);
-	}
+	};
+	player_walk_dynamics();
 
 	//// jumping
 	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
@@ -82,7 +91,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player pos", -7, 7, ImVec2(0, 200));
 
 		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_accel", accels, COUNT, cur, "player accel", 0, 20, ImVec2(0, 200));
+		ImGui::PlotLines("###_debug_accel", accels, COUNT, cur, "player accel", 0, 70, ImVec2(0, 200));
 
 		ImGui::End();
 	}
