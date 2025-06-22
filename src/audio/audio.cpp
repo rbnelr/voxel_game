@@ -1,18 +1,31 @@
 #include "audio.hpp"
-#include "read_wav.hpp"
+#include "game.hpp"
 #include "kisslib/kissmath.hpp"
+#include "kisslib/string.hpp"
+#include "kisslib/random.hpp"
+#include "portaudio.h"
+// audio loading with libsoundwave
+#include "AudioDecoder.h"
+#include "WavEncoder.h"
+#include "PostProcess.h"
+
 using namespace kissmath;
 
-#include "portaudio.h"
-#include "stdio.h"
-
-#include <atomic>
-
-#include "game.hpp"
-
 namespace audio {
-	AudioData16 load_sound_data_from_file (const char* filepath) {
-		return load_wav(filepath);
+	AudioDataF32 load_sound_data_from_file (std::string const& filepath) {
+		soundwave::SoundwaveIO loader;
+		soundwave::AudioData data;
+		loader.Load(&data, filepath);
+
+		if (data.channelCount < 1 || data.channelCount > 2)
+			return {};
+
+		AudioDataF32 res;
+		res.sample_rate = (double)data.sampleRate;
+		res.channels = data.channelCount;
+		res.count = (int)data.samples.size() / data.channelCount;
+		res.samples = std::move(data.samples);
+		return res;
 	}
 }
 
@@ -36,6 +49,8 @@ PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
 int playing_sounds_count = 0;
 
 void AudioManager::play_sound (Sound* sound, float volume, float speed) {
+	if (!sound->valid()) return; // Simply don't play if not valid
+
 	while (locked)
 		; // busy wait
 
@@ -163,4 +178,20 @@ Sound::Sound (std::string name, float volume, float speed) {
 
 void Sound::play (float volume, float speed) {
 	g->audio->play_sound(sound, volume, speed);
+}
+
+SoundSet::SoundSet (std::string base_name, int max_index, float volume, float speed) {
+	for (int i=0; i<max_index; i++) {
+		auto name = prints("%s%d", base_name.c_str(), i);
+		sounds.push_back( g->audio->load_sound(std::move(name), volume, speed) );
+	}
+}
+
+void SoundSet::play (int idx, float volume, float speed) {
+	assert(idx >= 0 && idx < (int)sounds.size());
+	g->audio->play_sound(sounds[idx], volume, speed);
+}
+void SoundSet::play_random (float volume, float speed) {
+	int idx = random.uniformi(0, (int)sounds.size());
+	play(idx, volume, speed);
 }

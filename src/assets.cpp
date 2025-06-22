@@ -310,6 +310,8 @@ BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data) {
 }
 
 GenericVertexData load_fbx (char const* filename, char const* submesh_name) {
+	clog("Loading fbx file '%s'...", filename);
+
 	auto* fbx = aiImportFile(filename, aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
 	
 	GenericVertexData data;

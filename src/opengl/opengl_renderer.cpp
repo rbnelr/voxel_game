@@ -407,6 +407,7 @@ void PlayerRenderer::draw (OpenglRenderer& r) {
 
 //// OpenglRenderer
 bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
+	clog("Loading textures...");
 
 	{
 		Image<srgba8> img;

@@ -75,11 +75,13 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
 	
-	cur_speed = length(vel);
+	float cur_speed2d = length((float2)vel);
 
 	float walking_ang = atan2f(-vel.x, vel.y);
-	float anim_fac = clamp(map(cur_speed, m.walk_speed, m.run_speed), 0.0f, 1.0f);
+	float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
 	float facing_ang = alerp(rot_ae.x, walking_ang, anim_fac * 0.5f);
+
+	update_walking_step_bob(I, cur_speed2d);
 
 	update_body_dynamics(I, facing_ang);
 
@@ -155,6 +157,26 @@ void Player::update_body_dynamics (Input& I, float facing_ang) {
 	body_rot.x = rotate_towards_shorter_angle(I, body_rot.x, facing_ang, deg(1200), deg(70));
 	body_rot.y = rotate_towards_range(I, body_rot.y, rot_ae.y, deg(800), deg(50),
 		deg(float2(-90, +90)), deg(float2(-60, +70)));
+}
+
+void Player::update_walking_step_bob (Input& I, float cur_speed2d) {
+	if (!grounded) {
+		// need to take full step again after landing, and no steps in air!
+		walking_step_bob_counter = 0;
+		return;
+	}
+
+	walking_step_bob_counter += cur_speed2d * I.dt;
+	if (walking_step_bob_counter > visual_dynamics.step_length) {
+		walking_step_bob_counter = wrap(walking_step_bob_counter, visual_dynamics.step_length);
+
+		float effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 2.0f);
+
+		float bob_impulse = visual_dynamics.step_head_bob_strength * effect_scale;
+		apply_head_bob_impulse(float3(0,0,-bob_impulse));
+
+		g->assets->steps_soft.play_random(effect_scale, 1.0f);
+	}
 }
 
 void Player::apply_head_bob_impulse (float3 delta_vel) {

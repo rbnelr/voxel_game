@@ -1,7 +1,7 @@
 #pragma once
 #include "kisslib/string.hpp"
 using namespace kiss;
-
+#include "imgui/dear_imgui.hpp"
 #include "kisslib/stl_extensions.hpp"
 #include <string>
 #include <unordered_map>
@@ -33,7 +33,7 @@ namespace audio {
 		double sample_rate;
 		int channels; // mono or sterio
 
-		int count; 
+		int count;
 		std::unique_ptr<int16_t[]> samples = nullptr;
 
 		static inline float sample_to_f (int16_t val) {
@@ -73,7 +73,51 @@ namespace audio {
 		}
 	};
 
-	AudioData16 load_sound_data_from_file (const char* filepath);
+	
+	struct AudioDataF32 {
+		double sample_rate;
+		int channels = 0; // mono or sterio
+
+		int count;
+		std::vector<float> samples;
+
+		bool valid () { return channels > 0; }
+
+		inline AudioSample sample (double t) {
+			//assert(channels == 1 || channels == 2);
+
+			t *= sample_rate;
+
+			// just clamp the sample indices, to prevent out of bounds
+			int ai = clamp((int)t, 0, count-1);
+			int bi = min(ai + 1, count-1);
+			float interp = (float)(t - (double)ai);
+
+			auto test = samples.data();
+
+			if (channels == 1) {
+				float a = samples[ai];
+				float b = samples[bi];
+
+				float tmp = lerp(a, b, interp);
+				return { tmp, tmp };
+			} else {
+
+				auto al = samples[ai * 2    ];
+				auto ar = samples[bi * 2    ];
+				auto bl = samples[ai * 2 + 1];
+				auto br = samples[bi * 2 + 1];
+
+				return {
+					lerp(al, ar, interp),
+					lerp(bl, br, interp),
+				};
+			}
+		}
+	};
+
+	//AudioData16 load_sound_data_from_file (const char* filepath);
+	AudioDataF32 load_sound_data_from_file (std::string const& filepath);
 }
 
 class AudioManager {
@@ -81,9 +125,11 @@ public:
 	const std::string sounds_directory = "sounds/";
 	
 	struct Sound {
-		audio::AudioData16 data;
+		audio::AudioDataF32 data;
 		float volume;
 		float speed;
+
+		bool valid () { return data.valid(); }
 	};
 
 	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
@@ -95,7 +141,8 @@ public:
 		}
 
 		auto filepath = prints("%s%s.wav", sounds_directory.c_str(), name.c_str());
-		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath.c_str()), volume, speed }));
+		clog("Loading sound file '%s'...", filepath.c_str());
+		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath), volume, speed }));
 
 		auto* s = ptr.get();
 		loaded_sounds.emplace(std::move(name), std::move(ptr));
@@ -112,4 +159,13 @@ struct Sound {
 	Sound (std::string name, float volume=1, float speed=1);
 
 	void play (float volume=1, float speed=1);
+};
+struct SoundSet {
+	std::vector<AudioManager::Sound*> sounds;
+
+	SoundSet () {}
+	SoundSet (std::string base_name, int max_index, float volume=1, float speed=1);
+
+	void play (int idx, float volume=1, float speed=1);
+	void play_random (float volume=1, float speed=1);
 };

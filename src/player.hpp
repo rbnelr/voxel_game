@@ -66,23 +66,29 @@ struct Player {
 	float2 body_rot = INF;
 	float3 head_bob_offset = 0;
 	float3 head_bob_vel = 0;
+	float walking_step_bob_counter = 0;
 
 	void update_body_dynamics (Input& I, float facing_ang);
 
 	// Make head bob to react to worldspace velocity change
 	void apply_head_bob_impulse (float3 delta_vel);
+	void update_walking_step_bob (Input& I, float walked_distance);
 	void update_view_dynamics (Input& I);
 
 	bool grounded = false;
 	
 	struct VisualDynamicsParams {
-		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max)
+		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
+			step_length, step_head_bob_strength)
 			
 		float bob_strength = 2;
 		float spring_k = 1;
 		float spring_damp = 1;
 		float3 offset_max = 0.2f;
 		float vel_max = 5;
+
+		float step_length = 0.8f;
+		float step_head_bob_strength = 1;
 		
 		void imgui () {
 			if (ImGui::TreeNode("Visual Dynamics")) {
@@ -91,6 +97,10 @@ struct Player {
 				ImGui::DragFloat("spring_damp", &spring_damp, 0.1f);
 				ImGui::DragFloat3("offset_max", &offset_max.x, 0.1f);
 				ImGui::DragFloat("vel_max", &vel_max, 0.1f);
+
+				ImGui::DragFloat("step_length", &step_length, 0.1f);
+				ImGui::DragFloat("step_head_bob_strength", &step_head_bob_strength, 0.1f);
+
 				ImGui::TreePop();
 			}
 		}

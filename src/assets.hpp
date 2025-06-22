@@ -204,6 +204,8 @@ struct Assets {
 	PlayerAssets			player;
 
 	Sound break_sound = { "dig1", 1.2f, 0.8f };
+	SoundSet steps_soft = { "step_soft", 6, 1.0f, 1.0f };
+	SoundSet steps_hard = { "step_hard", 7, 1.0f, 1.0f };
 
 	GenericVertexData		stock_models;
 
@@ -213,7 +215,8 @@ struct Assets {
 	static Assets load () {
 		ZoneScoped;
 		Assets a;
-
+		
+		clog("Loading assets");
 		json blocks_json = load_json("blocks.json");
 
 		a.load_block_types(blocks_json);
