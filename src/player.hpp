@@ -59,8 +59,10 @@ struct Player {
 	Camera tps_camera;
 
 	//// Physics
-	float radius = 0.4f;
-	float height = 1.7f;
+	float width = 0.6f;
+	float height () { return head_pivot.z + 0.05f; }
+
+	bool grounded = false;
 
 	struct MovementParams {
 		SERIALIZE(MovementParams, walk_speed, run_speed,
@@ -105,8 +107,7 @@ struct Player {
 		fps_camera.imgui("fps_camera");
 		tps_camera.imgui("tps_camera");
 
-		ImGui::DragFloat("radius", &radius, 0.05f);
-		ImGui::DragFloat("height", &height, 0.05f);
+		ImGui::DragFloat("width", &width, 0.05f);
 
 		auto& m = movement_params;
 		ImGui::DragFloat("walk_speed", &m.walk_speed, 0.05f);
@@ -251,5 +252,6 @@ struct Player {
 
 inline bool BlockInteraction::entity_in_block (int3 block_place_pos) {
 	auto& player = *g->player;
-	return cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.radius, player.height);
+	// TODO: convert to AABB
+	return cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.width, player.height());
 }

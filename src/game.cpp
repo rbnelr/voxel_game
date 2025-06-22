@@ -139,7 +139,13 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (open) ImGui::Checkbox("flycam_control_player", &flycam_control_player);
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
-				player->pos = flycam->cam.pos;
+				//player->pos = flycam->cam.pos;
+				player->pos = float3(
+				-78.52836608886719f,
+				-46.81139373779297f,
+				-112.0999984741211f
+				);
+				player->vel = 0;
 			}
 
 			if (open) ImGui::Checkbox("Creative Mode [C]", &creative_mode);
@@ -220,9 +226,6 @@ void Game::update (Window& window, Input& I) {
 	
 	chunks->update_chunk_meshing();
 
-	if (activate_flycam || player->third_person) {
-		g_debugdraw.cylinder(player->pos, player->radius, player->height, lrgba(1,0,1,0.5f));
-	}
 	if (activate_flycam) {
 		g_debugdraw.axis_gizmo(view, I.window_size);
 		g_debugdraw.movable("player", &player->pos, 0.4f, lrgba(0.7f,0,0.7f,1), &player->vel);

@@ -11,7 +11,7 @@ struct ButtonState {
 };
 
 struct Input {
-	SERIALIZE(Input, mouselook_sensitiviy_divider, view_elevation_down_limit, view_elevation_up_limit)
+	SERIALIZE(Input, time_scale, pause_time, mouselook_sensitiviy_divider, view_elevation_down_limit, view_elevation_up_limit)
 
 	//// Input Data
 	// zero on first frame

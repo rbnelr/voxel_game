@@ -130,6 +130,7 @@ struct DebugDraw {
 	void line (float3 const& a, float3 const& b, lrgba const& col);
 	void vector (float3 const& pos, float3 const& dir, lrgba const& col);
 
+	// pos is center, size is edge length (not 'radius')
 	void wire_cube (float3 const& pos, float3 const& size, lrgba const& col);
 	void wire_sphere (float3 const& pos, float r, lrgba const& col, int angres=32, int wires=16);
 	void wire_cone (float3 const& pos, float ang, float length, float3x3 const& rot, lrgba const& col, int circres=16, int wires=8);
