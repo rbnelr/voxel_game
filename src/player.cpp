@@ -48,7 +48,10 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	player_walk_dynamics();
 
 	auto do_jump = [&] () {
+		float3 jump_impulse = float3(0,0, g->physics->jump_impulse_for_jump_height(1.2f)); // jump height based on the default gravity, tweaked gravity will change the jump height
+
 		vel += jump_impulse;
+
 		// Head bob on jump
 		apply_head_bob_impulse(jump_impulse);
 
@@ -66,8 +69,10 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		obj.grounded.trigger_step_sound(audio_stren);
 	};
 
+	_dbg_apply_forw_impulse(I);
+
 	//// jumping
-	if (inp.jump_held/*went_down*/ && grounded) {
+	if (inp.jump_held/*went_down*/ && grounded && !buried) {
 		do_jump();
 	}
 
@@ -78,13 +83,16 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	obj.vel = vel;
 	obj.aabb0 = float3(-width*0.5f,-width*0.5f, 0);
 	obj.aabb1 = float3(+width*0.5f,+width*0.5f, height());
-	
+	obj.drag_coeff = g->physics->drag_coeff_for_terminal_vel(g->physics->player_terminal_speed);
+
 	obj.coll = collison_response;
 
 	g->physics->update_object(I, *g->chunks, obj, collision_debug);
 	
-	if (collision_debug) {
+	if (collision_debug || g->activate_flycam || third_person) {
 		obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
+	}
+	if (collision_debug) {
 		g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
 	}
 
@@ -100,7 +108,8 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	pos = obj.pos;
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
-	
+	buried = obj.buried;
+
 	float cur_speed2d = length((float2)vel);
 
 	float walking_ang = atan2f(-vel.x, vel.y);
@@ -125,7 +134,8 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		float3 calc_accel3d = (vel - prev_vel) / (I.dt + 0.0001f);
 		float calc_accel = length(calc_accel3d);
 
-		float cur_speed = length((float2)vel);
+		//float cur_speed = length((float2)vel);
+		float cur_speed = length(vel);
 
 		if (!I.pause_time) {
 			vels[cur] = cur_speed;
@@ -199,7 +209,11 @@ void Player::update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject
 		float effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 2.0f);
 
 		float bob_impulse = visual_dynamics.step_head_bob_strength * effect_scale;
-		apply_head_bob_impulse(float3(0,0,-bob_impulse));
+		
+		// Kinda hacky to do it this way (could ignore head bob offset for third person)
+		// But keeping head bob for impacts in third person would be interesting
+		if (!third_person)
+			apply_head_bob_impulse(float3(0,0,-bob_impulse));
 
 		phys.grounded.trigger_step_sound(effect_scale);
 	}
@@ -226,6 +240,6 @@ void Player::update_view_dynamics (Input& I) {
 	ImGui::Text("head_bob_vel: %6.3f %6.3f %6.3f", head_bob_vel.x, head_bob_vel.y, head_bob_vel.z);
 	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);
 
-	if (collision_debug && g->activate_flycam)
+	if (g->activate_flycam || third_person)
 		g_debugdraw.wire_cube(pos + head_pivot + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
 }

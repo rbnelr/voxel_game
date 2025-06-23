@@ -22,8 +22,8 @@ struct Game {
 	friend void from_json (const nlohmann::ordered_json& j, Game& t);
 
 	struct ImguiOpen {
-		SERIALIZE(ImguiOpen, performance, world, chunks, entities, graphics, audio)
-		bool performance=true, world=false, chunks=false, entities=false, graphics=false, audio=false;
+		SERIALIZE(ImguiOpen, performance, world, chunks, physics, entities, graphics, audio)
+		bool performance=true, world=false, chunks=false, physics=false, entities=false, graphics=false, audio=false;
 	};
 	ImguiOpen imopen;
 

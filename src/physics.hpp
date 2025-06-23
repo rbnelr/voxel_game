@@ -44,10 +44,12 @@ struct PhysicsObject {
 	float3 pos;
 	float3 vel;
 	float3 aabb0, aabb1;
+	float drag_coeff;
 
 	CollisionResponse coll;
 
 	GroundedInfo grounded;
+	bool buried;
 
 	void dbgdraw_aabb (float3 pos, lrgba col) {
 		float3 sz = aabb1 - aabb0;
@@ -60,15 +62,18 @@ struct PhysicsObject {
 struct World;
 
 struct Physics {
-	float3 grav_accel = float3(0, 0, -10);
+	float3 grav_accel = float3(0, 0, -15);
 
 	float min_speed = 0.001f;
 	float max_speed = 1000;
 
-	void imgui () {
-		if (!ImGui::CollapsingHeader("Physics")) return;
+	// https://www.sciencefacts.net/terminal-velocity-of-a-human.html
+	// 40 m/s (skydiving belly first) - 100 m/s (skydiving head down)
+	float player_terminal_speed = 50;
 
-		ImGui::DragFloat3("grav_accel", &grav_accel.x, 0.2f);
+	void imgui () {
+		ImGui::DragFloat3("grav_accel", &grav_accel.x, 0.1f);
+		ImGui::DragFloat("player_terminal_speed", &player_terminal_speed, 0.1f);
 	}
 
 	float jump_height_from_jump_impulse (float jump_impulse_up) {
@@ -76,6 +81,23 @@ struct Physics {
 	}
 	float jump_impulse_for_jump_height (float jump_height) {
 		return sqrt( 2.0f * jump_height * -grav_accel.z );
+	}
+
+	// drag_coeff includes object airflow area and 'regular' drag coefficient
+	// in the original formula drag_coeff really just specifies the shape and surface air drag
+	// and higher mass causes higher accel, but 
+	float air_drag (float speed, float drag_coeff) {
+		// https://en.wikipedia.org/wiki/Drag_equation
+		// gas_density = 1; // could change this number inside different gas voxels?
+		// ignore useless 0.5
+		//float drag_force = 0.5f * speed*speed * gas_density * drag_coeff * drag_area;
+		//float drag_deceleration = drag_force / mass; // ignore mass as we don't want to track mass
+		float drag_deceleration = speed*speed * drag_coeff;
+		return drag_deceleration;
+	}
+	float drag_coeff_for_terminal_vel (float terminal_speed) {
+		// ignore mass and useless 0.5 factor
+		return length(grav_accel) / (terminal_speed*terminal_speed);
 	}
 	
 #if 0
@@ -445,11 +467,15 @@ struct Physics {
 		else if (speed_sq > max_speed*max_speed) obj.vel = max_speed * normalize(obj.vel);
 		
 		obj.grounded = {};
+		obj.buried = false;
 
 		////
 		float remain_dt = I.dt;
 
 		// Need at least 3 iterations to handle jumping into corners correctly, which sucks
+		// This is because the player controller applies forces to the velocity and moving even slightly into a wall requires one iteration
+		// This would likely not be the case for particles, seemingly allowing us to get away with less iterations for them
+		// but would suddenly break the moment more external forces are introduced (or gravity points in other directions)
 		for (int i=0; i<3; i++) {
 			auto hit = world_voxel_box_collision(chunks, obj, collision_debug);
 			
@@ -462,8 +488,8 @@ struct Physics {
 
 			if (hit && hit.buried) {
 				//clog("collision - buried");
-
 				obj.vel = 0;
+				obj.buried = true;
 			}
 			else if (hit && hit.t0 <= remain_dt) {
 				//clog("collision - handle_collison");
@@ -486,6 +512,10 @@ struct Physics {
 		if (obj.grounded) {
 			obj.grounded.bid = g->chunks->read_block(obj.grounded.vox);
 		}
+		
+		float speed = length(obj.vel);
+		if (speed > min_speed)
+			obj.vel -= (obj.vel / speed) * air_drag(speed, obj.drag_coeff) * I.dt;
 
 		// if remaining time, ignore it to prefer non-clipping to executing full movement speed
 		// but could consider capping velocity to reflect missing movement step

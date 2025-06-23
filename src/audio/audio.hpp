@@ -121,7 +121,11 @@ namespace audio {
 	AudioDataF32 load_sound_data_from_file (std::string const& filepath);
 }
 
+// Opaque pointer to hide audio engine from header
+struct AudioEngine;
+
 class AudioManager {
+	AudioEngine* engine;
 public:
 	SERIALIZE(AudioManager, global_volume)
 
@@ -142,6 +146,9 @@ public:
 	};
 
 	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
+
+	AudioManager ();
+	~AudioManager ();
 
 	Sound* load_sound (std::string name, float volume, float speed) {
 		auto it = loaded_sounds.find(name);

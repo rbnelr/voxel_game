@@ -1,7 +1,4 @@
 {
-	"audio": {
-		"global_volume": 0.5
-	},
 	"world_gen": {
 		"seed_str": "test4",
 		"savefile": "../saves/testMovem",
@@ -45,7 +42,7 @@
 		"disable_grass": false
 	},
 	"chunks": {
-		"load_radius": 250.0,
+		"load_radius": 600.0,
 		"load_from_disk": true,
 		"unload_hyster": 0.0,
 		"mesh_world_border": false,
@@ -75,13 +72,13 @@
 	"flycam": {
 		"cam": {
 			"pos": [
-				-85.56048583984375,
-				-48.0723991394043,
-				-111.20457458496094
+				-79.6905746459961,
+				-44.382720947265625,
+				-111.24784851074219
 			],
 			"rot_aer": [
-				-1.3147273063659668,
-				-0.36287346482276917,
+				2.7554638385772705,
+				-0.5773641467094421,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -97,8 +94,8 @@
 	},
 	"player": {
 		"pos": [
-			-80.91643524169922,
-			-49.04435729980469,
+			-78.25126647949219,
+			-48.10673904418945,
 			-114.0
 		],
 		"vel": [
@@ -107,8 +104,8 @@
 			0.0
 		],
 		"rot_ae": [
-			0.8102114200592041,
-			-0.4185182452201843
+			-0.8266513347625732,
+			-0.1888270527124405
 		],
 		"third_person": false,
 		"visual_dynamics": {
@@ -137,10 +134,12 @@
 	"activate_flycam": false,
 	"imopen": {
 		"performance": true,
-		"graphics": false,
 		"world": true,
 		"chunks": false,
-		"entities": true
+		"physics": true,
+		"entities": true,
+		"graphics": false,
+		"audio": true
 	},
 	"lod_follow_flycam": false,
 	"renderer_opengl": {
@@ -235,5 +234,8 @@
 		"mouselook_sensitiviy_divider": 500.0,
 		"view_elevation_down_limit": -0.1745329350233078,
 		"view_elevation_up_limit": 0.0872664675116539
+	},
+	"audio": {
+		"global_volume": 1.0
 	}
 }

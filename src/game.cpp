@@ -142,12 +142,12 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (open) ImGui::Checkbox("flycam_control_player", &flycam_control_player);
 
 			if ((open && ImGui::Button("Respawn Player [Q]")) || window.input.buttons[KEY_Q].went_down) {
-				//player->pos = flycam->cam.pos;
-				player->pos = float3(
-				-78.52836608886719f,
-				-46.81139373779297f,
-				-112.0999984741211f
-				);
+				player->pos = flycam->cam.pos;
+				//player->pos = float3(
+				//-78.52836608886719f,
+				//-46.81139373779297f,
+				//-112.0999984741211f
+				//);
 				player->vel = 0;
 			}
 
@@ -183,12 +183,16 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			world_gen->imgui();
 		}
 
+		if (imgui_header("Physics", &imopen.physics)) {
+			physics->imgui();
+		}
+		
 		if (imgui_header("Chunks", &imopen.chunks)) {
 			chunks->edits.imgui(I);
 			chunks->imgui(renderer);
 			block_update->imgui();
 		}
-		
+
 		if (imgui_header("Graphics", &imopen.graphics)) {
 			//if (ImGui::Combo("render_backend", (int*)&g_window.render_backend, "OPENGL"))
 			//	g_window.switch_render_backend = true;

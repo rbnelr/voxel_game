@@ -75,7 +75,9 @@ struct Player {
 	void update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject& phys);
 	void update_view_dynamics (Input& I);
 
+	// Results from previous frame physics needed before physics for character movement
 	GroundedInfo grounded = {};
+	bool buried = true;
 	
 	struct VisualDynamicsParams {
 		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
@@ -140,11 +142,19 @@ struct Player {
 
 	CollisionResponse collison_response;
 
-	float3 jump_impulse = float3(0,0, g->physics->jump_impulse_for_jump_height(1.2f)); // jump height based on the default gravity, tweaked gravity will change the jump height
-
 	float3x4 head_to_world;
 
 	bool collision_debug = false;
+
+	void _dbg_apply_forw_impulse (Input& I) {
+		static float _impulse = 50;
+		ImGui::DragFloat("_impulse", &_impulse, 0.1f);
+
+		if (I.buttons[KEY_U].went_down) {
+			float3 iw = look_rotation() * float3(0,0,-_impulse);
+			vel += iw;
+		}
+	}
 
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Player", name)) return;
@@ -268,6 +278,12 @@ struct Player {
 	}
 
 	void update_movement (Input& I, PlayerInput& inp);
+
+	float3x3 look_rotation () {
+		float3x3 body_rotation = rotate3_Z(rot_ae.x);
+		float3x3 head_elevation = rotate3_X(rot_ae.y);
+		return body_rotation * head_elevation * rotate3_X(deg(90));
+	}
 
 	float3 calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation) {
 		Ray ray;
