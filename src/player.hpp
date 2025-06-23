@@ -72,10 +72,10 @@ struct Player {
 
 	// Make head bob to react to worldspace velocity change
 	void apply_head_bob_impulse (float3 delta_vel);
-	void update_walking_step_bob (Input& I, float walked_distance);
+	void update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject& phys);
 	void update_view_dynamics (Input& I);
 
-	bool grounded = false;
+	GroundedInfo grounded = {};
 	
 	struct VisualDynamicsParams {
 		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
@@ -144,6 +144,8 @@ struct Player {
 
 	float3x4 head_to_world;
 
+	bool collision_debug = false;
+
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Player", name)) return;
 
@@ -179,6 +181,8 @@ struct Player {
 		collison_response.imgui();
 
 		imgui_pop();
+
+		ImGui::Checkbox("collision_debug", &collision_debug);
 	}
 
 

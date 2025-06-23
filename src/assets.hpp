@@ -203,9 +203,18 @@ struct Assets {
 
 	PlayerAssets			player;
 
-	Sound break_sound = { "dig1", 1.2f, 0.8f };
-	SoundSet steps_soft = { "step_soft", 6, 1.0f, 1.0f };
-	SoundSet steps_hard = { "step_hard", 7, 1.0f, 1.0f };
+	Sound break_sound = Sound( "dig1.wav", 1.5f, 0.8f );
+	Sound hit_sound = Sound( "break1.wav", 0.8f, 1 );
+
+	std::unordered_map<std::string, std::unique_ptr<SoundSet>> sound_sets;
+
+	SoundSet* load_sound_set (std::string const& name) {
+		auto it = sound_sets.find(name);
+		if (it != sound_sets.end()) return it->second.get();
+
+		sound_sets[name] = std::make_unique<SoundSet>(name);
+		return sound_sets[name].get();
+	}
 
 	GenericVertexData		stock_models;
 

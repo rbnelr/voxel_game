@@ -55,7 +55,9 @@ void AudioManager::play_sound (Sound* sound, float volume, float speed) {
 		; // busy wait
 
 	if (playing_sounds_count < MAX_PLAYING_SOUNDS) {
-		playing_sounds[playing_sounds_count] = { sound, volume * sound->volume, speed * sound->speed, 0 };
+		playing_sounds[playing_sounds_count] = { sound,
+			global_volume * volume * sound->volume,
+			speed * sound->speed, 0 };
 		playing_sounds_count++;
 	}
 	//_timescale = input.time_scale;
@@ -181,6 +183,16 @@ void Sound::play (float volume, float speed) {
 }
 
 SoundSet::SoundSet (std::string base_name, int max_index, float volume, float speed) {
+	if (max_index < 0) {
+		Directory dir;
+		if (kiss::read_directory(g->audio->sounds_directory, &dir, base_name + "*.wav")) {
+			for (auto& files : dir.filenames) {
+				sounds.push_back( g->audio->load_sound(std::move(files), volume, speed) );
+			}
+		}
+		return;
+	}
+
 	for (int i=0; i<max_index; i++) {
 		auto name = prints("%s%d", base_name.c_str(), i);
 		sounds.push_back( g->audio->load_sound(std::move(name), volume, speed) );

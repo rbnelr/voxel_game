@@ -24,6 +24,22 @@ struct CollisionResponse {
 	}
 };
 
+struct GroundedInfo {
+
+	bool grounded;
+	int3 vox = INT_MIN;
+	block_id bid = B_NULL;
+	
+	void trigger_step_sound (float volume) {
+		if (!grounded) return;
+
+		auto* sounds = g->assets->block_types[bid].step_sound;
+		if (sounds)
+			sounds->play_random(volume, 1.0f);
+	}
+
+	operator bool () { return grounded; }
+};
 struct PhysicsObject {
 	float3 pos;
 	float3 vel;
@@ -31,13 +47,14 @@ struct PhysicsObject {
 
 	CollisionResponse coll;
 
-	bool grounded;
+	GroundedInfo grounded;
 
 	void dbgdraw_aabb (float3 pos, lrgba col) {
 		float3 sz = aabb1 - aabb0;
 		float3 local_center = (aabb0 + aabb1) * 0.5f;
 		g_debugdraw.wire_cube(pos + local_center, sz, col);
 	}
+
 };
 
 struct World;
@@ -303,7 +320,7 @@ struct Physics {
 
 		return true;
 	}
-	void handle_collison (PhysicsObject& obj, VoxelCollisionHit const& hit, bool* grounded) {
+	void handle_collison (PhysicsObject& obj, VoxelCollisionHit const& hit) {
 		// TODO: implement bouncing and friction again, probablty want to take average of bounciness and friction params of voxel and object
 		// The problem is that earliest VoxelCollisionHit can be ambiguous, when standing on 4 flat voxels for example
 		// -> if hit t0 different, simply take earliest
@@ -344,13 +361,12 @@ struct Physics {
 		obj.vel = sliding_vel + norm_vel;
 
 		
-		if (hit.normal.z > 0.0f) {
-			// grounded if colliding with any top of block
-			*grounded = true;
+		if (hit.normal.z > 0.0f && abs(obj.vel.z) < min_speed) {
+			obj.grounded.grounded = true;
 		}
 	}
 
-	VoxelCollisionHit world_voxel_box_collision (Chunks& chunks, PhysicsObject& obj) {
+	VoxelCollisionHit world_voxel_box_collision (Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
 
 		//// Avoid zero speed to allow for easier voxel_box_cast
 		//float speed = length(obj.vel);
@@ -384,12 +400,23 @@ struct Physics {
 				float3 vox0 = float3(0);
 				float3 vox1 = float3(1);
 
+				float3 rel = obj.pos - vox_origin;
+
 				VoxelCollisionHit hit;
 				if (!voxel_box_cast(local0, local1, obj.vel, vox0, vox1, &hit)) {
 					continue;
 				}
 
-				g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, hit.buried ? srgba(255,255,0,200) : srgba(255,0,0,200));
+				// Ugh, another reason why earliest hit response sucks
+				// Later hits can be the one that are closer to player feet and thus where we might want to play sounds from
+				bool standing_directly_on = rel.x >= vox0.x && rel.x < vox1.x &&
+				                            rel.y >= vox0.y && rel.y < vox1.y;
+				bool is_grounded = hit.normal.z > 0.0f;
+				if (standing_directly_on && is_grounded)
+					obj.grounded.vox = int3(x,y,z);
+
+				if (collision_debug)
+					g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, hit.buried ? srgba(255,255,0,200) : srgba(255,0,0,200));
 
 				if (hit.t0 < res_hit.t0) {
 					res_hit = hit;
@@ -403,12 +430,10 @@ struct Physics {
 	}
 
 
-	void update_object (Input& I, Chunks& chunks, PhysicsObject& obj) {
+	void update_object (Input& I, Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
 		ZoneScoped;
 
 		if (I.dt == 0) return;
-
-		bool grounded = false;
 
 		//// gravity
 		obj.vel += grav_accel * I.dt;
@@ -418,13 +443,15 @@ struct Physics {
 		float speed_sq = length_sqr(obj.vel);
 		if (speed_sq < min_speed*min_speed) obj.vel = 0;
 		else if (speed_sq > max_speed*max_speed) obj.vel = max_speed * normalize(obj.vel);
+		
+		obj.grounded = {};
 
 		////
 		float remain_dt = I.dt;
 
 		// Need at least 3 iterations to handle jumping into corners correctly, which sucks
 		for (int i=0; i<3; i++) {
-			auto hit = world_voxel_box_collision(chunks, obj);
+			auto hit = world_voxel_box_collision(chunks, obj, collision_debug);
 			
 			//if (hit) {
 			//	float end_t = min(hit.t0, 1.0f);
@@ -433,10 +460,6 @@ struct Physics {
 			//	obj.dbgdraw_aabb(collided_pos, lrgba(1,1,0,1));
 			//}
 
-			if (hit && grounded && abs(obj.vel.z) < min_speed) {
-				grounded = true;
-			}
-
 			if (hit && hit.buried) {
 				//clog("collision - buried");
 
@@ -444,7 +467,7 @@ struct Physics {
 			}
 			else if (hit && hit.t0 <= remain_dt) {
 				//clog("collision - handle_collison");
-				handle_collison(obj, hit, &grounded);
+				handle_collison(obj, hit);
 
 				if (hit.t0 >= 0.0f) remain_dt -= hit.t0;
 
@@ -460,10 +483,9 @@ struct Physics {
 			break;
 		}
 
-		obj.grounded = grounded;
-
-		obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
-		g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
+		if (obj.grounded) {
+			obj.grounded.bid = g->chunks->read_block(obj.grounded.vox);
+		}
 
 		// if remaining time, ignore it to prefer non-clipping to executing full movement speed
 		// but could consider capping velocity to reflect missing movement step

@@ -121,8 +121,6 @@ struct BlockBreakAnim {
 	float anim_t = 0;
 	bool anim_triggered;
 
-	Sound hit_sound = Sound( "break1", 0.5f, 1 );
-
 	void imgui (const char* name=nullptr) {
 		if (!imgui_push("Fists", name)) return;
 
@@ -147,7 +145,7 @@ struct BlockBreakAnim {
 			//clog(INFO, "[BreakBlock] anim hit");
 			if (sel) {
 				BlockInteraction::apply_block_damage(*g->chunks, sel, item, g->creative_mode);
-				hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
+				g->assets->hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
 			}
 			anim_triggered = true;
 		}

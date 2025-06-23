@@ -51,6 +51,8 @@ struct BlockTypes {
 		uint16_t			hardness = 0;               // hardness value to determine damage resistance
 		uint8_t				glow = 0;                   // with what light level to glow with
 		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
+		
+		SoundSet*			step_sound = nullptr;
 	};
 
 	std::vector<Block> blocks;

@@ -184,7 +184,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\audio\audio.hpp" />
-    <ClInclude Include="..\..\..\src\audio\read_wav.hpp" />
     <ClInclude Include="..\..\..\src\blocks.hpp" />
     <ClInclude Include="..\..\..\src\block_interaction.hpp" />
     <ClInclude Include="..\..\..\src\block_update.hpp" />
@@ -260,7 +259,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\audio\audio.cpp" />
-    <ClCompile Include="..\..\..\src\audio\read_wav.cpp" />
     <ClCompile Include="..\..\..\src\chunks.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>

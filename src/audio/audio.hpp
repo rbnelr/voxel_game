@@ -1,12 +1,13 @@
 #pragma once
 #include "kisslib/string.hpp"
-using namespace kiss;
 #include "imgui/dear_imgui.hpp"
+#include "kisslib/serialization.hpp"
 #include "kisslib/stl_extensions.hpp"
 #include <string>
 #include <unordered_map>
 #include <memory>
 #include "assert.h"
+using namespace kiss;
 
 namespace audio {
 	inline int max (int a, int b) {
@@ -122,7 +123,15 @@ namespace audio {
 
 class AudioManager {
 public:
+	SERIALIZE(AudioManager, global_volume)
+
 	const std::string sounds_directory = "sounds/";
+
+	float global_volume = 1;
+
+	void imgui () {
+		ImGui::SliderFloat("global_volume", &global_volume, 0, 1);
+	}
 	
 	struct Sound {
 		audio::AudioDataF32 data;
@@ -140,7 +149,7 @@ public:
 			return it->second.get();
 		}
 
-		auto filepath = prints("%s%s.wav", sounds_directory.c_str(), name.c_str());
+		auto filepath = sounds_directory + name;
 		clog("Loading sound file '%s'...", filepath.c_str());
 		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath), volume, speed }));
 
@@ -149,6 +158,8 @@ public:
 		return s;
 	}
 
+	// Currently always one-shot sounds that play until done
+	// Could easily implement looping sound though, 
 	void play_sound (Sound* sound, float volume, float speed);
 };
 
@@ -164,7 +175,7 @@ struct SoundSet {
 	std::vector<AudioManager::Sound*> sounds;
 
 	SoundSet () {}
-	SoundSet (std::string base_name, int max_index, float volume=1, float speed=1);
+	SoundSet (std::string base_name, int max_index=-1, float volume=1, float speed=1);
 
 	void play (int idx, float volume=1, float speed=1);
 	void play_random (float volume=1, float speed=1);

@@ -453,6 +453,8 @@ struct Chunks {
 	// read a block with a chunk block pos
 	block_id read_block (int x, int y, int z, chunk_id cid);
 
+	block_id read_block (int3 pos) { return read_block(pos.x, pos.y, pos.z); }
+
 	// 
 	void write_block (int x, int y, int z, block_id bid);
 	//

@@ -16,14 +16,14 @@ struct BlockUpdate;
 struct Player;
 
 struct Game {
-#define SERIALIZE_NORMAL     world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam
+#define SERIALIZE_NORMAL world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam
 
 	friend void to_json (nlohmann::ordered_json& j, const Game& t);
 	friend void from_json (const nlohmann::ordered_json& j, Game& t);
 
 	struct ImguiOpen {
-		SERIALIZE(ImguiOpen, performance, graphics, world, chunks, entities)
-		bool performance=true, graphics=true, world=true, chunks=true, entities=true;
+		SERIALIZE(ImguiOpen, performance, world, chunks, entities, graphics, audio)
+		bool performance=true, world=false, chunks=false, entities=false, graphics=false, audio=false;
 	};
 	ImguiOpen imopen;
 

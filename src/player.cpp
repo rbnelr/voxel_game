@@ -47,12 +47,28 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	};
 	player_walk_dynamics();
 
-	//// jumping
-	// TODO: player_on_ground is not reliable because of a hack in the collision system, so went_down does not work yet
-	if (inp.jump_held/*went_down*/ && grounded) {
+	auto do_jump = [&] () {
 		vel += jump_impulse;
 		// Head bob on jump
 		apply_head_bob_impulse(jump_impulse);
+
+		grounded.trigger_step_sound(1.4f); // Jump sound
+	};
+	auto on_landing = [&] (PhysicsObject& obj, float3 falling_vel, float3 val_after_landing) {
+		float3 delta_vel = val_after_landing - falling_vel;
+		float impact_impulse = length(delta_vel);
+		float audio_stren = map_clamp(impact_impulse, 2.0f, 20.0f, 0.7f, 6.0f);
+
+		//clog("Landed impact_impulse: %f", impact_impulse);
+
+		// Landing sound, two makes it stronger (good idea?)
+		obj.grounded.trigger_step_sound(audio_stren);
+		obj.grounded.trigger_step_sound(audio_stren);
+	};
+
+	//// jumping
+	if (inp.jump_held/*went_down*/ && grounded) {
+		do_jump();
 	}
 
 	////
@@ -65,12 +81,22 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	
 	obj.coll = collison_response;
 
-	g->physics->update_object(I, *g->chunks, obj);
+	g->physics->update_object(I, *g->chunks, obj, collision_debug);
 	
+	if (collision_debug) {
+		obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
+		g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
+	}
+
 	// Head bob on collision, ie landing, hitting a wall etc.
 	float3 collision_impulse = obj.vel - vel;
 	apply_head_bob_impulse(collision_impulse);
 	
+	bool landed = !grounded && obj.grounded;
+	if (landed) {
+		on_landing(obj, vel, obj.vel);
+	}
+
 	pos = obj.pos;
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
@@ -81,7 +107,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
 	float facing_ang = alerp(rot_ae.x, walking_ang, anim_fac * 0.5f);
 
-	update_walking_step_bob(I, cur_speed2d);
+	update_walking_step_bob(I, cur_speed2d, obj);
 
 	update_body_dynamics(I, facing_ang);
 
@@ -159,7 +185,7 @@ void Player::update_body_dynamics (Input& I, float facing_ang) {
 		deg(float2(-90, +90)), deg(float2(-60, +70)));
 }
 
-void Player::update_walking_step_bob (Input& I, float cur_speed2d) {
+void Player::update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject& phys) {
 	if (!grounded) {
 		// need to take full step again after landing, and no steps in air!
 		walking_step_bob_counter = 0;
@@ -175,7 +201,7 @@ void Player::update_walking_step_bob (Input& I, float cur_speed2d) {
 		float bob_impulse = visual_dynamics.step_head_bob_strength * effect_scale;
 		apply_head_bob_impulse(float3(0,0,-bob_impulse));
 
-		g->assets->steps_soft.play_random(effect_scale, 1.0f);
+		phys.grounded.trigger_step_sound(effect_scale);
 	}
 }
 
@@ -200,6 +226,6 @@ void Player::update_view_dynamics (Input& I) {
 	ImGui::Text("head_bob_vel: %6.3f %6.3f %6.3f", head_bob_vel.x, head_bob_vel.y, head_bob_vel.z);
 	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);
 
-	if (g->activate_flycam)
+	if (collision_debug && g->activate_flycam)
 		g_debugdraw.wire_cube(pos + head_pivot + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
 }

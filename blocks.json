@@ -20,70 +20,83 @@
 		"earth": {
 			"hardness": 3,
 			"tool": "shovel",
-			"tex": [1,2]
+			"tex": [1,2],
+			"step_sound": "step_soft"
 		},
 		"grass": {
 			"hardness": 3,
 			"tool": "shovel",
-			"tex": { "top": [1,0], "side": [1,1], "bottom": [1,2] }
+			"tex": { "top": [1,0], "side": [1,1], "bottom": [1,2] },
+			"step_sound": "step_soft"
 		},
 
 		"stone": {
 			"tool": "pickaxe",
 			"hardness": 20,
-			"tex": [6,0]
+			"tex": [6,0],
+			"step_sound": "step_hard"
 		},
 		"hardstone": {
 			"tool": "pickaxe",
 			"hardness": 30,
-			"tex": [7,0]
+			"tex": [7,0],
+			"step_sound": "step_hard"
 		},
 		
 		"sand": {
 			"hardness": 1,
 			"tool": "shovel",
-			"tex": [4,0]
+			"tex": [4,0],
+			"step_sound": "step_soft"
 		},
 		"gravel": {
 			"hardness": 5,
 			"tool": "shovel",
-			"tex": [3,0]
+			"tex": [3,0],
+			"step_sound": "step_soft"
 		},
 
 		"mossy_rock": {
 			"tool": "pickaxe",
 			"hardness": 16,
-			"tex": [8,2]
+			"tex": [8,2],
+			"step_sound": "step_hard"
 		},
 		"ice": {
 			"tool": "pickaxe",
 			"hardness": 16,
-			"tex": [9,2]
+			"tex": [9,2],
+			"step_sound": "step_hard"
 		},
 		"magma": {
 			"tool": "pickaxe",
 			"hardness": 16,
-			"tex": [10,2]
+			"tex": [10,2],
+			"step_sound": "step_hard"
 		},
 		"badrock": {
 			"tool": "pickaxe",
 			"hardness": 10,
-			"tex": [11,2]
+			"tex": [11,2],
+			"step_sound": "step_hard"
 		},
 		"slime": {
 			"tool": "shovel",
 			"hardness": 1,
-			"tex": [12,2]
+			"tex": [12,2],
+			"step_sound": "step_soft"
 		},
 		"crystal": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [9,1]
+			"tex": [9,1],
+			"step_sound": "step_hard"
 		},
 		"uranium": {
 			"tool": "pickaxe",
 			"hardness": 12,
-			"tex": [12,1]
+			"tex": [12,1],
+			"step_sound": "step_hard"
 		},
 
 		"tree_log": {
@@ -92,15 +105,17 @@
 			"transparency": "partial",
 			//"mesh": "log",
 			"offs-strength": 0.2,
-			"tex": { "top-bottom": [0,1], "side": [0,2] }
+			"tex": { "top-bottom": [0,1], "side": [0,2] },
+			"step_sound": "step_hard"
 		},
 		"leaves": {
 			//"class": "deco",
 			"hardness": 2,
 			//"mesh": "X-leaves",
 			"tex": [2,1],
-			"transparency": "alpha_test"
-			//"transparency": "alpha_test"
+			"transparency": "alpha_test",
+			//"transparency": "alpha_test",
+			"step_sound": "step_soft"
 		},
 
 		"torch": {
@@ -120,33 +135,39 @@
 		"glass": {
 			"class": "solid",
 			"transparency": "transparent",
-			"tex": [2,4]
+			"tex": [2,4],
+			"step_sound": "step_hard"
 		},
 		
 		"crystal2": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [8,3]
+			"tex": [8,3],
+			"step_sound": "step_hard"
 		},
 		"crystal3": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [9,3]
+			"tex": [9,3],
+			"step_sound": "step_hard"
 		},
 		"crystal4": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [10,3]
+			"tex": [10,3],
+			"step_sound": "step_hard"
 		},
 		"crystal5": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [11,3]
+			"tex": [11,3],
+			"step_sound": "step_hard"
 		},
 		"crystal6": {
 			"tool": "pickaxe",
 			"hardness": 8,
-			"tex": [12,3]
+			"tex": [12,3],
+			"step_sound": "step_hard"
 		},
 
 		"glowshroom": {

@@ -12,12 +12,15 @@ void to_json (nlohmann::ordered_json& j, const Game& t) {
 	if (g_window.render_backend == RenderBackend::OPENGL)
 		g_window.renderer->serialize(j["renderer_opengl"]);
 	j["input"] = g_window.input;
+	j["audio"] = *t.audio;
 }
 void from_json (const nlohmann::ordered_json& j, Game& t) {
 	_JSON_EXPAND(_JSON_PASTE(_JSON_FROM, SERIALIZE_NORMAL))
 	if (g_window.render_backend == RenderBackend::OPENGL && j.contains("renderer_opengl"))
 		g_window.renderer->deserialize(j["renderer_opengl"]);
 	if (j.contains("input")) j.at("input").get_to(g_window.input);
+	// Dereference causes object values to be deserialized instead of ptr deserialized, which causes object to be recreated, breaking sound references
+	if (j.contains("audio")) j.at("audio").get_to(*t.audio);
 }
 
 // Global game definition
@@ -193,7 +196,10 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 			if (renderer)
 				renderer->graphics_imgui(I, *this);
 		}
-
+		
+		if (imgui_header("Audio", &imopen.audio)) {
+			audio->imgui();
+		}
 	}
 
 	ImGui::PopItemWidth();

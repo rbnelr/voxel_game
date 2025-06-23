@@ -1,5 +1,6 @@
 #include "common.hpp"
 #include "assets.hpp"
+#include "game.hpp"
 // 
 #include "assimp/cimport.h"        // Plain-C interface
 #include "assimp/scene.h"          // Output data structure
@@ -58,6 +59,12 @@ void Assets::load_block_types (json const& blocks_json) {
 		GET(val, "hardness")	.get_to(b.hardness);
 		GET(val, "glow")		.get_to(b.glow);
 		GET(val, "absorb")		.get_to(b.absorb);
+		
+		std::string step_sound;
+		GET(val, "step_sound")	.get_to(step_sound);
+
+		if (step_sound.empty()) step_sound = "step_hard";
+		b.step_sound = load_sound_set(step_sound);
 
 		//name_map.emplace(b.name, (block_id)blocks.size());
 		block_types.blocks.push_back(std::move(b));
