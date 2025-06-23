@@ -1,7 +1,7 @@
 #pragma once
 #include "common.hpp"
 #include "glad/glad.h"
-#include "tracyOpenGL.hpp"
+#include "tracy/TracyOpenGL.hpp"
 #include "kisslib/stb_image_write.hpp"
 #include "shader_preprocessor.hpp"
 

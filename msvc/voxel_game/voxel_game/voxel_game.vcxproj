@@ -95,10 +95,10 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>BUILD_DEBUG;CONSOLE_SUBSYS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -117,10 +117,10 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>BUILD_RELEASE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -141,10 +141,10 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>BUILD_VALIDATE;CONSOLE_SUBSYS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -165,10 +165,10 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>BUILD_TRACY;TRACY_ENABLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\portaudio\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\libsoundwave\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -238,9 +238,6 @@
     <ClInclude Include="..\..\..\src\kisslib\threadpool.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\threadsafe_queue.hpp" />
     <ClInclude Include="..\..\..\src\kisslib\timer.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp" />
     <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
     <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
@@ -362,7 +359,9 @@
     <ClCompile Include="..\..\..\src\kisslib\string.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
     <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp" />
+    <ClCompile Include="..\..\..\src\kisslib\tracy\public\TracyClient.cpp">
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">BUILD_TRACY;TRACY_ENABLE;WINAPI_PARTITION_DESKTOP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>

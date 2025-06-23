@@ -49,7 +49,7 @@ static constexpr const char* APPNAME = "Voxel Game";
 
 #include "imgui/dear_imgui.hpp"
 
-#include "Tracy.hpp"
+#include "tracy/Tracy.hpp"
 
 #ifdef TRACY_ENABLE
 	// avoid large functions being inlined to make profiling results more clear
