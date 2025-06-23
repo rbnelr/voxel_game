@@ -30,12 +30,15 @@ struct GroundedInfo {
 	int3 vox = INT_MIN;
 	block_id bid = B_NULL;
 	
-	void trigger_step_sound (float volume) {
+	void trigger_step_sound (float volume, float set_pitch = -1) {
 		if (!grounded) return;
+
+		float pitch = set_pitch >= 0.0f ? set_pitch :
+			map_clamp(volume, 0, 2, 0.7f, 1.2f);
 
 		auto* sounds = g->assets->block_types[bid].step_sound;
 		if (sounds)
-			sounds->play_random(volume, 1.0f);
+			sounds->play_random(volume, pitch);
 	}
 
 	operator bool () { return grounded; }
@@ -43,20 +46,13 @@ struct GroundedInfo {
 struct PhysicsObject {
 	float3 pos;
 	float3 vel;
-	float3 aabb0, aabb1;
+	AABB local_aabb;
 	float drag_coeff;
 
 	CollisionResponse coll;
 
 	GroundedInfo grounded;
 	bool buried;
-
-	void dbgdraw_aabb (float3 pos, lrgba col) {
-		float3 sz = aabb1 - aabb0;
-		float3 local_center = (aabb0 + aabb1) * 0.5f;
-		g_debugdraw.wire_cube(pos + local_center, sz, col);
-	}
-
 };
 
 struct World;
@@ -230,7 +226,7 @@ struct Physics {
 	}
 #endif
 
-	struct VoxelCollisionHit {
+	struct VoxelCollisionCastHit {
 		// Can currently be negative if still not exited voxel (set your own threshold to better handle slight float error)
 		float t0 = INF; // Voxel entry time (pos + vel)
 
@@ -251,7 +247,7 @@ struct Physics {
 	// voxel AABB (vox0, vox1) relative to voxel origin
 	// TODO: Can probably be significantly optimized if combined with voxel grid iteration
 	bool voxel_box_cast (float3 box0, float3 box1, float3 box_vel,
-	                     float3 vox0, float3 vox1, VoxelCollisionHit* hit) {
+	                     float3 vox0, float3 vox1, VoxelCollisionCastHit* hit) {
 		*hit = {};
 
 		// If object on left of voxel: how far to move in positive to start(l) and stop(h) colliding
@@ -342,7 +338,7 @@ struct Physics {
 
 		return true;
 	}
-	void handle_collison (PhysicsObject& obj, VoxelCollisionHit const& hit) {
+	void handle_collison (PhysicsObject& obj, VoxelCollisionCastHit const& hit) {
 		// TODO: implement bouncing and friction again, probablty want to take average of bounciness and friction params of voxel and object
 		// The problem is that earliest VoxelCollisionHit can be ambiguous, when standing on 4 flat voxels for example
 		// -> if hit t0 different, simply take earliest
@@ -388,7 +384,7 @@ struct Physics {
 		}
 	}
 
-	VoxelCollisionHit world_voxel_box_collision (Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
+	VoxelCollisionCastHit world_voxel_box_cast (Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
 
 		//// Avoid zero speed to allow for easier voxel_box_cast
 		//float speed = length(obj.vel);
@@ -398,14 +394,14 @@ struct Physics {
 		
 		auto& block_types = g->assets->block_types;
 
-		float3 aabb0 = obj.pos + obj.aabb0;
-		float3 aabb1 = obj.pos + obj.aabb1;
+		float3 aabb0 = obj.pos + obj.local_aabb.lo;
+		float3 aabb1 = obj.pos + obj.local_aabb.hi;
 
 		// TODO: take into account movement to compute all relevant voxels
 		int3 start = (int3)floor(aabb0) -1;
 		int3 end =   (int3)ceil( aabb1) +1;
 
-		VoxelCollisionHit res_hit = {};
+		VoxelCollisionCastHit res_hit = {};
 
 		for (int z=start.z; z<end.z; ++z)
 		for (int y=start.y; y<end.y; ++y)
@@ -424,7 +420,7 @@ struct Physics {
 
 				float3 rel = obj.pos - vox_origin;
 
-				VoxelCollisionHit hit;
+				VoxelCollisionCastHit hit;
 				if (!voxel_box_cast(local0, local1, obj.vel, vox0, vox1, &hit)) {
 					continue;
 				}
@@ -450,7 +446,40 @@ struct Physics {
 
 		return res_hit;
 	}
+	
+	bool world_voxel_box_overlap (Chunks& chunks, AABB aabb_world) {
+		auto& block_types = g->assets->block_types;
 
+		int3 start = (int3)floor(aabb_world.lo);
+		int3 end =   (int3)ceil( aabb_world.hi);
+
+		bool overlap = false;
+		for (int z=start.z; z<end.z; ++z)
+		for (int y=start.y; y<end.y; ++y)
+		for (int x=start.x; x<end.x; ++x) {
+			auto bid = chunks.read_block(x,y,z);
+			//g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, srgba(40,40,40,100));
+
+			if (block_types[bid].collision == CM_SOLID) {
+				float3 vox_origin = (float3)int3(x,y,z);
+				
+				float3 vox0 = vox_origin + float3(0);
+				float3 vox1 = vox_origin + float3(1);
+
+				bool overlapX = vox0.x < aabb_world.hi.x && vox1.x > aabb_world.lo.x;
+				bool overlapY = vox0.y < aabb_world.hi.y && vox1.y > aabb_world.lo.y;
+				bool overlapZ = vox0.z < aabb_world.hi.z && vox1.z > aabb_world.lo.z;
+
+				if (overlapX && overlapX && overlapZ) {
+					overlap = true;
+					break;
+					//g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.8f, srgba(255,0,0,100));
+				}
+			}
+		}
+
+		return overlap;
+	}
 
 	void update_object (Input& I, Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
 		ZoneScoped;
@@ -477,7 +506,7 @@ struct Physics {
 		// This would likely not be the case for particles, seemingly allowing us to get away with less iterations for them
 		// but would suddenly break the moment more external forces are introduced (or gravity points in other directions)
 		for (int i=0; i<3; i++) {
-			auto hit = world_voxel_box_collision(chunks, obj, collision_debug);
+			auto hit = world_voxel_box_cast(chunks, obj, collision_debug);
 			
 			//if (hit) {
 			//	float end_t = min(hit.t0, 1.0f);

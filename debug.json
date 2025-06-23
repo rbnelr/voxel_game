@@ -52,33 +52,33 @@
 		"debug_frustrum_culling": false,
 		"edits": {
 			"open": false,
-			"brush_block": "earth",
+			"brush_block": "stone",
 			"brush_mode": 1,
 			"brush_size": 1.0,
 			"brush_repeat": true,
 			"brush_ray_max_dist": 50.0,
 			"brush_plane": [
 				-75.0,
-				-39.5,
-				-117.0
+				-56.0,
+				-114.5
 			],
 			"brush_plane_normal": [
 				0.0,
-				-1.0,
-				0.0
+				0.0,
+				1.0
 			]
 		}
 	},
 	"flycam": {
 		"cam": {
 			"pos": [
-				-79.6905746459961,
-				-44.382720947265625,
-				-111.24784851074219
+				-61.20592498779297,
+				-56.93620300292969,
+				-111.52235412597656
 			],
 			"rot_aer": [
-				2.7554638385772705,
-				-0.5773641467094421,
+				2.2011749744415283,
+				-0.7653461694717407,
 				0.0
 			],
 			"mode": "PERSPECTIVE",
@@ -94,8 +94,8 @@
 	},
 	"player": {
 		"pos": [
-			-78.25126647949219,
-			-48.10673904418945,
+			-76.3388900756836,
+			-40.23028564453125,
 			-114.0
 		],
 		"vel": [
@@ -104,9 +104,10 @@
 			0.0
 		],
 		"rot_ae": [
-			-0.8266513347625732,
-			-0.1888270527124405
+			-1.813808798789978,
+			-0.061764754354953766
 		],
+		"crouching_progress": 0.0,
 		"third_person": false,
 		"visual_dynamics": {
 			"bob_strength": 2.0,
@@ -118,24 +119,27 @@
 				0.30000001192092896
 			],
 			"vel_max": 100.0,
-			"step_length": 1.7000000476837158,
+			"step_length": 1.600000023841858,
+			"step_length_crouch": 0.8999999761581421,
 			"step_head_bob_strength": 0.30000001192092896
 		},
 		"movement_params": {
 			"walk_speed": 4.0,
+			"crouch_speed": 1.2000000476837158,
 			"run_speed": 10.0,
 			"allow_backwards_sprint": false,
 			"walk_accel_scaled_max": 15.0,
 			"walk_accel_scaled": 2.0,
 			"walk_accel_boost": 50.0,
-			"air_control_accel_base": 2.0
+			"air_control_accel_base": 2.0,
+			"crouch_transition_speed": 7.0
 		}
 	},
 	"activate_flycam": false,
 	"imopen": {
 		"performance": true,
 		"world": true,
-		"chunks": false,
+		"chunks": true,
 		"physics": true,
 		"entities": true,
 		"graphics": false,

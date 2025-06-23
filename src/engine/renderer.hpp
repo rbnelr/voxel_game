@@ -1,5 +1,6 @@
 #pragma once
-#include "common.hpp"
+#include "kisslib/serialization.hpp"
+#include "kisslib/read_directory.hpp"
 
 enum class AttribMode {
 	FLOAT,		// simply pass float to shader
@@ -22,6 +23,7 @@ enum class RenderBackend : int {
 struct GLFWwindow;
 struct Game;
 struct Chunks;
+struct Input;
 
 class Renderer {
 public:

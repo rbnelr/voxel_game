@@ -12,7 +12,7 @@ struct Block;
 struct Game;
 
 struct Player {
-	SERIALIZE(Player, pos, vel, rot_ae, third_person,
+	SERIALIZE(Player, pos, vel, rot_ae, crouching_progress, third_person,
 		visual_dynamics, movement_params)
 
 	// Player ground position
@@ -24,6 +24,11 @@ struct Player {
 	// Player look rotation
 	float2	rot_ae = float2(deg(0), deg(-10)); // azimuth elevation
 
+	float crouching_progress = 0;
+	float crouching_change = 0;
+
+	bool is_crouched () { return crouching_progress > 0.75f; }
+
 	//// Cameras
 	bool third_person = false;
 
@@ -33,20 +38,16 @@ struct Player {
 	BlockPlaceAnim	block_place;
 	PlayerInventory	inventory;
 
-	struct PlayerInput {
-		ButtonState attack_button;
-		ButtonState build_button;
-
-		float2 move_dir;
-		bool jump_held;
-		bool sprint;
-	};
-
 	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
 
 	// Fps camera pivot for fps mode ie. where your eyes are
 	//  First and third person cameras rotate around this
-	float3 head_pivot = float3(0, 0, 1.55f);
+	float3 head_pivot_standing = float3(0, 0, 1.55f);
+	float3 head_pivot_crouching = float3(0, 0, 0.95f);
+
+	float3 head_pivot () {
+		return lerp(head_pivot_standing, head_pivot_crouching, crouching_progress);
+	}
 
 	// Closest position the third person camera can go relative to head_pivot
 	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
@@ -60,7 +61,20 @@ struct Player {
 
 	//// Physics
 	float width = 0.6f;
-	float height () { return head_pivot.z + 0.15f; }
+
+	float height (bool crouched) {
+		return crouched ?
+			0.99f :
+			1.55f + 0.15f; // head_pivot_standing.z + 0.15f;
+	}
+	float height () { return height(is_crouched()); }
+
+	AABB collision_local_aabb (bool crouched) {
+		return {
+			float3(-width*0.5f,-width*0.5f, 0),
+			float3(+width*0.5f,+width*0.5f, height(crouched)),
+		};
+	}
 
 	// Visual direction of body (only for first and third person body and arms)
 	float2 body_rot = INF;
@@ -81,7 +95,7 @@ struct Player {
 	
 	struct VisualDynamicsParams {
 		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
-			step_length, step_head_bob_strength)
+			step_length, step_length_crouch, step_head_bob_strength)
 			
 		float bob_strength = 2;
 		float spring_k = 1;
@@ -89,7 +103,9 @@ struct Player {
 		float3 offset_max = 0.2f;
 		float vel_max = 5;
 
-		float step_length = 0.8f;
+		float step_length = 1.6f;
+		float step_length_crouch = 0.75f;
+		float step_length_sprint = 2.1f;
 		float step_head_bob_strength = 1;
 		
 		void imgui () {
@@ -101,6 +117,8 @@ struct Player {
 				ImGui::DragFloat("vel_max", &vel_max, 0.1f);
 
 				ImGui::DragFloat("step_length", &step_length, 0.1f);
+				ImGui::DragFloat("step_length_crouch", &step_length_crouch, 0.1f);
+				ImGui::DragFloat("step_length_sprint", &step_length_sprint, 0.1f);
 				ImGui::DragFloat("step_head_bob_strength", &step_head_bob_strength, 0.1f);
 
 				ImGui::TreePop();
@@ -110,11 +128,12 @@ struct Player {
 	VisualDynamicsParams visual_dynamics;
 
 	struct MovementParams {
-		SERIALIZE(MovementParams, walk_speed, run_speed, allow_backwards_sprint,
+		SERIALIZE(MovementParams, walk_speed, crouch_speed, run_speed, allow_backwards_sprint,
 			walk_accel_scaled_max, walk_accel_scaled, walk_accel_boost,
-			air_control_accel_base)
+			air_control_accel_base, crouch_transition_speed)
 
 		float walk_speed = 3.5f;
+		float crouch_speed = 1.2f;
 		float run_speed = 8;
 		bool allow_backwards_sprint = false;
 
@@ -123,10 +142,13 @@ struct Player {
 		float walk_accel_boost = 50;
 
 		float air_control_accel_base = 1;
+
+		float crouch_transition_speed = 10;
 		
 		void imgui () {
 			if (ImGui::TreeNode("Movement Params")) {
 				ImGui::DragFloat("walk_speed", &walk_speed, 0.05f);
+				ImGui::DragFloat("crouch_speed", &crouch_speed, 0.05f);
 				ImGui::DragFloat("run_speed", &run_speed, 0.05f);
 				ImGui::Checkbox("allow_backwards_sprint", &allow_backwards_sprint);
 				ImGui::DragFloat("walk_accel_scaled_max", &walk_accel_scaled_max, 0.05f);
@@ -134,6 +156,9 @@ struct Player {
 				ImGui::DragFloat("walk_accel_boost", &walk_accel_boost, 0.05f);
 
 				ImGui::DragFloat("air_control_accel_base", &air_control_accel_base, 0.05f);
+
+				ImGui::DragFloat("crouch_transition_speed", &crouch_transition_speed, 0.1f);
+
 				ImGui::TreePop();
 			}
 		}
@@ -172,7 +197,8 @@ struct Player {
 
 		ImGui::Checkbox("third_person", &third_person);
 
-		ImGui::DragFloat3("head_pivot", &head_pivot.x, 0.05f);
+		ImGui::DragFloat3("head_pivot_standing", &head_pivot_standing.x, 0.05f);
+		ImGui::DragFloat3("head_pivot_crouching", &head_pivot_crouching.x, 0.05f);
 		ImGui::DragFloat3("tps_camera_base_pos", &tps_camera_base_pos.x, 0.05f);
 		ImGui::DragFloat3("tps_camera_dir", &tps_camera_dir.x, 0.05f);
 		ImGui::DragFloat("tps_camera_dist", &tps_camera_dist, 0.05f);
@@ -194,8 +220,18 @@ struct Player {
 
 		ImGui::Checkbox("collision_debug", &collision_debug);
 	}
+	
 
+	struct PlayerInput {
+		ButtonState attack_button;
+		ButtonState build_button;
 
+		float2 move_dir;
+		bool jump_held;
+		bool sprint;
+
+		ButtonState crouch_button;
+	};
 	PlayerInput get_controls (Input& I) {
 		PlayerInput inp = {};
 
@@ -240,6 +276,8 @@ struct Player {
 			Camera& cam = third_person ? tps_camera : fps_camera;
 
 			rotate_with_mouselook(I, &rot_ae.x, &rot_ae.y, cam.vfov);
+
+			inp.crouch_button = I.buttons[KEY_LEFT_CONTROL];
 		}
 
 		return inp;
@@ -287,7 +325,7 @@ struct Player {
 
 	float3 calc_third_person_cam_pos (Chunks& chunks, float3x3 body_rotation, float3x3 head_elevation) {
 		Ray ray;
-		ray.pos = pos + body_rotation * (head_pivot + tps_camera_base_pos);
+		ray.pos = pos + body_rotation * (head_pivot() + tps_camera_base_pos);
 		ray.dir = body_rotation * head_elevation * tps_camera_dir;
 
 		float dist = tps_camera_dist;
@@ -316,8 +354,10 @@ struct Player {
 
 		Camera& cam = third_person ? tps_camera : fps_camera;
 
-		float3x4 world_to_head = head_elevation_inv * translate(-head_pivot) * body_rotation_inv * translate(-pos_world);
-		head_to_world = translate(pos_world) * body_rotation * translate(head_pivot) * head_elevation;
+		auto h_pivot = head_pivot();
+
+		float3x4 world_to_head = head_elevation_inv * translate(-h_pivot) * body_rotation_inv * translate(-pos_world);
+		head_to_world = translate(pos_world) * body_rotation * translate(h_pivot) * head_elevation;
 
 		Camera_View view;
 		view.world_to_cam = rotate3_X(-deg(90)) * translate(-cam_offs_local) * world_to_head;
@@ -331,7 +371,7 @@ struct Player {
 	}
 
 	float3x4 body_to_world () {
-		return translate(pos) * rotate3_Z(body_rot.x) * translate(head_pivot) * rotate3_X(body_rot.y);
+		return translate(pos) * rotate3_Z(body_rot.x) * translate(head_pivot()) * rotate3_X(body_rot.y);
 	}
 };
 

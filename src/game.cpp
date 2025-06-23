@@ -136,7 +136,7 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 					float3x3 cam_to_world_rot;
 					flycam->calc_world_to_cam_rot(&cam_to_world_rot);
 
-					flycam->cam.pos = player->pos + player->head_pivot - cam_to_world_rot * float3(0,0,-1) * 2;
+					flycam->cam.pos = player->pos + player->head_pivot() - cam_to_world_rot * float3(0,0,-1) * 2;
 				}
 			}
 			if (open) ImGui::Checkbox("flycam_control_player", &flycam_control_player);

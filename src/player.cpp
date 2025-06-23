@@ -21,11 +21,53 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	float cur_speed = length(vel);
 
 	auto& m = movement_params;
-	
+
+	auto player_crouching = [&] () {
+		// TODO: support crouch toggle?
+		
+		//// Crouch logic
+		bool want_crouch = inp.crouch_button.is_down;
+		bool is_crouch = is_crouched();
+		if ((is_crouch != want_crouch) && !buried) {
+			if (want_crouch) {
+				// able to crouch if grounded
+				if (grounded)
+					is_crouch = true;
+			}
+			else {
+				// able to uncrouch if grounded
+				if (!g->physics->world_voxel_box_overlap(*g->chunks, collision_local_aabb(false) + pos)) {
+					is_crouch = false;
+				}
+			}
+		}
+		float crouch_target = is_crouch ? 1.0f : 0.0f;
+		auto prev_crouch = crouching_progress;
+
+		// Linearly extend/pull in legs
+		crouching_progress = move_towards_linear(crouching_progress,
+			crouch_target, m.crouch_transition_speed, I.dt);
+		
+		{ // Compute head bob from head lower/raise impulse
+			float3 crouch_dir = normalizesafe(head_pivot_crouching - head_pivot_standing);
+			auto cur_crouch_change = normalizesafe(crouching_progress - prev_crouch);
+			// only use direction, ignore real velocity to keep impulse constant
+			float3 impulse = crouch_dir * (cur_crouch_change - crouching_change);
+
+			apply_head_bob_impulse(impulse);
+
+			crouching_change = cur_crouch_change;
+		}
+	};
+	player_crouching();
+
 	auto player_walk_dynamics = [&] () {
 		bool forward_move = inp.move_dir.y > 0.0f;
-		bool do_sprint = inp.sprint && (forward_move || m.allow_backwards_sprint);
-		float target_speed = do_sprint ? m.run_speed : m.walk_speed;
+		bool sprint_allowed = !is_crouched() && (forward_move || m.allow_backwards_sprint);
+		bool do_sprint = sprint_allowed && inp.sprint;
+
+		float walk_or_crouch_speed = is_crouched() ? m.crouch_speed : m.walk_speed;
+		float target_speed = do_sprint ? m.run_speed : walk_or_crouch_speed;
 
 		float2 target_vel = body_rotation * (normalizesafe(inp.move_dir) * target_speed);
 
@@ -55,7 +97,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		// Head bob on jump
 		apply_head_bob_impulse(jump_impulse);
 
-		grounded.trigger_step_sound(1.4f); // Jump sound
+		grounded.trigger_step_sound(1.4f, 1); // Jump sound
 	};
 	auto on_landing = [&] (PhysicsObject& obj, float3 falling_vel, float3 val_after_landing) {
 		float3 delta_vel = val_after_landing - falling_vel;
@@ -65,14 +107,14 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		//clog("Landed impact_impulse: %f", impact_impulse);
 
 		// Landing sound, two makes it stronger (good idea?)
-		obj.grounded.trigger_step_sound(audio_stren);
-		obj.grounded.trigger_step_sound(audio_stren);
+		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
+		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
 	};
 
 	_dbg_apply_forw_impulse(I);
 
 	//// jumping
-	if (inp.jump_held/*went_down*/ && grounded && !buried) {
+	if (inp.jump_held/*went_down*/ && grounded && !buried && !is_crouched()) {
 		do_jump();
 	}
 
@@ -81,8 +123,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	
 	obj.pos = pos;
 	obj.vel = vel;
-	obj.aabb0 = float3(-width*0.5f,-width*0.5f, 0);
-	obj.aabb1 = float3(+width*0.5f,+width*0.5f, height());
+	obj.local_aabb = collision_local_aabb(is_crouched());
 	obj.drag_coeff = g->physics->drag_coeff_for_terminal_vel(g->physics->player_terminal_speed);
 
 	obj.coll = collison_response;
@@ -90,7 +131,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	g->physics->update_object(I, *g->chunks, obj, collision_debug);
 	
 	if (collision_debug || g->activate_flycam || third_person) {
-		obj.dbgdraw_aabb(obj.pos, lrgba(1,0,1,1));
+		obj.local_aabb.dbgdraw(obj.pos, lrgba(1,0,1,1));
 	}
 	if (collision_debug) {
 		g_debugdraw.vector(obj.pos, obj.vel*0.1f, lrgba(0,0,1,1));
@@ -201,12 +242,20 @@ void Player::update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject
 		walking_step_bob_counter = 0;
 		return;
 	}
+	
+	bool is_sprinting = cur_speed2d > movement_params.walk_speed;
+	float step_len;
+	if (is_crouched())     step_len = visual_dynamics.step_length_crouch;
+	else if (is_sprinting) step_len = visual_dynamics.step_length_sprint;
+	else                   step_len = visual_dynamics.step_length;
 
 	walking_step_bob_counter += cur_speed2d * I.dt;
-	if (walking_step_bob_counter > visual_dynamics.step_length) {
-		walking_step_bob_counter = wrap(walking_step_bob_counter, visual_dynamics.step_length);
+	if (walking_step_bob_counter > step_len) {
+		walking_step_bob_counter = wrap(walking_step_bob_counter, step_len);
 
-		float effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 2.0f);
+		float effect_scale;
+		if (is_crouched()) effect_scale = 0.3f;
+		else effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 1.8f);
 
 		float bob_impulse = visual_dynamics.step_head_bob_strength * effect_scale;
 		
@@ -241,5 +290,5 @@ void Player::update_view_dynamics (Input& I) {
 	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);
 
 	if (g->activate_flycam || third_person)
-		g_debugdraw.wire_cube(pos + head_pivot + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
+		g_debugdraw.wire_cube(pos + head_pivot() + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
 }
