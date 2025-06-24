@@ -335,6 +335,17 @@ namespace worldgen {
 
 	void object_pass (Chunks& chunks, chunk_id cid, Neighbours& neighbours, WorldGenerator const* wg) {
 		ZoneScoped;
+
+		// TODO: This function is pretty slow because it needs to read all voxels and does so in the sparsified chunk format
+		// Easy optimization:
+		// Allocate buffer for neighbours (3x3 chunks), leave uninited
+		// Allocate bool buffer for 3x4 chunks subchunks (bool subchunk_cached) memset to false
+		// Efficiently densify middle chunk into cache (subchunk copy can be done with unrolled loops of sse copy instructions)
+		// now outer chunks.read_block(x,y,z, cid) can be entirely simplified to pointer lookup
+		// the other two neighbour voxels could could be done using a single subchunk extra from the neighbours
+		// In the rare case that object placement happens, we read a bunch of local blocks, which can be lazily densified using a single if using bool array
+		// This likely optimizes well for speeding up lookups while also avoiding touching voxels which are unlikely to be touched far from chunk border in neighbors
+		// final sparification can utilize bool array to also avoid touching unchanged voxels
 		
 		OSN::Noise<2> noise (wg->seed);
 		OSN::Noise<3> noise3 (wg->seed);

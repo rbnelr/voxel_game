@@ -137,6 +137,7 @@ void Chunks::densify_subchunk (ChunkVoxels& vox, uint32_t& subc) {
 	subc = subchunks.alloc();
 	auto& subchunk = subchunks[subc];
 
+	// Use sse, like fill sse reg with bids, then use it to fill x-rows of voxels with a few unrolled writes?
 	for (uint32_t i=0; i<SUBCHUNK_VOXEL_COUNT; ++i)
 		subchunk.voxels[i] = bid;
 }
