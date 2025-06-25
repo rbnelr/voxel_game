@@ -29,52 +29,35 @@ struct Player {
 
 	bool is_crouched () { return crouching_progress > 0.75f; }
 
-	//// Cameras
-	bool third_person = false;
+	//// Physics
+	float width = 0.6f;
 
-	////
-	SelectedBlock	selected_block;
-	BlockBreakAnim	break_block;
-	BlockPlaceAnim	block_place;
-	PlayerInventory	inventory;
+	float collision_height = 1.7f;
+	float crouch_height = 0.99f;
 
-	/////// These are more like settings that should possibly apply to all players, might make static later or move into PlayerSettings or something
+	// Collision box height (starting at player origin)
+	AABB collision_local_aabb (float crouching_progress) {
+		return {
+			float3(-width*0.5f,-width*0.5f, 0),
+			float3(+width*0.5f,+width*0.5f, lerp(collision_height, crouch_height, crouching_progress)),
+		};
+	}
+	AABB collision_world_aabb () {
+		return collision_local_aabb(crouching_progress) + pos;
+	}
 
-	// Fps camera pivot for fps mode ie. where your eyes are
-	//  First and third person cameras rotate around this
-	float3 head_pivot_standing = float3(0, 0, 1.55f);
-	float3 head_pivot_crouching = float3(0, 0, 0.95f);
+	// Camera position relative to player origin
+	// Smoothly interpolates with head_pivot()
+	float3 head_pivot_standing = float3(0, 0, collision_height - 0.15f);
+	float3 head_pivot_crouching = float3(0, 0.16f, crouch_height - 0.05f);
 
 	float3 head_pivot () {
 		return lerp(head_pivot_standing, head_pivot_crouching, crouching_progress);
 	}
 
-	// Closest position the third person camera can go relative to head_pivot
-	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
-	// In which direction the camera moves back if no blocks are in the way
-	float3 tps_camera_dir = float3(0,-1,0);
-	// How far the camera will move back
-	float tps_camera_dist = 4;
-
-	Camera fps_camera;
-	Camera tps_camera;
-
-	//// Physics
-	float width = 0.6f;
-
-	float height (bool crouched) {
-		return crouched ?
-			0.99f :
-			1.55f + 0.15f; // head_pivot_standing.z + 0.15f;
-	}
-	float height () { return height(is_crouched()); }
-
-	AABB collision_local_aabb (bool crouched) {
-		return {
-			float3(-width*0.5f,-width*0.5f, 0),
-			float3(+width*0.5f,+width*0.5f, height(crouched)),
-		};
-	}
+	// Results from previous frame physics needed before physics for character movement
+	GroundedInfo grounded = {};
+	bool buried = true;
 
 	// Visual direction of body (only for first and third person body and arms)
 	float2 body_rot = INF;
@@ -89,9 +72,26 @@ struct Player {
 	void update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject& phys);
 	void update_view_dynamics (Input& I);
 
-	// Results from previous frame physics needed before physics for character movement
-	GroundedInfo grounded = {};
-	bool buried = true;
+	
+	//// Cameras
+	// Closest position the third person camera can go relative to head_pivot
+	float3 tps_camera_base_pos = float3(0.5f, -0.15f, 0);
+	// In which direction the camera moves back if no blocks are in the way
+	float3 tps_camera_dir = float3(0,-1,0);
+	// How far the camera will move back
+	float tps_camera_dist = 4;
+	
+	bool third_person = false;
+
+	Camera fps_camera;
+	Camera tps_camera;
+	
+	////
+	SelectedBlock	selected_block;
+	BlockBreakAnim	break_block;
+	BlockPlaceAnim	block_place;
+	PlayerInventory	inventory;
+
 	
 	struct VisualDynamicsParams {
 		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
@@ -317,6 +317,7 @@ struct Player {
 
 	void update_movement (Input& I, PlayerInput& inp);
 
+	float3x3 body_rotation () { return rotate3_Z(rot_ae.x); }
 	float3x3 look_rotation () {
 		float3x3 body_rotation = rotate3_Z(rot_ae.x);
 		float3x3 head_elevation = rotate3_X(rot_ae.y);
@@ -375,8 +376,9 @@ struct Player {
 	}
 };
 
-inline bool BlockInteraction::entity_in_block (int3 block_place_pos) {
+inline bool BlockInteraction::entity_in_block (int3 block_place_pos, BlockTypes::Block const& bt) {
 	auto& player = *g->player;
-	// TODO: convert to AABB
-	return cylinder_cube_intersect(player.pos -(float3)block_place_pos, player.width, player.height());
+	auto a = bt.get_local_aabb() + (float3)block_place_pos;
+	auto b = player.collision_world_aabb();
+	return a.overlaps(b);
 }

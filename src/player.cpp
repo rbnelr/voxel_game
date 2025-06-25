@@ -16,7 +16,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	ZoneScoped;
 	
 	//// walking
-	float2x2 body_rotation = rotate2(rot_ae.x);
+	float2x2 body_rotation2d = rotate2(rot_ae.x);
 	float3 prev_vel = vel;
 	float cur_speed = length(vel);
 
@@ -27,49 +27,56 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		
 		//// Crouch logic
 		bool want_crouch = inp.crouch_button.is_down;
-		bool is_crouch = is_crouched();
-		if ((is_crouch != want_crouch) && !buried) {
+		bool was_crouch = is_crouched();
+		bool do_crouch = was_crouch;
+
+		// if buried crouching state will remain
+		if ((want_crouch != was_crouch) && !buried) {
 			if (want_crouch) {
 				// able to crouch if grounded
-				if (grounded)
-					is_crouch = true;
+				if (grounded) {
+					do_crouch = true;
+				}
 			}
 			else {
-				// able to uncrouch if grounded
-				if (!g->physics->world_voxel_box_overlap(*g->chunks, collision_local_aabb(false) + pos)) {
-					is_crouch = false;
+				// able to uncrouch if collision box can actually be grown again
+				auto standing_aabb = collision_local_aabb(0) + pos;
+				if (!g->physics->world_voxel_box_overlap(*g->chunks, standing_aabb)) {
+					do_crouch = false;
 				}
 			}
 		}
-		float crouch_target = is_crouch ? 1.0f : 0.0f;
-		auto prev_crouch = crouching_progress;
 
-		// Linearly extend/pull in legs
-		crouching_progress = move_towards_linear(crouching_progress,
-			crouch_target, m.crouch_transition_speed, I.dt);
+
+		// Linearly animate head position during crouching transition if standing on ground
+		// Crouching progress will eventually switch is_crouched() and thus collision box
+		float crouch_target = do_crouch ? 1.0f : 0.0f;
+		float prev_crouch = crouching_progress;
+		crouching_progress = move_towards_linear(crouching_progress, crouch_target,
+			m.crouch_transition_speed, I.dt);
 		
-		{ // Compute head bob from head lower/raise impulse
-			float3 crouch_dir = normalizesafe(head_pivot_crouching - head_pivot_standing);
-			auto cur_crouch_change = normalizesafe(crouching_progress - prev_crouch);
+		{ // Compute head bob from head lower/raise toggle impulse
+			// track delta crouch_change (float) instead of float3 head pivot to save on memory I guess?
+			float3 crouch_dir = body_rotation() * normalizesafe(head_pivot_crouching - head_pivot_standing);
+			float cur_crouch_change = normalizesafe(crouching_progress - prev_crouch);
 			// only use direction, ignore real velocity to keep impulse constant
 			float3 impulse = crouch_dir * (cur_crouch_change - crouching_change);
-
+		
 			apply_head_bob_impulse(impulse);
-
+		
 			crouching_change = cur_crouch_change;
 		}
 	};
-	player_crouching();
 
 	auto player_walk_dynamics = [&] () {
 		bool forward_move = inp.move_dir.y > 0.0f;
 		bool sprint_allowed = !is_crouched() && (forward_move || m.allow_backwards_sprint);
 		bool do_sprint = sprint_allowed && inp.sprint;
 
-		float walk_or_crouch_speed = is_crouched() ? m.crouch_speed : m.walk_speed;
+		float walk_or_crouch_speed = lerp(m.walk_speed, m.crouch_speed, crouching_progress);
 		float target_speed = do_sprint ? m.run_speed : walk_or_crouch_speed;
 
-		float2 target_vel = body_rotation * (normalizesafe(inp.move_dir) * target_speed);
+		float2 target_vel = body_rotation2d * (normalizesafe(inp.move_dir) * target_speed);
 
 		float2 delta_vel = target_vel - (float2)vel;
 		float delta_speed = length(delta_vel);
@@ -87,10 +94,9 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		delta_vel = normalizesafe(delta_vel) * min(move_accel * I.dt, delta_speed);
 		vel += float3(delta_vel, 0);
 	};
-	player_walk_dynamics();
 
 	auto do_jump = [&] () {
-		float3 jump_impulse = float3(0,0, g->physics->jump_impulse_for_jump_height(1.2f)); // jump height based on the default gravity, tweaked gravity will change the jump height
+		float3 jump_impulse = float3(0,0, g->physics->jump_impulse_for_jump_height(1.15f)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
 		vel += jump_impulse;
 
@@ -110,6 +116,9 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
 		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
 	};
+	
+	player_crouching();
+	player_walk_dynamics();
 
 	_dbg_apply_forw_impulse(I);
 
@@ -123,7 +132,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	
 	obj.pos = pos;
 	obj.vel = vel;
-	obj.local_aabb = collision_local_aabb(is_crouched());
+	obj.local_aabb = collision_local_aabb(crouching_progress);
 	obj.drag_coeff = g->physics->drag_coeff_for_terminal_vel(g->physics->player_terminal_speed);
 
 	obj.coll = collison_response;
@@ -290,5 +299,5 @@ void Player::update_view_dynamics (Input& I) {
 	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);
 
 	if (g->activate_flycam || third_person)
-		g_debugdraw.wire_cube(pos + head_pivot() + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
+		g_debugdraw.wire_cube(pos + body_rotation() * head_pivot() + head_bob_offset, float3(0.3f, 0.3f, 0.4f),  lrgba(1,0,1,1));
 }

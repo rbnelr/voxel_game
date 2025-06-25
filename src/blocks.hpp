@@ -1,5 +1,6 @@
 #pragma once
 #include "common.hpp"
+#include "kisslib/collision.hpp"
 
 typedef uint16_t block_id;
 
@@ -53,6 +54,10 @@ struct BlockTypes {
 		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
 		
 		SoundSet*			step_sound = nullptr;
+
+		AABB get_local_aabb () const {
+			return { float3(0), float3(1) };
+		}
 	};
 
 	std::vector<Block> blocks;

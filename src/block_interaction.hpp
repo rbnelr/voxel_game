@@ -56,8 +56,8 @@ struct BlockInteraction {
 	}
 	static bool try_place_block (Chunks& chunks, int3 pos, block_id id) {
 		// Can't place solid blocks inside player, but can do with non-player collision blocks
-		bool solid_block = g->assets->block_types[id].collision == CM_SOLID;
-		if (entity_in_block(pos) && solid_block) return false;
+		auto& bt = g->assets->block_types[id];
+		if (entity_in_block(pos, bt) && bt.collision == CM_SOLID) return false;
 
 		auto cur_block = g->chunks->read_block(pos.x, pos.y, pos.z);
 
@@ -68,7 +68,7 @@ struct BlockInteraction {
 		return true;
 	}
 
-	static bool entity_in_block (int3 block_place_pos);
+	static bool entity_in_block (int3 block_place_pos, BlockTypes::Block const& bt);
 	
 	static void aimed_block_selection (SelectedBlock& block, Camera_View& view, float reach) {
 		Ray ray;
