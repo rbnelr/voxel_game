@@ -38,7 +38,7 @@ struct GroundedInfo {
 
 		auto* sounds = g->assets->block_types[bid].step_sound;
 		if (sounds)
-			sounds->play_random(volume, pitch);
+			sounds->play_random_once(volume, pitch);
 	}
 
 	operator bool () { return grounded; }
@@ -603,5 +603,94 @@ struct Physics {
 		//static int frame_counter = 0;
 		//clog("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
 		//	obj.grounded ? "(grounded)":"");
+	}
+};
+
+class ListenerMovementWindSounds {
+public:
+	Sound flying_main = {"flying1.wav", true};
+	Sound flying_whoosh = {"flying_whoosh.wav", true};
+	Sound flying_cloth_flutter = {"flying_cloth_flutter.wav", true};
+	
+	bool test_active = true;
+	float test_speed = 0;
+
+	float overall_volume = .5f;
+
+	float2 main_range = float2(12, 45);
+	float2 main_volumeR = float2(0, 3.0f);
+	float2 main_pitchR = float2(0.25f, 2.0f);
+	
+	float2 whoosh_range = float2(15, 40);
+	float2 whoosh_volumeR = float2(0, 0.7f);
+	float2 whoosh_pitchR = float2(0.2f, 1.2f);
+
+	float2 flutter_range = float2(11, 40);
+	float2 flutter_volumeR = float2(0, 0.8f);
+	float2 flutter_pitchR = float2(0.5f, 1.4f);
+
+	void imgui () {
+		if (ImGui::Begin("ListenerMovementWindSounds")) {
+			ImGui::Checkbox("test_active", &test_active);
+			ImGui::SliderFloat("test_speed", &test_speed, 0, 100);
+			ImGui::SliderFloat("overall_volume", &overall_volume, 0, 3);
+
+			ImGui::DragFloat2("main_range", &main_range.x, 0.1f);
+			ImGui::DragFloat2("main_volume", &main_volumeR.x, 0.1f);
+			ImGui::DragFloat2("main_pitch", &main_pitchR.x, 0.1f);
+
+			ImGui::DragFloat2("whoosh_range", &whoosh_range.x, 0.1f);
+			ImGui::DragFloat2("whoosh_volumeR", &whoosh_volumeR.x, 0.1f);
+			ImGui::DragFloat2("whoosh_pitchR", &whoosh_pitchR.x, 0.1f);
+
+			ImGui::DragFloat2("flutter_range", &flutter_range.x, 0.1f);
+			ImGui::DragFloat2("flutter_volumeR", &flutter_volumeR.x, 0.1f);
+			ImGui::DragFloat2("flutter_pitchR", &flutter_pitchR.x, 0.1f);
+		}
+		ImGui::End();
+	}
+
+	void update (float player_speed) {
+		float speed = max(player_speed, test_speed);
+
+		float main_t = map_clamp(speed, main_range.x, main_range.y);
+		float main_vol = lerp(main_volumeR.x, main_volumeR.y, main_t);
+		float main_pitch = lerp(main_pitchR.x, main_pitchR.y, main_t);
+		flying_main.set_volume(overall_volume * main_vol);
+		flying_main.set_pitch(main_pitch);
+		
+		float whoosh_t = map_clamp(speed, whoosh_range.x, whoosh_range.y);
+		float whoosh_vol = lerp(whoosh_volumeR.x, whoosh_volumeR.y, whoosh_t);
+		float whoosh_pitch = lerp(whoosh_pitchR.x, whoosh_pitchR.y, whoosh_t);
+		flying_whoosh.set_volume(overall_volume * whoosh_vol);
+		flying_whoosh.set_pitch(whoosh_pitch);
+		
+		float flutter_t = map_clamp(speed, flutter_range.x, flutter_range.y);
+		float flutter_vol = lerp(flutter_volumeR.x, flutter_volumeR.y, flutter_t);
+		float flutter_pitch = lerp(flutter_pitchR.x, flutter_pitchR.y, flutter_t);
+		flying_cloth_flutter.set_volume(overall_volume * flutter_vol);
+		flying_cloth_flutter.set_pitch(flutter_pitch);
+
+		flying_main.set_playing(test_active);
+		flying_whoosh.set_playing(test_active);
+		flying_cloth_flutter.set_playing(test_active);
+		
+		static constexpr int COUNT = 128;
+		static float main_vols[COUNT] = {};
+		static float main_pitchs[COUNT] = {};
+		static int cur = 0;
+		
+		main_vols[cur] = main_vol;
+		main_pitchs[cur] = main_pitch;
+		cur = (cur+1) % COUNT;
+
+		if (ImGui::Begin("ListenerMovementWindSounds")) {
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotLines("###_main_vol", main_vols, COUNT, cur, "main_vol", 0, 2, ImVec2(0, 80));
+			
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotLines("###_main_pitch", main_pitchs, COUNT, cur, "main_pitch", 0, 2, ImVec2(0, 80));
+		}
+		ImGui::End();
 	}
 };

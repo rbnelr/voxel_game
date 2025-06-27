@@ -118,12 +118,6 @@
     <ClInclude Include="..\..\..\src\engine\threading.hpp">
       <Filter>engine</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\tracy\Tracy.hpp">
-      <Filter>kisslib\tracy</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyVulkan.hpp">
-      <Filter>kisslib\tracy</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\src\kisslib\image.hpp">
       <Filter>kisslib</Filter>
     </ClInclude>
@@ -135,9 +129,6 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h">
       <Filter>opengl\glad</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\..\src\kisslib\tracy\TracyOpenGL.hpp">
-      <Filter>kisslib\tracy</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp">
       <Filter>opengl</Filter>
@@ -220,6 +211,9 @@
     <ClInclude Include="..\..\..\src\player.hpp">
       <Filter>game\gameplay</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\libs\miniaudio\miniaudio.h">
+      <Filter>audio</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp">
@@ -294,9 +288,6 @@
     <ClCompile Include="..\..\..\src\common.cpp">
       <Filter>engine</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\kisslib\tracy\TracyClient.cpp">
-      <Filter>kisslib\tracy</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c">
       <Filter>opengl\glad</Filter>
     </ClCompile>
@@ -354,6 +345,7 @@
     <ClCompile Include="..\..\..\src\player.cpp">
       <Filter>game\gameplay</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\kisslib\tracy\public\TracyClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="kisslib">

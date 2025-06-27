@@ -213,6 +213,8 @@ void Game::imgui (Window& window, Input& I, Renderer* renderer) {
 void Game::update (Window& window, Input& I) {
 	ImGui::Begin("Debug");
 
+	audio->update_volumes();
+
 	g_debugdraw.clear();
 
 	player->update(I);

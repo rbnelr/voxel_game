@@ -2,188 +2,86 @@
 #include "kisslib/string.hpp"
 #include "imgui/dear_imgui.hpp"
 #include "kisslib/serialization.hpp"
-#include "kisslib/stl_extensions.hpp"
 #include <string>
 #include <unordered_map>
 #include <memory>
-#include "assert.h"
+#include "kisslib/random.hpp"
 using namespace kiss;
 
-namespace audio {
-	inline int max (int a, int b) {
-		return a >= b ? a : b;
-	}
-	inline int min (int a, int b) {
-		return a <= b ? a : b;
-	}
-
-	inline int clamp (int x, int a, int b) {
-		return min(max(x, a), b);
-	}
-
-	inline float lerp (float a, float b, float t) {
-		return a * (1 - t) + b * t;
-	}
-
-	struct AudioSample {
-		float left;
-		float right;
-	};
-
-	struct AudioData16 {
-		double sample_rate;
-		int channels; // mono or sterio
-
-		int count;
-		std::unique_ptr<int16_t[]> samples = nullptr;
-
-		static inline float sample_to_f (int16_t val) {
-			return (float)val / (float)(1 << 15);
-		}
-
-		inline AudioSample sample (double t) {
-			assert(channels == 1);
-
-			t *= sample_rate;
-
-			// just clamp the sample indices, to prevent out of bounds
-			int ai = clamp((int)t, 0, count);
-			int bi = min(ai + 1, count);
-			float interp = (float)(t - (double)ai);
-
-			auto test = samples.get();
-
-			if (channels == 1) {
-				float a = sample_to_f( samples[ai] );
-				float b = sample_to_f( samples[bi] );
-
-				float tmp = lerp(a, b, interp);
-				return { tmp, tmp };
-			} else {
-
-				auto al = sample_to_f( samples[ai * 2    ] );
-				auto ar = sample_to_f( samples[bi * 2    ] );
-				auto bl = sample_to_f( samples[ai * 2 + 1] );
-				auto br = sample_to_f( samples[bi * 2 + 1] );
-
-				return {
-					lerp(al, ar, interp),
-					lerp(bl, br, interp),
-				};
-			}
-		}
-	};
-
-	
-	struct AudioDataF32 {
-		double sample_rate;
-		int channels = 0; // mono or sterio
-
-		int count;
-		std::vector<float> samples;
-
-		bool valid () { return channels > 0; }
-
-		inline AudioSample sample (double t) {
-			//assert(channels == 1 || channels == 2);
-
-			t *= sample_rate;
-
-			// just clamp the sample indices, to prevent out of bounds
-			int ai = clamp((int)t, 0, count-1);
-			int bi = min(ai + 1, count-1);
-			float interp = (float)(t - (double)ai);
-
-			auto test = samples.data();
-
-			if (channels == 1) {
-				float a = samples[ai];
-				float b = samples[bi];
-
-				float tmp = lerp(a, b, interp);
-				return { tmp, tmp };
-			} else {
-
-				auto al = samples[ai * 2    ];
-				auto ar = samples[bi * 2    ];
-				auto bl = samples[ai * 2 + 1];
-				auto br = samples[bi * 2 + 1];
-
-				return {
-					lerp(al, ar, interp),
-					lerp(bl, br, interp),
-				};
-			}
-		}
-	};
-
-	//AudioData16 load_sound_data_from_file (const char* filepath);
-	AudioDataF32 load_sound_data_from_file (std::string const& filepath);
-}
-
 // Opaque pointer to hide audio engine from header
-struct AudioEngine;
+class AudioEngine;
+
+// TODO: Test out spatialization
 
 class AudioManager {
-	AudioEngine* engine;
 public:
 	SERIALIZE(AudioManager, global_volume)
+
+	std::unique_ptr<AudioEngine> engine;
 
 	const std::string sounds_directory = "sounds/";
 
 	float global_volume = 1;
 
-	void imgui () {
-		ImGui::SliderFloat("global_volume", &global_volume, 0, 1);
-	}
-	
-	struct Sound {
-		audio::AudioDataF32 data;
-		float volume;
-		float speed;
-
-		bool valid () { return data.valid(); }
-	};
-
-	std::unordered_map<std::string, std::unique_ptr<Sound>> loaded_sounds;
-
 	AudioManager ();
 	~AudioManager ();
 
-	Sound* load_sound (std::string name, float volume, float speed) {
-		auto it = loaded_sounds.find(name);
-		if (it != loaded_sounds.end()) {
-			return it->second.get();
-		}
+	void update_volumes ();
 
-		auto filepath = sounds_directory + name;
-		clog("Loading sound file '%s'...", filepath.c_str());
-		auto ptr = std::make_unique<Sound>(std::move(Sound{ audio::load_sound_data_from_file(filepath), volume, speed }));
-
-		auto* s = ptr.get();
-		loaded_sounds.emplace(std::move(name), std::move(ptr));
-		return s;
+	void imgui () {
+		ImGui::SliderFloat("global_volume", &global_volume, 0, 3);
 	}
-
-	// Currently always one-shot sounds that play until done
-	// Could easily implement looping sound though, 
-	void play_sound (Sound* sound, float volume, float speed);
 };
 
-struct Sound {
-	AudioManager::Sound* sound = nullptr;
+struct ma_sound;
+
+class Sound {
+	// address needs to stay stable, so need to heap alloc and make sound class move-only
+	MOVE_ONLY_CLASS(Sound)
+	ma_sound* sound = nullptr;
+public:
 
 	Sound () {}
-	Sound (std::string name, float volume=1, float speed=1);
+	// filepath with file extension relative to sound directory
+	// looping, volume, pitch: initial values, can be set using set_*()
+	Sound (std::string const& name, bool looping=false, float volume=1, float pitch=1);
+	~Sound ();
 
-	void play (float volume=1, float speed=1);
+	void play_once (float volume=1, float pitch=1);
+
+	void set_volume (float volume);
+	void set_pitch (float pitch);
+	void set_looping (bool looping);
+	
+	void play ();
+	// -1 means don't modify
+	void play (float set_volume, float set_pitch=-1);
+	void stop ();
+	void set_playing (bool playing);
 };
-struct SoundSet {
-	std::vector<AudioManager::Sound*> sounds;
+inline void swap (Sound& l, Sound& r) {
+	std::swap(l.sound, r.sound);
+}
+
+class SoundSet {
+	std::vector<Sound> sounds;
+public:
 
 	SoundSet () {}
-	SoundSet (std::string base_name, int max_index=-1, float volume=1, float speed=1);
+	// expect name_format like step%d.wav where %d becomes [0,max_index)
+	SoundSet (std::string const& name_format, int max_index=-1);
 
-	void play (int idx, float volume=1, float speed=1);
-	void play_random (float volume=1, float speed=1);
+	void play_once (int idx, float volume=1, float pitch=1) {
+		if (idx < 0 || idx >= (int)sounds.size()) return;
+		sounds[idx].play_once(volume, pitch);
+	}
+	void play_random_once (float volume=1, float pitch=1) {
+		get_random()->play_once(volume, pitch);
+	}
+
+	Sound* get_random () {
+		if (sounds.empty()) return nullptr;
+		int idx = random.uniformi(0, (int)sounds.size());
+		return &sounds[idx];
+	}
 };

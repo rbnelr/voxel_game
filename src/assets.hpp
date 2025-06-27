@@ -203,9 +203,10 @@ struct Assets {
 
 	PlayerAssets			player;
 
-	Sound break_sound = Sound( "dig1.wav", 1.5f, 0.8f );
-	Sound hit_sound = Sound( "break1.wav", 0.8f, 1 );
+	Sound break_sound = Sound("dig1.wav"); // 1.5f, 0.8f 
+	Sound hit_sound = Sound("break1.wav"); // 0.8f, 1
 
+	// Added by blocks.json for step sounds, never deleted currently
 	std::unordered_map<std::string, std::unique_ptr<SoundSet>> sound_sets;
 
 	SoundSet* load_sound_set (std::string const& name) {

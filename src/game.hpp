@@ -13,7 +13,7 @@ struct Physics;
 struct Chunks;
 struct WorldGenerator;
 struct BlockUpdate;
-struct Player;
+class Player;
 
 struct Game {
 #define SERIALIZE_NORMAL world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam

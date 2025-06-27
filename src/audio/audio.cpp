@@ -2,225 +2,248 @@
 #include "game.hpp"
 #include "kisslib/kissmath.hpp"
 #include "kisslib/string.hpp"
-#include "kisslib/random.hpp"
-#include "portaudio.h"
-// audio loading with libsoundwave
-#include "AudioDecoder.h"
-#include "WavEncoder.h"
-#include "PostProcess.h"
 
-using namespace kissmath;
+// Include implementation directly to minimize TUs
+#include "miniaudio.c"
 
-namespace audio {
-	AudioDataF32 load_sound_data_from_file (std::string const& filepath) {
-		soundwave::SoundwaveIO loader;
-		soundwave::AudioData data;
-		loader.Load(&data, filepath);
+// Core problem: miniaudio does not have any way to play the same loaded sound multiple times
+// Likely because each ma_sound structure represents a playing sound instance with associated volume, pitch etc data
+// Also a complication is that ma_sound needs a stable address (I believe it's linked into a graph that the audio thread reads)
+// Manually having to create unique sound instances for each sound that may play at once is not convenient, so I'd like this API:
+// LoadedSound.play_once(volume, pitch etc.) // Plays it once and can be called as many times as needed
+// LoadedSound.play(set_volume=1, set_pitch=1, loop=false) // etc.
+// LoadedSound.stop()
+// LoadedSound.set_volume() // change volume of playing sound etc.
+// If looping sound needs to exist twice simply specify make a copy
 
-		if (data.channelCount < 1 || data.channelCount > 2)
-			return {};
+// The only reasonable way to automatically handle overlapping sound using a single object is to allocate the sound structures somewhere else,
+// play them and recycle them when they are done, this is what ma_engine_play_sound already implements though I'm not sure how efficient it is
+// I'd prefer to add my own wrapper, but I'm really unsure how the library handles the thread safety
 
-		AudioDataF32 res;
-		res.sample_rate = (double)data.sampleRate;
-		res.channels = data.channelCount;
-		res.count = (int)data.samples.size() / data.channelCount;
-		res.samples = std::move(data.samples);
-		return res;
-	}
+// Derived from ma_engine_play_sound_ex
+// For some reason despite essentially just pooling memory for ma_sounds, which support volume/pitch etc.
+// they decided to not support setting volume/pitch on these 'inlined' sounds
+MA_API ma_result sound_play_once (ma_engine* pEngine, ma_sound* copy_from_sound, float volume, float pitch)
+{
+    ma_result result = MA_SUCCESS;
+    ma_sound_inlined* pSound = NULL;
+    ma_sound_inlined* pNextSound = NULL;
+
+    ma_node* pNode = ma_node_graph_get_endpoint(&pEngine->nodeGraph);
+    ma_uint32 nodeInputBusIndex = 0;
+
+    /*
+    We want to check if we can recycle an already-allocated inlined sound. Since this is just a
+    helper I'm not *too* concerned about performance here and I'm happy to use a lock to keep
+    the implementation simple. Maybe this can be optimized later if there's enough demand, but
+    if this function is being used it probably means the caller doesn't really care too much.
+
+    What we do is check the atEnd flag. When this is true, we can recycle the sound. Otherwise
+    we just keep iterating. If we reach the end without finding a sound to recycle we just
+    allocate a new one. This doesn't scale well for a massive number of sounds being played
+    simultaneously as we don't ever actually free the sound objects. Some kind of garbage
+    collection routine might be valuable for this which I'll think about.
+    */
+    ma_spinlock_lock(&pEngine->inlinedSoundLock);
+    {
+        ma_uint32 soundFlags = 0;
+
+        for (pNextSound = pEngine->pInlinedSoundHead; pNextSound != NULL; pNextSound = pNextSound->pNext) {
+            if (ma_sound_at_end(&pNextSound->sound)) {
+                /*
+                The sound is at the end which means it's available for recycling. All we need to do
+                is uninitialize it and reinitialize it. All we're doing is recycling memory.
+                */
+                pSound = pNextSound;
+                ma_atomic_fetch_sub_32(&pEngine->inlinedSoundCount, 1);
+                break;
+            }
+        }
+
+        if (pSound != NULL) {
+            /*
+            We actually want to detach the sound from the list here. The reason is because we want the sound
+            to be in a consistent state at the non-recycled case to simplify the logic below.
+            */
+            if (pEngine->pInlinedSoundHead == pSound) {
+                pEngine->pInlinedSoundHead =  pSound->pNext;
+            }
+
+            if (pSound->pPrev != NULL) {
+                pSound->pPrev->pNext = pSound->pNext;
+            }
+            if (pSound->pNext != NULL) {
+                pSound->pNext->pPrev = pSound->pPrev;
+            }
+
+            /* Now the previous sound needs to be uninitialized. */
+            ma_sound_uninit(&pNextSound->sound);
+        } else {
+            /* No sound available for recycling. Allocate one now. */
+            pSound = (ma_sound_inlined*)ma_malloc(sizeof(*pSound), &pEngine->allocationCallbacks);
+        }
+
+        if (pSound != NULL) {   /* Safety check for the allocation above. */
+            /*
+            At this point we should have memory allocated for the inlined sound. We just need
+            to initialize it like a normal sound now.
+            */
+            //soundFlags |= MA_SOUND_FLAG_ASYNC;                 /* For inlined sounds we don't want to be sitting around waiting for stuff to load so force an async load. */
+            soundFlags |= MA_SOUND_FLAG_NO_DEFAULT_ATTACHMENT; /* We want specific control over where the sound is attached in the graph. We'll attach it manually just before playing the sound. */
+            //soundFlags |= MA_SOUND_FLAG_NO_PITCH;              /* Pitching isn't usable with inlined sounds, so disable it to save on speed. */
+            //soundFlags |= MA_SOUND_FLAG_NO_SPATIALIZATION;     /* Not currently doing spatialization with inlined sounds, but this might actually change later. For now disable spatialization. Will be removed if we ever add support for spatialization here. */
+
+            result = ma_sound_init_copy(pEngine, copy_from_sound, soundFlags, NULL, &pSound->sound);
+            if (result == MA_SUCCESS) {
+                /* Now attach the sound to the graph. */
+                result = ma_node_attach_output_bus(pSound, 0, pNode, nodeInputBusIndex);
+                if (result == MA_SUCCESS) {
+                    /* At this point the sound should be loaded and we can go ahead and add it to the list. The new item becomes the new head. */
+                    pSound->pNext = pEngine->pInlinedSoundHead;
+                    pSound->pPrev = NULL;
+
+                    pEngine->pInlinedSoundHead = pSound;    /* <-- This is what attaches the sound to the list. */
+                    if (pSound->pNext != NULL) {
+                        pSound->pNext->pPrev = pSound;
+                    }
+                } else {
+                    ma_free(pSound, &pEngine->allocationCallbacks);
+                }
+            } else {
+                ma_free(pSound, &pEngine->allocationCallbacks);
+            }
+        } else {
+            result = MA_OUT_OF_MEMORY;
+        }
+    }
+    ma_spinlock_unlock(&pEngine->inlinedSoundLock);
+
+    if (result != MA_SUCCESS) {
+        return result;
+    }
+
+	ma_sound_set_volume(&pSound->sound, volume);
+	ma_sound_set_pitch(&pSound->sound, pitch);
+
+    /* Finally we can start playing the sound. */
+    result = ma_sound_start(&pSound->sound);
+    if (result != MA_SUCCESS) {
+        /* Failed to start the sound. We need to mark it for recycling and return an error. */
+        ma_atomic_exchange_32(&pSound->sound.atEnd, MA_TRUE);
+        return result;
+    }
+
+    ma_atomic_fetch_add_32(&pEngine->inlinedSoundCount, 1);
+    return result;
 }
 
 ////
-struct AudioEngine {
-	static constexpr double SAMPLE_RATE = 44100; // output sample rate
-	float volume = 0.5f;
+class AudioEngine {
+friend class AudioManager;
+friend class Sound;
+	ma_engine engine;
 
-	std::atomic<bool> locked = false;
-	std::atomic<float> _timescale = 1;
-
-	PaStream *stream;
-
-	struct PlayingSound {
-		AudioManager::Sound* sound;
-		float volume;
-		float speed;
-
-		double t = 0;
-	};
-
-	static constexpr int MAX_PLAYING_SOUNDS = 128;
-	PlayingSound playing_sounds[MAX_PLAYING_SOUNDS];
-	int playing_sounds_count = 0;
-
-	audio::AudioSample mix_sounds () {
-		audio::AudioSample total = { 0 };
-
-		for (int i=0; i<playing_sounds_count;) {
-			auto& sound = playing_sounds[i];
-
-			auto sampl = sound.sound->data.sample( sound.t );
-
-			sound.t += sound.speed / SAMPLE_RATE * (double)_timescale;
-
-			total.left  += sampl.left  * sound.volume;
-			total.right += sampl.right * sound.volume;
-
-			if (sound.t > (1.0f / sound.sound->data.sample_rate * (double)sound.sound->data.count)) {
-				playing_sounds[i] = playing_sounds[playing_sounds_count - 1];
-				playing_sounds_count--;
-			} else {
-				i++;
-			}
-		}
-
-		total.left  = clamp(total.left,  0.0f,1.0f);
-		total.right = clamp(total.right, 0.0f,1.0f);
-		return total;
-	}
-
-	
-	static int portaudio_callback (
-		const void *input,
-		void *output,
-		unsigned long frameCount,
-		const PaStreamCallbackTimeInfo* timeInfo,
-		PaStreamCallbackFlags statusFlags,
-		void *userData
-	) {
-		AudioEngine* e = (AudioEngine*)userData;
-
-		e->locked = true;
-
-		float *out = (float*)output;
-
-		for(unsigned i=0; i<frameCount; i++) {
-			auto smpl = e->mix_sounds();
-
-			float left  = smpl.left  * e->volume;
-			float right = smpl.right * e->volume;
-
-			*out++ = left; // left
-			*out++ = right; // right
-		}
-
-		e->locked = false;
-		return 0;
-	}
-	
+public:
 	AudioEngine () {
+		auto engineConfig = ma_engine_config_init();
+		//engineConfig.listenerCount = 1; // default
 
-		PaError err = Pa_Initialize();
-		if(err != paNoError) {
-			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-			return;
-		}
-
-		////
-
-		/* Open an audio I/O stream. */
-		err = Pa_OpenDefaultStream(&stream,
-			0,          /* no input channels */
-			2,          /* stereo output */
-			paFloat32,  /* 32 bit floating point output */
-			SAMPLE_RATE,
-			64,        /* frames per buffer, i.e. the number
-					   of sample frames that PortAudio will
-					   request from the callback. Many apps
-					   may want to use
-					   paFramesPerBufferUnspecified, which
-					   tells PortAudio to pick the best,
-					   possibly changing, buffer size.*/
-			portaudio_callback, /* this is your callback function */
-			this); /*This is a pointer that will be passed to
-					your callback*/
-		if(err != paNoError) {
-			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-			return;
-		}
-
-		err = Pa_StartStream(stream);
-		if(err != paNoError) {
-			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
+		if (ma_engine_init(&engineConfig, &engine) != MA_SUCCESS) {
+			clog("Audio Engine failed to init! (ma_engine_init)");
 			return;
 		}
 	}
 	~AudioEngine () {
-		// Liekly waits and stops audio thread before returning, so this getting freed should be safe afterwards
-		PaError err = Pa_StopStream( stream );
-		if(err != paNoError) {
-			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-			return;
-		}
-		
-		err = Pa_Terminate();
-		if(err != paNoError) {
-			fprintf(stderr, "PortAudio error: %s\n", Pa_GetErrorText(err));
-			return;
-		}
+		ma_engine_uninit(&engine);
 	}
 };
 
 AudioManager::AudioManager () {
-	engine = new AudioEngine();
+	engine = std::make_unique<AudioEngine>();
+
+	update_volumes();
 }
-AudioManager::~AudioManager () {
-	delete engine;
-}
-void AudioManager::play_sound (Sound* sound, float volume, float speed) {
-	if (!sound->valid()) return; // Simply don't play if not valid
+AudioManager::~AudioManager () {}
 
-	// I think I got this code from an example somewhere, but turns out, sound APIs are really simple:
-	// I think portaudio's audio thread calls portaudio_callback which reads sound data
-	// So is our dodgy way of doing a mutex, except manually with a atomic bool, which sounds bad
-	// But with audio you have a fixed timespan in which the audio thread needs to be done or else audio cuts out
-	// So I guess this way of syncing avoids random stutter due to threads going to sleep
-	// But on second thought this is not safe at all?
-	while (engine->locked)
-		; // busy wait
-
-	// Here the audio thread might be writing locked=true
-	// after that technically it's unsafe to modify the sounds!
-	// there might be ways to use atomics to push new sounds that are technically safe, but I'll likely switch audio libs later
-
-	if (engine->playing_sounds_count < engine->MAX_PLAYING_SOUNDS) {
-		engine->playing_sounds[engine->playing_sounds_count] = { sound,
-			global_volume * volume * sound->volume,
-			speed * sound->speed, 0 };
-		engine->playing_sounds_count++;
-	}
-	//_timescale = input.time_scale;
-	engine->_timescale = 1; // fix 
+void AudioManager::update_volumes () {
+	ma_engine_set_volume(&engine->engine, global_volume);
 }
 
-Sound::Sound (std::string name, float volume, float speed) {
-	sound = g->audio->load_sound(std::move(name), volume, speed);
-}
 
-void Sound::play (float volume, float speed) {
-	g->audio->play_sound(sound, volume, speed);
-}
-
-SoundSet::SoundSet (std::string base_name, int max_index, float volume, float speed) {
-	if (max_index < 0) {
-		Directory dir;
-		if (kiss::read_directory(g->audio->sounds_directory, &dir, base_name + "*.wav")) {
-			for (auto& files : dir.filenames) {
-				sounds.push_back( g->audio->load_sound(std::move(files), volume, speed) );
-			}
-		}
+Sound::Sound (std::string const& name, bool looping, float volume, float pitch) {
+	ZoneScoped;
+	auto* engine = &g->audio->engine->engine;
+	auto filepath = g->audio->sounds_directory + name;
+	sound = new ma_sound();
+	auto res = ma_sound_init_from_file(engine, filepath.c_str(), MA_SOUND_FLAG_DECODE, NULL, NULL, sound);
+	if (res != MA_SUCCESS) {
+		delete sound;
+		sound = nullptr;
 		return;
 	}
 
-	for (int i=0; i<max_index; i++) {
-		auto name = prints("%s%d", base_name.c_str(), i);
-		sounds.push_back( g->audio->load_sound(std::move(name), volume, speed) );
+	set_volume(volume);
+	set_pitch(pitch);
+	set_looping(looping);
+}
+Sound::~Sound () {
+	if (sound) ma_sound_uninit(sound);
+}
+
+void Sound::play_once (float volume, float pitch) {
+	if (!sound) return;
+	ZoneScoped;
+	auto* engine = &g->audio->engine->engine;
+	sound_play_once(engine, sound, volume, pitch);
+}
+
+void Sound::set_volume (float volume) {
+	if (!sound) return;
+	ma_sound_set_volume(sound, volume);
+}
+void Sound::set_pitch (float pitch) {
+	if (!sound) return;
+	ma_sound_set_pitch(sound, pitch);
+}
+void Sound::set_looping (bool looping) {
+	if (!sound) return;
+	ma_sound_set_looping(sound, looping);
+}
+
+void Sound::play () {
+	if (!sound) return;
+	ma_sound_start(sound);
+}
+void Sound::play (float volume, float pitch) {
+	if (!sound) return;
+	if (volume >= 0) set_volume(volume);
+	if (pitch >= 0) set_pitch(pitch);
+	play();
+}
+void Sound::stop () {
+	if (!sound) return;
+	ma_sound_stop(sound);
+}
+void Sound::set_playing (bool playing) {
+	if (!sound) return;
+	if ((ma_sound_is_playing(sound) != 0) != playing) {
+		if (playing) ma_sound_start(sound);
+		else         ma_sound_stop(sound);
 	}
 }
 
-void SoundSet::play (int idx, float volume, float speed) {
-	assert(idx >= 0 && idx < (int)sounds.size());
-	g->audio->play_sound(sounds[idx], volume, speed);
-}
-void SoundSet::play_random (float volume, float speed) {
-	int idx = random.uniformi(0, (int)sounds.size());
-	play(idx, volume, speed);
+SoundSet::SoundSet (std::string const& name_format, int max_index) {
+	if (max_index < 0) {
+		Directory dir;
+		if (kiss::read_directory(g->audio->sounds_directory, &dir, name_format + "*.wav")) {
+			for (auto& file : dir.filenames) {
+				sounds.push_back(Sound( file ));
+			}
+		}
+	}
+	else {
+		for (int i=0; i<max_index; i++) {
+			sounds.push_back(Sound( prints("%s%d", name_format.c_str()) ));
+		}
+	}
 }

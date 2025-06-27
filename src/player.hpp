@@ -11,7 +11,8 @@
 struct Block;
 struct Game;
 
-struct Player {
+class Player {
+public:
 	SERIALIZE(Player, pos, vel, rot_ae, crouching_progress, third_person,
 		visual_dynamics, movement_params)
 
@@ -92,7 +93,6 @@ struct Player {
 	BlockPlaceAnim	block_place;
 	PlayerInventory	inventory;
 
-	
 	struct VisualDynamicsParams {
 		SERIALIZE(VisualDynamicsParams, bob_strength, spring_k, spring_damp, offset_max, vel_max,
 			step_length, step_length_crouch, step_head_bob_strength)
@@ -171,6 +171,8 @@ struct Player {
 
 	bool collision_debug = false;
 
+	ListenerMovementWindSounds move_wind_sounds;
+
 	void _dbg_apply_forw_impulse (Input& I) {
 		static float _impulse = 50;
 		ImGui::DragFloat("_impulse", &_impulse, 0.1f);
@@ -219,6 +221,8 @@ struct Player {
 		imgui_pop();
 
 		ImGui::Checkbox("collision_debug", &collision_debug);
+
+		move_wind_sounds.imgui();
 	}
 	
 

@@ -110,7 +110,7 @@ static constexpr int3 FULL_NEIGHBOURS[26] = {
 
 struct World;
 struct WorldGenerator;
-struct Player;
+class Player;
 struct Assets;
 struct Chunks;
 class Renderer;

@@ -160,6 +160,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
 	buried = obj.buried;
 
+	cur_speed = length(vel);
 	float cur_speed2d = length((float2)vel);
 
 	float walking_ang = atan2f(-vel.x, vel.y);
@@ -172,6 +173,8 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 	//apply_head_bob_impulse(vel - prev_vel); // full accel as impulse for luls
 	update_view_dynamics(I);
+	
+	move_wind_sounds.update(cur_speed);
 
 #if 1 // movement speed plotting to better develop movement code
 	{
@@ -194,20 +197,19 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 			cur = (cur+1) % COUNT;
 		}
 
-		ImGui::Begin("Player Movement Dev");
-		
-		ImGui::Text("Speed: %6.2f m/s (%6.2f km/h)", cur_speed, cur_speed * 3.6f);
-		ImGui::Text("Accel: %6.2f m/s^2  %6.2f g", calc_accel, calc_accel / 9.80665f);
+		if (ImGui::Begin("Player Movement Dev")) {
+			ImGui::Text("Speed: %6.2f m/s (%6.2f km/h)", cur_speed, cur_speed * 3.6f);
+			ImGui::Text("Accel: %6.2f m/s^2  %6.2f g", calc_accel, calc_accel / 9.80665f);
 
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_vel", vels, COUNT, cur, "player vel", 0, 15, ImVec2(0, 200));
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotLines("###_debug_vel", vels, COUNT, cur, "player vel", 0, 15, ImVec2(0, 200));
 
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player pos", -7, 7, ImVec2(0, 200));
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotLines("###_debug_pos", poss, COUNT, cur, "player pos", -7, 7, ImVec2(0, 200));
 
-		ImGui::SetNextItemWidth(-1);
-		ImGui::PlotLines("###_debug_accel", accels, COUNT, cur, "player accel", 0, 70, ImVec2(0, 200));
-
+			ImGui::SetNextItemWidth(-1);
+			ImGui::PlotLines("###_debug_accel", accels, COUNT, cur, "player accel", 0, 70, ImVec2(0, 200));
+		}
 		ImGui::End();
 	}
 #endif

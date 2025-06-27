@@ -49,7 +49,7 @@ struct BlockInteraction {
 		block.damage += dmg;
 
 		if (block.damage >= 1) {
-			g->assets->break_sound.play();
+			g->assets->break_sound.play_once();
 
 			g->chunks->write_block(block.hit.pos.x, block.hit.pos.y, block.hit.pos.z, g->assets->block_types.air_id);
 		}
@@ -145,7 +145,7 @@ struct BlockBreakAnim {
 			//clog(INFO, "[BreakBlock] anim hit");
 			if (sel) {
 				BlockInteraction::apply_block_damage(*g->chunks, sel, item, g->creative_mode);
-				g->assets->hit_sound.play(1, /*random.uniform(0.95f, 1.05f)*/1);
+				g->assets->hit_sound.play_once(1, random.uniformf(0.95f, 1.05f));
 			}
 			anim_triggered = true;
 		}
