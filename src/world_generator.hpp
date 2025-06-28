@@ -225,7 +225,7 @@ struct WorldGenerator {
 	}
 
 	static void imgui_noise_layers (char const* name, std::vector<NoiseParam>& layers) {
-		if (!imgui_push(name)) return;
+		if (!ImGui::TreeNode(name)) return;
 
 		int count = (int)layers.size();
 		ImGui::DragInt("count", &count, 0.01f, 0, 20);
@@ -237,10 +237,10 @@ struct WorldGenerator {
 			ImGui::PopID();
 		}
 
-		imgui_pop();
+		ImGui::TreePop();
 	}
 	void imgui () {
-		if (!imgui_push("WorldGenerator")) return;
+		if (!ImGui::TreeNode("WorldGenerator")) return;
 
 		ImGui::InputText("seed str", &seed_str, 0, NULL, NULL);
 		ImGui::Text("seed code: 0x%016p", get_seed(seed_str));
@@ -273,7 +273,7 @@ struct WorldGenerator {
 		ImGui::Checkbox("disable_grass", &disable_grass);
 
 		ImGui::PopItemWidth();
-		imgui_pop();
+		ImGui::TreePop();
 	}
 };
 

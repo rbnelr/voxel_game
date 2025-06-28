@@ -1035,7 +1035,7 @@ void save_chunk_to_disk (Chunks& chunks, chunk_id cid, char const* dirname) {
 }
 void Chunks::save_chunks_to_disk (const char* save_dirname) {
 	
-	CreateDirectoryA(save_dirname, NULL); // C has no way of creating directories, are you kidding me?
+	create_directory(save_dirname);
 
 	for (chunk_id cid=0; cid < end(); ++cid) {
 		save_chunk_to_disk(*this, cid, save_dirname);

@@ -7,41 +7,194 @@
 #include "GLFW/glfw3.h" // include after glad
 
 namespace gl {
+	
+void APIENTRY OpenglRenderer::debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
+	//OpenglRenderer* r = (OpenglRenderer*)userParam;
 
-// Repeat reloading of assets because reacting to filechanges often fails because of half-written files
-template <typename FUNC>
-bool try_reloading (FUNC loadfunc) {
-	int max_retries = 100;
-	int retry_delay = 10; // ms
-
-	for (int i=0; i<max_retries; ++i) {
-		Sleep(retry_delay); // start out with a delay in hopes of getting a working file the first time
-
-		if (loadfunc())
-			return true; // success
+	//if (source == GL_DEBUG_SOURCE_SHADER_COMPILER_ARB) return;
+	if (source == GL_DEBUG_SOURCE_APPLICATION_ARB) {
+		//printf("%.*s\n", length, message); // message is not null terminated, pass explicit length
+		return; // OGL_TRACE is only for organizing drawcalls in nsight, not to spam the console
 	}
-	return false; // fail
+		
+	// hiding irrelevant infos/warnings
+	switch (id) {
+		case 131185: // Buffer detailed info
+		//case 1282: // using shader that was not compiled successfully
+		//case 2: // API_ID_RECOMPILE_FRAGMENT_SHADER performance warning has been generated. Fragment shader recompiled due to state change.
+		//case 131218: // Program/shader state performance warning: Fragment shader in program 3 is being recompiled based on GL state.
+			
+		////case 131154: // Pixel transfer sync with rendering warning
+		//
+		//case 1282: // Wierd error on notebook when trying to do texture streaming
+		//case 131222: // warning with unused shadow samplers ? (Program undefined behavior warning: Sampler object 0 is bound to non-depth texture 0, yet it is used with a program that uses a shadow sampler . This is undefined behavior.), This might just be unused shadow samplers, which should not be a problem
+		//case 131218: // performance warning, because of shader recompiling based on some 'key'
+
+		// Pixel-path detailed info: The current pixel-path operation converts data from 2-bit integer to 1-bit integer, and may exhibit data loss
+		// when intentionally uploading uint16_t to GL_R8UI
+		case 131153:
+			return;
+
+		default:
+			break;
+	}
+
+	const char* src_str = "<unknown>";
+	switch (source) {
+		case GL_DEBUG_SOURCE_API_ARB:				src_str = "API";				break;
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM_ARB:		src_str = "WINDOW_SYSTEM";		break;
+		case GL_DEBUG_SOURCE_SHADER_COMPILER_ARB:	src_str = "SHADER_COMPILER";	break;
+		case GL_DEBUG_SOURCE_THIRD_PARTY_ARB:		src_str = "THIRD_PARTY";		break;
+		case GL_DEBUG_SOURCE_APPLICATION_ARB:		src_str = "APPLICATION";		break;
+		case GL_DEBUG_SOURCE_OTHER_ARB:				src_str = "OTHER";				break;
+	}
+
+	const char* type_str = "<unknown>";
+	switch (source) {
+		case GL_DEBUG_TYPE_ERROR_ARB:				type_str = "ERROR";					break;
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB:	type_str = "DEPRECATED_BEHAVIOR";	break;
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB:	type_str = "UNDEFINED_BEHAVIOR";	break;
+		case GL_DEBUG_TYPE_PORTABILITY_ARB:			type_str = "PORTABILITY";			break;
+		case GL_DEBUG_TYPE_PERFORMANCE_ARB:			type_str = "PERFORMANCE";			break;
+		case GL_DEBUG_TYPE_OTHER_ARB:				type_str = "OTHER";					break;
+	}
+
+	const char* severity_str = "<unknown>";
+	switch (severity) {
+		case GL_DEBUG_SEVERITY_HIGH_ARB:			severity_str = "HIGH";		break;
+		case GL_DEBUG_SEVERITY_MEDIUM_ARB:			severity_str = "MEDIUM";	break;
+		case GL_DEBUG_SEVERITY_LOW_ARB:				severity_str = "LOW";		break;
+	}
+
+	log(severity == GL_DEBUG_SEVERITY_HIGH_ARB ? ERROR : WARNING,
+		"[OpenGL] debug message: severity:%s  src:%s  type:%s  id:%d\n%.*s", severity_str, src_str, type_str, id, length, message); // message is not null terminated, pass explicit length
+
+#if RENDERER_DEBUG_OUTPUT_BREAKPOINT
+	if (severity == GL_DEBUG_SEVERITY_HIGH_ARB)
+		__debugbreak();
+#endif
+}
+
+OpenglContext::OpenglContext (OpenglRenderer* r, GLFWwindow* window) {
+	ZoneScopedN("OpenglContext init");
+	log("OpenGL init...");
+	
+	glfwMakeContextCurrent(window);
+
+	{
+		ZoneScopedN("gladLoadGLLoader");
+		if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+			fatal_error("gladLoadGLLoader error!");
+		}
+		gladLoadGL();
+	}
+		
+	{
+		ZoneScopedN("check extensions and print version");
+		
+	#if RENDERER_DEBUG_OUTPUT
+		if (glfwExtensionSupported("GL_ARB_debug_output")) {
+			glDebugMessageCallbackARB(OpenglRenderer::debug_callback, this);
+		#if RENDERER_DEBUG_OUTPUT_BREAKPOINT
+			glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB); // Call message on thread that call was made
+		#endif
+		}
+	#endif
+
+		if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
+			r->_vsync_on_interval = -1;
+
+
+		if (glfwExtensionSupported("WGL_EXT_swap_control_tear"))
+			r->_vsync_on_interval = -1;
+		
+		//if (!glfwExtensionSupported("GL_ARB_bindless_texture")) {
+		//	log(ERROR,"[OpenGL] No bindless textures supported! This is bad!");
+		//}
+		if (  !glfwExtensionSupported("GL_ARB_gpu_shader5") ||
+				!glfwExtensionSupported("GL_ARB_gpu_shader_int64")) {
+			log(ERROR,"[OpenGL] GL_ARB_gpu_shader5 or GL_ARB_gpu_shader_int64 not supported! This is bad!");
+		}
+
+		// srgb enabled by default if supported
+		// TODO: should I use glfwExtensionSupported or GLAD_GL_ARB_framebuffer_sRGB? does it make a difference?
+		if (glfwExtensionSupported("GL_ARB_framebuffer_sRGB"))
+			glEnable(GL_FRAMEBUFFER_SRGB);
+		else
+			log(ERROR,"[OpenGL] No sRGB framebuffers supported! Shading will be wrong!");
+
+	#if OGL_USE_REVERSE_DEPTH
+		ogl::reverse_depth = glfwExtensionSupported("GL_ARB_clip_control");
+	#endif
+
+		//if (	!glfwExtensionSupported("GL_NV_gpu_shader5") ||
+		//	!glfwExtensionSupported("GL_NV_shader_buffer_load")) {
+		//	log(ERROR, "[OpenGL] GL_NV_gpu_shader5 or GL_NV_shader_buffer_load not supported!");
+		//}
+		
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // core since 3.2
+
+		// I never align my pixel rows
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &r->max_aniso);
+
+		auto* vend = glGetString(GL_VENDOR);
+		auto* rend = glGetString(GL_RENDERER);
+		auto* vers = glGetString(GL_VERSION);
+		
+		log( "GL_VENDOR:   %s\n"
+		     "GL_RENDERER: %s\n"
+		     "GL_VERSION:  %s", vend, rend, vers);
+	}
+
+	{
+		ZoneScopedN("TracyGpuContext");
+		TracyGpuContext;
+	}
+	
+	r->set_vsync(r->vsync);
 }
 
 //// OpenglRenderer
-void OpenglRenderer::frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files) {
-	ctx.imgui_begin();
+OpenglRenderer::OpenglRenderer (Game& game): ctx{this, game.window} {
+	ZoneScopedN("OpenglRenderer init");
 
-	shaders.update_recompilation(changed_files, debug_draw.wireframe);
+	load_static_data();
 
-	if (changed_files.any_starts_with("textures/", FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
-		clog(INFO, "[OpenglRenderer] Reload textures due to file change");
-		try_reloading([&] () { return load_static_data(); });
-	}
+	float max_aniso = 1.0f;
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
+
+	glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glSamplerParameterf(pixelated_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+
+	glSamplerParameteri(smooth_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(smooth_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glSamplerParameterf(smooth_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+
+	glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glSamplerParameterf(smooth_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
+
+	ImGui_ImplOpenGL3_Init();
+}
+OpenglRenderer::~OpenglRenderer () {
+	ImGui_ImplOpenGL3_Shutdown();
 }
 
-void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
-	ImGui::Begin("Debug");
-
-	render_size = I.window_size;
+void OpenglRenderer::render_frame (Game& game) {
+	render_size = game.input.window_size;
 
 	chunk_renderer.upload_remeshed(*game.chunks);
-	raytracer.update(*this, I);
+	raytracer.update(*this, game.input);
 
 
 	glLineWidth(debug_draw.line_width);
@@ -59,7 +212,7 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, block_meshes_ssbo);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, block_tiles_ssbo);
 
-		debug_draw.update(I);
+		debug_draw.update(game.input);
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -104,21 +257,23 @@ void OpenglRenderer::render_frame (GLFWwindow* window, Input& I, Game& game) {
 	{
 		OGL_TRACE("ui draws");
 
-		if (trigger_screenshot && !screenshot_hud)	take_screenshot(I.window_size);
+		if (trigger_screenshot && !screenshot_hud)	take_screenshot(game.input.window_size);
 
 		if (!g->activate_flycam || g->creative_mode)
-			gui_renderer.draw_gui(*this, I);
+			gui_renderer.draw_gui(*this, game.input);
 
-		ImGui::End();
-		ctx.imgui_draw();
+		game.draw_imgui();
 
-		if (trigger_screenshot && screenshot_hud)	take_screenshot(I.window_size);
+		if (trigger_screenshot && screenshot_hud)	take_screenshot(game.input.window_size);
 		trigger_screenshot = false;
 	}
 
 	TracyGpuCollect;
-
-	glfwSwapBuffers(window);
+	
+	{
+		ZoneScopedN("glfwSwapBuffers");
+		glfwSwapBuffers(game.window);
+	}
 }
 
 //// BlockHighlight
@@ -250,7 +405,7 @@ void GuiRenderer::update_gui (Input& I) {
 
 		float2 start = anchor -(float2)int2(w-1,h-1)/2 * frame_sz;
 
-		int2 hovered_idx = roundi((I.cursor_pos_bottom_up - start) / frame_sz);
+		int2 hovered_idx = roundi((I.cursor_pos_bottom_up() - start) / frame_sz);
 
 		for (int i=0; i<count; ++i) {
 			int2 idx2 = int2(i%w, h-1 -i/w);
@@ -297,7 +452,7 @@ void GuiRenderer::update_gui (Input& I) {
 		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
 
 		if (I.cursor_enabled && g->player->inventory.hand.id != I_NULL)
-			draw_item_quad(I.cursor_pos_bottom_up +(item_sz/2), item_sz, g->player->inventory.hand.id);
+			draw_item_quad(I.cursor_pos_bottom_up() +(item_sz/2), item_sz, g->player->inventory.hand.id);
 	}
 }
 void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I) {
@@ -407,7 +562,7 @@ void PlayerRenderer::draw (OpenglRenderer& r) {
 
 //// OpenglRenderer
 bool OpenglRenderer::load_textures (GenericVertexData& mesh_data) {
-	clog("Loading textures...");
+	log("Loading textures...");
 
 	{
 		Image<srgba8> img;

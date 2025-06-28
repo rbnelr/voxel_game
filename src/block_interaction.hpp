@@ -122,13 +122,13 @@ struct BlockBreakAnim {
 	bool anim_triggered;
 
 	void imgui (const char* name=nullptr) {
-		if (!imgui_push("Fists", name)) return;
+		if (!ImGui::TreeNode("Fists", name)) return;
 
 		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
 		ImGui::DragFloat("damage", &damage, 0.05f);
 		ImGui::DragFloat("reach", &reach, 0.05f);
 
-		imgui_pop();
+		ImGui::TreePop();
 	}
 	void update (Input& I, Item& item, SelectedBlock& sel, ButtonState const& attack) {
 		auto& button = I.buttons[MOUSE_BUTTON_LEFT];
@@ -136,13 +136,13 @@ struct BlockBreakAnim {
 
 		float anim_hit_t = 0;
 
-		//clog(INFO, "[BreakBlock] anim_t: %f", anim_t);
+		//log(INFO, "[BreakBlock] anim_t: %f", anim_t);
 
 		if (anim_t > 0 || inp) {
 			anim_t += anim_speed * I.dt;
 		}
 		if (!anim_triggered && anim_t > anim_hit_t && inp) {
-			//clog(INFO, "[BreakBlock] anim hit");
+			//log(INFO, "[BreakBlock] anim hit");
 			if (sel) {
 				BlockInteraction::apply_block_damage(*g->chunks, sel, item, g->creative_mode);
 				g->assets->hit_sound.play_once(1, random.uniformf(0.95f, 1.05f));
@@ -150,7 +150,7 @@ struct BlockBreakAnim {
 			anim_triggered = true;
 		}
 		if (anim_t >= 1) {
-			//clog(INFO, "[BreakBlock] anim over");
+			//log(INFO, "[BreakBlock] anim over");
 			anim_t = 0;
 			anim_triggered = false;
 		}
@@ -166,12 +166,12 @@ struct BlockPlaceAnim {
 	float anim_t = 0;
 
 	void imgui (const char* name=nullptr) {
-		if (!imgui_push("BlockPlace", name)) return;
+		if (!ImGui::TreeNode("BlockPlace", name)) return;
 
 		ImGui::DragFloat("anim_speed", &anim_speed, 0.05f);
 		ImGui::DragFloat("reach", &reach, 0.05f);
 
-		imgui_pop();
+		ImGui::TreePop();
 	}
 	void update (Input& I, Item& item, SelectedBlock& sel, ButtonState const& build) {
 		bool can_place = item.is_block() && item.block.count > 0;

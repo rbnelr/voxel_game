@@ -5,8 +5,6 @@
 #include "world_generator.hpp"
 #include "opengl_renderer.hpp"
 
-#include "engine/window.hpp" // for frame_counter hack
-
 namespace gl {
 	
 void ChunkRenderer::upload_remeshed (Chunks& chunks) {
@@ -175,7 +173,7 @@ void ChunkRenderer::draw_chunks (OpenglRenderer& r) {
 		}
 	}
 
-	water_scrolling_t += g_window.input.real_dt * 0.01f;
+	water_scrolling_t += g->input.real_dt * 0.01f;
 	water_scrolling_t = fmodf(water_scrolling_t, 1.0f);
 }
 

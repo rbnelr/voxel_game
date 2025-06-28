@@ -18,6 +18,149 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\imgui.cpp" />
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\..\..\libs\dear_imgui\misc\cpp\imgui_stdlib.cpp" />
+    <ClCompile Include="..\..\..\..\libs\tracy\public\TracyClient.cpp" />
+    <ClCompile Include="..\..\..\src\assets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\chunks.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\chunk_mesher.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\common.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\audio.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\debug_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\engine.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\imgui\dear_imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\engine\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\..\..\src\engine\imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\allocator.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\collision.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\file_io.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\random.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\read_directory.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash1.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash2.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash3.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\stb_image.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\stb_image_write.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\stb_rect_pack.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\string.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\threadpool.cpp" />
+    <ClCompile Include="..\..\..\src\engine\kisslib\timer.cpp" />
+    <ClCompile Include="..\..\..\src\engine\open_simplex_noise\open_simplex_noise.cpp" />
+    <ClCompile Include="..\..\..\src\engine\renderer.cpp" />
+    <ClCompile Include="..\..\..\src\game.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
+    <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
+    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp" />
+    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\player.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\..\..\src\world_generator.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\libs\tracy\public\tracy\Tracy.hpp" />
+    <ClInclude Include="..\..\..\src\assets.hpp" />
+    <ClInclude Include="..\..\..\src\blocks.hpp" />
+    <ClInclude Include="..\..\..\src\block_interaction.hpp" />
+    <ClInclude Include="..\..\..\src\block_update.hpp" />
+    <ClInclude Include="..\..\..\src\chunks.hpp" />
+    <ClInclude Include="..\..\..\src\chunk_mesher.hpp" />
+    <ClInclude Include="..\..\..\src\common.hpp" />
+    <ClInclude Include="..\..\..\src\engine\audio.hpp" />
+    <ClInclude Include="..\..\..\src\engine\camera.hpp" />
+    <ClInclude Include="..\..\..\src\engine\debug_draw.hpp" />
+    <ClInclude Include="..\..\..\src\engine\engine.hpp" />
+    <ClInclude Include="..\..\..\src\engine\imgui\dear_imgui.hpp" />
+    <ClInclude Include="..\..\..\src\engine\imgui\imconfig.hpp" />
+    <ClInclude Include="..\..\..\src\engine\imgui\imgui_impl_glfw.h" />
+    <ClInclude Include="..\..\..\src\engine\imgui\imgui_impl_opengl3.h" />
+    <ClInclude Include="..\..\..\src\engine\input.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\allocator.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\animation.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\ankerl\unordered_dense.h" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\clean_windows_h.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\collision.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\file_io.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\kissmath.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\kissmath_colors.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\macros.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\profiling.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\random.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\read_directory.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\serialization.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash1.h" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash2.h" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\smhasher\MurmurHash3.h" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\string.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\threadpool.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\threadsafe_queue.hpp" />
+    <ClInclude Include="..\..\..\src\engine\kisslib\timer.hpp" />
+    <ClInclude Include="..\..\..\src\engine\open_simplex_noise\open_simplex_noise.hpp" />
+    <ClInclude Include="..\..\..\src\engine\renderer.hpp" />
+    <ClInclude Include="..\..\..\src\engine\threading.hpp" />
+    <ClInclude Include="..\..\..\src\game.hpp" />
+    <ClInclude Include="..\..\..\src\inventory.hpp" />
+    <ClInclude Include="..\..\..\src\items.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\gl_dbg_draw.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\gl_raytracer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\opengl_shaders.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp" />
+    <ClInclude Include="..\..\..\src\physics.hpp" />
+    <ClInclude Include="..\..\..\src\player.hpp" />
+    <ClInclude Include="..\..\..\src\world_generator.hpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -98,7 +241,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\miniaudio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\engine;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\..\libs\stb;$(SolutionDir)..\..\..\libs\dear_imgui;$(SolutionDir)..\..\..\libs\nlohmann_json\include;$(SolutionDir)..\..\..\libs\miniaudio;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\tracy\public;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -106,7 +249,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Avrt.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -120,7 +263,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\miniaudio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\engine;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\..\libs\stb;$(SolutionDir)..\..\..\libs\dear_imgui;$(SolutionDir)..\..\..\libs\nlohmann_json\include;$(SolutionDir)..\..\..\libs\miniaudio;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\tracy\public;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -130,8 +273,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Avrt.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">
@@ -144,7 +288,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\miniaudio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\engine;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\..\libs\stb;$(SolutionDir)..\..\..\libs\dear_imgui;$(SolutionDir)..\..\..\libs\nlohmann_json\include;$(SolutionDir)..\..\..\libs\miniaudio;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\tracy\public;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -153,8 +297,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;$(SolutionDir)..\..\..\libs\libsoundwave\lib\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Avrt.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
@@ -168,7 +312,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\dear_imgui;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\src\kisslib\nlohmann_json\include;$(SolutionDir)..\..\src\kisslib\tracy\public;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\vulkan_sdk\Include;$(SolutionDir)..\..\..\libs\Assimp\Include;$(SolutionDir)..\..\..\libs\miniaudio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\src\;$(SolutionDir)..\..\src\engine;$(SolutionDir)..\..\src\opengl;$(SolutionDir)..\..\..\libs\stb;$(SolutionDir)..\..\..\libs\dear_imgui;$(SolutionDir)..\..\..\libs\nlohmann_json\include;$(SolutionDir)..\..\..\libs\miniaudio;$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\include;$(SolutionDir)..\..\..\libs\tracy\public;$(SolutionDir)..\..\..\libs\Assimp\Include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <ShowIncludes>false</ShowIncludes>
       <AdditionalOptions>/wd4065 %(AdditionalOptions)</AdditionalOptions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -177,256 +321,12 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\portaudio\lib;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;$(SolutionDir)..\..\..\libs\libsoundwave\lib\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Winmm.lib;Avrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\..\libs\glfw-3.3.2.bin.WIN64\lib-vc2019;$(SolutionDir)..\..\..\libs\Assimp\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3dll.lib;assimp-vc140-mt.lib;Avrt.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SubSystem>Windows</SubSystem>
+      <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="..\..\..\..\libs\miniaudio\miniaudio.h" />
-    <ClInclude Include="..\..\..\src\audio\audio.hpp" />
-    <ClInclude Include="..\..\..\src\blocks.hpp" />
-    <ClInclude Include="..\..\..\src\block_interaction.hpp" />
-    <ClInclude Include="..\..\..\src\block_update.hpp" />
-    <ClInclude Include="..\..\..\src\chunks.hpp" />
-    <ClInclude Include="..\..\..\src\chunk_mesher.hpp" />
-    <ClInclude Include="..\..\..\src\common.hpp" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imconfig.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imgui.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imgui_internal.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imstb_rectpack.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imstb_textedit.h" />
-    <ClInclude Include="..\..\..\src\dear_imgui\imstb_truetype.h" />
-    <ClInclude Include="..\..\..\src\engine\camera.hpp" />
-    <ClInclude Include="..\..\..\src\engine\debug_draw.hpp" />
-    <ClInclude Include="..\..\..\src\engine\input.hpp" />
-    <ClInclude Include="..\..\..\src\engine\input_buttons.hpp" />
-    <ClInclude Include="..\..\..\src\engine\renderer.hpp" />
-    <ClInclude Include="..\..\..\src\engine\threading.hpp" />
-    <ClInclude Include="..\..\..\src\engine\window.hpp" />
-    <ClInclude Include="..\..\..\src\game.hpp" />
-    <ClInclude Include="..\..\..\src\assets.hpp" />
-    <ClInclude Include="..\..\..\src\imgui\dear_imgui.hpp" />
-    <ClInclude Include="..\..\..\src\imgui\imgui_impl_glfw.h" />
-    <ClInclude Include="..\..\..\src\imgui\imgui_impl_opengl3.h" />
-    <ClInclude Include="..\..\..\src\inventory.hpp" />
-    <ClInclude Include="..\..\..\src\items.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\allocator.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\animation.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\bit_twiddling.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\circular_buffer.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\clean_windows_h.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\collision.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\containers.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\file_io.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\image.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\kissmath.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\kissmath_colors.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\macros.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\parse.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\random.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\read_directory.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\running_average.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\serialization.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash1.h" />
-    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash2.h" />
-    <ClInclude Include="..\..\..\src\kisslib\smhasher\MurmurHash3.h" />
-    <ClInclude Include="..\..\..\src\kisslib\stb_image.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\stb_image_write.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\stb_rect_pack.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\stl_extensions.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\string.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\threadpool.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\threadsafe_queue.hpp" />
-    <ClInclude Include="..\..\..\src\kisslib\timer.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\gl_chunk_renderer.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\glad\glad.h" />
-    <ClInclude Include="..\..\..\src\opengl\glad\glad_wgl.h" />
-    <ClInclude Include="..\..\..\src\opengl\glad\khrplatform.h" />
-    <ClInclude Include="..\..\..\src\opengl\gl_dbg_draw.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\gl_raytracer.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\opengl_context.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp" />
-    <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp" />
-    <ClInclude Include="..\..\..\src\open_simplex_noise\open_simplex_noise.hpp" />
-    <ClInclude Include="..\..\..\src\physics.hpp" />
-    <ClInclude Include="..\..\..\src\player.hpp" />
-    <ClInclude Include="..\..\..\src\world_generator.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\..\src\audio\audio.cpp" />
-    <ClCompile Include="..\..\..\src\chunks.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\chunk_mesher.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\common.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\dear_imgui\imgui.cpp" />
-    <ClCompile Include="..\..\..\src\dear_imgui\imgui_demo.cpp" />
-    <ClCompile Include="..\..\..\src\dear_imgui\imgui_draw.cpp" />
-    <ClCompile Include="..\..\..\src\dear_imgui\imgui_widgets.cpp" />
-    <ClCompile Include="..\..\..\src\engine\camera.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\engine\input.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\engine\debug_draw.cpp" />
-    <ClCompile Include="..\..\..\src\engine\renderer.cpp" />
-    <ClCompile Include="..\..\..\src\engine\window.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\game.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\assets.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\imgui\dear_imgui.cpp" />
-    <ClCompile Include="..\..\..\src\imgui\imgui_impl_glfw.cpp" />
-    <ClCompile Include="..\..\..\src\imgui\imgui_impl_opengl3.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\allocator.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\collision.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\file_io.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\random.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\read_directory.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash1.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash2.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\smhasher\MurmurHash3.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\stb_image.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\stb_image_write.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\stb_rect_pack.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\string.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\threadpool.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\timer.cpp" />
-    <ClCompile Include="..\..\..\src\kisslib\tracy\public\TracyClient.cpp">
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">BUILD_TRACY;TRACY_ENABLE;WINAPI_PARTITION_DESKTOP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
-    <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
-    <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\opengl_context.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp" />
-    <ClCompile Include="..\..\..\src\open_simplex_noise\open_simplex_noise.cpp" />
-    <ClCompile Include="..\..\..\src\player.cpp" />
-    <ClCompile Include="..\..\..\src\world_generator.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Validate|x64'">common.hpp</PrecompiledHeaderFile>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Tracy|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\blocks.json" />
-    <None Include="..\..\..\shaders.json" />
-    <None Include="..\..\..\shaders\gl\block_highlight.glsl" />
-    <None Include="..\..\..\shaders\gl\chunks.glsl" />
-    <None Include="..\..\..\shaders\gl\common.glsl" />
-    <None Include="..\..\..\shaders\gl\dbg_indirect_draw.glsl" />
-    <None Include="..\..\..\shaders\gl\debug_lines.glsl" />
-    <None Include="..\..\..\shaders\gl\debug_tris.glsl" />
-    <None Include="..\..\..\shaders\gl\debug_wire_instance.glsl" />
-    <None Include="..\..\..\shaders\gl\fullscreen_triangle.glsl" />
-    <None Include="..\..\..\shaders\gl\gpu_voxels.glsl" />
-    <None Include="..\..\..\shaders\gl\gui.glsl" />
-    <None Include="..\..\..\shaders\gl\held_block.glsl" />
-    <None Include="..\..\..\shaders\gl\held_item.glsl" />
-    <None Include="..\..\..\shaders\gl\rand.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_df_gen.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_df_init.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_forward.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_lighting.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_post.glsl" />
-    <None Include="..\..\..\shaders\gl\rt_util.glsl" />
-    <None Include="..\..\..\shaders\gl\test.glsl" />
-    <None Include="..\..\..\shaders\gl\vct_filter.glsl" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="test.natvis" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

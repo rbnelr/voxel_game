@@ -1,10 +1,10 @@
 #pragma once
 #include "common.hpp"
-#include "engine/renderer.hpp"
+#include "renderer.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 
-struct Game;
+class Game;
 namespace gl {
 class OpenglRenderer;
 

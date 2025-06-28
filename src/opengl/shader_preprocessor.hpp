@@ -20,7 +20,7 @@ inline bool preprocess_include_file (char const* shader_name, char const* filena
 
 	std::string source;
 	if (!kiss::load_text_file(filename, &source)) {
-		clog(ERROR, "[Shaders] \"%s\": could not find file \"%s\"!", shader_name, filename);
+		log(ERROR, "[Shaders] \"%s\": could not find file \"%s\"!", shader_name, filename);
 		return false;
 	}
 
@@ -49,7 +49,7 @@ inline bool preprocess_include_file (char const* shader_name, char const* filena
 
 				std::string_view inc_filename;
 				if (!quoted_string(c, &inc_filename)) {
-					clog(ERROR, "[Shaders] \"%s\": expected filename in include at line %d!", shader_name, line_no);
+					log(ERROR, "[Shaders] \"%s\": expected filename in include at line %d!", shader_name, line_no);
 					success = false;
 				} else {
 

@@ -3,8 +3,7 @@
 #include "chunks.hpp"
 #include "chunk_mesher.hpp"
 #include "opengl_renderer.hpp"
-
-#include "engine/window.hpp" // for frame_counter hack
+#include "game.hpp"
 
 namespace gl {
 	
@@ -516,7 +515,7 @@ namespace gl {
 	}
 
 	void Raytracer::set_uniforms (OpenglRenderer& r, Shader* shad) {
-		shad->set_uniform("rand_seed_time", rand_seed_time ? g_window.frame_counter : 0);
+		shad->set_uniform("rand_seed_time", rand_seed_time ? (int)g->input.frame_counter : 0);
 
 		shad->set_uniform("framebuf_size", renderscale.size);
 		shad->set_uniform("update_debugdraw", r.debug_draw.update_indirect);

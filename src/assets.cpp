@@ -300,7 +300,7 @@ GenericSubmesh load_subobject (GenericVertexData* data, aiScene const* scene, st
 		}
 	}
 
-	clog(ERROR, "[load_subobject] Suboject %s not found in fbx!", subobj);
+	log(ERROR, "[load_subobject] Suboject %s not found in fbx!", subobj);
 	return m;
 }
 
@@ -317,7 +317,7 @@ BlockHighlightSubmeshes load_block_highlight_mesh (GenericVertexData* data) {
 }
 
 GenericVertexData load_fbx (char const* filename, char const* submesh_name) {
-	clog("Loading fbx file '%s'...", filename);
+	log("Loading fbx file '%s'...", filename);
 
 	auto* fbx = aiImportFile(filename, aiProcess_Triangulate|aiProcess_JoinIdenticalVertices);
 	

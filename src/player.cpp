@@ -3,15 +3,6 @@
 #include "game.hpp"
 #include "player.hpp"
 
-// TODO: verify this is working
-// Look at https://stackoverflow.com/questions/2708476/rotation-interpolation
-inline float alerp (float ang0, float ang1, float t) {
-	float offset = wrap(ang1 - ang0, TAU);
-	if (abs(offset) > PI)
-		offset -= TAU;
-	return wrap(ang0 + offset * t, TAU);
-}
-
 void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	ZoneScoped;
 	
@@ -52,8 +43,8 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		// Crouching progress will eventually switch is_crouched() and thus collision box
 		float crouch_target = do_crouch ? 1.0f : 0.0f;
 		float prev_crouch = crouching_progress;
-		crouching_progress = move_towards_linear(crouching_progress, crouch_target,
-			m.crouch_transition_speed, I.dt);
+		crouching_progress = move_linear(crouching_progress, crouch_target,
+			m.crouch_transition_speed * I.dt);
 		
 		{ // Compute head bob from head lower/raise toggle impulse
 			// track delta crouch_change (float) instead of float3 head pivot to save on memory I guess?
@@ -110,7 +101,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		float impact_impulse = length(delta_vel);
 		float audio_stren = map_clamp(impact_impulse, 2.0f, 20.0f, 0.7f, 6.0f);
 
-		//clog("Landed impact_impulse: %f", impact_impulse);
+		//log("Landed impact_impulse: %f", impact_impulse);
 
 		// Landing sound, two makes it stronger (good idea?)
 		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
@@ -165,7 +156,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 	float walking_ang = atan2f(-vel.x, vel.y);
 	float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
-	float facing_ang = alerp(rot_ae.x, walking_ang, anim_fac * 0.5f);
+	float facing_ang = lerp_angle(rot_ae.x, walking_ang, anim_fac * 0.5f);
 
 	update_walking_step_bob(I, cur_speed2d, obj);
 

@@ -551,12 +551,12 @@ struct Physics {
 			//}
 
 			if (hit && hit.buried) {
-				//clog("collision - buried");
+				//log("collision - buried");
 				obj.vel = 0;
 				obj.buried = true;
 			}
 			else if (hit && hit.t0 <= remain_dt) {
-				//clog("collision - handle_collison");
+				//log("collision - handle_collison");
 				handle_collison(obj, hit);
 
 				if (hit.t0 >= 0.0f) remain_dt -= hit.t0;
@@ -565,7 +565,7 @@ struct Physics {
 				else continue; // repeat collision with deflected or bounced velocity and position using remainging timestep
 			}
 			else {
-				//clog("collision - move without collision");
+				//log("collision - move without collision");
 				obj.pos = obj.pos + obj.vel * remain_dt;
 			}
 
@@ -601,7 +601,7 @@ struct Physics {
 
 
 		//static int frame_counter = 0;
-		//clog("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
+		//log("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
 		//	obj.grounded ? "(grounded)":"");
 	}
 };

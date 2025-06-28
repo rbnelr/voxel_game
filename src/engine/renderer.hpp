@@ -12,7 +12,8 @@ enum class AttribMode {
 	UNORM,		// uint turns into [0, 1] float (ex. from [0, 255])
 };
 
-// Base class for multiple render backends
+// Base class for supporting multiple render backends, but I removed vulkan for now
+// so would need to reimplement feature so actually switch renderers again
 
 enum class RenderBackend : int {
 	OPENGL=0,
@@ -21,7 +22,7 @@ enum class RenderBackend : int {
 // Controls for in what builds to output debug info, set in this file to allow window.cpp to use these too
 
 struct GLFWwindow;
-struct Game;
+class Game;
 struct Chunks;
 struct Input;
 
@@ -35,12 +36,13 @@ public:
 	virtual bool get_vsync () = 0;
 	virtual void set_vsync (bool state) = 0;
 
-	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files) = 0;
-	virtual void render_frame (GLFWwindow* window, Input& I, Game& game) = 0;
+	virtual void render_frame (Game& game) = 0;
 
-	virtual void screenshot_imgui (Input& I) = 0;
-	virtual void graphics_imgui (Input& I, Game& g) = 0;
+	virtual void screenshot_imgui () = 0;
+	virtual void graphics_imgui () = 0;
 	virtual void chunk_renderer_imgui (Chunks& chunks) = 0;
+	
+	virtual bool update_files_changed (kiss::ChangedFiles& changed_files) = 0;
 };
 
-std::unique_ptr<Renderer> start_renderer (RenderBackend backend, GLFWwindow* window);
+std::unique_ptr<Renderer> start_renderer (RenderBackend backend, Game& game);

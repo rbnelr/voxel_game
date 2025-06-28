@@ -1,8 +1,0 @@
-[submodule "kisslib"]
-	path = src/kisslib
-	url = https://github.com/rbnelr/kisslib.git
-	branch = master
-[submodule "dear_imgui"]
-	path = src/dear_imgui
-	url = https://github.com/ocornut/imgui.git
-	branch = tables

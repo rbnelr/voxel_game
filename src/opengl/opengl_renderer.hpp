@@ -1,15 +1,17 @@
 #pragma once
 #include "common.hpp"
-#include "engine/renderer.hpp"
-#include "opengl_context.hpp"
+#include "game.hpp"
+#include "renderer.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
 #include "gl_chunk_renderer.hpp"
 #include "gl_raytracer.hpp"
 #include "gl_dbg_draw.hpp"
-#include "bloom.hpp"
-#include "engine/input.hpp"
+#include "input.hpp"
 #include "opengl/radiance_cascades.hpp"
+#include "GLFW/glfw3.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 namespace gl {
 
@@ -185,20 +187,42 @@ struct PlayerRenderer {
 
 };
 
+// Need to wrap opengl context init into class to make it run before other class member initializers which depend on gl calls
+class OpenglRenderer;
+
+class OpenglContext {
+public:
+	OpenglContext (OpenglRenderer* r, GLFWwindow* window);
+};
+
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, rc3D, imopen)
+	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, rc3D)
 
-	struct ImguiOpen {
-		SERIALIZE(ImguiOpen, framebuffer, debugdraw, gui)
-		bool framebuffer=true, debugdraw=true, gui=true;
-	};
-
-	virtual void deserialize (nlohmann::ordered_json const& j) { j.get_to(*this); }
+	virtual void deserialize (nlohmann::ordered_json const& j) {
+		j.get_to(*this);
+		// take vsync into account
+		set_vsync(vsync);
+	}
 	virtual void serialize (nlohmann::ordered_json& j) { j = *this; }
+	
+	OpenglContext ctx;
 
-	OpenglContext	ctx; // make an 'opengl context' first member so opengl init happens before any other ctors (which might make opengl calls)
+	#if OGL_USE_REVERSE_DEPTH
+	//// Use reverse depth to fix depth precision issues if possible
+	// requires float depth buffer and glClipControl
+	// https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
+	bool reverse_depth = false;
+	#endif
 
+	float max_aniso = 1.0f;
+
+	bool vsync = true;
+	int _vsync_on_interval = 1; // handle vsync interval allowing -1 or not depending on extension
+
+	static void APIENTRY debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam);
+	
+////
 	int2			render_size;
 
 	Vao				dummy_vao = {"dummy_vao"};
@@ -270,12 +294,15 @@ public:
 	RadianceCascades3D rc3D = RadianceCascades3D(*this);
 
 	virtual bool get_vsync () {
-		return ctx.vsync;
+		return vsync;
 	}
 	virtual void set_vsync (bool state) {
-		ctx.set_vsync(state);
+		ZoneScoped;
+		glfwSwapInterval(state ? _vsync_on_interval : 0);
+		vsync = state;
 	}
-	
+
+
 	void update_view (Camera_View const& view, int2 viewport_size, float3 lod_center) {
 		memset(&common_uniforms, 0, sizeof(common_uniforms)); // zero padding
 		common_uniforms.view.set(view, (float2)viewport_size, lod_center);
@@ -288,54 +315,23 @@ public:
 	bool load_textures (GenericVertexData& mesh_data); // can be reloaded
 	bool load_static_data ();
 
-	OpenglRenderer (GLFWwindow* window, char const* app_name): ctx{window, app_name} {
+	OpenglRenderer (Game& game);
+	virtual ~OpenglRenderer ();
 
-		// I never align my pixel rows
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	virtual void render_frame (Game& game);
 
-		load_static_data();
-
-		float max_aniso = 1.0f;
-		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
-
-		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glSamplerParameteri(pixelated_sampler, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameterf(pixelated_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
-
-		glSamplerParameteri(smooth_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(smooth_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(smooth_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSamplerParameterf(smooth_sampler, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
-
-		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glSamplerParameteri(smooth_sampler_wrap, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glSamplerParameterf(smooth_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
-	}
-	virtual ~OpenglRenderer () {}
-
-	virtual void frame_begin (GLFWwindow* window, Input& I, kiss::ChangedFiles& changed_files);
-	virtual void render_frame (GLFWwindow* window, Input& I, Game& game);
-
-	ImguiOpen imopen;
-
-	virtual void screenshot_imgui (Input& I) {
-		trigger_screenshot = ImGui::Button("Screenshot [F8]") || I.buttons[KEY_F8].went_down;
+	virtual void screenshot_imgui () {
+		trigger_screenshot = ImGui::Button("Screenshot [F8]") || g->input.buttons[KEY_F8].went_down;
 		ImGui::SameLine();
 		ImGui::Checkbox("With HUD", &screenshot_hud);
 	}
-	virtual void graphics_imgui (Input& I, Game& g) {
+	virtual void graphics_imgui () {
 		ImGui::Checkbox("rc2D", &rc2D.imopen);
 		ImGui::Checkbox("rc3D", &rc3D.imopen);
 		rc2D.imgui();
 		rc3D.imgui();
 
-		if (imgui_treenode("Debug Draw", &imopen.debugdraw)) {
+		if (ImGui::TreeNode("Debug Draw")) {
 			debug_draw.imgui();
 
 			ImGui::TreePop();
@@ -343,7 +339,7 @@ public:
 
 		ImGui::Checkbox("draw_chunks", &chunk_renderer._draw_chunks);
 
-		if (imgui_treenode("GUI", &imopen.gui)) {
+		if (ImGui::TreeNode("GUI")) {
 			ImGui::Checkbox("crosshair", &gui_renderer.crosshair);
 			ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
 
@@ -352,11 +348,23 @@ public:
 
 		fog.imgui();
 
-		raytracer.imgui(I);
+		raytracer.imgui(g->input);
 	}
 
 	virtual void chunk_renderer_imgui (Chunks& chunks) {
 		chunk_renderer.imgui(chunks);
+	}
+	
+	virtual bool update_files_changed (kiss::ChangedFiles& changed_files) {
+		
+		bool success = true;
+
+		if (changed_files.any_starts_with("textures/", FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME)) {
+			log(INFO, "[OpenglRenderer] Reload textures due to file change");
+			success = try_reloading([&] () { return load_static_data(); }) && success;
+		}
+
+		return shaders.update_recompilation(changed_files, shaders.wireframe) && success;
 	}
 };
 

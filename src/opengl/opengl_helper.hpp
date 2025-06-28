@@ -827,7 +827,7 @@ inline bool upload_texture_arr (GLuint tex, const char* filename, int arr_count=
 	void* pixels = (void*)stbi_load_from_memory(data.get(), (int)memsz, &w, &h, &n, stbi_comp);
 
 	if (!pixels) {
-		clog(ERROR, "[upload_texture_arr] Error uploading file \"%s\"!\n", filename);
+		log(ERROR, "[upload_texture_arr] Error uploading file \"%s\"!", filename);
 		return false;
 	}
 
@@ -911,7 +911,7 @@ struct Shader {
 
 		// Load shader base source file
 		if (!preprocess_include_file(name.c_str(), filename.c_str(), &source, &src_files)) {
-			clog(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
+			log(ERROR, "[Shaders] \"%s\": shader compilation error!", name.c_str());
 			return false;
 		}
 
@@ -959,12 +959,12 @@ struct Shader {
 				bool stage_error = status == GL_FALSE;
 				if (stage_error) {
 					// compilation failed
-					clog(ERROR,"[Shaders] OpenGL error in shader compilation \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+					log(ERROR,"[Shaders] OpenGL error in shader compilation \"%s\"!\n>>>\n%s<<<", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 					error = true;
 				} else {
 					// compilation success
 					if (log_avail) {
-						clog(WARNING,"[Shaders] OpenGL shader compilation log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+						log(WARNING,"[Shaders] OpenGL shader compilation log \"%s\":\n>>>\n%s<<<", name.c_str(), log_str.c_str());
 					}
 				}
 			}
@@ -985,11 +985,11 @@ struct Shader {
 				error = status == GL_FALSE;
 				if (error) {
 					// linking failed
-					clog(ERROR,"[Shaders] OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<\n", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
+					log(ERROR,"[Shaders] OpenGL error in shader linkage \"%s\"!\n>>>\n%s\n<<<", name.c_str(), log_avail ? log_str.c_str() : "<no log available>");
 				} else {
 					// linking success
 					if (log_avail) {
-						clog(WARNING,"[Shaders] OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<\n", name.c_str(), log_str.c_str());
+						log(WARNING,"[Shaders] OpenGL shader linkage log \"%s\":\n>>>\n%s\n<<<", name.c_str(), log_str.c_str());
 					}
 				}
 			}
@@ -1029,7 +1029,7 @@ struct Shader {
 		}
 
 		if (error) {
-			clog(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
+			log(ERROR, "[Shaders] \"%s\": shader compilation error!\n", name.c_str());
 
 			glDeleteProgram(prog);
 			prog = 0;
@@ -1042,19 +1042,20 @@ struct Shader {
 			glDeleteProgram(prog);
 	}
 
-	void recompile (char const* reason, bool wireframe) {
+	bool recompile (char const* reason, bool wireframe) {
 		auto old_prog = prog;
 
-		clog(INFO, "[Shaders] Recompile shader %-35s due to %s", name.c_str(), reason);
+		log(INFO, "[Shaders] Recompile shader %-35s due to %s", name.c_str(), reason);
 
 		if (!compile(wireframe)) {
 			// new compilation failed, revert old shader
 			prog = old_prog;
-			return;
+			return false;
 		}
 
 		if (old_prog)
 			glDeleteProgram(old_prog);
+		return true;
 	}
 
 	void get_uniform_locations () {
@@ -1094,13 +1095,16 @@ struct Shaders {
 
 	bool wireframe = false;
 
-	void update_recompilation (kiss::ChangedFiles& changed_files, bool wireframe) {
+	bool update_recompilation (kiss::ChangedFiles& changed_files, bool wireframe) {
+		bool success = true;
+
 		if (changed_files.any()) {
 			for (auto& s : shaders) {
 				std::string const* changed_file;
 				if (changed_files.contains_any(s->src_files, FILE_ADDED|FILE_MODIFIED|FILE_RENAMED_NEW_NAME, &changed_file)) {
 					// any source file was changed
-					s->recompile(prints("shader source change (%s)", changed_file->c_str()).c_str(), wireframe);
+					if (s->recompile(prints("shader source change (%s)", changed_file->c_str()).c_str(), wireframe))
+						success = false;
 				}
 			}
 		}
@@ -1109,9 +1113,12 @@ struct Shaders {
 			this->wireframe = wireframe;
 
 			for (auto& s : shaders) {
-				s->recompile("wireframe toggle", wireframe);
+				if (s->recompile("wireframe toggle", wireframe))
+					success = false;
 			}
 		}
+
+		return success;
 	}
 
 	inline Shader* compile (
@@ -1492,12 +1499,15 @@ inline void take_screenshot (int2 size) {
 
 	glPixelStorei(GL_PACK_ALIGNMENT, 1);
 	glReadPixels(0,0, size.x, size.y, GL_RGB, GL_UNSIGNED_BYTE, img.pixels);
+	
+	char timestr [80] = "";
+	{
+		time_t t = time(0); // get time now
+		struct tm now;
+		localtime_s(&now, &t);
 
-	time_t t = time(0); // get time now
-	struct tm* now = localtime(&t);
-
-	char timestr [80];
-	strftime(timestr, 80, "%g%m%d-%H%M%S", now); // yy-mm-dd_hh-mm-ss
+		strftime(timestr, 80, "%g%m%d-%H%M%S", &now); // yy-mm-dd_hh-mm-ss
+	}
 
 	static int counter = 0; // counter to avoid overwriting files in edge cases
 	auto filename = prints("../screenshots/screen_%s_%d.jpg", timestr, counter++);

@@ -1,15 +1,15 @@
 #pragma once
 #include "common.hpp"
 #include "assets.hpp"
-#include "engine/camera.hpp"
+#include "camera.hpp"
 #include "physics.hpp"
-#include "audio/audio.hpp"
-#include "engine/window.hpp"
+#include "audio.hpp"
+#include "engine.hpp"
 #include "inventory.hpp"
 #include "block_interaction.hpp"
 
 struct Block;
-struct Game;
+class Game;
 
 class Player {
 public:
@@ -184,7 +184,7 @@ public:
 	}
 
 	void imgui (const char* name=nullptr) {
-		if (!imgui_push("Player", name)) return;
+		if (!ImGui::TreeNode("Player", name)) return;
 
 		ImGui::DragFloat3("pos", &pos.x, 0.05f);
 
@@ -218,7 +218,7 @@ public:
 
 		collison_response.imgui();
 
-		imgui_pop();
+		ImGui::TreePop();
 
 		ImGui::Checkbox("collision_debug", &collision_debug);
 
@@ -258,7 +258,7 @@ public:
 
 			if (I.buttons[KEY_E].went_down) {
 				inventory.is_open = !inventory.is_open;
-				I.set_cursor_mode(g_window, inventory.is_open);
+				I.set_cursor_mode(*g, inventory.is_open);
 			}
 		}
 
@@ -279,7 +279,11 @@ public:
 			//// look
 			Camera& cam = third_person ? tps_camera : fps_camera;
 
-			rotate_with_mouselook(I, &rot_ae.x, &rot_ae.y, cam.vfov);
+			constexpr float look_down_limit = deg(-10);
+			constexpr float look_up_limit = deg(0);
+			rotate_with_mouselook(I, cam.vfov, g->cam_binds, &rot_ae, -deg(180), deg(180),
+				deg(-90)+look_down_limit,
+				deg(90)-look_up_limit);
 
 			inp.crouch_button = I.buttons[KEY_LEFT_CONTROL];
 		}
@@ -296,7 +300,7 @@ public:
 
 		g->view = g->player_view;
 		if (g->activate_flycam)
-			g->view = g->flycam->update(I, I.window_size, g->player_controls_active());
+			g->view = g->flycam->update(I, I.window_size, g->cam_binds, g->player_controls_active());
 
 		//
 		auto& sel = selected_block;

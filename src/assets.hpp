@@ -1,7 +1,8 @@
 #pragma once
+#include "kisslib/animation.hpp"
 #include "common.hpp"
 #include "blocks.hpp"
-//#include "engine/renderer.hpp"
+//#include "renderer.hpp"
 
 static constexpr int  TILE_SIZE = 16;
 inline constexpr int2 TILEMAP_SIZE = int2(16,16);
@@ -226,8 +227,8 @@ struct Assets {
 		ZoneScoped;
 		Assets a;
 		
-		clog("Loading assets");
-		json blocks_json = load_json("blocks.json");
+		log("Loading assets");
+		json blocks_json = serialize::load_json("blocks.json");
 
 		a.load_block_types(blocks_json);
 		a.block_meshes.load(blocks_json);

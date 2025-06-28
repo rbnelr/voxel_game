@@ -7,12 +7,11 @@
 
 #include "GLFW/glfw3.h" // need to include vulkan before glfw because GLFW checks for VK_VERSION_1_0
 
-std::unique_ptr<Renderer> start_renderer (RenderBackend backend, GLFWwindow* window) {
+std::unique_ptr<Renderer> start_renderer (RenderBackend backend, Game& game) {
 	try {
 		switch (backend) {
-
 			case RenderBackend::OPENGL: {
-				return std::make_unique<gl::OpenglRenderer>(window, APPNAME);
+				return std::make_unique<gl::OpenglRenderer>(game);
 			} break;
 		}
 	} catch (std::exception ex) {

@@ -39,7 +39,7 @@ struct BlockUpdate {
 	}
 
 	void imgui () {
-		if (!imgui_push("BlockUpdate")) return;
+		if (!ImGui::TreeNode("BlockUpdate")) return;
 
 		ImGui::DragFloat("block_update_fraction", &block_update_fraction, 0.00005f, 0.00000001f, 1);
 
@@ -51,7 +51,7 @@ struct BlockUpdate {
 		ImGui::DragFloat("grass_grow_step_down_multipiler", &grass_grow_step_down_multipiler, 0.05f);
 		ImGui::DragFloat("grass_grow_step_up_multipiler", &grass_grow_step_up_multipiler, 0.05f);
 
-		imgui_pop();
+		ImGui::TreePop();
 	}
 
 	bool update_block (Chunks& chunks, Chunk& chunk, block_id bid, int3 pos_world) {

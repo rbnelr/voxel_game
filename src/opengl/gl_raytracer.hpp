@@ -6,8 +6,6 @@
 #include "game.hpp"
 #include "player.hpp"
 
-#include "engine/window.hpp" // frame_counter
-
 namespace gl {
 	class OpenglRenderer;
 

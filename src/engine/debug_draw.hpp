@@ -1,6 +1,8 @@
 #pragma once
 #include "renderer.hpp"
 #include "camera.hpp"
+#include "kisslib/stl_extensions.hpp"
+using namespace kiss;
 
 struct DebugDraw {
 	struct LineVertex {

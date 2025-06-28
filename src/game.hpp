@@ -1,6 +1,6 @@
 #pragma once
 #include "common.hpp"
-#include "engine/camera.hpp"
+#include "camera.hpp"
 
 // Game is stored as a global such that systems needed everywhere can be accessed like g->assets->
 //  (audio, assets, chunks, etc.)
@@ -14,21 +14,28 @@ struct Chunks;
 struct WorldGenerator;
 struct BlockUpdate;
 class Player;
+class Renderer;
 
-struct Game {
-#define SERIALIZE_NORMAL world_gen, chunks, flycam, player, activate_flycam, imopen, lod_follow_flycam
+class Game : public Engine {
+	#define SERIALIZE_NORMAL world_gen, chunks,\
+		cam_binds, flycam, player, activate_flycam, lod_follow_flycam,\
+		imopen
+public:
+	Game ();
+	~Game ();
 
-	friend void to_json (nlohmann::ordered_json& j, const Game& t);
-	friend void from_json (const nlohmann::ordered_json& j, Game& t);
+	virtual void json_load ();
+	virtual void json_save ();
 
 	struct ImguiOpen {
 		SERIALIZE(ImguiOpen, performance, world, chunks, physics, entities, graphics, audio)
 		bool performance=true, world=false, chunks=false, physics=false, entities=false, graphics=false, audio=false;
 	};
 	ImguiOpen imopen;
-
-	std::unique_ptr<AudioManager> audio;
-	std::unique_ptr<Assets> assets;
+	
+	std::unique_ptr<AudioManager> audio; // has to go before assets
+	std::unique_ptr<Assets> assets;      // has to go before renderer
+	std::unique_ptr<Renderer> renderer;
 
 	bool dbg_pause = false;
 	Timing_Histogram fps_display;
@@ -39,6 +46,7 @@ struct Game {
 	std::unique_ptr<Physics> physics;
 	std::unique_ptr<Chunks> chunks;
 
+	CameraBinds cam_binds;
 	std::unique_ptr<Flycam> flycam;
 	std::unique_ptr<Player> player;
 
@@ -58,12 +66,18 @@ struct Game {
 	bool lod_follow_flycam = true;
 	float3 lod_center ();
 
-	Game ();
-	void init (); // Called after renderer is inited, since renderer wants access to game.assets
-	~Game ();
+	virtual void imgui ();
+	virtual void frame ();
 	
-	void imgui (Window& window, Input& I, Renderer* renderer);
-	void update (Window& window, Input& I);
+	virtual bool update_files_changed (kiss::ChangedFiles& changed_files) {
+		bool success = renderer->update_files_changed(changed_files);
+		//if (changed_files.any_starts_with("assets")) {
+		//	//assets.reload_all();
+		//	//renderer->reload_textures(changed_files);
+		//}
+		//
+		return success;
+	}
 };
 
 extern Game* g;

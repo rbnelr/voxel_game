@@ -1,0 +1,15 @@
+[submodule "kissmath"]
+	path = kissmath
+	url = https://github.com/rbnelr/kissmath.git
+[submodule "nlohmann_json"]
+	path = nlohmann_json
+	url = https://github.com/nlohmann/json.git
+	branch = master
+[submodule "tracy"]
+	path = tracy
+	url = https://github.com/wolfpld/tracy.git
+	branch = master
+[submodule "stb"]
+	path = stb
+	url = https://github.com/nothings/stb.git
+	branch = master
