@@ -41,6 +41,13 @@ namespace kissmath {
 	inline float sign (float x) {
 		return copysignf(1.0f, x);
 	}
+	inline float3 sign (float3 x) {
+		return float3(
+			copysignf(1.0f, x.x),
+			copysignf(1.0f, x.y),
+			copysignf(1.0f, x.z)
+		);
+	}
 	
 	inline constexpr float map_clamp (float x, float in_a, float in_b) {
 		return clamp(map(x, in_a, in_b), 0.0f, 1.0f);

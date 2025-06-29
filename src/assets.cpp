@@ -66,6 +66,9 @@ void Assets::load_block_types (json const& blocks_json) {
 		if (step_sound.empty()) step_sound = "step_hard";
 		b.step_sound = load_sound_set(step_sound);
 
+		GET(val, "fluid_density").get_to(b.fluid_density);
+		GET(val, "volume_drag")   .get_to(b.volume_drag);
+
 		//name_map.emplace(b.name, (block_id)blocks.size());
 		block_types.blocks.push_back(std::move(b));
 	}

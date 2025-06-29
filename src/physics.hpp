@@ -54,7 +54,8 @@ struct PhysicsObject {
 	GroundedInfo grounded;
 	bool buried;
 
-	float avg_fluid_dens;
+	float avg_fluid_mass;
+	float avg_fluid_drag;
 };
 
 struct World;
@@ -86,13 +87,13 @@ struct Physics {
 	// drag_coeff includes object airflow area and 'regular' drag coefficient
 	// in the original formula drag_coeff really just specifies the shape and surface air drag
 	// and higher mass causes higher accel, but 
-	float fluid_drag_decel (float speed, float drag_coeff, float fluid_dens=air_density) {
+	float fluid_drag_decel (float speed_sqr, float drag_coeff, float fluid_dens=air_density) {
 		// https://en.wikipedia.org/wiki/Drag_equation
 		// gas_density = 1; // could change this number inside different gas voxels?
 		// ignore useless 0.5
 		//float drag_force = 0.5f * speed*speed * gas_density * drag_coeff * drag_area;
 		//float drag_deceleration = drag_force / mass; // ignore mass as we don't want to track mass
-		float drag_deceleration = speed*speed * fluid_dens * drag_coeff;
+		float drag_deceleration = speed_sqr * fluid_dens * drag_coeff;
 		return drag_deceleration;
 	}
 	float drag_coeff_for_terminal_vel (float terminal_speed) {
@@ -390,21 +391,10 @@ struct Physics {
 
 	VoxelCollisionCastHit world_voxel_box_cast (Chunks& chunks, PhysicsObject& obj, bool collision_debug) {
 
-		//// Avoid zero speed to allow for easier voxel_box_cast
-		//float speed = length(obj.vel);
-		//float3 dir = speed >= min_speed ?
-		//	obj.vel / speed :
-		//	float3(0,0,-1);
-		
 		auto& block_types = g->assets->block_types;
 
 		float3 aabb0 = obj.pos + obj.local_aabb.lo;
 		float3 aabb1 = obj.pos + obj.local_aabb.hi;
-
-		float3 aabb_sz = obj.local_aabb.hi - obj.local_aabb.lo;
-		float obj_volume = aabb_sz.x * aabb_sz.y * aabb_sz.z;
-		float inv_obj_volume = 1.0f / obj_volume;
-		obj.avg_fluid_dens = 0;
 
 		// TODO: take into account movement to compute all relevant voxels
 		int3 start = (int3)floor(aabb0) -1;
@@ -416,7 +406,9 @@ struct Physics {
 		for (int y=start.y; y<end.y; ++y)
 		for (int x=start.x; x<end.x; ++x) {
 			auto bid = chunks.read_block(x,y,z);
+			auto& bt = block_types[bid];
 
+			if (bt.collision == CM_GAS) continue;
 			//if (bid == B_NULL) break; // for debugging: colliding with unloaded chunk voxels is confusing for debugging, but in practice this might actually be desired
 			
 			float3 vox_origin = (float3)int3(x,y,z);
@@ -424,17 +416,16 @@ struct Physics {
 			float3 box1 = aabb1 - vox_origin;
 			float3 vox0 = float3(0);
 			float3 vox1 = float3(1);
+			
+			float3 rel = obj.pos - vox_origin;
 
-			auto& collt = block_types[bid].collision;
-			if (collt == CM_SOLID) {
+			VoxelCollisionCastHit hit;
+			if (!voxel_box_cast(box0, box1, obj.vel, vox0, vox1, &hit)) {
+				continue;
+			}
+
+			if (bt.collision == CM_SOLID) {
 				
-				float3 rel = obj.pos - vox_origin;
-
-				VoxelCollisionCastHit hit;
-				if (!voxel_box_cast(box0, box1, obj.vel, vox0, vox1, &hit)) {
-					continue;
-				}
-
 				// Ugh, another reason why earliest hit response sucks
 				// Later hits can be the one that are closer to player feet and thus where we might want to play sounds from
 				bool standing_directly_on = rel.x >= vox0.x && rel.x < vox1.x &&
@@ -450,8 +441,8 @@ struct Physics {
 					res_hit = hit;
 				}
 			}
-			else if (collt == CM_LIQUID) {
-				if (chunks.read_block(x,y,z+1) != bid)
+			else if (bt.collision == CM_LIQUID || bt.collision == CM_BREAKABLE) {
+				if (bt.collision == CM_LIQUID && chunks.read_block(x,y,z+1) != bid)
 					vox1.z = 0.9f; // water has lower top TODO: make this better
 				// Ignoring gas above water entirely right now
 
@@ -460,10 +451,13 @@ struct Physics {
 				float3 h = min(vox1, box1);
 				if (l.x < h.x && l.y < h.y && l.z < h.z) {
 					float3 overlap = h - l;
+					float overlap_volume = overlap.x * overlap.y * overlap.z;
 
-					float volume = overlap.x * overlap.y * overlap.z;
-					float fluid_dens = 1.0f;
-					obj.avg_fluid_dens += fluid_dens * volume * inv_obj_volume;
+					// Fluids are allow buoyancy
+					if (bt.collision == CM_LIQUID)
+						obj.avg_fluid_mass += bt.fluid_density * overlap_volume;
+					// Fluids and permeable blocks 
+					obj.avg_fluid_drag += bt.volume_drag * overlap_volume;
 
 					float3 p = vox_origin + (l+h)/2;
 					g_debugdraw.wire_cube(p, overlap, srgba(255,100,40,100));
@@ -518,12 +512,6 @@ struct Physics {
 		//// gravity
 		obj.vel += grav_accel * I.dt;
 		
-		{ // apply drag
-			float speed = length(obj.vel);
-			if (speed > min_speed)
-				obj.vel -= (obj.vel / speed) * fluid_drag_decel(speed, obj.drag_coeff) * I.dt;
-		}
-
 		// clamp velocity
 		// Ensure min_speed is low enough to let through gravity!!
 		float speed_sq = length_sqr(obj.vel);
@@ -541,6 +529,9 @@ struct Physics {
 		// This would likely not be the case for particles, seemingly allowing us to get away with less iterations for them
 		// but would suddenly break the moment more external forces are introduced (or gravity points in other directions)
 		for (int i=0; i<3; i++) {
+			obj.avg_fluid_mass = 0;
+			obj.avg_fluid_drag = 0;
+	
 			auto hit = world_voxel_box_cast(chunks, obj, collision_debug);
 			
 			//if (hit) {
@@ -573,7 +564,13 @@ struct Physics {
 			break;
 		}
 
+		
+		float3 aabb_sz = obj.local_aabb.hi - obj.local_aabb.lo;
+		float obj_volume = aabb_sz.x * aabb_sz.y * aabb_sz.z;
+		
 		float obj_dens = 0.94f;
+		float avg_fluid_dens = obj.avg_fluid_mass / obj_volume;
+		float avg_fluid_drag = obj.avg_fluid_drag / obj_volume;
 
 		// TODO: do this at beginning of frame with previous frame data? That requires storing this data though...
 		// Currently this results in 'wrong' velocities
@@ -581,14 +578,21 @@ struct Physics {
 			// TODO: write down formula and dirivation logic
 			// hint: fluid_dens is relative to player, which is essentially water
 			// mass cancels out, ratio of densities matters (I think)
-			obj.vel -= grav_accel * (obj.avg_fluid_dens / obj_dens) * I.dt;
+			obj.vel -= grav_accel * (avg_fluid_dens / obj_dens) * I.dt;
 		}
+
 		// TODO: this applies air drag even when in water and is inefficient
+
 		{ // apply drag for liquids
-			float speed = length(obj.vel);
-			if (speed > min_speed) {
-				float dens = 100 * obj.avg_fluid_dens;
-				obj.vel -= (obj.vel / speed) * fluid_drag_decel(speed, obj.drag_coeff, dens) * I.dt;
+			float speedsq = length_sqr(obj.vel);
+			if (speedsq > min_speed*min_speed) {
+
+				// fluid drag
+				float decel = fluid_drag_decel(speedsq, obj.drag_coeff, avg_fluid_drag);
+				// air drag (technically not correct as this applies even if fully submerged in fluid)
+				decel +=      fluid_drag_decel(speedsq, obj.drag_coeff);
+
+				obj.vel -= (obj.vel / sqrt(speedsq)) * (decel * I.dt);
 			}
 		}
 

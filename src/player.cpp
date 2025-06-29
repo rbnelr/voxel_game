@@ -158,7 +158,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
 	float facing_ang = lerp_angle(rot_ae.x, walking_ang, anim_fac * 0.5f);
 
-	update_walking_step_bob(I, cur_speed2d, obj);
+	update_walking_step_bob(I, body_rotation2d, cur_speed2d, obj);
 
 	update_body_dynamics(I, facing_ang);
 
@@ -238,7 +238,7 @@ void Player::update_body_dynamics (Input& I, float facing_ang) {
 		deg(float2(-90, +90)), deg(float2(-60, +70)));
 }
 
-void Player::update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject& phys) {
+void Player::update_walking_step_bob (Input& I, float2x2 body_rotation2d, float cur_speed2d, PhysicsObject& phys) {
 	if (!grounded) {
 		// need to take full step again after landing, and no steps in air!
 		walking_step_bob_counter = 0;
@@ -259,12 +259,17 @@ void Player::update_walking_step_bob (Input& I, float cur_speed2d, PhysicsObject
 		if (is_crouched()) effect_scale = 0.3f;
 		else effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 1.8f);
 
-		float bob_impulse = visual_dynamics.step_head_bob_strength * effect_scale;
+		float stren = visual_dynamics.step_head_bob_strength * effect_scale;
+		float side = walking_step_bob_foot ? -1.0f : +1.0f;
+		walking_step_bob_foot = !walking_step_bob_foot;
+
+		float3 bob_impulse = float3(body_rotation2d * float2(side * stren * 0.33f, 0), -stren);
 		
 		// Kinda hacky to do it this way (could ignore head bob offset for third person)
 		// But keeping head bob for impacts in third person would be interesting
-		if (!third_person)
-			apply_head_bob_impulse(float3(0,0,-bob_impulse));
+		if (!third_person) {
+			apply_head_bob_impulse(bob_impulse);
+		}
 
 		phys.grounded.trigger_step_sound(effect_scale);
 	}
@@ -277,16 +282,17 @@ void Player::update_view_dynamics (Input& I) {
 	auto& vd = visual_dynamics;
 	
 	// Spring constant
-	float3 offs_t = head_bob_offset / vd.offset_max;
-	float3 spring_accel = offs_t * vd.spring_k * -3;
+	//float3 offs_ratio = head_bob_offset / vd.offset_max0.x; // try to keep springyness constant if offset is changed
+	//float3 spring_accel = sign(head_bob_offset) * head_bob_offset*head_bob_offset * vd.spring_k * -3;
+	float3 spring_accel = head_bob_offset * vd.spring_k * -3;
 	// Spring dampening
-	spring_accel -= head_bob_vel / vd.offset_max * vd.spring_damp;
+	spring_accel -= head_bob_vel * vd.spring_damp;
 	// Apply spring accel
 	head_bob_vel += spring_accel * I.dt;
 	head_bob_vel = clamp(head_bob_vel, -vd.vel_max, +vd.vel_max);
 
 	head_bob_offset += head_bob_vel * I.dt;
-	head_bob_offset = clamp(head_bob_offset, -vd.offset_max, +vd.offset_max);
+	head_bob_offset = clamp(head_bob_offset, -vd.offset_max0, +vd.offset_max1);
 
 	ImGui::Text("head_bob_vel: %6.3f %6.3f %6.3f", head_bob_vel.x, head_bob_vel.y, head_bob_vel.z);
 	ImGui::Text("head_bob_offset: %6.3f %6.3f %6.3f", head_bob_offset.x, head_bob_offset.y, head_bob_offset.z);

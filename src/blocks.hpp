@@ -54,6 +54,8 @@ struct BlockTypes {
 		uint8_t				absorb = MAX_LIGHT_LEVEL;   // how mich light level to absorb (MAX_LIGHT_LEVEL to make block opaque to light)
 		
 		SoundSet*			step_sound = nullptr;
+		float				fluid_density = 0;
+		float				volume_drag = 0;
 
 		AABB get_local_aabb () const {
 			return { float3(0), float3(1) };
