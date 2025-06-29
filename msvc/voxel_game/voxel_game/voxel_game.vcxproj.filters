@@ -294,6 +294,9 @@
     <ClInclude Include="..\..\..\..\libs\tracy\public\tracy\Tracy.hpp">
       <Filter>engine\tracy</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\src\engine\imgui\curve_edit.hpp">
+      <Filter>engine\imgui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="game">

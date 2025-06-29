@@ -154,6 +154,9 @@ void Game::imgui () {
 }
 
 void Game::frame () {
+	static AnimCurve curve;
+	curve.imgui("curve");
+
 	audio->update_volumes();
 
 	g_debugdraw.clear();

@@ -174,7 +174,7 @@ public:
 	ListenerMovementWindSounds move_wind_sounds;
 
 	void _dbg_apply_forw_impulse (Input& I) {
-		static float _impulse = 50;
+		static float _impulse = 20;
 		ImGui::DragFloat("_impulse", &_impulse, 0.1f);
 
 		if (I.buttons[KEY_U].went_down) {

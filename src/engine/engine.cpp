@@ -669,11 +669,29 @@ void Engine::draw_imgui () {
 	_need_to_draw_imgui = false;
 }
 
-//void clear_window_color (GLFWwindow* window) {
-//	glClearColor(0.02f, 0.03f, 0.05f, 1.0f);
-//	glClear(GL_COLOR_BUFFER_BIT);
-//	glfwSwapBuffers(window);
-//}
+struct WindowClearer {
+	// Load OpenGL function pointers manually to enable clearing window before real opengl renderer is created
+	// (since it wants to init only after assets are loaded)
+	// Could use a few more functions to display simple loading screen,
+	// but at some point should probably just make the renderer be able to start up without assets loaded yet
+	PFNGLCLEARCOLORPROC _glClearColor;
+	PFNGLCLEARPROC _glClear;
+
+	void clear_window_color (GLFWwindow* window) {
+		if (_glClearColor && _glClear) {
+			_glClearColor(0.02f, 0.03f, 0.05f, 1.0f);
+			_glClear(GL_COLOR_BUFFER_BIT);
+			glfwSwapBuffers(window);
+		}
+	}
+
+	WindowClearer (GLFWwindow* window) {
+		glfwMakeContextCurrent(window);
+
+		_glClearColor = (PFNGLCLEARCOLORPROC)glfwGetProcAddress("glClearColor");
+		_glClear = (PFNGLCLEARPROC)glfwGetProcAddress("glClear");
+	}
+};
 
 Engine::Engine (const char* window_title) {
 	ZoneScoped;
@@ -682,7 +700,8 @@ Engine::Engine (const char* window_title) {
 
 	window_setup(*this, window_title);
 	
-	//clear_window_color(window); // hide the ugly white rectangle on black background that happens due to loading time of the game
+	WindowClearer clearer(window);
+	clearer.clear_window_color(window); // hide the ugly white rectangle on black background that happens due to loading time of the game
 
 	{ // load window placement
 		HWND hwnd = glfwGetWin32Window(window);
@@ -692,7 +711,7 @@ Engine::Engine (const char* window_title) {
 		}
 	}
 
-	//clear_window_color(window);
+	clearer.clear_window_color(window);
 }
 Engine::~Engine () {
 	ZoneScoped;

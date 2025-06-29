@@ -60,7 +60,7 @@ struct PhysicsObject {
 struct World;
 
 struct Physics {
-	float3 grav_accel = float3(0, 0, -15);
+	float3 grav_accel = float3(0, 0, -16);
 
 	float min_speed = 0.001f;
 	float max_speed = 1000;
@@ -417,7 +417,7 @@ struct Physics {
 		for (int x=start.x; x<end.x; ++x) {
 			auto bid = chunks.read_block(x,y,z);
 
-			if (bid == B_NULL) break; // for debugging: colliding with unloaded chunk voxels is confusing for debugging, but in practice this might actually be desired
+			//if (bid == B_NULL) break; // for debugging: colliding with unloaded chunk voxels is confusing for debugging, but in practice this might actually be desired
 			
 			float3 vox_origin = (float3)int3(x,y,z);
 			float3 box0 = aabb0 - vox_origin;
@@ -573,7 +573,7 @@ struct Physics {
 			break;
 		}
 
-		float obj_dens = 0.97f;
+		float obj_dens = 0.94f;
 
 		// TODO: do this at beginning of frame with previous frame data? That requires storing this data though...
 		// Currently this results in 'wrong' velocities
@@ -674,23 +674,5 @@ public:
 		flying_main.set_playing(test_active);
 		flying_whoosh.set_playing(test_active);
 		flying_cloth_flutter.set_playing(test_active);
-		
-		static constexpr int COUNT = 128;
-		static float main_vols[COUNT] = {};
-		static float main_pitchs[COUNT] = {};
-		static int cur = 0;
-		
-		main_vols[cur] = main_vol;
-		main_pitchs[cur] = main_pitch;
-		cur = (cur+1) % COUNT;
-
-		if (ImGui::Begin("ListenerMovementWindSounds")) {
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PlotLines("###_main_vol", main_vols, COUNT, cur, "main_vol", 0, 2, ImVec2(0, 80));
-			
-			ImGui::SetNextItemWidth(-1);
-			ImGui::PlotLines("###_main_pitch", main_pitchs, COUNT, cur, "main_pitch", 0, 2, ImVec2(0, 80));
-		}
-		ImGui::End();
 	}
 };

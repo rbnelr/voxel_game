@@ -63,6 +63,7 @@
 
 #include "tracy/Tracy.hpp"
 #include "imgui/dear_imgui.hpp"
+#include "imgui/curve_edit.hpp"
 #include "engine.hpp"
 
 #define SERIALIZE_LOG(type, ...) log(type, __VA_ARGS__)

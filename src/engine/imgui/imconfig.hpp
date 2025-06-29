@@ -62,8 +62,8 @@
 
 //---- Avoid multiple STB libraries implementations, or redefine path/filenames to prioritize another version
 // By default the embedded implementations are declared static and not available outside of Dear ImGui sources files.
-#define IMGUI_STB_TRUETYPE_FILENAME   "../kisslib/stb/stb_truetype.h"
-#define IMGUI_STB_RECT_PACK_FILENAME  "../kisslib/stb/stb_rect_pack.h"
+#define IMGUI_STB_TRUETYPE_FILENAME   "stb_truetype.h"
+#define IMGUI_STB_RECT_PACK_FILENAME  "stb_rect_pack.h"
 //#define IMGUI_STB_SPRINTF_FILENAME    "my_folder/stb_sprintf.h"    // only used if enabled
 //#define IMGUI_DISABLE_STB_TRUETYPE_IMPLEMENTATION
 //#define IMGUI_DISABLE_STB_RECT_PACK_IMPLEMENTATION

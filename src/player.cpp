@@ -103,7 +103,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 		//log("Landed impact_impulse: %f", impact_impulse);
 
-		// Landing sound, two makes it stronger (good idea?)
+		// Landing sound, two makes it stronger and actually sounds like two feet landing
 		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
 		obj.grounded.trigger_step_sound(audio_stren, 0.95f);
 	};
