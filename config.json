@@ -110,9 +110,9 @@
 	},
 	"player": {
 		"pos": [
-			308.5523376464844,
-			1174.0596923828125,
-			-12.0
+			-55.049007415771484,
+			-54.596431732177734,
+			-114.0
 		],
 		"vel": [
 			0.0,
@@ -120,8 +120,8 @@
 			0.0
 		],
 		"rot_ae": [
-			-1.639981746673584,
-			-0.21779946982860565
+			-0.997727632522583,
+			-0.3841216564178467
 		],
 		"crouching_progress": 0.0,
 		"third_person": false,
@@ -153,7 +153,8 @@
 			"walk_accel_scaled": 2.0,
 			"walk_accel_boost": 50.0,
 			"air_control_accel_base": 2.0,
-			"crouch_transition_speed": 7.0
+			"crouch_transition_speed": 7.0,
+			"swimming_force": 2.0
 		}
 	},
 	"activate_flycam": false,

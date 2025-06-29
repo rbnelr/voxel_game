@@ -59,6 +59,7 @@ public:
 	// Results from previous frame physics needed before physics for character movement
 	GroundedInfo grounded = {};
 	bool buried = true;
+	float submerged_ratio = 0;
 
 	// Visual direction of body (only for first and third person body and arms)
 	float2 body_rot = INF;
@@ -134,7 +135,7 @@ public:
 	struct MovementParams {
 		SERIALIZE(MovementParams, walk_speed, crouch_speed, run_speed, allow_backwards_sprint,
 			walk_accel_scaled_max, walk_accel_scaled, walk_accel_boost,
-			air_control_accel_base, crouch_transition_speed)
+			air_control_accel_base, crouch_transition_speed, swimming_force)
 
 		float walk_speed = 3.5f;
 		float crouch_speed = 1.2f;
@@ -148,6 +149,8 @@ public:
 		float air_control_accel_base = 1;
 
 		float crouch_transition_speed = 10;
+
+		float swimming_force = 4;
 		
 		void imgui () {
 			if (ImGui::TreeNode("Movement Params")) {
@@ -162,6 +165,8 @@ public:
 				ImGui::DragFloat("air_control_accel_base", &air_control_accel_base, 0.05f);
 
 				ImGui::DragFloat("crouch_transition_speed", &crouch_transition_speed, 0.1f);
+
+				ImGui::DragFloat("swimming_force", &swimming_force, 0.1f);
 
 				ImGui::TreePop();
 			}

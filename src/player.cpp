@@ -7,6 +7,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	ZoneScoped;
 	
 	//// walking
+	float3x3 look_rot = look_rotation();
 	float2x2 body_rotation2d = rotate2(rot_ae.x);
 	float3 prev_vel = vel;
 	float cur_speed = length(vel);
@@ -86,6 +87,25 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		vel += float3(delta_vel, 0);
 	};
 
+	auto player_swim_dynamics = [&] () {
+		//float max_swim_speed = m.walk_speed; // enforce this?
+		// since fluids have lots of drag anyway, assume can't get too fast anyway
+		// but could happen if low density fluid is created (maybe scale swim accel by fluid density?)
+
+		float2 swim2d = inp.move_dir;
+		float3 swim3d = look_rot * float3(swim2d.x, 0, -swim2d.y);
+		if (inp.jump_held) swim3d.z += 1;
+		if (inp.crouch_button.is_down) swim3d.z -= 1;
+		// normalize result of view relative wasd swimming + up/down movement
+		swim3d = normalizesafe(swim3d);
+
+		float3 accel = swim3d * m.swimming_force;
+		float3 delta_vel = accel * I.dt;
+		vel += delta_vel;
+		
+		apply_head_bob_impulse(-delta_vel);
+	};
+
 	auto do_jump = [&] () {
 		float3 jump_impulse = float3(0,0, g->physics->jump_impulse_for_jump_height(1.15f)); // jump height based on the default gravity, tweaked gravity will change the jump height
 
@@ -109,7 +129,16 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	};
 	
 	player_crouching();
-	player_walk_dynamics();
+
+	if (submerged_ratio < 0.75f) {
+		// allow walking if not swimming and grounded
+		// and some air control if not swimming and not grounded
+		player_walk_dynamics();
+	}
+	else {
+		ImGui::Text("submerged_ratio: %f", submerged_ratio);
+		player_swim_dynamics();
+	}
 
 	_dbg_apply_forw_impulse(I);
 
@@ -150,6 +179,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	vel = obj.vel;
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
 	buried = obj.buried;
+	submerged_ratio = obj.submerged_ratio;
 
 	cur_speed = length(vel);
 	float cur_speed2d = length((float2)vel);

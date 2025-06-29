@@ -54,6 +54,8 @@ struct PhysicsObject {
 	GroundedInfo grounded;
 	bool buried;
 
+	float submerged_ratio;
+	float total_fluid_volume;
 	float avg_fluid_mass;
 	float avg_fluid_drag;
 };
@@ -454,8 +456,10 @@ struct Physics {
 					float overlap_volume = overlap.x * overlap.y * overlap.z;
 
 					// Fluids are allow buoyancy
-					if (bt.collision == CM_LIQUID)
+					if (bt.collision == CM_LIQUID) {
+						obj.total_fluid_volume += overlap_volume;
 						obj.avg_fluid_mass += bt.fluid_density * overlap_volume;
+					}
 					// Fluids and permeable blocks 
 					obj.avg_fluid_drag += bt.volume_drag * overlap_volume;
 
@@ -529,6 +533,7 @@ struct Physics {
 		// This would likely not be the case for particles, seemingly allowing us to get away with less iterations for them
 		// but would suddenly break the moment more external forces are introduced (or gravity points in other directions)
 		for (int i=0; i<3; i++) {
+			obj.total_fluid_volume = 0;
 			obj.avg_fluid_mass = 0;
 			obj.avg_fluid_drag = 0;
 	
@@ -568,7 +573,9 @@ struct Physics {
 		float3 aabb_sz = obj.local_aabb.hi - obj.local_aabb.lo;
 		float obj_volume = aabb_sz.x * aabb_sz.y * aabb_sz.z;
 		
-		float obj_dens = 0.94f;
+		obj.submerged_ratio = obj.total_fluid_volume / obj_volume;
+		
+		float obj_dens = 0.97f;
 		float avg_fluid_dens = obj.avg_fluid_mass / obj_volume;
 		float avg_fluid_drag = obj.avg_fluid_drag / obj_volume;
 

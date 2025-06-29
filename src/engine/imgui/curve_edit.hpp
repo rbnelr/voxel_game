@@ -124,6 +124,10 @@ struct AnimCurve {
 	#endif
 	}
 	
+	float2 get_rangeX () {
+		if (keys.size() <= 0) return 1;
+		return float2(keys.front().x, keys.back().x);
+	}
 	ImRect get_range (float extend_relative=0) {
 		//assert((int)keys.size() >= 1);
 		ImRect res(ImVec2(0,0), ImVec2(1,1));
@@ -156,6 +160,8 @@ struct AnimCurve {
 	bool imgui (const char* label) {
 		bool changed = false;
 
+		ImGui::PushID(label);
+
 		ImGui::SetNextItemWidth(-1);
 		auto rang = get_range(0.1f);
 		int resX = (int)(ImGui::GetContentRegionAvail().x / 2.0f);
@@ -170,13 +176,14 @@ struct AnimCurve {
 			return (*static_cast<decltype(getter)*>(data))(idx);
 		};
 
-		ImGui::PlotLines("###_debug_vel", getter2, &getter, resX, 0, "Curve", rang.Min.y, rang.Max.y, ImVec2(0, 25));
+		ImGui::PlotLines("###plot_lines", getter2, &getter, resX, 0, label, rang.Min.y, rang.Max.y, ImVec2(0, 25));
 		if (_BeginPopupContextWindow(NULL, ImVec2(600, 400),
 				ImGuiPopupFlags_MouseButtonLeft | ImGuiPopupFlags_MouseButtonRight)) {
 			changed = _popup() || changed;
 			ImGui::EndPopup();
 		}
-
+		
+		ImGui::PopID();
 		return changed;
 	}
 	bool _popup () {
@@ -215,7 +222,8 @@ struct AnimCurve {
 		auto curve_color = ImColor(_curve_color);
 		auto curve_colorG = ImColor(ImVec4(_curve_color.x, _curve_color.y, _curve_color.z, 0.4f));
 
-		static ImRect view_range = get_range(0.1f);
+		//static ImRect view_range = get_range(0.1f);
+		ImRect view_range = get_range(0.1f);
 		//ImRect curv_range = get_range(0.1f);
 
 		ImRect bbFlippedY = ImRect(ImVec2(bb.Min.x, bb.Max.y), ImVec2(bb.Max.x, bb.Min.y));
