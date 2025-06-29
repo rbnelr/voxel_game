@@ -72,7 +72,8 @@ public:
 
 	// Make head bob to react to worldspace velocity change
 	void apply_head_bob_impulse (float3 delta_vel);
-	void update_walking_step_bob (Input& I, float2x2 body_rotation2d, float cur_speed2d, PhysicsObject& phys);
+	void update_walking_step_bob (Input& I, float2x2 body_rotation2d,
+		float step_speed, GroundedInfo& grounded);
 	void update_view_dynamics (Input& I);
 
 	
@@ -240,7 +241,7 @@ public:
 		ButtonState build_button;
 
 		float2 move_dir;
-		bool jump_held;
+		ButtonState jump_button;
 		bool sprint;
 
 		ButtonState crouch_button;
@@ -282,7 +283,7 @@ public:
 			if (I.buttons[KEY_S].is_down) inp.move_dir.y -= 1;
 			if (I.buttons[KEY_W].is_down) inp.move_dir.y += 1;
 
-			inp.jump_held = I.buttons[KEY_SPACE].is_down;
+			inp.jump_button = I.buttons[KEY_SPACE];
 			inp.sprint    = I.buttons[KEY_LEFT_SHIFT].is_down;
 
 			//// look

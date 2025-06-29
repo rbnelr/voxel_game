@@ -69,22 +69,52 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 		float target_speed = do_sprint ? m.run_speed : walk_or_crouch_speed;
 
 		float2 target_vel = body_rotation2d * (normalizesafe(inp.move_dir) * target_speed);
-
 		float2 delta_vel = target_vel - (float2)vel;
 		float delta_speed = length(delta_vel);
 		
+		// scale down velocity change control on slippery surfaces
+		float slip = grounded.slip_factor();
+
+		bool no_input = length_sqr(target_vel) <= 0.1f;
+
 		float move_accel = 0;
 		if (grounded) {
 			// scale acceleration to higher when standing still, and lower when close to target speed
 			float control_fac = 1.0f - smoothstep(clamp(cur_speed / (m.walk_speed*2), 0.0f, 1.0f));
 			float linear_boost = m.walk_accel_boost * pow(control_fac, 3.0f);
 			move_accel = min(pow(delta_speed, 1.5f) * m.walk_accel_scaled, m.walk_accel_scaled_max) + linear_boost;
-		}
+			
+			// slip=1: no input slows down automatically (but counterstrafing allows stopping it faster)
+			// slip=0: no input means keep slipping for very long
+			if (no_input) slip *= slip;
 
-		move_accel = max(move_accel, m.air_control_accel_base);
+			move_accel *= slip;
+		}
+		else {
+			move_accel = m.air_control_accel_base;
+		}
 
 		delta_vel = normalizesafe(delta_vel) * min(move_accel * I.dt, delta_speed);
 		vel += float3(delta_vel, 0);
+
+	////
+
+		cur_speed = length(vel);
+		float cur_speed2d = length((float2)vel);
+
+		float walking_ang = atan2f(-vel.x, vel.y);
+		float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
+		float facing_ang = lerp_angle(rot_ae.x, walking_ang, anim_fac * 0.5f);
+
+		// slip=1: steps takes into account the actual distance walked (feed don't slip)
+		// slip=0: steps work based on how much we are trying to change direction (delta can be higher than running speed)
+		// this makes it kinda cartoon-style funny when walking on ice
+		float slip_fast_steps = 0.0f;
+		if (!no_input) slip_fast_steps = clamp(delta_speed*1.5f, 1.0f, m.run_speed*1.5f);
+		float step_speed = lerp(slip_fast_steps, cur_speed2d, slip);
+		update_walking_step_bob(I, body_rotation2d, step_speed, grounded);
+
+		update_body_dynamics(I, facing_ang);
 	};
 
 	auto player_swim_dynamics = [&] () {
@@ -94,7 +124,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 
 		float2 swim2d = inp.move_dir;
 		float3 swim3d = look_rot * float3(swim2d.x, 0, -swim2d.y);
-		if (inp.jump_held) swim3d.z += 1;
+		if (inp.jump_button  .is_down) swim3d.z += 1;
 		if (inp.crouch_button.is_down) swim3d.z -= 1;
 		// normalize result of view relative wasd swimming + up/down movement
 		swim3d = normalizesafe(swim3d);
@@ -143,7 +173,7 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	_dbg_apply_forw_impulse(I);
 
 	//// jumping
-	if (inp.jump_held/*went_down*/ && grounded && !buried && !is_crouched()) {
+	if (inp.jump_button.went_down && grounded && !buried && !is_crouched()) {
 		do_jump();
 	}
 
@@ -180,17 +210,6 @@ void Player::update_movement (Input& I, Player::PlayerInput& inp) {
 	grounded = obj.grounded; // in theory still valid for next frame, at least if no voxel changes?
 	buried = obj.buried;
 	submerged_ratio = obj.submerged_ratio;
-
-	cur_speed = length(vel);
-	float cur_speed2d = length((float2)vel);
-
-	float walking_ang = atan2f(-vel.x, vel.y);
-	float anim_fac = clamp(map(cur_speed2d, m.walk_speed, m.run_speed), 0.0f, 1.0f);
-	float facing_ang = lerp_angle(rot_ae.x, walking_ang, anim_fac * 0.5f);
-
-	update_walking_step_bob(I, body_rotation2d, cur_speed2d, obj);
-
-	update_body_dynamics(I, facing_ang);
 
 	//apply_head_bob_impulse(vel - prev_vel); // full accel as impulse for luls
 	update_view_dynamics(I);
@@ -268,26 +287,28 @@ void Player::update_body_dynamics (Input& I, float facing_ang) {
 		deg(float2(-90, +90)), deg(float2(-60, +70)));
 }
 
-void Player::update_walking_step_bob (Input& I, float2x2 body_rotation2d, float cur_speed2d, PhysicsObject& phys) {
-	if (!grounded) {
+// TODO: cur_speed2d should be 
+void Player::update_walking_step_bob (Input& I, float2x2 body_rotation2d,
+		float step_speed, GroundedInfo& grounded) {
+	if (!grounded || step_speed < 0.01f) {
 		// need to take full step again after landing, and no steps in air!
 		walking_step_bob_counter = 0;
 		return;
 	}
 	
-	bool is_sprinting = cur_speed2d > movement_params.walk_speed;
+	bool is_sprinting = step_speed > movement_params.walk_speed;
 	float step_len;
 	if (is_crouched())     step_len = visual_dynamics.step_length_crouch;
 	else if (is_sprinting) step_len = visual_dynamics.step_length_sprint;
 	else                   step_len = visual_dynamics.step_length;
 
-	walking_step_bob_counter += cur_speed2d * I.dt;
+	walking_step_bob_counter += step_speed * I.dt;
 	if (walking_step_bob_counter > step_len) {
 		walking_step_bob_counter = wrap(walking_step_bob_counter, step_len);
 
 		float effect_scale;
 		if (is_crouched()) effect_scale = 0.3f;
-		else effect_scale = clamp(cur_speed2d / movement_params.walk_speed, 0.5f, 1.8f);
+		else effect_scale = clamp(step_speed / movement_params.walk_speed, 0.5f, 1.8f);
 
 		float stren = visual_dynamics.step_head_bob_strength * effect_scale;
 		float side = walking_step_bob_foot ? -1.0f : +1.0f;
@@ -301,7 +322,7 @@ void Player::update_walking_step_bob (Input& I, float2x2 body_rotation2d, float 
 			apply_head_bob_impulse(bob_impulse);
 		}
 
-		phys.grounded.trigger_step_sound(effect_scale);
+		grounded.trigger_step_sound(effect_scale);
 	}
 }
 

@@ -26,8 +26,9 @@ struct CollisionResponse {
 
 struct GroundedInfo {
 
-	bool grounded;
+	bool grounded = false;
 	int3 vox = INT_MIN;
+	float overlap_area = 0;
 	block_id bid = B_NULL;
 	
 	void trigger_step_sound (float volume, float set_pitch = -1) {
@@ -39,6 +40,13 @@ struct GroundedInfo {
 		auto* sounds = g->assets->block_types[bid].step_sound;
 		if (sounds)
 			sounds->play_random_once(volume, pitch);
+	}
+
+	// friction < 1: less grip for walking logic
+	float slip_factor () {
+		if (!grounded) return 1.0f;
+		auto& fric = g->assets->block_types[bid].friction;
+		return min(fric, 1.0f);
 	}
 
 	operator bool () { return grounded; }
@@ -425,16 +433,19 @@ struct Physics {
 			if (!voxel_box_cast(box0, box1, obj.vel, vox0, vox1, &hit)) {
 				continue;
 			}
+			
+			// overlap AABB
+			float3 l = max(vox0, box0);
+			float3 h = min(vox1, box1);
+			float3 overlap = h - l;
 
 			if (bt.collision == CM_SOLID) {
-				
-				// Ugh, another reason why earliest hit response sucks
-				// Later hits can be the one that are closer to player feet and thus where we might want to play sounds from
-				bool standing_directly_on = rel.x >= vox0.x && rel.x < vox1.x &&
-				                            rel.y >= vox0.y && rel.y < vox1.y;
-				bool is_grounded = hit.normal.z > 0.0f;
-				if (standing_directly_on && is_grounded)
+				// record voxel standing 'the most', ie count where center of player stands on unless that is off of edge
+				float overlap_area = overlap.x * overlap.y;
+				if (overlap_area > obj.grounded.overlap_area && hit.normal.z > 0.0f) {
 					obj.grounded.vox = int3(x,y,z);
+					obj.grounded.overlap_area = overlap_area;
+				}
 
 				if (collision_debug)
 					g_debugdraw.wire_cube((float3)int3(x,y,z) + 0.5f, 0.98f, hit.buried ? srgba(255,255,0,200) : srgba(255,0,0,200));
@@ -448,11 +459,7 @@ struct Physics {
 					vox1.z = 0.9f; // water has lower top TODO: make this better
 				// Ignoring gas above water entirely right now
 
-				// overlap AABB
-				float3 l = max(vox0, box0);
-				float3 h = min(vox1, box1);
 				if (l.x < h.x && l.y < h.y && l.z < h.z) {
-					float3 overlap = h - l;
 					float overlap_volume = overlap.x * overlap.y * overlap.z;
 
 					// Fluids are allow buoyancy
@@ -461,7 +468,7 @@ struct Physics {
 						obj.avg_fluid_mass += bt.fluid_density * overlap_volume;
 					}
 					// Fluids and permeable blocks 
-					obj.avg_fluid_drag += bt.volume_drag * overlap_volume;
+					obj.avg_fluid_drag += bt.friction * overlap_volume;
 
 					float3 p = vox_origin + (l+h)/2;
 					g_debugdraw.wire_cube(p, overlap, srgba(255,100,40,100));
@@ -595,7 +602,7 @@ struct Physics {
 			if (speedsq > min_speed*min_speed) {
 
 				// fluid drag
-				float decel = fluid_drag_decel(speedsq, obj.drag_coeff, avg_fluid_drag);
+				float decel = fluid_drag_decel(speedsq, obj.drag_coeff, avg_fluid_drag * 100);
 				// air drag (technically not correct as this applies even if fully submerged in fluid)
 				decel +=      fluid_drag_decel(speedsq, obj.drag_coeff);
 
@@ -607,12 +614,7 @@ struct Physics {
 			obj.grounded.bid = g->chunks->read_block(obj.grounded.vox);
 		}
 
-		// if remaining time, ignore it to prefer non-clipping to executing full movement speed
-		// but could consider capping velocity to reflect missing movement step
-
-
-		//static int frame_counter = 0;
-		//log("%5d: pos.z: %7.4f vel.z: %7.4f %s", frame_counter++, obj.pos.z, obj.vel.z,
+		//log("pos.z: %7.4f vel.z: %7.4f %s", obj.pos.z, obj.vel.z,
 		//	obj.grounded ? "(grounded)":"");
 	}
 };
