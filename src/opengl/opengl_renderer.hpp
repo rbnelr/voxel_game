@@ -4,16 +4,19 @@
 #include "renderer.hpp"
 #include "opengl_helper.hpp"
 #include "opengl_shaders.hpp"
-#include "gl_chunk_renderer.hpp"
-#include "gl_raytracer.hpp"
 #include "gl_dbg_draw.hpp"
 #include "input.hpp"
-#include "opengl/radiance_cascades.hpp"
-#include "GLFW/glfw3.h"
-#include "imgui/imgui_impl_glfw.h"
-#include "imgui/imgui_impl_opengl3.h"
+#include "assets.hpp"
+#include "player.hpp"
 
 namespace gl {
+
+struct ChunkRenderer;
+struct Raytracer;
+struct PlayerRenderer;
+struct GuiRenderer;
+class RadianceCascades2D;
+class RadianceCascades3D;
 
 // mesh has to be bound
 inline void draw_submesh (GenericSubmesh submesh) {
@@ -90,103 +93,6 @@ struct CommonUniforms {
 	ViewUniforms view;
 };
 
-struct BlockHighlight {
-	Shader*					shad;
-	BlockHighlightSubmeshes	block_highl;
-
-	BlockHighlight (Shaders& shaders) {
-		shad = shaders.compile("block_highlight");
-	}
-	void draw (OpenglRenderer& r, SelectedBlock& block);
-};
-
-struct GuiRenderer {
-	Shader*			gui_shad;
-	Sampler			gui_sampler = {"gui_sampler"};
-
-	struct GUIVertex {
-		float2 pos; // 2d because we display 2d gui
-		float3 normal; // but still 3d normals for a bit of lighting on the pseudo 3d cubes for blocks
-		float3 uvi; // z is tile texture index, -1 means gui texture
-		
-		template <typename ATTRIBS>
-		static void attributes (ATTRIBS& a) {
-			int loc = 0;
-			a.init(sizeof(GUIVertex));
-			a.template add<AttribMode::FLOAT, decltype(pos   )>(loc++, "pos"   , offsetof(GUIVertex, pos   ));
-			a.template add<AttribMode::FLOAT, decltype(normal)>(loc++, "normal", offsetof(GUIVertex, normal));
-			a.template add<AttribMode::FLOAT, decltype(uvi   )>(loc++, "uvi"   , offsetof(GUIVertex, uvi   ));
-		}
-	};
-
-	IndexedBuffer	gui_ib	= indexed_buffer<GUIVertex>("GUIRenderer.gui_vbo");
-
-	std::vector<GUIVertex> gui_vertex_data;
-	std::vector<uint16_t> gui_index_data;
-
-	// allocate vertices for N quads (4 each) and already fill indices for them
-	GUIVertex* push_quads (int count) {
-		size_t base_idx = gui_vertex_data.size();
-		gui_vertex_data.resize(base_idx + 4*count);
-		auto* verts = &gui_vertex_data[base_idx];
-
-		size_t idx_offs = gui_index_data.size();
-		gui_index_data.resize(idx_offs + 6*count);
-		auto* indices = &gui_index_data[idx_offs];
-
-		for (int j=0; j<count; ++j) {
-			for (int i=0; i<6; ++i) {
-				*indices++ = (uint16_t)(base_idx + j*4 + QUAD_INDICES[i]);
-			}
-		}
-
-		return verts;
-	}
-
-	struct AtlasUVs {
-		float2 pos;
-		float2 size;
-	};
-	static constexpr AtlasUVs crosshair_uv			= { float2(   0,    0)   ,    32    };
-	static constexpr AtlasUVs frame_uv				= { float2(32*1,    0) +6,    16 +4 };
-	static constexpr AtlasUVs frame_highl_uv		= { float2(32*2,    0) +6,    16 +4 };
-	static constexpr AtlasUVs frame_grabbed_uv		= { float2(32*2, 32*1) +6,    16 +4 };
-	static constexpr AtlasUVs frame_selected_uv		= { float2(32*3,    0) +4,    16 +8 };
-
-	int gui_scale = 4;
-	bool crosshair = false;
-
-	// render quad with pixel coords
-	void draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv);
-	void draw_item_quad (float2 const& pos, float2 const& size, item_id item);
-
-	GuiRenderer (Shaders& shaders) {
-		gui_shad = shaders.compile("gui");
-
-		glSamplerParameteri(gui_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glSamplerParameteri(gui_sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glSamplerParameteri(gui_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSamplerParameterf(gui_sampler, GL_TEXTURE_MAX_ANISOTROPY, 1);
-	}
-	void draw_gui (OpenglRenderer& r, Input& I);
-
-	void update_gui (Input& I);
-};
-
-// Drawing of meshes that are displayed in first and third person for now
-struct PlayerRenderer {
-	Shader*			held_block_shad;
-	Shader*			held_item_shad;
-
-	PlayerRenderer (Shaders& shaders) {
-		held_block_shad    = shaders.compile("held_block");
-		held_item_shad     = shaders.compile("held_item");
-	}
-	void draw (OpenglRenderer& r);
-
-};
-
 // Need to wrap opengl context init into class to make it run before other class member initializers which depend on gl calls
 class OpenglRenderer;
 
@@ -197,14 +103,10 @@ public:
 
 class OpenglRenderer : public Renderer {
 public:
-	SERIALIZE(OpenglRenderer, chunk_renderer, raytracer, debug_draw, fog, rc2D, rc3D)
+	#define SERIALIZE_OpenglRenderer chunk_renderer, raytracer, debug_draw, fog, rc2D, rc3D
 
-	virtual void deserialize (nlohmann::ordered_json const& j) {
-		j.get_to(*this);
-		// take vsync into account
-		set_vsync(vsync);
-	}
-	virtual void serialize (nlohmann::ordered_json& j) { j = *this; }
+	virtual void deserialize (nlohmann::ordered_json const& j);
+	virtual void serialize (nlohmann::ordered_json& j);
 	
 	OpenglContext ctx;
 
@@ -235,12 +137,10 @@ public:
 	bool			trigger_screenshot = false;
 	bool			screenshot_hud = false;
 
-	ChunkRenderer	chunk_renderer	= ChunkRenderer(shaders);
-	PlayerRenderer	player_rederer	= PlayerRenderer(shaders);
-	Raytracer		raytracer		= Raytracer(shaders);
-
-	BlockHighlight	block_highl		= BlockHighlight(shaders);
-	GuiRenderer		gui_renderer	= GuiRenderer(shaders);
+	std::unique_ptr<ChunkRenderer>  chunk_renderer;
+	std::unique_ptr<Raytracer>      raytracer;
+	std::unique_ptr<PlayerRenderer> player_rederer;
+	std::unique_ptr<GuiRenderer>    gui_renderer;
 
 	Ubo				common_uniforms_ubo = {"common_ubo"};
 
@@ -290,17 +190,11 @@ public:
 	};
 	Fog fog;
 
-	RadianceCascades2D rc2D = RadianceCascades2D(*this);
-	RadianceCascades3D rc3D = RadianceCascades3D(*this);
+	std::unique_ptr<RadianceCascades2D> rc2D;
+	std::unique_ptr<RadianceCascades3D> rc3D;
 
-	virtual bool get_vsync () {
-		return vsync;
-	}
-	virtual void set_vsync (bool state) {
-		ZoneScoped;
-		glfwSwapInterval(state ? _vsync_on_interval : 0);
-		vsync = state;
-	}
+	virtual bool get_vsync ();
+	virtual void set_vsync (bool state);
 
 
 	void update_view (Camera_View const& view, int2 viewport_size, float3 lod_center) {
@@ -320,40 +214,9 @@ public:
 
 	virtual void render_frame (Game& game);
 
-	virtual void screenshot_imgui () {
-		trigger_screenshot = ImGui::Button("Screenshot [F8]") || g->input.buttons[KEY_F8].went_down;
-		ImGui::SameLine();
-		ImGui::Checkbox("With HUD", &screenshot_hud);
-	}
-	virtual void graphics_imgui () {
-		ImGui::Checkbox("rc2D", &rc2D.imopen);
-		ImGui::Checkbox("rc3D", &rc3D.imopen);
-		rc2D.imgui();
-		rc3D.imgui();
-
-		if (ImGui::TreeNode("Debug Draw")) {
-			debug_draw.imgui();
-
-			ImGui::TreePop();
-		}
-
-		ImGui::Checkbox("draw_chunks", &chunk_renderer._draw_chunks);
-
-		if (ImGui::TreeNode("GUI")) {
-			ImGui::Checkbox("crosshair", &gui_renderer.crosshair);
-			ImGui::SliderInt("gui_scale", &gui_renderer.gui_scale, 1, 16);
-
-			ImGui::TreePop();
-		}
-
-		fog.imgui();
-
-		raytracer.imgui(g->input);
-	}
-
-	virtual void chunk_renderer_imgui (Chunks& chunks) {
-		chunk_renderer.imgui(chunks);
-	}
+	virtual void screenshot_imgui ();
+	virtual void graphics_imgui ();
+	virtual void chunk_renderer_imgui (Chunks& chunks);
 	
 	virtual bool update_files_changed (kiss::ChangedFiles& changed_files) {
 		

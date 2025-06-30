@@ -22,16 +22,7 @@
     <ClCompile Include="..\..\..\src\assets.cpp">
       <Filter>game\systems</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
-      <Filter>opengl</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
-      <Filter>opengl</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
-      <Filter>opengl</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp">
       <Filter>opengl</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp">
@@ -296,6 +287,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\src\engine\imgui\curve_edit.hpp">
       <Filter>engine\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\src\opengl\player_renderer.hpp">
+      <Filter>opengl</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

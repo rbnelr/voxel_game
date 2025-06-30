@@ -157,8 +157,20 @@ namespace nlohmann {
 			j = *val;
 		}
 		static void from_json(const ordered_json& j, type& val) {
-			val = std::make_unique<T>();
-			j.get_to(*val);
+			//val = std::make_unique<T>();
+			// avoid problem where classes get recreated even though they alreay exists,
+			// which I think is not a problem with by-value
+			// allocating if does not exist is probably fine
+			if constexpr (std::is_default_constructible_v<T>) {
+				if (val == nullptr)
+					val = std::make_unique<T>();
+				// TODO: can json values be null? if yes should we make existing pointers null?
+				j.get_to(*val);
+			}
+			else {
+				if (val != nullptr)
+					j.get_to(*val);
+			}
 		}
 	};
 	

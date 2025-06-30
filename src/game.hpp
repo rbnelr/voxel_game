@@ -17,7 +17,7 @@ class Player;
 class Renderer;
 
 class Game : public Engine {
-	#define SERIALIZE_NORMAL world_gen, chunks,\
+	#define SERIALIZE_Game audio, world_gen, chunks,\
 		cam_binds, flycam, player, activate_flycam, lod_follow_flycam,\
 		imopen
 public:

@@ -79,20 +79,8 @@
     <ClCompile Include="..\..\..\src\game.cpp" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad.c" />
     <ClCompile Include="..\..\..\src\opengl\glad\glad_wgl.c" />
-    <ClCompile Include="..\..\..\src\opengl\gl_chunk_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\gl_dbg_draw.cpp" />
-    <ClCompile Include="..\..\..\src\opengl\gl_raytracer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
     <ClCompile Include="..\..\..\src\opengl\opengl_renderer.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\..\..\src\opengl\radiance_cascades.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">common.hpp</PrecompiledHeaderFile>
     </ClCompile>
@@ -156,6 +144,7 @@
     <ClInclude Include="..\..\..\src\opengl\opengl_helper.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\opengl_shaders.hpp" />
+    <ClInclude Include="..\..\..\src\opengl\player_renderer.hpp" />
     <ClInclude Include="..\..\..\src\opengl\radiance_cascades.hpp" />
     <ClInclude Include="..\..\..\src\opengl\shader_preprocessor.hpp" />
     <ClInclude Include="..\..\..\src\physics.hpp" />

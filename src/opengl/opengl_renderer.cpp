@@ -1,13 +1,28 @@
 #include "common.hpp"
 #include "opengl_renderer.hpp"
-#include "items.hpp"
-#include "game.hpp"
-#include "player.hpp"
+#include "gl_chunk_renderer.hpp"
+#include "gl_raytracer.hpp"
+#include "player_renderer.hpp"
+#include "radiance_cascades.hpp"
 
 #include "GLFW/glfw3.h" // include after glad
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 namespace gl {
 	
+void OpenglRenderer::deserialize (nlohmann::ordered_json const& j) {
+	auto& t = *this;
+	_JSON_EXPAND(_JSON_PASTE(_JSON_FROM, SERIALIZE_OpenglRenderer))
+
+	// take vsync into account
+	set_vsync(vsync);
+}
+void OpenglRenderer::serialize (nlohmann::ordered_json& j) {
+	auto& t = *this;
+	_JSON_EXPAND(_JSON_PASTE(_JSON_TO, SERIALIZE_OpenglRenderer))
+}
+
 void APIENTRY OpenglRenderer::debug_callback (GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const char* message, void const* userParam) {
 	//OpenglRenderer* r = (OpenglRenderer*)userParam;
 
@@ -73,6 +88,15 @@ void APIENTRY OpenglRenderer::debug_callback (GLenum source, GLenum type, GLuint
 	if (severity == GL_DEBUG_SEVERITY_HIGH_ARB)
 		__debugbreak();
 #endif
+}
+
+bool OpenglRenderer::get_vsync () {
+	return vsync;
+}
+void OpenglRenderer::set_vsync (bool state) {
+	ZoneScoped;
+	glfwSwapInterval(state ? _vsync_on_interval : 0);
+	vsync = state;
 }
 
 OpenglContext::OpenglContext (OpenglRenderer* r, GLFWwindow* window) {
@@ -161,8 +185,6 @@ OpenglContext::OpenglContext (OpenglRenderer* r, GLFWwindow* window) {
 OpenglRenderer::OpenglRenderer (Game& game): ctx{this, game.window} {
 	ZoneScopedN("OpenglRenderer init");
 
-	load_static_data();
-
 	float max_aniso = 1.0f;
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &max_aniso);
 
@@ -185,16 +207,61 @@ OpenglRenderer::OpenglRenderer (Game& game): ctx{this, game.window} {
 	glSamplerParameterf(smooth_sampler_wrap, GL_TEXTURE_MAX_ANISOTROPY, max_aniso);
 
 	ImGui_ImplOpenGL3_Init();
+
+	chunk_renderer = std::make_unique<ChunkRenderer>(shaders);
+	raytracer      = std::make_unique<Raytracer>(shaders);
+	player_rederer = std::make_unique<PlayerRenderer>(shaders);
+	gui_renderer   = std::make_unique<GuiRenderer>(shaders);
+
+	load_static_data();
+
+	rc2D = std::make_unique<RadianceCascades2D>(*this);
+	rc3D = std::make_unique<RadianceCascades3D>(*this);
 }
 OpenglRenderer::~OpenglRenderer () {
 	ImGui_ImplOpenGL3_Shutdown();
 }
 
+void OpenglRenderer::screenshot_imgui () {
+	trigger_screenshot = ImGui::Button("Screenshot [F8]") || g->input.buttons[KEY_F8].went_down;
+	ImGui::SameLine();
+	ImGui::Checkbox("With HUD", &screenshot_hud);
+}
+void OpenglRenderer::graphics_imgui () {
+	ImGui::Checkbox("rc2D", &rc2D->imopen);
+	ImGui::Checkbox("rc3D", &rc3D->imopen);
+	rc2D->imgui();
+	rc3D->imgui();
+
+	if (ImGui::TreeNode("Debug Draw")) {
+		debug_draw.imgui();
+
+		ImGui::TreePop();
+	}
+
+	ImGui::Checkbox("draw_chunks", &chunk_renderer->_draw_chunks);
+
+	if (ImGui::TreeNode("GUI")) {
+		ImGui::Checkbox("crosshair", &gui_renderer->crosshair);
+		ImGui::SliderInt("gui_scale", &gui_renderer->gui_scale, 1, 16);
+
+		ImGui::TreePop();
+	}
+
+	fog.imgui();
+
+	raytracer->imgui(g->input);
+}
+
+void OpenglRenderer::chunk_renderer_imgui (Chunks& chunks) {
+	chunk_renderer->imgui(chunks);
+}
+
 void OpenglRenderer::render_frame (Game& game) {
 	render_size = game.input.window_size;
 
-	chunk_renderer.upload_remeshed(*game.chunks);
-	raytracer.update(*this, game.input);
+	chunk_renderer->upload_remeshed(*game.chunks);
+	raytracer->update(*this, game.input);
 
 
 	glLineWidth(debug_draw.line_width);
@@ -223,8 +290,8 @@ void OpenglRenderer::render_frame (Game& game) {
 
 		OGL_TRACE("3d draws");
 
-		if (raytracer.enable)
-			raytracer.draw(*this);
+		if (raytracer->enable)
+			raytracer->draw(*this);
 		else
 			update_view(g->view, render_size, g->lod_center());
 
@@ -232,16 +299,16 @@ void OpenglRenderer::render_frame (Game& game) {
 
 		// draw before chunks so it shows through transparent blocks
 		if (g->player->selected_block)
-			block_highl.draw(*this, g->player->selected_block);
+			gui_renderer->block_highl.draw(*this, g->player->selected_block);
 
 		debug_draw.draw_wireframe_able(state, [&] () {
-			if (!raytracer.enable) {
-				chunk_renderer.draw_chunks(*this);
+			if (!raytracer->enable) {
+				chunk_renderer->draw_chunks(*this);
 			}
 		});
 
-		rc2D.update(*this);
-		rc3D.update(*this);
+		rc2D->update(*this);
+		rc3D->update(*this);
 
 		debug_draw.draw(*this);
 
@@ -251,7 +318,7 @@ void OpenglRenderer::render_frame (Game& game) {
 		}
 
 		// draws first and third person player items
-		player_rederer.draw(*this);
+		player_rederer->draw(*this);
 	}
 
 	{
@@ -260,7 +327,7 @@ void OpenglRenderer::render_frame (Game& game) {
 		if (trigger_screenshot && !screenshot_hud)	take_screenshot(game.input.window_size);
 
 		if (!g->activate_flycam || g->creative_mode)
-			gui_renderer.draw_gui(*this, game.input);
+			gui_renderer->draw_gui(*this, game.input);
 
 		game.draw_imgui();
 
@@ -273,290 +340,6 @@ void OpenglRenderer::render_frame (Game& game) {
 	{
 		ZoneScopedN("glfwSwapBuffers");
 		glfwSwapBuffers(game.window);
-	}
-}
-
-//// BlockHighlight
-void BlockHighlight::draw (OpenglRenderer& r, SelectedBlock& block) {
-	OGL_TRACE("block_highlight");
-
-	// rotate from -Y to facing in a block face direction
-	static constexpr float3x3 face_rotation[] = {
-		// BF_NEG_X
-		//rotate3_Z(deg(-90)),
-		float3x3(0,1,0,  -1,0,0,  0,0,1),
-		// BF_POS_X
-		//rotate3_Z(deg(+90)),
-		float3x3(0,-1,0,  1,0,0,  0,0,1),
-		// BF_NEG_Y
-		//float3x3::identity(),
-		float3x3(1,0,0,  0,1,0,  0,0,1),
-		// BF_POS_Y
-		//rotate3_Z(deg(180)),
-		float3x3(-1,0,0,  0,-1,0,  0,0,1),
-		// BF_NEG_Z
-		//rotate3_X(deg(+90)),
-		float3x3(1,0,0,  0,0,-1,  0,1,0),
-		// BF_POS_Z
-		//rotate3_X(deg(-90)),
-		float3x3(1,0,0,  0,0,1,  0,-1,0),
-	};
-
-	PipelineState s;
-	s.depth_test = true;
-	s.blend_enable = true;
-	r.state.set(s);
-
-	glUseProgram(shad->prog);
-	r.state.bind_textures(shad, {});
-
-	shad->set_uniform("block_pos", (float3)block.hit.pos);
-	shad->set_uniform("face_rotation", face_rotation[0]);
-	shad->set_uniform("tint", srgba(40,40,40,240));
-
-	glBindVertexArray(r.mesh_data.vao);
-	draw_submesh(block_highl.block_highlight);
-	
-	if (block.hit.face >= 0) {
-		shad->set_uniform("face_rotation", face_rotation[ (BlockFace)(block.hit.face >= 0 ? block.hit.face : 0) ]);
-		draw_submesh(block_highl.face_highlight);
-	}
-}
-
-//// GuiRenderer
-std::array<GuiRenderer::GUIVertex, 12> build_gui_block_mesh () {
-	static constexpr float scale = 0.41f;
-	const float3x3 rot = rotate3_X(deg(-82.0f)) * rotate3_Z(deg(8.0f));
-	std::array<GuiRenderer::GUIVertex, 12> verts;
-
-	static constexpr BlockFace faces[] = { BF_NEG_X, BF_NEG_Y, BF_POS_Z };
-
-	int i = 0;
-	for (int face=0; face<3; ++face) {
-		for (int vert=0; vert<4; ++vert) {
-			auto& v = verts[i++];
-			v.pos    = (float2)(rot * CUBE_CORNERS[faces[face]][vert]*scale);
-			v.normal = rot * CUBE_NORMALS[faces[face]];
-			v.uvi    = float3(QUAD_UV[vert], 0);
-		}
-	}
-	return verts;
-}
-std::array<GuiRenderer::GUIVertex, 12> _gui_block_mesh = build_gui_block_mesh();
-
-void GuiRenderer::draw_gui_quad (float2 const& pos, float2 const& size, AtlasUVs const& uv) {
-	GUIVertex* verts = push_quads(1);
-	for (int i=0; i<4; ++i) {
-		verts[i].pos    = pos + QUAD_CORNERS[i] * size;
-		verts[i].normal = float3(0, 0, 1);
-		verts[i].uvi    = float3((uv.pos + QUAD_UV[i] * uv.size) * (1.0f/256), -1);
-	}
-}
-void GuiRenderer::draw_item_quad (float2 const& pos, float2 const& size, item_id item) {
-	if (item < MAX_BLOCK_ID) {
-		GUIVertex* verts = push_quads(3);
-		
-		float tile_idxs[] = {
-			(float)g->assets->block_tiles[item].sides[BF_NEG_X],
-			(float)g->assets->block_tiles[item].sides[BF_NEG_Y],
-			(float)g->assets->block_tiles[item].sides[BF_POS_Z],
-		};
-		
-		for (int i=0; i<12; ++i) {
-			verts[i].pos    = pos +  _gui_block_mesh[i].pos * size;
-			verts[i].normal =        _gui_block_mesh[i].normal;
-			verts[i].uvi    = float3(_gui_block_mesh[i].uvi.x, _gui_block_mesh[i].uvi.y, tile_idxs[i/4]);
-		}
-
-	} else {
-		GUIVertex* verts = push_quads(1);
-		
-		float tile_idx = (float)ITEM_TILES[item - MAX_BLOCK_ID];
-		for (int i=0; i<4; ++i) {
-			verts[i].pos    = pos + QUAD_CORNERS[i] * size;
-			verts[i].normal = float3(0, 0, 1);
-			verts[i].uvi    = float3(QUAD_UV[i], tile_idx);
-		}
-	}
-}
-
-void GuiRenderer::update_gui (Input& I) {
-	gui_vertex_data.clear();
-	gui_index_data.clear();
-
-	float sz = (float)gui_scale;
-
-	float2 screen_center = round((float2)I.window_size /2);
-	
-	// calc pixel coords
-
-	if (crosshair) { // crosshair
-		draw_gui_quad(screen_center, 32*sz, crosshair_uv);
-	}
-
-	float frame_sz     = frame_uv.size.x * sz;
-	float sel_frame_sz = frame_selected_uv.size.x * sz;
-	float item_sz      = 16 * sz;
-
-	bool clicked = I.cursor_enabled && I.buttons[MOUSE_BUTTON_LEFT].went_down;
-
-	auto draw_items_grid = [&] (Item* items, int count, int w, int h, float2 const& anchor, int selected=-1) {
-		auto& backpack = g->player->inventory.backpack;
-
-		float2 start = anchor -(float2)int2(w-1,h-1)/2 * frame_sz;
-
-		int2 hovered_idx = roundi((I.cursor_pos_bottom_up() - start) / frame_sz);
-
-		for (int i=0; i<count; ++i) {
-			int2 idx2 = int2(i%w, h-1 -i/w);
-
-			bool hovered = I.cursor_enabled && idx2 == hovered_idx;
-			if (hovered && clicked) {
-				std::swap(items[i], g->player->inventory.hand);
-				clicked = false;
-			}
-			auto& tex = hovered ?
-				//(g->player->inventory.hand.id != I_NULL ? frame_grabbed_uv : frame_highl_uv) :
-				frame_highl_uv :
-				frame_uv;
-
-			float2 pos = start + (float2)idx2 * frame_sz;
-			
-			draw_gui_quad(pos, frame_sz, tex);
-
-			if (items[i].id != I_NULL)
-				draw_item_quad(pos, item_sz, items[i].id);
-		}
-
-		if (selected >= 0) {
-			int2 idx2 = int2(selected % w, h-1 - selected / w);
-			float2 pos = start + (float2)idx2 * frame_sz;
-			draw_gui_quad(pos, sel_frame_sz, frame_selected_uv);
-		}
-	};
-
-	{ // toolbar
-		auto& toolbar = g->player->inventory.toolbar;
-
-		float2 anchor = float2(screen_center.x, frame_sz/2 +1*sz);
-		draw_items_grid(toolbar.slots, ARRLEN(toolbar.slots), ARRLEN(toolbar.slots), 1, anchor, toolbar.selected);
-	}
-
-	if (g->player->inventory.is_open) { // backpack
-		auto& backpack = g->player->inventory.backpack;
-
-		static int w = 10;
-		ImGui::DragInt("backpack gui w", &w, 0.05f);
-
-		float2 anchor = screen_center;
-		draw_items_grid(&backpack.slots[0][0], 10*10, w, 10, anchor);
-
-		if (I.cursor_enabled && g->player->inventory.hand.id != I_NULL)
-			draw_item_quad(I.cursor_pos_bottom_up() +(item_sz/2), item_sz, g->player->inventory.hand.id);
-	}
-}
-void GuiRenderer::draw_gui (OpenglRenderer& r, Input& I) {
-	ZoneScoped;
-	OGL_TRACE("gui");
-	
-	update_gui(I);
-
-	glBindVertexArray(gui_ib.vao);
-	stream_buffer(gui_ib, gui_vertex_data, gui_index_data);
-
-	if (gui_vertex_data.size() > 0) {
-		PipelineState s;
-		s.depth_test = false;
-		s.blend_enable = true;
-		r.state.set(s);
-		glUseProgram(gui_shad->prog);
-
-		r.state.bind_textures(gui_shad, {
-			{"tex", r.gui_atlas, gui_sampler},
-			{"tile_textures", r.tile_textures, r.pixelated_sampler},
-		});
-
-		glDrawElements(GL_TRIANGLES, (GLsizei)gui_index_data.size(), GL_UNSIGNED_SHORT, (void*)0);
-	}
-}
-
-//// PlayerRenderer
-void PlayerRenderer::draw (OpenglRenderer& r) {
-	ZoneScoped;
-	OGL_TRACE("player");
-
-	auto& item = g->player->inventory.toolbar.get_selected();
-	
-	if (item.id != I_NULL) {
-		auto& assets = *g->assets;
-	
-		float anim_t = g->player->break_block.anim_t != 0 ? g->player->break_block.anim_t : g->player->block_place.anim_t;
-		auto a = assets.player.animation.calc(anim_t);
-
-		PipelineState s;
-		s.depth_test = true;
-		s.blend_enable = true;
-		r.state.set(s);
-
-		float3x4 mat = g->player->body_to_world() * translate(a.pos) * a.rot;
-
-		if (item.is_block()) {
-			glUseProgram(held_block_shad->prog);
-
-			r.state.bind_textures(held_block_shad, {
-				{"tile_textures", r.tile_textures, r.pixelated_sampler}
-			});
-
-			held_block_shad->set_uniform("model_to_world", (float4x4)(mat * assets.player.block_mat));
-
-			//
-			auto bid = (block_id)item.id;
-
-			auto& tile = assets.block_tiles[bid];
-			int meshid = assets.block_meshes.block_meshes[(block_id)item.id];
-
-			static constexpr int MAX_MESH_SLICES = 64;
-			float texids[MAX_MESH_SLICES] = {};
-
-			int count;
-
-			if (meshid < 0) {
-				held_block_shad->set_uniform("meshid", 0);
-
-				count = 6;
-				for (int i=0; i<6; ++i) {
-					texids[i] = (float)tile.calc_tex_index((BlockFace)i, 0);
-				}
-			} else {
-				auto& bm_info = assets.block_meshes.meshes[meshid];
-
-				held_block_shad->set_uniform("meshid", bm_info.index);
-
-				count = bm_info.length;
-				for (int i=0; i<bm_info.length; ++i) {
-					texids[i] = (float)tile.calc_tex_index((BlockFace)0, 0);
-				}
-			}
-
-			glUniform1fv(held_block_shad->get_uniform_location("texids[0]"), ARRLEN(texids), texids);
-
-			glBindVertexArray(r.dummy_vao);
-			glDrawArrays(GL_TRIANGLES, 0, count*6);
-		} else {
-			glUseProgram(held_item_shad->prog);
-			
-			r.state.bind_textures(held_item_shad, {
-				{"tile_textures", r.tile_textures, r.pixelated_sampler}
-			});
-
-			auto id = (item_id)item.id;
-
-			held_item_shad->set_uniform("model_to_world", (float4x4)(mat * assets.player.tool_mat));
-			held_item_shad->set_uniform("texid", (float)ITEM_TILES[id - MAX_BLOCK_ID]);
-
-			glBindVertexArray(r.mesh_data.vao);
-			draw_submesh(r.item_meshes[id - MAX_BLOCK_ID]);
-		}
 	}
 }
 
@@ -628,7 +411,7 @@ bool OpenglRenderer::load_static_data () {
 
 	GenericVertexData data;
 
-	block_highl.block_highl = load_block_highlight_mesh(&data);
+	gui_renderer->block_highl.block_highl = load_block_highlight_mesh(&data);
 
 	if (!load_textures(data))
 		return false;

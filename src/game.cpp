@@ -10,18 +10,15 @@
 void Game::json_load () {
 	serialize::json_load("config.json", [&] (nlohmann::ordered_json& j) {
 		auto& t = *this;
-		_JSON_EXPAND(_JSON_PASTE(_JSON_FROM, SERIALIZE_NORMAL))
+		_JSON_EXPAND(_JSON_PASTE(_JSON_FROM, SERIALIZE_Game))
 		if (j.contains("renderer_opengl")) renderer->deserialize(j["renderer_opengl"]);
-		// Dereference causes object values to be deserialized instead of ptr deserialized, which causes object to be recreated, breaking sound references
-		if (j.contains("audio")) j.at("audio").get_to(*t.audio);
 	});
 }
 void Game::json_save () {
 	serialize::json_save("config.json", [&] (nlohmann::ordered_json& j) {
 		auto& t = *this;
-		_JSON_EXPAND(_JSON_PASTE(_JSON_TO, SERIALIZE_NORMAL))
+		_JSON_EXPAND(_JSON_PASTE(_JSON_TO, SERIALIZE_Game))
 		renderer->serialize(j["renderer_opengl"]);
-		j["audio"] = *t.audio;
 	});
 }
 

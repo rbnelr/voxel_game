@@ -539,7 +539,7 @@ struct Physics {
 		// This is because the player controller applies forces to the velocity and moving even slightly into a wall requires one iteration
 		// This would likely not be the case for particles, seemingly allowing us to get away with less iterations for them
 		// but would suddenly break the moment more external forces are introduced (or gravity points in other directions)
-		for (int i=0; i<3; i++) {
+		for (int i=0; i<5; i++) {
 			obj.total_fluid_volume = 0;
 			obj.avg_fluid_mass = 0;
 			obj.avg_fluid_drag = 0;
